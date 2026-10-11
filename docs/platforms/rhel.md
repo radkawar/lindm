@@ -173,13 +173,17 @@ user egress, all ten package scenarios, SELinux Enforcing, scriptlets observed i
 Not exercised on RHEL: x86_64, RHEL 10, EUS/E4S streams, module streams,
 `Weak Dependency` and obsoleting transactions (refused by policy, not exercised),
 and the DNF4 path without the versionlock plugin (exact versions are refused).
+All eight resource kinds (packages, files, groups, users, sysctl, timers and
+drop-ins, password policy, firewall zone) also passed together in one connected
+lane on registered RHEL 9.8 aarch64 (73/73 scenarios); see
+[verification](../verification.md#all-resource-kinds-in-one-connected-lane).
 
 ## Host resource providers (EL 9)
 
 Managed files, local groups and users, sysctl, systemd timers and drop-ins,
 password policy and firewall zones use the same providers as Fedora. Their
-platform gates accept `rhel` and `almalinux` only with an EL 9 `VERSION_ID`;
-Rocky Linux and EL 8/10 are refused as unqualified. Password policy pins the
+platform gates accept `rhel` and `almalinux` only with an EL 9 or EL 10
+`VERSION_ID` (EL 10 below); Rocky Linux and EL 8 are refused as unqualified. Password policy pins the
 exact product (`rhel`/`almalinux` 9.8) and native releases observed there:
 libpwquality 1.4.4, pam 1.5.1 (its `pam_pwhistory` reads
 `/etc/security/pwhistory.conf`, `remember`, `enforce_for_root` and `file`) and
@@ -235,6 +239,36 @@ Native quirks the providers handle:
 
 Evidence and the unproven remainder are in
 [verification](../verification.md#host-resource-providers-on-el-9).
+
+## Host resource providers (EL 10)
+
+The same providers and gates cover EL 10; password policy pins `rhel`/`almalinux`
+10.2 with libpwquality 1.4.5, pam 1.6.1 and authselect 1.5.2. Native facts were
+checked on the RHEL 10.2 KVM and AlmaLinux 10.2 GenericCloud aarch64 guests
+(kernel 6.12, SELinux Enforcing, shadow-utils 4.15.0-11, systemd 257-23,
+`yescrypt` password hashing):
+
+- **Accounts.** shadow-utils 4.15 now offers `--prefix` for every tool including
+  `chage`, but still labels the rewritten databases from the prefixed path
+  (`var_lib_t` under `/var/lib/lindm`; `restorecon -n` wants `passwd_file_t` and
+  `shadow_t`, and `chage -l` then fails with "cannot open /etc/passwd"). EL 10
+  therefore uses the same chrooted account root as EL 9
+  ([`ChrootAccountRoot`](../../internal/agent/accountprovider/prefix_linux.go));
+  `groupadd`, `useradd`, `usermod` (shell, UID, lock, groups), `chage`,
+  `userdel` and `groupdel` exit 0 there with correct labels. `/bin`, `/sbin` and
+  `/lib64` are symlinks into `/usr`, as on EL 9.
+- **Timers and drop-ins.** systemd 257 meets the general 255 floor; the EL 9
+  exception (252) does not apply.
+- **Password policy.** Unlike EL 9, both EL 10 images ship an authselect selection
+  (`local`, no features; `authselect check` valid), so a policy is managed
+  without the EL 9 profile step. EL 10 profiles are `local`, `sssd` and
+  `winbind`; `local` offers `with-pwhistory` and `with-faillock`.
+- **Firewall zones.** As on EL 9, neither image installs firewalld or nftables;
+  the lane installs both and keeps firewalld active. The EL 9 boot-restoration
+  fixes apply unchanged.
+
+Evidence and the unproven remainder are in
+[verification](../verification.md#host-resource-providers-on-el-10).
 
 ## Encryption and recovery
 

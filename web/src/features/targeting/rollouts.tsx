@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { newRequestId } from "@/lib/ids";
@@ -32,7 +33,7 @@ export function RolloutsView() {
     <section className="grid min-w-0 gap-6">
       <PageHeader
         title="Rollouts"
-        description="Assign profile revisions to devices and groups. Preview device resources before activation. Rollout progress does not confirm device compliance."
+        description="Assign profiles to devices and groups, and roll them out in stages."
       />
       <TargetPreviewView />
       {canPermission(principal, "resources.assign", true) ? (
@@ -42,8 +43,8 @@ export function RolloutsView() {
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Managing assignments and rollouts requires unrestricted resource assignment permission.
-          You can preview and activate devices within your authorized scope.
+          You can preview and activate devices you manage. Ask an administrator with full assignment
+          access to change assignments or rollouts.
         </p>
       )}
     </section>
@@ -57,15 +58,14 @@ function Assignments() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Target assignments</CardTitle>
+        <CardTitle>Assignments</CardTitle>
         <CardDescription>
-          Priority, exclusions, activation/expiry and rollout bindings are retained with each
-          revision. Disabling retains a tombstone; it does not erase execution history.
+          Which profiles apply to which devices. Disabling an assignment keeps its history.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         <TargetMutation
-          title="Create target assignment"
+          title="Create assignment"
           formKey="target-assignment:new"
           schema={PutTargetAssignmentRequestSchema}
           initial={() =>
@@ -98,27 +98,27 @@ function Assignments() {
                   key={candidate.assignment.assignmentId}
                   className="grid min-w-0 gap-3 border p-4"
                 >
-                  <h3 className="break-all text-sm font-medium">
-                    Assignment {candidate.assignment.assignmentId}
+                  <h3 className="text-sm font-medium">
+                    Assignment, priority {candidate.assignment.priority}
                   </h3>
                   <p className="text-sm">
-                    Revision {candidate.revision.toString()} · priority{" "}
-                    {candidate.assignment.priority} ·{" "}
                     <StatusBadge status={candidate.assignment.disabled ? "neutral" : "info"}>
                       {candidate.assignment.disabled ? "Disabled" : "Enabled"}
                     </StatusBadge>
                   </p>
-                  <details>
-                    <summary className="cursor-pointer text-sm">
-                      Current immutable assignment revision
-                    </summary>
+                  <TechnicalDetails
+                    items={[
+                      { label: "Assignment ID", value: candidate.assignment.assignmentId },
+                      { label: "Revision", value: candidate.revision.toString() },
+                    ]}
+                  >
                     <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
                       {toJsonString(TargetCandidateSchema, candidate, { prettySpaces: 2 })}
                     </pre>
-                  </details>
+                  </TechnicalDetails>
                   <TargetMutation
                     key={`${candidate.assignment.assignmentId}:${candidate.revision}`}
-                    title="Update target assignment"
+                    title="Edit assignment"
                     formKey={`target-assignment:${candidate.assignment.assignmentId}`}
                     schema={PutTargetAssignmentRequestSchema}
                     initial={() =>
@@ -154,9 +154,9 @@ function Rollouts() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rollout rings</CardTitle>
+        <CardTitle>Staged rollouts</CardTitle>
         <CardDescription>
-          Deploy in stages with canary devices, observation periods and health requirements.
+          Roll out to a few devices first, then widen in stages if they stay healthy.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
@@ -211,29 +211,31 @@ function RolloutCard({ state }: { state: RolloutState }) {
   if (!rollout) return null;
   return (
     <article className="grid min-w-0 gap-3 border p-4">
-      <h3 className="break-all text-sm font-medium">Rollout {rollout.rolloutId}</h3>
+      <h3 className="text-sm font-medium">
+        Rollout, stage {rollout.rings[state.ringIndex]?.name ?? state.ringIndex + 1}
+      </h3>
       <p className="text-sm">
-        Revision {state.revision.toString()} · ring{" "}
-        {rollout.rings[state.ringIndex]?.name ?? "Not recorded"} ·{" "}
         <StatusBadge status={state.paused ? "warning" : "info"}>
           {state.paused ? "Paused" : "Running"}
         </StatusBadge>
       </p>
-      {state.pauseReason ? <p className="text-sm">Pause reason: {state.pauseReason}</p> : null}
+      {state.pauseReason ? <p className="text-sm">Paused because: {state.pauseReason}</p> : null}
       <p className="text-sm">
-        Selected {state.selectedCount} · pending {state.pendingCount} · excluded{" "}
-        {state.excludedCount}
+        {state.selectedCount} devices included, {state.pendingCount} waiting, {state.excludedCount}{" "}
+        excluded
       </p>
-      <details>
-        <summary className="cursor-pointer text-sm">
-          Complete rollout state and ring policies
-        </summary>
+      <TechnicalDetails
+        items={[
+          { label: "Rollout ID", value: rollout.rolloutId },
+          { label: "Revision", value: state.revision.toString() },
+        ]}
+      >
         <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
           {toJsonString(RolloutStateSchema, state, { prettySpaces: 2 })}
         </pre>
-      </details>
+      </TechnicalDetails>
       <div className="grid gap-1.5">
-        <Label htmlFor={`rollout-operation-${rollout.rolloutId}`}>Control operation</Label>
+        <Label htmlFor={`rollout-operation-${rollout.rolloutId}`}>Action</Label>
         <SelectField
           id={`rollout-operation-${rollout.rolloutId}`}
           value={String(operation)}
@@ -251,14 +253,14 @@ function RolloutCard({ state }: { state: RolloutState }) {
             { value: ControlRolloutRequest_Operation.RESUME, label: "Resume" },
             {
               value: ControlRolloutRequest_Operation.PROMOTE,
-              label: "Promote (health gates still apply)",
+              label: "Move to next stage (if healthy)",
             },
           ]}
         />
       </div>
       <TargetMutation
         key={`${rollout.rolloutId}:${state.revision}:${operation}`}
-        title="Control rollout"
+        title="Apply to rollout"
         formKey={`rollout-control:${rollout.rolloutId}:${operation}`}
         schema={ControlRolloutRequestSchema}
         initial={() =>

@@ -9,41 +9,36 @@ import { formatTimestamp } from "@/lib/time";
 export const ASSISTANCE_PERMISSION = "remote_assistance.run";
 
 const stateLabels: Record<AssistanceState, { label: string; tone: StatusTone }> = {
-  [AssistanceState.UNSPECIFIED]: { label: "State not reported", tone: "neutral" },
+  [AssistanceState.UNSPECIFIED]: { label: "Unknown", tone: "neutral" },
   [AssistanceState.REQUESTED]: { label: "Waiting for device", tone: "info" },
-  [AssistanceState.PROMPTED]: { label: "Waiting for local consent", tone: "info" },
-  [AssistanceState.OFFERED]: { label: "Consented, ready to connect", tone: "warning" },
+  [AssistanceState.PROMPTED]: { label: "Waiting for user to accept", tone: "info" },
+  [AssistanceState.OFFERED]: { label: "Accepted, ready to connect", tone: "warning" },
   [AssistanceState.ANSWERED]: { label: "Connecting", tone: "warning" },
   [AssistanceState.ACTIVE]: { label: "Live", tone: "destructive" },
   [AssistanceState.ENDED]: { label: "Ended", tone: "neutral" },
 };
 
 export const modeLabels: Record<AssistanceMode, string> = {
-  [AssistanceMode.UNSPECIFIED]: "Not recorded",
+  [AssistanceMode.UNSPECIFIED]: "Unknown",
   [AssistanceMode.VIEW]: "View only",
   [AssistanceMode.CONTROL]: "View and request control",
 };
 
 const endCauseLabels: Record<AssistanceEndCause, string> = {
-  [AssistanceEndCause.UNSPECIFIED]: "No cause recorded",
-  [AssistanceEndCause.DECLINED]: "The local user declined the request.",
-  [AssistanceEndCause.CONSENT_TIMEOUT]:
-    "The local user did not respond before the consent deadline.",
-  [AssistanceEndCause.OPERATOR_STOPPED]: "An operator stopped the session.",
-  [AssistanceEndCause.USER_STOPPED]: "The local user stopped the session.",
-  [AssistanceEndCause.PORTAL_CLOSED]: "The desktop screen-sharing session was closed.",
-  [AssistanceEndCause.SESSION_LOCKED]: "The local session was locked.",
-  [AssistanceEndCause.SESSION_ENDED]:
-    "The local session ended, changed user, or lost its session helper.",
-  [AssistanceEndCause.EXPIRED]: "The maximum session duration elapsed.",
-  [AssistanceEndCause.AUTHORIZATION_LOST]:
-    "Fresh server authorization was not observed in time, so the session ended.",
-  [AssistanceEndCause.NO_ELIGIBLE_SESSION]:
-    "No eligible active, unlocked local graphical session was available.",
-  [AssistanceEndCause.UNAVAILABLE]:
-    "The device could not provide the desktop portal, PipeWire, encoder or relay capability.",
-  [AssistanceEndCause.CONNECTION_FAILED]: "The media connection failed or closed.",
-  [AssistanceEndCause.DISABLED]: "Device policy does not enable remote assistance.",
+  [AssistanceEndCause.UNSPECIFIED]: "Ended.",
+  [AssistanceEndCause.DECLINED]: "The user declined.",
+  [AssistanceEndCause.CONSENT_TIMEOUT]: "The user didn't respond in time.",
+  [AssistanceEndCause.OPERATOR_STOPPED]: "An admin stopped the session.",
+  [AssistanceEndCause.USER_STOPPED]: "The user stopped the session.",
+  [AssistanceEndCause.PORTAL_CLOSED]: "Screen sharing was closed on the device.",
+  [AssistanceEndCause.SESSION_LOCKED]: "The device screen was locked.",
+  [AssistanceEndCause.SESSION_ENDED]: "The user signed out or switched users.",
+  [AssistanceEndCause.EXPIRED]: "The time limit was reached.",
+  [AssistanceEndCause.AUTHORIZATION_LOST]: "The device lost contact with the server.",
+  [AssistanceEndCause.NO_ELIGIBLE_SESSION]: "No one was signed in and unlocked on the device.",
+  [AssistanceEndCause.UNAVAILABLE]: "Screen sharing isn't available on this device.",
+  [AssistanceEndCause.CONNECTION_FAILED]: "The connection failed.",
+  [AssistanceEndCause.DISABLED]: "Remote assistance is turned off for this device.",
 };
 
 export function AssistanceStateBadge({ state }: { state: AssistanceState }) {
@@ -58,25 +53,23 @@ export function AssistanceStateBadge({ state }: { state: AssistanceState }) {
 export function endCauseText(session: AssistanceSession): string {
   if (session.state !== AssistanceState.ENDED) return "";
   const label = endCauseLabels[session.endCause] ?? endCauseLabels[AssistanceEndCause.UNSPECIFIED];
-  return session.endDetail ? `${label} Detail: ${session.endDetail}` : label;
+  return session.endDetail ? `${label} (${session.endDetail})` : label;
 }
 
 export function localSessionText(session: AssistanceSession): string {
   const local = session.localSession;
   if (!local?.username) {
-    return session.targetUsername
-      ? `Not bound yet (requested user ${session.targetUsername})`
-      : "Not bound yet";
+    return session.targetUsername ? `Waiting (${session.targetUsername})` : "Waiting";
   }
   const kind = [local.sessionType, local.desktop].filter(Boolean).join(", ");
-  return `${local.username}@session ${local.logindSessionId}${kind ? ` (${kind})` : ""}`;
+  return `${local.username}${kind ? ` (${kind})` : ""}`;
 }
 
 export function controlText(session: AssistanceSession): string {
   if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
   if (session.controlGranted) return "Granted";
   if (session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED)
-    return "Pending local approval";
+    return "Waiting for user";
   return "Not granted";
 }
 
@@ -94,24 +87,24 @@ export function TimeCell({ value }: { value: Timestamp | undefined }) {
 // other code stays a plain failure.
 const failureMessages: Record<string, string> = {
   [`${Code.FailedPrecondition}:assistance_unconfigured`]:
-    "Remote assistance is not configured on this server.",
+    "Remote assistance isn't set up on this server.",
   [`${Code.FailedPrecondition}:device_offline`]:
-    "The device has not checked in within the last 2 minutes.",
+    "The device is offline. Try again once it has checked in.",
   [`${Code.FailedPrecondition}:assistance_busy`]:
     "Another remote assistance session is already open on this device.",
   [`${Code.FailedPrecondition}:assistance_capacity`]:
-    "The server is at its concurrent remote assistance limit. Try again later.",
+    "Too many remote assistance sessions are running. Try again later.",
   [`${Code.FailedPrecondition}:assistance_state`]:
-    "The session is no longer waiting for a connection. It may already be connected from another page.",
+    "This session isn't waiting for a connection. It may be open in another tab.",
   [`${Code.FailedPrecondition}:assistance_ended`]: "The session has already ended.",
   [`${Code.FailedPrecondition}:assistance_non_relay`]:
-    "The browser offered a connection path that is not the configured assistance relay, so it was refused.",
+    "Your browser couldn't connect through the server's relay.",
   [`${Code.InvalidArgument}:assistance_fingerprint`]:
-    "The browser answer did not carry exactly one DTLS fingerprint and was refused.",
+    "Your browser couldn't set up a secure connection. Try again.",
   [`${Code.PermissionDenied}:assistance_not_creator`]:
-    "Only the operator who requested this session can connect to it.",
+    "Only the admin who requested this session can connect to it.",
   [`${Code.AlreadyExists}:idempotency_conflict`]:
-    "This request ID was already used for a different request. Prepare a new request.",
+    "This request was already sent with different details. Start over.",
 };
 
 // Expected assistance conditions; other failures use the shared RPC error presentation.

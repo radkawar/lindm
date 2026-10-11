@@ -10,13 +10,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 
 export const collectionLabels: Record<CollectionStatus, string> = {
   [CollectionStatus.UNSPECIFIED]: "Not reported",
-  [CollectionStatus.SUCCESS]: "Successful collection",
+  [CollectionStatus.SUCCESS]: "Collected",
   [CollectionStatus.UNAVAILABLE]: "Not available",
   [CollectionStatus.PERMISSION_DENIED]: "Permission denied",
-  [CollectionStatus.TIMEOUT]: "Collection timed out",
-  [CollectionStatus.INVALID_OUTPUT]: "Invalid native output",
-  [CollectionStatus.CAPACITY_EXCEEDED]: "Collection capacity exceeded",
-  [CollectionStatus.NATIVE_COMMAND_FAILURE]: "Native command failed",
+  [CollectionStatus.TIMEOUT]: "Timed out",
+  [CollectionStatus.INVALID_OUTPUT]: "Unreadable output",
+  [CollectionStatus.CAPACITY_EXCEEDED]: "Too much data",
+  [CollectionStatus.NATIVE_COMMAND_FAILURE]: "Command failed",
   [CollectionStatus.NOT_APPLICABLE]: "Not applicable",
 };
 
@@ -115,7 +115,7 @@ export function ObservedTime({
         </TooltipTrigger>
         <TooltipContent>
           {formatted.local} · {formatted.utc}
-          {server ? " · Server receipt time, not live presence or inventory freshness." : ""}
+          {server ? " · When the server received it." : ""}
         </TooltipContent>
       </Tooltip>
     );

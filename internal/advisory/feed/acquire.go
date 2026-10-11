@@ -123,13 +123,9 @@ func (c *Client) acquireOSVArchive(ctx context.Context, source *advisoryv1.FeedS
 			acquisition = nil
 		}
 	}()
-	// The shared client's whole-request timeout would cut a slow but healthy
-	// transfer; the caller's context deadline bounds this request instead.
-	streaming := *c
-	client := *c.http
-	client.Timeout = 0
-	streaming.http = &client
-	digest, err := streaming.downloadArchive(ctx, source.GetUrl(), file, osvArchiveBound(source))
+	// Archive transfers use the client without a whole-request timeout; the
+	// caller's context deadline bounds this request.
+	digest, err := c.downloadArchive(ctx, source.GetUrl(), file, osvArchiveBound(source), nil)
 	if err != nil {
 		return nil, err
 	}

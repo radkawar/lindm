@@ -25,7 +25,7 @@ export function SignIn({ notice }: { notice: string }) {
           <CardTitle>
             <h1 className="text-2xl font-semibold tracking-tight">lindm console</h1>
           </CardTitle>
-          <CardDescription>Console access is separate from device enrollment.</CardDescription>
+          <CardDescription>Sign in to manage your devices.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {notice !== "" ? (
@@ -43,7 +43,7 @@ export function SignIn({ notice }: { notice: string }) {
           {options.isError ? (
             <RpcError failure={toRpcFailure(options.error)}>
               <Button variant="outline" onClick={() => void options.refetch()}>
-                Retry
+                Try again
               </Button>
             </RpcError>
           ) : null}

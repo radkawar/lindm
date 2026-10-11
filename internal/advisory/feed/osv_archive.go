@@ -45,7 +45,7 @@ func (c *Client) fetchOSVArchive(ctx context.Context, config *advisoryv1.FeedSou
 			doc = nil
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, config.GetUrl(), file, osvArchiveBound(config))
+	digest, err := c.downloadArchive(ctx, config.GetUrl(), file, osvArchiveBound(config), progress)
 	if err != nil {
 		return nil, err
 	}

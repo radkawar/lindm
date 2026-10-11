@@ -22,6 +22,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
 import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
 import { formatTimestamp } from "@/lib/time";
 import type { PackageSearch } from "./package-search";
@@ -73,11 +74,9 @@ export function DevicePackages({
   return (
     <Card aria-busy={packages.isFetching}>
       <CardHeader>
-        <CardTitle>Package records</CardTitle>
+        <CardTitle>Installed packages</CardTitle>
         <CardDescription>
-          Every page is pinned to one complete snapshot. A view expires after 15 minutes; refreshing
-          a page does not extend it. Module identity is native package evidence, never inferred from
-          repository IDs.
+          From the device&apos;s latest package list. Results expire after 15 minutes.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
@@ -95,7 +94,7 @@ export function DevicePackages({
           }}
         >
           <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor="package-manager">Manager for new view</Label>
+            <Label htmlFor="package-manager">Package manager</Label>
             <Input
               id="package-manager"
               value={manager}
@@ -105,7 +104,7 @@ export function DevicePackages({
             />
           </div>
           <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor="package-prefix">Name prefix for new view</Label>
+            <Label htmlFor="package-prefix">Name starts with</Label>
             <Input
               id="package-prefix"
               value={namePrefix}
@@ -114,7 +113,7 @@ export function DevicePackages({
               placeholder="All names"
             />
           </div>
-          <Button type="submit">Apply to latest snapshot</Button>
+          <Button type="submit">Search</Button>
         </form>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -122,10 +121,10 @@ export function DevicePackages({
             disabled={packages.isFetching}
             onClick={() => void packages.refetch()}
           >
-            Refresh this page
+            Refresh
           </Button>
           <Button variant="outline" disabled={packages.isFetching} onClick={latest}>
-            Latest snapshot
+            Show latest list
           </Button>
           <Label htmlFor="package-page-size">Page size</Label>
           <SelectField
@@ -138,57 +137,51 @@ export function DevicePackages({
           />
         </div>
         {failure ? (
-          <RpcError failure={failure} title="Package inventory unavailable">
-            <p>
-              Choose Latest snapshot to start a new view. Existing snapshots are never replaced
-              silently.
-            </p>
+          <RpcError failure={failure} title="Couldn't load packages">
+            <p>Choose Show latest list to try again.</p>
           </RpcError>
         ) : null}
-        {packages.isPending ? <p role="status">Loading package records…</p> : null}
+        {packages.isPending ? <p role="status">Loading packages…</p> : null}
         {data ? (
           <>
-            <div className="grid gap-1 text-sm text-muted-foreground">
-              <p className="break-all">
-                Viewing snapshot <span className="font-mono text-xs">{data.snapshotId}</span>,
-                sequence {data.sequence.toString()}.
-              </p>
-              <p>
-                View expires:{" "}
-                {expiry.date ? (
-                  <time dateTime={expiry.utc} title={expiry.utc}>
-                    {expiry.local}
-                  </time>
-                ) : (
-                  expiry.local
-                )}
-                .
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Results expire{" "}
+              {expiry.date ? (
+                <time dateTime={expiry.utc} title={expiry.utc}>
+                  {expiry.local}
+                </time>
+              ) : (
+                expiry.local
+              )}
+              .
+            </p>
+            <TechnicalDetails
+              items={[
+                { label: "Snapshot ID", value: data.snapshotId },
+                { label: "Sequence", value: data.sequence.toString() },
+              ]}
+            />
             {currentSnapshotSequence > data.sequence ? (
               <Alert>
-                <AlertTitle>A newer published snapshot is available</AlertTitle>
-                <AlertDescription>
-                  This table remains on its original snapshot. Choose Latest snapshot to switch
-                  explicitly.
-                </AlertDescription>
+                <AlertTitle>A newer package list is available</AlertTitle>
+                <AlertDescription>Choose Show latest list to see it.</AlertDescription>
               </Alert>
             ) : null}
             {data.packages.length === 0 ? (
               <EmptyState
-                title="No packages match this view"
-                description="Adjust the package filters to see more results. The snapshot's recorded package count is unchanged."
+                title="No matching packages"
+                description="Try a different name or package manager."
               />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Version (including epoch)</TableHead>
+                    <TableHead>Version</TableHead>
                     <TableHead>Architecture</TableHead>
                     <TableHead>Manager</TableHead>
-                    <TableHead>Native source package</TableHead>
-                    <TableHead>Native module evidence</TableHead>
+                    <TableHead>Source package</TableHead>
+                    <TableHead>Module</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -196,14 +189,12 @@ export function DevicePackages({
                     <TableRow key={`${data.snapshotId}:${record.position}`}>
                       <TableCell className="font-medium">{record.name}</TableCell>
                       <TableCell className="font-mono text-xs">{record.version}</TableCell>
-                      <TableCell>
-                        {record.architecture || "Not recorded by native metadata"}
-                      </TableCell>
+                      <TableCell>{record.architecture || "Not reported"}</TableCell>
                       <TableCell>{record.manager}</TableCell>
                       <TableCell>
                         {record.sourceName
                           ? `${record.sourceName} ${record.sourceVersion}`
-                          : "Not recorded by native metadata"}
+                          : "Not reported"}
                       </TableCell>
                       <TableCell className="whitespace-normal">
                         <PackageModuleEvidence module={record.module} />
@@ -240,7 +231,7 @@ function PackageModuleEvidence({ module }: { module: ModuleObservation | undefin
   if (!module || module.status !== CollectionStatus.SUCCESS) {
     return <CollectionStatusBadge status={module?.status} />;
   }
-  if (!module.modular) return <span>Not modular (native observation)</span>;
+  if (!module.modular) return <span>None</span>;
   return (
     <dl className="grid gap-2">
       <Fact label="Module name">{module.name}</Fact>

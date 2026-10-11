@@ -107,7 +107,14 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 			return nil, err
 		}
 	}
-	if id := config.Platform.GetOsId(); id != "ubuntu" && id != "fedora" && ((id != "rhel" && id != "almalinux") || !strings.HasPrefix(config.Platform.GetVersion(), "9.")) {
+	switch id := config.Platform.GetOsId(); id {
+	case "ubuntu", "fedora":
+	case "rhel", "almalinux":
+		// Of Enterprise Linux only EL 9 and EL 10 are qualified.
+		if major, _, _ := strings.Cut(config.Platform.GetVersion(), "."); major != "9" && major != "10" {
+			return nil, ErrUnsupported
+		}
+	default:
 		return nil, ErrUnsupported
 	}
 	for _, marker := range []string{"/run/ostree-booted", "/etc/NIXOS"} {

@@ -25,6 +25,7 @@ import type { RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { enrollmentFailure, validateEnrollment } from "./validation";
 import { downloadEnrollmentFile } from "./download";
 
@@ -34,10 +35,8 @@ export function OfflineEnrollment() {
       <Alert>
         <AlertTitle>Offline enrollment</AlertTitle>
         <AlertDescription>
-          Use the same signed installed package and independently authenticated deployment trust.
-          Signed files do not contain the provisioning token or device private key. Transfer them
-          through controlled media, keep files root-owned mode 0600, and do not edit their signed
-          contents. Exporting a response is not proof of installation or first contact.
+          For devices without network access. Move files by removable media, keep them readable by
+          root only (mode 0600), and do not edit them.
         </AlertDescription>
       </Alert>
       <OfflineAuthorization />
@@ -63,7 +62,8 @@ function OfflineAuthorization() {
     setBusy(true);
     setFailure(null);
     try {
-      if (file.size > 64 * 1024) throw new Error("Execution root files are limited to 64 KiB.");
+      if (file.size > 64 * 1024)
+        throw new Error("That file is too large. Root files are 64 KiB at most.");
       const root = fromJsonString(ExecutionRootSchema, await file.text());
       validateEnrollment(ExecutionRootSchema, root);
       // ExecutionRoot has no maps: schema-order protobuf serialization matches
@@ -111,7 +111,7 @@ function OfflineAuthorization() {
         timeoutMs: 30_000,
       });
       lifetime.signal.throwIfAborted();
-      if (!response.authorization) throw new Error("The server returned no offline authorization.");
+      if (!response.authorization) throw new Error("No authorization came back. Try again.");
       setDocument(
         toJsonString(OfflineEnrollmentAuthorizationFileSchema, response.authorization, {
           prettySpaces: 2,
@@ -133,7 +133,7 @@ function OfflineAuthorization() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>1. Issue signed offline authorization</CardTitle>
+        <CardTitle>1. Create an offline authorization</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <form
@@ -145,15 +145,15 @@ function OfflineAuthorization() {
         >
           <fieldset className="grid gap-3" disabled={busy || captured !== null || !!document}>
             <label className="grid gap-1.5 text-sm font-medium">
-              Provisioning token secret
+              Provisioning token
               <Input name="token" type="password" autoComplete="off" required spellCheck={false} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Authorization lifetime (seconds)
+              Valid for (seconds)
               <Input name="lifetime" type="number" defaultValue="3600" required />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Verified execution root (JSON file)
+              Execution root file (execution-root.json)
               <Input
                 type="file"
                 accept="application/json,.json"
@@ -161,7 +161,7 @@ function OfflineAuthorization() {
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Authenticated bootstrap root version
+              Root version
               <Input
                 name="rootVersion"
                 inputMode="numeric"
@@ -171,7 +171,7 @@ function OfflineAuthorization() {
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Root SHA-256 (base64 protobuf digest)
+              Root SHA-256
               <Input
                 name="rootDigest"
                 required
@@ -181,28 +181,19 @@ function OfflineAuthorization() {
               />
             </label>
             <p className="text-sm text-muted-foreground">
-              Select the independently authenticated execution-root.json used on the target, or
-              enter its maintained execution-trust version/digest. This is not the raw JSON digest
-              in a bootstrap bundle. Selecting a file does not authenticate it; the server and
-              executor still verify signed continuity.
+              Choose the execution-root.json used on the device to fill these in.
             </p>
             <label className="grid gap-1.5 text-sm font-medium">
-              Audit reason
+              Reason
               <Textarea name="reason" required />
             </label>
           </fieldset>
           {captured ? (
-            <p className="break-all text-xs text-muted-foreground">
-              Request {captured.requestId}. Retries keep the same token and trust binding.
-            </p>
+            <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
           ) : null}
           {failure ? <RpcError failure={failure} /> : null}
           <Button type="submit" className="w-fit" disabled={busy || !!document}>
-            {busy
-              ? "Issuing…"
-              : captured
-                ? "Retry exact authorization request"
-                : "Issue offline authorization"}
+            {busy ? "Creating…" : captured ? "Try again" : "Create authorization"}
           </Button>
         </form>
         {document ? (
@@ -212,19 +203,19 @@ function OfflineAuthorization() {
             onDismiss={() => setDocument("")}
           />
         ) : null}
-        <p className="text-sm">On the disconnected device, as root with the executor running:</p>
+        <p className="text-sm">On the offline device, run as root:</p>
         <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
           /usr/libexec/lindm/lindm-agent offline-export -root /etc/lindm/execution-root.json -bundle
           /etc/lindm/bootstrap.dsse.json -file /run/lindm/lindm-offline-authorization.json -out
           /run/lindm/lindm-offline-request.json
         </pre>
         <p className="text-sm text-muted-foreground">
-          Interrupted export: use{" "}
+          If it was interrupted, run{" "}
           <code>
             /usr/libexec/lindm/lindm-agent offline-export -resume -out
             /run/lindm/lindm-offline-request.json
           </code>{" "}
-          with the same protected journal, never a new identity.
+          instead. Don't start over.
         </p>
       </CardContent>
     </Card>
@@ -242,17 +233,21 @@ function OfflineExchange() {
   );
   const [failure, setFailure] = useState<RpcFailure | null>(null);
   const [reason, setReason] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<{
+    state: string;
+    deviceId: string;
+    generation: string;
+  } | null>(null);
   const [document, setDocument] = useState("");
   async function loadFile(file: File | undefined) {
     if (!file || busy || attempt) return;
     setFailure(null);
     setRequest(null);
-    setStatus("");
+    setStatus(null);
     setDocument("");
     try {
       if (file.size > 768 * 1024)
-        throw new Error("Offline files are limited to 768 KiB, matching the installed agent.");
+        throw new Error("That file is too large. Offline files are 768 KiB at most.");
       const text = await file.text();
       lifetime.signal.throwIfAborted();
       const value = fromJsonString(OfflineEnrollmentRequestFileSchema, text);
@@ -278,10 +273,12 @@ function OfflineExchange() {
         submitted = true;
         const result = await adminClient.importOfflineEnrollmentRequest(payload, options);
         lifetime.signal.throwIfAborted();
-        if (!result.enrollment) throw new Error("The server returned no enrollment state.");
-        setStatus(
-          `Device ${result.enrollment.deviceId} · Generation ${result.enrollment.enrollmentGeneration} · ${result.enrollment.state.replaceAll("_", " ")}`,
-        );
+        if (!result.enrollment) throw new Error("No enrollment status came back. Try again.");
+        setStatus({
+          state: result.enrollment.state.replaceAll("_", " "),
+          deviceId: result.enrollment.deviceId,
+          generation: String(result.enrollment.enrollmentGeneration),
+        });
         void client.invalidateQueries({ queryKey: ["pending-enrollments", lifetime.generation] });
         void client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
       } else {
@@ -294,7 +291,7 @@ function OfflineExchange() {
         submitted = true;
         const result = await adminClient.exportOfflineEnrollmentResponse(payload, options);
         lifetime.signal.throwIfAborted();
-        if (!result.response) throw new Error("The server returned no signed offline response.");
+        if (!result.response) throw new Error("No response file came back. Try again.");
         setDocument(
           toJsonString(OfflineEnrollmentResponseFileSchema, result.response, { prettySpaces: 2 }),
         );
@@ -314,11 +311,11 @@ function OfflineExchange() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>2. Import device request and export signed response</CardTitle>
+        <CardTitle>2. Import the device's request and export a response</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
         <label className="grid gap-1.5 text-sm font-medium">
-          Device-signed request file
+          Request file from the device
           <Input
             type="file"
             accept="application/json,.json"
@@ -327,30 +324,26 @@ function OfflineExchange() {
           />
         </label>
         <p className="text-sm text-muted-foreground">
-          Import preserves the exact CSR, installation and transaction. If approval is required,
-          finish the independent decision and requester execution in the{" "}
+          Import the file first. If it needs approval, approve it in the{" "}
           <Link to="/approvals" className="underline underline-offset-4">
             approval inbox
           </Link>
-          , then export using this same request file. No second token use is consumed.
+          , then export the response using the same file.
         </p>
         <label className="grid gap-1.5 text-sm font-medium">
-          Export audit reason
+          Reason for export
           <Textarea
             value={reason}
             disabled={busy || attempt !== null}
             onChange={(event) => setReason(event.target.value)}
           />
         </label>
-        <p className="text-sm text-muted-foreground">
-          Import uses the token's immutable issuance reason in the enrollment audit.
-        </p>
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={busy || !request || (attempt !== null && attempt.action !== "import")}
             onClick={() => void exchange("import")}
           >
-            {attempt?.action === "import" ? "Retry exact import" : "Import signed request"}
+            {attempt?.action === "import" ? "Try import again" : "Import request"}
           </Button>
           <Button
             variant="outline"
@@ -362,13 +355,21 @@ function OfflineExchange() {
             }
             onClick={() => void exchange("export")}
           >
-            {attempt?.action === "export" ? "Retry exact export" : "Export signed response"}
+            {attempt?.action === "export" ? "Try export again" : "Export response"}
           </Button>
         </div>
         {status ? (
-          <p role="status" className="break-all text-sm">
-            {status}
-          </p>
+          <div className="grid gap-1">
+            <p role="status" className="text-sm">
+              Request imported. Status: {status.state}.
+            </p>
+            <TechnicalDetails
+              items={[
+                { label: "Device ID", value: status.deviceId },
+                { label: "Enrollment generation", value: status.generation },
+              ]}
+            />
+          </div>
         ) : null}
         {failure ? <RpcError failure={failure} /> : null}
         {document ? (
@@ -378,9 +379,7 @@ function OfflineExchange() {
             onDismiss={() => setDocument("")}
           />
         ) : null}
-        <p className="text-sm">
-          Return the signed response to the same protected installation, then run as root:
-        </p>
+        <p className="text-sm">Copy the response file to the same device, then run as root:</p>
         <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
           /usr/libexec/lindm/lindm-agent offline-import -file /run/lindm/lindm-offline-response.json
         </pre>
@@ -401,8 +400,7 @@ function OfflineDocument({
   return (
     <div className="grid gap-3 border p-3">
       <p className="text-sm">
-        Signed protobuf JSON file: {name}. Save through controlled media, then set root ownership
-        and mode 0600 before agent import. The console cannot enforce downloaded-file permissions.
+        {name} is ready. Copy it to the device and make it readable by root only (mode 0600).
       </p>
       <Textarea
         aria-label={name}
@@ -412,10 +410,10 @@ function OfflineDocument({
         className="min-h-48 font-mono text-xs"
       />
       <Button className="w-fit" onClick={() => downloadEnrollmentFile(name, value)}>
-        Download signed file
+        Download file
       </Button>
       <Button className="w-fit" variant="outline" onClick={onDismiss}>
-        Dismiss exported file
+        Dismiss
       </Button>
     </div>
   );

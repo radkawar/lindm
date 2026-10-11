@@ -12,7 +12,7 @@ import (
 )
 
 func TestPackageSnapshotBatchesBindExactBytes(t *testing.T) {
-	data, err := packages(2001)
+	data, err := packages(2001, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

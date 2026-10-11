@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
@@ -37,17 +38,15 @@ export function DeviceLockRestriction({ deviceId }: { deviceId: string }) {
   if (!query.data?.sessionsLocked) return null;
   return (
     <Alert>
-      <AlertTitle>Lock restriction retained</AlertTitle>
+      <AlertTitle>Accounts on this device may be locked</AlertTitle>
       <AlertDescription>
-        <p className="break-all">Original action: {query.data.lockActionId}</p>
         <p>
-          A start grant may have locked sessions or disabled local accounts. This is not a fresh
-          observation or proof of completion. Only a signed, verified release matching this original
-          action clears this restriction; release never unlocks a screen. Do not repeat unknown
-          work.
+          A lock action may have locked sessions or disabled local accounts. Use Undo account lock
+          to restore them. Screens stay locked until a user unlocks them.
         </p>
+        <TechnicalDetails items={[{ label: "Lock action ID", value: query.data.lockActionId }]} />
         <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Refresh lock restriction
+          Refresh
         </Button>
       </AlertDescription>
     </Alert>
@@ -62,8 +61,8 @@ export function DeviceActionsPanel({ deviceId }: { deviceId: string }) {
         <CardHeader>
           <CardTitle>Start a device action</CardTitle>
           <CardDescription>
-            Use Actions in the device header for simple operations. Storage changes open a dedicated
-            preparation page.
+            Use Actions at the top of the page for quick actions. Storage actions open their own
+            page.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4">
@@ -97,46 +96,41 @@ export function DeviceActionHistory({ deviceId }: { deviceId: string }) {
     <Card>
       <CardHeader>
         <CardTitle>Device action history</CardTitle>
-        <CardDescription>
-          Recorded actions and protected device results. Acceptance is not completion.
-        </CardDescription>
+        <CardDescription>Actions sent to this device and their results.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold">Protected action history</h3>
+          <h3 className="font-semibold">Recent actions</h3>
           <Button
             variant="outline"
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
-            Refresh action outcomes
+            Refresh
           </Button>
         </div>
         {query.isPending ? <p role="status">Loading action history…</p> : null}
         {failure ? <RpcError failure={failure} /> : null}
         {data ? (
           <Alert>
-            <AlertTitle>Server restriction fences</AlertTitle>
+            <AlertTitle>Active restrictions</AlertTitle>
             <AlertDescription>
               <dl className="grid gap-3 sm:grid-cols-3">
-                <Fact label="Lock restriction">{data.sessionsLocked ? "Retained" : "Not set"}</Fact>
-                <Fact label="Original lock action">{data.lockActionId || "None"}</Fact>
-                <Fact label="Quarantine fence">{data.quarantined ? "Set" : "Not set"}</Fact>
-                <Fact label="Quarantine fence expiry">
+                <Fact label="Account lock">{data.sessionsLocked ? "Active" : "None"}</Fact>
+                <Fact label="Network quarantine">{data.quarantined ? "Active" : "None"}</Fact>
+                <Fact label="Quarantine ends">
                   <ObservedTime value={data.quarantineUntil} server />
                 </Fact>
               </dl>
-              <p>
-                These are server restrictions. Check the device's reported result for session and
-                firewall state; disconnected devices may retain restrictions after expiry.
-              </p>
+              <p>Offline devices may keep restrictions until they reconnect.</p>
+              <TechnicalDetails items={[{ label: "Lock action ID", value: data.lockActionId }]} />
             </AlertDescription>
           </Alert>
         ) : null}
         {data?.actions.length === 0 ? (
           <EmptyState
-            title="No device actions on this page"
-            description="Use Actions in the device header to prepare an operation."
+            title="No actions yet"
+            description="Use Actions at the top of the page to start one."
           />
         ) : null}
         {data?.actions.map((action) => (
@@ -163,7 +157,13 @@ export function DeviceActionHistory({ deviceId }: { deviceId: string }) {
   );
 }
 
-export function DeviceActionResult({ action }: { action: DeviceAction }) {
+export function DeviceActionResult({
+  action,
+  linked = true,
+}: {
+  action: DeviceAction;
+  linked?: boolean;
+}) {
   const status = action.status;
   const unknown =
     status?.state === DeviceActionState.OUTCOME_UNKNOWN ||
@@ -187,67 +187,59 @@ export function DeviceActionResult({ action }: { action: DeviceAction }) {
         }
       >
         {unknown
-          ? "Outcome unknown, no automatic retry"
+          ? "Outcome unknown, don't retry"
           : status
             ? actionStateLabels[status.state]
-            : "Accepted, no protected result received"}
+            : "Sent, waiting for device"}
       </StatusBadge>
-      <dl className="grid gap-3 break-all text-sm sm:grid-cols-2">
-        <Fact label="Action ID">
-          <Link
-            to="/devices/$deviceId/actions/$actionId"
-            params={{ deviceId: action.deviceId, actionId: action.actionId }}
-            className="underline"
-          >
-            {action.actionId}
-          </Link>
-        </Fact>
-        <Fact label="Frozen enrollment generation">{action.enrollmentGeneration}</Fact>
-        <Fact label="Created (server)">
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        <Fact label="Created">
           <ObservedTime value={action.createdAt} server />
         </Fact>
-        <Fact label="Intent expiry">
+        <Fact label="Expires">
           <ObservedTime value={action.expiresAt} server />
         </Fact>
-        <Fact label="Closed reason">{action.closedReason || "Not closed"}</Fact>
-        <Fact label="Revision">{action.actionRevision.toString()}</Fact>
+        {action.closedReason ? <Fact label="Closed because">{action.closedReason}</Fact> : null}
       </dl>
+      {linked ? (
+        <Link
+          to="/devices/$deviceId/actions/$actionId"
+          params={{ deviceId: action.deviceId, actionId: action.actionId }}
+          className="w-fit text-sm underline"
+        >
+          View action
+        </Link>
+      ) : null}
       <DeviceActionSpecView spec={action.spec} />
       {status ? (
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <Fact label="Root accepted">
+          <Fact label="Accepted by device">
             <ObservedTime value={status.acceptedAt} />
           </Fact>
-          <Fact label="Root started">
+          <Fact label="Started">
             <ObservedTime value={status.startedAt} />
           </Fact>
-          <Fact label="Root completed">
+          <Fact label="Finished">
             <ObservedTime value={status.completedAt} />
           </Fact>
           <Fact label="Failure">
             {DeviceActionFailure[status.failure] ?? "Unknown failure code"}
           </Fact>
-          <Fact label="Native support">
-            {status.before?.supported
-              ? "Supported for this exact preflight"
-              : "Unsupported / not observed"}
+          <Fact label="Supported on this device">
+            {status.before?.supported ? "Yes" : "No"}
             {status.before?.reason ? `: ${status.before.reason}` : ""}
           </Fact>
-          <Fact label="Verification">
-            {status.verification?.verified ? "Verified by executor" : "Not verified"}
+          <Fact label="Verified">
+            {status.verification?.verified ? "Verified by device" : "Not verified"}
           </Fact>
           {status.verification?.evidence ? (
-            <Fact label="Native evidence">{status.verification.evidence}</Fact>
+            <Fact label="Details">{status.verification.evidence}</Fact>
           ) : null}
           {action.spec?.action.case === "restart" || action.spec?.action.case === "shutdown" ? (
             <>
-              <Fact label="Native power request">
-                {status.verification?.powerRequestAccepted
-                  ? "Accepted, not proof of completion"
-                  : "Not confirmed"}
+              <Fact label="Power request">
+                {status.verification?.powerRequestAccepted ? "Accepted by device" : "Not confirmed"}
               </Fact>
-              <Fact label="Boot ID before">{status.before?.bootId || "Not reported"}</Fact>
-              <Fact label="Verified boot ID">{status.verification?.bootId || "Not reported"}</Fact>
             </>
           ) : null}
           {action.spec?.action.case === "refreshInventory" ? (
@@ -258,28 +250,36 @@ export function DeviceActionResult({ action }: { action: DeviceAction }) {
           {action.spec?.action.case === "lockSessions" ||
           action.spec?.action.case === "releaseLock" ? (
             <>
-              <Fact label="Observed disabled local accounts">
+              <Fact label="Disabled local accounts">
                 {status.verification?.after?.disabledAccounts.join(", ") || "None reported"}
               </Fact>
-              <Fact label="Preserved local accounts">
+              <Fact label="Untouched local accounts">
                 {status.verification?.after?.preservedAccounts.join(", ") ||
                   status.before?.preservedAccounts.join(", ") ||
                   "None reported"}
               </Fact>
-              <Fact label="Observed session lock">
-                {status.verification?.after?.sessionsLocked ? "Locked" : "Not established"}
+              <Fact label="Sessions locked">
+                {status.verification?.after?.sessionsLocked ? "Yes" : "Not confirmed"}
               </Fact>
             </>
           ) : null}
         </dl>
       ) : null}
+      <TechnicalDetails
+        items={[
+          { label: "Action ID", value: action.actionId },
+          { label: "Enrollment generation", value: String(action.enrollmentGeneration) },
+          { label: "Revision", value: action.actionRevision.toString() },
+          { label: "Boot ID before", value: status?.before?.bootId },
+          { label: "Boot ID after", value: status?.verification?.bootId },
+        ]}
+      />
       {status?.volatileResult ? (
         <Alert>
-          <AlertTitle>Volatile executor result</AlertTitle>
+          <AlertTitle>Result sent before power-off</AlertTitle>
           <AlertDescription>
-            This terminal proof was held only in executor memory after live-root header erasure and
-            delivered to the server. It was not committed to the erased root journal. Power-off is
-            unconditional; absence of proof remains OUTCOME UNKNOWN.
+            The device reported this result just before it powered off. If no result arrived, the
+            outcome is unknown.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -287,18 +287,16 @@ export function DeviceActionResult({ action }: { action: DeviceAction }) {
       <NativeSanitizeVerificationView verification={status?.verification} />
       {needsCredential && status?.state !== DeviceActionState.SUCCEEDED ? (
         <p className="text-sm">
-          Encryption operations require an action-bound, memory-only one-shot credential supplied
-          through the protected root-local socket, or a qualified TPM token. This console never
-          accepts owner credentials. Missing credentials remain an explicit precondition, not
-          successful rotation.
+          This needs a recovery credential entered on the device, or a TPM. You can&apos;t provide
+          it from the console.
         </p>
       ) : null}
       {unknown ? (
         <Alert className="border-warning/25 bg-warning/10">
           <AlertTitle>Effects may already have happened</AlertTitle>
           <AlertDescription>
-            Check device history and recovery records before acting. A lost result does not mean the
-            action failed. Do not repeat a destructive action to recover its response.
+            Check device history and recovery records before acting. Don&apos;t repeat a destructive
+            action.
           </AlertDescription>
         </Alert>
       ) : null}

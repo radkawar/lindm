@@ -268,7 +268,7 @@ func (c *Client) consumeSignedCSAF(ctx context.Context, config *advisoryv1.FeedS
 			signedAt = time.Time{}
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, location, file, redHatRecordBytes)
+	digest, err := c.downloadArchive(ctx, location, file, redHatRecordBytes, nil)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -408,7 +408,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 			signedAt = time.Time{}
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, location, file, maxArchiveBytes)
+	digest, err := c.downloadArchive(ctx, location, file, maxArchiveBytes, nil)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -434,7 +434,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 	return &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}, signedAt, nil
 }
 
-func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File, bound int64) (digest []byte, err error) {
+func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File, bound int64, progress func() error) (digest []byte, err error) {
 	u, err := signedArtifactURL(location)
 	if err != nil {
 		return nil, err
@@ -444,7 +444,7 @@ func (c *Client) downloadArchive(ctx context.Context, location string, file *os.
 		return nil, fmt.Errorf("feed: create archive request: %w", err)
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	resp, err := c.http.Do(req)
+	resp, err := c.archive.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("feed: fetch archive: %w", err)
 	}
@@ -482,6 +482,9 @@ func (c *Client) downloadArchive(ctx context.Context, location string, file *os.
 		checksum = crc32.New(crc32.MakeTable(crc32.Castagnoli))
 		destination = io.MultiWriter(destination, checksum)
 	}
+	if progress != nil {
+		destination = &progressWriter{dst: destination, progress: progress}
+	}
 	if err := copyArchive(ctx, destination, resp.Body, bound); err != nil {
 		return nil, err
 	}
@@ -509,4 +512,24 @@ func copyArchive(ctx context.Context, dst io.Writer, src io.Reader, bound int64)
 		return fmt.Errorf("feed: finish archive stream: %w", err)
 	}
 	return nil
+}
+
+// progressWriter reports transfer progress to the refresh watchdog every
+// progressBytes, so a slow but advancing download is not treated as stalled.
+type progressWriter struct {
+	dst      io.Writer
+	progress func() error
+	pending  int64
+}
+
+const progressBytes = 16 << 20
+
+func (w *progressWriter) Write(p []byte) (int, error) {
+	n, err := w.dst.Write(p)
+	w.pending += int64(n)
+	if err == nil && w.pending >= progressBytes {
+		w.pending = 0
+		err = markProgress(w.progress)
+	}
+	return n, err
 }

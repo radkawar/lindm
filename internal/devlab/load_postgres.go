@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	configv1 "lindm/gen/lindm/config/v1"
 )
 
 const loadPostgresImage = "postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
@@ -36,6 +38,39 @@ type LoadAuthorityOptions struct {
 	// network namespace (shared by the caller) instead of publishing a port.
 	networkContainer string
 	airgap           *AirgapAuthorityOptions
+	// ListenAddress binds admin/device listeners to one local IPv4 address
+	// (default loopback) so a generator on another host can reach them. TLS
+	// names and signed origins are unchanged; clients dial this address.
+	ListenAddress string
+	// Advisories enables real feed refresh/evaluation in the server under test.
+	Advisories *configv1.AdvisoryConfig
+	// PostgresSettings are allowlisted durable-safe server parameters for the
+	// dedicated cluster (name=value), recorded with the experiment.
+	PostgresSettings []string
+}
+
+// loadPostgresSettingNames admits capacity tuning only; durability-reducing
+// parameters (fsync, synchronous_commit, full_page_writes) are never accepted.
+var loadPostgresSettingNames = map[string]bool{
+	"shared_buffers": true, "effective_cache_size": true, "wal_buffers": true, "max_wal_size": true,
+	"min_wal_size": true, "checkpoint_timeout": true, "checkpoint_completion_target": true,
+	"wal_compression": true, "work_mem": true, "maintenance_work_mem": true,
+	"autovacuum_vacuum_cost_limit": true, "autovacuum_naptime": true, "autovacuum_max_workers": true,
+	"effective_io_concurrency": true, "random_page_cost": true, "max_parallel_workers_per_gather": true,
+}
+
+var loadPostgresSettingValue = regexp.MustCompile(`^[A-Za-z0-9._]{1,32}$`)
+
+func validateLoadPostgresSettings(settings []string) error {
+	seen := map[string]bool{}
+	for _, setting := range settings {
+		name, value, ok := strings.Cut(setting, "=")
+		if !ok || !loadPostgresSettingNames[name] || seen[name] || !loadPostgresSettingValue.MatchString(value) {
+			return fmt.Errorf("postgres setting %q is not an allowlisted capacity parameter name=value", setting)
+		}
+		seen[name] = true
+	}
+	return nil
 }
 
 // LoadExperimentEnvironment is safe to persist: it contains no URLs or secrets.
@@ -47,6 +82,7 @@ type LoadExperimentEnvironment struct {
 	ContainerID           string   `json:"container_id,omitempty"`
 	PostgresCPUs          string   `json:"postgres_cpus,omitempty"`
 	PostgresEffectiveCPUs string   `json:"postgres_effective_cpus,omitempty"`
+	PostgresSettings      []string `json:"postgres_settings,omitempty"`
 	ServerCPUs            string   `json:"server_cpus,omitempty"`
 	MountPath             string   `json:"mount_path,omitempty"`
 	Filesystem            string   `json:"filesystem,omitempty"`
@@ -62,6 +98,7 @@ type LoadExperimentEnvironment struct {
 func (f *AuthorityFixture) ExperimentEnvironment() LoadExperimentEnvironment {
 	environment := f.environment
 	environment.BackingDevices = append([]string(nil), environment.BackingDevices...)
+	environment.PostgresSettings = append([]string(nil), environment.PostgresSettings...)
 	return environment
 }
 
@@ -102,7 +139,37 @@ func (o LoadAuthorityOptions) validate() error {
 	if o.networkContainer != "" && (o.DatabaseStorage != "tmpfs" || !loadContainerIDPattern.MatchString(o.networkContainer)) {
 		return errors.New("shared network namespace requires dedicated tmpfs PostgreSQL and an exact container ID")
 	}
+	if len(o.PostgresSettings) != 0 && o.DatabaseStorage != "nvme" && o.DatabaseStorage != "tmpfs" {
+		return errors.New("postgres settings require a dedicated nvme or tmpfs cluster; shared PostgreSQL is never changed")
+	}
+	if err := validateLoadPostgresSettings(o.PostgresSettings); err != nil {
+		return err
+	}
+	if o.ListenAddress != "" {
+		if err := validateLoadListenAddress(o.ListenAddress); err != nil {
+			return err
+		}
+	}
 	return errors.Join(validateLoadCPUList(o.PostgresCPUs), validateLoadCPUList(o.ServerCPUs))
+}
+
+// validateLoadListenAddress admits only a literal IPv4 address assigned to a
+// local interface; it never binds a wildcard.
+func validateLoadListenAddress(value string) error {
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() == nil || ip.IsUnspecified() || ip.IsMulticast() || ip.String() != value {
+		return errors.New("load listen address must be a literal local IPv4 address")
+	}
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	for _, address := range addresses {
+		if network, ok := address.(*net.IPNet); ok && network.IP.Equal(ip) {
+			return nil
+		}
+	}
+	return errors.New("load listen address is not assigned to a local interface")
 }
 
 // OpenLoadAuthorityFixture preserves the ordinary fixture while opting into an
@@ -154,13 +221,17 @@ func loadPostgresArgs(repository, shared, directory string, options LoadAuthorit
 	for _, name := range []string{"postgres-password", "database-init.sql"} {
 		args = append(args, "--mount", "type=bind,src="+filepath.Join(directory, name)+",dst=/run/lindm-dev/"+name+",readonly")
 	}
-	return append(args, "--mount", "type=bind,src="+filepath.Join(repository, "deploy/dev/postgres-entrypoint.sh")+",dst=/opt/lindm/postgres-entrypoint.sh,readonly", "--entrypoint", "/bin/sh", loadPostgresImage, "/opt/lindm/postgres-entrypoint.sh")
+	args = append(args, "--mount", "type=bind,src="+filepath.Join(repository, "deploy/dev/postgres-entrypoint.sh")+",dst=/opt/lindm/postgres-entrypoint.sh,readonly", "--entrypoint", "/bin/sh", loadPostgresImage, "/opt/lindm/postgres-entrypoint.sh")
+	for _, setting := range options.PostgresSettings {
+		args = append(args, "-c", setting)
+	}
+	return args
 }
 
 func openLoadPostgres(ctx context.Context, repository, shared string, options LoadAuthorityOptions) (_ *loadPostgres, resultErr error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cluster := &loadPostgres{environment: LoadExperimentEnvironment{Image: loadPostgresImage, ImageDigest: loadPostgresDigest, PostgresCPUs: options.PostgresCPUs, ServerCPUs: options.ServerCPUs}}
+	cluster := &loadPostgres{environment: LoadExperimentEnvironment{Image: loadPostgresImage, ImageDigest: loadPostgresDigest, PostgresCPUs: options.PostgresCPUs, ServerCPUs: options.ServerCPUs, PostgresSettings: append([]string(nil), options.PostgresSettings...)}}
 	defer func() {
 		if resultErr != nil {
 			resultErr = errors.Join(resultErr, cluster.Close())

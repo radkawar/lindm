@@ -113,8 +113,8 @@ Rocky Linux and x86_64 derivatives are not exercised.
 
 Managed files, local groups and users, sysctl, systemd timers and drop-ins,
 password policy and firewall zones accept `almalinux` (and `rhel`) only with an
-EL 9 `VERSION_ID`; password policy pins AlmaLinux 9.8 exactly. Rocky Linux,
-AlmaLinux 8 and 10 are refused as unqualified. The AlmaLinux 9.8 GenericCloud
+EL 9 or EL 10 `VERSION_ID`; password policy pins AlmaLinux 9.8 and 10.2 exactly.
+Rocky Linux and AlmaLinux 8 are refused as unqualified. The AlmaLinux 9.8 GenericCloud
 image has the same native stack as RHEL 9.8 (shadow-utils 4.9-16, systemd 252,
 authselect 1.2.6, pam 1.5.1, libpwquality 1.4.4, SELinux Enforcing, no
 firewalld/nftables, pam-package stacks without an authselect selection), so the
@@ -125,6 +125,14 @@ handling of a concurrent nftables generation change and of repeated
 acknowledgments. Records are in
 [verification](../verification.md#host-resource-providers-on-el-9); AlmaLinux
 records are derivative evidence, not RHEL qualification.
+
+AlmaLinux 10.2 GenericCloud matches RHEL 10.2 natively (shadow-utils 4.15.0-11,
+systemd 257, authselect 1.5.2 with the `local` profile already selected, pam
+1.6.1, libpwquality 1.4.5, SELinux Enforcing, no firewalld/nftables), so the
+[RHEL EL 10 notes](rhel.md#host-resource-providers-el-10) apply: chrooted shadow
+tools (EL 10 `--prefix` still mislabels the databases), no profile step for
+password policy. Records are in
+[verification](../verification.md#host-resource-providers-on-el-10).
 
 ## Encryption and recovery
 

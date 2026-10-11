@@ -77,13 +77,17 @@ VALUES($1,$2,1,$3,$4,$5,$6,$7)`, assignment, id, id.String()+".service", i, []by
 			t.Fatalf("resource %d state=%q want=%q", i, states[resources[i].String()], want)
 		}
 	}
-	finding := uuid.New()
-	if _, err := pool.Exec(ctx, `INSERT INTO advisory_evaluations(device_id,id,evaluated_at,expires_at,state,reason,finding_digest)
-VALUES($1,$2,now(),now()+interval '1 hour','unknown','inventory unavailable',$3)`, device, uuid.New(), make([]byte, 32)); err != nil {
+	finding, set := uuid.New(), uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,finding_count,critical_count,high_count,medium_count,low_count,other_count)
+VALUES($1,'offline',$2,$3,'evaluated','',$3,1,0,1,0,0,0)`, set, uuid.New(), make([]byte, 32)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO advisory_findings(id,device_id,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,feed_id,source_url)
-VALUES($1,$2,'CVE-test','openssl','1.0','1.1','amd64','high',ARRAY['CVE-test'],'offline','https://vendor.example.test/advisory')`, finding, device); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,source_url)
+VALUES($1,$2,'CVE-test','openssl','1.0','1.1','amd64','high',ARRAY['CVE-test'],'https://vendor.example.test/advisory')`, set, finding); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO advisory_evaluations(device_id,id,evaluated_at,expires_at,state,reason,finding_digest,finding_set_id)
+VALUES($1,$2,now(),now()+interval '1 hour','unknown','inventory unavailable',$3,$4)`, device, uuid.New(), make([]byte, 32), set); err != nil {
 		t.Fatal(err)
 	}
 	output.Reset()

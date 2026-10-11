@@ -103,16 +103,15 @@ export function recoveryReadinessTone(reason: string): "neutral" | "warning" {
 }
 
 const BLOCKED_REASON_LABELS: Record<string, string> = {
-  secret_unavailable: "Blocked: the referenced secret version is unavailable on the server.",
-  secret_binding_mismatch:
-    "Blocked: the secret reference does not match the stored purpose or subject binding.",
+  secret_unavailable: "Blocked: the secret this profile uses is no longer available.",
+  secret_binding_mismatch: "Blocked: the secret doesn't match what this setting expects.",
   device_encryption_key_unavailable:
-    "Blocked: the device has no current attested encryption key for secret delivery.",
+    "Blocked: the device can't receive secrets yet. Wait for it to check in again.",
   secret_delivery_unauthorized:
-    "Blocked: the assigning administrator no longer holds secret management for this device.",
+    "Blocked: the admin who assigned this profile can no longer send secrets to this device.",
   policy_authority_changed:
-    "Blocked: the policy author's authorization changed. Set the policy again to resume rotation.",
-  escrow_unconfigured: "Blocked: the server escrow transport key is not configured.",
+    "Blocked: the admin who set this policy lost access. Set the policy again to resume.",
+  escrow_unconfigured: "Blocked: secret storage isn't set up on the server.",
 };
 
 // Server-recorded blocked or attention reasons; unknown reasons are shown verbatim.
@@ -207,26 +206,24 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "snapshot_unavailable":
         return {
           tone: "neutral",
-          title: "Inventory snapshot not available",
-          message: "No readable package snapshot is available for this view.",
-          action:
-            "Choose Latest snapshot to start a new view, or wait for the device to publish inventory.",
+          title: "Package list not available",
+          message: "This device hasn't reported a package list yet.",
+          action: "Choose Latest snapshot, or wait for the device to report.",
         };
       case "snapshot_expired":
       case "page_expired":
         return {
           tone: "warning",
-          title: "Inventory view expired",
-          message: "This inventory snapshot or saved page is no longer available.",
-          action:
-            "Start a new search or choose Latest snapshot. The current view will not be replaced silently.",
+          title: "This page expired",
+          message: "The package list changed since you opened this page.",
+          action: "Start a new search or choose Latest snapshot.",
         };
       case "device_action_inventory_stale":
         return {
           tone: "warning",
           title: "Inventory needs refreshing",
-          message: "The recorded inventory is too old to authorize this action.",
-          action: "Wait for a fresh device report, then refresh.",
+          message: "The device's last report is too old for this action.",
+          action: "Wait for the device to check in, then refresh.",
         };
       case "device_action_offline":
         return {
@@ -273,35 +270,35 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     return {
       tone: "warning",
       title: "Purpose does not match",
-      message: "The material or reference does not match the secret's immutable purpose.",
-      action: "Use material of the kind this secret's purpose requires.",
+      message: "This value doesn't match the kind of secret you chose.",
+      action: "Enter a value of the right kind.",
     };
   }
   if (failure.code === Code.AlreadyExists && failure.reason === "request_id_reused") {
     return {
       tone: "warning",
-      title: "Request ID already used",
-      message: "A different request was already recorded with this request ID.",
-      action: "Prepare a new request. The earlier request is not repeated.",
+      title: "Already submitted",
+      message: "This form was already submitted with different values.",
+      action: "Start over to send a new request.",
     };
   }
   if (failure.code === Code.Unimplemented) {
     return {
       tone: "neutral",
-      title: "Capability not supported",
-      message: "The server does not support this operation.",
-      action: "Check the deployed server version and available capabilities.",
+      title: "Not supported",
+      message: "This server doesn't support this action.",
+      action: "Check the server version.",
     };
   }
   return {
     tone: "destructive",
-    title: failure.ambiguous ? "Request outcome unknown" : "Request failed",
+    title: failure.ambiguous ? "Result unknown" : "Something went wrong",
     message: failure.ambiguous
-      ? "The request ended without a confirmed result."
-      : "The request could not be completed.",
+      ? "We couldn't confirm whether this went through."
+      : "The request couldn't be completed.",
     action: failure.ambiguous
-      ? "Check the current result before retrying. If the operation supports request IDs, retry only the captured request with the same ID."
-      : "Review the diagnostic details before trying again.",
+      ? "Check the current state before trying again."
+      : "Try again. If it keeps failing, share the details below with support.",
   };
 }
 

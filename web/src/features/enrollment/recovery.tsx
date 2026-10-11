@@ -19,6 +19,7 @@ import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { enrollmentFailure, validateEnrollment } from "./validation";
 
 export function RecoveryEnrollment({ device }: { device: Device }) {
@@ -41,7 +42,7 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
     let submitted = false;
     try {
       if (!captured && String(data.get("confirmation") ?? "").trim() !== device.id)
-        throw new Error("Retype this device ID to confirm explicit identity linkage.");
+        throw new Error("Type the device ID exactly as shown to confirm.");
       const request =
         captured ??
         create(CreateRecoveryEnrollmentGrantRequestSchema, {
@@ -62,7 +63,7 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
       lifetime.signal.throwIfAborted();
       if (!result.approval?.id)
         throw new Error(
-          "The server did not return an approval ID. Inspect the inbox before submitting again.",
+          "The approval request may not have been created. Check the approval inbox before trying again.",
         );
       setApprovalId(result.approval.id);
       void client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
@@ -86,22 +87,16 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
       <CardContent className="grid gap-4">
         <Alert variant={held ? "destructive" : "default"}>
           <AlertTitle>
-            {held
-              ? "Identity on hold. Do not merge clones."
-              : "Replace this specific device generation"}
+            {held ? "This device is on hold. Don't merge clones." : "Reinstall this exact device"}
           </AlertTitle>
           <AlertDescription>
-            Verify the physical installation independently. Hostname, serial, MAC and TPM hints
-            alone do not authorize recovery. The approved one-use grant links a new key and
-            generation to this device without releasing the old identity. All old-generation
-            credentials are retired when the grant is used. Other clones must enroll separately.
-            Never erase a journal to retry an interrupted enrollment. If the generation or
-            revocation state changes, refresh and request a new approval. An earlier approval cannot
-            override a later revocation.
+            Check the physical machine yourself first; hostname, serial or MAC alone are not enough.
+            Once used, the device's old credentials stop working. Clones must enroll as new devices.
           </AlertDescription>
         </Alert>
+        <p className="break-all text-sm">Device: {device.hostname || "Unnamed device"}</p>
         <p className="break-all text-sm">
-          Device {device.id} · Current generation {device.enrollmentGeneration}
+          Device ID (needed to confirm): <span className="font-mono">{device.id}</span>
         </p>
         {allowed ? (
           <form
@@ -113,48 +108,48 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
           >
             <fieldset className="grid gap-3" disabled={busy || captured !== null || !!approvalId}>
               <label className="grid gap-1.5 text-sm font-medium">
-                Retype device ID to link the reinstall
+                Type the device ID to confirm
                 <Input name="confirmation" required autoComplete="off" />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
-                Recovery grant lifetime (seconds, after issuance)
+                Code valid for (seconds)
                 <Input name="lifetime" type="number" defaultValue="300" required />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
-                Reason and independently verified linkage evidence
+                Reason and how you verified the device
                 <Textarea name="reason" required />
               </label>
             </fieldset>
             {captured ? (
-              <p className="break-all text-xs text-muted-foreground">
-                Exact request {captured.requestId}; expected generation{" "}
-                {captured.expectedGenerationId}; expected revoked:{" "}
-                {captured.expectedRevoked ? "yes" : "no"}. The server rejects stale linkage; refresh
-                and reapprove after a state change.
-              </p>
+              <TechnicalDetails
+                items={[
+                  { label: "Request ID", value: captured.requestId },
+                  { label: "Expected enrollment generation", value: captured.expectedGenerationId },
+                  { label: "Expected revoked", value: captured.expectedRevoked ? "yes" : "no" },
+                ]}
+              />
             ) : null}
             {failure ? <RpcError failure={failure} /> : null}
             {approvalId ? (
-              <p role="status" className="break-all text-sm">
-                Approval {approvalId} requested.{" "}
-                <Link to="/approvals" className="underline underline-offset-4">
-                  Open approvals
-                </Link>
-                . A different person must approve. Then return as requester to issue the grant.
-              </p>
+              <div className="grid gap-1">
+                <p role="status" className="text-sm">
+                  Approval requested. Another admin must approve it in{" "}
+                  <Link to="/approvals" className="underline underline-offset-4">
+                    approvals
+                  </Link>
+                  , then come back here to finish.
+                </p>
+                <TechnicalDetails items={[{ label: "Approval ID", value: approvalId }]} />
+              </div>
             ) : (
               <Button type="submit" className="w-fit" variant="destructive" disabled={busy}>
-                {busy
-                  ? "Requesting…"
-                  : captured
-                    ? "Retry exact recovery request"
-                    : "Request independent recovery approval"}
+                {busy ? "Requesting…" : captured ? "Try again" : "Request approval to reinstall"}
               </Button>
             )}
           </form>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Recovery requires a human account with device revocation permission for this device.
+            You need permission to revoke this device to reinstall it.
           </p>
         )}
       </CardContent>

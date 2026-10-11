@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
@@ -18,27 +19,25 @@ export function PendingEnrollments() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Enrollment transactions</CardTitle>
+        <CardTitle>Devices waiting to enroll</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="text-sm text-muted-foreground">
-          Waiting devices have no usable device credential. A different authorized human must
-          approve the exact inbox payload, then the requester executes it. The device resumes using
-          its same protected installation and key; a new bootstrap is not a retry. The server
-          rechecks current scope.
+          Another admin must approve each device in the approval inbox before it can finish
+          enrolling.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-            Refresh enrollment transactions
+            Refresh
           </Button>
           <Link to="/approvals" className="text-sm underline underline-offset-4">
             Open approval inbox
           </Link>
         </div>
-        {list.isPending ? <p role="status">Loading enrollment transactions…</p> : null}
+        {list.isPending ? <p role="status">Loading waiting devices…</p> : null}
         {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
         {!list.error && list.data?.enrollments.length === 0 ? (
-          <EmptyState title="No enrollment transactions in your scope" />
+          <EmptyState title="No devices waiting to enroll" />
         ) : null}
         {!list.error &&
           list.data?.enrollments.map((enrollment) => (
@@ -49,7 +48,7 @@ export function PendingEnrollments() {
                   params={{ deviceId: enrollment.deviceId }}
                   className="break-all text-sm underline underline-offset-4"
                 >
-                  Device {enrollment.deviceId}
+                  Open device
                 </Link>
                 <StatusBadge
                   status={enrollment.state === "pending_approval" ? "warning" : "neutral"}
@@ -59,20 +58,24 @@ export function PendingEnrollments() {
                     : enrollment.state.replaceAll("_", " ")}
                 </StatusBadge>
               </div>
-              <dl className="grid gap-1 break-all text-sm sm:grid-cols-2">
-                <dt className="text-muted-foreground">Transaction</dt>
-                <dd>{enrollment.transactionId}</dd>
-                <dt className="text-muted-foreground">Generation</dt>
-                <dd>{enrollment.enrollmentGeneration}</dd>
-                <dt className="text-muted-foreground">Installation</dt>
-                <dd>{enrollment.installationId}</dd>
-                <dt className="text-muted-foreground">Token</dt>
-                <dd>{enrollment.tokenId}</dd>
-                <dt className="text-muted-foreground">Approval</dt>
-                <dd>{enrollment.approvalId || "Not required"}</dd>
+              <dl className="grid gap-1 text-sm sm:grid-cols-2">
+                <dt className="text-muted-foreground">Requested</dt>
+                <dd>{formatTimestamp(enrollment.createdAt).local}</dd>
                 <dt className="text-muted-foreground">Expires</dt>
                 <dd>{formatTimestamp(enrollment.expiresAt).local}</dd>
+                <dt className="text-muted-foreground">Approval</dt>
+                <dd>{enrollment.approvalId ? "Needed" : "Not needed"}</dd>
               </dl>
+              <TechnicalDetails
+                items={[
+                  { label: "Device ID", value: enrollment.deviceId },
+                  { label: "Transaction ID", value: enrollment.transactionId },
+                  { label: "Enrollment generation", value: enrollment.enrollmentGeneration },
+                  { label: "Installation ID", value: enrollment.installationId },
+                  { label: "Token ID", value: enrollment.tokenId },
+                  { label: "Approval ID", value: enrollment.approvalId },
+                ]}
+              />
             </article>
           ))}
         <div className="flex gap-2">

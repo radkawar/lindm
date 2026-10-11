@@ -13,7 +13,8 @@ func TestLoadAuthorityOptions(t *testing.T) {
 	for _, options := range []LoadAuthorityOptions{
 		{}, {DatabaseStorage: "shared", ServerCPUs: "0-2,12-14"},
 		{DatabaseStorage: "nvme", PostgresCPUs: "4-5,16-17", ServerCPUs: "6,18"},
-		{DatabaseStorage: "tmpfs", PostgresCPUs: "0"},
+		{DatabaseStorage: "tmpfs", PostgresCPUs: "0"}, {ListenAddress: "127.0.0.1"},
+		{DatabaseStorage: "nvme", PostgresSettings: []string{"shared_buffers=8GB", "max_wal_size=16GB"}},
 	} {
 		if err := options.validate(); err != nil {
 			t.Errorf("valid options %+v: %v", options, err)
@@ -26,6 +27,13 @@ func TestLoadAuthorityOptions(t *testing.T) {
 		{ServerCPUs: "2-1"}, {ServerCPUs: "1-1"}, {ServerCPUs: "1,"},
 		{ServerCPUs: "1,,2"}, {ServerCPUs: "1-2-3"}, {ServerCPUs: "+2"},
 		{ServerCPUs: " 2"}, {ServerCPUs: "9999999999999999999999999999999999999999999999"},
+		{ListenAddress: "0.0.0.0"}, {ListenAddress: "::1"}, {ListenAddress: "localhost"},
+		{ListenAddress: "192.0.2.1"}, {ListenAddress: "127.000.0.1"},
+		{DatabaseStorage: "shared", PostgresSettings: []string{"shared_buffers=8GB"}},
+		{DatabaseStorage: "nvme", PostgresSettings: []string{"synchronous_commit=off"}},
+		{DatabaseStorage: "nvme", PostgresSettings: []string{"fsync=off"}},
+		{DatabaseStorage: "nvme", PostgresSettings: []string{"work_mem=1MB;drop"}},
+		{DatabaseStorage: "nvme", PostgresSettings: []string{"work_mem=1MB", "work_mem=2MB"}},
 	} {
 		if err := options.validate(); err == nil {
 			t.Errorf("accepted invalid options %+v", options)

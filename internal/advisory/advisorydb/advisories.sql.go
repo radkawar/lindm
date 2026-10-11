@@ -15,7 +15,7 @@ import (
 const acceptAdvisoryException = `-- name: AcceptAdvisoryException :exec
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
 VALUES($1,$2,$3,$4,$5,$6)
-ON CONFLICT(finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
+ON CONFLICT(device_id,finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
  accepted_at=EXCLUDED.accepted_at,expires_at=EXCLUDED.expires_at
 `
 
@@ -202,6 +202,25 @@ func (q *Queries) AdvisoryDeviceVisible(ctx context.Context, arg AdvisoryDeviceV
 	return column_1, err
 }
 
+const advisoryPackageDigest = `-- name: AdvisoryPackageDigest :one
+SELECT sha256(convert_to(coalesce(string_agg(
+ concat_ws(',', position, length(name), name, length(version), version, length(architecture), architecture,
+  length(manager), manager, length(source_name), source_name, length(source_version), source_version,
+  module_status, length(module_name), module_name, length(module_stream), module_stream,
+  length(module_version), module_version, length(module_context), module_context),
+ ';' ORDER BY position), ''), 'UTF8'))::bytea AS digest
+FROM snapshot_packages WHERE snapshot_id=$1
+`
+
+// Normalized identity of every matching input in one published snapshot:
+// length-prefixed fields in position order, so equal digests mean equal rows.
+func (q *Queries) AdvisoryPackageDigest(ctx context.Context, snapshotID uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, advisoryPackageDigest, snapshotID)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
+}
+
 const advisorySourceMappingMissing = `-- name: AdvisorySourceMappingMissing :one
 SELECT EXISTS (SELECT 1 FROM snapshot_packages WHERE snapshot_id=$1 AND manager='dpkg'
  AND (source_name='' OR source_version=''))::boolean
@@ -283,15 +302,6 @@ func (q *Queries) CountAdvisoryDevices(ctx context.Context, arg CountAdvisoryDev
 	var i CountAdvisoryDevicesRow
 	err := row.Scan(&i.Evaluated, &i.Total)
 	return i, err
-}
-
-const deleteAdvisoryFindings = `-- name: DeleteAdvisoryFindings :exec
-DELETE FROM advisory_findings WHERE device_id=$1
-`
-
-func (q *Queries) DeleteAdvisoryFindings(ctx context.Context, deviceID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteAdvisoryFindings, deviceID)
-	return err
 }
 
 const deleteAdvisoryPublicationBatch = `-- name: DeleteAdvisoryPublicationBatch :exec
@@ -431,7 +441,7 @@ func (q *Queries) GetAdvisoryDevice(ctx context.Context, id uuid.UUID) (GetAdvis
 }
 
 const getAdvisoryEvaluation = `-- name: GetAdvisoryEvaluation :one
-SELECT device_id, id, snapshot_id, feed_id, feed_revision, evaluated_at, inventory_at, host_received_at, expires_at, state, reason, finding_digest FROM advisory_evaluations WHERE device_id=$1
+SELECT device_id, id, snapshot_id, feed_id, feed_revision, evaluated_at, inventory_at, host_received_at, expires_at, state, reason, finding_digest, finding_set_id FROM advisory_evaluations WHERE device_id=$1
 `
 
 func (q *Queries) GetAdvisoryEvaluation(ctx context.Context, deviceID uuid.UUID) (AdvisoryEvaluation, error) {
@@ -450,6 +460,7 @@ func (q *Queries) GetAdvisoryEvaluation(ctx context.Context, deviceID uuid.UUID)
 		&i.State,
 		&i.Reason,
 		&i.FindingDigest,
+		&i.FindingSetID,
 	)
 	return i, err
 }
@@ -534,6 +545,38 @@ func (q *Queries) GetAdvisoryFinding(ctx context.Context, arg GetAdvisoryFinding
 	return i, err
 }
 
+const getAdvisoryFindingSet = `-- name: GetAdvisoryFindingSet :one
+SELECT id, feed_id, feed_revision, package_digest, state, reason, finding_digest, finding_count, critical_count, high_count, medium_count, low_count, other_count, created_at FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND package_digest=$3
+`
+
+type GetAdvisoryFindingSetParams struct {
+	FeedID        string
+	FeedRevision  uuid.UUID
+	PackageDigest []byte
+}
+
+func (q *Queries) GetAdvisoryFindingSet(ctx context.Context, arg GetAdvisoryFindingSetParams) (AdvisoryFindingSet, error) {
+	row := q.db.QueryRow(ctx, getAdvisoryFindingSet, arg.FeedID, arg.FeedRevision, arg.PackageDigest)
+	var i AdvisoryFindingSet
+	err := row.Scan(
+		&i.ID,
+		&i.FeedID,
+		&i.FeedRevision,
+		&i.PackageDigest,
+		&i.State,
+		&i.Reason,
+		&i.FindingDigest,
+		&i.FindingCount,
+		&i.CriticalCount,
+		&i.HighCount,
+		&i.MediumCount,
+		&i.LowCount,
+		&i.OtherCount,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertAdvisoryAudit = `-- name: InsertAdvisoryAudit :exec
 INSERT INTO audit_events(id,actor_id,action,resource_id,reason)
 VALUES($1,$2,$3,$4,$5)
@@ -579,19 +622,47 @@ func (q *Queries) InsertAdvisoryExceptionRequest(ctx context.Context, arg Insert
 	return err
 }
 
-type InsertAdvisoryFindingsParams struct {
-	ID               uuid.UUID
-	DeviceID         uuid.UUID
-	AdvisoryID       string
-	PackageName      string
-	InstalledVersion string
-	FixedVersion     string
-	Architecture     string
-	Severity         string
-	PublishedAt      pgtype.Timestamptz
-	Cves             []string
-	FeedID           string
-	SourceUrl        string
+const insertAdvisoryFindingSet = `-- name: InsertAdvisoryFindingSet :exec
+INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,
+ finding_count,critical_count,high_count,medium_count,low_count,other_count)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+`
+
+type InsertAdvisoryFindingSetParams struct {
+	ID            uuid.UUID
+	FeedID        string
+	FeedRevision  uuid.UUID
+	PackageDigest []byte
+	State         string
+	Reason        string
+	FindingDigest []byte
+	FindingCount  int32
+	CriticalCount int32
+	HighCount     int32
+	MediumCount   int32
+	LowCount      int32
+	OtherCount    int32
+}
+
+// A concurrent creator of the same content is a serialization conflict in the
+// caller's repeatable-read transaction; the evaluation job retries next pass.
+func (q *Queries) InsertAdvisoryFindingSet(ctx context.Context, arg InsertAdvisoryFindingSetParams) error {
+	_, err := q.db.Exec(ctx, insertAdvisoryFindingSet,
+		arg.ID,
+		arg.FeedID,
+		arg.FeedRevision,
+		arg.PackageDigest,
+		arg.State,
+		arg.Reason,
+		arg.FindingDigest,
+		arg.FindingCount,
+		arg.CriticalCount,
+		arg.HighCount,
+		arg.MediumCount,
+		arg.LowCount,
+		arg.OtherCount,
+	)
+	return err
 }
 
 type InsertAdvisoryPublicationBatchParams struct {
@@ -604,6 +675,27 @@ type InsertAdvisoryPublicationBatchParams struct {
 	SourcePackage bool
 	Architecture  string
 	RecordBytes   []byte
+}
+
+type InsertAdvisorySetAdvisoriesParams struct {
+	SetID      uuid.UUID
+	AdvisoryID string
+	Severity   string
+	Findings   int32
+}
+
+type InsertAdvisorySetFindingsParams struct {
+	SetID            uuid.UUID
+	FindingKey       uuid.UUID
+	AdvisoryID       string
+	PackageName      string
+	InstalledVersion string
+	FixedVersion     string
+	Architecture     string
+	Severity         string
+	PublishedAt      pgtype.Timestamptz
+	Cves             []string
+	SourceUrl        string
 }
 
 const listAdvisoryEvaluationsPending = `-- name: ListAdvisoryEvaluationsPending :many
@@ -691,22 +783,41 @@ func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error)
 }
 
 const listAdvisorySummary = `-- name: ListAdvisorySummary :many
-SELECT f.advisory_id,f.severity,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='affected')::bigint AS affected_devices,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='accepted')::bigint AS accepted_devices,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='unknown')::bigint AS unknown_devices
-FROM advisory_finding_status f
-WHERE device_scope_matches(f.device_id,$1::boolean,$2::jsonb)
- AND (f.advisory_id,f.severity)>($3::text,$4::text)
-GROUP BY f.advisory_id,f.severity ORDER BY f.advisory_id,f.severity LIMIT $5
+WITH dev AS (
+ SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ WHERE s.finding_set_id IS NOT NULL
+  AND device_scope_matches(s.device_id,$2::boolean,$3::jsonb)
+), bound AS (
+ SELECT finding_set_id, count(*) FILTER (WHERE NOT unknown)::bigint AS fresh,
+  count(*) FILTER (WHERE unknown)::bigint AS stale
+ FROM dev GROUP BY finding_set_id
+), totals AS (
+ SELECT a.advisory_id, a.severity, sum(b.fresh)::bigint AS fresh, sum(b.stale)::bigint AS stale
+ FROM bound b JOIN advisory_set_advisories a ON a.set_id=b.finding_set_id
+ WHERE (a.advisory_id,a.severity)>($4::text,$5::text)
+ GROUP BY a.advisory_id, a.severity
+), accepted AS (
+ SELECT f.advisory_id, f.severity, dev.device_id, count(*)::integer AS accepted, max(sa.findings) AS findings
+ FROM dev
+ JOIN advisory_exceptions x ON x.device_id=dev.device_id AND x.expires_at>CURRENT_TIMESTAMP
+ JOIN advisory_set_findings f ON f.set_id=dev.finding_set_id AND f.finding_key=x.finding_id
+ JOIN advisory_set_advisories sa ON sa.set_id=dev.finding_set_id AND sa.advisory_id=f.advisory_id AND sa.severity=f.severity
+ WHERE NOT dev.unknown
+ GROUP BY f.advisory_id, f.severity, dev.device_id
+)
+SELECT t.advisory_id, t.severity,
+ (t.fresh - coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity AND a.accepted>=a.findings),0))::bigint AS affected_devices,
+ coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity),0)::bigint AS accepted_devices,
+ t.stale::bigint AS unknown_devices
+FROM totals t ORDER BY t.advisory_id, t.severity LIMIT $1
 `
 
 type ListAdvisorySummaryParams struct {
+	RowLimit          int32
 	ScopeUnrestricted bool
 	Scopes            []byte
 	AfterAdvisory     string
 	AfterSeverity     string
-	RowLimit          int32
 }
 
 type ListAdvisorySummaryRow struct {
@@ -717,13 +828,16 @@ type ListAdvisorySummaryRow struct {
 	UnknownDevices  int64
 }
 
+// Same device states as advisory_finding_status, weighted from shared sets:
+// a fresh device is affected unless every finding of the advisory is under an
+// active exception, accepted if any is, and stale devices are unknown.
 func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySummaryParams) ([]ListAdvisorySummaryRow, error) {
 	rows, err := q.db.Query(ctx, listAdvisorySummary,
+		arg.RowLimit,
 		arg.ScopeUnrestricted,
 		arg.Scopes,
 		arg.AfterAdvisory,
 		arg.AfterSeverity,
-		arg.RowLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -934,14 +1048,32 @@ func (q *Queries) PruneAdvisoryExceptionRequests(ctx context.Context) error {
 }
 
 const pruneAdvisoryExceptions = `-- name: PruneAdvisoryExceptions :exec
-DELETE FROM advisory_exceptions WHERE finding_id IN
- (SELECT finding_id FROM advisory_exceptions WHERE expires_at < now()-interval '90 days'
+DELETE FROM advisory_exceptions WHERE (device_id,finding_id) IN
+ (SELECT device_id,finding_id FROM advisory_exceptions WHERE expires_at < now()-interval '90 days'
  ORDER BY expires_at LIMIT 1000)
 `
 
 func (q *Queries) PruneAdvisoryExceptions(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, pruneAdvisoryExceptions)
 	return err
+}
+
+const pruneAdvisoryFindingSets = `-- name: PruneAdvisoryFindingSets :execrows
+DELETE FROM advisory_finding_sets WHERE id IN (
+ SELECT s.id FROM advisory_finding_sets s
+ WHERE s.created_at < clock_timestamp()-interval '15 minutes'
+  AND NOT EXISTS (SELECT 1 FROM advisory_evaluations e WHERE e.finding_set_id=s.id)
+ ORDER BY s.created_at LIMIT $1)
+`
+
+// Unbound sets are removed after a grace period; a binding racing the delete
+// fails its foreign-key check and is retried by the evaluation job.
+func (q *Queries) PruneAdvisoryFindingSets(ctx context.Context, setLimit int32) (int64, error) {
+	result, err := q.db.Exec(ctx, pruneAdvisoryFindingSets, setLimit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const publishAdvisoryFeed = `-- name: PublishAdvisoryFeed :execrows
@@ -1027,12 +1159,12 @@ func (q *Queries) StartAdvisoryGeneration(ctx context.Context, arg StartAdvisory
 }
 
 const storeAdvisoryEvaluation = `-- name: StoreAdvisoryEvaluation :exec
-INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 ON CONFLICT(device_id) DO UPDATE SET id=EXCLUDED.id,snapshot_id=EXCLUDED.snapshot_id,
  feed_id=EXCLUDED.feed_id,feed_revision=EXCLUDED.feed_revision,evaluated_at=EXCLUDED.evaluated_at,
  inventory_at=EXCLUDED.inventory_at,host_received_at=EXCLUDED.host_received_at,expires_at=EXCLUDED.expires_at,state=EXCLUDED.state,
- reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest
+ reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id
 `
 
 type StoreAdvisoryEvaluationParams struct {
@@ -1048,6 +1180,7 @@ type StoreAdvisoryEvaluationParams struct {
 	Reason         string
 	FindingDigest  []byte
 	HostReceivedAt pgtype.Timestamptz
+	FindingSetID   *uuid.UUID
 }
 
 func (q *Queries) StoreAdvisoryEvaluation(ctx context.Context, arg StoreAdvisoryEvaluationParams) error {
@@ -1064,6 +1197,7 @@ func (q *Queries) StoreAdvisoryEvaluation(ctx context.Context, arg StoreAdvisory
 		arg.Reason,
 		arg.FindingDigest,
 		arg.HostReceivedAt,
+		arg.FindingSetID,
 	)
 	return err
 }

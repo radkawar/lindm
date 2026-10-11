@@ -16,4 +16,5 @@ exec /usr/local/bin/docker-entrypoint.sh postgres \
   -c ssl_cert_file=/var/lib/postgresql/server.crt \
   -c ssl_key_file=/var/lib/postgresql/server.key \
   -c ssl_min_protocol_version=TLSv1.3 \
-  -c ssl_max_protocol_version=TLSv1.3
+  -c ssl_max_protocol_version=TLSv1.3 \
+  "$@"

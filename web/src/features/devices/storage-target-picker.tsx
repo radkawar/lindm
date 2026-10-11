@@ -23,16 +23,12 @@ export type ObservedStorageSelection = {
 };
 
 const unavailableMessages: Record<string, string> = {
-  device_action_inventory_unavailable:
-    "No storage observed yet. Ask the device to refresh inventory.",
-  device_action_inventory_stale:
-    "The storage observation is stale. Ask the device to refresh inventory before selecting a target.",
-  device_action_storage_unavailable:
-    "No storage observed yet. Ask the device to refresh inventory.",
+  device_action_inventory_unavailable: "No storage reported yet. Refresh inventory.",
+  device_action_inventory_stale: "Storage info is out of date. Refresh inventory first.",
+  device_action_storage_unavailable: "No storage reported yet. Refresh inventory.",
   device_action_storage_identity_unavailable:
-    "No eligible storage target has a complete observed identity. Ask the device to refresh inventory.",
-  device_action_tpm2_unavailable:
-    "TPM 2.0 is not available in the current observation. Ask the device to refresh inventory.",
+    "No disk can be used for this action yet. Refresh inventory.",
+  device_action_tpm2_unavailable: "No TPM 2.0 reported. Refresh inventory.",
 };
 
 export function observedStorageSelections(
@@ -84,12 +80,12 @@ export function ObservedStorageTargetPicker({
   const selected = entries.find((entry) => entry.key === selectedKey);
   const unavailable = targets?.unavailableReason
     ? (unavailableMessages[targets.unavailableReason] ??
-      "Storage selection is unavailable. Ask the device to refresh inventory.")
+      "Storage can't be selected right now. Refresh inventory.")
     : targets && !targets.fresh
       ? unavailableMessages.device_action_inventory_stale
       : targets?.targets.length
         ? unavailableMessages.device_action_storage_identity_unavailable
-        : "No storage observed yet. Ask the device to refresh inventory.";
+        : "No storage reported yet. Refresh inventory.";
 
   return (
     <section className="grid min-w-0 gap-3" aria-label="Observed storage target">
@@ -114,12 +110,11 @@ export function ObservedStorageTargetPicker({
             }}
           />
           <p id={`${id}-help`} className="text-sm text-muted-foreground">
-            Only eligible targets from the device&apos;s current inventory can be selected. Identity
-            is read-only and is checked again before the action runs.
+            Only disks this action can use are listed.
           </p>
           {selectedKey && !selected ? (
             <p role="status" className="text-sm text-muted-foreground">
-              The selected identity is no longer available. Select a current observed target.
+              This disk is no longer reported. Pick another.
             </p>
           ) : null}
           {selected ? <ObservedStorageIdentity selection={selected.selection} /> : null}
@@ -152,13 +147,13 @@ function ObservedStorageIdentity({ selection }: { selection: ObservedStorageSele
               {identity?.basis === NvmeIdentityBasis.NAMESPACE_NID
                 ? "Namespace NID (NGUID/EUI-64)"
                 : identity?.basis === NvmeIdentityBasis.CONTROLLER_SERIAL_NSID
-                  ? "Controller serial + namespace ID (namespace identifiers absent or rejected by kernel)"
+                  ? "Controller serial + namespace ID"
                   : "Not reported"}
             </Fact>
-            <Fact label="Exact NVMe namespace ID">{scope.namespaceId}</Fact>
-            <Fact label="Observed command scope">
+            <Fact label="NVMe namespace ID">{scope.namespaceId}</Fact>
+            <Fact label="Scope">
               {scope.controllerWide
-                ? "Entire controller: all qualified namespaces affected"
+                ? "Entire controller: all namespaces"
                 : "Selected namespace only"}
             </Fact>
             {identity ? (

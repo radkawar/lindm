@@ -141,26 +141,54 @@ SELECT * FROM advisory_evaluations WHERE device_id=$1;
 SELECT id FROM devices WHERE id=$1 FOR UPDATE;
 
 -- name: StoreAdvisoryEvaluation :exec
-INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 ON CONFLICT(device_id) DO UPDATE SET id=EXCLUDED.id,snapshot_id=EXCLUDED.snapshot_id,
  feed_id=EXCLUDED.feed_id,feed_revision=EXCLUDED.feed_revision,evaluated_at=EXCLUDED.evaluated_at,
  inventory_at=EXCLUDED.inventory_at,host_received_at=EXCLUDED.host_received_at,expires_at=EXCLUDED.expires_at,state=EXCLUDED.state,
- reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest;
+ reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id;
 
 -- name: TouchAdvisoryEvaluation :exec
 -- Records that unchanged feed-less evidence was rechecked against the current
 -- feed configuration, without replacing the evaluation identity bound by cursors.
 UPDATE advisory_evaluations SET evaluated_at=$2 WHERE device_id=$1 AND id=$3;
 
--- name: DeleteAdvisoryFindings :exec
-DELETE FROM advisory_findings WHERE device_id=$1;
+-- name: AdvisoryPackageDigest :one
+-- Normalized identity of every matching input in one published snapshot:
+-- length-prefixed fields in position order, so equal digests mean equal rows.
+SELECT sha256(convert_to(coalesce(string_agg(
+ concat_ws(',', position, length(name), name, length(version), version, length(architecture), architecture,
+  length(manager), manager, length(source_name), source_name, length(source_version), source_version,
+  module_status, length(module_name), module_name, length(module_stream), module_stream,
+  length(module_version), module_version, length(module_context), module_context),
+ ';' ORDER BY position), ''), 'UTF8'))::bytea AS digest
+FROM snapshot_packages WHERE snapshot_id=$1;
 
--- name: InsertAdvisoryFindings :copyfrom
--- Finding IDs are device-namespaced and deduplicated before insertion, and the
--- device's previous findings are deleted in the same transaction.
-INSERT INTO advisory_findings(id,device_id,advisory_id,package_name,installed_version,fixed_version,architecture,severity,published_at,cves,feed_id,source_url)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);
+-- name: GetAdvisoryFindingSet :one
+SELECT * FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND package_digest=$3;
+
+-- name: InsertAdvisoryFindingSet :exec
+-- A concurrent creator of the same content is a serialization conflict in the
+-- caller's repeatable-read transaction; the evaluation job retries next pass.
+INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,
+ finding_count,critical_count,high_count,medium_count,low_count,other_count)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);
+
+-- name: InsertAdvisorySetFindings :copyfrom
+INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,published_at,cves,source_url)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+
+-- name: InsertAdvisorySetAdvisories :copyfrom
+INSERT INTO advisory_set_advisories(set_id,advisory_id,severity,findings) VALUES($1,$2,$3,$4);
+
+-- name: PruneAdvisoryFindingSets :execrows
+-- Unbound sets are removed after a grace period; a binding racing the delete
+-- fails its foreign-key check and is retried by the evaluation job.
+DELETE FROM advisory_finding_sets WHERE id IN (
+ SELECT s.id FROM advisory_finding_sets s
+ WHERE s.created_at < clock_timestamp()-interval '15 minutes'
+  AND NOT EXISTS (SELECT 1 FROM advisory_evaluations e WHERE e.finding_set_id=s.id)
+ ORDER BY s.created_at LIMIT sqlc.arg('set_limit'));
 
 -- name: ListDeviceAdvisoryFindings :many
 SELECT f.*, EXISTS (
@@ -182,14 +210,36 @@ ORDER BY f.id LIMIT sqlc.arg('row_limit');
 SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;
 
 -- name: ListAdvisorySummary :many
-SELECT f.advisory_id,f.severity,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='affected')::bigint AS affected_devices,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='accepted')::bigint AS accepted_devices,
- count(DISTINCT f.device_id) FILTER(WHERE f.state='unknown')::bigint AS unknown_devices
-FROM advisory_finding_status f
-WHERE device_scope_matches(f.device_id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb)
- AND (f.advisory_id,f.severity)>(sqlc.arg('after_advisory')::text,sqlc.arg('after_severity')::text)
-GROUP BY f.advisory_id,f.severity ORDER BY f.advisory_id,f.severity LIMIT sqlc.arg('row_limit');
+-- Same device states as advisory_finding_status, weighted from shared sets:
+-- a fresh device is affected unless every finding of the advisory is under an
+-- active exception, accepted if any is, and stale devices are unknown.
+WITH dev AS (
+ SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ WHERE s.finding_set_id IS NOT NULL
+  AND device_scope_matches(s.device_id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb)
+), bound AS (
+ SELECT finding_set_id, count(*) FILTER (WHERE NOT unknown)::bigint AS fresh,
+  count(*) FILTER (WHERE unknown)::bigint AS stale
+ FROM dev GROUP BY finding_set_id
+), totals AS (
+ SELECT a.advisory_id, a.severity, sum(b.fresh)::bigint AS fresh, sum(b.stale)::bigint AS stale
+ FROM bound b JOIN advisory_set_advisories a ON a.set_id=b.finding_set_id
+ WHERE (a.advisory_id,a.severity)>(sqlc.arg('after_advisory')::text,sqlc.arg('after_severity')::text)
+ GROUP BY a.advisory_id, a.severity
+), accepted AS (
+ SELECT f.advisory_id, f.severity, dev.device_id, count(*)::integer AS accepted, max(sa.findings) AS findings
+ FROM dev
+ JOIN advisory_exceptions x ON x.device_id=dev.device_id AND x.expires_at>CURRENT_TIMESTAMP
+ JOIN advisory_set_findings f ON f.set_id=dev.finding_set_id AND f.finding_key=x.finding_id
+ JOIN advisory_set_advisories sa ON sa.set_id=dev.finding_set_id AND sa.advisory_id=f.advisory_id AND sa.severity=f.severity
+ WHERE NOT dev.unknown
+ GROUP BY f.advisory_id, f.severity, dev.device_id
+)
+SELECT t.advisory_id, t.severity,
+ (t.fresh - coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity AND a.accepted>=a.findings),0))::bigint AS affected_devices,
+ coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity),0)::bigint AS accepted_devices,
+ t.stale::bigint AS unknown_devices
+FROM totals t ORDER BY t.advisory_id, t.severity LIMIT sqlc.arg('row_limit');
 
 -- name: CountAdvisoryDevices :one
 SELECT count(*) FILTER(WHERE e.state='evaluated' AND e.expires_at>CURRENT_TIMESTAMP
@@ -227,7 +277,7 @@ LIMIT sqlc.arg('row_limit');
 -- name: AcceptAdvisoryException :exec
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
 VALUES($1,$2,$3,$4,$5,$6)
-ON CONFLICT(finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
+ON CONFLICT(device_id,finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
  accepted_at=EXCLUDED.accepted_at,expires_at=EXCLUDED.expires_at;
 
 -- name: GetAdvisoryExceptionRequest :one
@@ -259,6 +309,6 @@ DELETE FROM advisory_exception_requests WHERE (actor_id,request_id) IN
  WHERE created_at < now()-interval '90 days' ORDER BY created_at LIMIT 1000);
 
 -- name: PruneAdvisoryExceptions :exec
-DELETE FROM advisory_exceptions WHERE finding_id IN
- (SELECT finding_id FROM advisory_exceptions WHERE expires_at < now()-interval '90 days'
+DELETE FROM advisory_exceptions WHERE (device_id,finding_id) IN
+ (SELECT device_id,finding_id FROM advisory_exceptions WHERE expires_at < now()-interval '90 days'
  ORDER BY expires_at LIMIT 1000);

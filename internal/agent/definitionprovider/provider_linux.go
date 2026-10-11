@@ -120,17 +120,21 @@ func nativeContext(ctx context.Context, config NativeConfig) (*Provider, error) 
 			return nil, err
 		}
 	}
-	// Ubuntu 24.04 and Fedora 44 were qualified on systemd 255 and newer; EL 9
-	// ships systemd 252 for its whole life, whose timer and unit-file D-Bus
-	// interface and systemd-analyze verify options this provider uses.
+	// Ubuntu 24.04, Fedora 44 and EL 10 (systemd 257) were qualified on systemd
+	// 255 and newer; EL 9 ships systemd 252 for its whole life, whose timer and
+	// unit-file D-Bus interface and systemd-analyze verify options this provider
+	// uses.
 	minimum := 255
 	switch config.Platform.GetOsId() {
 	case "ubuntu", "fedora", "debian":
 	case "rhel", "almalinux":
-		if !strings.HasPrefix(config.Platform.GetVersion(), "9.") {
+		switch major, _, _ := strings.Cut(config.Platform.GetVersion(), "."); major {
+		case "9":
+			minimum = 252
+		case "10":
+		default:
 			return nil, ErrUnsupported
 		}
-		minimum = 252
 	default:
 		return nil, ErrUnsupported
 	}

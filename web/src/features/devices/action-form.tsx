@@ -44,6 +44,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecoveryReadinessView } from "./recovery-readiness";
 import { recoveryReadinessMessage } from "@/lib/errors";
@@ -94,28 +95,26 @@ const imperativeKinds: DeviceActionKind[] = [
 ];
 const approvalLabels: Record<ApprovalState, string> = {
   [ApprovalState.UNSPECIFIED]: "Unknown",
-  [ApprovalState.PENDING]: "Pending independent approval",
+  [ApprovalState.PENDING]: "Waiting for approval",
   [ApprovalState.APPROVED]: "Approved",
   [ApprovalState.REJECTED]: "Rejected",
-  [ApprovalState.CONSUMED]: "Consumed",
+  [ApprovalState.CONSUMED]: "Used",
   [ApprovalState.EXPIRED]: "Expired",
 };
 
 const actionSummaries: Record<DeviceActionKind, string> = {
-  escrowRotate: "Create a new recovery key in server escrow for the exact encrypted volume.",
-  tpm2Bind: "Bind TPM 2.0 unlock to the exact encrypted volume and PCR policy.",
-  lockSessions: "Lock interactive sessions and optionally restrict local account login.",
-  releaseLock: "Restore account state owned by the original lock. Screen locks remain in place.",
-  quarantine: "Restrict network access while retaining the approved management IPs.",
-  releaseQuarantine: "Remove the network restrictions owned by the original quarantine.",
-  cryptoErase:
-    "Destroy the selected LUKS headers and keyslots. Independent recovery copies remain.",
-  sanitize: "Erase the exact unencrypted storage target using the selected qualified method.",
-  restart: "Request a device restart. Completion requires evidence of a new boot.",
-  shutdown: "Request device shutdown. Native acceptance does not prove power-off.",
-  refreshInventory: "Collect and publish a new full inventory snapshot from this device.",
-  localAdminPasswordRotate:
-    "Generate, escrow and then set a new password for the managed local-admin account.",
+  escrowRotate: "Create a new recovery key for this encrypted volume and store it on the server.",
+  tpm2Bind: "Unlock this encrypted volume automatically with the device's TPM.",
+  lockSessions: "Lock user sessions and optionally block local logins.",
+  releaseLock: "Restore accounts locked by lindm. Screen locks stay in place.",
+  quarantine: "Cut network access except for the management IPs you allow.",
+  releaseQuarantine: "Remove the network restrictions added by quarantine.",
+  cryptoErase: "Destroy the encryption keys on this volume. Recovery keys on the server are kept.",
+  sanitize: "Permanently erase this unencrypted disk.",
+  restart: "Restart the device.",
+  shutdown: "Shut down the device.",
+  refreshInventory: "Collect a fresh inventory from this device.",
+  localAdminPasswordRotate: "Set a new password for the managed local admin account.",
 };
 
 export function DeviceActionForm({
@@ -197,7 +196,6 @@ export function DeviceActionForm({
   const liveErase = kind === "cryptoErase" && eraseMode === CryptoEraseMode.LIVE_ROOT_HEADER;
   const destructive = kind === "cryptoErase" || kind === "sanitize";
   const frozen = attempt !== null;
-  const observed = !encryption.error ? encryption.data?.observation : undefined;
   const ready =
     !detail.error &&
     !!detail.data?.device?.enrollmentGeneration &&
@@ -273,7 +271,7 @@ export function DeviceActionForm({
         (entry) => entry.selection.target.luksUuid === currentSelection.target.luksUuid,
       )
     ) {
-      setError("This observed volume is already in the aggregate.");
+      setError("This volume is already in the list.");
       return;
     }
     setLiveTargets([...liveTargets, { key: selectedTarget!.key, selection: currentSelection }]);
@@ -287,24 +285,23 @@ export function DeviceActionForm({
     setRpcFailure(null);
     try {
       if (needsRecovery && !recoveryDigest)
-        throw new Error("Enter the signed recovery image SHA-256 as 64 hexadecimal characters.");
+        throw new Error("Enter the recovery image SHA-256 (64 hexadecimal characters).");
       if (needsRecovery && !recoveryReady)
         throw new Error(recoveryReadinessMessage(eligibleTargets?.recoveryReadiness?.reason || ""));
       if (storage && confirmation !== confirmationName)
-        throw new Error(`Type ${confirmationName} exactly to confirm this storage action.`);
-      if (storage && !currentSelection)
-        throw new Error("Select a currently observed storage target before review.");
+        throw new Error(`Type ${confirmationName} exactly to confirm.`);
+      if (storage && !currentSelection) throw new Error("Select a storage target.");
       if (
         liveErase &&
         (!liveTargets.length || !liveTargets.every((entry) => isStillObserved(entry)))
       )
-        throw new Error("Every aggregate volume must still match an eligible observed target.");
+        throw new Error("A volume in the list is no longer available. Refresh and try again.");
       if (
         liveErase &&
         new Set(liveTargets.map((entry) => entry.selection.target.luksUuid)).size !==
           liveTargets.length
       )
-        throw new Error("The aggregate must contain each observed volume exactly once.");
+        throw new Error("Each volume can only be listed once.");
       const target = storage && !liveErase ? currentSelection!.target : undefined;
       const spec = create(DeviceActionSpecSchema);
       switch (kind) {
@@ -314,7 +311,7 @@ export function DeviceActionForm({
             !encryption.data?.escrowKeyId ||
             !encryption.data.escrowPublicKey.length
           )
-            throw new Error("Server escrow custody is unavailable; rotation cannot be prepared.");
+            throw new Error("The server recovery key isn't set up, so you can't rotate yet.");
           spec.action = {
             case: kind,
             value: create(EscrowRotateActionSchema, {
@@ -339,7 +336,7 @@ export function DeviceActionForm({
           break;
         case "lockSessions":
           if (accountSelection === "explicit" && !usernames.split(/[\s,]+/).some(Boolean))
-            throw new Error("Enter at least one explicit local username.");
+            throw new Error("Enter at least one local username.");
           spec.action = {
             case: kind,
             value: create(LockSessionsActionSchema, {
@@ -352,7 +349,7 @@ export function DeviceActionForm({
           break;
         case "releaseLock":
           if (!lockId || lockId !== currentLockId)
-            throw new Error("Select the current original lock action; refresh if it changed.");
+            throw new Error("The account lock changed. Refresh and try again.");
           spec.action = {
             case: kind,
             value: create(ReleaseLockActionSchema, { lockActionId: lockId }),
@@ -389,7 +386,7 @@ export function DeviceActionForm({
           if (recoveryHandoff && target) {
             const hex = recoveryImageSha256.trim();
             if (!/^(?:[0-9a-fA-F]{2})+$/.test(hex))
-              throw new Error("Enter the configured recovery image SHA-256 as hexadecimal bytes.");
+              throw new Error("Enter the recovery image SHA-256 in hexadecimal.");
             const imageSha256 = Uint8Array.from(hex.match(/../g)!, (byte) =>
               Number.parseInt(byte, 16),
             );
@@ -412,7 +409,7 @@ export function DeviceActionForm({
           if (method >= SanitizeMethod.NVME_FORMAT_USER_DATA) {
             if (!nvmeScope)
               throw new Error(
-                "This target has no complete observed native NVMe identity. Refresh inventory before selecting this method.",
+                "This disk's NVMe details are incomplete. Refresh inventory, then try again.",
               );
             validateInventory(NVMeSanitizeScopeSchema, nvmeScope);
           }
@@ -472,9 +469,7 @@ export function DeviceActionForm({
           !capturedTargets.length ||
           !capturedTargets.every((entry) => isStillObserved(entry, latestEntries))
         )
-          throw new Error(
-            "The observed storage identity changed during preparation. Select the current target and review again.",
-          );
+          throw new Error("The storage on this device changed. Select the target again.");
         if (needsRecovery && !latest?.recoveryReadiness?.ready)
           throw new Error(recoveryReadinessMessage(latest?.recoveryReadiness?.reason || ""));
       }
@@ -488,7 +483,7 @@ export function DeviceActionForm({
       });
     } catch (error) {
       if (!lifetime.signal.aborted)
-        setError(error instanceof Error ? error.message : "Check the action inputs.");
+        setError(error instanceof Error ? error.message : "Check the action details.");
     } finally {
       inFlight.current = false;
       if (!lifetime.signal.aborted) setBusy(false);
@@ -521,17 +516,14 @@ export function DeviceActionForm({
         timeoutMs: 30_000,
       });
       lifetime.signal.throwIfAborted();
-      if (!response.action?.actionId)
-        throw new Error("The server did not return an action receipt.");
+      if (!response.action?.actionId) throw new Error("The server didn't confirm the action.");
       setDeviceActionAttempt(lifetime, attemptKey, {
         ...next,
         status: "accepted",
         failure: null,
         actionId: response.action.actionId,
       });
-      toast.success("Device action request accepted", {
-        description: "Acceptance is not proof of execution. Review the action status.",
-      });
+      toast.success("Action sent to device");
       void queryClient.invalidateQueries({
         queryKey: ["device-actions", lifetime.generation, deviceId],
       });
@@ -545,9 +537,7 @@ export function DeviceActionForm({
       });
       if (!lifetime.signal.aborted) {
         const feedback = classifyRpcFailure(failure);
-        toast[feedback.tone === "destructive" ? "error" : "warning"](feedback.title, {
-          description: "Review the inline result and frozen request before continuing.",
-        });
+        toast[feedback.tone === "destructive" ? "error" : "warning"](feedback.title);
       }
     } finally {
       inFlight.current = false;
@@ -575,16 +565,16 @@ export function DeviceActionForm({
         { signal: lifetime.signal, timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();
-      if (!response.approval?.id) throw new Error("No approval receipt returned.");
+      if (!response.approval?.id)
+        throw new Error("The server didn't confirm the approval request.");
       setDeviceActionAttempt(lifetime, attemptKey, {
         ...attempt,
         approvalId: response.approval.id,
         approvalState: response.approval.state,
         approvalAmbiguous: false,
       });
-      toast.success("Device action approval receipt received", {
-        description:
-          "Review the recorded approval state. This receipt does not prove native execution.",
+      toast.success("Approval requested", {
+        description: "Another admin must approve before you can send this action.",
       });
       await queryClient.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     } catch (error) {
@@ -596,9 +586,7 @@ export function DeviceActionForm({
       if (!lifetime.signal.aborted) {
         setRpcFailure(failure);
         const feedback = classifyRpcFailure(failure);
-        toast[feedback.tone === "destructive" ? "error" : "warning"](feedback.title, {
-          description: "Review the inline result and frozen request before continuing.",
-        });
+        toast[feedback.tone === "destructive" ? "error" : "warning"](feedback.title);
       }
     } finally {
       inFlight.current = false;
@@ -653,13 +641,13 @@ export function DeviceActionForm({
           ) : null}
           {storage && storageTargets.isPending ? (
             <div role="status" className="grid gap-2">
-              <p className="text-sm text-muted-foreground">Loading observed storage…</p>
+              <p className="text-sm text-muted-foreground">Loading storage…</p>
               <Skeleton className="h-24 w-full" />
             </div>
           ) : null}
           {storage && storageTargets.isSuccess && !eligibleTargets && !detail.error ? (
             <p role="status" className="text-sm text-warning">
-              Device enrollment changed. Refresh this page before choosing storage.
+              This device was re-enrolled. Refresh the page before choosing storage.
             </p>
           ) : null}
           {storage && eligibleTargets ? (
@@ -678,20 +666,15 @@ export function DeviceActionForm({
             />
           ) : null}
           {kind === "sanitize" && eligibleTargets && !currentSelection ? (
-            <details className="grid gap-3">
-              <summary className="w-fit cursor-pointer text-sm font-medium">
-                Recovery handoff readiness
-              </summary>
-              <div className="mt-3">
-                <RecoveryReadinessView readiness={eligibleTargets.recoveryReadiness} />
-              </div>
-            </details>
+            <div className="mt-3">
+              <RecoveryReadinessView readiness={eligibleTargets.recoveryReadiness} />
+            </div>
           ) : null}
           {!storage || currentSelection ? (
             <>
               {kind === "cryptoErase" ? (
                 <>
-                  <Label htmlFor={`${prefix}-erase-mode`}>Wipe execution mode</Label>
+                  <Label htmlFor={`${prefix}-erase-mode`}>Wipe mode</Label>
                   <SelectField
                     id={`${prefix}-erase-mode`}
                     value={eraseMode}
@@ -706,11 +689,11 @@ export function DeviceActionForm({
                     options={[
                       {
                         value: CryptoEraseMode.OFFLINE,
-                        label: "Offline: one qualified volume, off-target journal",
+                        label: "Offline: one volume that isn't in use",
                       },
                       {
                         value: CryptoEraseMode.LIVE_ROOT_HEADER,
-                        label: "Live root: complete encrypted-volume set, forced power-off",
+                        label: "While running: all encrypted volumes, then power off",
                       },
                     ]}
                   />
@@ -719,7 +702,7 @@ export function DeviceActionForm({
               {liveErase ? (
                 <div className="grid gap-3">
                   <Button type="button" variant="outline" disabled={busy} onClick={addLiveTarget}>
-                    Add selected volume to aggregate
+                    Add selected volume
                   </Button>
                   {liveTargets.map((entry) => (
                     <div key={entry.key} className="grid gap-2 rounded-md border p-3">
@@ -730,8 +713,8 @@ export function DeviceActionForm({
                       <StorageTargetView target={entry.selection.target} />
                       {!isStillObserved(entry) ? (
                         <p className="text-sm text-warning">
-                          This volume no longer matches the current inventory. Remove it and select
-                          an observed volume.
+                          This volume is no longer reported by the device. Remove it and pick
+                          another.
                         </p>
                       ) : null}
                       <Button
@@ -744,7 +727,7 @@ export function DeviceActionForm({
                           )
                         }
                       >
-                        Remove volume from draft
+                        Remove volume
                       </Button>
                     </div>
                   ))}
@@ -752,9 +735,7 @@ export function DeviceActionForm({
               ) : null}
               {kind === "escrowRotate" ? (
                 <>
-                  <Label htmlFor={`${prefix}-slot`}>
-                    Old lindm-owned slot to retire (optional)
-                  </Label>
+                  <Label htmlFor={`${prefix}-slot`}>Old key slot to remove (optional)</Label>
                   <Input
                     id={`${prefix}-slot`}
                     inputMode="numeric"
@@ -776,29 +757,29 @@ export function DeviceActionForm({
               ) : null}
               {kind === "lockSessions" ? (
                 <fieldset className="grid gap-3 rounded-md border p-3" disabled={busy}>
-                  <legend>Session and account restrictions</legend>
-                  <Label htmlFor={`${prefix}-termination`}>Interactive sessions</Label>
+                  <legend>What to lock</legend>
+                  <Label htmlFor={`${prefix}-termination`}>User sessions</Label>
                   <SelectField
                     id={`${prefix}-termination`}
                     value={terminateSessions ? "terminate" : "lock"}
                     onValueChange={(value) => setTerminateSessions(value === "terminate")}
                     options={[
-                      { value: "lock", label: "Lock supported sessions" },
+                      { value: "lock", label: "Lock sessions" },
                       {
                         value: "terminate",
-                        label: "Lock and terminate sessions",
+                        label: "Lock and sign out sessions",
                       },
                     ]}
                   />
-                  <Label htmlFor={`${prefix}-accounts`}>Disable local account login</Label>
+                  <Label htmlFor={`${prefix}-accounts`}>Block local logins</Label>
                   <SelectField
                     id={`${prefix}-accounts`}
                     value={accountSelection}
                     onValueChange={setAccountSelection}
                     options={[
-                      { value: "none", label: "None: session lock only" },
-                      { value: "explicit", label: "Explicit local usernames" },
-                      { value: "all", label: "All eligible local human accounts" },
+                      { value: "none", label: "None, lock sessions only" },
+                      { value: "explicit", label: "Specific usernames" },
+                      { value: "all", label: "All local user accounts" },
                     ]}
                   />
                   {accountSelection === "explicit" ? (
@@ -813,32 +794,32 @@ export function DeviceActionForm({
                     </>
                   ) : null}
                   {currentLockId ? (
-                    <p className="text-warning">
-                      Release original lock {currentLockId} before another lock.
-                    </p>
+                    <p className="text-warning">Undo the current account lock first.</p>
                   ) : null}
                 </fieldset>
               ) : null}
               {kind === "releaseLock" ? (
                 <div className="grid gap-2">
-                  <Label htmlFor={`${prefix}-original-lock`}>Original lock action</Label>
+                  <Label htmlFor={`${prefix}-original-lock`}>Lock to undo</Label>
                   <SelectField
                     id={`${prefix}-original-lock`}
                     value={lockId}
                     disabled={busy || !currentLockId}
                     onValueChange={setLockId}
                     options={[
-                      { value: "", label: "Select the original lock" },
-                      ...(currentLockId ? [{ value: currentLockId, label: currentLockId }] : []),
+                      { value: "", label: "Select the lock" },
+                      ...(currentLockId
+                        ? [{ value: currentLockId, label: "Current account lock" }]
+                        : []),
                     ]}
                   />
-                  {!currentLockId ? <p>No current original lock is available.</p> : null}
+                  {!currentLockId ? <p>This device has no account lock to undo.</p> : null}
                 </div>
               ) : null}
               {kind === "quarantine" ? (
                 <>
                   <Label htmlFor={`${prefix}-endpoints`}>
-                    Retained management IPs (one per line)
+                    Management IPs to keep reachable (one per line)
                   </Label>
                   <Textarea
                     id={`${prefix}-endpoints`}
@@ -850,7 +831,7 @@ export function DeviceActionForm({
               ) : null}
               {kind === "releaseQuarantine" ? (
                 <>
-                  <Label htmlFor={`${prefix}-quarantine`}>Original quarantine action ID</Label>
+                  <Label htmlFor={`${prefix}-quarantine`}>Quarantine action ID</Label>
                   <Input
                     id={`${prefix}-quarantine`}
                     required
@@ -861,7 +842,7 @@ export function DeviceActionForm({
               ) : null}
               {kind === "sanitize" ? (
                 <>
-                  <Label htmlFor={`${prefix}-method`}>Qualified method</Label>
+                  <Label htmlFor={`${prefix}-method`}>Method</Label>
                   <SelectField
                     id={`${prefix}-method`}
                     value={method}
@@ -880,7 +861,7 @@ export function DeviceActionForm({
               {kind === "sanitize" && method >= SanitizeMethod.NVME_FORMAT_USER_DATA ? (
                 currentSelection?.nvmeScope ? (
                   <div className="grid gap-2">
-                    <Label htmlFor={`${prefix}-nvme-scope`}>Approved effect scope</Label>
+                    <Label htmlFor={`${prefix}-nvme-scope`}>What to erase</Label>
                     <SelectField
                       id={`${prefix}-nvme-scope`}
                       value={nvmeControllerWide ? "controller" : "namespace"}
@@ -890,51 +871,46 @@ export function DeviceActionForm({
                         { value: "namespace", label: "Selected namespace only" },
                         {
                           value: "controller",
-                          label: "Entire controller: all qualified namespaces",
+                          label: "Entire controller: all namespaces",
                         },
                       ]}
                     />
-                    <p className="text-sm text-muted-foreground">
-                      The exact observed native identity is included automatically.
-                      {nvmeControllerWide
-                        ? " This authorizes erasure across the entire controller, not only the selected namespace."
-                        : " Methods requiring controller-wide effects are rejected unless that scope is explicitly approved."}
-                    </p>
+                    {nvmeControllerWide ? (
+                      <p className="text-sm text-warning">
+                        Every namespace on this controller will be erased.
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Native NVMe identity is not available for this target. Refresh inventory before
-                    choosing a native NVMe method.
+                    NVMe details aren&apos;t available for this disk. Refresh inventory, then try
+                    again.
                   </p>
                 )
               ) : null}
               {kind === "sanitize" ? (
                 <div className="grid gap-2">
-                  <Label htmlFor={`${prefix}-sanitize-mode`}>Sanitize execution mode</Label>
+                  <Label htmlFor={`${prefix}-sanitize-mode`}>Mode</Label>
                   <SelectField
                     id={`${prefix}-sanitize-mode`}
                     value={recoveryHandoff ? "recovery" : "offline"}
                     disabled={busy}
                     onValueChange={(value) => setRecoveryHandoff(value === "recovery")}
                     options={[
-                      { value: "offline", label: "Already in qualified offline recovery" },
-                      { value: "recovery", label: "Original-device signed recovery handoff" },
+                      { value: "offline", label: "Device is already in recovery" },
+                      { value: "recovery", label: "Boot into lindm recovery first" },
                     ]}
                   />
                   {recoveryHandoff ? (
                     <>
-                      <Label htmlFor={`${prefix}-recovery-image`}>
-                        Configured signed recovery image SHA-256
-                      </Label>
+                      <Label htmlFor={`${prefix}-recovery-image`}>Recovery image SHA-256</Label>
                       <Input
                         id={`${prefix}-recovery-image`}
                         required
                         value={recoveryImageSha256}
                         onChange={(event) => setRecoveryImageSha256(event.target.value)}
                       />
-                      <Label htmlFor={`${prefix}-recovery-boot`}>
-                        Locally authorized boot method
-                      </Label>
+                      <Label htmlFor={`${prefix}-recovery-boot`}>Boot method</Label>
                       <SelectField
                         id={`${prefix}-recovery-boot`}
                         value={recoveryBootMode}
@@ -948,7 +924,7 @@ export function DeviceActionForm({
                         }
                         options={[
                           { value: RecoveryBootMode.UKI, label: "Signed UKI" },
-                          { value: RecoveryBootMode.KEXEC, label: "Qualified signed kexec" },
+                          { value: RecoveryBootMode.KEXEC, label: "Signed kexec" },
                         ]}
                       />
                       <RecoveryReadinessView readiness={eligibleTargets?.recoveryReadiness} />
@@ -958,94 +934,15 @@ export function DeviceActionForm({
               ) : null}
               <p className="text-sm">{actionSummaries[kind]}</p>
               {liveErase ? (
-                <p className="text-sm">
-                  Every selected volume loses its LUKS headers, keyslots and tokens. The device then
-                  forces power-off within 120 seconds. Include the complete required
-                  encrypted-volume set.
+                <p className="text-sm text-warning">
+                  Every selected volume is wiped and the device powers off within 2 minutes. Include
+                  all encrypted volumes.
                 </p>
               ) : null}
-              <details className="text-sm text-muted-foreground">
-                <summary className="cursor-pointer">Details</summary>
-                <div className="mt-3 grid gap-3">
-                  <p>
-                    Preparation freezes the target, enrollment generation, expiry and signed
-                    payload. Every action requires the root-local allowlist, exact native preflight
-                    and a fresh start grant valid for at most 30 seconds. There is no offline
-                    destructive queue. Platform inventory is not execution authorization.
-                  </p>
-                  <p>
-                    {observed
-                      ? `Last preflight: ${observed.supported ? "supported for that recorded action only" : "unsupported"}${observed.reason ? `: ${observed.reason}` : ""}.`
-                      : "No protected preflight observation is available."}
-                  </p>
-                  <p>
-                    Approval receipts are not cached authority. Start rechecks both distinct humans,
-                    authorization versions, generation, exact specification and expiry. Unknown
-                    outcomes must not be treated as safe to repeat.
-                  </p>
-                  {kind === "lockSessions" || kind === "releaseLock" ? (
-                    <p>
-                      Root and locally protected accounts are excluded. All-human selection uses
-                      local passwd, login.defs UID limits and interactive shells, not directory
-                      accounts. Account locking requires a separate local opt-in. No accounts or
-                      data are deleted. Session locking is not boot locking or proof of physical
-                      control. Release restores only matching owned shadow state, preserves
-                      administrator changes and never unlocks a screen.
-                    </p>
-                  ) : null}
-                  {kind === "escrowRotate" ? (
-                    <p>
-                      A new high-entropy key is encrypted to server escrow. Retiring an old managed
-                      slot requires a durable signed custody receipt; independent owner slots are
-                      preserved. Supply one-shot credentials locally on the device, or use a
-                      qualified TPM token. Never enter owner credentials in this console.
-                    </p>
-                  ) : null}
-                  {kind === "tpm2Bind" ? (
-                    <p>
-                      Binding requires qualified TPM 2.0 tooling, an explicit PCR policy, exact LUKS
-                      identity and a root-local one-shot credential. It does not prove Secure Boot
-                      enforcement.
-                    </p>
-                  ) : null}
-                  {kind === "quarantine" ? (
-                    <p>
-                      Only locally pinned numeric management IPs can remain reachable. Local policy
-                      bounds duration and rejects unsupported firewall ownership.
-                    </p>
-                  ) : null}
-                  {kind === "cryptoErase" ? (
-                    <p>
-                      Offline erasure requires qualified recovery and an off-target journal.
-                      Live-root erasure must include every configured and server-escrowed encrypted
-                      volume, including root, with explicit local permission for every member. It
-                      destroys headers, keyslots and tokens, then forces power-off within 120
-                      seconds of consumption even if delivery fails. Mounted keys remain in memory
-                      until power-off. Its final aggregate proof is memory-only. Neither mode
-                      destroys independent recovery material, server escrow or header backups.
-                    </p>
-                  ) : null}
-                  {kind === "sanitize" ? (
-                    <p>
-                      Sanitation requires unencrypted media in qualified offline recovery with an
-                      off-target journal. Controller-wide commands can affect every namespace. The
-                      root verifies the approved identity basis, controller capabilities, namespace
-                      inventory and mount/swap safety without downgrading identity or substituting
-                      generic discard. Sampling is not physical SSD secure-erasure certification.
-                      Signed recovery handoff requires the original device&apos;s proof and fresh
-                      boot grant, then a new recovery challenge and start grant. Its scoped
-                      credential is not a start grant and its private key never reaches transport.
-                      The media digest binds the exact target. Unsupported image, boot, signature,
-                      media, TPM or journal placement fails closed.
-                    </p>
-                  ) : null}
-                </div>
-              </details>
               <p className="text-sm text-muted-foreground">
                 {destructive
-                  ? "Independent approval is required before execution."
-                  : "Request any required approval at review."}{" "}
-                Review does not send the action.
+                  ? "Another admin must approve before this runs."
+                  : "You'll review the action before it's sent."}
               </p>
               {storage ? (
                 <div className="grid gap-2">
@@ -1061,7 +958,7 @@ export function DeviceActionForm({
                   />
                 </div>
               ) : null}
-              <Label htmlFor={`${prefix}-reason`}>Audit reason</Label>
+              <Label htmlFor={`${prefix}-reason`}>Reason</Label>
               <Textarea
                 id={`${prefix}-reason`}
                 required
@@ -1070,7 +967,7 @@ export function DeviceActionForm({
               />
               {!ready ? (
                 <p className="text-warning">
-                  Current device generation and action permission are required before review.
+                  You don&apos;t have permission for this action, or the device isn&apos;t ready.
                 </p>
               ) : null}
               <Button
@@ -1097,22 +994,13 @@ export function DeviceActionForm({
         <div className="grid gap-3">
           {selectedKind && attempt.payload.spec?.action.case !== selectedKind ? (
             <p className="text-sm text-warning">
-              A previous action is frozen for this device. Resolve that exact request before
-              preparing another.
+              Another action for this device is still waiting. Send or discard it first.
             </p>
           ) : null}
-          <dl className="grid gap-2 break-all text-sm">
-            <dt>Request ID</dt>
-            <dd className="font-mono">{attempt.payload.requestId}</dd>
-            <dt>Device / frozen generation</dt>
-            <dd className="font-mono">
-              {attempt.payload.deviceId} / {attempt.payload.enrollmentGeneration}
-            </dd>
-            <dt>Intent expires</dt>
+          <dl className="grid gap-2 text-sm">
+            <dt className="text-muted-foreground">Expires</dt>
             <dd>{formatTimestamp(attempt.payload.expiresAt).local}</dd>
-            <dt>Specification SHA-256</dt>
-            <dd className="font-mono">{attempt.specSha256}</dd>
-            <dt>Audit reason</dt>
+            <dt className="text-muted-foreground">Reason</dt>
             <dd>{attempt.payload.reason}</dd>
           </dl>
           <DeviceActionSpecView spec={attempt.payload.spec} />
@@ -1120,7 +1008,7 @@ export function DeviceActionForm({
             <RecoveryReadinessView readiness={eligibleTargets?.recoveryReadiness} />
           ) : null}
           <div className="flex items-center gap-2 text-sm">
-            Submission:
+            Status:
             <StatusBadge
               status={
                 attempt.status === "ambiguous"
@@ -1134,11 +1022,11 @@ export function DeviceActionForm({
             >
               {
                 {
-                  frozen: "Ready for review",
-                  inflight: "Submitting",
+                  frozen: "Ready to send",
+                  inflight: "Sending",
                   ambiguous: "Outcome unknown",
                   rejected: "Not accepted",
-                  accepted: "Accepted, execution not confirmed",
+                  accepted: "Sent",
                 }[attempt.status]
               }
             </StatusBadge>
@@ -1149,7 +1037,7 @@ export function DeviceActionForm({
               params={{ deviceId, actionId: attempt.actionId }}
               className="text-sm underline"
             >
-              View action status
+              View action
             </Link>
           ) : null}
           <p>
@@ -1166,27 +1054,37 @@ export function DeviceActionForm({
               }
             >
               {attempt.approvalState === undefined
-                ? "No approval receipt"
+                ? "Not requested"
                 : approvalLabels[attempt.approvalState]}
-            </StatusBadge>
-            {attempt.approvalId ? ` (${attempt.approvalId})` : ""}.{" "}
+            </StatusBadge>{" "}
             <Link to="/approvals" className="underline">
               Open approvals
             </Link>
           </p>
           {attempt.approvalAmbiguous ? (
             <p className="text-warning">
-              Approval delivery unknown. Retry the exact approval request; do not prepare another
-              payload.
+              We couldn&apos;t confirm the approval request. Retry it before changing anything.
             </p>
           ) : null}
           {attempt.failure ? (
             <RpcError failure={attempt.failure}>
               {attempt.status === "ambiguous" ? (
-                <p>Retry this exact request only. Do not create another action.</p>
+                <p>Retry sending. Don&apos;t create a new action.</p>
               ) : null}
             </RpcError>
           ) : null}
+          <TechnicalDetails
+            items={[
+              { label: "Request ID", value: attempt.payload.requestId },
+              { label: "Device ID", value: attempt.payload.deviceId },
+              {
+                label: "Enrollment generation",
+                value: String(attempt.payload.enrollmentGeneration),
+              },
+              { label: "Specification SHA-256", value: attempt.specSha256 },
+              { label: "Approval ID", value: attempt.approvalId },
+            ]}
+          />
           {attempt.status !== "accepted" ? (
             <Alert
               variant={
@@ -1196,23 +1094,23 @@ export function DeviceActionForm({
                   : "default"
               }
             >
-              <AlertTitle>Confirm submission</AlertTitle>
+              <AlertTitle>Before you send</AlertTitle>
               <AlertDescription>
                 {attempt.payload.spec?.action.case === "cryptoErase"
                   ? attempt.payload.spec.action.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER
-                    ? "Irreversible header erasure with forced power-off. Independent approval is required."
-                    : "Irreversible header erasure. Independent approval is required."
+                    ? "This permanently wipes the volumes and powers off the device. Another admin must approve."
+                    : "This permanently wipes the volume. Another admin must approve."
                   : attempt.payload.spec?.action.case === "sanitize"
                     ? attempt.payload.spec.action.value.nvmeScope?.controllerWide
-                      ? "Irreversible erasure affects the entire controller. Independent approval is required."
-                      : "Irreversible storage erasure. Independent approval is required."
+                      ? "This permanently erases every namespace on the controller. Another admin must approve."
+                      : "This permanently erases the disk. Another admin must approve."
                     : attempt.payload.spec?.action.case === "lockSessions" &&
                         attempt.payload.spec.action.value.terminateSessions
-                      ? "Terminating sessions can lose unsaved work."
+                      ? "Signing out sessions can lose unsaved work."
                       : attempt.payload.spec?.action.case === "restart" ||
                           attempt.payload.spec?.action.case === "shutdown"
-                        ? "This interrupts device use and can lose unsaved work."
-                        : "Submit only after reviewing the exact target and effects above."}
+                        ? "Users can lose unsaved work."
+                        : "Check the details above before sending."}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -1227,7 +1125,7 @@ export function DeviceActionForm({
               }
               onClick={() => void send(attempt)}
             >
-              {attempt.status === "ambiguous" ? "Retry exact submission" : "Submit frozen action"}
+              {attempt.status === "ambiguous" ? "Retry sending" : "Send action"}
             </Button>
             <Button
               variant="outline"
@@ -1244,10 +1142,10 @@ export function DeviceActionForm({
               onClick={() => void approval()}
             >
               {attempt.approvalId
-                ? "Refresh exact approval state"
+                ? "Refresh approval status"
                 : attempt.approvalAmbiguous
-                  ? "Retry exact approval request"
-                  : "Request independent approval"}
+                  ? "Retry approval request"
+                  : "Request approval"}
             </Button>
             <Button
               variant="outline"
@@ -1276,7 +1174,7 @@ export function DeviceActionForm({
               <DialogHeader>
                 <DialogTitle>Refresh inventory</DialogTitle>
                 <DialogDescription>
-                  Ask {confirmationName} to collect and publish a fresh inventory snapshot.
+                  Ask {confirmationName} to send a fresh inventory.
                 </DialogDescription>
               </DialogHeader>
               <DeviceActionForm
@@ -1304,7 +1202,7 @@ export function DeviceActionForm({
             disabled={storageTargets.isFetching}
             onClick={() => void storageTargets.refetch()}
           >
-            Retry storage lookup
+            Retry
           </Button>
         </RpcError>
       ) : null}

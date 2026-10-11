@@ -27,6 +27,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
@@ -50,23 +51,21 @@ export function AttributeDefinitions() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Custom attribute definitions</CardTitle>
+        <CardTitle>Custom attributes</CardTitle>
         <CardDescription>
-          Each key has one type: string, integer, boolean or enum. Definition changes require
-          unrestricted inventory management permission; the server rejects incompatible changes to
-          values already in use.
+          Attributes you can set on devices. Each one is text, a number, yes/no, or a fixed list.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {failure ? <RpcError failure={failure} /> : null}
-        {definitions.isPending ? <p role="status">Loading definitions…</p> : null}
+        {definitions.isPending ? <p role="status">Loading attributes…</p> : null}
         {data ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Key</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Enum values</TableHead>
+                <TableHead>Allowed values</TableHead>
                 {canManage ? <TableHead>Action</TableHead> : null}
               </TableRow>
             </TableHeader>
@@ -78,7 +77,7 @@ export function AttributeDefinitions() {
                     {AttributeType[definition.type]?.toLowerCase() ?? "Unknown"}
                   </TableCell>
                   <TableCell className="whitespace-normal">
-                    {definition.enumValues.join(", ") || "Not an enum"}
+                    {definition.enumValues.join(", ") || "Any"}
                   </TableCell>
                   {canManage ? (
                     <TableCell>
@@ -96,28 +95,28 @@ export function AttributeDefinitions() {
             </TableBody>
           </Table>
         ) : null}
-        {data?.definitions.length === 0 ? <p>No definitions on this page.</p> : null}
+        {data?.definitions.length === 0 ? <p>No custom attributes yet.</p> : null}
         <div className="flex gap-2">
           <Button
             variant="outline"
             disabled={!afterKey || definitions.isFetching}
             onClick={() => setAfterKey("")}
           >
-            First keys
+            First page
           </Button>
           <Button
             variant="outline"
             disabled={!data?.nextAfterKey || definitions.isFetching}
             onClick={() => setAfterKey(data?.nextAfterKey ?? "")}
           >
-            Next keys
+            Next page
           </Button>
           <Button
             variant="outline"
             disabled={definitions.isFetching}
             onClick={() => void definitions.refetch()}
           >
-            Refresh definitions
+            Refresh
           </Button>
         </div>
         {canManage && !editing ? (
@@ -127,7 +126,7 @@ export function AttributeDefinitions() {
               setEditing(create(AttributeDefinitionSchema, { type: AttributeType.STRING }))
             }
           >
-            Define a new key
+            Add attribute
           </Button>
         ) : null}
         {editing ? <DefinitionForm definition={editing} onClose={() => setEditing(null)} /> : null}
@@ -157,7 +156,7 @@ function DefinitionForm({
       lifetime.signal.throwIfAborted();
     },
     onSuccess: () => {
-      if (!lifetime.signal.aborted) toast.success("Attribute definition saved");
+      if (!lifetime.signal.aborted) toast.success("Attribute saved");
       void queryClient.invalidateQueries({
         queryKey: ["attribute-definitions", lifetime.generation],
       });
@@ -171,9 +170,7 @@ function DefinitionForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Definition save outcome unknown" : "Definition not saved", {
-          description: "Review the inline result and captured request before continuing.",
-        });
+        ](failure.ambiguous ? "Couldn't confirm attribute was saved" : "Couldn't save attribute");
       }
     },
     onSettled: () => {
@@ -219,7 +216,7 @@ function DefinitionForm({
     >
       <fieldset disabled={captured !== null} className="grid gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="definition-key">Key</Label>
+          <Label htmlFor="definition-key">Name</Label>
           <Input
             id="definition-key"
             name="key"
@@ -236,16 +233,16 @@ function DefinitionForm({
             disabled={captured !== null}
             onValueChange={(value) => setType(Number(value) as AttributeType)}
             options={[
-              { value: AttributeType.STRING, label: "String" },
-              { value: AttributeType.INT, label: "Integer" },
-              { value: AttributeType.BOOL, label: "Boolean" },
-              { value: AttributeType.ENUM, label: "Enum" },
+              { value: AttributeType.STRING, label: "Text" },
+              { value: AttributeType.INT, label: "Whole number" },
+              { value: AttributeType.BOOL, label: "Yes/no" },
+              { value: AttributeType.ENUM, label: "List of values" },
             ]}
           />
         </div>
         {type === AttributeType.ENUM ? (
           <div className="grid gap-1.5">
-            <Label htmlFor="definition-enum">Allowed enum values (one per line)</Label>
+            <Label htmlFor="definition-enum">Allowed values (one per line)</Label>
             <Textarea
               id="definition-enum"
               name="enum"
@@ -255,16 +252,16 @@ function DefinitionForm({
           </div>
         ) : null}
         <div className="grid gap-1.5">
-          <Label htmlFor="definition-reason">Audit reason</Label>
+          <Label htmlFor="definition-reason">Reason</Label>
           <Textarea id="definition-reason" name="reason" required />
         </div>
       </fieldset>
       {captured ? (
-        <p className="break-all font-mono text-xs">Request ID {captured.requestId}</p>
+        <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
-          <p>{failure.ambiguous ? " Outcome unknown; retry the same captured request." : ""}</p>
+          {failure.ambiguous ? <p>We couldn&apos;t confirm the save. Retry to make sure.</p> : null}
         </RpcError>
       ) : null}
       {inputError ? (
@@ -272,10 +269,10 @@ function DefinitionForm({
           {inputError}
         </p>
       ) : null}
-      {save.isSuccess ? <p role="status">Definition saved.</p> : null}
+      {save.isSuccess ? <p role="status">Attribute saved.</p> : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={save.isPending || save.isSuccess}>
-          {save.isPending ? "Saving…" : captured ? "Retry same request" : "Save definition"}
+          {save.isPending ? "Saving…" : captured ? "Retry" : "Save attribute"}
         </Button>
         <Button
           type="button"
@@ -294,7 +291,7 @@ function DefinitionForm({
               save.reset();
             }}
           >
-            Edit a new request
+            Edit and try again
           </Button>
         ) : null}
       </div>

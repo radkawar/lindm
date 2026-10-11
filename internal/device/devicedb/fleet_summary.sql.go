@@ -150,14 +150,35 @@ func (q *Queries) FleetSummaryCounts(ctx context.Context, arg FleetSummaryCounts
 }
 
 const fleetSummaryFindings = `-- name: FleetSummaryFindings :one
-SELECT count(*) FILTER (WHERE f.severity = 'critical')::bigint AS critical_findings,
- count(*) FILTER (WHERE f.severity = 'high')::bigint AS high_findings,
- count(*) FILTER (WHERE f.severity = 'medium')::bigint AS medium_findings,
- count(*) FILTER (WHERE f.severity = 'low')::bigint AS low_findings,
- count(*) FILTER (WHERE f.severity NOT IN ('critical', 'high', 'medium', 'low'))::bigint AS other_findings
-FROM advisory_finding_status f
-WHERE f.state = 'affected'
- AND device_scope_matches(f.device_id, $1::boolean, $2::jsonb)
+WITH dev AS (
+ SELECT s.device_id, s.finding_set_id FROM advisory_device_status s
+ WHERE NOT s.unknown AND s.finding_set_id IS NOT NULL
+  AND device_scope_matches(s.device_id, $1::boolean, $2::jsonb)
+), bound AS (
+ SELECT finding_set_id, count(*)::bigint AS devices FROM dev GROUP BY finding_set_id
+), totals AS (
+ SELECT coalesce(sum(b.devices * fs.critical_count), 0)::bigint AS critical,
+  coalesce(sum(b.devices * fs.high_count), 0)::bigint AS high,
+  coalesce(sum(b.devices * fs.medium_count), 0)::bigint AS medium,
+  coalesce(sum(b.devices * fs.low_count), 0)::bigint AS low,
+  coalesce(sum(b.devices * fs.other_count), 0)::bigint AS other
+ FROM bound b JOIN advisory_finding_sets fs ON fs.id = b.finding_set_id
+), accepted AS (
+ SELECT count(*) FILTER (WHERE f.severity = 'critical')::bigint AS critical,
+  count(*) FILTER (WHERE f.severity = 'high')::bigint AS high,
+  count(*) FILTER (WHERE f.severity = 'medium')::bigint AS medium,
+  count(*) FILTER (WHERE f.severity = 'low')::bigint AS low,
+  count(*) FILTER (WHERE f.severity NOT IN ('critical', 'high', 'medium', 'low'))::bigint AS other
+ FROM dev
+ JOIN advisory_exceptions x ON x.device_id = dev.device_id AND x.expires_at > CURRENT_TIMESTAMP
+ JOIN advisory_set_findings f ON f.set_id = dev.finding_set_id AND f.finding_key = x.finding_id
+)
+SELECT (t.critical - a.critical)::bigint AS critical_findings,
+ (t.high - a.high)::bigint AS high_findings,
+ (t.medium - a.medium)::bigint AS medium_findings,
+ (t.low - a.low)::bigint AS low_findings,
+ (t.other - a.other)::bigint AS other_findings
+FROM totals t CROSS JOIN accepted a
 `
 
 type FleetSummaryFindingsParams struct {
@@ -173,8 +194,9 @@ type FleetSummaryFindingsRow struct {
 	OtherFindings    int64
 }
 
-// Canonical view applies current inventory/feed validity and exception expiry;
-// never infer open findings from retained evidence rows or sum advisory devices.
+// Same affected population as advisory_finding_status, computed from shared
+// finding sets weighted by fresh bound devices, minus each device's active
+// exceptions. Never infer open findings from retained evidence rows.
 func (q *Queries) FleetSummaryFindings(ctx context.Context, arg FleetSummaryFindingsParams) (FleetSummaryFindingsRow, error) {
 	row := q.db.QueryRow(ctx, fleetSummaryFindings, arg.ScopeUnrestricted, arg.Scopes)
 	var i FleetSummaryFindingsRow

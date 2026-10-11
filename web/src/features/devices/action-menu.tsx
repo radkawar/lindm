@@ -104,9 +104,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
           <DialogContent finalFocus={trigger} className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>{actionLabels[kind]}</DialogTitle>
-              <DialogDescription>
-                {device.hostname || "Device"}: {device.id}
-              </DialogDescription>
+              <DialogDescription>{device.hostname || "This device"}</DialogDescription>
             </DialogHeader>
             <DeviceActionForm
               key={kind}
@@ -134,7 +132,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
             <DialogHeader>
               <DialogTitle>Revoke {device.hostname || "device"}</DialogTitle>
               <DialogDescription>
-                Request independent approval to revoke enrollment for {device.id}.
+                Another admin must approve before this device is removed from lindm.
               </DialogDescription>
             </DialogHeader>
             {revoke}

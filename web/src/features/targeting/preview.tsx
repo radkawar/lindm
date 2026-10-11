@@ -17,6 +17,7 @@ import {
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,13 +82,13 @@ export function TargetPreviewView() {
       );
       lifetime.signal.throwIfAborted();
       if (!response.approval?.id)
-        throw new Error("The server did not return an approval identity.");
+        throw new Error("The server didn't confirm the approval request.");
       return response.approval.id;
     },
     onSuccess: (approvalId) => {
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
       update({ ...session, approvalId, approvalBusy: false, approvalFailure: undefined });
-      toast.success("Snapshot activation approval requested");
+      toast.success("Approval requested");
       void client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     },
     onError: (error) => {
@@ -110,7 +111,7 @@ export function TargetPreviewView() {
         !response.preview.previewId ||
         response.preview.previewSha256.length !== 32
       )
-        throw new Error("The server did not return a complete immutable preview.");
+        throw new Error("The server returned an incomplete preview. Try again.");
       return response.preview;
     },
     onSuccess: (result) => {
@@ -137,7 +138,7 @@ export function TargetPreviewView() {
     onSuccess: () => {
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
       update({ ...session, status: "accepted", activationFailure: undefined });
-      toast.success("Target snapshot activation accepted");
+      toast.success("Device changes activated");
       void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
       void client.invalidateQueries({
         queryKey: ["device-resources", lifetime.generation, session.preview?.deviceId],
@@ -156,12 +157,8 @@ export function TargetPreviewView() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Preview device resources</CardTitle>
-        <CardDescription>
-          Review the resources assigned to one device, then activate the captured snapshot.
-          Activation rechecks access, device generation and freshness. It does not apply changes
-          itself.
-        </CardDescription>
+        <CardTitle>Preview a device</CardTitle>
+        <CardDescription>See which settings a device will get, then activate them.</CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         <form
@@ -178,7 +175,7 @@ export function TargetPreviewView() {
               return;
             const id = canonicalUuid(deviceId);
             if (!id) {
-              setValidationError("Enter a device UUID.");
+              setValidationError("Enter a valid device ID.");
               return;
             }
             setValidationError("");
@@ -196,7 +193,7 @@ export function TargetPreviewView() {
             />
           </div>
           <Button disabled={!!current.loading || unresolved}>
-            {current.loading ? "Capturing snapshot…" : "Capture preview"}
+            {current.loading ? "Loading preview…" : "Preview"}
           </Button>
         </form>
         {validationError ? (
@@ -206,57 +203,50 @@ export function TargetPreviewView() {
         ) : null}
         {current.previewFailure ? (
           <RpcError failure={current.previewFailure}>
-            {preview ? <p>The snapshot below is from the previous capture.</p> : null}
+            {preview ? <p>Showing the previous preview.</p> : null}
           </RpcError>
         ) : null}
         {preview ? (
           <>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-muted-foreground">Immutable preview</dt>
-                <dd className="break-all font-mono">{preview.previewId}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Device / generation</dt>
-                <dd className="break-all font-mono">
-                  {preview.deviceId} / {preview.generationId}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Evaluated</dt>
+                <dt className="text-muted-foreground">Checked</dt>
                 <dd>{formatTimestamp(preview.evaluatedAt).local}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Valid until (server rechecks)</dt>
+                <dt className="text-muted-foreground">Valid until</dt>
                 <dd>{formatTimestamp(preview.validUntil).local}</dd>
               </div>
-              {[
-                { label: "Input SHA-256", value: preview.inputSha256 },
-                { label: "Preview SHA-256", value: preview.previewSha256 },
-                { label: "Resolution SHA-256", value: preview.resolutionSha256 },
-              ].map((digest) => (
-                <div key={digest.label}>
-                  <dt className="text-muted-foreground">{digest.label}</dt>
-                  <dd className="break-all font-mono text-xs">
-                    {digest.value.length === 32
+            </dl>
+            <TechnicalDetails
+              items={[
+                { label: "Preview ID", value: preview.previewId },
+                { label: "Device ID", value: preview.deviceId },
+                { label: "Generation", value: preview.generationId },
+                ...[
+                  { label: "Input SHA-256", value: preview.inputSha256 },
+                  { label: "Preview SHA-256", value: preview.previewSha256 },
+                  { label: "Resolution SHA-256", value: preview.resolutionSha256 },
+                ].map((digest) => ({
+                  label: digest.label,
+                  value:
+                    digest.value.length === 32
                       ? Array.from(digest.value, (byte) => byte.toString(16).padStart(2, "0")).join(
                           "",
                         )
-                      : "Unavailable"}
-                  </dd>
-                </div>
-              ))}
-              <div>
-                <dt className="text-muted-foreground">Previous active preview</dt>
-                <dd className="break-all font-mono">{preview.previousPreviewId ?? "None"}</dd>
-              </div>
-            </dl>
+                      : "Unavailable",
+                })),
+                { label: "Previous preview", value: preview.previousPreviewId ?? "None" },
+              ]}
+            >
+              <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
+                {toJsonString(TargetPreviewSchema, preview, { prettySpaces: 2 })}
+              </pre>
+            </TechnicalDetails>
             <div className="grid gap-2">
-              <h3 className="text-sm font-medium">Captured assignment candidates</h3>
+              <h3 className="text-sm font-medium">Matching assignments</h3>
               {preview.candidates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No assignment candidates in this capture.
-                </p>
+                <p className="text-sm text-muted-foreground">No assignments match this device.</p>
               ) : (
                 preview.candidates.map((candidate, index) => (
                   <div
@@ -270,44 +260,30 @@ export function TargetPreviewView() {
                           ? "Excluded"
                           : "Unknown"}
                     </StatusBadge>
-                    <span className="break-all">
-                      Assignment {candidate.assignment?.assignmentId ?? "Not recorded"} · revision{" "}
-                      {candidate.revision.toString()} · profile revision{" "}
-                      {candidate.assignment?.profileRevisionId ?? "Not recorded"} · priority{" "}
-                      {candidate.assignment?.priority ?? "Not recorded"}
-                    </span>
+                    <span>Priority {candidate.assignment?.priority ?? "unknown"}</span>
+                    <TechnicalDetails
+                      items={[
+                        { label: "Assignment ID", value: candidate.assignment?.assignmentId },
+                        { label: "Revision", value: candidate.revision.toString() },
+                        {
+                          label: "Profile revision ID",
+                          value: candidate.assignment?.profileRevisionId,
+                        },
+                      ]}
+                    />
                   </div>
                 ))
               )}
             </div>
-            <details>
-              <summary className="cursor-pointer text-sm">
-                Complete immutable typed snapshot
-              </summary>
-              <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
-                {toJsonString(TargetPreviewSchema, preview, { prettySpaces: 2 })}
-              </pre>
-            </details>
             <div className="grid gap-2">
-              <h3 className="text-sm font-medium">
-                Resolved resources, conflicts and dispatch capability
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Dispatch support is a control-plane capability, not qualification of this device's
-                native backend, requested features or ownership. Native planning can still refuse.
-              </p>
+              <h3 className="text-sm font-medium">Settings this device will get</h3>
               {!preview.resolution ? (
                 <Alert>
-                  <AlertTitle>Resolution unavailable</AlertTitle>
-                  <AlertDescription>
-                    No typed resolution was returned. Do not infer readiness from assignment
-                    matches.
-                  </AlertDescription>
+                  <AlertTitle>Couldn't work out this device's settings</AlertTitle>
+                  <AlertDescription>Preview again before activating.</AlertDescription>
                 </Alert>
               ) : preview.resolution.resources.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  This snapshot resolves no desired resources.
-                </p>
+                <p className="text-sm text-muted-foreground">No settings apply to this device.</p>
               ) : (
                 preview.resolution.resources.map((resolved, index) => (
                   <article
@@ -315,8 +291,8 @@ export function TargetPreviewView() {
                     className="grid gap-2 border p-3 text-sm"
                   >
                     <h4 className="break-all font-medium">
-                      {resolved.ref?.kind ?? "Unknown kind"} /{" "}
-                      {resolved.ref?.canonicalKey ?? "Unknown key"}
+                      {resolved.ref?.kind ?? "Unknown type"} /{" "}
+                      {resolved.ref?.canonicalKey ?? "Unknown"}
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       <StatusBadge
@@ -331,7 +307,7 @@ export function TargetPreviewView() {
                         }
                       >
                         {resolved.disposition === ResourceResolutionDisposition.READY
-                          ? "Resolved"
+                          ? "Ready"
                           : resolved.disposition === ResourceResolutionDisposition.CONFLICT
                             ? "Conflict"
                             : resolved.disposition === ResourceResolutionDisposition.BLOCKED
@@ -339,21 +315,23 @@ export function TargetPreviewView() {
                               : "Unknown"}
                       </StatusBadge>
                       <StatusBadge status={resolved.dispatchSupported ? "info" : "warning"}>
-                        {resolved.dispatchSupported ? "Dispatch supported" : "Dispatch unsupported"}
+                        {resolved.dispatchSupported ? "Supported" : "Not supported"}
                       </StatusBadge>
                     </div>
-                    <p className="break-all">
-                      Required capability: {resolved.capabilityId || "Unavailable"}
-                    </p>
                     {resolved.reason ? <p>Reason: {resolved.reason}</p> : null}
-                    <p className="break-all">
-                      Contributing immutable profile revisions:{" "}
-                      {resolved.contributingRevisionIds.join(", ") || "None"}
-                    </p>
-                    <p className="break-all">
-                      Overridden immutable profile revisions:{" "}
-                      {resolved.overriddenRevisionIds.join(", ") || "None"}
-                    </p>
+                    <TechnicalDetails
+                      items={[
+                        { label: "Required capability", value: resolved.capabilityId },
+                        {
+                          label: "From profile revisions",
+                          value: resolved.contributingRevisionIds.join(", "),
+                        },
+                        {
+                          label: "Overridden profile revisions",
+                          value: resolved.overriddenRevisionIds.join(", "),
+                        },
+                      ]}
+                    />
                   </article>
                 ))
               )}
@@ -391,7 +369,7 @@ export function TargetPreviewView() {
                 activate.mutate(request);
               }}
             >
-              <Label htmlFor="target-activation-reason">Activation reason</Label>
+              <Label htmlFor="target-activation-reason">Reason</Label>
               <Textarea
                 id="target-activation-reason"
                 value={current.request?.reason ?? reason}
@@ -400,36 +378,33 @@ export function TargetPreviewView() {
                 required
               />
               <p className="text-sm text-muted-foreground">
-                Activation uses this exact preview and digest. Refresh changed or expired previews,
-                and resolve unsupported resources or conflicts before deployment.
+                Fix any conflicts or unsupported settings first. If the preview expires, preview
+                again.
               </p>
               {current.request ? (
-                <p className="break-all font-mono text-xs">
-                  Request ID {current.request.requestId}
-                </p>
+                <TechnicalDetails
+                  items={[{ label: "Request ID", value: current.request.requestId }]}
+                />
               ) : null}
               {current.activationFailure ? (
                 <RpcError failure={current.activationFailure}>
                   <p>
                     {current.status === "ambiguous"
-                      ? "Retry this captured request. Keep this snapshot until the outcome is known."
-                      : "Capture a fresh preview before preparing another activation."}
+                      ? "We couldn't confirm activation. Retry: it won't apply twice."
+                      : "Preview again, then activate."}
                   </p>
                 </RpcError>
               ) : null}
               {current.activationFailure?.message === "approval_required" ? (
                 <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
-                  <p>
-                    This exact device-generation snapshot requires approval by a different
-                    authorized human.
-                  </p>
+                  <p>Activating this device needs approval from another administrator.</p>
                   {current.approvalId ? (
                     <p>
-                      Approval {current.approvalId} requested.{" "}
+                      Approval requested.{" "}
                       <Link to="/approvals" className="underline">
-                        Review and execute in approvals
+                        Go to approvals
                       </Link>
-                      . Expiry and changed-input fences still apply.
+                      .
                     </p>
                   ) : (
                     <Button
@@ -445,8 +420,8 @@ export function TargetPreviewView() {
                       {current.approvalBusy
                         ? "Requesting approval…"
                         : current.approvalFailure?.ambiguous
-                          ? "Retry exact approval request"
-                          : "Request approval for this snapshot"}
+                          ? "Retry approval request"
+                          : "Request approval"}
                     </Button>
                   )}
                   {current.approvalFailure ? <RpcError failure={current.approvalFailure} /> : null}
@@ -454,7 +429,7 @@ export function TargetPreviewView() {
               ) : null}
               {current.status === "accepted" ? (
                 <p role="status" className="text-sm">
-                  Snapshot activation accepted. Device execution has not been confirmed.
+                  Activated. The device will apply the changes on its next check-in.
                 </p>
               ) : null}
               <Button
@@ -467,8 +442,8 @@ export function TargetPreviewView() {
                 {current.status === "pending"
                   ? "Activating…"
                   : current.status === "ambiguous"
-                    ? "Retry exact activation"
-                    : "Activate this snapshot"}
+                    ? "Retry"
+                    : "Activate"}
               </Button>
             </form>
           </>

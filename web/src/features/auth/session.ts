@@ -17,7 +17,7 @@ export async function fetchSession(signal?: AbortSignal): Promise<SessionPrincip
   if (!response.ok) throw new Error(await readError(response));
   const principal = fromJson(SessionPrincipalSchema, (await response.json()) as JsonValue);
   if (principal.csrfToken === "") {
-    throw new Error("Session response did not include a CSRF token.");
+    throw new Error("Couldn't start your session. Reload the page.");
   }
   return principal;
 }

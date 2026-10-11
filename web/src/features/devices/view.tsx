@@ -139,21 +139,15 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
             {complianceLabels[device.compliance] ?? "Unknown"}
           </TooltipTrigger>
           <TooltipContent className="block space-y-2">
-            <p>
-              Worst state across current assigned services, not a live probe or whole-device
-              compliance.
-            </p>
+            <p>Worst status across the services assigned to this device.</p>
             <p>
               {device.lastVerifiedAt ? (
                 <>
-                  Oldest verification: <ObservedTime value={device.lastVerifiedAt} server />.
+                  Last fully checked: <ObservedTime value={device.lastVerifiedAt} server />.
                 </>
               ) : (
-                "No complete verification timestamp."
+                "Not fully checked yet."
               )}
-            </p>
-            <p>
-              The timestamp is present only when every current resource has a recorded verification.
             </p>
           </TooltipContent>
         </Tooltip>
@@ -270,13 +264,13 @@ export function DevicesView({
               {data ? `${data.devices.length} devices on this page` : "Device inventory"}
             </span>
             <p className="text-xs text-muted-foreground">
-              {sort ? "Sorted within this page only" : "Stable server order"}
+              {sort ? "Sorted within this page" : "Default order"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {sort ? (
               <Button size="sm" variant="ghost" onClick={() => setSort(null)}>
-                Reset page sort
+                Reset sort
               </Button>
             ) : null}
             <details className="relative">
@@ -335,7 +329,7 @@ export function DevicesView({
         {rows.length > 0 ? (
           <Table className={compact ? "[&_td]:h-12 [&_td]:py-2" : "[&_td]:py-4"}>
             <caption className="sr-only">
-              Enrolled devices. Column sorting applies only to the current cursor page.
+              Enrolled devices. Sorting applies to the current page only.
             </caption>
             <TableHeader className="bg-muted/40">
               <TableRow>
@@ -455,29 +449,19 @@ export function DevicesView({
           </div>
         </div>
       </div>
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">
-          About contact times and search pages
-        </summary>
-        <p className="mt-2 max-w-3xl leading-relaxed">
-          Last contact is a server receipt time, not live presence or inventory freshness. Search
-          pages use a bounded enrollment cutoff and stable device ordering. Inventory and metadata
-          remain live, not a frozen snapshot. Cursors expire after 15 minutes.
-          {data ? (
-            <>
-              {" "}
-              This search expires: <ObservedTime value={data.cursorExpiresAt} />.
-            </>
-          ) : null}
+      {data ? (
+        <p className="text-xs text-muted-foreground">
+          This search expires <ObservedTime value={data.cursorExpiresAt} />. Start a new search to
+          see newly enrolled devices.
         </p>
-      </details>
+      ) : null}
       <details className="border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Export inventory</summary>
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Export devices</summary>
         <DeviceExport key={`${search.filter ?? ""}:${search.pageSize}`} search={search} />
       </details>
       <details className="border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-          Attribute definitions
+          Custom attributes
         </summary>
         <AttributeDefinitions />
       </details>
@@ -527,7 +511,7 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
           <DialogHeader>
             <DialogTitle>Revoke {device.hostname || "device"}</DialogTitle>
             <DialogDescription>
-              Request independent approval to revoke this device’s enrollment.
+              Another admin must approve before this device is removed from lindm.
             </DialogDescription>
           </DialogHeader>
           {children}

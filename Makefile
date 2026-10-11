@@ -107,3 +107,13 @@ check-web: acceptance-build
 
 acceptance: acceptance-build
 	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
+
+# Local CI (basecamp/gh-signoff): run the gates on this machine, then post
+# green commit statuses for the pushed HEAD. gh-signoff refuses a dirty tree or
+# an unpushed commit, so a signoff always attests to exactly what is on GitHub.
+.PHONY: signoff signoff-acceptance
+signoff: check test-integration
+	gh signoff check integration
+
+signoff-acceptance: acceptance
+	gh signoff acceptance

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { DeviceActionForm } from "./action-form";
@@ -20,7 +21,7 @@ import { RecoveryKeyReveal } from "./recovery-reveal";
 export function DeviceActionPage({
   deviceId,
   title,
-  description = "Review the target and complete the required inputs.",
+  description = "Check the device and fill in the details.",
   children,
 }: {
   deviceId: string;
@@ -51,17 +52,21 @@ export function DeviceActionPage({
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Target device</CardTitle>
+              <CardTitle>Device</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid gap-3">
               <dl className="grid gap-3 break-all text-sm sm:grid-cols-2">
                 <Fact label="Hostname">{device.hostname || "Not reported"}</Fact>
-                <Fact label="Device ID">{device.id}</Fact>
-                <Fact label="Enrollment generation">{device.enrollmentGeneration}</Fact>
                 <Fact label="Operating system">
                   {[device.osId, device.osVersion].filter(Boolean).join(" ") || "Not reported"}
                 </Fact>
               </dl>
+              <TechnicalDetails
+                items={[
+                  { label: "Device ID", value: device.id },
+                  { label: "Enrollment generation", value: String(device.enrollmentGeneration) },
+                ]}
+              />
             </CardContent>
           </Card>
           {children(device)}
@@ -120,32 +125,27 @@ export function DeviceActionStatusPage({
     <DeviceActionPage
       deviceId={deviceId}
       title="Action status"
-      description="Follow this action's recorded progress and result."
+      description="Progress and result of this action."
     >
       {() => (
         <div className="grid gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="break-all font-mono text-sm">{actionId}</p>
             <Button
               variant="outline"
               disabled={query.isFetching}
               onClick={() => void query.refetch()}
             >
-              Refresh result
+              Refresh
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Acceptance is not completion. This page follows the exact action ID, including its
-            frozen target and protected result.
-          </p>
           {query.isPending ? <p role="status">Loading action result…</p> : null}
           {query.error ? (
             <RpcError failure={toRpcFailure(query.error)} />
           ) : query.data ? (
-            <DeviceActionResult action={query.data} />
+            <DeviceActionResult action={query.data} linked={false} />
           ) : null}
           <Link to="/devices/$deviceId" params={{ deviceId }} className="w-fit text-sm underline">
-            Back to device and action history
+            Back to device
           </Link>
         </div>
       )}
@@ -167,15 +167,15 @@ export function DeviceRecoveryRevealPage({
     <DeviceActionPage
       deviceId={deviceId}
       title="Reveal recovery key"
-      description="Request access to the recorded recovery key for this volume."
+      description="Get access to the recovery key for this volume."
     >
       {() => (
         <div className="grid gap-4">
-          {query.isPending ? <p role="status">Loading exact escrow action…</p> : null}
+          {query.isPending ? <p role="status">Loading recovery key record…</p> : null}
           {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
           {action ? (
             <>
-              <DeviceActionResult action={action} />
+              <DeviceActionResult action={action} linked={false} />
               {action.spec?.action.case === "escrowRotate" ? (
                 <Card>
                   <CardHeader>
@@ -191,8 +191,8 @@ export function DeviceRecoveryRevealPage({
                 </Card>
               ) : (
                 <p>
-                  This action is not a recovery escrow rotation. Select an escrow record from
-                  Encryption.
+                  This action doesn&apos;t have a recovery key. Pick a recovery key from the
+                  Encryption tab.
                 </p>
               )}
             </>

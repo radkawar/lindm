@@ -74,7 +74,7 @@ func (c *inventoryReplayClient) checkManifest(manifest *devicev1.PackageSnapshot
 func TestInventoryRetainsInterruptedUpload(t *testing.T) {
 	for _, phase := range []string{"host", "begin", "batch", "commit"} {
 		t.Run(phase, func(t *testing.T) {
-			data, err := packages(2000)
+			data, err := packages(2000, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

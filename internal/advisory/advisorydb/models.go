@@ -22,6 +22,7 @@ type AdvisoryEvaluation struct {
 	State          string
 	Reason         string
 	FindingDigest  []byte
+	FindingSetID   *uuid.UUID
 }
 
 type AdvisoryFeed struct {
@@ -58,4 +59,21 @@ type AdvisoryFinding struct {
 	Cves             []string
 	FeedID           string
 	SourceUrl        string
+}
+
+type AdvisoryFindingSet struct {
+	ID            uuid.UUID
+	FeedID        string
+	FeedRevision  uuid.UUID
+	PackageDigest []byte
+	State         string
+	Reason        string
+	FindingDigest []byte
+	FindingCount  int32
+	CriticalCount int32
+	HighCount     int32
+	MediumCount   int32
+	LowCount      int32
+	OtherCount    int32
+	CreatedAt     pgtype.Timestamptz
 }

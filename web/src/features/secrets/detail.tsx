@@ -13,6 +13,7 @@ import { SecretRefSchema } from "../../../gen/lindm/resource/v1/common_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -58,7 +59,7 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
       </Link>
       <PageHeader
         title={secret?.displayName.trim() || "Secret"}
-        description="Metadata and immutable versions. Material is never shown here unless revealed."
+        description="Values stay hidden unless you reveal them."
         actions={
           <Button
             variant="outline"
@@ -80,10 +81,6 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
             <CardContent>
               <dl className="grid gap-4 break-words text-sm sm:grid-cols-2 lg:grid-cols-3 [&_dt]:text-xs [&_dt]:text-muted-foreground">
                 <div>
-                  <dt>Secret ID</dt>
-                  <dd className="break-all font-mono text-xs">{secret.secretId}</dd>
-                </div>
-                <div>
                   <dt>Purpose</dt>
                   <dd>{purposeLabels[secret.purpose] ?? "Unrecognized purpose"}</dd>
                 </div>
@@ -92,14 +89,10 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                   <dd>{secret.currentVersion.toString()}</dd>
                 </div>
                 <div>
-                  <dt>Subject binding ID</dt>
-                  <dd className="break-all font-mono text-xs">{secret.subjectBindingId}</dd>
-                </div>
-                <div>
                   <dt>Created</dt>
                   <dd>
                     {formatTimestamp(secret.createdAt).local} by{" "}
-                    {secret.createdByDisplayName.trim() || secret.createdBy || "unknown actor"}
+                    {secret.createdByDisplayName.trim() || "unknown"}
                   </dd>
                 </div>
                 <div>
@@ -107,16 +100,22 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                   <dd>{formatTimestamp(secret.updatedAt).local}</dd>
                 </div>
               </dl>
+              <div className="mt-4">
+                <TechnicalDetails
+                  items={[
+                    { label: "Secret ID", value: secret.secretId },
+                    { label: "Subject binding ID", value: secret.subjectBindingId },
+                    { label: "Created by ID", value: secret.createdBy },
+                  ]}
+                />
+              </div>
             </CardContent>
           </Card>
           <SecretReferenceCard secret={secret} version={version} />
           <Card>
             <CardHeader>
               <CardTitle>Versions</CardTitle>
-              <CardDescription>
-                Newest first, at most 100. Existing versions never change; profiles pin one
-                explicitly.
-              </CardDescription>
+              <CardDescription>Newest first. Old versions never change.</CardDescription>
             </CardHeader>
             <CardContent>
               {versions.length === 0 ? (
@@ -137,9 +136,7 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                       <TableRow key={entry.version.toString()}>
                         <TableCell>{entry.version.toString()}</TableCell>
                         <TableCell>{formatTimestamp(entry.createdAt).local}</TableCell>
-                        <TableCell>
-                          {entry.createdByDisplayName.trim() || entry.createdBy || "Unknown actor"}
-                        </TableCell>
+                        <TableCell>{entry.createdByDisplayName.trim() || "Unknown"}</TableCell>
                         <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
                           {entry.reason.trim() || "Not recorded"}
                         </TableCell>
@@ -199,31 +196,13 @@ function SecretReferenceCard({ secret, version }: { secret: SecretSummary; versi
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile reference for version {version.toString()}</CardTitle>
+        <CardTitle>Use version {version.toString()} in a profile</CardTitle>
         <CardDescription>
-          Paste this SecretRef into a profile field of the same purpose. A new version is delivered
-          only after a profile revision references it.
+          Copy this and paste it into a profile field of the same type. Devices get a new version
+          only after you update the profile.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <dl className="grid gap-3 break-all text-sm sm:grid-cols-2 [&_dt]:text-xs [&_dt]:text-muted-foreground">
-          <div>
-            <dt>secret_id</dt>
-            <dd className="font-mono text-xs">{secret.secretId}</dd>
-          </div>
-          <div>
-            <dt>version</dt>
-            <dd>{version.toString()}</dd>
-          </div>
-          <div>
-            <dt>purpose</dt>
-            <dd>{purposeLabels[secret.purpose] ?? "Unrecognized purpose"}</dd>
-          </div>
-          <div>
-            <dt>subject_binding_id</dt>
-            <dd className="font-mono text-xs">{secret.subjectBindingId}</dd>
-          </div>
-        </dl>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border p-3 text-xs">
           {json}
         </pre>
@@ -232,13 +211,15 @@ function SecretReferenceCard({ secret, version }: { secret: SecretSummary; versi
           variant="outline"
           onClick={() =>
             void navigator.clipboard.writeText(json).then(
-              () => toast.success("SecretRef copied"),
+              () => toast.success("Copied"),
               () =>
-                toast.error("Copy failed", { description: "Select and copy the text instead." }),
+                toast.error("Couldn't copy", {
+                  description: "Select the text and copy it instead.",
+                }),
             )
           }
         >
-          Copy SecretRef
+          Copy
         </Button>
       </CardContent>
     </Card>
@@ -279,8 +260,8 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
       failureTitle: "Secret rotation",
       onSuccess: async (response) => {
         setReason("");
-        toast.success(`Version ${response.secret?.currentVersion.toString() ?? "unknown"} stored`, {
-          description: "Devices receive it only after a profile revision references it.",
+        toast.success(`Version ${response.secret?.currentVersion.toString() ?? "unknown"} saved`, {
+          description: "Update the profile to send it to devices.",
         });
         await Promise.all([
           queryClient.invalidateQueries({
@@ -297,16 +278,15 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
       <CardHeader>
         <CardTitle>Rotate secret</CardTitle>
         <CardDescription>
-          Appends version {(secret.currentVersion + 1n).toString()} only if version{" "}
-          {secret.currentVersion.toString()} is still current. Requires an unrestricted
-          secret-management grant.
+          Saves a new version {(secret.currentVersion + 1n).toString()}. Devices keep the current
+          version until you update the profile.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={submit} autoComplete="off">
           <MaterialField id={`${id}-material`} purpose={secret.purpose} disabled={locked} />
           <div className="grid gap-2">
-            <Label htmlFor={`${id}-reason`}>Audit reason</Label>
+            <Label htmlFor={`${id}-reason`}>Reason</Label>
             <Textarea
               id={`${id}-reason`}
               value={reason}
@@ -323,24 +303,19 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
             <RpcError failure={exact.failure} title="Secret not rotated">
               {exact.ambiguous ? (
                 <p>
-                  The captured request, including its material, is kept in page memory only. Retry
-                  sends it again with the same request ID. Discard it only after refreshing and
-                  confirming that no new version was stored.
+                  Refresh to see whether a new version was saved. Try again, or discard to start
+                  over.
                 </p>
               ) : null}
             </RpcError>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={exact.busy}>
-              {exact.busy
-                ? "Storing…"
-                : exact.ambiguous
-                  ? "Retry exact rotation request"
-                  : "Rotate secret"}
+              {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Rotate secret"}
             </Button>
             {exact.ambiguous ? (
               <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
-                Discard captured request
+                Discard
               </Button>
             ) : null}
           </div>

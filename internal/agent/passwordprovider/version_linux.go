@@ -23,6 +23,8 @@ func pinnedVersions(p *resourcev1.PlatformProduct) (nativeVersions, bool) {
 		return nativeVersions{quality: "1.4.5", pam: "1.7.2", manager: "1.7.1"}, true
 	case (p.GetOsId() == "rhel" || p.GetOsId() == "almalinux") && p.GetVersion() == "9.8":
 		return nativeVersions{quality: "1.4.4", pam: "1.5.1", manager: "1.2.6"}, true
+	case (p.GetOsId() == "rhel" || p.GetOsId() == "almalinux") && p.GetVersion() == "10.2":
+		return nativeVersions{quality: "1.4.5", pam: "1.6.1", manager: "1.5.2"}, true
 	default:
 		return nativeVersions{}, false
 	}

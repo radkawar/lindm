@@ -19,8 +19,8 @@ import { object, sameReference } from "./resource-draft";
 const labels: Record<string, string> = {
   nativeName: "Package name",
   ecosystem: "Package format",
-  presence: "Desired presence",
-  runtime: "Runtime state",
+  presence: "Should be",
+  runtime: "Running state",
   enablement: "Start at boot",
   unit: "Unit name",
   gid: "Group ID",
@@ -35,8 +35,8 @@ const labels: Record<string, string> = {
   intervalSeconds: "Interval (seconds)",
   installedShell: "Installed login shell",
   localUserNames: "Local names",
-  maxAgeSeconds: "Maximum verification age (seconds)",
-  completeMembershipDimension: "Own complete membership",
+  maxAgeSeconds: "Re-check within (seconds)",
+  completeMembershipDimension: "Remove members not listed here",
   noNewPrivileges: "Prevent privilege escalation",
   requireLuksRoot: "Require LUKS root encryption",
   requireEscrow: "Require recovery escrow",
@@ -431,10 +431,10 @@ function MessageInput({
             {
               value: "",
               label: value.canonicalKey
-                ? `Saved reference: ${String(value.canonicalKey)}`
+                ? `Current: ${String(value.canonicalKey)}`
                 : repository
                   ? "Choose a repository in this profile"
-                  : "Choose a resource in this profile",
+                  : "Choose a setting in this profile",
             },
             ...choices,
           ]}
@@ -447,7 +447,7 @@ function MessageInput({
           // Their identity is apt/<repository ID> or rpm/<repository ID>.
           <>
             <Label htmlFor={`${id}-approved`}>
-              Approved source (apt/ or rpm/ followed by its repository ID)
+              Approved source (apt/ or rpm/ followed by the repository ID)
             </Label>
             <Input
               id={`${id}-approved`}
@@ -469,7 +469,7 @@ function MessageInput({
           </>
         ) : allowed.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Add the referenced resource to this profile first.
+            Add the setting this depends on to this profile first.
           </p>
         ) : null}
       </div>
@@ -509,8 +509,7 @@ function FileContent({
   } catch {
     return (
       <p className="text-sm text-muted-foreground">
-        Binary file contents are retained unchanged. Clear the content setting before replacing it
-        with text.
+        This file isn't text and will be kept as is. Clear it to replace it with text.
       </p>
     );
   }

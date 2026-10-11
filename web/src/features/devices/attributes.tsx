@@ -29,7 +29,7 @@ export function readAttributeInputs(data: FormData, attributes: Record<string, A
         result[key] = create(AttributeValueSchema, { value: { case: "enumValue", value: text } });
         break;
       case "intValue":
-        if (!/^-?\d+$/.test(text)) throw new Error(`${key}: enter a whole integer.`);
+        if (!/^-?\d+$/.test(text)) throw new Error(`${key}: enter a whole number.`);
         result[key] = fromJsonString(AttributeValueSchema, JSON.stringify({ intValue: text }));
         break;
       case "boolValue":
@@ -38,7 +38,7 @@ export function readAttributeInputs(data: FormData, attributes: Record<string, A
         });
         break;
       default:
-        throw new Error(`${key}: attribute type is not defined.`);
+        throw new Error(`${key}: this attribute no longer exists.`);
     }
   }
   return result;
@@ -66,9 +66,7 @@ export function AttributeFields({
   const choices = failure ? [] : (definitions.data?.definitions ?? []);
   return (
     <fieldset className="grid min-w-0 gap-3" disabled={disabled}>
-      <legend className="mb-2 text-sm font-medium">
-        Typed attributes (all must match when filtering)
-      </legend>
+      <legend className="mb-2 text-sm font-medium">Custom attributes</legend>
       {Object.entries(attributes).map(([key, attribute]) => {
         const field = attribute.value;
         const definition = choices.find((item) => item.key === key);
@@ -123,7 +121,7 @@ export function AttributeFields({
         );
       })}
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor="attribute-key">Defined key</Label>
+        <Label htmlFor="attribute-key">Attribute</Label>
         <SelectField
           id="attribute-key"
           className="max-w-full"
@@ -131,7 +129,7 @@ export function AttributeFields({
           disabled={disabled}
           onValueChange={setSelected}
           options={[
-            { value: "", label: "Choose a key" },
+            { value: "", label: "Choose an attribute" },
             ...choices
               .filter((definition) => !Object.hasOwn(attributes, definition.key))
               .map((definition) => ({
@@ -183,7 +181,7 @@ export function AttributeFields({
             setSelected("");
           }}
         >
-          First keys
+          First page
         </Button>
         <Button
           type="button"
@@ -194,16 +192,15 @@ export function AttributeFields({
             setSelected("");
           }}
         >
-          Next keys
+          Next page
         </Button>
       </div>
       {!canReadDefinitions ? (
         <p className="text-sm text-muted-foreground">
-          Unrestricted fleet read permission is required to browse available keys. Existing typed
-          values can still be edited.
+          You can edit existing attributes, but you need fleet read access to add new ones.
         </p>
       ) : definitions.isPending ? (
-        <p role="status">Loading attribute definitions…</p>
+        <p role="status">Loading attributes…</p>
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}
     </fieldset>

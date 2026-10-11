@@ -50,6 +50,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 1 && args[0] == "ha" {
 		return runHA(ctx, args[1:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "load-generator" {
+		return runLoadGenerator(ctx, args[1:], os.Stdin, stdout)
+	}
 	if len(args) >= 1 && args[0] == "guest" {
 		return runGuestProbe(ctx, args[1:], stdout, stderr)
 	}

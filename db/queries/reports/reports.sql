@@ -120,8 +120,11 @@ WHERE r.device_id::text || '/' || r.resource_id::text > sqlc.arg('after_cursor')
 ORDER BY r.device_id::text || '/' || r.resource_id::text LIMIT 128;
 
 -- name: FindingsReportRows :many
-SELECT f.id::text AS cursor, jsonb_build_object('finding_id',f.id,'device_id',f.device_id,
+-- Finding keys are unique per device, not globally: page by (device, finding).
+SELECT (f.device_id::text || '/' || f.id::text)::text AS cursor, jsonb_build_object('finding_id',f.id,'device_id',f.device_id,
 'advisory_id',f.advisory_id,'package_name',f.package_name,'installed_version',f.installed_version,
 'fixed_version',f.fixed_version,'architecture',f.architecture,'severity',f.severity,'state',f.state,
 'evaluated_at',f.evaluated_at,'inventory_at',f.inventory_at)::text AS record
-FROM advisory_finding_status f WHERE f.id > sqlc.arg('after_id')::uuid ORDER BY f.id LIMIT 128;
+FROM advisory_finding_status f
+WHERE (f.device_id, f.id) > (sqlc.arg('after_device')::uuid, sqlc.arg('after_id')::uuid)
+ORDER BY f.device_id, f.id LIMIT 128;

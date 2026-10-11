@@ -18,6 +18,7 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
@@ -50,8 +51,8 @@ export function GroupsView() {
   return (
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
       <PageHeader
-        title="Authorization groups"
-        description="Static device membership controls access scopes. Only unrestricted account managers can edit these groups."
+        title="Device groups"
+        description="Group devices to limit what an account can manage. Only admins with access to all devices can edit groups."
       />
       <GroupEditor
         key={createGeneration}
@@ -63,7 +64,7 @@ export function GroupsView() {
         disabled={list.isFetching}
         onClick={() => void list.refetch()}
       >
-        Refresh groups
+        Refresh
       </Button>
       {list.isPending ? (
         <div role="status" className="grid gap-3">
@@ -73,14 +74,14 @@ export function GroupsView() {
       ) : null}
       {list.error ? (
         <RpcError failure={toRpcFailure(list.error)}>
-          {list.data ? <p>The groups below are from the last successful refresh.</p> : null}
+          {list.data ? <p>Showing the groups from the last refresh.</p> : null}
         </RpcError>
       ) : null}
       {list.data?.groups.map((group) => (
         <GroupEditor key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`} group={group} />
       ))}
       {!list.error && list.data?.groups.length === 0 ? (
-        <EmptyState title="No authorization groups on this page" />
+        <EmptyState title="No device groups yet" description="Create one above." />
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button
@@ -157,7 +158,11 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
       else await adminClient.deleteDeviceGroup(exact, options);
       lifetime.signal.throwIfAborted();
       setCompleted(true);
-      toast.success("Authorization group change completed");
+      toast.success(
+        exact.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
+          ? "Group deleted"
+          : "Group saved",
+      );
       await client.invalidateQueries({ queryKey: ["device-groups", lifetime.generation] });
       if (!group) onCreated?.();
     } catch (cause) {
@@ -183,7 +188,7 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
       }}
     >
       <h2 className="break-words font-semibold">{group ? group.name : "Create group"}</h2>
-      <p className="break-all font-mono text-xs text-muted-foreground">Group ID: {groupId}</p>
+      <TechnicalDetails summary="Group ID" items={[{ label: "Group ID", value: groupId }]} />
       <label className="grid gap-2 text-sm font-medium">
         Group name
         <Input
@@ -195,17 +200,17 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
         />
       </label>
       <label className="grid gap-2 text-sm font-medium">
-        Member device UUIDs, separated by whitespace
+        Member device IDs (one per line or space separated)
         <Textarea
           className="min-h-28 font-mono text-xs"
-          aria-label="Member device UUIDs, separated by whitespace"
+          aria-label="Member device IDs"
           value={members}
           disabled={busy || attempt !== null}
           onChange={(event) => setMembers(event.target.value)}
         />
       </label>
       <label className="grid gap-2 text-sm font-medium">
-        Audit reason
+        Reason
         <Input
           aria-label="Group change reason"
           required
@@ -228,7 +233,9 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
       ) : null}
       {completed ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm">
-          Group change completed.
+          {attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
+            ? "Group deleted."
+            : "Group saved."}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
@@ -236,7 +243,7 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
             type="submit"
             disabled={busy || attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"}
           >
-            {attempt ? "Retry exact save" : "Save group"}
+            {attempt ? "Try again" : "Save group"}
           </Button>
           {group ? (
             <Button
@@ -251,13 +258,13 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
                 if (
                   attempt ||
                   window.confirm(
-                    "Delete this authorization group? Its scoped grants will no longer match members.",
+                    "Delete this group? Accounts limited to it will lose access to its devices.",
                   )
                 )
                   void save(true);
               }}
             >
-              {attempt ? "Retry exact deletion" : "Delete group"}
+              {attempt ? "Try deleting again" : "Delete group"}
             </Button>
           ) : null}
         </div>

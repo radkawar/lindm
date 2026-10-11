@@ -6,7 +6,8 @@ import {
   PutDynamicGroupRequestSchema,
 } from "../../../gen/lindm/admin/v1/targeting_pb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
@@ -21,11 +22,10 @@ export function DynamicGroupsView() {
   return (
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
       <header className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Dynamic targeting groups</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Dynamic groups</h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Match devices by inventory rules for resource assignments. Dynamic groups do not grant
-          access. Missing or stale inventory remains unknown and does not automatically include a
-          device.
+          Groups that include devices automatically based on their inventory. Use them to target
+          assignments. Devices with missing inventory aren't included.
         </p>
       </header>
       <TargetMutation
@@ -47,7 +47,7 @@ export function DynamicGroupsView() {
         disabled={list.isFetching}
         onClick={() => void list.refetch()}
       >
-        Refresh dynamic groups
+        Refresh groups
       </Button>
       <ListStatus
         pending={list.isPending}
@@ -60,20 +60,21 @@ export function DynamicGroupsView() {
             <Card key={group.groupId}>
               <CardHeader>
                 <CardTitle>{group.name}</CardTitle>
-                <CardDescription>
-                  Group {group.groupId} · revision {group.revision.toString()}
-                </CardDescription>
               </CardHeader>
               <CardContent className="grid min-w-0 gap-3">
-                <details>
-                  <summary className="cursor-pointer text-sm">Current typed definition</summary>
+                <TechnicalDetails
+                  items={[
+                    { label: "Group ID", value: group.groupId },
+                    { label: "Revision", value: group.revision.toString() },
+                  ]}
+                >
                   <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
                     {toJsonString(DynamicTargetGroupSchema, group, { prettySpaces: 2 })}
                   </pre>
-                </details>
+                </TechnicalDetails>
                 <TargetMutation
                   key={`${group.groupId}:${group.revision}`}
-                  title="Update dynamic group"
+                  title="Edit dynamic group"
                   formKey={`dynamic-group:${group.groupId}`}
                   schema={PutDynamicGroupRequestSchema}
                   initial={() =>

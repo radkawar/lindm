@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -88,7 +89,7 @@ export function ProfileEditor({
       });
       lifetime.signal.throwIfAborted();
       if (!response.revision?.spec || response.revision.revisionId === "") {
-        throw new Error("The server did not return a published revision.");
+        throw new Error("The server didn't confirm the profile was published.");
       }
       return response.revision;
     },
@@ -100,7 +101,7 @@ export function ProfileEditor({
         failure: null,
         conflict: false,
       });
-      toast.success("Profile revision published");
+      toast.success("Profile published");
       void queryClient.invalidateQueries({ queryKey: ["profiles", lifetime.generation] });
       void queryClient.invalidateQueries({
         queryKey: ["resource-profile-heads", lifetime.generation],
@@ -162,12 +163,8 @@ export function ProfileEditor({
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle>{creating ? "Create profile" : "Publish a new revision"}</CardTitle>
-        <CardDescription>Define resources, then publish a saved revision.</CardDescription>
-        <details className="text-xs text-muted-foreground">
-          <summary className="w-fit cursor-pointer py-1">Publishing scope</summary>
-          <p className="mt-2">{CATALOG_SEMANTICS}</p>
-        </details>
+        <CardTitle>{creating ? "Create profile" : "Edit profile"}</CardTitle>
+        <CardDescription>{CATALOG_SEMANTICS}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -182,7 +179,7 @@ export function ProfileEditor({
             }
             if (attempt) return;
             if (mode === "edit" && expectedRevisionId === undefined) {
-              setFieldErrors(["Load the latest revision before publishing this draft."]);
+              setFieldErrors(["Load the latest revision before publishing."]);
               return;
             }
             try {
@@ -201,27 +198,23 @@ export function ProfileEditor({
               setFieldErrors([]);
               send(payload);
             } catch (error) {
-              setFieldErrors([
-                error instanceof Error ? error.message : "Invalid resource document",
-              ]);
+              setFieldErrors([error instanceof Error ? error.message : "A setting is invalid"]);
             }
           }}
         >
           <p id="profile-publish-note" className="text-sm text-muted-foreground">
             {sourceNote}
           </p>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            Profile ID {profileId}
-          </p>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            {creating ? "New profile" : `Expected latest revision ${shownExpected}`}
-          </p>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            Request ID {shownRequestId}
-          </p>
+          <TechnicalDetails
+            items={[
+              { label: "Profile ID", value: profileId },
+              { label: "Based on revision", value: shownExpected },
+              { label: "Request ID", value: shownRequestId },
+            ]}
+          />
           {locked ? (
             <p className="text-sm">
-              This request is locked. Retry it unchanged, or explicitly start a new request.
+              Editing is paused while this save is pending. Retry it, or start over.
             </p>
           ) : null}
           <div className="grid gap-1.5">
@@ -265,11 +258,10 @@ export function ProfileEditor({
               disabled={locked || shown.resources.length >= MAX_RESOURCES}
               onClick={() => setDraft({ ...draft, resources: [...draft.resources, newResource()] })}
             >
-              Add resource
+              Add setting
             </Button>
             <p className="text-sm text-muted-foreground">
-              {shown.resources.length} of {MAX_RESOURCES} resources. After removing a resource,
-              update typed dependency references before publishing.
+              {shown.resources.length} of {MAX_RESOURCES} settings.
             </p>
           </div>
           <div className="grid gap-1.5">
@@ -301,16 +293,14 @@ export function ProfileEditor({
           {attempt ? <AttemptStatus attempt={attempt} /> : null}
           <div className="flex flex-wrap gap-2">
             {!attempt ? (
-              <Button type="submit">{creating ? "Publish profile" : "Publish new revision"}</Button>
+              <Button type="submit">{creating ? "Publish profile" : "Publish changes"}</Button>
             ) : null}
             {attempt?.status === "inflight" ? (
               <Button type="button" disabled>
                 Publishing…
               </Button>
             ) : null}
-            {attempt?.status === "ambiguous" ? (
-              <Button type="submit">Retry same request</Button>
-            ) : null}
+            {attempt?.status === "ambiguous" ? <Button type="submit">Retry</Button> : null}
             {attempt?.status === "conflict" ? (
               <Button
                 type="button"
@@ -335,7 +325,7 @@ export function ProfileEditor({
                     .finally(() => setRefreshing(false));
                 }}
               >
-                {refreshing ? "Refreshing revision…" : "Refresh latest revision"}
+                {refreshing ? "Loading latest revision…" : "Load latest revision"}
               </Button>
             ) : null}
             {attempt?.status === "conflict" && attempt.refreshedHead ? (
@@ -352,12 +342,10 @@ export function ProfileEditor({
                       head.revisionId,
                       attempt.payload.reason,
                     );
-                    setNote(
-                      `Draft kept with new request ID for revision ${head.revisionId}. Not published yet.`,
-                    );
+                    setNote("Your changes now build on the latest revision. Not published yet.");
                   }}
                 >
-                  Rebase draft onto latest revision
+                  Keep my changes on the latest revision
                 </Button>
                 <Button
                   type="button"
@@ -368,12 +356,10 @@ export function ProfileEditor({
                     const head = attempt.refreshedHead;
                     if (!head?.spec) return;
                     unlock(draftFromSpec(head.spec), head.revisionId, attempt.payload.reason);
-                    setNote(
-                      `Draft replaced with revision ${head.revisionId} and a new request ID. Not published yet.`,
-                    );
+                    setNote("Draft replaced with the latest revision. Not published yet.");
                   }}
                 >
-                  Replace draft with latest revision
+                  Discard my changes and use the latest revision
                 </Button>
               </>
             ) : null}
@@ -390,14 +376,10 @@ export function ProfileEditor({
                     attempt.payload.expectedRevisionId,
                     attempt.payload.reason,
                   );
-                  setNote(
-                    attempt.conflict
-                      ? "New request ID prepared. The expected revision is unchanged. Not published yet."
-                      : "New request ID prepared. The previous request was not retried. Not published yet.",
-                  );
+                  setNote("You can edit the draft again. Not published yet.");
                 }}
               >
-                Start a different request
+                Edit draft
               </Button>
             ) : null}
             {attempt?.status === "published" ? (
@@ -418,14 +400,12 @@ export function ProfileEditor({
                     setReason("");
                     setRequestId(newRequestId());
                     setFieldErrors([]);
-                    setNote(
-                      `The next publish targets ${published.revisionId}, the revision just published. It is not submitted.`,
-                    );
+                    setNote("Ready for your next change. Not published yet.");
                   }
                   clearAttempt(lifetime, profileId);
                 }}
               >
-                {mode === "create" ? "Prepare another profile" : "Prepare another revision"}
+                {mode === "create" ? "Create another profile" : "Make another change"}
               </Button>
             ) : null}
           </div>
@@ -440,11 +420,11 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
     const published = attempt.published;
     return (
       <Alert>
-        <AlertTitle>Revision published</AlertTitle>
+        <AlertTitle>Profile published</AlertTitle>
         <AlertDescription>
           <p>
-            Request {attempt.payload.requestId} published revision {published.revisionId} as number{" "}
-            {formatRevisionNumber(published.revisionNumber)}. {CATALOG_SEMANTICS}
+            Revision {formatRevisionNumber(published.revisionNumber)} is saved. To apply it to
+            devices, assign it in Rollouts.
           </p>
           <p>
             <Link
@@ -453,7 +433,7 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
               search={{ revision: published.revisionId }}
               className="underline underline-offset-4"
             >
-              Open this exact revision
+              View this revision
             </Link>
           </p>
         </AlertDescription>
@@ -463,7 +443,7 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
   if (attempt.status === "inflight") {
     return (
       <p role="status" className="border bg-muted/30 p-3 text-sm">
-        Publishing the captured request…
+        Publishing…
       </p>
     );
   }
@@ -473,9 +453,9 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
       <RpcError failure={attempt.failure}>
         <p>
           {attempt.conflict
-            ? "No new revision was published. Refresh the latest revision, then rebase explicitly to prepare a new request."
+            ? "Someone published a newer revision first. Load it, then choose whether to keep your changes."
             : attempt.failure.ambiguous
-              ? "Retry the same request ID and captured content. If it already succeeded, the retry returns that revision without publishing another."
+              ? "We couldn't confirm the save. Retry: it won't publish twice."
               : ""}
         </p>
       </RpcError>
@@ -498,19 +478,19 @@ function RefreshedHead({
   const same = expected !== undefined && expected === head.revisionId;
   return (
     <Alert>
-      <AlertTitle>Loaded catalog head</AlertTitle>
+      <AlertTitle>Latest revision</AlertTitle>
       <AlertDescription>
         <p>
-          {head.spec?.name.trim() || "Unnamed profile"}, revision {head.revisionId}, number{" "}
-          {formatRevisionNumber(head.revisionNumber)}, {head.spec?.resources.length ?? 0} resources.
+          {head.spec?.name.trim() || "Unnamed profile"}, revision{" "}
+          {formatRevisionNumber(head.revisionNumber)}, {head.spec?.resources.length ?? 0} settings.
           {published.date ? ` Published ${published.local}.` : ""}
         </p>
         <p>
           {same
-            ? "This is still the expected revision. The conflict was not a newer head."
+            ? "Your draft is already based on this revision."
             : expected
-              ? `This is not expected revision ${expected}. Rebase only if you intend to publish against this head.`
-              : "This profile ID is already in the catalog. Rebase only if you intend to publish another revision of it."}
+              ? "This is newer than the revision your draft started from."
+              : "A profile with this ID already exists. Keep your changes only if you meant to update it."}
         </p>
         <p>
           <Link
@@ -519,7 +499,7 @@ function RefreshedHead({
             search={{ revision: head.revisionId }}
             className="underline underline-offset-4"
           >
-            Open this head
+            View this revision
           </Link>
         </p>
       </AlertDescription>

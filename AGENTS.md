@@ -65,6 +65,7 @@ make lint             # prettier, markdownlint, eslint, tsc, buf lint/format, go
 make test             # builds web assets, then go test -race ./cmd/... ./db/... ./gen/... ./internal/... ./web/...
 make check            # default target and pre-push hook: lint + test + audit (npm audit + govulncheck)
 make test-integration # dev-up, then go run ./cmd/dev test-integration (real Postgres)
+make signoff          # local CI: check + test-integration, then gh signoff check integration (clean, pushed HEAD only)
 make build            # artifacts/bin/{lindmd,lindm-agent,lab}
 make dev-up && go run ./cmd/lindmd serve -config .cache/dev/server.json   # console at https://localhost:18444
 make dev-down

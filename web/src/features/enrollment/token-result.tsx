@@ -99,7 +99,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
     } catch {
       if (mounted.current && !lifetime.signal.aborted) {
         setCopyFailed(true);
-        setCopyStatus("Clipboard access failed. Select the text and copy it manually.");
+        setCopyStatus("Couldn't copy. Select the text and copy it yourself.");
       }
     }
   }
@@ -109,14 +109,10 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
     try {
       downloadEnrollmentFile("provisioning-token", `${secret}\n`);
       setCopyFailed(false);
-      setCopyStatus(
-        "Token download requested. Protect and remove the downloaded copy after delivery.",
-      );
+      setCopyStatus("Token file downloaded. Delete your copy once it's on the device.");
     } catch {
       setCopyFailed(true);
-      setCopyStatus(
-        "The token file could not be downloaded. Copy the token and transfer it securely.",
-      );
+      setCopyStatus("Couldn't download the token file. Copy the token instead.");
     }
   }
 
@@ -155,27 +151,25 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {unavailable
-              ? "The credential exists, but its secret is unavailable."
+              ? "This was created, but the secret can't be shown."
               : provisioning
-                ? "A reusable, bounded token for automatic fleet enrollment. Shown only now."
-                : "A single-use code to enroll one device now. Shown only now."}
+                ? "Reusable token for automatic enrollment. Copy it now; it won't be shown again."
+                : "Single-use code to enroll one device. Copy it now; it won't be shown again."}
           </DialogDescription>
         </DialogHeader>
         {unavailable ? (
           <div className="grid gap-2">
             <StatusBadge status="destructive" className="w-fit">
-              {credential.deliveryUnknown ? "Secret delivery unknown" : "Secret unavailable"}
+              {credential.deliveryUnknown ? "Secret not shown" : "Secret unavailable"}
             </StatusBadge>
             <p className="text-sm">
-              Revoke this {provisioning ? "token" : "code"} in the list, then create a replacement.
-              Retrying cannot retrieve the secret. Do not assume issuance failed.
+              Revoke this {provisioning ? "token" : "code"} in the list, then create a new one.
             </p>
           </div>
         ) : (
           <div className="grid gap-3">
             <p className="text-sm text-muted-foreground">
-              Copy before closing. This dialog forgets the secret when dismissed or when your
-              session ends. Clipboard and downloaded copies remain your responsibility.
+              Copy it before closing. It's forgotten when you close this dialog.
             </p>
             <Label htmlFor="enrollment-secret">{title}</Label>
             <div className="flex flex-wrap gap-2">
@@ -223,22 +217,20 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                   disabled={instructions.isFetching}
                   onClick={() => void instructions.refetch()}
                 >
-                  Reload installation instructions
+                  Try again
                 </Button>
               </div>
             ) : null}
             <p className="text-sm text-muted-foreground">
               {instructions.isPending
-                ? "Loading this deployment's installation instructions."
+                ? "Loading install steps…"
                 : instructions.isError
-                  ? "Installation instructions are unavailable. Resolve the read failure before copying a snippet."
+                  ? "Couldn't load install steps. Try again before copying."
                   : installScript
-                    ? "Includes installation from this deployment's configured signed repository."
+                    ? "Installs the lindm agent from your repository, then enrolls."
                     : packageFamily
-                      ? `No ${packageFamily.toUpperCase()} repository instructions are configured. Install the signed agent package and configuration before running this snippet.`
-                      : "Install the verified agent package and configuration separately for this format."}{" "}
-              Authenticate the deployment execution root and signed bootstrap bundle before
-              enrollment. Public downloads alone do not establish root trust.
+                      ? `No ${packageFamily.toUpperCase()} repository is set up. Install the lindm agent first, then run this.`
+                      : "Install the lindm agent separately for this format."}
             </p>
             <Textarea
               data-sensitive="true"
@@ -263,7 +255,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
               </Button>
               {provisioning && format === "nixos" ? (
                 <Button variant="outline" onClick={downloadToken}>
-                  Download sensitive token file
+                  Download token file
                 </Button>
               ) : null}
             </div>
@@ -290,15 +282,12 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             {!unavailable ? (
               <>
                 <p>
-                  Keep credentials out of arguments, environment variables, URLs, logs, shell
-                  history, golden images and the Nix store. The snippets put the credential in a
-                  root-owned mode 0600 file. Base64 is not encryption. Protect copied snippets and
-                  installer transport, caches and retained logs; remove delivered copies after use.
+                  Keep the secret out of command lines, logs, URLs and images. Delete copies after
+                  use.
                 </p>
                 <p>
-                  Install authenticated trust at /etc/lindm/execution-root.json and
-                  /etc/lindm/bootstrap.dsse.json. Never replace trust or protected installation
-                  state to retry enrollment.
+                  The device needs /etc/lindm/execution-root.json and /etc/lindm/bootstrap.dsse.json
+                  from you.
                 </p>
                 {instructions.data?.executionRootUrl ? (
                   <a
@@ -307,7 +296,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Download execution root for independent authentication
+                    Download execution root
                   </a>
                 ) : null}
                 {instructions.data?.bootstrapBundleUrl ? (
@@ -322,30 +311,20 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 ) : null}
                 {instructions.data && !instructions.data.bootstrapBundleUrl ? (
                   <p>
-                    Public bootstrap downloads are not configured. Obtain the trust files through
-                    your deployment owner's authenticated installation channel.
+                    Download links aren't set up. Get these files from whoever runs this deployment.
                   </p>
                 ) : null}
                 <p>
-                  Bootstrap may reserve a device without completing enrollment. Resume waits up to
-                  one hour for any required independent approval and identity installation, then
-                  fails visibly. After a timeout or transient failure, use the same protected
-                  installation and run /usr/libexec/lindm/lindm-agent resume -wait-seconds 3600 as
-                  root. Never generate another key to retry.
+                  If enrollment times out, run /usr/libexec/lindm/lindm-agent resume -wait-seconds
+                  3600 as root on the same device. Don't reinstall to retry.
                 </p>
                 {provisioning ? (
                   <p>
-                    Installer snippets are integration fragments, not complete OS profiles. Start
-                    lindm-provision.service again after resolving a failed wait; its token file is
-                    removed only after successful enrollment. NixOS uses a separately delivered,
-                    target-encrypted systemd credential; follow the module comments. Browser
-                    downloads do not enforce Unix ownership or permissions.
+                    These snippets only add lindm to your installer. For NixOS, follow the comments
+                    in the module.
                   </p>
                 ) : (
-                  <p>
-                    After a successful manual resume, remove /run/lindm-enrollment/grant from the
-                    device.
-                  </p>
+                  <p>When enrollment finishes, delete /run/lindm-enrollment/grant on the device.</p>
                 )}
               </>
             ) : null}

@@ -60,21 +60,13 @@ export function SecretsView({
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Secrets"
-        description="Deployment-wide credentials referenced by profiles. Listing shows metadata only."
+        description="Passwords and keys that profiles can use. Values are never shown in this list."
         actions={
           <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
             Refresh
           </Button>
         }
       />
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Custody and delivery</summary>
-        <p className="mt-2">
-          Material is stored encrypted on the server and delivered only sealed to one device's
-          attested encryption key, for an explicit profile version reference. Rotation appends a new
-          version; devices receive it only after a profile revision references it.
-        </p>
-      </details>
       {canPermission(principal, "secrets.manage", true) ? (
         <CreateSecretForm onCreated={onCreated} />
       ) : null}
@@ -126,16 +118,11 @@ export function SecretsView({
                   >
                     {secret.displayName.trim() || "Unnamed secret"}
                   </Link>
-                  <p className="break-all font-mono text-xs text-muted-foreground">
-                    {secret.secretId}
-                  </p>
                 </TableCell>
                 <TableCell>{purposeLabels[secret.purpose] ?? "Unrecognized purpose"}</TableCell>
                 <TableCell>{secret.currentVersion.toString()}</TableCell>
                 <TableCell>{formatTimestamp(secret.updatedAt).local}</TableCell>
-                <TableCell>
-                  {secret.createdByDisplayName.trim() || secret.createdBy || "Unknown actor"}
-                </TableCell>
+                <TableCell>{secret.createdByDisplayName.trim() || "Unknown"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -194,8 +181,8 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
       onSuccess: async (response) => {
         setDisplayName("");
         setReason("");
-        toast.success("Secret stored", {
-          description: "Reference an explicit version in a profile.",
+        toast.success("Secret created", {
+          description: "Select it in a profile to send it to devices.",
         });
         await queryClient.invalidateQueries({ queryKey: ["secrets", lifetime.generation] });
         if (response.secret?.secretId) onCreated(response.secret.secretId);
@@ -207,9 +194,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
     <Card>
       <CardHeader>
         <CardTitle>Create secret</CardTitle>
-        <CardDescription>
-          The purpose is immutable. Requires an unrestricted secret-management grant.
-        </CardDescription>
+        <CardDescription>You can't change the purpose later.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={submit} autoComplete="off">
@@ -235,7 +220,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
           </div>
           <MaterialField key={purpose} id={`${id}-material`} purpose={purpose} disabled={locked} />
           <div className="grid gap-2">
-            <Label htmlFor={`${id}-reason`}>Audit reason</Label>
+            <Label htmlFor={`${id}-reason`}>Reason</Label>
             <Textarea
               id={`${id}-reason`}
               value={reason}
@@ -252,24 +237,18 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
             <RpcError failure={exact.failure} title="Secret not created">
               {exact.ambiguous ? (
                 <p>
-                  The captured request, including its material, is kept in page memory only. Retry
-                  sends it again with the same request ID. Discard it only after confirming in the
-                  list that the secret was not created.
+                  Check the list to see whether it was created. Try again, or discard to start over.
                 </p>
               ) : null}
             </RpcError>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={exact.busy}>
-              {exact.busy
-                ? "Storing…"
-                : exact.ambiguous
-                  ? "Retry exact create request"
-                  : "Create secret"}
+              {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Create secret"}
             </Button>
             {exact.ambiguous ? (
               <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
-                Discard captured request
+                Discard
               </Button>
             ) : null}
           </div>

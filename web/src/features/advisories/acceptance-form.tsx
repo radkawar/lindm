@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AcceptAdvisoryFindingRequestSchema } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +44,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
     onSuccess: (_response, captured) => {
       if (!setAcceptanceAttempt(lifetime, key, { ...captured, status: "succeeded", failure: null }))
         return;
-      toast.success("Risk acceptance recorded", {
-        description: "Acceptance is temporary acknowledgement, not remediation.",
-      });
+      toast.success("Risk accepted");
       void queryClient.invalidateQueries({
         queryKey: ["advisory-findings", lifetime.generation, deviceId],
       });
@@ -62,7 +61,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         const { tone, title } = classifyRpcFailure(failure);
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
-          { description: "Acceptance not confirmed. Review the inline result before continuing." },
+          { description: "Check the result below before trying again." },
         );
       }
     },
@@ -80,7 +79,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         if (attempt) return;
         const date = new Date(expiry);
         if (!Number.isFinite(date.getTime())) {
-          setErrors(["Enter an acceptance expiry date and time."]);
+          setErrors(["Enter when the acceptance should expire."]);
           return;
         }
         const payload = create(AcceptAdvisoryFindingRequestSchema, {
@@ -103,30 +102,25 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         send({ payload, status: "inflight", failure: null });
       }}
     >
-      <p className="text-sm">
-        Risk acceptance is not a fix. Expiry is validated and enforced by the server.
-      </p>
+      <p className="text-sm">Accepting a risk doesn't fix the package. It expires automatically.</p>
       {attempt ? (
         <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
-          <p className="break-all font-mono text-xs">Request ID: {attempt.payload.requestId}</p>
+          <TechnicalDetails items={[{ label: "Request ID", value: attempt.payload.requestId }]} />
           <p className="whitespace-pre-wrap break-words">Reason: {attempt.payload.reason}</p>
-          <p>Requested expiry: {formatTimestamp(attempt.payload.expiresAt).local}</p>
+          <p>Expires: {formatTimestamp(attempt.payload.expiresAt).local}</p>
           <p role="status">
             {attempt.status === "succeeded"
-              ? "Acceptance recorded. Refreshing server findings."
+              ? "Risk accepted. Updating findings…"
               : attempt.status === "inflight"
-                ? "Recording acceptance…"
-                : "Acceptance not confirmed."}
+                ? "Saving…"
+                : "Not saved."}
           </p>
           {attempt.failure ? <RpcError failure={attempt.failure} /> : null}
           {attempt.status === "ambiguous" ? (
             <>
-              <p>
-                The outcome is unknown. Retry sends exactly the same request ID and inputs. This
-                record survives navigation, but not a tab reload.
-              </p>
+              <p>We couldn't confirm this was saved. Retry: it won't be recorded twice.</p>
               <Button type="button" onClick={() => send(attempt)}>
-                Retry same acceptance request
+                Retry
               </Button>
             </>
           ) : null}
@@ -140,20 +134,20 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
                 mutation.reset();
               }}
             >
-              Prepare another acceptance
+              Accept again
             </Button>
           ) : null}
         </div>
       ) : (
         <>
-          <Label htmlFor={`reason-${findingId}`}>Acceptance reason</Label>
+          <Label htmlFor={`reason-${findingId}`}>Reason</Label>
           <Textarea
             id={`reason-${findingId}`}
             required
             value={reason}
             onChange={(event) => setReason(event.target.value)}
           />
-          <Label htmlFor={`expiry-${findingId}`}>Expiry (local time)</Label>
+          <Label htmlFor={`expiry-${findingId}`}>Expires (local time)</Label>
           <Input
             id={`expiry-${findingId}`}
             type="datetime-local"
@@ -162,7 +156,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
             onChange={(event) => setExpiry(event.target.value)}
           />
           <Button type="submit" className="w-fit">
-            Accept risk until expiry
+            Accept risk
           </Button>
         </>
       )}

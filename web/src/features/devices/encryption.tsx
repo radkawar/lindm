@@ -20,6 +20,7 @@ import { toRpcFailure } from "@/lib/errors";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { actionLabels, actionPermissions, StorageTargetView } from "./action-display";
 import { deviceActionsQueryOptions, deviceEncryptionQueryOptions } from "./action-queries";
 import { Fact, ObservedTime } from "./observations";
@@ -60,44 +61,26 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Encryption and recovery escrow</CardTitle>
+        <CardTitle>Encryption and recovery keys</CardTitle>
         <CardDescription>
-          Select an exact recorded LUKS volume to view its observation and recovery escrow.
+          Pick a volume to see its encryption status and recovery key.
         </CardDescription>
-        <details className="text-sm text-muted-foreground">
-          <summary className="cursor-pointer font-medium">Coverage and custody cautions</summary>
-          <p className="mt-2">
-            This is not a complete multi-volume inventory or device-wide encryption compliance
-            report. Without a selection, the latest observation and escrow can describe different
-            volumes. Custody alone does not prove old-slot retirement, current encryption health, or
-            deletion of other recovery material.
-          </p>
-        </details>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor={`encryption-volume-${deviceId}`}>LUKS volume</Label>
+          <Label htmlFor={`encryption-volume-${deviceId}`}>Encrypted volume</Label>
           <SelectField
             id={`encryption-volume-${deviceId}`}
             value={luksUuid}
             onValueChange={setLuksUuid}
             options={[
-              { value: "", label: "Latest records across device (not volume-matched)" },
+              { value: "", label: "Most recent records (any volume)" },
               ...[...volumes].sort().map((uuid) => ({ value: uuid, label: uuid })),
             ]}
           />
-          <details className="text-sm text-muted-foreground">
-            <summary className="cursor-pointer font-medium">
-              Where these volume choices come from
-            </summary>
-            <p className="mt-2">
-              Choices come from real encryption records and this page of action history. Browse
-              older action records to find other managed volumes.
-            </p>
-          </details>
           {historyFailure ? (
-            <RpcError failure={historyFailure} title="Volume history unavailable">
-              <p>Only volumes identified by the current encryption response can be selected.</p>
+            <RpcError failure={historyFailure} title="Couldn't load volume history">
+              <p>Only the most recently reported volumes are listed.</p>
             </RpcError>
           ) : null}
           <div className="flex gap-2">
@@ -106,73 +89,67 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
               disabled={!volumePageToken || history.isFetching}
               onClick={() => setVolumePageToken("")}
             >
-              Newest volume records
+              Newest volumes
             </Button>
             <Button
               variant="outline"
               disabled={!!historyFailure || !history.data?.nextPageToken || history.isFetching}
               onClick={() => setVolumePageToken(history.data?.nextPageToken ?? "")}
             >
-              Older volume records
+              Older volumes
             </Button>
           </div>
         </div>
         <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Refresh encryption and escrow
+          Refresh
         </Button>
-        {query.isPending ? <p role="status">Loading encryption custody…</p> : null}
+        {query.isPending ? <p role="status">Loading encryption status…</p> : null}
         {failure ? <RpcError failure={failure} /> : null}
         {observed ? (
           <>
             <h3 className="font-semibold">
-              {luksUuid ? "Latest observation for selected volume" : "Latest observed volume"}
+              {luksUuid ? "Selected volume" : "Most recently reported volume"}
             </h3>
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="Observed (device)">
+              <Fact label="Reported">
                 <ObservedTime value={observed.observedAt} />
               </Fact>
-              <Fact label="Last action preflight">
-                {observed.supported ? "Supported for its exact action" : "Unsupported"}
+              <Fact label="Encryption actions">
+                {observed.supported ? "Supported" : "Not supported"}
                 {observed.reason ? `: ${observed.reason}` : ""}
               </Fact>
-              <Fact label="Encrypted target">
+              <Fact label="Encryption">
                 <StatusBadge status={observed.encrypted ? "success" : "warning"}>
-                  {observed.encrypted ? "Encrypted" : "Not encrypted (this observation only)"}
+                  {observed.encrypted ? "Encrypted" : "Not encrypted"}
                 </StatusBadge>
               </Fact>
-              <Fact label="TPM 2.0 bound">
+              <Fact label="TPM 2.0 unlock">
                 <StatusBadge status={observed.tpm2Bound ? "success" : "neutral"}>
-                  {observed.tpm2Bound ? "Bound" : "Not bound (this observation only)"}
+                  {observed.tpm2Bound ? "On" : "Off"}
                 </StatusBadge>
               </Fact>
-              <Fact label="lindm-owned keyslots">
-                {observed.lindmKeyslots.length
-                  ? observed.lindmKeyslots.join(", ")
-                  : "None observed"}
+              <Fact label="Key slots managed by lindm">
+                {observed.lindmKeyslots.length ? observed.lindmKeyslots.join(", ") : "None"}
               </Fact>
-              <Fact label="Recovery environment / off-target journal">
-                {observed.recoveryEnvironment ? "Recovery environment" : "Not recovery environment"}{" "}
-                / {observed.offTargetJournal ? "Off-target" : "Not off-target"}
+              <Fact label="Running from recovery">
+                {observed.recoveryEnvironment ? "Yes" : "No"}
               </Fact>
             </dl>
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="All occupied LUKS keyslots">
+              <Fact label="All used key slots">
                 {observed.occupiedKeyslots.length
                   ? observed.occupiedKeyslots.join(", ")
-                  : "None observed"}
+                  : "None reported"}
               </Fact>
             </dl>
             {observed.luksTokens.length ? (
               <Table>
-                <TableCaption>
-                  Public token identifiers and keyslot associations for this observed volume only.
-                  Credential material and native token blobs are never included.
-                </TableCaption>
+                <TableCaption>Unlock tokens on this volume. Secrets are never shown.</TableCaption>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Token ID</TableHead>
-                    <TableHead>Native type</TableHead>
-                    <TableHead>Associated keyslots</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Key slots</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -181,49 +158,42 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
                       <TableCell>{token.tokenId}</TableCell>
                       <TableCell>{token.type || "Not reported"}</TableCell>
                       <TableCell>
-                        {token.keyslots.length ? token.keyslots.join(", ") : "None associated"}
+                        {token.keyslots.length ? token.keyslots.join(", ") : "None"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             ) : (
-              <p>No public LUKS token records were reported for this observation.</p>
+              <p>No unlock tokens reported.</p>
             )}
             <StorageTargetView target={observed.target} />
           </>
         ) : data ? (
-          <details className="text-sm">
-            <summary className="cursor-pointer font-medium">
-              No protected encryption action observation is available.
-            </summary>
-            <p className="mt-2">
-              Absence is not proof that storage is unencrypted or that an action is supported.
-            </p>
-          </details>
+          <p className="text-sm">No encryption status reported yet.</p>
         ) : null}
         {escrow ? (
           <>
             <h3 className="font-semibold">
-              {luksUuid
-                ? "Recovery escrow for selected volume"
-                : "Latest recovery escrow for an exact LUKS volume"}
+              {luksUuid ? "Recovery key for selected volume" : "Most recent recovery key"}
             </h3>
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="Escrow action">
-                <span className="break-all font-mono text-xs">{escrow.actionId}</span>
-              </Fact>
-              <Fact label="LUKS UUID">{escrow.luksUuid}</Fact>
-              <Fact label="New keyslot">{escrow.keyslot}</Fact>
-              <Fact label="Ciphertext stored (server)">
+              <Fact label="Key slot">{escrow.keyslot}</Fact>
+              <Fact label="Stored on server">
                 <ObservedTime value={escrow.storedAt} server />
               </Fact>
-              <Fact label="Old managed-slot retirement">
+              <Fact label="Old key removed">
                 <StatusBadge status={escrow.retirementConfirmed ? "success" : "warning"}>
-                  {escrow.retirementConfirmed ? "Confirmed" : "Not confirmed"}
+                  {escrow.retirementConfirmed ? "Yes" : "Not confirmed"}
                 </StatusBadge>
               </Fact>
             </dl>
+            <TechnicalDetails
+              items={[
+                { label: "Action ID", value: escrow.actionId },
+                { label: "LUKS UUID", value: escrow.luksUuid },
+              ]}
+            />
             {canPermission(principal, "recovery_keys.read") ? (
               <Link
                 to="/devices/$deviceId/recovery/$actionId"
@@ -235,14 +205,7 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
             ) : null}
           </>
         ) : data ? (
-          <details className="text-sm">
-            <summary className="cursor-pointer font-medium">
-              No recovery escrow is recorded.
-            </summary>
-            <p className="mt-2">
-              Existing independent owner keys and header backups are not managed by this view.
-            </p>
-          </details>
+          <p className="text-sm">No recovery key stored yet.</p>
         ) : null}
         <div className="flex flex-wrap gap-4">
           {(["escrowRotate", "tpm2Bind"] as const)

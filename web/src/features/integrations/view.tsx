@@ -8,7 +8,7 @@ export function IntegrationsView() {
     <div className="grid min-w-0 gap-8">
       <PageHeader
         title="Integrations and reports"
-        description="Manage event export, delivery failures and stored reports. Requires unrestricted integrations.manage permission and configured control-plane integration workers."
+        description="Send events to other systems, retry failed deliveries and download reports."
       />
       <Destinations />
       <Deliveries />

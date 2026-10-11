@@ -3,8 +3,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 
 const labels: Record<DeviceState, string> = {
   [DeviceState.UNSPECIFIED]: "Not reported",
-  [DeviceState.PENDING]: "Pending",
-  [DeviceState.ACTIVE]: "Active",
+  [DeviceState.PENDING]: "Waiting to enroll",
+  [DeviceState.ACTIVE]: "Enrolled",
   [DeviceState.REVOKED]: "Revoked",
   [DeviceState.RECOVERY_HOLD]: "Recovery hold",
 };

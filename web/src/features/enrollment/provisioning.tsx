@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -48,9 +49,7 @@ export function ProvisioningTokens() {
         </CardHeader>
         <CardContent className="grid gap-4">
           <p className="text-sm text-muted-foreground">
-            Current server-visible scope only. Assignments are fixed at issuance; expiry and use
-            limits bound new enrollments. Revocation stops further redemption, not already enrolled
-            devices.
+            Reusable tokens for enrolling many devices. Revoking a token stops new enrollments only.
           </p>
           <Button
             className="w-fit"
@@ -58,12 +57,12 @@ export function ProvisioningTokens() {
             disabled={list.isFetching}
             onClick={() => void list.refetch()}
           >
-            Refresh tokens
+            Refresh
           </Button>
           {list.isPending ? <p role="status">Loading tokens…</p> : null}
           {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
           {!list.error && list.data?.tokens.length === 0 ? (
-            <EmptyState title="No provisioning tokens in your scope" />
+            <EmptyState title="No provisioning tokens yet" />
           ) : null}
           {list.error && list.data ? (
             <p className="text-sm text-muted-foreground">
@@ -155,9 +154,7 @@ export function IssueProvisioningToken({
       });
       lifetime.signal.throwIfAborted();
       if (!result.tokenId)
-        throw new Error(
-          "The server returned no token ID. Inspect the list and retry this exact request; do not assume issuance failed.",
-        );
+        throw new Error("The token may not have been created. Check the list, then try again.");
       onIssued(result);
       setCompleted(true);
       void client.invalidateQueries({ queryKey: ["provisioning-tokens", lifetime.generation] });
@@ -182,9 +179,10 @@ export function IssueProvisioningToken({
       }}
     >
       <DialogHeader>
-        <DialogTitle>Automatic enrollment (provisioning token)</DialogTitle>
+        <DialogTitle>Create a provisioning token</DialogTitle>
         <DialogDescription>
-          Enroll a fleet during installation with a reusable token bounded by expiry and use limit.
+          A reusable token that enrolls devices during installation, until it expires or runs out of
+          uses.
         </DialogDescription>
       </DialogHeader>
       <fieldset className="grid gap-4" disabled={busy || captured !== null || completed}>
@@ -216,14 +214,15 @@ export function IssueProvisioningToken({
         </div>
         <label className="flex items-start gap-2 text-sm">
           <input name="approval" type="checkbox" defaultChecked />
-          Require independent approval before device credentials are issued
+          Require another admin to approve each device
         </label>
         <details className="border p-3">
-          <summary className="cursor-pointer text-sm font-medium">Advanced assignments</summary>
+          <summary className="cursor-pointer text-sm font-medium">
+            Settings for enrolled devices (optional)
+          </summary>
           <div className="mt-3 grid gap-3">
             <p className="text-sm text-muted-foreground">
-              Assignments are fixed at issuance. Choose only labels, groups and profiles you are
-              authorized to manage.
+              Applied to every device enrolled with this token. These can't be changed later.
             </p>
             <label className="grid gap-1.5 text-sm font-medium">
               Labels (space separated)
@@ -238,7 +237,7 @@ export function IssueProvisioningToken({
               options={[
                 { value: "", label: "Unassigned" },
                 { value: "ownerText", label: "Owner name" },
-                { value: "ownerPrincipalId", label: "Owner principal UUID" },
+                { value: "ownerPrincipalId", label: "Owner account ID" },
               ]}
             />
             {ownerKind ? (
@@ -248,15 +247,15 @@ export function IssueProvisioningToken({
               </label>
             ) : null}
             <label className="grid gap-1.5 text-sm font-medium">
-              Static group UUIDs (space separated)
+              Group IDs (space separated)
               <Textarea name="groups" spellCheck={false} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Service profile revision ID
+              Profile revision ID
               <Input name="profile" spellCheck={false} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Custom attributes (protobuf JSON)
+              Custom attributes (JSON)
               <Textarea
                 name="metadata"
                 defaultValue={'{"attributes":{}}'}
@@ -265,31 +264,23 @@ export function IssueProvisioningToken({
               />
             </label>
             <p className="text-sm text-muted-foreground">
-              Use existing attribute definitions. Example:{" "}
-              {`{"attributes":{"site":{"stringValue":"east"}}}`}. Labels and owner come from the
-              fields above.
+              Example: {`{"attributes":{"site":{"stringValue":"east"}}}`}
             </p>
           </div>
         </details>
       </fieldset>
       {captured ? (
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer">Request details</summary>
-          <p className="mt-2 break-all">
-            Request {captured.requestId}. Retries retain this exact scope and assignments.
-          </p>
-        </details>
+        <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}
       {failure?.ambiguous ? (
         <p className="text-sm text-muted-foreground">
-          The token may have been created. Retry this exact request to resolve its status; a retry
-          cannot recover its secret.
+          The token may have been created. Try again to check. The secret can't be shown twice.
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy || completed}>
-          {busy ? "Creating…" : captured ? "Retry exact request" : "Create provisioning token"}
+          {busy ? "Creating…" : captured ? "Try again" : "Create provisioning token"}
         </Button>
         {onCancel ? (
           <Button
@@ -377,18 +368,16 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
         {token.usedCount} / {token.maxUses} uses · Expires {formatTimestamp(token.expiresAt).local}
       </p>
       <p className="text-sm text-muted-foreground">
-        Created by {token.creatorDisplayName || "unavailable"} ·{" "}
-        {token.approvalRequired ? "Independent approval required" : "No independent approval"}
+        Created by {token.creatorDisplayName || "unknown"} ·{" "}
+        {token.approvalRequired ? "Each device needs approval" : "No approval needed"}
       </p>
       <details>
         <summary className="cursor-pointer text-sm">Details</summary>
         <dl className="mt-3 grid gap-1 break-all text-sm">
-          <dt className="text-muted-foreground">Credential type</dt>
-          <dd>Reusable provisioning token</dd>
           <dt className="text-muted-foreground">Token ID</dt>
           <dd className="font-mono text-xs">{token.tokenId}</dd>
-          <dt className="text-muted-foreground">Creator principal ID</dt>
-          <dd className="font-mono text-xs">{token.createdBy || "Unavailable"}</dd>
+          <dt className="text-muted-foreground">Created by (ID)</dt>
+          <dd className="font-mono text-xs">{token.createdBy || "Unknown"}</dd>
           <dt className="text-muted-foreground">Created</dt>
           <dd>{formatTimestamp(token.createdAt).local}</dd>
           {token.revokedAt ? (
@@ -401,7 +390,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           <dd>{token.groupIds.join(", ") || "None"}</dd>
           <dt className="text-muted-foreground">Profile revision IDs</dt>
           <dd>{token.profileRevisionIds.join(", ") || "None"}</dd>
-          <dt className="text-muted-foreground">Assigned metadata</dt>
+          <dt className="text-muted-foreground">Device settings</dt>
           <dd>
             {token.metadata ? (
               <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
@@ -433,8 +422,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           <DialogHeader>
             <DialogTitle>Revoke provisioning token?</DialogTitle>
             <DialogDescription>
-              Stop new enrollments using this reusable provisioning token. Already enrolled devices
-              are not revoked.
+              New devices can no longer enroll with it. Devices already enrolled are not affected.
             </DialogDescription>
           </DialogHeader>
           <p className="break-words text-sm font-medium">{token.reason || "Provisioning token"}</p>
@@ -447,31 +435,27 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           >
             <fieldset className="grid gap-3" disabled={busy || captured !== null || revoked}>
               <label className="grid gap-1.5 text-sm">
-                Revocation reason
+                Reason
                 <Textarea name="reason" required />
               </label>
             </fieldset>
             {captured ? (
-              <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Request details</summary>
-                <p className="mt-2 break-all">
-                  Request {captured.requestId}. Token {captured.tokenId}.
-                </p>
-              </details>
+              <TechnicalDetails
+                items={[
+                  { label: "Request ID", value: captured.requestId },
+                  { label: "Token ID", value: captured.tokenId },
+                ]}
+              />
             ) : null}
             {failure ? <RpcError failure={failure} /> : null}
             {failure?.ambiguous ? (
               <p className="text-sm text-muted-foreground">
-                Revocation may have succeeded. Retry the exact request to resolve its status.
+                The token may already be revoked. Try again to check.
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" variant="destructive" disabled={busy || revoked}>
-                {busy
-                  ? "Revoking…"
-                  : captured
-                    ? "Retry exact revocation"
-                    : "Revoke provisioning token"}
+                {busy ? "Revoking…" : captured ? "Try again" : "Revoke provisioning token"}
               </Button>
               <Button
                 type="button"

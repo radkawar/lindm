@@ -34,7 +34,11 @@ const (
 // request. Ordinary acquisition has a two-minute deadline; streaming Red Hat and
 // OSV archive refreshes are bounded by the publisher's progress watchdog.
 type Client struct {
-	http        *http.Client
+	http *http.Client
+	// archive has no whole-request timeout: large exports (the complete Ubuntu
+	// OSV archive is ~780 MB) are bounded by the caller's refresh context and
+	// its idle-progress watchdog instead of a fixed two-minute transfer cap.
+	archive     *http.Client
 	validator   protovalidate.Validator
 	signedTrust *vendorTrust
 }
@@ -66,7 +70,9 @@ func New(client *http.Client) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{http: &copyClient, validator: validator, signedTrust: signedTrust}, nil
+	archiveClient := copyClient
+	archiveClient.Timeout = 0
+	return &Client{http: &copyClient, archive: &archiveClient, validator: validator, signedTrust: signedTrust}, nil
 }
 
 // Fetch materializes a bounded document. Publication of complete OSV ecosystems

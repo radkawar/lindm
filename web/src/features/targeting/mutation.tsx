@@ -77,7 +77,7 @@ export function TargetMutation<S extends DescMessage>({
       const current = attempts.get(formKey);
       if (current) attempts.set(formKey, { ...current, status: "accepted" });
       notify();
-      toast.success(`${title} accepted`);
+      toast.success("Changes saved");
       void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
       onAccepted?.();
     },
@@ -120,14 +120,13 @@ export function TargetMutation<S extends DescMessage>({
           setError("");
           mutation.mutate(request);
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : "Invalid protobuf JSON");
+          setError(cause instanceof Error ? cause.message : "Invalid JSON");
         }
       }}
     >
-      <Label htmlFor={id}>{title} (protobuf JSON)</Label>
+      <Label htmlFor={id}>{title} (JSON)</Label>
       <p className="text-sm text-muted-foreground">
-        Include an audit reason and expected revision where required. Sending locks this request and
-        its ID. Retries use the same request.
+        Include a reason. Once sent, edits are locked.
       </p>
       <Textarea
         id={id}
@@ -148,19 +147,19 @@ export function TargetMutation<S extends DescMessage>({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.status === "ambiguous"
-              ? "Retry this captured request. A new request does not cancel it."
-              : "Refresh server state before preparing a new request."}
+              ? "We couldn't confirm this was saved. Retry: it won't apply twice."
+              : "Refresh, then try again."}
           </p>
         </RpcError>
       ) : null}
       {attempt?.status === "accepted" ? (
         <p role="status" className="text-sm">
-          Request accepted. This is not evidence of native execution or compliance.
+          Saved.
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
         {!attempt || attempt.status === "ambiguous" ? (
-          <Button type="submit">{attempt ? "Retry same request" : title}</Button>
+          <Button type="submit">{attempt ? "Retry" : title}</Button>
         ) : null}
         {attempt?.status === "pending" ? <Button disabled>Sending…</Button> : null}
         {attempt && attempt.status !== "pending" ? (
@@ -175,7 +174,7 @@ export function TargetMutation<S extends DescMessage>({
               setError("");
             }}
           >
-            Prepare a different request
+            Start over
           </Button>
         ) : null}
       </div>

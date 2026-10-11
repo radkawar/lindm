@@ -60,11 +60,20 @@ const idleLink: LinkState = { stage: "idle", failure: null, error: "", retryable
 
 const stageLabels: Record<LinkStage, string> = {
   idle: "Not connected",
-  joining: "Fetching the device offer",
-  negotiating: "Preparing the relay connection",
-  answering: "Sending the answer",
-  answered: "Answer sent",
-  failed: "Connection setup failed",
+  joining: "Connecting",
+  negotiating: "Connecting",
+  answering: "Connecting",
+  answered: "Connecting",
+  failed: "Couldn't connect",
+};
+
+const mediaLabels: Record<string, string> = {
+  new: "Connecting",
+  connecting: "Connecting",
+  connected: "Connected",
+  disconnected: "Connection interrupted",
+  failed: "Connection lost",
+  closed: "Disconnected",
 };
 
 // Resolves when ICE gathering completes, or false after the contract's 10 s bound.
@@ -97,10 +106,10 @@ function stopOnLeave(lifetime: AuthLifetime, sessionId: string) {
       { sessionId },
       { signal: lifetime.signal, timeoutMs: STOP_ON_LEAVE_TIMEOUT_MS },
     )
-    .catch((error: unknown) => {
+    .catch(() => {
       if (lifetime.signal.aborted) return;
-      toast.error("Remote assistance stop not confirmed", {
-        description: `${toRpcFailure(error).message} Open the session from the device page and stop it.`,
+      toast.error("Couldn't confirm the session stopped", {
+        description: "Open the session from the device page and stop it.",
       });
     });
 }
@@ -166,7 +175,7 @@ export function AssistanceViewerPage({
       </nav>
       <PageHeader
         title="Remote assistance"
-        description="The local user can stop sharing at any time. Leaving this page ends a session you requested."
+        description="The user on the device can stop sharing at any time. Leaving this page ends the session."
         actions={
           session && !ended && allowed ? (
             <StopButton sessionId={sessionId} deviceId={deviceId} />
@@ -174,7 +183,7 @@ export function AssistanceViewerPage({
         }
       />
       {query.error ? (
-        <RpcError failure={toRpcFailure(query.error)} title="Session status unavailable" />
+        <RpcError failure={toRpcFailure(query.error)} title="Couldn't load session" />
       ) : null}
       {query.isPending ? <p role="status">Loading session…</p> : null}
       {session ? (
@@ -189,11 +198,11 @@ export function AssistanceViewerPage({
             />
           ) : !ended ? (
             <Alert>
-              <AlertTitle>Status only</AlertTitle>
+              <AlertTitle>View only</AlertTitle>
               <AlertDescription>
                 {allowed
-                  ? "Only the operator who requested this session can connect to it. You can stop it."
-                  : "Only the operator who requested this session can connect to it."}
+                  ? "Only the admin who requested this session can connect. You can still stop it."
+                  : "Only the admin who requested this session can connect."}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -226,7 +235,7 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
           ) : null}
           {waiting && Number.isFinite(consentBy) ? (
             <span className="text-sm font-normal text-muted-foreground">
-              Consent window closes in {remainingLabel(consentBy - now)}
+              User has {remainingLabel(consentBy - now)} to accept
             </span>
           ) : null}
         </CardTitle>
@@ -234,16 +243,16 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
       <CardContent>
         <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Mode">{modeLabels[session.mode]}</Fact>
-          <Fact label="Operator">{session.operatorDisplay || session.operatorId}</Fact>
-          <Fact label="Local user">{localSessionText(session)}</Fact>
+          <Fact label="Admin">{session.operatorDisplay || "Unknown"}</Fact>
+          <Fact label="Device user">{localSessionText(session)}</Fact>
           <Fact label="Control">{controlText(session)}</Fact>
-          <Fact label="Created">
+          <Fact label="Requested">
             <TimeCell value={session.createdAt} />
           </Fact>
           <Fact label="Started">
             <TimeCell value={session.startedAt} />
           </Fact>
-          <Fact label="Ends at the latest">
+          <Fact label="Ends by">
             <TimeCell value={session.endsAt} />
           </Fact>
           <Fact label="Ended">
@@ -317,9 +326,9 @@ function StopButton({ sessionId, deviceId }: { sessionId: string; deviceId: stri
           })
         }
       >
-        {exact.busy ? "Stopping…" : exact.ambiguous ? "Retry stop" : "Stop session"}
+        {exact.busy ? "Stopping…" : exact.ambiguous ? "Try stopping again" : "Stop session"}
       </Button>
-      {exact.failure ? <RpcError failure={exact.failure} title="Session not stopped" /> : null}
+      {exact.failure ? <RpcError failure={exact.failure} title="Couldn't stop session" /> : null}
     </div>
   );
 }
@@ -364,9 +373,9 @@ function AssistanceConnection({
       );
       signal.throwIfAborted();
       if (join.session?.id !== sessionId || join.session.deviceId !== deviceId) {
-        throw new Error("The join response does not match this device and session.");
+        throw new Error("The server returned a different session. Reload the page.");
       }
-      if (!join.offerSdp) throw new Error("The device offer is missing.");
+      if (!join.offerSdp) throw new Error("The device didn't send its screen. Try again.");
       if (
         join.iceServers.length === 0 ||
         join.iceServers.some(
@@ -374,7 +383,7 @@ function AssistanceConnection({
             server.urls.length === 0 || server.urls.some((url) => !/^turns?:\S+$/.test(url)),
         )
       ) {
-        throw new Error("The server did not provide relay-only ICE servers.");
+        throw new Error("The server's relay isn't set up correctly. Contact your server admin.");
       }
       update({ stage: "negotiating" });
       const peer = new RTCPeerConnection({
@@ -421,7 +430,7 @@ function AssistanceConnection({
       const answerSdp = peer.localDescription?.sdp ?? "";
       if (!/^a=candidate:.* typ relay\b/m.test(answerSdp)) {
         throw new Error(
-          "No relay candidate was gathered within 10 seconds. Check that this browser can reach the assistance relay.",
+          "Couldn't reach the server's relay within 10 seconds. Check your network and try again.",
         );
       }
       const request = create(AnswerAssistanceSessionRequestSchema, { sessionId, answerSdp });
@@ -556,7 +565,9 @@ function AssistanceConnection({
           <span>Screen</span>
           <span className="flex flex-wrap items-center gap-2 text-sm font-normal">
             <span className="text-muted-foreground">
-              {link.stage === "answered" ? `Media: ${connectionState}` : stageLabels[link.stage]}
+              {link.stage === "answered"
+                ? (mediaLabels[connectionState] ?? "Connecting")
+                : stageLabels[link.stage]}
             </span>
             {controlRequested ? (
               <Button
@@ -575,27 +586,27 @@ function AssistanceConnection({
         {session.state === AssistanceState.REQUESTED ||
         session.state === AssistanceState.PROMPTED ? (
           <p role="status">
-            Waiting for the local user to accept on the device. Keep this page open; leaving it
-            cancels the request.
+            Waiting for the user on the device to accept. Keep this page open; leaving cancels the
+            request.
           </p>
         ) : null}
         {attachedElsewhere ? (
           <Alert>
-            <AlertTitle>Connected from another page</AlertTitle>
+            <AlertTitle>Open in another tab</AlertTitle>
             <AlertDescription>
-              This session was already answered and cannot be joined again. Stop it and request a
-              new session to reconnect.
+              This session is already connected elsewhere. To reconnect here, stop it and request a
+              new session.
             </AlertDescription>
           </Alert>
         ) : null}
         {link.failure ? (
-          <RpcError failure={link.failure} title="Connection not established">
+          <RpcError failure={link.failure} title="Couldn't connect">
             {precondition ? <p>{precondition}</p> : null}
           </RpcError>
         ) : null}
         {link.error ? (
           <Alert variant="destructive">
-            <AlertTitle>Connection not established</AlertTitle>
+            <AlertTitle>Couldn't connect</AlertTitle>
             <AlertDescription>{link.error}</AlertDescription>
           </Alert>
         ) : null}
@@ -605,17 +616,17 @@ function AssistanceConnection({
             className="w-fit"
             onClick={() => setAttempt((current) => current + 1)}
           >
-            Retry connection
+            Try again
           </Button>
         ) : null}
         {connectionState === "failed" ? (
           <p role="alert" className="text-sm text-destructive">
-            The relay connection failed. The device ends the session.
+            The connection was lost. The session will end.
           </p>
         ) : null}
         {controlRequested && !session.controlGranted && session.state === AssistanceState.ACTIVE ? (
           <p className="text-sm text-muted-foreground">
-            The local user granted viewing only. Control stays unavailable for this session.
+            The user allowed viewing only, so you can't control this session.
           </p>
         ) : null}
         <div
@@ -648,8 +659,7 @@ function AssistanceConnection({
         </div>
         {capturing ? (
           <p className="text-sm text-muted-foreground">
-            Control is on while the screen has focus. Keys and clicks go to the device; browser
-            shortcuts such as closing the tab still apply. Click outside the screen to release the
+            Control is on. Keys and clicks go to the device. Click outside the screen to release the
             keyboard.
           </p>
         ) : null}

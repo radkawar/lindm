@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
@@ -32,10 +33,28 @@ const candidatePage = 500
 // truncated result.
 const maxFindings = 100000
 
+// evaluationAttempts bounds retries of one device evaluation that lost a
+// serialization race: the device row is updated by heartbeats and inventory
+// while the repeatable-read evaluation waits for its row lock, and concurrent
+// workers may create the same finding set (the retry binds the committed one).
+const evaluationAttempts = 4
+
 // Evaluate publishes one bounded, repeatable-read evaluation of the device's
 // current immutable snapshot. Publication of a new snapshot or feed immediately
-// makes the previous evaluation UNKNOWN through the shared SQL view.
+// makes the previous evaluation UNKNOWN through the shared SQL view. A
+// serialization conflict retries from a fresh snapshot; nothing is reused.
 func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.AdvisoryEvaluation, error) {
+	for attempt := 1; ; attempt++ {
+		evaluation, err := s.evaluateOnce(ctx, deviceID)
+		var database *pgconn.PgError
+		if attempt < evaluationAttempts && errors.As(err, &database) && (database.Code == "40001" || database.Code == "40P01" || database.ConstraintName == "advisory_finding_sets_feed_id_feed_revision_package_digest_key") && ctx.Err() == nil {
+			continue
+		}
+		return evaluation, err
+	}
+}
+
+func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisorydb.AdvisoryEvaluation, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
@@ -148,7 +167,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 		previous.EvaluatedAt = dbNow
 		return previous, nil
 	}
-	findings := make(map[uuid.UUID]advisorydb.InsertAdvisoryFindingsParams)
+	e.FindingDigest = emptyFindingDigest()
 	if selected != nil && d.CurrentSnapshotID != nil {
 		missing, err := q.AdvisorySourceMappingMissing(ctx, *d.CurrentSnapshotID)
 		if err != nil {
@@ -166,131 +185,30 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 				unknown("package_architecture_uncovered")
 			}
 		}
-		// Deterministic record/capacity failures persist an UNKNOWN evaluation
-		// instead of failing the background job forever on unchanged evidence.
-		// Candidates arrive in bounded keyset pages; memory never holds more
-		// than one page of record bytes plus the admitted findings.
-		afterPosition, afterRecord := int32(-1), uuid.Nil
-	matching:
-		for {
-			rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, Generation: selected.Revision, SnapshotID: *d.CurrentSnapshotID, AfterPosition: afterPosition, AfterRecord: afterRecord, RowLimit: candidatePage})
-			if err != nil {
-				return advisorydb.AdvisoryEvaluation{}, err
-			}
-			for _, row := range rows {
-				var record advisoryv1.Advisory
-				if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
-					unknown("advisory_record_invalid")
-					break matching
-				}
-				if selectedSource.GetDistro() == "rhel" && !record.GetSourceRecordRejected() {
-					if row.ModuleStatus != 1 {
-						unknown("native_module_identity_unavailable")
-						continue
-					}
-					if row.ModuleName != record.GetModuleName() || row.ModuleStream != record.GetModuleStream() {
-						if record.GetAssessmentUnknown() && record.GetModuleName() == "" && row.ModuleName != "" {
-							unknown("vendor_module_binding_ambiguous")
-						}
-						continue
-					}
-				}
-				version := row.Version
-				if record.GetSourcePackage() {
-					version = row.SourceVersion
-				}
-				affected, err := matches(row.Manager, version, &record)
-				if err != nil {
-					unknown("package_version_unrecognized")
-					continue
-				}
-				if !affected {
-					continue
-				}
-				if record.GetSourceRecordRejected() {
-					unknown("source_record_rejected")
-				} else if record.GetAssessmentUnknown() {
-					unknown("vendor_assessment_unknown")
-				}
-				id := findingID(deviceID, selected.ID, record.GetId(), row.Name, row.Version, row.Architecture)
-				f := advisorydb.InsertAdvisoryFindingsParams{ID: id, DeviceID: deviceID, AdvisoryID: record.GetId(), PackageName: row.Name, InstalledVersion: row.Version, FixedVersion: record.GetFixedVersion(), Architecture: row.Architecture, Severity: record.GetSeverity(), Cves: record.GetCves(), FeedID: selected.ID, SourceUrl: record.GetSourceUrl()}
-				if f.Cves == nil {
-					f.Cves = []string{}
-				}
-				if record.GetPublishedAt() != nil {
-					f.PublishedAt = timestamp(record.GetPublishedAt().AsTime())
-				}
-				if previous, exists := findings[id]; exists {
-					// A CSAF advisory can emit one matching record per CVE.
-					// They are one accepted-risk identity, not last-row-wins.
-					f.Cves = append(previous.Cves, f.Cves...)
-					slices.Sort(f.Cves)
-					f.Cves = slices.Compact(f.Cves)
-					if len(f.Cves) > 2048 {
-						unknown("matching_capacity_exceeded")
-						break matching
-					}
-					if feed.SeverityRank(previous.Severity) > feed.SeverityRank(f.Severity) {
-						f.Severity = previous.Severity
-					}
-					if previous.FixedVersion == "" || f.FixedVersion == "" {
-						f.FixedVersion = ""
-					} else {
-						comparison, err := feed.Compare(row.Manager, previous.FixedVersion, f.FixedVersion)
-						if err != nil {
-							unknown("advisory_record_invalid")
-							break matching
-						}
-						if comparison > 0 {
-							f.FixedVersion = previous.FixedVersion
-						}
-					}
-					if previous.PublishedAt.Valid && (!f.PublishedAt.Valid || previous.PublishedAt.Time.Before(f.PublishedAt.Time)) {
-						f.PublishedAt = previous.PublishedAt
-					}
-					if previous.SourceUrl < f.SourceUrl {
-						f.SourceUrl = previous.SourceUrl
-					}
-				}
-				if _, exists := findings[id]; !exists && len(findings) == maxFindings {
-					unknown("matching_capacity_exceeded")
-					break matching
-				}
-				findings[id] = f
-			}
-			if len(rows) < candidatePage {
-				break
-			}
-			afterPosition, afterRecord = rows[len(rows)-1].Position, rows[len(rows)-1].RecordID
+		// Matching depends only on the feed generation and the exact package
+		// rows, so identical package sets share one persisted finding set.
+		digest, err := q.AdvisoryPackageDigest(ctx, *d.CurrentSnapshotID)
+		if err != nil {
+			return advisorydb.AdvisoryEvaluation{}, err
 		}
+		set, err := q.GetAdvisoryFindingSet(ctx, advisorydb.GetAdvisoryFindingSetParams{FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: digest})
+		if errors.Is(err, pgx.ErrNoRows) {
+			set, err = matchFindingSet(ctx, q, selected, selectedSource, *d.CurrentSnapshotID, digest)
+		}
+		if err != nil {
+			return advisorydb.AdvisoryEvaluation{}, err
+		}
+		if set.State != "evaluated" {
+			unknown(set.Reason)
+		}
+		e.FindingDigest = set.FindingDigest
+		e.FindingSetID = &set.ID
 	}
-	ids := make([]uuid.UUID, 0, len(findings))
-	for id := range findings {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return bytes.Compare(ids[i][:], ids[j][:]) < 0 })
-	hash := sha256.New()
-	for _, id := range ids {
-		f := findings[id]
-		_, _ = hash.Write(id[:])
-		_, _ = hash.Write([]byte(strings.Join([]string{f.FixedVersion, f.Severity, f.PublishedAt.Time.UTC().Format(time.RFC3339Nano), strings.Join(f.Cves, ","), f.SourceUrl}, "\x00")))
-	}
-	e.FindingDigest = hash.Sum(nil)
 	// Candidate-level uncertainty (including a rejected source record) is
 	// discovered after the fast path above. Reuse its evaluation identity when
 	// evidence is unchanged so pagination does not invalidate itself.
-	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt && bytes.Equal(previous.FindingDigest, e.FindingDigest) {
+	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt && bytes.Equal(previous.FindingDigest, e.FindingDigest) && sameID(previous.FindingSetID, e.FindingSetID) {
 		return previous, nil
-	}
-	if err := q.DeleteAdvisoryFindings(ctx, deviceID); err != nil {
-		return advisorydb.AdvisoryEvaluation{}, err
-	}
-	ordered := make([]advisorydb.InsertAdvisoryFindingsParams, 0, len(ids))
-	for _, id := range ids {
-		ordered = append(ordered, findings[id])
-	}
-	if _, err := q.InsertAdvisoryFindings(ctx, ordered); err != nil {
-		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	if err := q.StoreAdvisoryEvaluation(ctx, e); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
@@ -310,12 +228,176 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 	return result, nil
 }
 
+func emptyFindingDigest() []byte {
+	digest := sha256.Sum256(nil)
+	return digest[:]
+}
+
+// matchFindingSet matches one published snapshot against one feed generation
+// and persists the device-independent result. Deterministic record/capacity
+// failures persist an UNKNOWN set instead of failing the background job forever
+// on unchanged evidence. Candidates arrive in bounded keyset pages; memory never
+// holds more than one page of record bytes plus the admitted findings.
+func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advisorydb.AdvisoryFeed, selectedSource *advisoryv1.FeedSource, snapshotID uuid.UUID, packageDigest []byte) (advisorydb.AdvisoryFindingSet, error) {
+	set := advisorydb.AdvisoryFindingSet{ID: uuid.New(), FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: packageDigest, State: "evaluated"}
+	unknown := func(reason string) {
+		if set.State != "unknown" {
+			set.State = "unknown"
+			set.Reason = reason
+		}
+	}
+	findings := make(map[uuid.UUID]advisorydb.InsertAdvisorySetFindingsParams)
+	afterPosition, afterRecord := int32(-1), uuid.Nil
+matching:
+	for {
+		rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, Generation: selected.Revision, SnapshotID: snapshotID, AfterPosition: afterPosition, AfterRecord: afterRecord, RowLimit: candidatePage})
+		if err != nil {
+			return set, err
+		}
+		for _, row := range rows {
+			var record advisoryv1.Advisory
+			if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
+				unknown("advisory_record_invalid")
+				break matching
+			}
+			if selectedSource.GetDistro() == "rhel" && !record.GetSourceRecordRejected() {
+				if row.ModuleStatus != 1 {
+					unknown("native_module_identity_unavailable")
+					continue
+				}
+				if row.ModuleName != record.GetModuleName() || row.ModuleStream != record.GetModuleStream() {
+					if record.GetAssessmentUnknown() && record.GetModuleName() == "" && row.ModuleName != "" {
+						unknown("vendor_module_binding_ambiguous")
+					}
+					continue
+				}
+			}
+			version := row.Version
+			if record.GetSourcePackage() {
+				version = row.SourceVersion
+			}
+			affected, err := matches(row.Manager, version, &record)
+			if err != nil {
+				unknown("package_version_unrecognized")
+				continue
+			}
+			if !affected {
+				continue
+			}
+			if record.GetSourceRecordRejected() {
+				unknown("source_record_rejected")
+			} else if record.GetAssessmentUnknown() {
+				unknown("vendor_assessment_unknown")
+			}
+			key := findingKey(selected.ID, record.GetId(), row.Name, row.Version, row.Architecture)
+			f := advisorydb.InsertAdvisorySetFindingsParams{SetID: set.ID, FindingKey: key, AdvisoryID: record.GetId(), PackageName: row.Name, InstalledVersion: row.Version, FixedVersion: record.GetFixedVersion(), Architecture: row.Architecture, Severity: record.GetSeverity(), Cves: record.GetCves(), SourceUrl: record.GetSourceUrl()}
+			if f.Cves == nil {
+				f.Cves = []string{}
+			}
+			if record.GetPublishedAt() != nil {
+				f.PublishedAt = timestamp(record.GetPublishedAt().AsTime())
+			}
+			if previous, exists := findings[key]; exists {
+				// A CSAF advisory can emit one matching record per CVE.
+				// They are one accepted-risk identity, not last-row-wins.
+				f.Cves = append(previous.Cves, f.Cves...)
+				slices.Sort(f.Cves)
+				f.Cves = slices.Compact(f.Cves)
+				if len(f.Cves) > 2048 {
+					unknown("matching_capacity_exceeded")
+					break matching
+				}
+				if feed.SeverityRank(previous.Severity) > feed.SeverityRank(f.Severity) {
+					f.Severity = previous.Severity
+				}
+				if previous.FixedVersion == "" || f.FixedVersion == "" {
+					f.FixedVersion = ""
+				} else {
+					comparison, err := feed.Compare(row.Manager, previous.FixedVersion, f.FixedVersion)
+					if err != nil {
+						unknown("advisory_record_invalid")
+						break matching
+					}
+					if comparison > 0 {
+						f.FixedVersion = previous.FixedVersion
+					}
+				}
+				if previous.PublishedAt.Valid && (!f.PublishedAt.Valid || previous.PublishedAt.Time.Before(f.PublishedAt.Time)) {
+					f.PublishedAt = previous.PublishedAt
+				}
+				if previous.SourceUrl < f.SourceUrl {
+					f.SourceUrl = previous.SourceUrl
+				}
+			}
+			if _, exists := findings[key]; !exists && len(findings) == maxFindings {
+				unknown("matching_capacity_exceeded")
+				break matching
+			}
+			findings[key] = f
+		}
+		if len(rows) < candidatePage {
+			break
+		}
+		afterPosition, afterRecord = rows[len(rows)-1].Position, rows[len(rows)-1].RecordID
+	}
+	keys := make([]uuid.UUID, 0, len(findings))
+	for key := range findings {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return bytes.Compare(keys[i][:], keys[j][:]) < 0 })
+	hash := sha256.New()
+	ordered := make([]advisorydb.InsertAdvisorySetFindingsParams, 0, len(keys))
+	type advisoryKey struct{ id, severity string }
+	rollup := make(map[advisoryKey]int32)
+	for _, key := range keys {
+		f := findings[key]
+		_, _ = hash.Write(key[:])
+		_, _ = hash.Write([]byte(strings.Join([]string{f.FixedVersion, f.Severity, f.PublishedAt.Time.UTC().Format(time.RFC3339Nano), strings.Join(f.Cves, ","), f.SourceUrl}, "\x00")))
+		ordered = append(ordered, f)
+		rollup[advisoryKey{f.AdvisoryID, f.Severity}]++
+		switch f.Severity {
+		case "critical":
+			set.CriticalCount++
+		case "high":
+			set.HighCount++
+		case "medium":
+			set.MediumCount++
+		case "low":
+			set.LowCount++
+		default:
+			set.OtherCount++
+		}
+	}
+	set.FindingDigest = hash.Sum(nil)
+	set.FindingCount = int32(len(ordered))
+	if err := q.InsertAdvisoryFindingSet(ctx, advisorydb.InsertAdvisoryFindingSetParams{ID: set.ID, FeedID: set.FeedID, FeedRevision: set.FeedRevision, PackageDigest: set.PackageDigest, State: set.State, Reason: set.Reason, FindingDigest: set.FindingDigest, FindingCount: set.FindingCount, CriticalCount: set.CriticalCount, HighCount: set.HighCount, MediumCount: set.MediumCount, LowCount: set.LowCount, OtherCount: set.OtherCount}); err != nil {
+		return set, err
+	}
+	if _, err := q.InsertAdvisorySetFindings(ctx, ordered); err != nil {
+		return set, err
+	}
+	advisories := make([]advisorydb.InsertAdvisorySetAdvisoriesParams, 0, len(rollup))
+	for key, count := range rollup {
+		advisories = append(advisories, advisorydb.InsertAdvisorySetAdvisoriesParams{SetID: set.ID, AdvisoryID: key.id, Severity: key.severity, Findings: count})
+	}
+	if _, err := q.InsertAdvisorySetAdvisories(ctx, advisories); err != nil {
+		return set, err
+	}
+	return set, nil
+}
+
 func sameID(a, b *uuid.UUID) bool {
 	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
-func findingID(device uuid.UUID, parts ...string) uuid.UUID {
-	return uuid.NewSHA1(device, []byte(strings.Join(parts, "\x00")))
+// findingKey is device-independent and SQL-reproducible (migration 00019):
+// the first 16 bytes of SHA-256 over the NUL-joined identity parts. The API
+// finding ID is this key within the device's context.
+func findingKey(parts ...string) uuid.UUID {
+	digest := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	var key uuid.UUID
+	copy(key[:], digest[:16])
+	return key
 }
 
 func matches(manager, installed string, record *advisoryv1.Advisory) (bool, error) {

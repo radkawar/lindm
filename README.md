@@ -61,17 +61,19 @@ Open `https://localhost:18444` using a development browser profile that trusts
 there is no production no-auth or insecure-TLS mode. The separate device mTLS listener
 is on port 18445. Development ports are loopback-only.
 
-| Command                 | Purpose                                                                                   |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| `make bootstrap`        | Install pinned generators/linters, locked npm dependencies and repository-local Git hooks |
-| `make generate`         | Generate protobuf Go/TypeScript contracts and sqlc queries                                |
-| `make build`            | Build the console and `artifacts/bin/{lindmd,lindm-agent,lab}`                            |
-| `make check`            | Format checks, Go/protobuf/Markdown/TypeScript lint, race tests and dependency audit      |
-| `make test-integration` | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas    |
-| `make dev-check`        | Check runtime database TLS and actual OIDC/directory access                               |
-| `make dev-trust`        | Create or verify development-only DSSE bootstrap/execution and separate TUF trust         |
-| `make dev-down`         | Stop this checkout's lab services while preserving credentials and volumes                |
-| `make fmt`              | Apply repository formatting                                                               |
+| Command                   | Purpose                                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make bootstrap`          | Install pinned generators/linters, locked npm dependencies and repository-local Git hooks                                                         |
+| `make generate`           | Generate protobuf Go/TypeScript contracts and sqlc queries                                                                                        |
+| `make build`              | Build the console and `artifacts/bin/{lindmd,lindm-agent,lab}`                                                                                    |
+| `make check`              | Format checks, Go/protobuf/Markdown/TypeScript lint, race tests and dependency audit                                                              |
+| `make test-integration`   | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas                                                            |
+| `make signoff`            | Local CI: run `check` and `test-integration`, then post `signoff/check` and `signoff/integration` commit statuses on the pushed HEAD (gh-signoff) |
+| `make signoff-acceptance` | Run the release acceptance gate, then post `signoff/acceptance`                                                                                   |
+| `make dev-check`          | Check runtime database TLS and actual OIDC/directory access                                                                                       |
+| `make dev-trust`          | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                 |
+| `make dev-down`           | Stop this checkout's lab services while preserving credentials and volumes                                                                        |
+| `make fmt`                | Apply repository formatting                                                                                                                       |
 
 The lab uses `.cache/dev` with mode 0700 and secret files with mode 0600. Never commit
 or copy these credentials. Development-only certificates last five years. Moved,

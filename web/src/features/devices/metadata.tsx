@@ -18,6 +18,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
@@ -37,19 +38,23 @@ export function DeviceMetadataCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ownership, labels and custom attributes</CardTitle>
-        <CardDescription>
-          Administrative metadata is separate from native device observations. Saving replaces all
-          metadata; removing an owner clears ownership.
-        </CardDescription>
+        <CardTitle>Owner, labels and attributes</CardTitle>
+        <CardDescription>Saving replaces all of these at once.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <dl className="grid gap-2 text-sm">
           <dt className="text-muted-foreground">Owner</dt>
           <dd>
-            {value.owner.case
-              ? `${value.owner.value}${value.owner.case === "ownerPrincipalId" ? " (principal ID)" : ""}`
-              : "Unassigned"}
+            {value.owner.case === "ownerPrincipalId" ? (
+              <>
+                Console user
+                <TechnicalDetails items={[{ label: "User ID", value: value.owner.value }]} />
+              </>
+            ) : value.owner.case ? (
+              value.owner.value
+            ) : (
+              "Unassigned"
+            )}
           </dd>
           <dt className="text-muted-foreground">Labels</dt>
           <dd>{value.labels.length ? value.labels.join(", ") : "No labels"}</dd>
@@ -75,12 +80,12 @@ export function DeviceMetadataCard({
             <MetadataForm deviceId={deviceId} metadata={editing} onClose={() => setEditing(null)} />
           ) : (
             <Button className="w-fit" onClick={() => setEditing(value)}>
-              Edit metadata
+              Edit
             </Button>
           )
         ) : (
           <p className="text-sm text-muted-foreground">
-            Inventory management permission is required to edit metadata.
+            You need inventory management access to edit these.
           </p>
         )}
       </CardContent>
@@ -114,7 +119,7 @@ function MetadataForm({
       lifetime.signal.throwIfAborted();
     },
     onSuccess: () => {
-      if (!lifetime.signal.aborted) toast.success("Device metadata saved");
+      if (!lifetime.signal.aborted) toast.success("Device details saved");
       void queryClient.invalidateQueries({ queryKey: ["device", lifetime.generation, deviceId] });
       void queryClient.invalidateQueries({ queryKey: ["devices", lifetime.generation] });
     },
@@ -127,9 +132,7 @@ function MetadataForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Metadata save outcome unknown" : "Metadata not saved", {
-          description: "Review the inline result and captured request before continuing.",
-        });
+        ](failure.ambiguous ? "Couldn't confirm changes were saved" : "Couldn't save changes");
       }
     },
     onSettled: () => {
@@ -181,7 +184,7 @@ function MetadataForm({
     >
       <fieldset disabled={captured !== null} className="grid gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="metadata-owner-kind">Owner form</Label>
+          <Label htmlFor="metadata-owner-kind">Owner type</Label>
           <SelectField
             id="metadata-owner-kind"
             value={ownerKind}
@@ -189,15 +192,15 @@ function MetadataForm({
             onValueChange={(value) => setOwnerKind(value as typeof ownerKind)}
             options={[
               { value: "", label: "Unassigned" },
-              { value: "ownerText", label: "Free-text owner" },
-              { value: "ownerPrincipalId", label: "Principal ID" },
+              { value: "ownerText", label: "Name" },
+              { value: "ownerPrincipalId", label: "Console user ID" },
             ]}
           />
         </div>
         {ownerKind ? (
           <div className="grid gap-1.5">
             <Label htmlFor="metadata-owner">
-              Owner {ownerKind === "ownerPrincipalId" ? "UUID" : "name"}
+              Owner {ownerKind === "ownerPrincipalId" ? "user ID" : "name"}
             </Label>
             <Input
               id="metadata-owner"
@@ -218,26 +221,22 @@ function MetadataForm({
         </div>
         {!canEditLabels ? (
           <p className="text-sm text-muted-foreground">
-            Labels control access scopes. Changing them requires unrestricted account management
-            permission; existing labels are preserved when saving owner or attributes.
+            Labels control who can see this device. You need account management access to change
+            them.
           </p>
         ) : null}
         <AttributeFields attributes={attributes} onChange={setAttributes} />
         <div className="grid gap-1.5">
-          <Label htmlFor="metadata-reason">Audit reason</Label>
+          <Label htmlFor="metadata-reason">Reason</Label>
           <Textarea id="metadata-reason" name="reason" required />
         </div>
       </fieldset>
       {captured ? (
-        <p className="break-all font-mono text-xs">Request ID {captured.requestId}</p>
+        <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
-          <p>
-            {failure.ambiguous
-              ? " The outcome is unknown. Retry the captured request without changing its ID or payload."
-              : ""}
-          </p>
+          {failure.ambiguous ? <p>We couldn&apos;t confirm the save. Retry to make sure.</p> : null}
         </RpcError>
       ) : null}
       {inputError ? (
@@ -245,12 +244,10 @@ function MetadataForm({
           {inputError}
         </p>
       ) : null}
-      {mutation.isSuccess ? (
-        <p role="status">Metadata saved. Refreshing current metadata.</p>
-      ) : null}
+      {mutation.isSuccess ? <p role="status">Saved.</p> : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={mutation.isPending || mutation.isSuccess}>
-          {mutation.isPending ? "Saving…" : captured ? "Retry same request" : "Save metadata"}
+          {mutation.isPending ? "Saving…" : captured ? "Retry" : "Save"}
         </Button>
         <Button
           type="button"
@@ -270,7 +267,7 @@ function MetadataForm({
               mutation.reset();
             }}
           >
-            Edit a new request
+            Edit and try again
           </Button>
         ) : null}
       </div>

@@ -4,6 +4,7 @@ package device
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -281,22 +282,44 @@ VALUES('summary-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT
 SELECT id,$2,$3,'summary-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_received_at,CURRENT_TIMESTAMP+interval '1 day','evaluated','',decode(repeat('00',32),'hex') FROM devices WHERE id=$1`,
 			device.deviceID, uuid.NewString(), snapshot, feedRevision)
 	}
-	addFinding := func(device, severity string) string {
+	// Each device binds its own shared finding set; per-severity counts and the
+	// advisory rollup are persisted with the set exactly as the matcher does.
+	bindSet := func(device string, severities []string) []string {
 		t.Helper()
-		id := uuid.NewString()
-		fleetSummaryExec(t, f, `INSERT INTO advisory_findings(id,device_id,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,feed_id,source_url)
-VALUES($1,$2,'SUMMARY-1','summary-package','1','2','amd64',$3,'{}','summary-feed','https://example.test/feed')`, id, device, severity)
-		return id
+		setID := uuid.NewString()
+		packageDigest := sha256.Sum256([]byte(setID))
+		counts := map[string]int{}
+		for _, severity := range severities {
+			switch severity {
+			case "critical", "high", "medium", "low":
+				counts[severity]++
+			default:
+				counts["other"]++
+			}
+		}
+		fleetSummaryExec(t, f, `INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,finding_count,critical_count,high_count,medium_count,low_count,other_count)
+VALUES($1,'summary-feed',$2,$9,'evaluated','',decode(repeat('11',32),'hex'),$3,$4,$5,$6,$7,$8)`,
+			setID, feedRevision, len(severities), counts["critical"], counts["high"], counts["medium"], counts["low"], counts["other"], packageDigest[:])
+		keys := make([]string, 0, len(severities))
+		rollup := map[string]int{}
+		for _, severity := range severities {
+			key := uuid.NewString()
+			keys = append(keys, key)
+			rollup[severity]++
+			fleetSummaryExec(t, f, `INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,source_url)
+VALUES($1,$2,'SUMMARY-1','summary-package','1','2','amd64',$3,'{}','https://example.test/feed')`, setID, key, severity)
+		}
+		for severity, n := range rollup {
+			fleetSummaryExec(t, f, "INSERT INTO advisory_set_advisories(set_id,advisory_id,severity,findings) VALUES($1,'SUMMARY-1',$2,$3)", setID, severity, n)
+		}
+		fleetSummaryExec(t, f, "UPDATE advisory_evaluations SET finding_set_id=$1 WHERE device_id=$2", setID, device)
+		return keys
 	}
-	for _, severity := range []string{"critical", "critical", "high", "medium", "low", "unrated"} {
-		addFinding(f.deviceID, severity)
-	}
-	accepted := addFinding(f.deviceID, "high")
+	keys := bindSet(f.deviceID, []string{"critical", "critical", "high", "medium", "low", "unrated", "high"})
+	accepted := keys[len(keys)-1]
 	fleetSummaryExec(t, f, `INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
 VALUES($1,$2,$3,'summary accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day')`, accepted, f.deviceID, owner.ID)
-	for range 4 {
-		addFinding(hidden.deviceID, "critical")
-	}
+	bindSet(hidden.deviceID, []string{"critical", "critical", "critical", "critical"})
 	ctx := identity.WithPrincipal(f.ctx, scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}}))
 	want := &adminv1.FleetFindingSummary{CriticalFindings: 2, HighFindings: 1, MediumFindings: 1, LowFindings: 1, OtherFindings: 1, EvaluatedDevices: 1}
 	got := fleetSummary(t, f.svc, ctx, 0)

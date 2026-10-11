@@ -9,51 +9,6 @@ import (
 	"context"
 )
 
-// iteratorForInsertAdvisoryFindings implements pgx.CopyFromSource.
-type iteratorForInsertAdvisoryFindings struct {
-	rows                 []InsertAdvisoryFindingsParams
-	skippedFirstNextCall bool
-}
-
-func (r *iteratorForInsertAdvisoryFindings) Next() bool {
-	if len(r.rows) == 0 {
-		return false
-	}
-	if !r.skippedFirstNextCall {
-		r.skippedFirstNextCall = true
-		return true
-	}
-	r.rows = r.rows[1:]
-	return len(r.rows) > 0
-}
-
-func (r iteratorForInsertAdvisoryFindings) Values() ([]interface{}, error) {
-	return []interface{}{
-		r.rows[0].ID,
-		r.rows[0].DeviceID,
-		r.rows[0].AdvisoryID,
-		r.rows[0].PackageName,
-		r.rows[0].InstalledVersion,
-		r.rows[0].FixedVersion,
-		r.rows[0].Architecture,
-		r.rows[0].Severity,
-		r.rows[0].PublishedAt,
-		r.rows[0].Cves,
-		r.rows[0].FeedID,
-		r.rows[0].SourceUrl,
-	}, nil
-}
-
-func (r iteratorForInsertAdvisoryFindings) Err() error {
-	return nil
-}
-
-// Finding IDs are device-namespaced and deduplicated before insertion, and the
-// device's previous findings are deleted in the same transaction.
-func (q *Queries) InsertAdvisoryFindings(ctx context.Context, arg []InsertAdvisoryFindingsParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"advisory_findings"}, []string{"id", "device_id", "advisory_id", "package_name", "installed_version", "fixed_version", "architecture", "severity", "published_at", "cves", "feed_id", "source_url"}, &iteratorForInsertAdvisoryFindings{rows: arg})
-}
-
 // iteratorForInsertAdvisoryPublicationBatch implements pgx.CopyFromSource.
 type iteratorForInsertAdvisoryPublicationBatch struct {
 	rows                 []InsertAdvisoryPublicationBatchParams
@@ -92,4 +47,81 @@ func (r iteratorForInsertAdvisoryPublicationBatch) Err() error {
 
 func (q *Queries) InsertAdvisoryPublicationBatch(ctx context.Context, arg []InsertAdvisoryPublicationBatchParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"advisory_publication_batch"}, []string{"publication_id", "position", "id", "feed_id", "advisory_id", "package_name", "source_package", "architecture", "record_bytes"}, &iteratorForInsertAdvisoryPublicationBatch{rows: arg})
+}
+
+// iteratorForInsertAdvisorySetAdvisories implements pgx.CopyFromSource.
+type iteratorForInsertAdvisorySetAdvisories struct {
+	rows                 []InsertAdvisorySetAdvisoriesParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertAdvisorySetAdvisories) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertAdvisorySetAdvisories) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].SetID,
+		r.rows[0].AdvisoryID,
+		r.rows[0].Severity,
+		r.rows[0].Findings,
+	}, nil
+}
+
+func (r iteratorForInsertAdvisorySetAdvisories) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertAdvisorySetAdvisories(ctx context.Context, arg []InsertAdvisorySetAdvisoriesParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"advisory_set_advisories"}, []string{"set_id", "advisory_id", "severity", "findings"}, &iteratorForInsertAdvisorySetAdvisories{rows: arg})
+}
+
+// iteratorForInsertAdvisorySetFindings implements pgx.CopyFromSource.
+type iteratorForInsertAdvisorySetFindings struct {
+	rows                 []InsertAdvisorySetFindingsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertAdvisorySetFindings) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertAdvisorySetFindings) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].SetID,
+		r.rows[0].FindingKey,
+		r.rows[0].AdvisoryID,
+		r.rows[0].PackageName,
+		r.rows[0].InstalledVersion,
+		r.rows[0].FixedVersion,
+		r.rows[0].Architecture,
+		r.rows[0].Severity,
+		r.rows[0].PublishedAt,
+		r.rows[0].Cves,
+		r.rows[0].SourceUrl,
+	}, nil
+}
+
+func (r iteratorForInsertAdvisorySetFindings) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertAdvisorySetFindings(ctx context.Context, arg []InsertAdvisorySetFindingsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"advisory_set_findings"}, []string{"set_id", "finding_key", "advisory_id", "package_name", "installed_version", "fixed_version", "architecture", "severity", "published_at", "cves", "source_url"}, &iteratorForInsertAdvisorySetFindings{rows: arg})
 }

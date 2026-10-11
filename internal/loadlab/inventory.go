@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -29,12 +30,24 @@ type pendingInventoryUpload struct {
 	nextBatch    int
 }
 
-func packages(count int) (packageData, error) {
+// packages places the optional recorded native baseline first, then pads with
+// unique synthetic records so every snapshot has exactly count packages.
+func packages(count int, baseline []*inventoryv1.Package) (packageData, error) {
 	var data packageData
+	if len(baseline) > count {
+		return data, errors.New("package baseline exceeds snapshot package count")
+	}
 	for start := 0; start < count; start += 500 {
 		batch := &inventoryv1.PackageBatch{}
 		for i := start; i < min(start+500, count); i++ {
-			batch.Packages = append(batch.Packages, &inventoryv1.Package{Name: fmt.Sprintf("libload-package-%05d", i), Version: fmt.Sprintf("1:%d.24.04-0ubuntu1.7", i%17), Architecture: "amd64", Manager: "dpkg"})
+			if i < len(baseline) {
+				batch.Packages = append(batch.Packages, baseline[i])
+				continue
+			}
+			// dpkg inventory always carries source identity; without it the
+			// server correctly marks advisory evaluation UNKNOWN.
+			name, version := fmt.Sprintf("libload-package-%05d", i), fmt.Sprintf("1:%d.24.04-0ubuntu1.7", i%17)
+			batch.Packages = append(batch.Packages, &inventoryv1.Package{Name: name, Version: version, Architecture: "amd64", Manager: "dpkg", SourceName: name, SourceVersion: version})
 		}
 		encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(batch)
 		if err != nil {
@@ -68,6 +81,7 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 			manifest: &devicev1.PackageSnapshotManifest{SnapshotId: id.String(), CreatedAt: now, EnrollmentGeneration: d.generation, Sequence: d.packageSequence, StartedAt: now, FinishedAt: now, Backend: "dpkg-query", Batches: r.packages.descriptors},
 		}
 		r.inventoryCycles.Add(1)
+		d.lastInventory = time.Now()
 	}
 	pending := d.inventoryUpload
 	if !pending.hostAccepted {

@@ -8,6 +8,7 @@ import {
   type RevealSecretRequest,
 } from "../../../gen/lindm/admin/v1/secrets_pb";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,14 @@ import { newRequestId } from "@/lib/ids";
 import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
 import { validateRequest } from "./validation";
+
+const approvalStateLabels: Partial<Record<ApprovalState, string>> = {
+  [ApprovalState.PENDING]: "waiting for another admin",
+  [ApprovalState.APPROVED]: "approved",
+  [ApprovalState.REJECTED]: "rejected",
+  [ApprovalState.CONSUMED]: "used",
+  [ApprovalState.EXPIRED]: "expired",
+};
 
 export function SecretReveal({ secretId, version }: { secretId: string; version: bigint }) {
   const lifetime = useAuthLifetime();
@@ -74,7 +83,7 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
   function capture() {
     if (!request.current) {
       if (confirmation !== secretId)
-        throw new Error("Type the exact secret ID to confirm secret access.");
+        throw new Error("Type the secret ID exactly as shown to confirm.");
       const payload = create(RevealSecretRequestSchema, {
         requestId: newRequestId(),
         secretId,
@@ -109,7 +118,7 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         { signal: AbortSignal.any([controller.signal, lifetime.signal]), timeoutMs: 30_000 },
       );
       if (controller.signal.aborted || lifetime.signal.aborted) return;
-      if (!response.approval?.id) throw new Error("The server did not return an approval receipt.");
+      if (!response.approval?.id) throw new Error("The approval request wasn't saved. Try again.");
       setApprovalId(response.approval.id);
       setApprovalState(response.approval.state);
       request.current = create(RevealSecretRequestSchema, {
@@ -117,8 +126,8 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         approvalId: response.approval.id,
       });
       setAmbiguous(null);
-      toast.success("Secret approval receipt received", {
-        description: "Review the recorded approval state before requesting access.",
+      toast.success("Approval requested", {
+        description: "Reveal the secret once another admin approves.",
       });
     } catch (error) {
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
@@ -126,9 +135,11 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         setAmbiguous(result.ambiguous ? "approval" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous ? "Approval delivery unknown" : "Secret approval request failed",
+          result.ambiguous
+            ? "Approval request may not have been sent"
+            : "Couldn't request approval",
           {
-            description: "Review the inline result and captured request before continuing.",
+            description: "Refresh before trying again.",
           },
         );
       }
@@ -170,18 +181,18 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
       setApprovalId("");
       setApprovalState(null);
       if (!material) {
-        setFailure(toRpcFailure(new Error("The server returned no secret material.")));
+        setFailure(toRpcFailure(new Error("No value came back. Try again.")));
         return;
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         material.fill(0);
-        setNotice("The response arrived while this page was hidden; the secret was dismissed.");
+        setNotice("The page was hidden when the value arrived, so it wasn't shown. Try again.");
         return;
       }
       held.current = material;
       setSecret(material);
-      toast.success("Secret received", {
-        description: "The value is shown temporarily in the reveal panel only.",
+      toast.success("Secret revealed", {
+        description: "It disappears after 30 seconds.",
       });
     } catch (error) {
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
@@ -189,9 +200,9 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         setAmbiguous(result.ambiguous ? "reveal" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous ? "Secret delivery unknown" : "Secret request failed",
+          result.ambiguous ? "Secret may not have been revealed" : "Couldn't reveal secret",
           {
-            description: "Review the inline result and captured request before continuing.",
+            description: "Refresh before trying again.",
           },
         );
       }
@@ -204,24 +215,25 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
   const shown = secret ? revealedText(secret) : null;
   return (
     <div className="grid gap-3 rounded-md border p-3">
-      <details className="text-sm text-muted-foreground">
-        <summary className="cursor-pointer">Secret access requirements</summary>
-        <p className="mt-2">
-          Access requires an unrestricted secret reveal grant, an audit reason, and recent step-up
-          authentication. A policy may require approval. The value is dismissed after 30 seconds, on
-          blur, or on navigation; browser memory cannot be guaranteed erased.
-        </p>
-      </details>
-      <Label htmlFor={`${idPrefix}-reason`}>Secret access reason</Label>
+      <p className="text-sm text-muted-foreground">
+        The value disappears after 30 seconds or when you leave this page.
+      </p>
+      <Label htmlFor={`${idPrefix}-reason`}>Reason</Label>
       <Textarea
         id={`${idPrefix}-reason`}
         value={reason}
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
       />
-      <Label htmlFor={`${idPrefix}-approval`}>Approval receipt ID</Label>
-      <Input id={`${idPrefix}-approval`} value={approvalId} readOnly autoComplete="off" />
-      <Label htmlFor={`${idPrefix}-confirmation`}>Type the secret ID to confirm access</Label>
+      <TechnicalDetails items={[]}>
+        <div className="mt-2 grid gap-2">
+          <Label htmlFor={`${idPrefix}-approval`}>Approval ID</Label>
+          <Input id={`${idPrefix}-approval`} value={approvalId} readOnly autoComplete="off" />
+        </div>
+      </TechnicalDetails>
+      <Label htmlFor={`${idPrefix}-confirmation`}>
+        Type <span className="break-all font-mono">{secretId}</span> to confirm
+      </Label>
       <Input
         id={`${idPrefix}-confirmation`}
         value={confirmation}
@@ -229,12 +241,10 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         readOnly={busy || request.current !== null}
         autoComplete="off"
       />
-      <p className="text-sm text-muted-foreground">
-        This reveals version {version.toString()} of this secret.
-      </p>
+      <p className="text-sm text-muted-foreground">Reveals version {version.toString()}.</p>
       {approvalState !== null ? (
         <p>
-          Last observed approval: {ApprovalState[approvalState]}.{" "}
+          Approval: {approvalStateLabels[approvalState] ?? "Unknown"}.{" "}
           <Link to="/approvals" className="underline">
             Open approvals
           </Link>
@@ -252,18 +262,14 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
           disabled={busy || secret !== null || ambiguous === "approval"}
           onClick={() => void reveal()}
         >
-          {busy
-            ? "Requesting…"
-            : ambiguous === "reveal"
-              ? "Retry exact reveal request"
-              : "Reveal secret"}
+          {busy ? "Requesting…" : ambiguous === "reveal" ? "Try again" : "Reveal secret"}
         </Button>
         <Button
           variant="outline"
           disabled={busy || secret !== null || ambiguous === "reveal"}
           onClick={() => void requestApproval()}
         >
-          {approvalState === null ? "Request independent approval" : "Refresh exact approval state"}
+          {approvalState === null ? "Request approval" : "Check approval"}
         </Button>
         {request.current && ambiguous === null ? (
           <Button
@@ -277,12 +283,12 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
               setNotice("");
             }}
           >
-            Prepare different access request
+            Start over
           </Button>
         ) : null}
         {secret ? (
           <Button variant="outline" onClick={hide}>
-            Dismiss now
+            Hide now
           </Button>
         ) : null}
       </div>
@@ -290,7 +296,7 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         <>
           {shown.hex ? (
             <p className="text-sm text-muted-foreground">
-              Shown as hexadecimal: the value is not valid UTF-8 text.
+              Shown as hexadecimal because it isn't plain text.
             </p>
           ) : null}
           <pre

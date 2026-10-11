@@ -171,7 +171,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
-	adminAddressToReserve := "127.0.0.1:0"
+	listen := "127.0.0.1"
+	if options.ListenAddress != "" {
+		listen = options.ListenAddress
+	}
+	adminAddressToReserve := net.JoinHostPort(listen, "0")
 	if mode == authorityKeycloakConsole {
 		adminAddressToReserve = "127.0.0.1:18444"
 	}
@@ -184,7 +188,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			resultErr = errors.Join(resultErr, admin.Close())
 		}
 	}()
-	device, err := net.Listen("tcp4", "127.0.0.1:0")
+	device, err := net.Listen("tcp4", net.JoinHostPort(listen, "0"))
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +204,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		return nil, errors.New("isolated authority listeners did not reserve TCP addresses")
 	}
 	cfg := proto.CloneOf(document.Proto)
-	cfg.AdminListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(adminAddress.Port)}
-	cfg.DeviceListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(deviceAddress.Port)}
+	cfg.AdminListener = &configv1.ListenerConfig{Address: listen, Port: uint32(adminAddress.Port)}
+	cfg.DeviceListener = &configv1.ListenerConfig{Address: listen, Port: uint32(deviceAddress.Port)}
+	if options.Advisories != nil {
+		cfg.Advisories = proto.CloneOf(options.Advisories)
+	}
 	deviceOrigin := "https://localhost:18445"
 	if mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityHA {
 		f.ConsoleOrigin = fmt.Sprintf("https://localhost:%d", adminAddress.Port)

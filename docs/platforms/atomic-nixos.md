@@ -3,11 +3,14 @@
 ## Versions, architectures and qualification
 
 **Fedora Silverblue/Kinoite and NixOS are separate native management products, not
-mutable RPM/DEB aliases.** They are launch-required, not optional extensions.
-The authoritative [qualification allocation](../verification.md#1-launch-platform-qualification)
-names x86_64 Silverblue and Kinoite, and x86_64 NixOS stable 26.05 and successor.
-It requires actual atomic installers/deployments and owner-approved NixOS
-configuration/closure activation (`docs/verification.md:155-175`).
+mutable RPM/DEB aliases.** Under the
+[supported OS tiers](../product-specification.md#supported-os-tiers) they are a
+**future management model**. They stay design-only, and no lane qualifies them,
+until a separate declarative/image-based model is specified. The
+[branch allocation](../verification.md#branch-allocation) names x86_64 Silverblue,
+Kinoite and NixOS stable 26.05 and successor as the eventual targets. Those need
+actual atomic installers/deployments and owner-approved NixOS configuration/closure
+activation.
 
 The [resource matrix](../verification.md#resource-kind-coverage) records atomic OS
 deployment and NixOS generation activation as specified/planned, with no complete

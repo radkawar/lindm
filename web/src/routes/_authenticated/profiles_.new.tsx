@@ -30,16 +30,14 @@ function ProfileCreateRoute() {
         Back to profiles
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold">Publish a resource profile</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Creation reserves profile ID {profileId}. {CATALOG_SEMANTICS}
-        </p>
+        <h1 className="text-2xl font-semibold">Create profile</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">{CATALOG_SEMANTICS}</p>
       </div>
       <ProfileEditor
         key={profileId}
         mode="create"
         profileId={profileId}
-        sourceNote="The first publish omits expected revision. It creates this profile only if the reserved profile ID is not already in the catalog."
+        sourceNote="Add the settings this profile should apply, then publish."
         onPrepareAnother={() => setProfileId(replaceReservedCreateProfileId(lifetime))}
       />
     </section>

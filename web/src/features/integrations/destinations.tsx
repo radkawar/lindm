@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,22 +33,15 @@ export function Destinations() {
       aria-busy={list.isFetching}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">Delivery destinations</h2>
+        <h2 className="text-xl font-semibold">Destinations</h2>
         <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
           Refresh
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Deliver audit events through signed HTTPS webhooks or TLS syslog.
+        Send audit events to a webhook or a syslog server. Turning a destination off pauses
+        delivery.
       </p>
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Delivery security and lifecycle</summary>
-        <p className="mt-2">
-          HTTPS webhooks use timestamp-bound HMAC-SHA256. Syslog uses TLS with an explicitly pinned
-          CA. Destinations receive audit events, not signing secrets. Disabling pauses delivery;
-          deletion cancels pending work.
-        </p>
-      </details>
       <DestinationEditor />
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
@@ -58,8 +52,8 @@ export function Destinations() {
       ) : null}
       {list.data?.destinations.length === 0 ? (
         <EmptyState
-          title="No destinations on this page"
-          description="Add a destination to export audit events."
+          title="No destinations yet"
+          description="Add one to start sending audit events."
         />
       ) : null}
       {list.data?.destinations.map((destination) => (
@@ -160,19 +154,22 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
     <form onSubmit={save} className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
       <h3 className="break-words font-semibold">
         {destination
-          ? `Edit ${destination.config?.displayName ?? destination.id}`
+          ? `Edit ${destination.config?.displayName || "destination"}`
           : "Add destination"}
       </h3>
       {destination ? (
-        <p className="break-all font-mono text-xs">
-          {destination.id} · revision {destination.version.toString()}
-        </p>
+        <TechnicalDetails
+          items={[
+            { label: "Destination ID", value: destination.id },
+            { label: "Revision", value: destination.version.toString() },
+          ]}
+        />
       ) : null}
       {action.feedback}
       <fieldset className="grid min-w-0 gap-3" disabled={action.blocked}>
         <Label htmlFor={`${id}-name`}>Name</Label>
         <Input id={`${id}-name`} required value={name} onChange={(e) => setName(e.target.value)} />
-        <Label htmlFor={`${id}-kind`}>Protocol</Label>
+        <Label htmlFor={`${id}-kind`}>Type</Label>
         <SelectField
           id={`${id}-kind`}
           className="h-9 min-w-0"
@@ -180,11 +177,11 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
           disabled={!!destination}
           onValueChange={(value) => setKind(Number(value) as DestinationKind)}
           options={[
-            { value: DestinationKind.WEBHOOK, label: "Signed HTTPS webhook" },
-            { value: DestinationKind.SYSLOG_TLS, label: "RFC 5424 syslog over TLS" },
+            { value: DestinationKind.WEBHOOK, label: "HTTPS webhook" },
+            { value: DestinationKind.SYSLOG_TLS, label: "Syslog over TLS" },
           ]}
         />
-        <Label htmlFor={`${id}-endpoint`}>Endpoint</Label>
+        <Label htmlFor={`${id}-endpoint`}>Address</Label>
         <Input
           id={`${id}-endpoint`}
           required
@@ -197,10 +194,7 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
           onChange={(e) => setEndpoint(e.target.value)}
         />
         <Label htmlFor={`${id}-ca`}>
-          Pinned CA PEM{" "}
-          {kind === DestinationKind.SYSLOG_TLS
-            ? "(required)"
-            : "(optional; otherwise system trust)"}
+          CA certificate {kind === DestinationKind.SYSLOG_TLS ? "(required)" : "(optional)"}
         </Label>
         <Textarea
           id={`${id}-ca`}
@@ -212,9 +206,9 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
         />
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          Delivery enabled
+          Send events
         </label>
-        <Label htmlFor={`${id}-reason`}>Audit reason</Label>
+        <Label htmlFor={`${id}-reason`}>Reason</Label>
         <Input
           id={`${id}-reason`}
           required
@@ -224,7 +218,7 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
         {kind === DestinationKind.WEBHOOK ? (
           <>
             <Label htmlFor={`${id}-secret`}>
-              {destination ? "New signing secret (only for rotation)" : "Signing secret"}
+              {destination ? "New signing secret (to rotate)" : "Signing secret"}
             </Label>
             <Input
               id={`${id}-secret`}
@@ -235,25 +229,19 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
               onChange={(e) => setSecret(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Use a cryptographically random 32 to 64 byte UTF-8 secret shared with your receiver.
+              A random 32 to 64 character secret shared with your receiver. It's never shown again.
             </p>
-            <details className="text-xs text-muted-foreground">
-              <summary className="w-fit cursor-pointer py-1">Secret handling</summary>
-              <p className="mt-2">
-                Write-only: never cached or returned. Secret entry is discarded on navigation.
-              </p>
-            </details>
           </>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit">{destination ? "Save configuration" : "Create destination"}</Button>
+          <Button type="submit">{destination ? "Save" : "Create destination"}</Button>
           {destination ? (
             <Button
               type="button"
               variant="destructive"
               disabled={!reason.trim()}
               onClick={() => {
-                if (!window.confirm(`Delete ${name} and cancel pending deliveries?`)) return;
+                if (!window.confirm(`Delete ${name}? Undelivered events will be dropped.`)) return;
                 const request = {
                   requestId: crypto.randomUUID(),
                   destinationId: destination.id,
@@ -269,7 +257,7 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
         </div>
         {destination && kind === DestinationKind.WEBHOOK ? (
           <>
-            <Label htmlFor={`${id}-overlap`}>Old-secret overlap (seconds)</Label>
+            <Label htmlFor={`${id}-overlap`}>Keep old secret working for (seconds)</Label>
             <Input
               id={`${id}-overlap`}
               type="number"
@@ -285,7 +273,7 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
               Rotate signing secret
             </Button>
             <p className="text-xs">
-              Previous secret expires: {formatTimestamp(destination.previousSecretExpiresAt).local}
+              Old secret stops working: {formatTimestamp(destination.previousSecretExpiresAt).local}
             </p>
           </>
         ) : null}

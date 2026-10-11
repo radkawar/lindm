@@ -23,12 +23,20 @@ import { useListPagination } from "@/hooks/use-list-pagination";
 import { toRpcFailure } from "@/lib/errors";
 import type { PageSize } from "@/lib/list-search";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
-import { usePublishAttempts } from "./attempt";
-import { CATALOG_SEMANTICS, formatRevisionNumber, formatSha256 } from "./model";
+import { usePublishAttempts, type PublishStatus } from "./attempt";
+import { CATALOG_SEMANTICS, formatRevisionNumber } from "./model";
 import { profilesQueryOptions } from "./queries";
 import { type ProfileListSearch } from "./search";
 
 const PAGE_SIZES = [50, 100] as const;
+
+const ATTEMPT_LABEL: Record<PublishStatus, string> = {
+  inflight: "A profile is still saving.",
+  ambiguous: "A save may not have gone through.",
+  conflict: "A save was blocked by a newer change.",
+  rejected: "A save was rejected.",
+  published: "A profile was published.",
+};
 
 export function ProfilesView({
   pageSize,
@@ -51,7 +59,7 @@ export function ProfilesView({
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Profiles"
-        description="Reusable resource configurations. Each row shows the latest published revision."
+        description="Sets of device settings you can assign to devices."
         actions={
           <>
             <Button
@@ -67,22 +75,18 @@ export function ProfilesView({
           </>
         }
       />
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Publishing and deployment</summary>
-        <p className="mt-2">{CATALOG_SEMANTICS}</p>
-      </details>
+      <p className="text-sm text-muted-foreground">{CATALOG_SEMANTICS}</p>
       {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
-          <AlertTitle>A publish request is still open</AlertTitle>
+          <AlertTitle>A profile hasn't finished saving</AlertTitle>
           <AlertDescription>
             <ul className="grid gap-1">
               {attempts.map((attempt) => (
                 <li key={attempt.payload.requestId} className="break-all">
-                  Request {attempt.payload.requestId} for profile {attempt.profileId} is{" "}
-                  {attempt.status}.{" "}
+                  {ATTEMPT_LABEL[attempt.status]}{" "}
                   {attempt.mode === "create" ? (
                     <Link to="/profiles/new" className="underline underline-offset-4">
-                      Resume on the create page
+                      Continue creating it
                     </Link>
                   ) : (
                     <Link
@@ -91,7 +95,7 @@ export function ProfilesView({
                       search={{ revision: "" }}
                       className="underline underline-offset-4"
                     >
-                      Resume this profile
+                      Open the profile to finish
                     </Link>
                   )}
                 </li>
@@ -120,7 +124,7 @@ export function ProfilesView({
       </div>
       {list.isPending ? (
         <div role="status" className="grid gap-3 border p-4">
-          <span className="text-sm text-muted-foreground">Loading resource profiles…</span>
+          <span className="text-sm text-muted-foreground">Loading profiles…</span>
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
@@ -129,7 +133,7 @@ export function ProfilesView({
       {list.isSuccess && list.data.profiles.length === 0 ? (
         <EmptyState
           title={pageToken === "" ? "No profiles yet" : "No profiles on this page"}
-          description="Create a profile here, then assign its published revision in Rollouts."
+          description="Create a profile, then assign it to devices in Rollouts."
         />
       ) : null}
       {list.data && list.data.profiles.length > 0 ? (
@@ -138,12 +142,10 @@ export function ProfilesView({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead>Resources</TableHead>
+              <TableHead>Settings</TableHead>
               <TableHead>Revision</TableHead>
               <TableHead>Published</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Profile ID</TableHead>
-              <TableHead>Spec SHA-256</TableHead>
+              <TableHead>Published by</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,9 +174,9 @@ export function ProfilesView({
                       to="/profiles/$profileId"
                       params={{ profileId: profile.profileId }}
                       search={{ revision: profile.revisionId }}
-                      className="break-all font-mono text-xs underline underline-offset-4"
+                      className="underline underline-offset-4"
                     >
-                      {formatRevisionNumber(profile.revisionNumber)} {profile.revisionId}
+                      {formatRevisionNumber(profile.revisionNumber)}
                     </Link>
                   </TableCell>
                   <TableCell className="whitespace-normal">
@@ -183,16 +185,10 @@ export function ProfilesView({
                         {published.local} ({freshnessLabel(published.date, now)})
                       </time>
                     ) : (
-                      "Not recorded"
+                      "Unknown"
                     )}
                   </TableCell>
-                  <TableCell className="break-all font-mono text-xs">
-                    {profile.actorId.trim() || "Unknown actor"}
-                  </TableCell>
-                  <TableCell className="break-all font-mono text-xs">{profile.profileId}</TableCell>
-                  <TableCell className="break-all font-mono text-xs">
-                    {formatSha256(profile.specSha256)}
-                  </TableCell>
+                  <TableCell className="break-all">{profile.actorId.trim() || "Unknown"}</TableCell>
                 </TableRow>
               );
             })}

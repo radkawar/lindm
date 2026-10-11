@@ -42,7 +42,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
       );
       lifetime.signal.throwIfAborted();
       setApprovalId(result.approval?.id ?? "");
-      toast.success("Revocation approval requested");
+      toast.success("Approval requested");
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     } catch (error) {
       if (!lifetime.signal.aborted) {
@@ -52,7 +52,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
           {
-            description: "Review the inline approval request result before continuing.",
+            description: "Refresh before trying again.",
           },
         );
         if (!next.ambiguous) setPayload(null);
@@ -70,9 +70,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         void requestApproval();
       }}
     >
-      <p className="text-sm">
-        Revocation requires approval by a different authorized human. Approval expires in one hour.
-      </p>
+      <p className="text-sm">Another admin must approve this within one hour.</p>
       <label className="grid gap-2 text-sm font-medium">
         Revocation reason
         <Input
@@ -85,9 +83,9 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
       </label>
       {approvalId ? (
         <p role="status" className="break-words text-sm">
-          Approval {approvalId} requested.{" "}
+          Approval requested.{" "}
           <Link to="/approvals" className="underline underline-offset-4">
-            Open approvals to execute after approval
+            Open approvals to finish revoking once approved
           </Link>
         </p>
       ) : (
@@ -100,13 +98,13 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
           {busy
             ? "Requesting approval…"
             : failure?.ambiguous
-              ? "Retry exact approval request"
+              ? "Try again"
               : "Request revocation approval"}
         </Button>
       )}
       {failure ? (
         <RpcError failure={failure}>
-          {failure.ambiguous ? <p>Retry uses the same request ID and payload.</p> : null}
+          {failure.ambiguous ? <p>Check approvals before trying again.</p> : null}
         </RpcError>
       ) : null}
     </form>

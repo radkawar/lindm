@@ -34,7 +34,30 @@ import { fleetSummaryQueryOptions } from "./queries";
 import { StaleDevices } from "./stale-devices";
 
 const approvalHelp =
-  "Pending, unexpired requests visible through your approval inbox, not a global count or a grant to approve. Action-specific permissions and approval-management scopes apply independently of fleet.read. The server rechecks authority, scope, separation of duties and expiry at decision or execution. This inbox is authorized and read separately from the fleet evidence time.";
+  "Requests waiting in your approval inbox. Another admin must approve each one before it runs.";
+
+const osNames: Record<string, string> = {
+  almalinux: "AlmaLinux",
+  arch: "Arch Linux",
+  centos: "CentOS",
+  debian: "Debian",
+  fedora: "Fedora",
+  linuxmint: "Linux Mint",
+  opensuse: "openSUSE",
+  "opensuse-leap": "openSUSE Leap",
+  "opensuse-tumbleweed": "openSUSE Tumbleweed",
+  pop: "Pop!_OS",
+  rhel: "Red Hat Enterprise Linux",
+  rocky: "Rocky Linux",
+  sles: "SUSE Linux Enterprise",
+  ubuntu: "Ubuntu",
+};
+
+function osLabel(osId: string, osVersion: string): string {
+  if (!osId && !osVersion) return "Not reported yet";
+  const name = osId ? (osNames[osId] ?? osId) : "Unknown OS";
+  return osVersion ? `${name} ${osVersion}` : name;
+}
 
 export function DashboardView() {
   const lifetime = useAuthLifetime();
@@ -54,22 +77,18 @@ export function DashboardView() {
 
   const osRows = operatingSystems
     ? operatingSystems.groups.map(
-        (group) =>
-          [
-            `${group.osId || "Not reported"} · ${group.osVersion || "Not reported"}`,
-            group.devices,
-          ] as [string, bigint],
+        (group) => [osLabel(group.osId, group.osVersion), group.devices] as [string, bigint],
       )
     : [];
   if (operatingSystems && operatingSystems.otherDevices > 0n) {
-    osRows.push(["Other OS/version groups", operatingSystems.otherDevices]);
+    osRows.push(["Other", operatingSystems.otherDevices]);
   }
   const complianceRows: [string, bigint][] = compliance
     ? [
         ["Compliant", compliance.compliantResources],
-        ["Drift remediated", compliance.driftRemediatedResources],
-        ["Attention", compliance.attentionResources],
-        ["Stale", compliance.staleResources],
+        ["Drift fixed", compliance.driftRemediatedResources],
+        ["Needs attention", compliance.attentionResources],
+        ["Not checked recently", compliance.staleResources],
         ["Unknown", compliance.unknownResources],
       ]
     : [];
@@ -87,13 +106,9 @@ export function DashboardView() {
     <section className="grid min-w-0 gap-5" aria-busy={summary.isFetching}>
       <PageHeader
         title="Dashboard"
-        description="Recorded evidence across your authorized fleet."
+        description="Your fleet at a glance."
         actions={
           <>
-            <Help label="About fleet counts">
-              Server-calculated counts cover every device in your authorized scope, not an
-              inventory-page sample. Counts describe recorded evidence, not live presence.
-            </Help>
             <Button
               variant="outline"
               size="sm"
@@ -111,21 +126,20 @@ export function DashboardView() {
 
       {!canReadFleet ? (
         <Alert>
-          <AlertTitle>Fleet overview unavailable</AlertTitle>
+          <AlertTitle>You can't view the fleet overview</AlertTitle>
           <AlertDescription>
-            Fleet read permission is required for this overview. An unavailable summary is not an
-            empty fleet. Open{" "}
+            Ask an owner for fleet read access. You can still check{" "}
             <Link to="/approvals" className="underline">
               Approvals
-            </Link>{" "}
-            separately to check whether your session can view an inbox.
+            </Link>
+            .
           </AlertDescription>
         </Alert>
       ) : failure ? (
-        <RpcError failure={failure} title="Fleet summary unavailable" />
+        <RpcError failure={failure} title="Couldn't load the fleet overview" />
       ) : summary.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Loading fleet summary…
+          Loading…
         </p>
       ) : null}
 
@@ -133,40 +147,42 @@ export function DashboardView() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
-              title="Devices"
-              value={lifecycle?.totalDevices}
-              detail="Across all enrollment states."
-              help="Exact device count across every enrollment state in your fleet.read-authorized scope."
-            />
-            <Metric
-              title="Active enrollments"
+              title="Enrolled"
               value={lifecycle?.activeDevices}
-              detail="Currently enrolled devices."
-              help="Active means enrolled. Check contact, inventory and compliance separately."
+              detail={
+                lifecycle
+                  ? `${lifecycle.totalDevices.toString()} devices in total.`
+                  : "Enrollment summary unavailable."
+              }
+              help="Devices that finished enrolling and can be managed. Being enrolled does not mean a device is healthy."
             />
             <Metric
-              title="Stale contact"
+              title="Waiting to enroll"
+              value={lifecycle?.pendingDevices}
+              detail="Started enrolling but not finished yet."
+              help="These devices may be waiting for an admin to approve them. See Enrollment."
+            />
+            <Metric
+              title="Not seen recently"
               value={contact?.staleDevices}
               detail={
                 contact
-                  ? `No contact in over ${contact.staleAfterSeconds / 3600} hours.`
-                  : "Contact summary unavailable."
+                  ? `No check-in for over ${contact.staleAfterSeconds / 3600} hours.`
+                  : "Check-in summary unavailable."
               }
-              help="Server receipt times across all authorized enrollment states, evaluated at the fleet evidence time. Missing contact remains unknown and is not counted as stale. The exact threshold is included in recent contact."
+              help="Devices that never checked in are counted as unknown, not here."
             />
             <Metric
-              title="Pending approvals"
+              title="Approval requests"
               value={approvals?.pendingApprovals}
-              detail={
-                approvals ? "Unexpired requests in your inbox." : "Approval summary unavailable."
-              }
+              detail={approvals ? "Waiting in your inbox." : "Approval summary unavailable."}
               help={approvalHelp}
             />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              Evidence as of{" "}
+              Updated{" "}
               {observed.date ? (
                 <time dateTime={observed.utc}>{observed.local}</time>
               ) : (
@@ -181,8 +197,8 @@ export function DashboardView() {
           <div className="grid items-stretch gap-4 xl:grid-cols-3">
             <Panel
               title="Operating systems"
-              description="Devices by observed OS and version."
-              help="The latest successful host reports across your authorized fleet. Shows the twenty largest OS/version groups; Other contains the rest. Missing values appear as Not reported. Check device inventory timestamps for freshness."
+              description="Devices by operating system and version."
+              help="From each device's latest report. The twenty largest groups are shown; Other contains the rest."
             >
               {operatingSystems ? (
                 <DistributionChart kind="donut" rows={osRows} label="Devices" />
@@ -192,8 +208,8 @@ export function DashboardView() {
             </Panel>
             <Panel
               title="Service compliance"
-              description="Current assigned service resources."
-              help="Exact service-resource counts for current enrollment-generation assignment heads, not a device compliance rate. Devices without assigned resources are not counted as compliant. Open a device for verification times, dependencies, native evidence and action history."
+              description="Profile items assigned to devices."
+              help="Counts profile items, not devices. Devices without a profile are not counted as compliant. Open a device for details."
             >
               {compliance ? (
                 <>
@@ -201,11 +217,11 @@ export function DashboardView() {
                     <span className="text-2xl font-semibold tabular-nums">
                       {compliance.totalResources.toString()}
                     </span>
-                    <span className="text-xs text-muted-foreground">assigned resources</span>
+                    <span className="text-xs text-muted-foreground">profile items</span>
                   </div>
                   <DistributionChart kind="stacked" rows={complianceRows} label="Resources" />
                   <p className="mt-auto text-xs text-muted-foreground">
-                    {compliance.unassignedDevices.toString()} devices without assigned resources.
+                    {compliance.unassignedDevices.toString()} devices without a profile.
                   </p>
                 </>
               ) : (
@@ -213,16 +229,16 @@ export function DashboardView() {
               )}
             </Panel>
             <Panel
-              title="Open advisory findings"
-              description="Affected findings by severity."
-              help="Counts affected findings, not devices. Accepted and unknown findings are excluded but are not fixed. Other includes unspecified severity. Missing or stale coverage can hide findings, so zero findings does not mean no exposure."
+              title="Open security findings"
+              description="Findings by severity."
+              help="Counts findings, not devices. Accepted findings are not included. Missing advisory data can hide findings, so zero does not guarantee no exposure."
             >
               {findings ? (
                 <>
                   <DistributionChart kind="severity" rows={findingRows} label="Findings" />
                   <p className="text-xs text-muted-foreground">
-                    Active devices: {findings.evaluatedDevices.toString()} evaluated ·{" "}
-                    {findings.unknownDevices.toString()} unknown
+                    Devices checked: {findings.evaluatedDevices.toString()} · not checked:{" "}
+                    {findings.unknownDevices.toString()}
                   </p>
                 </>
               ) : (
@@ -237,8 +253,8 @@ export function DashboardView() {
           <div className="grid items-start gap-4 lg:grid-cols-2">
             <Panel
               title="Fleet status"
-              description="Enrollment and recorded contact."
-              help="Counts enrollment and last server contact across your authorized fleet. Recent contact means at or within the displayed threshold at the summary time. It is separate from inventory freshness and compliance. Missing contact remains unknown."
+              description="Enrollment and last check-in."
+              help="Last check-in is when the server last heard from each device."
             >
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="grid content-start gap-3">
@@ -246,8 +262,8 @@ export function DashboardView() {
                   {lifecycle ? (
                     <CountList
                       rows={[
-                        ["Pending", lifecycle.pendingDevices],
-                        ["Active", lifecycle.activeDevices],
+                        ["Waiting to enroll", lifecycle.pendingDevices],
+                        ["Enrolled", lifecycle.activeDevices],
                         ["Revoked", lifecycle.revokedDevices],
                         ["Recovery hold", lifecycle.recoveryHoldDevices],
                       ]}
@@ -257,7 +273,7 @@ export function DashboardView() {
                   )}
                 </div>
                 <div className="grid content-start gap-3">
-                  <h3 className="text-xs font-medium text-muted-foreground">Last contact</h3>
+                  <h3 className="text-xs font-medium text-muted-foreground">Last check-in</h3>
                   {contact ? (
                     <CountList
                       rows={[
@@ -288,8 +304,8 @@ export function DashboardView() {
 
           <Panel
             title="Recent activity"
-            description="Latest device and service action records."
-            help="Newest ten action records across all fleet.read-authorized devices and enrollment generations, ordered by issue time, action ID and kind. This bounded history is not used for aggregates. Server issuance, start authorization and closure are not native execution proof. An unknown outcome must not be treated as success or retried blindly. Open a device for protected results; no action payloads or recovery secrets are included here."
+            description="Latest actions sent to devices."
+            help="The ten most recent actions. A sent action is not proof the device carried it out; open the device for results."
           >
             {data.recentActions.length ? (
               <ul className="divide-y">
@@ -311,10 +327,10 @@ export function DashboardView() {
                       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                         <span className="break-all text-sm font-medium">
                           {action.kind === "resource"
-                            ? `Resource action · ${action.unit || action.resourceId || "Resource not recorded"}`
+                            ? `Profile item · ${action.unit || "Unnamed item"}`
                             : action.kind === "device"
-                              ? action.capability || "Capability not recorded"
-                              : "Unknown action kind"}
+                              ? action.capability || "Device action"
+                              : "Action"}
                         </span>
                         <ActionRecord action={action} />
                       </div>
@@ -324,8 +340,9 @@ export function DashboardView() {
                           params={{ deviceId: action.deviceId }}
                           search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                           className="max-w-full truncate underline-offset-4 hover:text-foreground hover:underline"
+                          title={action.deviceId}
                         >
-                          {action.deviceId}
+                          Open device
                         </Link>
                         <span>· {formatTimestamp(action.createdAt).local}</span>
                       </div>
@@ -335,8 +352,8 @@ export function DashboardView() {
               </ul>
             ) : (
               <EmptyState
-                title="No recent action records"
-                description="No device or service actions were found in your authorized fleet scope."
+                title="No recent actions"
+                description="Actions you send to devices appear here."
               />
             )}
           </Panel>
@@ -598,7 +615,7 @@ function CountList({ rows }: { rows: [string, bigint][] }) {
 }
 
 function Unavailable({ section }: { section: string }) {
-  return <p className="text-xs text-muted-foreground">{section} summary unavailable, not zero.</p>;
+  return <p className="text-xs text-muted-foreground">{section} unavailable.</p>;
 }
 
 function ActionRecord({ action }: { action: FleetRecentAction }) {
@@ -612,37 +629,26 @@ function ActionRecord({ action }: { action: FleetRecentAction }) {
           status={action.outcomeUnknown ? "warning" : action.closedAt ? "neutral" : "info"}
         >
           {action.outcomeUnknown
-            ? "Outcome unknown"
+            ? "Result unknown"
             : action.closedAt
               ? "Closed"
               : action.kind === "resource" && action.closedReason
-                ? "Cancellation requested"
+                ? "Cancelling"
                 : action.startAuthorizedAt
-                  ? "Start authorized"
-                  : "Issued"}
+                  ? "Started"
+                  : "Sent"}
         </StatusBadge>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">
         <div className="grid gap-1 break-all">
-          <p>
-            {action.kind === "resource"
-              ? "Resource action"
-              : action.kind === "device"
-                ? "Device action"
-                : "Unknown action kind"}{" "}
-            · {action.actionId}
-          </p>
           <p>Expires {formatTimestamp(action.expiresAt).local}</p>
           {action.closedReason ? <p>{action.closedReason}</p> : null}
           {action.closedAt ? (
             <p>Closed {formatTimestamp(action.closedAt).local}</p>
           ) : action.startAuthorizedAt ? (
-            <p>Authorized {formatTimestamp(action.startAuthorizedAt).local}</p>
+            <p>Started {formatTimestamp(action.startAuthorizedAt).local}</p>
           ) : null}
-          <p>
-            Server record, not native execution proof. Unknown outcomes are not success; do not
-            retry blindly.
-          </p>
+          <p className="font-mono text-xs">Action ID {action.actionId}</p>
         </div>
       </TooltipContent>
     </Tooltip>

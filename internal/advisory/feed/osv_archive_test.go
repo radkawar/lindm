@@ -113,7 +113,7 @@ func TestOSVArchiveDownloadBounds(t *testing.T) {
 					t.Error(err)
 				}
 			}()
-			if _, err := client.downloadArchive(t.Context(), server.URL, file, int64(len(raw)-1)); err == nil {
+			if _, err := client.downloadArchive(t.Context(), server.URL, file, int64(len(raw)-1), nil); err == nil {
 				t.Fatal("oversize accepted")
 			}
 			info, err := file.Stat()
@@ -192,7 +192,7 @@ func TestOSVArchiveTransferChecksum(t *testing.T) {
 					t.Error(err)
 				}
 			}()
-			_, err = client.downloadArchive(t.Context(), server.URL, file, 1024)
+			_, err = client.downloadArchive(t.Context(), server.URL, file, 1024, nil)
 			if (err != nil) != test.wantError {
 				t.Fatalf("checksum error = %v", err)
 			}

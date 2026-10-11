@@ -15,8 +15,8 @@ Desktop experience is the priority. Company-owned servers are also in the commer
 launch scope and share the management core, not the desktop assumptions.
 
 The commercial launch contract is the **entire** requirement set below (P01–P21) on
-every named family in [verification](verification.md): Debian/Ubuntu, Fedora/RHEL
-family, SUSE, maintained legacy branches, Arch/Tumbleweed, Fedora Atomic and NixOS.
+every Tier 1 and Tier 2 distribution in [supported OS tiers](#supported-os-tiers),
+plus the other branches allocated in [verification](verification.md).
 Nothing in this specification is optional roadmap. Implementation milestones (G0–G8)
 only order the work; they are not permission to ship a reduced product as
 production-ready. No resource, derivative, architecture or desktop workflow inherits
@@ -50,11 +50,10 @@ behavior unbuilt.
   capabilities also require physical-hardware validation.
 - Production security, scaling, repeatable lifecycle testing, maintainable automation,
   code review, linting, and Git hooks are requirements from the start.
-- Launch families: Ubuntu LTS, Debian, Fedora, RHEL/Rocky/Alma (each its own row),
-  SUSE enterprise, maintained legacy branches, Arch/Tumbleweed, Fedora Atomic and
-  NixOS. Each native management model gets its own qualification. Rolling systems use
-  pinned snapshots and whole-system upgrades; Atomic and NixOS use owner-approved
-  deployment/generation activation, not DEB/RPM aliases.
+- Launch distributions follow the [supported OS tiers](#supported-os-tiers). Each
+  native management model gets its own qualification. Rolling systems use pinned
+  snapshots and whole-system upgrades. NixOS and Fedora Atomic need a separately
+  specified declarative/image-based model, not DEB/RPM aliases.
 - Employee entitlements support both device and person assignments, with explicit
   organizational-identity/local-account bindings and no cross-user secret inheritance.
 - Built-in local admin accounts use Postgres, Argon2id and mandatory WebAuthn.
@@ -65,6 +64,28 @@ behavior unbuilt.
   issue identity tokens for other applications.
 - Graphical remote assistance is built into the product with explicit user consent;
   it is not outsourced to a third-party support product or an unattended root shell.
+
+### Supported OS tiers
+
+The owner set these tiers on 2026-10-11. The live per-capability matrix is in
+[verification](verification.md#platform-support-tiers).
+
+- **Tier 1, desktop-first, full parity with Ubuntu 24.04:** Ubuntu 22.04/24.04/26.04
+  LTS, Debian 12/13, Fedora (current two releases), RHEL 9/10, Rocky Linux and
+  AlmaLinux 9/10, Linux Mint (current, Cinnamon) and Pop!\_OS (current LTS, COSMIC).
+- **Tier 2:** Arch Linux, openSUSE Tumbleweed and Omarchy (Arch-based, Hyprland).
+- **Future management model, design-only:** NixOS and Fedora Atomic
+  (Silverblue/Kinoite). Their declarative and image-based models stay unadvertised
+  and unbuilt beyond design until a separate model is specified.
+
+Full parity means the agent lifecycle works: signed install, enrollment, upgrade,
+reboot, purge/reinstall and revocation. It also needs connected dispatch, strict
+inventory health and all eight configuration kinds. Encryption covers inventory,
+escrow, reveal, rotation, TPM2 binding and cold-boot recovery. Wipe covers live-root
+crypto-erase, report-loss and recovery sanitize. It also needs lock, release and
+quarantine, agent self-update, OS patch policy and remote assistance. Each
+distribution, version, architecture and desktop edition qualifies on its own; a
+derivative never inherits its base's evidence.
 
 ### Definitions
 

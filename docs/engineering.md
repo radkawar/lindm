@@ -119,13 +119,33 @@ actionable empty/error states. Toasts report accepted mutations, not proof of
 native execution, and never contain enrollment/recovery secrets. Inline normalized
 errors and ambiguous same-request-ID recovery remain authoritative; no mutation
 retry behavior changes.
+Sonner's stylesheet is bundled from `globals.css`: the console CSP (`style-src 'self'`)
+blocks the runtime-injected `<style>` it would otherwise add, which left toasts unstyled.
+The sidebar's in-flow gap carries the sidebar surface, so the column reaches the
+bottom of long pages. Full-page captures must start at scroll position zero: like any
+fixed or sticky element, the sidebar and header otherwise render at the scroll offset.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
-Long operational caveats live in accessible info tooltips or help disclosures,
-while destructive confirmation warnings remain visible.
+Explanations of how a feature works are not inline page text: keep at most one short
+helper sentence per control, put on-demand help in an info tooltip, and keep
+destructive confirmation warnings visible. Long or multi-step forms on a detail page
+open in a dialog from the page action that names them (for example, Assign profile).
 
-Console copy uses concise sentence case and names the operator's next action. Use
-commas, colons or periods rather than em or en dashes; ESLint checks string literals,
+Console copy is written for administrators, not for engineers. It is outcome-first,
+concise, sentence case and names the operator's next action ("Assignment saved. The
+device applies it at its next check-in."). Primary UI text (titles, descriptions,
+labels, badges, buttons, toasts and alerts) must not use internal model terms such
+as desired state, owned changes, ownership-safe release, generation, catalog head,
+disposition, receipt, exact request or native execution, and never shows request
+IDs, record UUIDs or raw enum names. Identifiers, sequences, hashes, protocol
+values and server/device clock distinctions live only in a collapsed `TechnicalDetails`
+disclosure (or `RpcError` "Details for support"), with values selectable for copy.
+Exceptions are values the operator must type or copy to act, such as a shown-once
+secret or a confirmation ID. Title records by name: devices use the hostname and fall
+back to "Unnamed device"; lifecycle states read Waiting to enroll, Enrolled, Revoked
+and Recovery hold. Toasts state the outcome in a few words ("Assignment saved",
+"Couldn't confirm the assignment") with a description only when it adds a next step.
+Use commas, colons or periods rather than em or en dashes; ESLint checks string literals,
 template text and JSX text in handwritten `web/src` code. Distinguish unavailable,
 unknown, stale and empty results. A failed read must not look like an empty list or
 a successful refresh. Use `RpcError` for classified failures and expandable technical
@@ -557,7 +577,12 @@ directory and whether it was created.
 `-arch arm64` (also `aarch64`; `amd64`/`x86_64` are equivalent) must match the
 pinned image manifest. Selection prefers matching KVM hosts over TCG, then a free
 configured host; `-host dgx20` overrides selection. `-accelerator kvm` explicitly
-refuses foreign-architecture TCG. `lab hosts` shows reachability, configured native
+refuses foreign-architecture TCG. Capacity never changes acceleration: lanes whose
+own `-accelerator` default is `kvm` (`encrypted`, `inspect-storage`,
+`device-actions`, `assistance`), and architecture-defaulted lanes for an
+architecture some configured host runs natively, wait for a native KVM slot
+instead of moving to a foreign TCG host; only explicit `-accelerator tcg` or an
+architecture with no native host selects TCG. `lab hosts` shows reachability, configured native
 architectures, observed KVM access, active leases, observed QEMU processes and free
 managed capacity. Old QEMU processes started without this command are visible but
 cannot be retroactively leased.
@@ -1596,7 +1621,11 @@ not vendor signatures. Only the canonical complete ecosystem export can establis
 complete coverage. Ubuntu 24.04 uses
 `https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip`,
 `FEED_FORMAT_OSV_ZIP`, distro `ubuntu`, release `24.04` and architecture `amd64`.
-OSV acquisition and parsing share the five-minute refresh deadline.
+Bounded OSV fetches share a five-minute deadline. Streamed OSV publication is
+governed by the refresh idle-progress watchdog: archive transfers report
+progress every 16 MiB and use no fixed whole-request timeout, because a fixed
+two-minute transfer cap failed the ~780 MB Ubuntu export on a slower link
+(observed twice on dgx21, 2026-10-11).
 Signed individual SUSE CSAF is capped at 32 MiB with 64 KiB proofs.
 Red Hat accepts 128 MiB documents, incrementally walks JSON product metadata and
 one vulnerability at a time, and verifies original-byte proofs before publication.
@@ -1607,9 +1636,11 @@ with an 8 MiB cache; source-wide claims are never held in a Go map. The configur
 total-claims limit bounds publication independently. Only materializing callers
 retain the 128 MiB/500,000-claim result cap. Eight logical requests (forty including
 redirects) and parsing share one five-minute deadline. Database insertion uses
-bounded COPY batches. A scheduled
-matcher scans at most 100 devices per minute; reads evaluate the current snapshot
-immediately. Expiry is rechecked at read time independently of scan progress.
+bounded COPY batches. The background evaluator polls every five seconds in
+batches of 32 devices; reads serve only persisted evaluations (see
+architecture: devices bind content-addressed finding sets, so only a new
+(feed generation, package set) pair is matched). Expiry is rechecked at read
+time independently of evaluation progress.
 Findings pages are row- and byte-bounded. Failed refreshes preserve historical
 evidence and expose an error without resetting freshness.
 

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -60,12 +61,12 @@ export function EnrollmentView() {
           <CardHeader>
             <Laptop className="mb-2 size-6 text-primary" aria-hidden="true" />
             <CardTitle>Enroll one device now</CardTitle>
-            <CardDescription>For an admin setting up one machine at its terminal.</CardDescription>
+            <CardDescription>For setting up one machine from its terminal.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <p className="text-sm">One-time enrollment code. Expires in 5 minutes. One use.</p>
+            <p className="text-sm">A single-use code that expires in 5 minutes.</p>
             <p className="text-sm text-muted-foreground">
-              Get the install and enrollment commands for apt or dnf.
+              You'll get the install and enroll commands for apt or dnf.
             </p>
             <Button className="w-fit" onClick={() => setMethod("grant")}>
               Create one-time code
@@ -75,18 +76,15 @@ export function EnrollmentView() {
         <Card>
           <CardHeader>
             <Cloud className="mb-2 size-6 text-primary" aria-hidden="true" />
-            <CardTitle>Automatic enrollment (provisioning token)</CardTitle>
+            <CardTitle>Automatic enrollment</CardTitle>
             <CardDescription>
               For cloud-init, Kickstart, autoinstall and device imaging.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <p className="text-sm">
-              Reusable provisioning token. Defaults to 24 hours and 100 uses.
-            </p>
+            <p className="text-sm">A reusable token. Defaults to 24 hours and 100 uses.</p>
             <p className="text-sm text-muted-foreground">
-              Copy a ready-to-paste installer snippet. Inject the token at deployment, not into a
-              golden image.
+              You'll get an installer snippet. Add the token at install time, not to a saved image.
             </p>
             <Button className="w-fit" onClick={() => setMethod("provisioning")}>
               Create provisioning token
@@ -154,7 +152,7 @@ export function EnrollmentView() {
                 tabs.current[next]?.focus();
               }}
             >
-              {tab === "grants" ? "Active grants" : "Provisioning tokens"}
+              {tab === "grants" ? "One-time codes" : "Provisioning tokens"}
             </button>
           ))}
         </div>
@@ -179,7 +177,7 @@ export function EnrollmentView() {
       </section>
       <details className="border p-4">
         <summary className="w-fit cursor-pointer text-sm font-medium">
-          Devices waiting for enrollment approval
+          Devices waiting for approval
         </summary>
         <div className="mt-4">
           <PendingEnrollments />
@@ -223,7 +221,8 @@ function IssueGrant({
         signal: authLifetime.signal,
       });
       authLifetime.signal.throwIfAborted();
-      if (!response.grantId.trim()) throw new Error("The server did not return a grant ID.");
+      if (!response.grantId.trim())
+        throw new Error("The code may not have been created. Try again.");
       const deliveryUnknown = response.secretDeliveryUnknown || !response.secret;
       onIssued({
         kind: "grant",
@@ -243,10 +242,10 @@ function IssueGrant({
       void client.invalidateQueries({ queryKey: ["enrollment-grants", authLifetime.generation] });
       if (!authLifetime.signal.aborted) {
         if (result.deliveryUnknown)
-          toast.error("One-time code was not delivered", {
-            description: "Revoke the grant and create a replacement.",
+          toast.error("Couldn't show the code", {
+            description: "Revoke it and create a new one.",
           });
-        else toast.success("One-time enrollment code created");
+        else toast.success("One-time code created");
       }
     },
     onError: (error) => {
@@ -266,9 +265,7 @@ function IssueGrant({
     <>
       <DialogHeader>
         <DialogTitle>Enroll one device now</DialogTitle>
-        <DialogDescription>
-          Create a one-time code for a single machine. This is not a reusable provisioning token.
-        </DialogDescription>
+        <DialogDescription>Create a single-use code for one machine.</DialogDescription>
       </DialogHeader>
       <form
         className="grid gap-4"
@@ -308,7 +305,7 @@ function IssueGrant({
           ]}
         />
         <p className="text-sm text-muted-foreground">
-          One use. Copy the matching install commands after creating the code.
+          You'll get the install commands after you create the code.
         </p>
         <Label htmlFor="grant-reason">Reason</Label>
         <Textarea
@@ -326,22 +323,13 @@ function IssueGrant({
         ) : null}
         {failure ? (
           <RpcError failure={failure}>
-            {failure.ambiguous ? (
-              <p>Retry this exact request. A retry cannot recover a withheld code.</p>
-            ) : null}
+            {failure.ambiguous ? <p>Try again to check. The code can't be shown twice.</p> : null}
           </RpcError>
         ) : null}
-        <details className="text-xs text-muted-foreground">
-          <summary className="w-fit cursor-pointer">Details</summary>
-          <p className="mt-2 break-all">Request ID: {requestId}</p>
-        </details>
+        <TechnicalDetails items={[{ label: "Request ID", value: requestId }]} />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={issue.isPending}>
-            {issue.isPending
-              ? "Creating code…"
-              : failure
-                ? "Retry exact request"
-                : "Create one-time code"}
+            {issue.isPending ? "Creating code…" : failure ? "Try again" : "Create one-time code"}
           </Button>
           <Button
             type="button"
@@ -363,7 +351,7 @@ function IssueGrant({
                 setFailure(null);
               }}
             >
-              Edit request
+              Edit
             </Button>
           ) : null}
         </div>

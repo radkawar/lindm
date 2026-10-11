@@ -55,9 +55,7 @@ export function TargetPagination({
       >
         Next page
       </Button>
-      <p className="self-center text-sm text-muted-foreground">
-        At most 100 records per page; these are not fleet totals.
-      </p>
+      <p className="self-center text-sm text-muted-foreground">Up to 100 per page.</p>
     </div>
   );
 }

@@ -14,22 +14,21 @@ export function ScopeEditor({
 }) {
   return (
     <fieldset className="grid min-w-0 gap-4 border p-4" disabled={disabled}>
-      <legend className="px-1 text-sm font-semibold">Device authorization scopes</legend>
+      <legend className="px-1 text-sm font-semibold">Device access</legend>
       <p className="max-w-3xl text-sm text-muted-foreground">
-        No scopes means unrestricted access. A device can match any scope. Within a scope, it must
-        match every label and each device or group filter you provide. Enter one label or UUID per
-        line.
+        Leave empty to allow all devices. Otherwise the account can manage devices that match any
+        rule. Enter one value per line.
       </p>
       {scopes.map((scope, index) => (
         <div className="grid min-w-0 gap-3 border bg-muted/20 p-4" key={index}>
-          <h3 className="text-sm font-semibold">Scope {index + 1}</h3>
+          <h3 className="text-sm font-semibold">Rule {index + 1}</h3>
           {(["labels", "deviceIds", "groupIds"] as const).map((field) => (
             <label key={field} className="grid gap-2 text-sm font-medium">
               {field === "labels"
-                ? "Exact labels"
+                ? "Labels (device must have all)"
                 : field === "deviceIds"
-                  ? "Device UUIDs (any)"
-                  : "Group UUIDs (any)"}
+                  ? "Device IDs"
+                  : "Group IDs"}
               <Textarea
                 className="font-mono text-xs"
                 value={scope[field].join("\n")}
@@ -52,7 +51,7 @@ export function ScopeEditor({
             variant="outline"
             onClick={() => onChange(scopes.filter((_, position) => position !== index))}
           >
-            Remove scope
+            Remove rule
           </Button>
         </div>
       ))}
@@ -62,7 +61,7 @@ export function ScopeEditor({
         variant="outline"
         onClick={() => onChange([...scopes, create(DeviceScopeSchema)])}
       >
-        Add scope
+        Add rule
       </Button>
     </fieldset>
   );

@@ -9,6 +9,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,12 +70,12 @@ export function ProfileDetailView({
     (record !== undefined && head !== undefined && record.revisionId === head.revisionId);
   const headLabel =
     revision === "" || isHead
-      ? "This revision is the catalog head."
+      ? "This is the latest revision."
       : headQuery.isPending
-        ? "This is an exact retained revision. Its catalog-head comparison is still loading."
+        ? "This is an older revision. Checking for newer ones…"
         : headFailure
-          ? "This is an exact retained revision. The catalog head could not be compared."
-          : "This retained revision is not the catalog head.";
+          ? "This is an older revision. Couldn't check for newer ones."
+          : "This is an older revision. A newer one is available.";
   const published = formatTimestamp(record?.publishedAt);
 
   function displayedSource(): EditorSource | null {
@@ -82,7 +83,7 @@ export function ProfileDetailView({
     return {
       draft: draftFromSpec(record.spec),
       expectedRevisionId: head.revisionId,
-      sourceNote: `This editor was initialized from revision ${record.revisionId} against catalog head ${head.revisionId}. The expected revision below is the current compare-and-swap target.`,
+      sourceNote: "This draft starts from the revision shown above.",
     };
   }
 
@@ -95,8 +96,7 @@ export function ProfileDetailView({
       setEditorSource({
         draft: draftFromPayload(attempt.payload),
         expectedRevisionId: attempt.payload.expectedRevisionId,
-        sourceNote:
-          "This draft was initialized from the captured request. Refreshing catalog data does not change its saved expected revision.",
+        sourceNote: "This draft keeps the changes you were saving.",
       });
     }
   }
@@ -112,7 +112,7 @@ export function ProfileDetailView({
       </Link>
       <PageHeader
         title={record?.spec?.name.trim() || "Profile"}
-        description={profileId}
+        description={record?.spec?.description.trim() || undefined}
         actions={
           <Button
             variant="outline"
@@ -127,15 +127,13 @@ export function ProfileDetailView({
         }
       />
       <p className="max-w-3xl text-sm text-muted-foreground">
-        {revision === "" ? "Latest published revision. " : "Saved revision. "}
+        {revision === "" ? "Latest revision. " : "Older revision. "}
         {CATALOG_SEMANTICS}
       </p>
       <Card>
         <CardHeader>
           <CardTitle>Find a revision</CardTitle>
-          <CardDescription>
-            Enter a revision ID to view a saved version, or return to the latest published revision.
-          </CardDescription>
+          <CardDescription>Open an older version by its revision ID.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -144,7 +142,7 @@ export function ProfileDetailView({
               event.preventDefault();
               const canonical = usableUuid(lookup);
               if (canonical === null) {
-                setLookupError("Enter a revision UUID.");
+                setLookupError("Enter a valid revision ID.");
                 return;
               }
               setLookupError("");
@@ -152,7 +150,7 @@ export function ProfileDetailView({
             }}
           >
             <div className="grid min-w-0 grow basis-64 gap-1.5">
-              <Label htmlFor="exact-revision">Exact revision ID</Label>
+              <Label htmlFor="exact-revision">Revision ID</Label>
               <Input
                 id="exact-revision"
                 value={lookup}
@@ -181,7 +179,7 @@ export function ProfileDetailView({
       {failure ? <RpcError failure={failure} /> : null}
       {displayed.isPending ? (
         <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading profile revision…</span>
+          <span className="text-sm text-muted-foreground">Loading profile…</span>
           <Skeleton className="h-40 w-full" />
         </div>
       ) : null}
@@ -195,7 +193,7 @@ export function ProfileDetailView({
             <CardContent>
               <div className="mb-4 flex flex-wrap gap-2">
                 <StatusBadge status={isHead ? "info" : "neutral"}>
-                  {isHead ? "Latest revision" : "Saved revision"}
+                  {isHead ? "Latest revision" : "Older revision"}
                 </StatusBadge>
                 {!isHead && head ? (
                   <Link
@@ -204,13 +202,12 @@ export function ProfileDetailView({
                     search={{ revision: "" }}
                     className="text-sm underline underline-offset-4"
                   >
-                    Open latest revision {head.revisionId}
+                    Open latest revision
                   </Link>
                 ) : null}
               </div>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Fact label="Revision ID">{record.revisionId}</Fact>
-                <Fact label="Revision number">{formatRevisionNumber(record.revisionNumber)}</Fact>
+                <Fact label="Revision">{formatRevisionNumber(record.revisionNumber)}</Fact>
                 <Fact label="Published">
                   {published.date ? (
                     <time dateTime={published.utc}>{published.local}</time>
@@ -218,22 +215,26 @@ export function ProfileDetailView({
                     published.local
                   )}
                 </Fact>
-                <Fact label="Actor">{record.actorId.trim() || "Unknown actor"}</Fact>
-                <Fact label="Spec SHA-256">{formatSha256(record.specSha256)}</Fact>
-                <Fact label="Resources">{record.spec.resources.length}</Fact>
+                <Fact label="Published by">{record.actorId.trim() || "Unknown"}</Fact>
+                <Fact label="Settings">{record.spec.resources.length}</Fact>
                 <Fact label="Description">
                   {record.spec.description.trim() || "No description"}
                 </Fact>
               </dl>
+              <TechnicalDetails
+                className="mt-4"
+                items={[
+                  { label: "Profile ID", value: profileId },
+                  { label: "Revision ID", value: record.revisionId },
+                  { label: "Spec SHA-256", value: formatSha256(record.specSha256) },
+                ]}
+              />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Resources</CardTitle>
-              <CardDescription>
-                Typed desired state, dependencies and ownership are catalog values, not native
-                observations or proof of capability support.
-              </CardDescription>
+              <CardTitle>Settings</CardTitle>
+              <CardDescription>What this profile sets on assigned devices.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               {record.spec.resources.map((resource) => (
@@ -246,8 +247,8 @@ export function ProfileDetailView({
       {headFailure ? (
         <RpcError failure={headFailure}>
           <p>
-            Load the latest revision before starting a new draft.
-            {attempt ? " You can still retry the captured request." : ""}
+            Couldn't load the latest revision. Refresh before editing.
+            {attempt ? " You can still retry saving your draft." : ""}
           </p>
         </RpcError>
       ) : null}
@@ -270,14 +271,11 @@ export function ProfileDetailView({
                 setCopyGeneration((current) => current + 1);
               }}
             >
-              Replace unsent draft with this revision
+              Start over from this revision
             </Button>
           </div>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Refreshing the revision does not change a prepared draft, its expected revision, or a
-            frozen request ID. A full browser reload or sign-out clears this tab's drafts and
-            requests. Replacing the draft copies the revision shown above and targets the loaded
-            catalog head. It does not publish.
+            Your draft is kept until you publish it or reload the page.
           </p>
           <ProfileEditor
             key={`${profileId}:${copyGeneration}`}
@@ -306,28 +304,29 @@ function ResourceFacts({ resource }: { resource: ProfileResource }) {
   return (
     <article className="grid min-w-0 gap-3 border bg-muted/20 p-4">
       <h2 className="break-all text-sm font-medium">
-        {resource.desired?.ref?.canonicalKey || "Resource reference not recorded"}
+        {resource.desired?.ref?.canonicalKey || "Unnamed setting"}
       </h2>
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Fact label="Resource ID">{resource.resourceId}</Fact>
-        <Fact label="Kind">{resource.desired?.state.case ?? "Not recorded"}</Fact>
-        <Fact label="Dependencies">
+        <Fact label="Type">{resource.desired?.state.case ?? "Unknown"}</Fact>
+        <Fact label="Depends on">
           {resource.dependsOn.length === 0
             ? "None"
             : resource.dependsOn
                 .map(
                   (dependency) =>
-                    `${dependency.ref?.kind ?? "Unknown"} / ${dependency.ref?.canonicalKey ?? "Unknown"} (condition ${dependency.condition})`,
+                    `${dependency.ref?.kind ?? "Unknown"} / ${dependency.ref?.canonicalKey ?? "Unknown"}`,
                 )
                 .join(", ")}
         </Fact>
       </dl>
-      <details>
-        <summary className="cursor-pointer text-sm">Complete typed resource specification</summary>
+      <TechnicalDetails
+        summary="Full setting"
+        items={[{ label: "Setting ID", value: resource.resourceId }]}
+      >
         <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
           {toJsonString(ProfileResourceSchema, resource, { prettySpaces: 2 })}
         </pre>
-      </details>
+      </TechnicalDetails>
     </article>
   );
 }

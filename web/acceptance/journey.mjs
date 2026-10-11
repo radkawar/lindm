@@ -122,14 +122,14 @@ export async function assignProfile(ui, config) {
     await ui.click({ label: "Profile revision" });
     // The placeholder option is always rendered; wait for the popup to mount
     // before reading the page's options once.
-    await ui.wait({ role: "option", text: "Select a profile head" });
+    await ui.wait({ role: "option", text: "Select a profile" });
     const labels = await ui.driver.observe(() =>
       [...document.querySelectorAll('[role="option"]')]
         .filter(
           (node) => node.getClientRects().length && node.getAttribute("aria-disabled") !== "true",
         )
         .map((node) => node.textContent.trim())
-        .filter((text) => text !== "Select a profile head"),
+        .filter((text) => text !== "Select a profile"),
     );
     if (labels.length > 200) throw new Error("profile_catalog_page_limit");
     for (let index = 0; index < labels.length; index++) {
@@ -169,8 +169,8 @@ export async function assignProfile(ui, config) {
     { label: "Reason (required)" },
     "Release acceptance verify native profile application",
   );
-  await ui.click({ role: "button", text: "Assign selected revision" });
-  await ui.wait({ role: "status", contains: "Assignment accepted." });
+  await ui.click({ role: "button", text: "Save assignment" });
+  await ui.wait({ role: "status", contains: "Assignment saved." });
   return {
     deviceId: config.deviceId,
     profileRevisionId: config.profileRevisionId,

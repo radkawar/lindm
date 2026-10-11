@@ -233,13 +233,11 @@ export function DeviceNativeDetails({
     <Card>
       <CardHeader>
         <CardTitle>Hardware and software</CardTitle>
-        <CardDescription>Reported in the host collection above.</CardDescription>
+        <CardDescription>From the device&apos;s latest inventory.</CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-6">
         {!details ? (
-          <p className="text-muted-foreground">
-            Native details were not reported by this host observation.
-          </p>
+          <p className="text-muted-foreground">No hardware or software details reported yet.</p>
         ) : (
           <>
             <div className="grid justify-items-start gap-2">
@@ -250,9 +248,7 @@ export function DeviceNativeDetails({
               >
                 Show unavailable fields
               </Button>
-              <p className="text-sm text-muted-foreground">
-                Optional fields with no data are hidden. Collection problems remain visible.
-              </p>
+              <p className="text-sm text-muted-foreground">Empty optional fields are hidden.</p>
             </div>
             <NativeFacts
               showUnavailable={showUnavailable}
@@ -286,10 +282,9 @@ export function DeviceNativeDetails({
             />
             {showPlatform ? (
               <section className="grid gap-4">
-                <h3 className="font-semibold">Native platform evidence</h3>
+                <h3 className="font-semibold">Platform and repositories</h3>
                 <p className="text-sm text-muted-foreground">
-                  DNF configuration is not proof of repository reachability or entitlement. URL
-                  credentials, query strings and fragments are omitted.
+                  Repositories as configured on the device. Credentials in URLs are hidden.
                 </p>
                 <NativeFacts
                   showUnavailable={showUnavailable}
@@ -355,7 +350,7 @@ export function DeviceNativeDetails({
                   />
                 ) : (
                   <NativeRows
-                    title="Native repository IDs"
+                    title="Repositories"
                     status={platform?.repositories?.status}
                     rows={platform?.repositories?.ids ?? []}
                     columns={[{ header: "Repository ID", render: (id) => id }]}
@@ -437,7 +432,7 @@ export function DeviceNativeDetails({
               ]}
             />
             <section className="grid gap-3">
-              <h3 className="font-semibold">Native backend presence</h3>
+              <h3 className="font-semibold">App platforms</h3>
               <NativeFacts
                 showUnavailable={showUnavailable}
                 fields={[

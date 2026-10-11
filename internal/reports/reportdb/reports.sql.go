@@ -234,20 +234,28 @@ func (q *Queries) FailReportArtifact(ctx context.Context, arg FailReportArtifact
 }
 
 const findingsReportRows = `-- name: FindingsReportRows :many
-SELECT f.id::text AS cursor, jsonb_build_object('finding_id',f.id,'device_id',f.device_id,
+SELECT (f.device_id::text || '/' || f.id::text)::text AS cursor, jsonb_build_object('finding_id',f.id,'device_id',f.device_id,
 'advisory_id',f.advisory_id,'package_name',f.package_name,'installed_version',f.installed_version,
 'fixed_version',f.fixed_version,'architecture',f.architecture,'severity',f.severity,'state',f.state,
 'evaluated_at',f.evaluated_at,'inventory_at',f.inventory_at)::text AS record
-FROM advisory_finding_status f WHERE f.id > $1::uuid ORDER BY f.id LIMIT 128
+FROM advisory_finding_status f
+WHERE (f.device_id, f.id) > ($1::uuid, $2::uuid)
+ORDER BY f.device_id, f.id LIMIT 128
 `
+
+type FindingsReportRowsParams struct {
+	AfterDevice uuid.UUID
+	AfterID     uuid.UUID
+}
 
 type FindingsReportRowsRow struct {
 	Cursor string
 	Record string
 }
 
-func (q *Queries) FindingsReportRows(ctx context.Context, afterID uuid.UUID) ([]FindingsReportRowsRow, error) {
-	rows, err := q.db.Query(ctx, findingsReportRows, afterID)
+// Finding keys are unique per device, not globally: page by (device, finding).
+func (q *Queries) FindingsReportRows(ctx context.Context, arg FindingsReportRowsParams) ([]FindingsReportRowsRow, error) {
+	rows, err := q.db.Query(ctx, findingsReportRows, arg.AfterDevice, arg.AfterID)
 	if err != nil {
 		return nil, err
 	}

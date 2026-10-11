@@ -212,7 +212,9 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          // lindm: the in-flow gap carries the sidebar surface so the column reaches the
+          // bottom of long pages behind the viewport-height fixed container.
+          "relative h-full w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear group-data-[side=left]:group-data-[variant=sidebar]:border-r group-data-[side=right]:group-data-[variant=sidebar]:border-l group-data-[variant=sidebar]:bg-sidebar",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"

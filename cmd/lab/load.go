@@ -29,6 +29,13 @@ func runLoad(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	generatorCPUs := flags.String("generator-cpus", "", "generator CPU list; re-exec before starting workload")
 	serverCPUs := flags.String("server-cpus", "", "real server CPU list; disjoint from generator/Postgres")
 	postgresCPUs := flags.String("postgres-cpus", "", "dedicated PostgreSQL container CPU list")
+	listen := flags.String("listen-address", "", "bind server listeners to this local IPv4 address (for example a direct-link address); default loopback")
+	generatorHost := flags.String("generator-host", "", "SSH alias running simulated devices via `lab load-generator`; default in-process")
+	generatorBinary := flags.String("generator-binary", "", "absolute path of the prebuilt lab executable on -generator-host")
+	generatorSSH := flags.String("generator-ssh-config", "", "optional absolute ssh_config file (ssh -F) for -generator-host")
+	advisoryFeeds := flags.String("advisory-feeds", "", "strict protobuf JSON AdvisoryConfig of real feeds; enables server refresh/evaluation and the advisory freshness SLO")
+	packageBaseline := flags.String("package-baseline", "", "protobuf JSON PackageBatch of recorded native packages placed first in every snapshot")
+	postgresSettings := flags.String("postgres-settings", "", "comma-separated allowlisted name=value tuning for the dedicated nvme/tmpfs PostgreSQL (durability settings are rejected)")
 	record := flags.String("record", "", "new private nonsecret JSON evidence file, including failed runs")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -52,6 +59,22 @@ func runLoad(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	}
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Hour)
 	defer cancel()
-	result, err := loadlab.Run(ctx, loadlab.Options{Repository: *repo, ServerBinary: *binary, Stages: counts, StageDuration: *duration, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, Seed: *seed, PoolSize: uint32(*pool), ProfileDir: *profiles, DatabaseStorage: *storage, GeneratorCPUs: *generatorCPUs, ServerCPUs: *serverCPUs, PostgresCPUs: *postgresCPUs})
+	result, err := loadlab.Run(ctx, loadlab.Options{Repository: *repo, ServerBinary: *binary, Stages: counts, StageDuration: *duration, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, Seed: *seed, PoolSize: uint32(*pool), ProfileDir: *profiles, DatabaseStorage: *storage, GeneratorCPUs: *generatorCPUs, ServerCPUs: *serverCPUs, PostgresCPUs: *postgresCPUs, ListenAddress: *listen, GeneratorHost: *generatorHost, GeneratorBinary: *generatorBinary, GeneratorSSHConfig: *generatorSSH, AdvisoryFeeds: *advisoryFeeds, PackageBaseline: *packageBaseline, PostgresSettings: splitSettings(*postgresSettings)})
 	return errors.Join(err, writeLabEvidence(stdout, *record, result))
+}
+
+// runLoadGenerator is started by `lab load -generator-host` over SSH. It speaks
+// only the orchestrator's stdin/stdout protocol and accepts no arguments.
+func runLoadGenerator(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) != 0 {
+		return errors.New("lab load-generator takes no arguments; it is started by lab load -generator-host")
+	}
+	return loadlab.ServeGenerator(ctx, stdin, stdout)
+}
+
+func splitSettings(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }

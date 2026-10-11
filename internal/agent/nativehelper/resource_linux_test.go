@@ -93,6 +93,7 @@ func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
 		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
 		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "10.2"}, true},
 	} {
 		plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: "lindm-native-test"}, Backend: &resourcev1.BackendSelection{Product: tc.product}, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: &resourcev1.LocalUserDesired{Name: "lindm-native-test"}}}}
 		values := unitValues(t, directory, plan, nil, nil)

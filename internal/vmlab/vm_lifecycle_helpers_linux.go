@@ -17,6 +17,7 @@ import (
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -182,6 +183,9 @@ func rebootLifecycleGuest(ctx context.Context, vm *guestVM, previousBoot string)
 
 // Only a fresh pinned connection reporting a changed boot ID establishes the
 // reboot boundary. Polls are read-only; the reboot command is never replayed.
+// A probe can reach the old boot's sshd just before shutdown stops it; the
+// killed session then ends without an exit status (observed on EL 10 guests)
+// and is retried like any other transport loss of the old boot.
 func waitGuestBootChange(ctx context.Context, previous uuid.UUID, probe func(context.Context) (string, error)) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -191,7 +195,8 @@ func waitGuestBootChange(ctx context.Context, previous uuid.UUID, probe func(con
 		}
 		boot, err := probe(ctx)
 		if err != nil {
-			if !sshBootNotReady(err) {
+			var missing *ssh.ExitMissingError
+			if !sshBootNotReady(err) && !errors.As(err, &missing) {
 				return fmt.Errorf("probe reconnected guest boot ID: %w", err)
 			}
 		} else {

@@ -128,3 +128,71 @@ func breached(rpc map[string]RPCResult) bool {
 func snapshotsComplete(completed, attempted, devices uint64) bool {
 	return completed*100 >= max(attempted, devices)*99
 }
+
+// HistogramData is a sparse, mergeable copy of one RPC histogram. A remote
+// generator returns these so percentiles are computed over the exact combined
+// distribution, never averaged from per-host percentiles.
+type HistogramData struct {
+	Bins                        map[int64]uint64
+	Calls, Errors, NonRetryable uint64
+	Codes, Reasons              map[string]uint64
+	Max                         int64
+}
+
+func (m *measurements) export(reset bool) map[string]HistogramData {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make(map[string]HistogramData, len(m.rpc))
+	for name, h := range m.rpc {
+		data := HistogramData{Bins: make(map[int64]uint64), Calls: h.calls, Errors: h.errors, NonRetryable: h.nonRetryable, Codes: maps.Clone(h.codes), Reasons: maps.Clone(h.reasons), Max: h.max}
+		for i, n := range h.bins {
+			if n != 0 {
+				data.Bins[int64(i)] = n
+			}
+		}
+		result[name] = data
+	}
+	if reset {
+		m.rpc = nil
+	}
+	return result
+}
+
+func (m *measurements) merge(remote map[string]HistogramData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.rpc == nil {
+		m.rpc = make(map[string]*histogram)
+	}
+	for name, data := range remote {
+		h := m.rpc[name]
+		if h == nil {
+			h = &histogram{codes: make(map[string]uint64), reasons: make(map[string]uint64)}
+			m.rpc[name] = h
+		}
+		var binned uint64
+		for i, n := range data.Bins {
+			if i < 0 || i >= int64(len(h.bins)) {
+				return errors.New("remote histogram bin out of range")
+			}
+			h.bins[i] += n
+			binned += n
+		}
+		if binned != data.Calls {
+			return errors.New("remote histogram calls do not match bins")
+		}
+		h.calls += data.Calls
+		h.errors += data.Errors
+		h.nonRetryable += data.NonRetryable
+		h.max = max(h.max, data.Max)
+		for code, n := range data.Codes {
+			h.codes[code] += n
+		}
+		for reason, n := range data.Reasons {
+			if len(h.reasons) < 32 || h.reasons[reason] > 0 {
+				h.reasons[reason] += n
+			}
+		}
+	}
+	return nil
+}

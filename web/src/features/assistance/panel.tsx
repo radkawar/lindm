@@ -98,9 +98,7 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
           parsed < 1 ||
           parsed > MAX_DURATION_MINUTES
         )
-          throw new Error(
-            `Maximum duration must be a whole number of minutes from 1 to ${MAX_DURATION_MINUTES}.`,
-          );
+          throw new Error(`Enter a whole number of minutes from 1 to ${MAX_DURATION_MINUTES}.`);
         const request = create(CreateAssistanceSessionRequestSchema, {
           requestId: newRequestId(),
           deviceId,
@@ -120,13 +118,13 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
         });
         const sessionId = response.session?.id;
         if (!sessionId || response.session?.deviceId !== deviceId) {
-          toast.error("Remote assistance requested", {
-            description: "The response did not identify the session. Open it from the history.",
+          toast.error("Requested, but couldn't open the session", {
+            description: "Open the session from the history below.",
           });
           return;
         }
         toast.success("Remote assistance requested", {
-          description: "Waiting for the local user to accept on the device.",
+          description: "Waiting for the user on the device to accept.",
         });
         void navigate({
           to: "/devices/$deviceId/assistance/$sessionId",
@@ -170,10 +168,9 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
       </div>
       <p id={`${id}-mode-help`} className="text-sm text-muted-foreground">
         {mode === AssistanceMode.CONTROL
-          ? "Control asks for keyboard and pointer access. The local user approves it separately in the desktop's own dialog and may grant viewing only."
-          : "View shares the screen only. You cannot type or click on the device."}{" "}
-        The session ends at the maximum duration and cannot be extended; a longer session needs a
-        new request and fresh consent.
+          ? "Control lets you use the keyboard and mouse. The user on the device can allow viewing only."
+          : "View shares the screen only. You can't type or click."}{" "}
+        The session ends after this time. To continue, request a new session.
       </p>
       <div className="grid gap-2">
         <Label htmlFor={`${id}-reason`}>Reason (shown to the local user and audited)</Label>
@@ -193,25 +190,16 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
       {exact.failure ? (
         <RpcError failure={exact.failure} title="Remote assistance not requested">
           {precondition ? <p>{precondition}</p> : null}
-          {exact.ambiguous ? (
-            <p>
-              Check the history first. Retry sends the captured request again with the same request
-              ID.
-            </p>
-          ) : null}
+          {exact.ambiguous ? <p>Check the history below before trying again.</p> : null}
         </RpcError>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={exact.busy}>
-          {exact.busy
-            ? "Requesting…"
-            : exact.ambiguous
-              ? "Retry exact assistance request"
-              : "Request remote assistance"}
+          {exact.busy ? "Requesting…" : exact.ambiguous ? "Try again" : "Request remote assistance"}
         </Button>
         {exact.ambiguous ? (
           <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
-            Discard captured request
+            Discard
           </Button>
         ) : null}
       </div>
@@ -234,25 +222,25 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
         </Button>
       </div>
       {query.isPending ? <p role="status">Loading assistance history…</p> : null}
-      {failure ? <RpcError failure={failure} title="Assistance history unavailable" /> : null}
+      {failure ? <RpcError failure={failure} title="Couldn't load session history" /> : null}
       {data?.sessions.length === 0 ? (
         <EmptyState
-          title="No remote assistance sessions on this page"
-          description="Requested sessions appear here with their consent and end cause."
+          title="No remote assistance sessions yet"
+          description="Sessions you request appear here."
         />
       ) : null}
       {data?.sessions.length ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>State</TableHead>
-              <TableHead>Operator</TableHead>
-              <TableHead>Local user</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Admin</TableHead>
+              <TableHead>Device user</TableHead>
               <TableHead>Control</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>Requested</TableHead>
               <TableHead>Started</TableHead>
               <TableHead>Ended</TableHead>
-              <TableHead>End cause</TableHead>
+              <TableHead>Why it ended</TableHead>
               <TableHead>
                 <span className="sr-only">Open</span>
               </TableHead>
@@ -266,7 +254,7 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
                   <p className="text-xs text-muted-foreground">{modeLabels[session.mode]}</p>
                 </TableCell>
                 <TableCell className="whitespace-normal">
-                  {session.operatorDisplay || session.operatorId}
+                  {session.operatorDisplay || "Unknown"}
                 </TableCell>
                 <TableCell className="whitespace-normal">{localSessionText(session)}</TableCell>
                 <TableCell>{controlText(session)}</TableCell>
@@ -280,7 +268,7 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
                   <TimeCell value={session.endedAt} />
                 </TableCell>
                 <TableCell className="min-w-48 whitespace-normal">
-                  {endCauseText(session) || "Open"}
+                  {endCauseText(session) || "Still open"}
                 </TableCell>
                 <TableCell>
                   <Link

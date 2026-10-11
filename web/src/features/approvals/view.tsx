@@ -13,6 +13,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,14 +34,14 @@ const APPROVAL_STATES: Record<ApprovalState, string> = {
   [ApprovalState.PENDING]: "Pending",
   [ApprovalState.APPROVED]: "Approved",
   [ApprovalState.REJECTED]: "Rejected",
-  [ApprovalState.CONSUMED]: "Consumed",
+  [ApprovalState.CONSUMED]: "Completed",
   [ApprovalState.EXPIRED]: "Expired",
 };
 
 const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> = {
   revokeDevice: "Revoke device access",
   setResourceAssignment: "Change resource assignment",
-  updateExecutionAuthority: "Update execution trust",
+  updateExecutionAuthority: "Change who can run actions",
   createDeviceAction: "Run device action",
   revealRecoveryKey: "Reveal recovery key",
   approvePendingEnrollment: "Approve device enrollment",
@@ -82,7 +83,7 @@ export function ApprovalsView() {
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Approval inbox"
-        description="Review each action and its exact target before approving or rejecting it."
+        description="Approve or reject requests from other admins."
       />
       {revealed ? (
         <section
@@ -90,13 +91,10 @@ export function ApprovalsView() {
           aria-label={`Revealed ${revealed.label}`}
         >
           <h2 className="font-semibold">Sensitive {revealed.label}</h2>
-          <p>
-            Keep this value in trusted custody. It remains only in page memory for 30 seconds and is
-            cleared when dismissed, focus changes, or you leave.
-          </p>
+          <p>Copy it now. It disappears after 30 seconds or when you leave this page.</p>
           {revealed.note ? <p>{revealed.note}</p> : null}
           {shown?.hex ? (
-            <p className="text-sm">Shown as hexadecimal: the value is not valid UTF-8 text.</p>
+            <p className="text-sm">Shown as hexadecimal because it isn't plain text.</p>
           ) : null}
           <pre className="whitespace-pre-wrap break-all select-all">{shown?.text}</pre>
           <Button className="w-fit" variant="outline" onClick={() => setRevealed(null)}>
@@ -120,7 +118,7 @@ export function ApprovalsView() {
         </div>
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}
-      {list.data?.approvals.length === 0 ? <EmptyState title="No approvals on this page" /> : null}
+      {list.data?.approvals.length === 0 ? <EmptyState title="No approvals waiting" /> : null}
       {list.data?.approvals.map((approval) => (
         <ApprovalCard
           key={`${approval.id}:${approval.state}`}
@@ -304,7 +302,7 @@ function ApprovalCard({
             onReveal({
               label: "secret",
               secret: material,
-              note: `Secret ${approval.payload.value.secretId}, version ${approval.payload.value.version.toString()}.`,
+              note: `Version ${approval.payload.value.version.toString()}.`,
             });
             break;
           }
@@ -320,21 +318,27 @@ function ApprovalCard({
             onReveal({
               label: "local-admin password",
               secret: response.password,
-              note: `Account ${response.escrow?.accountName || "not reported"}. ${
+              note: `Account ${response.escrow?.accountName || "unknown"}. ${
                 response.rotationDueAt
-                  ? `Post-reveal rotation is due ${formatTimestamp(response.rotationDueAt).local}.`
-                  : "No rotation is scheduled because the device has no policy."
+                  ? `The password will be changed ${formatTimestamp(response.rotationDueAt).local}.`
+                  : "The password won't be changed automatically."
               }`,
             });
             break;
           }
           default:
-            throw new Error("This approval has no executable payload.");
+            throw new Error("This approval has nothing to run.");
         }
       }
       lifetime.signal.throwIfAborted();
       setCompleted(true);
-      toast.success("Approval operation accepted");
+      toast.success(
+        exact.action === "approve"
+          ? "Approved"
+          : exact.action === "reject"
+            ? "Rejected"
+            : "Action started",
+      );
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
       if (exact.action === "execute") {
         await client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
@@ -354,7 +358,7 @@ function ApprovalCard({
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
           {
-            description: "Review the inline approval result and exact payload before continuing.",
+            description: "Refresh before trying again.",
           },
         );
         if (!next.ambiguous) setAttempt(null);
@@ -405,7 +409,7 @@ function ApprovalCard({
             ) : approval.payload.case === "approvePendingEnrollment" ? (
               "Pending device enrollment"
             ) : approval.payload.case === "revealSecret" ? (
-              `Secret ${approval.payload.value.secretId}, version ${approval.payload.value.version.toString()}`
+              `Secret, version ${approval.payload.value.version.toString()}`
             ) : (
               "Deployment"
             )}
@@ -413,18 +417,16 @@ function ApprovalCard({
         </div>
         <div>
           <dt>Permission</dt>
-          <dd>{permissionLabels[approval.permission] ?? "Unrecognized permission"}</dd>
+          <dd>{permissionLabels[approval.permission] ?? "Other permission"}</dd>
         </div>
         <div>
           <dt>Requester</dt>
-          <dd>{approval.requesterDisplayName.trim() || "Requester name unavailable"}</dd>
+          <dd>{approval.requesterDisplayName.trim() || "Unknown"}</dd>
         </div>
         <div>
-          <dt>Approver / decision actor</dt>
+          <dt>Decided by</dt>
           <dd>
-            {approval.approverId
-              ? approval.approverDisplayName.trim() || "Decision actor name unavailable"
-              : "Not decided"}
+            {approval.approverId ? approval.approverDisplayName.trim() || "Unknown" : "Not decided"}
           </dd>
         </div>
         <div>
@@ -459,47 +461,29 @@ function ApprovalCard({
           <RecoveryReadinessView readiness={currentReadiness} />
         )
       ) : null}
-      <details className="min-w-0 border bg-muted/30 p-3">
-        <summary className="cursor-pointer text-sm font-medium">Details</summary>
-        <dl className="mt-3 grid gap-3 break-all text-sm sm:grid-cols-2 [&_dt]:text-muted-foreground">
-          <div>
-            <dt>Approval ID</dt>
-            <dd>{approval.id}</dd>
-          </div>
-          <div>
-            <dt>Device ID</dt>
-            <dd>{approval.deviceId || "Not device-specific"}</dd>
-          </div>
-          <div>
-            <dt>Requester ID</dt>
-            <dd>{approval.requesterId}</dd>
-          </div>
-          <div>
-            <dt>Decision actor ID</dt>
-            <dd>{approval.approverId || "Not decided"}</dd>
-          </div>
-          <div>
-            <dt>Action identifier</dt>
-            <dd>{approval.action}</dd>
-          </div>
-          <div>
-            <dt>Permission identifier</dt>
-            <dd>{approval.permission}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt>Payload SHA-256</dt>
-            <dd className="font-mono">
-              {Array.from(approval.payloadSha256, (byte) =>
-                byte.toString(16).padStart(2, "0"),
-              ).join("")}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-4 text-sm font-medium">Exact server-stored payload and approval</p>
+      <TechnicalDetails
+        items={[
+          { label: "Approval ID", value: approval.id },
+          { label: "Device ID", value: approval.deviceId },
+          ...(approval.payload.case === "revealSecret"
+            ? [{ label: "Secret ID", value: approval.payload.value.secretId }]
+            : []),
+          { label: "Requester ID", value: approval.requesterId },
+          { label: "Approver ID", value: approval.approverId },
+          { label: "Action", value: approval.action },
+          { label: "Permission", value: approval.permission },
+          {
+            label: "Payload SHA-256",
+            value: Array.from(approval.payloadSha256, (byte) =>
+              byte.toString(16).padStart(2, "0"),
+            ).join(""),
+          },
+        ]}
+      >
         <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
           {toJsonString(ApprovalSchema, approval, { prettySpaces: 2 })}
         </pre>
-      </details>
+      </TechnicalDetails>
       {!completed && decisionAllowed ? (
         <div className="grid gap-2">
           <label className="grid gap-2 text-sm font-medium">
@@ -521,7 +505,7 @@ function ApprovalCard({
               }
               onClick={() => void act("approve")}
             >
-              Approve exact payload
+              Approve
             </Button>
             <Button
               variant="destructive"
@@ -542,25 +526,23 @@ function ApprovalCard({
           disabled={busy || (!recoveryReady && !failure?.ambiguous)}
           onClick={() => void act("execute")}
         >
-          {failure?.ambiguous ? "Retry exact approved execution" : "Execute exact approved payload"}
+          {failure?.ambiguous ? "Try again" : "Run now"}
         </Button>
       ) : null}
       {busy ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Submitting exact request…
+          Submitting…
         </p>
       ) : null}
       {completed ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm">
-          Operation accepted by the server.
+          Done.
         </p>
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
           {failure.ambiguous ? (
-            <p>
-              Refresh first. Any explicit retry preserves the same request ID and exact payload.
-            </p>
+            <p>Refresh to check whether it went through before trying again.</p>
           ) : null}
         </RpcError>
       ) : null}

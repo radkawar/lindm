@@ -28,7 +28,7 @@ export function useIntegrationAction() {
     try {
       await pending.current();
       lifetime.signal.throwIfAborted();
-      toast.success("Integration operation accepted");
+      toast.success("Saved");
       pending.current = null;
       await client.invalidateQueries({ queryKey: ["integrations", lifetime.generation] });
     } catch (error) {
@@ -48,7 +48,7 @@ export function useIntegrationAction() {
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
           {
-            description: "Review the inline integration result before making another change.",
+            description: "Refresh before making another change.",
           },
         );
       }
@@ -73,8 +73,8 @@ export function useIntegrationAction() {
           {failure.ambiguous ? (
             <>
               <p>
-                The operation may have committed. Retry this exact request before making another
-                change. Navigating away discards its in-memory retry.
+                This may have gone through. Try again before making another change; leaving this
+                page cancels the retry.
               </p>
               <Button
                 className="w-fit"
@@ -82,7 +82,7 @@ export function useIntegrationAction() {
                 disabled={busy}
                 onClick={() => void execute()}
               >
-                Retry exact request
+                Try again
               </Button>
             </>
           ) : null}

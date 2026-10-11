@@ -174,8 +174,9 @@ SERVE_PYTHON=/usr/bin/python3
 if [ -x /usr/bin/python3.9 ] && [ "$ID" != fedora ] && [ "$ID" != ubuntu ]; then SERVE_PYTHON=/usr/bin/python3.9; fi
 # An installed, enabled unit (not a transient one) keeps the signed repository
 # available after the sysctl and firewall lanes' real guest reboots, which run
-# before the package interruption scenario.
-cat > /etc/systemd/system/lindm-resource-repository.service <<UNIT
+# before the package interruption scenario. Lab units stay in lindm-lab-*: the
+# product's lindm-resource-<action> helper names are matched by lane oracles.
+cat > /etc/systemd/system/lindm-lab-resource-repository.service <<UNIT
 [Unit]
 Description=Disposable signed lindm resource lab repository
 After=network-online.target
@@ -186,7 +187,7 @@ ExecStart=$SERVE_PYTHON /var/lib/lindm-resource-lab/serve.py
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now lindm-resource-repository.service
+systemctl enable --now lindm-lab-resource-repository.service
 curl --fail --retry 10 --retry-connrefused --retry-delay 1 https://127.0.0.1:18449/ -o /dev/null
 `
 

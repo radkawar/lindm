@@ -366,7 +366,7 @@ func writeDomainReport(ctx context.Context, q *reportdb.Queries, writer io.Write
 
 func reportPage(ctx context.Context, q *reportdb.Queries, kind integrationsv1.ReportKind, cursor string, emit func(string) error) (string, int, error) {
 	after := uuid.Nil
-	if cursor != "" && kind != integrationsv1.ReportKind_REPORT_KIND_COMPLIANCE {
+	if cursor != "" && kind != integrationsv1.ReportKind_REPORT_KIND_COMPLIANCE && kind != integrationsv1.ReportKind_REPORT_KIND_FINDINGS {
 		var err error
 		after, err = uuid.Parse(cursor)
 		if err != nil {
@@ -399,7 +399,19 @@ func reportPage(ctx context.Context, q *reportdb.Queries, kind integrationsv1.Re
 		}
 		return cursor, len(rows), nil
 	case integrationsv1.ReportKind_REPORT_KIND_FINDINGS:
-		rows, err := q.FindingsReportRows(ctx, after)
+		// Finding keys are shared by devices bound to one finding set, so the
+		// cursor is the (device, finding) pair.
+		afterDevice, afterFinding := uuid.Nil, uuid.Nil
+		if cursor != "" {
+			device, finding, ok := strings.Cut(cursor, "/")
+			var deviceErr, findingErr error
+			afterDevice, deviceErr = uuid.Parse(device)
+			afterFinding, findingErr = uuid.Parse(finding)
+			if !ok || deviceErr != nil || findingErr != nil {
+				return "", 0, errors.New("reports: invalid findings cursor")
+			}
+		}
+		rows, err := q.FindingsReportRows(ctx, reportdb.FindingsReportRowsParams{AfterDevice: afterDevice, AfterID: afterFinding})
 		if err != nil {
 			return "", 0, err
 		}

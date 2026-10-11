@@ -44,7 +44,7 @@ function editorBound(field: DescField): number {
 }
 
 export const CATALOG_SEMANTICS =
-  "Publishing saves a revision. To deploy it, assign it in Rollouts. Publication alone does not confirm device compliance.";
+  "Publishing saves the profile. To apply it to devices, assign it in Rollouts.";
 
 // Preserve the complete protobuf document while typed controls edit individual fields.
 export type DraftResource = { resourceId: string; document: string };
@@ -126,7 +126,7 @@ export function updateResource(draft: DraftSpec, next: DraftResource): DraftSpec
 export function publishErrors(payload: PublishPayload): string[] {
   const result = validator.validate(PublishProfileRevisionRequestSchema, payload);
   if (result.kind === "invalid") return result.violations.map((violation) => violation.toString());
-  if (result.kind === "error") return [`Profile validation failed: ${result.error.message}`];
+  if (result.kind === "error") return [`Couldn't check the profile: ${result.error.message}`];
   // Canonical resource identity, dependency cycles and ownership claims are checked by the server.
   return [];
 }
@@ -149,7 +149,7 @@ export function capturePayload(input: {
         );
       } catch (error) {
         throw new Error(
-          `Resource ${index + 1}: ${error instanceof Error ? error.message : "Invalid protobuf JSON"}`,
+          `Setting ${index + 1}: ${error instanceof Error ? error.message : "Invalid JSON"}`,
           { cause: error },
         );
       }
@@ -185,5 +185,5 @@ export function formatSha256(bytes: Uint8Array): string {
 }
 
 export function formatRevisionNumber(value: bigint): string {
-  return value > 0n ? value.toString() : "Not recorded";
+  return value > 0n ? value.toString() : "Unknown";
 }

@@ -116,12 +116,7 @@ function FilterForm({
         </div>
         <div className="grid min-w-44 flex-1 gap-1.5">
           <Label htmlFor="filter-os">Operating system</Label>
-          <Input
-            id="filter-os"
-            name="os"
-            defaultValue={filter.osId}
-            placeholder="Exact OS ID, e.g. ubuntu"
-          />
+          <Input id="filter-os" name="os" defaultValue={filter.osId} placeholder="e.g. ubuntu" />
         </div>
         <div className="grid min-w-52 flex-1 gap-1.5">
           <Label htmlFor="filter-labels">Labels</Label>
@@ -129,7 +124,7 @@ function FilterForm({
             id="filter-labels"
             name="labels"
             defaultValue={filter.labels.join(" ")}
-            placeholder="All matching labels, space-separated"
+            placeholder="Space-separated"
           />
         </div>
         <Button type="submit">Search</Button>
@@ -145,7 +140,7 @@ function FilterForm({
         <div
           className="flex flex-wrap items-center gap-2"
           role="group"
-          aria-label="Applied inventory filters"
+          aria-label="Applied device filters"
         >
           <span className="text-xs text-muted-foreground">Applied</span>
           {filter.namePrefix ? (
@@ -201,12 +196,11 @@ function FilterForm({
         )}
       >
         <summary className="w-fit cursor-pointer text-xs font-medium text-muted-foreground">
-          Advanced filters &amp; search help
+          More filters
         </summary>
         <p className="mt-3 text-xs text-muted-foreground">
-          Hostname search is a case-sensitive literal prefix; %, _ and backslash are not wildcards.
-          OS/version and typed attributes use exact equality; all labels must match. Last seen uses
-          server receipt time, not live presence. Date/time filters are UTC.
+          Hostname matches the start of the name (case-sensitive). Other fields must match exactly.
+          Times are UTC.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="grid gap-1.5">
@@ -292,11 +286,9 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
   const [inputError, setInputError] = useState("");
   return (
     <section className="grid gap-2 rounded-lg border p-4">
-      <h2 className="font-semibold">Bounded inventory export</h2>
+      <h2 className="font-semibold">Export devices</h2>
       <p className="text-sm text-muted-foreground">
-        Exports current applied filters, at most {search.pageSize} devices per file. Every CSV
-        includes its own header; every JSON file is a standalone array. Continue explicitly; this is
-        not an unbounded whole-fleet download.
+        Exports devices matching the current filters, up to {search.pageSize} per file.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="export-format">Format</Label>
@@ -330,11 +322,7 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
             }
           }}
         >
-          {download.isPending
-            ? "Exporting…"
-            : pages
-              ? "Download next export page"
-              : "Download first export page"}
+          {download.isPending ? "Exporting…" : pages ? "Download next file" : "Download"}
         </Button>
         <Button
           variant="outline"
@@ -345,12 +333,13 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
             download.reset();
           }}
         >
-          Start new export
+          Start over
         </Button>
       </div>
       {pages ? (
         <p role="status" className="text-sm">
-          Downloaded {pages} page(s). {pageToken ? "More pages are available." : "Export complete."}
+          Downloaded {pages} file(s).{" "}
+          {pageToken ? "More devices are available." : "Export complete."}
         </p>
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}

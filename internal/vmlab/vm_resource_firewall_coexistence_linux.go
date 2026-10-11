@@ -495,8 +495,11 @@ done
 echo "kernel batch observed $(date +%s.%N) after state '$state'" >> "$log"
 units=$(systemctl list-units --plain --no-legend --all 'lindm-resource-*.service')
 echo "$units" >> "$log"
-unit=$(printf '%s\n' "$units" | awk '$3=="active"{print $1}')
+# Only the product's lindm-resource-<action UUID> helper is a target, and it
+# must be unambiguous; any other matching unit name must never be killed.
+unit=$(printf '%s\n' "$units" | awk '$3=="active"{print $1}' | grep -E '^lindm-resource-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.service$')
 test -n "$unit" || { echo "no active effect helper" >> "$log"; exit 1; }
+test "$(printf '%s\n' "$unit" | wc -l)" -eq 1 || { echo "ambiguous active effect helpers" >> "$log"; exit 1; }
 systemctl kill --kill-whom=all --signal=SIGKILL "$unit"
 echo "killed $unit $(date +%s.%N)" >> "$log"
 `

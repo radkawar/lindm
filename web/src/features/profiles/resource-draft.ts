@@ -11,62 +11,62 @@ export const resourceKinds = [
   {
     arm: "systemdService",
     label: "Systemd service",
-    help: "Manage an existing service, not its executable or unit content.",
+    help: "Start, stop or enable an existing service.",
   },
   {
     arm: "nativePackage",
-    label: "Native package",
-    help: "Select a DEB or RPM package and approved repository. Exact versions remain native versions, not semantic versions.",
+    label: "Package",
+    help: "Install or remove a DEB or RPM package from an approved repository.",
   },
   {
     arm: "managedFile",
     label: "Managed file",
-    help: "Manage a nonsecret file at an approved path. Existing files require ownership or approved adoption.",
+    help: "Write a file at an approved path. Don't put secrets here.",
   },
   {
     arm: "localUser",
     label: "Local user",
-    help: "Manage a local account only. Home data is never recursively deleted. Passwords use immutable secret references, never plaintext.",
+    help: "Create or remove a local account. Home folders are never deleted.",
   },
   {
     arm: "localGroup",
     label: "Local group",
-    help: "Manage local membership. Exact membership requires ownership of the complete membership dimension.",
+    help: "Create a local group and set its members.",
   },
   {
     arm: "sysctl",
     label: "Kernel setting",
-    help: "Set one approved dotted sysctl key. Persistent settings also require ownership of the managed configuration.",
+    help: "Set one approved kernel (sysctl) setting.",
   },
   {
     arm: "systemdDefinition",
     label: "Systemd timer or service drop-in",
-    help: "Schedule an existing service or set approved service limits. No commands or arbitrary unit content.",
+    help: "Schedule an existing service or set its resource limits.",
   },
   {
     arm: "firewallZone",
     label: "Firewall zone",
-    help: "Configure typed rules. Native backend support and connectivity safety are evaluated on each target.",
+    help: "Set firewall rules for a zone.",
   },
   {
     arm: "encryptionCompliance",
     label: "Encryption compliance",
-    help: "Check root encryption and optional escrow or TPM requirements. This policy does not encrypt disks or rotate keys.",
+    help: "Check that disks are encrypted. This doesn't encrypt disks or rotate keys.",
   },
   {
     arm: "passwordPolicy",
     label: "Password policy",
-    help: "Manage selected local authentication controls. Native PAM ownership and module support are required.",
+    help: "Set local password rules.",
   },
   {
     arm: "sessionPolicy",
     label: "Login and session policy",
-    help: "Select login or desktop scope. Screen locking and login limits require distinct native capabilities.",
+    help: "Set screen lock and login limits.",
   },
   {
     arm: "repository",
     label: "Package repository",
-    help: "Declare an approved package source for package selection. Publication does not qualify its native provider.",
+    help: "Add an approved package source that packages in this profile can use.",
   },
 ];
 

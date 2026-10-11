@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,19 +43,21 @@ export function AdvisoryFleet() {
     <div className="grid min-w-0 gap-6">
       <PageHeader
         title="Advisories"
-        description="Review package findings and advisory source coverage across your devices."
+        description="Security advisories affecting your devices, and whether advisory sources are up to date."
         actions={
           <Link to="/devices" className="text-sm underline underline-offset-4">
-            Inspect device findings
+            View findings by device
           </Link>
         }
       />
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2>Fleet summary</h2>
+            <h2>Across your devices</h2>
           </CardTitle>
-          <CardDescription>Accepting a finding does not fix affected devices.</CardDescription>
+          <CardDescription>
+            Accepting a finding hides it; it doesn't fix the device.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <Button
@@ -63,32 +66,31 @@ export function AdvisoryFleet() {
             disabled={summary.isFetching}
             onClick={() => void summary.refetch()}
           >
-            Refresh fleet summary
+            Refresh
           </Button>
           {summary.isPending ? (
             <div role="status" className="grid gap-3">
-              <span className="text-sm text-muted-foreground">Loading fleet summary…</span>
+              <span className="text-sm text-muted-foreground">Loading advisories…</span>
               <Skeleton className="h-32 w-full" />
             </div>
           ) : null}
           {summary.error ? <RpcError failure={toRpcFailure(summary.error)} /> : null}
           {feedUnknown ? (
             <p className="text-sm text-muted-foreground">
-              Counts may be incomplete. Review each feed source below before assessing current fleet
-              exposure.
+              Counts may be incomplete. Check advisory sources below.
             </p>
           ) : null}
           {summary.data ? (
             <>
               <dl className="grid gap-4 border bg-muted/30 p-4 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs text-muted-foreground">Evaluated devices</dt>
+                  <dt className="text-xs text-muted-foreground">Devices checked</dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
                     {summary.data.evaluatedDevices.toString()}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">Unknown devices</dt>
+                  <dt className="text-xs text-muted-foreground">Devices not checked</dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
                     {summary.data.unknownDevices.toString()}
                   </dd>
@@ -97,11 +99,11 @@ export function AdvisoryFleet() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Advisory / CVEs</TableHead>
+                    <TableHead>Advisory</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead>Affected devices</TableHead>
-                    <TableHead>Accepted devices</TableHead>
-                    <TableHead>Unknown devices</TableHead>
+                    <TableHead>Accepted</TableHead>
+                    <TableHead>Not checked</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -110,7 +112,7 @@ export function AdvisoryFleet() {
                       <TableCell>
                         <p>{advisory.advisoryId}</p>
                         <p className="text-xs text-muted-foreground">
-                          {advisory.cves.join(", ") || "No CVEs supplied"}
+                          {advisory.cves.join(", ") || "No CVEs listed"}
                         </p>
                       </TableCell>
                       <TableCell>
@@ -125,8 +127,8 @@ export function AdvisoryFleet() {
               </Table>
               {!summary.data.advisories.length ? (
                 <EmptyState
-                  title="No advisory summaries on this page"
-                  description="No findings are listed. Check source coverage before treating a device as unaffected."
+                  title="No advisories on this page"
+                  description="If advisory sources aren't up to date, devices may still be affected."
                 />
               ) : null}
             </>
@@ -142,10 +144,10 @@ export function AdvisoryFleet() {
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2>Feed freshness and status</h2>
+            <h2>Advisory sources</h2>
           </CardTitle>
           <CardDescription>
-            Each source needs a current refresh. Devices also need current inventory.
+            Findings are only accurate when sources and device inventory are up to date.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -155,19 +157,19 @@ export function AdvisoryFleet() {
             disabled={feeds.isFetching}
             onClick={() => void feeds.refetch()}
           >
-            Refresh feed status
+            Refresh sources
           </Button>
           {feeds.isPending ? (
             <div role="status" className="grid gap-3">
-              <span className="text-sm text-muted-foreground">Loading advisory feeds…</span>
+              <span className="text-sm text-muted-foreground">Loading advisory sources…</span>
               <Skeleton className="h-32 w-full" />
             </div>
           ) : null}
           {feeds.error ? <RpcError failure={toRpcFailure(feeds.error)} /> : null}
           {feeds.isSuccess && feeds.data.feeds.length === 0 ? (
             <EmptyState
-              title="No advisory feeds configured"
-              description="Add distro sources to advisories.feeds in the control-plane configuration. Enable scheduled refreshes or import a verified offline feed, then refresh this status view."
+              title="No advisory sources set up"
+              description="Add sources under advisories.feeds in the server configuration, then refresh."
             />
           ) : null}
           {feeds.data?.feeds.map((feed) => (
@@ -195,57 +197,44 @@ export function AdvisoryFleet() {
                       ? "Refresh failed"
                       : feed.fresh && unexpired(feed.expiresAt, now)
                         ? feed.rejectedRecords.length > 0
-                          ? `Current, ${feed.rejectedRecords.length} records rejected`
-                          : "Current"
+                          ? `Up to date, ${feed.rejectedRecords.length} entries skipped`
+                          : "Up to date"
                         : !feed.checkedAt
-                          ? "Awaiting refresh"
+                          ? "Not refreshed yet"
                           : unexpired(feed.expiresAt, now)
-                            ? "Incomplete coverage"
-                            : "Stale"}
+                            ? "Incomplete"
+                            : "Out of date"}
                 </StatusBadge>
               </div>
               <p className="break-all">Source: {feed.sourceUrl}</p>
               <p>
                 {feed.distro} {feed.release}
                 {feed.platformStream ? ` (${feed.platformStream})` : ""} ·{" "}
-                {feed.advisoryCount.toString()} advisory records
+                {feed.advisoryCount.toString()} advisories
               </p>
               <p>
-                Last successful refresh:{" "}
-                {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Not recorded"}
-              </p>
-              <p>
-                Signed snapshot:{" "}
-                {feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : "Not recorded"}
+                Last refreshed: {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Never"}
               </p>
               <p>Expires: {formatTimestamp(feed.expiresAt).local}</p>
-              <p>Last attempt: {formatTimestamp(feed.attemptedAt).local}</p>
               <p className={feed.error ? "text-destructive" : "text-muted-foreground"}>
-                Reason:{" "}
                 {feeds.error
-                  ? "The latest status request failed. Showing the last retrieved source details."
-                  : feed.error === "refresh_failed"
-                    ? "The source refresh failed. Check control-plane logs for details."
-                    : feed.error ||
-                      (feed.rejectedRecords.length > 0
-                        ? "Some source records could not be evaluated. Exposure counts may be incomplete."
-                        : feed.fresh && unexpired(feed.expiresAt, now)
-                          ? "The source is current."
-                          : !feed.checkedAt
-                            ? "No successful refresh is recorded."
-                            : !unexpired(feed.expiresAt, now)
-                              ? "The last successful refresh is out of date."
-                              : "The source snapshot has incomplete coverage.")}
+                  ? "Couldn't load the latest status. Showing the last known details."
+                  : feed.error
+                    ? "The last refresh failed. Check the server logs."
+                    : feed.rejectedRecords.length > 0
+                      ? "Some entries couldn't be read. Counts may be incomplete."
+                      : feed.fresh && unexpired(feed.expiresAt, now)
+                        ? "This source is up to date."
+                        : !feed.checkedAt
+                          ? "This source hasn't been refreshed yet."
+                          : !unexpired(feed.expiresAt, now)
+                            ? "This source is out of date. Refresh it."
+                            : "This source is missing some data."}
               </p>
-              {feed.error ? (
-                <p className="break-all text-xs text-muted-foreground">
-                  Reported reason: {feed.error}
-                </p>
-              ) : null}
               {feed.rejectedRecords.length > 0 ? (
                 <details>
                   <summary className="cursor-pointer font-medium">
-                    Rejected source records ({feed.rejectedRecords.length})
+                    Skipped entries ({feed.rejectedRecords.length})
                   </summary>
                   <ul className="mt-3 grid gap-3">
                     {feed.rejectedRecords.map((record, index) => (
@@ -253,11 +242,11 @@ export function AdvisoryFleet() {
                         key={`${record.id}:${index}`}
                         className="grid gap-1 break-words border-l-2 border-warning pl-3"
                       >
-                        <p className="font-medium">{record.id || "Record without an ID"}</p>
+                        <p className="font-medium">{record.id || "Entry without an ID"}</p>
                         <p>{record.reason}</p>
                         <p className="text-muted-foreground">
                           {record.unscoped
-                            ? "Affected packages could not be identified."
+                            ? "Affected packages unknown."
                             : `Packages: ${record.packageNames.join(", ")}`}
                         </p>
                       </li>
@@ -265,12 +254,18 @@ export function AdvisoryFleet() {
                   </ul>
                 </details>
               ) : null}
-              <p className="break-all font-mono">
-                Snapshot SHA-256: {feed.sourceSha256 || "Unavailable"}
-              </p>
-              {feed.artifacts.length > 0 ? (
-                <details>
-                  <summary className="cursor-pointer">Source artifact integrity</summary>
+              <TechnicalDetails
+                items={[
+                  { label: "Last attempt", value: formatTimestamp(feed.attemptedAt).local },
+                  {
+                    label: "Signed snapshot",
+                    value: feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : undefined,
+                  },
+                  { label: "Reported error", value: feed.error },
+                  { label: "Snapshot SHA-256", value: feed.sourceSha256 },
+                ]}
+              >
+                {feed.artifacts.length > 0 ? (
                   <ul className="mt-2 grid gap-3">
                     {feed.artifacts.map((artifact) => (
                       <li key={artifact.url} className="grid gap-1 break-all">
@@ -282,13 +277,13 @@ export function AdvisoryFleet() {
                           ).join("")}
                         </p>
                         <p className="font-mono">
-                          Signer: {artifact.signerFingerprint || "Signature not recorded"}
+                          Signer: {artifact.signerFingerprint || "Not signed"}
                         </p>
                       </li>
                     ))}
                   </ul>
-                </details>
-              ) : null}
+                ) : null}
+              </TechnicalDetails>
             </article>
           ))}
         </CardContent>

@@ -3,7 +3,6 @@ import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { type DraftResource } from "./model";
 import {
   desiredField,
@@ -46,7 +45,7 @@ export function ResourceFields({
         ? [
             {
               ref,
-              label: `${candidateKind?.label ?? "Resource"}: ${String(ref.canonicalKey)} (${position + 1})`,
+              label: `${candidateKind?.label ?? "Setting"}: ${String(ref.canonicalKey)} (${position + 1})`,
             },
           ]
         : [];
@@ -59,22 +58,21 @@ export function ResourceFields({
   );
   return (
     <fieldset disabled={locked} className="grid min-w-0 gap-4 border bg-muted/20 p-4">
-      <legend className="px-1 text-sm font-medium">Resource {index + 1}</legend>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <StatusBadge status="neutral">Native capability required</StatusBadge>
+      <legend className="px-1 text-sm font-medium">Setting {index + 1}</legend>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" variant="outline" size="sm" disabled={locked} onClick={onRemove}>
-          Remove resource {index + 1}
+          Remove setting {index + 1}
         </Button>
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-kind`}>Resource kind</Label>
+        <Label htmlFor={`${id}-kind`}>Setting type</Label>
         <SelectField
           id={`${id}-kind`}
           value={arm}
           disabled={locked}
           options={[
-            { value: "", label: "Choose a resource kind" },
-            ...(!kind && arm ? [{ value: arm, label: "Saved resource kind" }] : []),
+            { value: "", label: "Choose a setting type" },
+            ...(!kind && arm ? [{ value: arm, label: "Existing setting type" }] : []),
             ...resourceKinds
               .filter((entry) => desiredField(entry.arm))
               .map((entry) => ({ value: entry.arm, label: entry.label })),
@@ -97,14 +95,11 @@ export function ResourceFields({
         />
       ) : arm ? (
         <p className="text-sm text-muted-foreground">
-          This saved kind is retained unchanged. Its desired state is available in the read-only
-          JSON disclosure.
+          This setting type can't be edited here. It will be kept as is.
         </p>
       ) : null}
       <details className="min-w-0">
-        <summary className="cursor-pointer py-1 text-sm font-medium">
-          Ownership, verification and targeting
-        </summary>
+        <summary className="cursor-pointer py-1 text-sm font-medium">Advanced options</summary>
         <div className="mt-3">
           <TypedFields
             schema={{ ...ProfileResourceSchema, fields: metadataFields }}
@@ -117,11 +112,7 @@ export function ResourceFields({
         </div>
       </details>
       <details className="min-w-0 text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Advanced: view JSON</summary>
-        <p className="my-2">
-          Resource identity is derived from the typed fields. Publication saves policy only; native
-          support and compliance are evaluated separately on each target.
-        </p>
+        <summary className="w-fit cursor-pointer py-1">View JSON</summary>
         <pre
           className="max-h-96 overflow-auto whitespace-pre-wrap break-all border bg-muted/30 p-3"
           aria-label={`Resource ${index + 1} JSON`}

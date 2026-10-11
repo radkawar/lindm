@@ -1456,9 +1456,32 @@ binary alone matches about 10,000 OSV records. The per-device admission bound is
 100,000 findings: thousands of open kernel CVEs apply to each installed binary of
 the kernel source, so the stock 665-package Ubuntu 24.04 cloud image with one
 kernel has 28,821 findings against the 2026-10-10 Ubuntu export (2,157,314
-records), evaluated in about 1.5 s, with device reads under 5 ms. Deterministic
-record or capacity failures persist an UNKNOWN evaluation instead of retrying
+records), matched in about 1.5 s, with device reads under 5 ms. Deterministic
+record or capacity failures persist an UNKNOWN set instead of retrying
 unchanged evidence.
+
+Matching results are **content-addressed finding sets** (migration `00019`):
+matching depends only on the feed generation and the exact published package
+rows, so a set is keyed by (feed, feed generation, normalized package digest).
+The digest covers every matching input of each snapshot row in position order.
+A device evaluation binds its set; devices with identical package sets (fleets
+of one image, or a device whose periodic inventory did not change) bind the
+existing set without matching or writing findings again. Each set stores its
+findings once, a per-advisory rollup and per-severity counts. Device-level
+freshness (host/inventory/feed binding, expiry) remains per evaluation, and a
+device's state is its first device-level UNKNOWN reason, otherwise the set's.
+A finding's API ID is its device-independent key — the first 16 bytes of
+SHA-256 over feed, advisory, package, installed version and architecture —
+within the device's context. Risk acceptances are per-device overlays keyed by
+(device, finding key). Fleet summaries and the advisory summary weight set
+rollups by bound fresh/stale device counts and subtract each device's active
+exceptions, so they never scan per-device findings. Findings reports page by
+(device, finding). Unbound sets are pruned after 15 minutes, at most 20 per
+minute; a binding that races a prune fails its foreign-key check and retries.
+Migration `00019` converts existing exceptions to finding keys from their
+materialized findings, removes (with an audit event) exceptions whose finding
+no longer exists, drops per-device findings and evaluations, and lets the
+background job rebuild sets; reads report `evaluation_pending` meanwhile.
 RPM imported signing keys (`gpg-pubkey` rows without an architecture) are keyring
 entries, not packages: they neither match records nor make architecture coverage
 UNKNOWN; any other architecture-less package still does.

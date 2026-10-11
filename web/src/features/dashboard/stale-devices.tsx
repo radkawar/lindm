@@ -18,8 +18,8 @@ import { staleContactUntil, staleDevicesQueryOptions } from "./queries";
 
 const lifecycleLabels: Record<DeviceState, string> = {
   [DeviceState.UNSPECIFIED]: "Unknown",
-  [DeviceState.PENDING]: "Pending",
-  [DeviceState.ACTIVE]: "Active",
+  [DeviceState.PENDING]: "Waiting to enroll",
+  [DeviceState.ACTIVE]: "Enrolled",
   [DeviceState.REVOKED]: "Revoked",
   [DeviceState.RECOVERY_HOLD]: "Recovery hold",
 };
@@ -53,26 +53,23 @@ export function StaleDevices({
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle>
-            <h2>Devices with stale contact</h2>
+            <h2>Devices not seen recently</h2>
           </CardTitle>
           <Tooltip>
             <TooltipTrigger
-              aria-label="About stale device previews"
+              aria-label="About this list"
               className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <InfoIcon className="size-3.5" aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent className="max-w-sm text-xs leading-relaxed">
-              This separate, live inventory read shows the first five matches across all enrollment
-              states, newest enrollment first, not oldest contact first. Missing contact is
-              excluded. The fleet total is not calculated from these rows. Contacts can change after
-              the aggregate was read, so this preview may differ from the summary. Refresh the
-              overview to advance the cutoff; refreshing rows retains it.
+              Shows up to five devices. Devices that never checked in are not listed. Refresh the
+              dashboard to update the cutoff time.
             </TooltipContent>
           </Tooltip>
         </div>
         <CardDescription className="text-xs">
-          Contact over {staleAfterSeconds / 3600} hours before the summary time.
+          No check-in for over {staleAfterSeconds / 3600} hours.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -81,7 +78,7 @@ export function StaleDevices({
             <span className="font-medium text-foreground tabular-nums">
               {staleTotal.toString()}
             </span>{" "}
-            stale in fleet summary
+            in total
           </p>
           <Button
             variant="outline"
@@ -92,11 +89,11 @@ export function StaleDevices({
             }}
           >
             <RefreshCwIcon aria-hidden="true" />
-            {list.isFetching ? "Refreshing…" : "Refresh rows"}
+            {list.isFetching ? "Refreshing…" : "Refresh list"}
           </Button>
         </div>
-        {list.isPending ? <p role="status">Loading devices with stale contact…</p> : null}
-        {failure ? <RpcError failure={failure} title="Stale contact list unavailable" /> : null}
+        {list.isPending ? <p role="status">Loading…</p> : null}
+        {failure ? <RpcError failure={failure} title="Couldn't load this list" /> : null}
         {data?.devices.length ? (
           <>
             <ul className="divide-y">
@@ -112,10 +109,10 @@ export function StaleDevices({
                       search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                       className="truncate text-sm font-medium underline-offset-4 hover:underline"
                     >
-                      {device.hostname || device.id}
+                      {device.hostname || "Unnamed device"}
                     </Link>
                     <span className="text-xs text-muted-foreground">
-                      Last contact {formatTimestamp(device.lastSeenAt).local}
+                      Last check-in {formatTimestamp(device.lastSeenAt).local}
                     </span>
                   </div>
                   <StatusBadge status={lifecycleTones[device.lifecycleState] ?? "neutral"} dot>
@@ -126,13 +123,13 @@ export function StaleDevices({
             </ul>
             <p className="text-xs text-muted-foreground">
               Showing {data.devices.length}
-              {data.nextPageToken ? " · More matches available" : " · No further matching page"}
+              {data.nextPageToken ? ". More devices match." : "."}
             </p>
           </>
         ) : data ? (
           <EmptyState
-            title="No matching devices"
-            description="No stale contacts matched this separate read."
+            title="All devices checked in recently"
+            description="No device has gone quiet past the cutoff."
           />
         ) : null}
         <Link
@@ -140,7 +137,7 @@ export function StaleDevices({
           search={{ pageSize: 50, pageToken: "", filter }}
           className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-4 hover:underline"
         >
-          Browse matching devices <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
+          View all <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
         </Link>
       </CardContent>
     </Card>

@@ -44,7 +44,7 @@ async function request(path: string, body?: JsonValue, csrfToken?: string, signa
   if (!response.ok) {
     // Do not reflect response bodies that might accidentally contain authentication secrets.
     throw new ConnectError(
-      `Authentication request failed (${response.status}).`,
+      `Sign-in failed (${response.status}). Try again.`,
       response.status === 401
         ? Code.Unauthenticated
         : response.status === 403

@@ -12,6 +12,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -167,13 +169,20 @@ func (s *Service) Import(ctx context.Context, id string, input io.Reader) error 
 const (
 	// evaluationBatch bounds one pending-device query; each device is matched
 	// in its own bounded transaction.
-	evaluationBatch = 32
+	evaluationBatch = 64
 	// evaluationPoll is the latency between a published snapshot/feed
 	// generation and its persisted evaluation; reads never match inline.
 	evaluationPoll = 5 * time.Second
 	// evaluationBudget bounds one evaluation pass before the loop yields to
 	// its ticker again.
 	evaluationBudget = 45 * time.Second
+	// evaluationWorkers bounds concurrent device evaluations (and therefore
+	// database connections taken from the shared pool by this job).
+	evaluationWorkers = 4
+	// findingSetPruneBatch bounds unbound shared finding sets removed per
+	// minute; each cascades to its findings (tens of thousands for a stock
+	// Ubuntu image).
+	findingSetPruneBatch = 20
 )
 
 // RunMaintenance is the exclusive refresh, publication-cleanup and retention
@@ -212,6 +221,9 @@ func (s *Service) RunMaintenance(ctx context.Context) error {
 		}
 		if err := q.PruneAdvisoryExceptions(bounded); err != nil && ctx.Err() == nil {
 			slog.Warn("advisory exception retention failed", "error", err)
+		}
+		if _, err := q.PruneAdvisoryFindingSets(bounded, findingSetPruneBatch); err != nil && ctx.Err() == nil {
+			slog.Warn("advisory finding set retention failed", "error", err)
 		}
 		cancel()
 		select {
@@ -257,12 +269,14 @@ func (s *Service) RunEvaluations(ctx context.Context) error {
 	for {
 		pass, cancel := context.WithTimeout(ctx, evaluationBudget)
 		for pass.Err() == nil {
-			attempted, err := s.EvaluatePending(pass, evaluationBatch)
+			attempted, failures, err := s.evaluatePending(pass, evaluationBatch)
 			if err != nil && ctx.Err() == nil {
 				slog.Warn("advisory evaluation failed", "error", err)
 			}
-			// A failing batch is retried on the next tick, not spun on.
-			if err != nil || attempted < evaluationBatch {
+			// Isolated device failures (still pending) are retried by later
+			// batches; a wholly failing batch is retried on the next tick, not
+			// spun on.
+			if attempted < evaluationBatch || failures == attempted {
 				break
 			}
 		}
@@ -278,25 +292,51 @@ func (s *Service) RunEvaluations(ctx context.Context) error {
 // EvaluatePending persists fresh evaluations for at most limit active devices
 // whose stored evaluation no longer binds their current snapshot, host
 // observation or feed generation. It returns the number of devices attempted.
-// Device reads serve only these persisted evaluations.
+// Device reads serve only these persisted evaluations. Devices are evaluated by
+// a few concurrent workers, each in its own bounded transaction: a device
+// evaluation mostly waits on its row lock and short queries, so one serial
+// worker cannot keep up with a fleet's inventory arrivals.
 func (s *Service) EvaluatePending(ctx context.Context, limit int32) (int, error) {
+	attempted, _, err := s.evaluatePending(ctx, limit)
+	return attempted, err
+}
+
+func (s *Service) evaluatePending(ctx context.Context, limit int32) (attempted, failures int, resultErr error) {
 	ids, err := advisorydb.New(s.pool).ListAdvisoryEvaluationsPending(ctx, limit)
 	if err != nil {
-		return 0, fmt.Errorf("list pending advisory evaluations: %w", err)
+		return 0, 0, fmt.Errorf("list pending advisory evaluations: %w", err)
 	}
-	var failed error
-	for i, id := range ids {
-		if err := ctx.Err(); err != nil {
-			return i, err
-		}
-		if _, err := s.Evaluate(ctx, id); err != nil {
-			if ctx.Err() != nil {
-				return i, ctx.Err()
+	var (
+		mu   sync.Mutex
+		next atomic.Int64
+		wg   sync.WaitGroup
+	)
+	for range min(evaluationWorkers, len(ids)) {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= len(ids) || ctx.Err() != nil {
+					return
+				}
+				_, err := s.Evaluate(ctx, ids[i])
+				if ctx.Err() != nil {
+					return
+				}
+				mu.Lock()
+				attempted++
+				if err != nil {
+					failures++
+					resultErr = errors.Join(resultErr, fmt.Errorf("evaluate device %s: %w", ids[i], err))
+				}
+				mu.Unlock()
 			}
-			failed = errors.Join(failed, fmt.Errorf("evaluate device %s: %w", id, err))
-		}
+		})
 	}
-	return len(ids), failed
+	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return attempted, failures, err
+	}
+	return attempted, failures, resultErr
 }
 
 func timestamp(t time.Time) pgtype.Timestamptz {

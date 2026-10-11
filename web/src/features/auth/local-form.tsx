@@ -46,7 +46,7 @@ export function LocalForm({
         typeof PublicKeyCredential.parseCreationOptionsFromJSON !== "function" ||
         typeof PublicKeyCredential.parseRequestOptionsFromJSON !== "function"
       ) {
-        setNotice("Use a current browser with WebAuthn support over HTTPS.");
+        setNotice("Open the console over HTTPS in a current browser that supports security keys.");
         return;
       }
       const challenge = enrollment
@@ -74,7 +74,7 @@ export function LocalForm({
             signal: controller.signal,
           });
       if (!(credential instanceof PublicKeyCredential))
-        throw new Error("Authenticator did not return a credential.");
+        throw new Error("Your security key didn't respond. Try again.");
       await finishAuthentication(
         challenge.token,
         JSON.stringify(credential.toJSON()),
@@ -143,7 +143,7 @@ export function LocalForm({
       />
       {emergency ? (
         <>
-          <Label htmlFor="incident-reason">Incident reason (required for break-glass)</Label>
+          <Label htmlFor="incident-reason">Reason for emergency sign-in (required)</Label>
           <Input
             id="incident-reason"
             value={reason}
@@ -151,18 +151,18 @@ export function LocalForm({
             onChange={(event) => setReason(event.target.value)}
           />
           <p className="text-sm text-muted-foreground">
-            Do not include passwords or other secrets. Emergency access is audited and restricted.
+            Don't include passwords. Emergency sign-ins are recorded.
           </p>
         </>
       ) : null}
       <p className="text-sm text-muted-foreground">
         {enrollment
-          ? "Set your password, then register a security key or passkey with user verification. Enrollment does not sign you in."
-          : "After your password is accepted, verify with your registered security key or passkey."}
+          ? "Set a password, then register a security key or passkey. You'll sign in afterwards."
+          : "After your password, confirm with your security key or passkey."}
       </p>
       {notice ? (
         <Alert>
-          <AlertTitle>Authenticator required</AlertTitle>
+          <AlertTitle>Security key needed</AlertTitle>
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
       ) : null}

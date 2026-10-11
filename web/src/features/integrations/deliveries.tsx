@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,14 @@ import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { DeliveryStatus } from "../../../gen/lindm/integrations/v1/delivery_pb";
 import { useIntegrationAction } from "./action";
-import { deliveriesQueryOptions } from "./queries";
+import { deliveriesQueryOptions, destinationsQueryOptions } from "./queries";
 
 const STATUS: Record<DeliveryStatus, string> = {
   [DeliveryStatus.UNSPECIFIED]: "Unknown",
   [DeliveryStatus.PENDING]: "Pending",
   [DeliveryStatus.LEASED]: "Delivering",
   [DeliveryStatus.DELIVERED]: "Delivered",
-  [DeliveryStatus.DEAD_LETTER]: "Dead letter",
+  [DeliveryStatus.DEAD_LETTER]: "Failed",
   [DeliveryStatus.CANCELLED]: "Cancelled",
 };
 
@@ -39,6 +40,15 @@ export function Deliveries() {
   const [reason, setReason] = useState("");
   const list = useQuery(deliveriesQueryOptions(lifetime, page, deadLetters));
   const action = useIntegrationAction();
+  const destinations = useQuery(destinationsQueryOptions(lifetime, ""));
+  const destinationNames = useMemo(
+    () =>
+      new Map(
+        destinations.data?.destinations.map((d) => [d.id, d.config?.displayName.trim() ?? ""]) ??
+          [],
+      ),
+    [destinations.data],
+  );
   return (
     <section
       className="grid min-w-0 gap-4 border-t pt-6"
@@ -46,15 +56,13 @@ export function Deliveries() {
       aria-busy={list.isFetching}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">Delivery history and dead letters</h2>
+        <h2 className="text-xl font-semibold">Deliveries</h2>
         <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
           Refresh
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        At-least-once delivery can produce duplicates. Receivers must deduplicate the authenticated
-        body event ID for their destination, not unsigned delivery headers. A replay may deliver an
-        event already received before its acknowledgement was lost.
+        Receivers may get the same event more than once and should ignore repeats.
       </p>
       <label className="flex items-center gap-2">
         <input
@@ -65,9 +73,9 @@ export function Deliveries() {
             setPage("");
           }}
         />
-        Show dead letters only
+        Show failed deliveries only
       </label>
-      <Label htmlFor="replay-reason">Audit reason for manual replay</Label>
+      <Label htmlFor="replay-reason">Reason for retrying</Label>
       <Input
         id="replay-reason"
         value={reason}
@@ -82,33 +90,31 @@ export function Deliveries() {
           <Skeleton className="h-32 w-full" />
         </div>
       ) : null}
-      {list.data?.deliveries.length === 0 ? (
-        <EmptyState title="No deliveries on this page" />
-      ) : null}
+      {list.data?.deliveries.length === 0 ? <EmptyState title="No deliveries" /> : null}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Delivery / event</TableHead>
-            <TableHead>Destination / ordering key</TableHead>
+            <TableHead>Destination</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Attempts / replays</TableHead>
+            <TableHead>Attempts</TableHead>
             <TableHead>Next attempt</TableHead>
-            <TableHead>Failure</TableHead>
+            <TableHead>Last error</TableHead>
             <TableHead>Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {list.data?.deliveries.map((delivery) => (
             <TableRow key={delivery.id}>
-              <TableCell className="font-mono text-xs">
-                {delivery.id}
-                <br />
-                {delivery.eventId}
-              </TableCell>
-              <TableCell className="font-mono text-xs">
-                {delivery.destinationId}
-                <br />
-                {delivery.resourceId}
+              <TableCell className="whitespace-normal break-words">
+                {destinationNames.get(delivery.destinationId) || "Destination"}
+                <TechnicalDetails
+                  items={[
+                    { label: "Delivery ID", value: delivery.id },
+                    { label: "Event ID", value: delivery.eventId },
+                    { label: "Destination ID", value: delivery.destinationId },
+                    { label: "Resource", value: delivery.resourceId },
+                  ]}
+                />
               </TableCell>
               <TableCell>
                 <StatusBadge
@@ -128,11 +134,12 @@ export function Deliveries() {
                 </StatusBadge>
               </TableCell>
               <TableCell>
-                {delivery.attempts} / {delivery.replayCount}
+                {delivery.attempts}
+                {delivery.replayCount > 0 ? ` (${delivery.replayCount} retried)` : ""}
               </TableCell>
               <TableCell>{formatTimestamp(delivery.nextAttemptAt).local}</TableCell>
               <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                {delivery.lastError || "None recorded"}
+                {delivery.lastError || "None"}
               </TableCell>
               <TableCell>
                 {delivery.status === DeliveryStatus.DEAD_LETTER ? (
@@ -150,7 +157,7 @@ export function Deliveries() {
                       );
                     }}
                   >
-                    Replay
+                    Retry
                   </Button>
                 ) : null}
               </TableCell>

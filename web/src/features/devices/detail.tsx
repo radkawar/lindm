@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus, RefreshCw, Shield } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { CollectionStatus, SnapshotState } from "../../../gen/lindm/inventory/v1/observation_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,12 +28,13 @@ import { DeviceActionMenu } from "./action-menu";
 import { DeviceAgentUpdate } from "./agent-update";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 
 const snapshotLabels: Record<SnapshotState, string> = {
   [SnapshotState.UNSPECIFIED]: "Not reported",
-  [SnapshotState.STAGING]: "Upload in progress, not published",
+  [SnapshotState.STAGING]: "Uploading",
   [SnapshotState.COMMITTED]: "Published",
-  [SnapshotState.SUPERSEDED]: "Superseded",
+  [SnapshotState.SUPERSEDED]: "Replaced",
   [SnapshotState.EXPIRED]: "Expired",
 };
 
@@ -54,6 +55,7 @@ export function DeviceDetailView({
   search,
   onSearch,
   resources,
+  assignDialog,
   findings,
   history,
   compliance,
@@ -64,6 +66,7 @@ export function DeviceDetailView({
   search: PackageSearch;
   onSearch: (next: PackageSearch, replace?: boolean) => void;
   resources: (assignProfile: () => void) => ReactNode;
+  assignDialog: (open: boolean, onOpenChange: (open: boolean) => void) => ReactNode;
   findings: ReactNode;
   history: ReactNode;
   compliance: ReactNode;
@@ -79,27 +82,10 @@ export function DeviceDetailView({
     search.pageToken || search.manager || search.namePrefix ? "inventory" : "overview",
   );
   const [inventoryVisited, setInventoryVisited] = useState(activeTab === "inventory");
-  const [focusTarget, setFocusTarget] = useState<"resources" | null>(null);
-  useEffect(() => {
-    if (!focusTarget) return;
-    const target = "resource-profile";
-    const frame = requestAnimationFrame(() => {
-      const control = document.getElementById(target);
-      const panel = document.getElementById(`${tabId}-${focusTarget}-panel`);
-      const destination = control && !control.hasAttribute("disabled") ? control : panel;
-      destination?.focus();
-      destination?.scrollIntoView({ block: "center", behavior: "smooth" });
-      setFocusTarget(null);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [focusTarget, activeTab, deviceId, tabId]);
+  const [assignOpen, setAssignOpen] = useState(false);
   function activateTab(tab: DetailTab) {
     setActiveTab(tab);
     if (tab === "inventory") setInventoryVisited(true);
-  }
-  function openForm(tab: "resources") {
-    activateTab(tab);
-    setFocusTarget(tab);
   }
   const detail = useQuery(deviceQueryOptions(lifetime, deviceId));
   const failure = detail.error ? toRpcFailure(detail.error) : null;
@@ -146,8 +132,7 @@ export function DeviceDetailView({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <PageHeader title={device?.hostname.trim() || "Device inventory"} />
-          <p className="break-all font-mono text-xs text-muted-foreground">{deviceId}</p>
+          <PageHeader title={device?.hostname.trim() || "Unnamed device"} />
           {device ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <DeviceLifecycleBadge state={device.lifecycleState} />
@@ -173,13 +158,18 @@ export function DeviceDetailView({
                   </StatusBadge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Latest device-reported root filesystem storage observation, not full-disk
-                  coverage, escrow readiness, or live state. Inspect Inventory and Encryption for
-                  exact evidence.
+                  Based on the root disk the device last reported. See Encryption for details.
                 </TooltipContent>
               </Tooltip>
             </div>
           ) : null}
+          <TechnicalDetails
+            className="mt-3"
+            items={[
+              { label: "Device ID", value: deviceId },
+              { label: "Reported hostname", value: device?.hostname.trim() || "None" },
+            ]}
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -191,14 +181,17 @@ export function DeviceDetailView({
           </Button>
           {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
           {device && canPermission(principal, "resources.assign") ? (
-            <Button onClick={() => openForm("resources")}>
+            <Button onClick={() => setAssignOpen(true)}>
               <Plus aria-hidden="true" /> Assign profile
             </Button>
           ) : null}
         </div>
       </div>
+      {device && canPermission(principal, "resources.assign")
+        ? assignDialog(assignOpen, setAssignOpen)
+        : null}
       {failure ? <RpcError failure={failure} /> : null}
-      {detail.isPending ? <p role="status">Loading device inventory…</p> : null}
+      {detail.isPending ? <p role="status">Loading device…</p> : null}
       {device ? (
         <>
           <DeviceLockRestriction deviceId={deviceId} />
@@ -413,7 +406,7 @@ export function DeviceDetailView({
             </Card>
             <DeviceMetadataCard deviceId={deviceId} metadata={device.metadata} />
             <details className="border p-4">
-              <summary className="w-fit cursor-pointer font-medium">Diagnostics</summary>
+              <summary className="w-fit cursor-pointer font-medium">Details for support</summary>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Fact label="Host sequence">{device.hostSequence.toString()}</Fact>
                 <Fact label="Package attempt sequence">{device.packageSequence.toString()}</Fact>
@@ -448,28 +441,15 @@ export function DeviceDetailView({
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Host observations</CardTitle>
+                    <CardTitle>System</CardTitle>
                     <CardDescription>
-                      Device-reported hardware and operating system inventory.
+                      Hardware and operating system as last reported by the device.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <details className="mb-4 text-xs text-muted-foreground">
-                      <summary className="w-fit cursor-pointer">Observation caveats</summary>
-                      <p className="mt-2">
-                        Collection times and values are device-reported. Missing or failed fields
-                        are not successful empty values.
-                      </p>
-                    </details>
                     {host ? (
                       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <Fact label="Collection started (device)">
-                          <ObservedTime value={host.startedAt} />
-                        </Fact>
-                        <Fact label="Collection finished (device)">
-                          <ObservedTime value={host.finishedAt} />
-                        </Fact>
-                        <Fact label="Received (server)">
+                        <Fact label="Reported">
                           <ObservedTime value={data?.host?.receivedAt} server />
                         </Fact>
                         <Fact label="Hostname">
@@ -487,9 +467,6 @@ export function DeviceDetailView({
                         <Fact label="Kernel">
                           <ObservedValue field={host.kernelRelease} />
                         </Fact>
-                        <Fact label="Boot ID">
-                          <ObservedValue field={host.bootId} />
-                        </Fact>
                         <Fact label="Hardware vendor">
                           <ObservedValue field={host.hardwareVendor} />
                         </Fact>
@@ -501,7 +478,7 @@ export function DeviceDetailView({
                         </Fact>
                       </dl>
                     ) : (
-                      <p>No host observation has been accepted.</p>
+                      <p>The device hasn't reported its system details yet.</p>
                     )}
                   </CardContent>
                 </Card>
@@ -509,56 +486,54 @@ export function DeviceDetailView({
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Latest completed package attempt</CardTitle>
+                      <CardTitle>Last package scan</CardTitle>
                       <CardDescription>
-                        Result of the most recent completed package collection.
+                        If a scan fails, the previous package list stays in place.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <details className="mb-4 text-xs text-muted-foreground">
-                        <summary className="w-fit cursor-pointer">Collection and freshness</summary>
-                        <p className="mt-2">
-                          A failed collection preserves the last published inventory and its
-                          original freshness.
-                        </p>
-                      </details>
                       {attempt ? (
                         <dl className="grid gap-4 sm:grid-cols-2">
                           <Fact label="Result">
                             <CollectionStatusBadge status={attempt.status} />
                           </Fact>
-                          <Fact label="Sequence">{attempt.sequence.toString()}</Fact>
-                          <Fact label="Backend">{attempt.backend || "Not reported"}</Fact>
-                          <Fact label="Collection started (device)">
-                            <ObservedTime value={attempt.startedAt} />
-                          </Fact>
-                          <Fact label="Collection finished (device)">
-                            <ObservedTime value={attempt.finishedAt} />
-                          </Fact>
-                          <Fact label="Received (server)">
+                          <Fact label="Package manager">{attempt.backend || "Not reported"}</Fact>
+                          <Fact label="Reported">
                             <ObservedTime value={attempt.receivedAt} server />
                           </Fact>
                         </dl>
+                      ) : null}
+                      {attempt ? (
+                        <TechnicalDetails
+                          className="mt-3"
+                          items={[{ label: "Sequence", value: attempt.sequence.toString() }]}
+                        >
+                          <dl className="mt-1 grid gap-1">
+                            <div>
+                              <dt className="inline font-medium">Started (device clock): </dt>
+                              <dd className="inline">
+                                <ObservedTime value={attempt.startedAt} />
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="inline font-medium">Finished (device clock): </dt>
+                              <dd className="inline">
+                                <ObservedTime value={attempt.finishedAt} />
+                              </dd>
+                            </div>
+                          </dl>
+                        </TechnicalDetails>
                       ) : (
-                        <p>No completed package attempt has been accepted.</p>
+                        <p>No package scan has completed yet.</p>
                       )}
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader>
-                      <CardTitle>Latest published package inventory</CardTitle>
-                      <CardDescription>
-                        The latest complete published package snapshot.
-                      </CardDescription>
+                      <CardTitle>Installed packages</CardTitle>
+                      <CardDescription>The latest complete package list.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <details className="mb-4 text-xs text-muted-foreground">
-                        <summary className="w-fit cursor-pointer">Publication requirements</summary>
-                        <p className="mt-2">
-                          Only a complete committed snapshot is inventory. Partial uploads are never
-                          shown as complete.
-                        </p>
-                      </details>
                       {snapshot ? (
                         <dl className="grid gap-4 sm:grid-cols-2">
                           <Fact label="State">
@@ -571,31 +546,31 @@ export function DeviceDetailView({
                                     : "neutral"
                               }
                             >
-                              {snapshotLabels[snapshot.state] ?? "Unknown snapshot state"}
+                              {snapshotLabels[snapshot.state] ?? "Unknown"}
                             </StatusBadge>
                           </Fact>
                           <Fact label="Packages">{snapshot.packageCount.toLocaleString()}</Fact>
-                          <Fact label="Snapshot ID">
-                            <span className="break-all font-mono text-xs">
-                              {snapshot.snapshotId}
-                            </span>
-                          </Fact>
-                          <Fact label="Sequence">{snapshot.sequence.toString()}</Fact>
-                          <Fact label="Collection finished (device)">
-                            <ObservedTime value={snapshot.finishedAt} />
-                          </Fact>
-                          <Fact label="Published (server)">
+                          <Fact label="Updated">
                             <ObservedTime value={snapshot.committedAt} server />
                           </Fact>
                           {!snapshot.packagesAvailable ? (
-                            <Fact label="Package rows">
-                              No longer retained; the manifest count is not an empty collection.
+                            <Fact label="Package list">
+                              No longer stored. Only the count is available.
                             </Fact>
                           ) : null}
                         </dl>
                       ) : (
-                        <p>No complete package snapshot has been published.</p>
+                        <p>No complete package list yet.</p>
                       )}
+                      {snapshot ? (
+                        <TechnicalDetails
+                          className="mt-3"
+                          items={[
+                            { label: "Snapshot ID", value: snapshot.snapshotId },
+                            { label: "Sequence", value: snapshot.sequence.toString() },
+                          ]}
+                        />
+                      ) : null}
                     </CardContent>
                   </Card>
                 </div>
@@ -603,9 +578,8 @@ export function DeviceDetailView({
                   <Alert>
                     <AlertTitle>Package upload in progress</AlertTitle>
                     <AlertDescription>
-                      Snapshot {data.stagingSnapshot.snapshotId}, sequence{" "}
-                      {data.stagingSnapshot.sequence.toString()}, is staging. It has not replaced
-                      the published inventory.
+                      The device is uploading a new package list. The list below stays in place
+                      until the upload completes.
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -629,7 +603,7 @@ export function DeviceDetailView({
             hidden={activeTab !== "resources"}
             className="space-y-4"
           >
-            {resources(() => openForm("resources"))}
+            {resources(() => setAssignOpen(true))}
           </section>
           <section
             role="tabpanel"

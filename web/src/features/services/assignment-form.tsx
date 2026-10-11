@@ -10,6 +10,13 @@ import { SetResourceAssignmentRequestSchema } from "../../../gen/lindm/admin/v1/
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -18,6 +25,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { setAssignmentAttempt, useAssignmentAttempt, type AssignmentAttempt } from "./attempt";
@@ -93,8 +101,8 @@ export function ResourceAssignmentForm({
         })
       )
         return;
-      toast.success("Resource assignment accepted", {
-        description: "This receipt does not imply native execution.",
+      toast.success("Assignment saved", {
+        description: "The device applies it at its next check-in.",
       });
       void queryClient.invalidateQueries({
         queryKey: resourceStateQueryOptions(lifetime, deviceId).queryKey,
@@ -124,8 +132,8 @@ export function ResourceAssignmentForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Assignment outcome unknown" : "Assignment not accepted", {
-          description: "Review the inline result before continuing.",
+        ](failure.ambiguous ? "Couldn't confirm the assignment" : "Assignment not saved", {
+          description: "Open Assign profile to see what happened.",
         });
       }
     },
@@ -148,7 +156,7 @@ export function ResourceAssignmentForm({
     if (locked || !stateReady) return;
     const head = heads.data?.profiles.find((profile) => profile.revisionId === revisionId);
     if (!clear && (!head || headFailure)) {
-      setErrors(["Select a loaded profile revision before assigning."]);
+      setErrors(["Select a profile."]);
       return;
     }
     const payload = create(SetResourceAssignmentRequestSchema, {
@@ -173,8 +181,8 @@ export function ResourceAssignmentForm({
     send({
       payload,
       targetLabel: clear
-        ? "Release managed resources"
-        : `${head!.name} · revision ${head!.revisionNumber.toString()}`,
+        ? "Remove profile"
+        : `${head!.name} (revision ${head!.revisionNumber.toString()})`,
       status: "inflight",
       failure: null,
     });
@@ -196,7 +204,7 @@ export function ResourceAssignmentForm({
       lifetime.signal.throwIfAborted();
       setApprovalId(result.approval?.id ?? "");
       setApprovalAmbiguous(false);
-      toast.success("Resource assignment approval requested");
+      toast.success("Approval requested");
       await queryClient.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     } catch (error) {
       if (!lifetime.signal.aborted) {
@@ -209,8 +217,8 @@ export function ResourceAssignmentForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Approval request outcome unknown" : "Approval request failed", {
-          description: "Review the inline result before continuing.",
+        ](failure.ambiguous ? "Couldn't confirm the approval request" : "Approval request failed", {
+          description: "Open Assign profile to see what happened.",
         });
       }
     } finally {
@@ -250,33 +258,18 @@ export function ResourceAssignmentForm({
 
   return (
     <form
-      className="grid min-w-0 gap-3 border-t pt-5"
+      className="grid min-w-0 gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         capture(false);
       }}
     >
-      <h3 className="font-semibold">Assign a profile revision</h3>
-      <p className="text-sm text-muted-foreground">
-        Assigning pins all resources to the selected catalog head.
-      </p>
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">
-          Assignment and stop-managing behavior
-        </summary>
-        <p className="mt-2">
-          Later profile publications do not change this assignment. Stop managing records
-          ownership-safe release work. Pending, unsupported or conflicting cleanup remains visible;
-          already authorized effects are not cancelled.
-        </p>
-      </details>
       {attempt ? (
         <p className="border bg-muted/30 p-3 text-sm">
-          Captured request: {attempt.targetLabel}. The request stays frozen across navigation until
-          its outcome is resolved. Reloading the tab clears this local retry record.
+          {attempt.payload.clear ? "Removing the profile" : `Assigning ${attempt.targetLabel}`}
         </p>
       ) : (
-        <>
+        <div className="grid min-w-0 gap-2">
           <Label htmlFor="resource-profile">Profile revision</Label>
           <SelectField
             id="resource-profile"
@@ -285,22 +278,29 @@ export function ResourceAssignmentForm({
             disabled={locked || heads.isPending || !!headFailure}
             onValueChange={(value) => setRevisionId(value)}
             options={[
-              { value: "", label: "Select a profile head" },
+              { value: "", label: "Select a profile" },
               ...(heads.data?.profiles.map((profile) => ({
                 value: profile.revisionId,
-                label: `${profile.name} · revision ${profile.revisionNumber.toString()}`,
+                label: `${profile.name} (revision ${profile.revisionNumber.toString()})`,
               })) ?? []),
             ]}
           />
-          {heads.isPending ? <p role="status">Loading profile heads…</p> : null}
+          {heads.isPending ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              Loading profiles…
+            </p>
+          ) : null}
           {heads.data?.profiles.length === 0 ? (
-            <p className="text-sm">No profile heads on this page.</p>
+            <p className="text-sm text-muted-foreground">
+              No profiles found. Create one under Profiles.
+            </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             {pageToken ? (
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={locked || heads.isFetching}
                 onClick={() => {
                   setPageToken("");
@@ -314,6 +314,7 @@ export function ResourceAssignmentForm({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={locked || heads.isFetching}
                 onClick={() => {
                   setPageToken(heads.data!.nextPageToken);
@@ -326,53 +327,51 @@ export function ResourceAssignmentForm({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={locked || heads.isFetching}
               onClick={() => void heads.refetch()}
             >
               Refresh profiles
             </Button>
           </div>
-          {headFailure ? <RpcError failure={headFailure} title="Profile list unavailable" /> : null}
-        </>
+          {headFailure ? <RpcError failure={headFailure} title="Couldn't load profiles" /> : null}
+        </div>
       )}
-      <Label htmlFor="service-reconcile-interval">Reconciliation interval (seconds)</Label>
-      <Input
-        id="service-reconcile-interval"
-        type="number"
-        min={intervalMin}
-        max={intervalMax}
-        step={1}
-        required={!attempt?.payload.clear}
-        readOnly={locked}
-        disabled={attempt?.payload.clear}
-        value={attempt ? (attempt.payload.reconcileIntervalSeconds ?? "") : intervalSeconds}
-        onChange={(event) => setIntervalSeconds(event.target.value)}
-        aria-describedby="service-reconcile-interval-help"
-      />
-      <p id="service-reconcile-interval-help" className="text-sm text-muted-foreground">
-        Default: 15 minutes. Allowed range: {intervalMin} to {intervalMax} seconds. Checks verify
-        and remediate drift while the profile is assigned.
-      </p>
-      <Label htmlFor="service-assignment-reason">Reason (required)</Label>
-      <Textarea
-        id="service-assignment-reason"
-        required
-        readOnly={locked}
-        value={attempt?.payload.reason ?? reason}
-        onChange={(event) => setReason(event.target.value)}
-      />
-      <p className="break-all font-mono text-xs text-muted-foreground">
-        Request ID {attempt?.payload.requestId ?? requestId}
-      </p>
-      <p className="break-all font-mono text-xs text-muted-foreground">
-        Expected assignment:{" "}
-        {(attempt ? attempt.payload.expectedAssignmentId : expectedAssignmentId) ??
-          "none (never assigned)"}
-      </p>
+      <div className="grid min-w-0 gap-2">
+        <Label htmlFor="service-reconcile-interval">Check interval (seconds)</Label>
+        <Input
+          id="service-reconcile-interval"
+          type="number"
+          className="h-9"
+          min={intervalMin}
+          max={intervalMax}
+          step={1}
+          required={!attempt?.payload.clear}
+          readOnly={locked}
+          disabled={attempt?.payload.clear}
+          value={attempt ? (attempt.payload.reconcileIntervalSeconds ?? "") : intervalSeconds}
+          onChange={(event) => setIntervalSeconds(event.target.value)}
+          aria-describedby="service-reconcile-interval-help"
+        />
+        <p id="service-reconcile-interval-help" className="text-sm text-muted-foreground">
+          How often the device checks the profile and fixes drift. Default 900 (15 minutes), between{" "}
+          {intervalMin} and {intervalMax}.
+        </p>
+      </div>
+      <div className="grid min-w-0 gap-2">
+        <Label htmlFor="service-assignment-reason">Reason (required)</Label>
+        <Textarea
+          id="service-assignment-reason"
+          required
+          readOnly={locked}
+          value={attempt?.payload.reason ?? reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </div>
       {rpcFailure ? <RpcError failure={rpcFailure} /> : null}
       {errors.length ? (
         <Alert variant="destructive">
-          <AlertTitle>Cannot prepare assignment</AlertTitle>
+          <AlertTitle>Check the form</AlertTitle>
           <AlertDescription>
             <ul>
               {errors.map((error, index) => (
@@ -386,25 +385,25 @@ export function ResourceAssignmentForm({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.status === "ambiguous"
-              ? "Retry the exact request; do not send a replacement."
-              : "Refresh the assignment before preparing a new request."}
+              ? "Select Retry to resend the same request. It won't be applied twice."
+              : "Start a new assignment to try again."}
           </p>
         </RpcError>
       ) : null}
       {attempt?.status === "succeeded" ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm">
-          Assignment accepted. The current state is refreshed separately; this receipt does not
-          imply native execution.
+          Assignment saved. The device applies it at its next check-in; results appear under
+          Services.
         </p>
       ) : null}
       {approvalRequired ? (
         <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
-          <p>This exact assignment requires approval by a different authorized human.</p>
+          <p>This change needs approval from another administrator.</p>
           {approvalId ? (
             <p>
-              Approval {approvalId} requested.{" "}
+              Approval requested.{" "}
               <Link to="/approvals" className="underline">
-                Review and execute in approvals
+                Open approvals
               </Link>
             </p>
           ) : (
@@ -412,17 +411,28 @@ export function ResourceAssignmentForm({
               {approvalBusy
                 ? "Requesting approval…"
                 : approvalAmbiguous
-                  ? "Retry exact approval request"
-                  : "Request approval for exact assignment"}
+                  ? "Retry approval request"
+                  : "Request approval"}
             </Button>
           )}
         </div>
       ) : null}
+      <TechnicalDetails
+        items={[
+          { label: "Request ID", value: attempt?.payload.requestId ?? requestId },
+          {
+            label: "Replaces assignment",
+            value:
+              (attempt ? attempt.payload.expectedAssignmentId : expectedAssignmentId) ?? "None",
+          },
+          { label: "Approval ID", value: approvalId },
+        ]}
+      />
       <div className="flex flex-wrap gap-2">
         {!attempt ? (
           <>
             <Button type="submit" disabled={!stateReady || locked || !revisionId || !!headFailure}>
-              Assign selected revision
+              Save assignment
             </Button>
             <Button
               type="button"
@@ -430,18 +440,18 @@ export function ResourceAssignmentForm({
               disabled={!stateReady || locked || expectedAssignmentId === undefined}
               onClick={() => capture(true)}
             >
-              Stop managing
+              Remove profile
             </Button>
           </>
         ) : null}
         {attempt?.status === "inflight" ? (
           <p role="status" className="text-sm text-muted-foreground">
-            Sending assignment…
+            Saving…
           </p>
         ) : null}
         {attempt?.status === "ambiguous" ? (
           <Button type="button" onClick={() => send(attempt)}>
-            Retry exact request
+            Retry
           </Button>
         ) : null}
         {attempt?.status === "rejected" || attempt?.status === "succeeded" ? (
@@ -451,10 +461,44 @@ export function ResourceAssignmentForm({
             disabled={refreshing || approvalBusy || approvalAmbiguous || approvalId !== ""}
             onClick={() => void prepareAnother()}
           >
-            {refreshing ? "Refreshing assignment…" : "Refresh and prepare another request"}
+            {refreshing ? "Refreshing…" : "Start a new assignment"}
           </Button>
         ) : null}
       </div>
     </form>
+  );
+}
+
+export function ResourceAssignmentDialog({
+  deviceId,
+  open,
+  onOpenChange,
+}: {
+  deviceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const lifetime = useAuthLifetime();
+  const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Assign profile</DialogTitle>
+          <DialogDescription>
+            Choose the profile this device should follow. Later edits to the profile are not applied
+            until you assign the new revision.
+          </DialogDescription>
+        </DialogHeader>
+        {state.error ? (
+          <RpcError failure={toRpcFailure(state.error)} title="Couldn't load this device" />
+        ) : null}
+        <ResourceAssignmentForm
+          deviceId={deviceId}
+          expectedAssignmentId={state.data?.assignment?.assignmentId}
+          stateReady={state.isSuccess && !state.error}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

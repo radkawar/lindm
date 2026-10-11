@@ -104,7 +104,7 @@ func TestHistoricalHostPublicationPreservesEvidenceAndSessionFence(t *testing.T)
 			if failure == "transport" {
 				client.err = errors.New("publication failed")
 			}
-			data, err := packages(1)
+			data, err := packages(1, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

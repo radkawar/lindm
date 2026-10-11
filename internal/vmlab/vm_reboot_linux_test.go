@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -73,11 +74,14 @@ func TestRebootObservesOldBootThenTransientShutdownThenNewBoot(t *testing.T) {
 				return previous.String(), nil
 			case 2:
 				return "", io.EOF
+			case 3:
+				// The old boot's sshd is stopped while serving the probe.
+				return "", fmt.Errorf("guest operation transport failed: %w", &ssh.ExitMissingError{})
 			default:
 				return "00000000-0000-4000-8000-000000000002", nil
 			}
 		})
-		if err != nil || calls != 3 {
+		if err != nil || calls != 4 {
 			t.Fatalf("boot transition: calls=%d err=%v", calls, err)
 		}
 	})

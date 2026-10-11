@@ -78,9 +78,84 @@ the separate native recovery rerun of this correction.
 Every family/branch row below is a launch requirement, in both connected and
 air-gapped modes, with x86_64 desktop/server and the listed aarch64 server
 architectures. Build order prioritizes Ubuntu LTS, Fedora and RHEL, but no row is
-optional. Atomic Linux and NixOS use their own native management models rather than
-inherited mutable-provider behavior. The table allocates qualification work; it
-does not declare support.
+optional within its tier ([tiers](#platform-support-tiers)). NixOS and Fedora Atomic
+are design-only until their own management model is specified; mutable-provider
+behavior never qualifies them. The table allocates qualification work; it does not
+declare support.
+
+### Platform support tiers
+
+The owner set these tiers on 2026-10-11. **Tier 1** is desktop-first and requires
+full parity with Ubuntu 24.04. **Tier 2** gets the same capability contract
+through its own rolling model. Every cell still needs its own native evidence. The
+older family/branch allocation [below](#branch-allocation) still sets
+architectures and editions. Server-only legacy branches (RHEL/Rocky/Alma 8, SUSE
+enterprise, Leap) are outside these tiers until the owner places them.
+
+| Tier   | Distribution / branch                     | Desktop edition to qualify          | Architecture used in the lab                  | Platform page                             |
+| ------ | ----------------------------------------- | ----------------------------------- | --------------------------------------------- | ----------------------------------------- |
+| 1      | Ubuntu 22.04, 24.04, 26.04 LTS            | GNOME (official desktop)            | x86_64 desktop/server; aarch64 server         | [ubuntu](platforms/ubuntu.md)             |
+| 1      | Debian 12, 13                             | GNOME/KDE                           | x86_64 desktop/server; aarch64 server         | [debian](platforms/debian.md)             |
+| 1      | Fedora, current two releases (43, 44)     | Workstation GNOME; KDE edition      | x86_64 desktop/server; aarch64 server         | [fedora](platforms/fedora.md)             |
+| 1      | RHEL 9, 10 (supported minor)              | Vendor GNOME installation           | x86_64; aarch64 server on vendor images       | [rhel](platforms/rhel.md)                 |
+| 1      | Rocky Linux 9, 10; AlmaLinux 9, 10        | GNOME, one row per distribution     | x86_64; aarch64 server                        | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | Linux Mint, current release               | Cinnamon                            | x86_64 only (no arm64 build), local KVM       | [mint](platforms/mint.md)                 |
+| 1      | Pop!\_OS, current LTS                     | COSMIC                              | x86_64 local KVM (arm64 builds not qualified) | [popos](platforms/popos.md)               |
+| 2      | Arch Linux, pinned snapshot               | Owner-chosen desktop per record     | x86_64 local KVM                              | [arch](platforms/arch.md)                 |
+| 2      | openSUSE Tumbleweed, pinned snapshot      | KDE Plasma/GNOME per record         | x86_64; aarch64 records stay separate         | [opensuse](platforms/opensuse.md)         |
+| 2      | Omarchy, current release on pinned Arch   | Hyprland                            | x86_64 local KVM                              | [omarchy](platforms/omarchy.md)           |
+| Future | NixOS; Fedora Atomic (Silverblue/Kinoite) | Not qualified until a model is spec | None; design only                             | [atomic-nixos](platforms/atomic-nixos.md) |
+
+NixOS and Fedora Atomic manage the system declaratively or as images. They stay
+**design-only** until a separate management model is specified; see the
+[product specification](product-specification.md#supported-os-tiers). No mutable
+DEB/RPM evidence counts toward them.
+
+#### Tier capability matrix
+
+Full parity covers the capabilities in the columns. `N` means a named native subset
+is recorded in the linked ledger section. It is VM evidence for the named
+branch/architecture only and is not qualification. `—` means nothing is recorded
+yet. There are **no qualified cells**. Configuration means the eight configuration
+kinds in [resource-kind coverage](#resource-kind-coverage), and that table holds
+the per-kind state. OS patch policy is still being specified, so every cell is `—`.
+
+| Row            | Inventory        | Lifecycle          | Dispatch           | Config (8)       | Encryption | Wipe              | Lock/quarantine   | Self-update | OS patch | Assistance        |
+| -------------- | ---------------- | ------------------ | ------------------ | ---------------- | ---------- | ----------------- | ----------------- | ----------- | -------- | ----------------- |
+| Ubuntu 24.04   | [N][inv-hw]      | [N][ledger]        | [N][ledger]        | [N subset][rk]   | [N][enc]   | [N selected][enc] | [N selected][enc] | [N][upd]    | —        | [N GNOME][assist] |
+| Ubuntu 26.04   | [N][ledger]      | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| Ubuntu 22.04   | [N][ledger]      | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| Debian 13      | [N aarch64][arm] | [N][ledger]        | [N aarch64][arm]   | [N service][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| Debian 12      | [N aarch64][arm] | [N aarch64][arm]   | [N aarch64][arm]   | [N service][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| Fedora 44      | [N][inv-hw]      | [N][ledger]        | [N][ledger]        | [N subset][rk]   | [N][enc]   | [N selected][enc] | [N selected][enc] | [N][upd]    | —        | [N GNOME][assist] |
+| Fedora 43      | [N][ledger]      | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| RHEL 9.8       | [N][ledger]      | [N x86_64][ledger] | [N x86_64][ledger] | [N aarch64][el9] | —          | —                 | —                 | —           | —        | —                 |
+| RHEL 10.2      | —                | [N x86_64][ledger] | [N x86_64][ledger] | —                | —          | —                 | —                 | —           | —        | —                 |
+| Rocky 9.8      | [N][ledger]      | [N aarch64][arm]   | [N aarch64][arm]   | —                | —          | —                 | —                 | —           | —        | —                 |
+| Rocky 10.2     | [N][ledger]      | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| AlmaLinux 9.8  | [N][ledger]      | —                  | [N][ledger]        | [N aarch64][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| AlmaLinux 10.2 | [N][ledger]      | [N][ledger]        | [N][ledger]        | [N aarch64][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| Linux Mint     | —                | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| Pop!\_OS       | —                | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+| Arch           | [N][arch]        | [N][arch]          | —                  | [N service][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| Tumbleweed     | [N aarch64][rk]  | [N aarch64][rk]    | [N aarch64][rk]    | [N service][rk]  | —          | —                 | —                 | —           | —        | —                 |
+| Omarchy        | —                | —                  | —                  | —                | —          | —                 | —                 | —           | —        | —                 |
+
+[ledger]: #1-launch-platform-qualification
+[inv-hw]: #inventory-hardware-observations-2026-10-10
+[arm]: #1-launch-platform-qualification
+[rk]: #resource-kind-coverage
+[el9]: #host-resource-providers-on-el-9
+[enc]: #encryption-and-imperative-action-evidence-l10-l13-l15
+[upd]: #3-acceptance-scenario-families
+[assist]: #built-in-graphical-remote-assistance-l09-l12
+[arch]: #1-launch-platform-qualification
+
+An `N` cell links to the ledger section where its record names and SHA-256 digests
+are kept. A new record must update its cell in the same change. Desktop, physical,
+air-gapped and other-architecture evidence each stays a separate claim.
+
+### Branch allocation
 
 Versions are branches, not mutable download URLs. Pin exact vendor/minor/snapshot,
 verified image digest, repositories, architecture and installer recipe in executable
@@ -225,21 +300,24 @@ web typecheck passed; the later readiness and multi-mount changes also passed th
 vmlab race suite. These are inventory/configuration results, not DNF5 package
 transaction, entitlement, desktop, physical-machine or whole-family certification.
 
-| Family / branch                           | Build priority      | Native host acceptance                                                     | Architecture scope                      |
-| ----------------------------------------- | ------------------- | -------------------------------------------------------------------------- | --------------------------------------- |
-| Ubuntu 24.04 and 26.04 LTS                | 1 (major releases)  | Official GNOME Desktop and Server/minimal; Kubuntu/KDE separately          | x86_64 desktop/server; aarch64 server   |
-| Fedora 43 and 44 while upstream-supported | 1 (major releases)  | Workstation GNOME and KDE editions; Server/minimal                         | x86_64 desktop/server; aarch64 server   |
-| RHEL 9 and 10, supported minor            | 1 (major releases)  | Vendor GNOME-capable and minimal/server installations                      | x86_64; aarch64 server on vendor images |
-| Rocky Linux 9 and 10, current minor       | 2                   | Separate derivative lifecycle, not RHEL evidence                           | x86_64; aarch64 server                  |
-| AlmaLinux 9 and 10, current minor         | 2                   | Separate derivative lifecycle, not Rocky evidence                          | x86_64; aarch64 server                  |
-| Debian 13                                 | 2                   | GNOME/KDE and minimal separately                                           | x86_64 desktop/server; aarch64 server   |
-| openSUSE Leap 16.0                        | 2                   | GNOME/KDE and headless separately                                          | x86_64                                  |
-| Ubuntu 22.04 LTS; Debian 12 LTS           | 3 (legacy)          | Separate branch/content/runtime evidence                                   | x86_64; aarch64 server                  |
-| RHEL 8, Rocky 8, AlmaLinux 8              | 3 (legacy)          | Independent vendor rows and maintained security content                    | x86_64                                  |
-| SLES 15 SP7 and 16; SLED 15 SP7           | 3 (SUSE enterprise) | Each vendor product/desktop/server installation separately                 | x86_64                                  |
-| Arch Linux; openSUSE Tumbleweed           | 3 (rolling)         | Separate pinned snapshots, whole-system update and rollback semantics      | x86_64                                  |
-| Fedora Silverblue and Kinoite             | 3 (atomic)          | Actual atomic installer, deployment/layering, booted checksum and rollback | x86_64                                  |
-| NixOS stable 26.05 and successor          | 3 (declarative)     | Owner-approved configuration/closure and system-generation activation      | x86_64                                  |
+| Family / branch                           | Build priority       | Native host acceptance                                                | Architecture scope                      |
+| ----------------------------------------- | -------------------- | --------------------------------------------------------------------- | --------------------------------------- |
+| Ubuntu 24.04 and 26.04 LTS                | 1 (major releases)   | Official GNOME Desktop and Server/minimal; Kubuntu/KDE separately     | x86_64 desktop/server; aarch64 server   |
+| Fedora 43 and 44 while upstream-supported | 1 (major releases)   | Workstation GNOME and KDE editions; Server/minimal                    | x86_64 desktop/server; aarch64 server   |
+| RHEL 9 and 10, supported minor            | 1 (major releases)   | Vendor GNOME-capable and minimal/server installations                 | x86_64; aarch64 server on vendor images |
+| Rocky Linux 9 and 10, current minor       | 2                    | Separate derivative lifecycle, not RHEL evidence                      | x86_64; aarch64 server                  |
+| AlmaLinux 9 and 10, current minor         | 2                    | Separate derivative lifecycle, not Rocky evidence                     | x86_64; aarch64 server                  |
+| Debian 13                                 | 2                    | GNOME/KDE and minimal separately                                      | x86_64 desktop/server; aarch64 server   |
+| openSUSE Leap 16.0                        | 2                    | GNOME/KDE and headless separately                                     | x86_64                                  |
+| Ubuntu 22.04 LTS; Debian 12 LTS           | 3 (legacy)           | Separate branch/content/runtime evidence                              | x86_64; aarch64 server                  |
+| RHEL 8, Rocky 8, AlmaLinux 8              | 3 (legacy)           | Independent vendor rows and maintained security content               | x86_64                                  |
+| SLES 15 SP7 and 16; SLED 15 SP7           | 3 (SUSE enterprise)  | Each vendor product/desktop/server installation separately            | x86_64                                  |
+| Arch Linux; openSUSE Tumbleweed           | Tier 2 (rolling)     | Separate pinned snapshots, whole-system update and rollback semantics | x86_64                                  |
+| Omarchy on pinned Arch                    | Tier 2 (rolling)     | Omarchy installer, Hyprland session; not Arch evidence                | x86_64                                  |
+| Linux Mint current                        | Tier 1 (desktop)     | Cinnamon edition; not Ubuntu evidence                                 | x86_64                                  |
+| Pop!\_OS current LTS                      | Tier 1 (desktop)     | COSMIC edition and System76 installer; not Ubuntu evidence            | x86_64                                  |
+| Fedora Silverblue and Kinoite             | Future (atomic)      | Design-only; needs a specified deployment/layering/rollback model     | x86_64                                  |
+| NixOS stable 26.05 and successor          | Future (declarative) | Design-only; needs a specified configuration/generation model         | x86_64                                  |
 
 RHEL is not certified by testing Rocky; Alma is not certified by testing Rocky; a GUI
 installed on a server is not proof of a vendor's separate desktop product. RPM format
@@ -1527,12 +1605,88 @@ directory):
   provider now retries refused batches, accepts repeated object successes and
   replaces the socket after every batch; the race is not EL-specific.
 
-Not exercised on EL: Rocky Linux, EL 8 and 10, x86_64, password hash delivery
-(refused by design), history/aging/faillock password dimensions and interactive
+Not exercised on EL 9: Rocky Linux, EL 8, x86_64, delivered password hashes
+(the secret-password lane ran only on Ubuntu and Fedora), history/aging/faillock password dimensions and interactive
 PAM password change, authselect profiles other than `sssd`, a host whose
 authselect selection predates enrollment, file ACLs beyond the refusals, timers
 across a reboot, FORWARD probes and the firewall crash windows listed in the
 records' `unproven` fields.
+
+##### Host resource providers on EL 10
+
+The same host and firewall lanes ran on RHEL 10.2 (registered, vendor KVM image
+`0e6b8758…0836`) and AlmaLinux 10.2 (GenericCloud `b1203c2e…`) aarch64 guests,
+SELinux Enforcing, after the gates were extended to EL 10 and the password pins
+to 10.2 ([RHEL EL 10 notes](platforms/rhel.md#host-resource-providers-el-10)).
+Both images already select authselect `local`, so the EL 9 unmanaged-stack
+scenario does not arise. Per-kind development records, under
+`$HOME/.cache/lindm-resourcecoverage-20261011/el10host/`:
+
+| Record                                                         | Kinds and scenarios                                                          | SHA-256                                                            |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `rhel102-host-el10b.json` (RHEL 10.2, registered, `dgx21`)     | files 9, groups 7, users 11, sysctl 8, timers/drop-ins 10, password policy 4 | `bf09e21403c32e5c02b00005c13791d8e1f7f141d2b3906da4aea79eaf21ce9b` |
+| `alma102-host-el10a.json` (AlmaLinux 10.2, `dgx20`)            | the same 49 scenarios                                                        | `a6698fa0f1d1b7f5ec5c03e8d65f548d4013b84517bc1c302071d04f0e65f9aa` |
+| `rhel102-firewall-el10b.json` (RHEL 10.2, registered, `dgx21`) | firewall zone 13, firewalld active                                           | `efa5c80e3355b3c17a7aab973f6c09fd757d65a5e093c6b26a16968e5464b58f` |
+| `alma102-firewall-el10b.json` (AlmaLinux 10.2, `dgx20`)        | firewall zone 13, firewalld active                                           | `de056a9c6c233edb32eb2fd3d2044705b40e0e38788282a1dddb3cf32d89139b` |
+
+Each RHEL record's `redhat` block reports all five registration and cleanup
+outcomes true (host: run `lindm-lab-f57bd294ba353b74e1cfaa97fef40a02`, consumer
+`70f4e063-d8eb-4ab0-be47-96c96d9bb78b`; firewall: run
+`lindm-lab-c3485a05f5f1b43d1cffa60a4e8b4ff7`, consumer
+`9d76a277-a42a-4bc2-9d57-d71ecaace69f`). An earlier RHEL 10.2 host run
+(`rhel102-host-el10a.json`,
+`4bda96e1d1c6506e3e72ea10123114f8a88f1842605dab19a5e91f973d90510e`) passed files,
+accounts and the first three sysctl scenarios, then lost the SSH transport while
+probing the boot ID after the guest reboot; the rerun passed.
+
+No product defect beyond the gates surfaced on EL 10; the decisive native fact
+is that shadow-utils 4.15 `--prefix` still writes the account databases with the
+prefixed path's label (`var_lib_t`), checked in a scratch guest before enabling
+the chroot account root.
+
+Not exercised on EL 10: Rocky Linux, x86_64, history/aging/faillock password
+dimensions and interactive PAM password change, authselect profiles other than
+`local`, timers across a reboot, FORWARD probes and the firewall crash windows
+listed in the records' `unproven` fields.
+
+##### All resource kinds in one connected lane
+
+`lab vm resources -phase connected -kinds
+packages,files,accounts,sysctl,definitions,password,firewall` runs every kind's
+scenarios in sequence on one enrolled guest (plus the firewall probe peer), from
+an immutable snapshot of the landed shared tree, so the later kinds also run
+after the sysctl lane's and firewall lane's real reboots. Records are under
+`$HOME/.cache/lindm-resourcecoverage-20261011/`:
+
+| Platform                                          | Record                                    | Scenarios passed   | SHA-256                                                            |
+| ------------------------------------------------- | ----------------------------------------- | ------------------ | ------------------------------------------------------------------ |
+| RHEL 9.8 aarch64, registered (dgx21)              | `rhel98-arm64-dgx21-allkinds-g3.json`     | 73/73, eight kinds | `0ef046228e7cb999c3fb6dd2d43b27236a0b0a081cd5eca86f23b21a029c21f4` |
+| AlmaLinux 9.8 aarch64 (dgx20)                     | `alma98-arm64-dgx20-allkinds-g3.json`     | 73/73, eight kinds | `38bd4629131f2433869bcd190de19e3d211129f471c8b415fbaebe41e593f1c0` |
+| Ubuntu 24.04 x86_64 (local; firewall not in lane) | `ubuntu2404-amd64-local-allkinds-g1.json` | 59/59, seven kinds | `0f31861443b7e7256f7d262c59933a7c013fd042106cc1859926899bcb545fc7` |
+
+The RHEL record's Red Hat block reports all five registration and cleanup
+outcomes true (run `lindm-lab-25119be2e02e805e01bcee0b5dc201b7`, consumer
+`466b472d-2f13-4ff1-bffd-00062e12d493`); SELinux stayed Enforcing on both EL
+guests. Both EL records share lindmd
+`be646a1f69c4fb6bcf71fa210fe52f7cf6c2b41006fb59794296d068d3f49cc2`. The
+AlmaLinux record was copied from the retained remote run directory
+(`dgx20:/home/r/lindm-lab/runs/run-biS1hilutM/records/record`) after the
+controller's SSH session to dgx20 dropped at the end of the lane; the remote
+lane had completed and written it, but its `lab_host` provenance block is
+therefore absent. The Ubuntu x86_64 lane ran the seven host-local kinds; the
+firewall kind needs a second x86_64 guest for its probe peer.
+
+Two lane defects were found by these combined runs and fixed before the
+records. First (`*-allkinds-f1.json`), the signed fixture repository was a
+transient unit, so after the sysctl reboot the final package interruption
+scenario could not stage (`connection refused`) and never reached its
+interruption point. Second (`*-allkinds-g1.json`, `*-g1b.json`, and the
+diagnostic `alma98-arm64-dgx20-allkinds-g2.json`), the now-persistent repository
+unit was named `lindm-resource-repository.service`, which matched the firewall
+crash watcher's `lindm-resource-*.service` helper glob: `systemctl kill` got two
+unit names, killed neither, and the transaction succeeded instead of ending
+`OUTCOME_UNKNOWN`. The repository is now `lindm-lab-resource-repository.service`,
+and the watcher kills exactly one UUID-named effect helper or records why not.
 
 ### Capability matrix dimensions
 

@@ -37,6 +37,9 @@ func TestNativeModuleVersionSemanticsAreClosed(t *testing.T) {
 		{"almalinux", "9.8", "1.7.2-3.fc44", 2, false},
 		{"almalinux", "9.7", "1.5.1-26.el9", 2, false},
 		{"rocky", "9.8", "1.4.4-8.el9", 1, false},
+		{"almalinux", "10.2", "1.4.5-12.el10", 1, true},
+		{"rhel", "10.2", "1.6.1-9.el10", 3, true},
+		{"rhel", "10.2", "1.5.1-28.el9_8.1", 2, false},
 	} {
 		if got := moduleVersionSupported(&resourcev1.PlatformProduct{OsId: tc.os, Version: tc.release}, tc.feature, tc.version); got != tc.want {
 			t.Errorf("%s %s feature %d version %s = %t", tc.os, tc.release, tc.feature, tc.version, got)
@@ -99,6 +102,8 @@ func TestNativeManagerVersionsMatchSupportedTransactionSemantics(t *testing.T) {
 		{"ubuntu", "24.04", "ii \t1.5.3-5ubuntu5.4", true}, {"ubuntu", "24.04", "ii \t1.6.1-1", false},
 		// EL 9 authselect 1.2 has its own profile set and CLI; 1.7 semantics differ.
 		{"almalinux", "9.8", "1.2.6-3.el9", true}, {"rhel", "9.8", "1.7.1-1.fc44", false}, {"rhel", "10.1", "1.5.0-8.el10", false},
+		// EL 10.2 ships authselect 1.5.2; EL 9 authselect 1.2 must not stand in for it.
+		{"almalinux", "10.2", "1.5.2-1.el10", true}, {"rhel", "10.2", "1.2.6-3.el9", false},
 	} {
 		run := func(context.Context, string, ...string) ([]byte, error) { return []byte(tc.output), nil }
 		_, err := managerVersion(context.Background(), &resourcev1.PlatformProduct{OsId: tc.os, Version: tc.release}, run)

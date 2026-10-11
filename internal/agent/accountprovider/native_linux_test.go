@@ -256,7 +256,9 @@ func TestChrootProductUsesRootForEveryTool(t *testing.T) {
 	}{
 		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
 		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
-		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "10.1"}, false},
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "10.2"}, true},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "10.2"}, true},
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "8.10"}, false},
 		{&resourcev1.PlatformProduct{OsId: "rocky", Version: "9.8"}, false},
 		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
 		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false},

@@ -39,20 +39,14 @@ export function AuditView({
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
-        title="Audit"
-        description="Local append history for this deployment."
+        title="Audit log"
+        description="Who changed what, and why. Secret values are never recorded."
         actions={
           <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
             Refresh
           </Button>
         }
       />
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Audit limitations</summary>
-        <p className="mt-2">
-          This is not an external tamper-proof trail. Secrets are not recorded here.
-        </p>
-      </details>
       {failure ? <RpcError failure={failure} /> : null}
       <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="audit-page-size">Page size</Label>
@@ -71,25 +65,23 @@ export function AuditView({
       </div>
       {list.isPending ? (
         <div role="status" className="grid gap-3 border p-4">
-          <span className="text-sm text-muted-foreground">Loading audit events…</span>
+          <span className="text-sm text-muted-foreground">Loading audit log…</span>
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
       ) : null}
       {list.isSuccess && list.data.events.length === 0 ? (
-        <EmptyState
-          title={pageToken === "" ? "No audit events recorded" : "No audit events on this page"}
-        />
+        <EmptyState title={pageToken === "" ? "Nothing recorded yet" : "No more entries"} />
       ) : null}
       {list.data && list.data.events.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Occurred</TableHead>
+              <TableHead>When</TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Resource</TableHead>
-              <TableHead>Actor</TableHead>
+              <TableHead>Who</TableHead>
               <TableHead>Reason</TableHead>
             </TableRow>
           </TableHeader>
@@ -114,7 +106,7 @@ export function AuditView({
                     {event.resourceId.trim() || "Not recorded"}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    {event.actorId.trim() || "Unknown actor"}
+                    {event.actorId.trim() || "Unknown"}
                   </TableCell>
                   <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
                     {event.reason.trim() || "Not recorded"}

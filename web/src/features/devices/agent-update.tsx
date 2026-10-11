@@ -1,6 +1,7 @@
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import type { AgentUpdateStatus } from "../../../gen/lindm/agent/v1/update_pb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Fact, ObservedTime } from "./observations";
 
 export function DeviceAgentUpdate({
@@ -21,81 +22,65 @@ export function DeviceAgentUpdate({
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle>Agent self-update history</CardTitle>
-        <CardDescription>
-          Historical device-reported diagnostics, not proof of the currently installed version,
-          current package health, or verified update success. A missing native diagnostic does not
-          mean an update succeeded.
-        </CardDescription>
+        <CardTitle>Agent updates</CardTitle>
+        <CardDescription>The last update attempt the agent reported.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!status ? (
-          <p className="text-sm text-muted-foreground">Unknown: no self-update report received.</p>
+          <p className="text-sm text-muted-foreground">No update reports yet.</p>
         ) : (
           <>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Fact label="Reported update opt-in">{status.enabled ? "Enabled" : "Disabled"}</Fact>
-              <Fact label="Historical version">{status.version || "Not reported"}</Fact>
-              <Fact label="Transaction ID">
-                <span className="break-all font-mono">
-                  {status.transactionId || "Not reported"}
-                </span>
-              </Fact>
-              <Fact label="Reported phase">{status.phase || "Unknown"}</Fact>
-              <Fact label="Last reported outcome">{status.lastOutcome || "Unknown"}</Fact>
-              <Fact label="Device observation time">
+              <Fact label="Automatic updates">{status.enabled ? "On" : "Off"}</Fact>
+              <Fact label="Version">{status.version || "Not reported"}</Fact>
+              <Fact label="Phase">{status.phase || "Unknown"}</Fact>
+              <Fact label="Last result">{status.lastOutcome || "Unknown"}</Fact>
+              <Fact label="Reported">
                 <ObservedTime value={status.observedAt} />
               </Fact>
-              <Fact label="Attempt started">
+              <Fact label="Started">
                 <ObservedTime value={status.attemptStartedAt} />
               </Fact>
-              <Fact label="Attempt finished">
+              <Fact label="Finished">
                 <ObservedTime value={status.attemptFinishedAt} />
               </Fact>
-              <Fact label="Last metadata observation">
+              <Fact label="Last checked for updates">
                 <ObservedTime value={status.lastMetadataAt} />
               </Fact>
-              <Fact label="Reported reason">{status.reason || "Not reported"}</Fact>
+              <Fact label="Reason">{status.reason || "Not reported"}</Fact>
             </dl>
+            <TechnicalDetails items={[{ label: "Transaction ID", value: status.transactionId }]} />
             {diagnostic ? (
-              <section className="space-y-3" aria-label="Historical native update failure">
-                <h4 className="text-sm font-medium">Historical native update failure</h4>
+              <section className="space-y-3" aria-label="Last update failure">
+                <h4 className="text-sm font-medium">Last update failure</h4>
                 <dl className="grid gap-4 sm:grid-cols-3">
-                  <Fact label="Native manager">{diagnostic.manager || "Unknown"}</Fact>
-                  <Fact label="Failed operation phase">{diagnostic.phase || "Unknown"}</Fact>
+                  <Fact label="Package manager">{diagnostic.manager || "Unknown"}</Fact>
+                  <Fact label="Failed step">{diagnostic.phase || "Unknown"}</Fact>
                   <Fact label="Exit code">
-                    {diagnostic.exitCode === -1
-                      ? "Unavailable (non-exit error)"
-                      : diagnostic.exitCode}
+                    {diagnostic.exitCode === -1 ? "Not available" : diagnostic.exitCode}
                   </Fact>
                 </dl>
                 {errorLines.length ? (
                   <div>
-                    <p className="mb-2 text-sm text-muted-foreground">Final native error lines</p>
+                    <p className="mb-2 text-sm text-muted-foreground">Last error lines</p>
                     <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted p-3 text-xs">
                       {errorLines.join("\n")}
                     </pre>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No native error lines reported.</p>
+                  <p className="text-sm text-muted-foreground">No error output reported.</p>
                 )}
                 {truncated ? (
                   <p className="text-sm text-muted-foreground">
-                    Native error output was truncated. At most 8 lines of 512 characters each are
-                    shown.
+                    Output shortened to the last 8 lines.
                   </p>
                 ) : null}
               </section>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Native failure diagnostic not reported; native update outcome is not established by
-                its absence.
-              </p>
-            )}
+            ) : null}
           </>
         )}
         <dl>
-          <Fact label="Server report receipt">
+          <Fact label="Received">
             <ObservedTime value={receivedAt} server />
           </Fact>
         </dl>

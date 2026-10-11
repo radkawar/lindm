@@ -9,6 +9,7 @@ import {
   type RevealLocalAdminPasswordRequest,
 } from "../../../gen/lindm/admin/v1/secrets_pb";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,8 +81,7 @@ export function LocalAdminPasswordReveal({
 
   function capture() {
     if (!request.current) {
-      if (confirmation !== deviceId)
-        throw new Error("Type the exact device ID to confirm local-admin password access.");
+      if (confirmation !== deviceId) throw new Error("Type the device ID exactly to confirm.");
       const payload = create(RevealLocalAdminPasswordRequestSchema, {
         requestId: newRequestId(),
         deviceId,
@@ -116,7 +116,8 @@ export function LocalAdminPasswordReveal({
         { signal: AbortSignal.any([controller.signal, lifetime.signal]), timeoutMs: 30_000 },
       );
       if (controller.signal.aborted || lifetime.signal.aborted) return;
-      if (!response.approval?.id) throw new Error("The server did not return an approval receipt.");
+      if (!response.approval?.id)
+        throw new Error("The server didn't confirm the approval request.");
       setApprovalId(response.approval.id);
       setApprovalState(response.approval.state);
       request.current = create(RevealLocalAdminPasswordRequestSchema, {
@@ -124,8 +125,8 @@ export function LocalAdminPasswordReveal({
         approvalId: response.approval.id,
       });
       setAmbiguous(null);
-      toast.success("Password approval receipt received", {
-        description: "Review the recorded approval state before requesting access.",
+      toast.success("Approval requested", {
+        description: "Reveal the password once another admin approves.",
       });
     } catch (error) {
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
@@ -133,10 +134,7 @@ export function LocalAdminPasswordReveal({
         setAmbiguous(result.ambiguous ? "approval" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous ? "Approval delivery unknown" : "Password approval request failed",
-          {
-            description: "Review the inline result and captured request before continuing.",
-          },
+          result.ambiguous ? "Couldn't confirm approval request" : "Couldn't request approval",
         );
       }
     } finally {
@@ -180,8 +178,8 @@ export function LocalAdminPasswordReveal({
       });
       setNotice(
         response.rotationDueAt
-          ? `Post-reveal rotation is due ${formatTimestamp(response.rotationDueAt).local}.`
-          : "No rotation is scheduled because the device has no policy.",
+          ? `The password will change ${formatTimestamp(response.rotationDueAt).local}.`
+          : "The password won't change automatically. This device has no policy.",
       );
       if (
         response.password.length === 0 ||
@@ -189,19 +187,21 @@ export function LocalAdminPasswordReveal({
       ) {
         response.password.fill(0);
         setFailure(
-          toRpcFailure(new Error("Password has an unsupported encoding; nothing was displayed.")),
+          toRpcFailure(
+            new Error("The password can't be displayed. It contains unsupported characters."),
+          ),
         );
         return;
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         response.password.fill(0);
-        setNotice("The response arrived while this page was hidden; the password was dismissed.");
+        setNotice("The page was hidden when the password arrived, so it wasn't shown. Try again.");
         return;
       }
       held.current = response.password;
       setSecret(response.password);
-      toast.success("Local-admin password received", {
-        description: "The password is shown temporarily in this panel only.",
+      toast.success("Password revealed", {
+        description: "It hides after 30 seconds or when you leave the page.",
       });
     } catch (error) {
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
@@ -209,10 +209,7 @@ export function LocalAdminPasswordReveal({
         setAmbiguous(result.ambiguous ? "reveal" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous ? "Password delivery unknown" : "Password request failed",
-          {
-            description: "Review the inline result and captured request before continuing.",
-          },
+          result.ambiguous ? "Couldn't confirm password reveal" : "Couldn't reveal password",
         );
       }
     } finally {
@@ -223,32 +220,18 @@ export function LocalAdminPasswordReveal({
 
   return (
     <div className="grid gap-3 rounded-md border p-3">
-      <details className="text-sm text-muted-foreground">
-        <summary className="cursor-pointer">Password access requirements</summary>
-        <p className="mt-2">
-          Access requires the secret reveal permission for this device, an audit reason, and recent
-          step-up authentication. A policy may require approval. A reveal schedules a rotation after
-          the configured delay. The password is dismissed after 30 seconds, on blur, or on
-          navigation; browser memory cannot be guaranteed erased.
-        </p>
-      </details>
-      <Label htmlFor={`laps-reveal-reason-${actionId}`}>Password access reason</Label>
+      <p className="text-sm text-muted-foreground">
+        Revealing the password schedules a new one. It hides after 30 seconds.
+      </p>
+      <Label htmlFor={`laps-reveal-reason-${actionId}`}>Reason</Label>
       <Textarea
         id={`laps-reveal-reason-${actionId}`}
         value={reason}
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
       />
-      <Label htmlFor={`laps-reveal-approval-${actionId}`}>Approval receipt ID</Label>
-      <Input
-        id={`laps-reveal-approval-${actionId}`}
-        value={approvalId}
-        readOnly
-        autoComplete="off"
-      />
-      <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>
-        Type the device ID to confirm access
-      </Label>
+      <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>Type the device ID to confirm</Label>
+      <p className="break-all font-mono text-xs text-muted-foreground">{deviceId}</p>
       <Input
         id={`laps-reveal-confirmation-${actionId}`}
         value={confirmation}
@@ -256,19 +239,21 @@ export function LocalAdminPasswordReveal({
         readOnly={busy || request.current !== null}
         autoComplete="off"
       />
-      <p className="text-sm text-muted-foreground">
-        This reveals the password escrowed by action{" "}
-        <span className="break-all font-mono text-xs">{actionId}</span>.
-      </p>
+      <TechnicalDetails
+        items={[
+          { label: "Password action ID", value: actionId },
+          { label: "Approval ID", value: approvalId },
+        ]}
+      />
       {approvalState !== null ? (
         <p>
-          Last observed approval: {ApprovalState[approvalState]}.{" "}
+          Approval: {ApprovalState[approvalState]?.toLowerCase()}.{" "}
           <Link to="/approvals" className="underline">
             Open approvals
           </Link>
         </p>
       ) : null}
-      {failure ? <RpcError failure={failure} title="Password not revealed" /> : null}
+      {failure ? <RpcError failure={failure} title="Couldn't reveal password" /> : null}
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}
@@ -280,18 +265,14 @@ export function LocalAdminPasswordReveal({
           disabled={busy || secret !== null || ambiguous === "approval"}
           onClick={() => void reveal()}
         >
-          {busy
-            ? "Requesting…"
-            : ambiguous === "reveal"
-              ? "Retry exact reveal request"
-              : "Reveal password"}
+          {busy ? "Requesting…" : ambiguous === "reveal" ? "Retry" : "Reveal password"}
         </Button>
         <Button
           variant="outline"
           disabled={busy || secret !== null || ambiguous === "reveal"}
           onClick={() => void requestApproval()}
         >
-          {approvalState === null ? "Request independent approval" : "Refresh exact approval state"}
+          {approvalState === null ? "Request approval" : "Refresh approval status"}
         </Button>
         {request.current && ambiguous === null ? (
           <Button
@@ -305,19 +286,19 @@ export function LocalAdminPasswordReveal({
               setNotice("");
             }}
           >
-            Prepare different access request
+            Start over
           </Button>
         ) : null}
         {secret ? (
           <Button variant="outline" onClick={hide}>
-            Dismiss now
+            Hide now
           </Button>
         ) : null}
       </div>
       {secret ? (
         <pre
           className="whitespace-pre-wrap break-all rounded-md border p-3 font-mono text-sm select-all"
-          aria-label="Local-admin password"
+          aria-label="Local admin password"
         >
           {new TextDecoder().decode(secret)}
         </pre>

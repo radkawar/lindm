@@ -16,6 +16,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/labhost"
 	"lindm/internal/vmlab"
@@ -125,7 +126,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
-	requirements := &labhost.Requirements{Host: name, Architecture: arch, Vcpus: 2, MemoryMib: memory, RequireKVM: !vmHasHardwareFlags(clean[1]) || labhost.FlagValue(clean, "accelerator") == "kvm"}
+	requirements := &labhost.Requirements{Host: name, Architecture: arch, Vcpus: 2, MemoryMib: memory, RequireKVM: vmRequiresKVM(cfg, clean[1], labhost.FlagValue(clean, "accelerator"), arch)}
 	candidates, err := labhost.Select(cfg, requirements)
 	if err != nil {
 		return err
@@ -204,6 +205,32 @@ func vmHasHardwareFlags(command string) bool {
 		// These lanes retain their existing fixed native-KVM hardware contract.
 		return false
 	}
+}
+
+// vmRequiresKVM keeps acceleration a lane decision, not a capacity fallback.
+// A full native host must be waited for rather than replaced by a foreign
+// TCG host. Lanes whose own -accelerator default is kvm are KVM-only unless
+// explicitly told otherwise; architecture-defaulted lanes use TCG only when no
+// configured host runs that architecture natively.
+func vmRequiresKVM(cfg *labv1.LabConfig, command, accelerator, architecture string) bool {
+	if !vmHasHardwareFlags(command) {
+		return true
+	}
+	switch command {
+	case "encrypted", "inspect-storage", "device-actions", "assistance":
+		if accelerator == "" {
+			accelerator = "kvm"
+		}
+	}
+	if accelerator != "" {
+		return accelerator == "kvm"
+	}
+	for _, host := range cfg.GetHosts() {
+		if host.GetKvm() && slices.Contains(host.GetArchitectures(), architecture) {
+			return true
+		}
+	}
+	return false
 }
 
 // vmGuestCount is the number of concurrent guests a lane boots. The firewall

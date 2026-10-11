@@ -91,11 +91,11 @@ export function MaterialField({
       )}
       <p id={hintId} className="text-sm text-muted-foreground">
         {purpose === SecretPurpose.PASSWORD_HASH
-          ? "A crypt(3) yescrypt ($y$), SHA-512-crypt ($6$) or bcrypt ($2b$) hash generated offline, for example with mkpasswd. Never enter the plaintext password."
+          ? "A yescrypt, SHA-512 or bcrypt hash, for example from mkpasswd. Never enter the plain password."
           : purpose === SecretPurpose.WIFI_PSK
-            ? "8 to 63 printable ASCII characters, or exactly 64 hexadecimal digits."
-            : "1 to 4096 bytes, encoded as UTF-8 text exactly as entered."}{" "}
-        The field is cleared when the request is captured; re-enter it after a rejection.
+            ? "8 to 63 characters, or 64 hexadecimal digits."
+            : "Up to 4096 bytes of text, saved exactly as entered."}{" "}
+        You'll need to enter it again if saving fails.
       </p>
     </div>
   );

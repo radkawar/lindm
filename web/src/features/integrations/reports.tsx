@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ const KINDS: Record<ReportKind, string> = {
   [ReportKind.INVENTORY]: "Fleet inventory",
   [ReportKind.COMPLIANCE]: "Compliance",
   [ReportKind.FINDINGS]: "Advisory findings",
-  [ReportKind.AUDIT]: "Audit chain",
+  [ReportKind.AUDIT]: "Audit log",
 };
 const FORMATS: Record<ReportFormat, string> = {
   [ReportFormat.UNSPECIFIED]: "unknown",
@@ -58,27 +59,20 @@ export function Reports() {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Workers publish bounded durable CSV or JSON snapshots.
+        Build CSV or JSON reports on a schedule. Each report is kept for its retention period.
       </p>
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Report retention</summary>
-        <p className="mt-2">
-          Downloads expire at the configured retention boundary; disabling a schedule stops future
-          runs, not retention of existing artifacts.
-        </p>
-      </details>
       <ScheduleEditor />
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading report schedules…</span>
+          <span className="text-sm text-muted-foreground">Loading schedules…</span>
           <Skeleton className="h-32 w-full" />
         </div>
       ) : null}
       {list.data?.schedules.length === 0 ? (
         <EmptyState
-          title="No report schedules on this page"
-          description="Add a schedule to generate recurring reports."
+          title="No scheduled reports yet"
+          description="Add a schedule to build reports automatically."
         />
       ) : null}
       {list.data?.schedules.map((schedule) => (
@@ -169,7 +163,7 @@ function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
             { value: ReportFormat.JSON, label: "JSON" },
           ]}
         />
-        <Label htmlFor={`${id}-interval`}>Interval (seconds)</Label>
+        <Label htmlFor={`${id}-interval`}>Run every (seconds)</Label>
         <Input
           id={`${id}-interval`}
           required
@@ -177,7 +171,7 @@ function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
           value={interval}
           onChange={(e) => setInterval(Number(e.target.value))}
         />
-        <Label htmlFor={`${id}-retention`}>Retention (days)</Label>
+        <Label htmlFor={`${id}-retention`}>Keep reports for (days)</Label>
         <Input
           id={`${id}-retention`}
           required
@@ -187,9 +181,9 @@ function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
         />
         <label className="flex gap-2">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          Schedule enabled
+          Run on schedule
         </label>
-        <Label htmlFor={`${id}-reason`}>Audit reason</Label>
+        <Label htmlFor={`${id}-reason`}>Reason</Label>
         <Input
           id={`${id}-reason`}
           required
@@ -223,9 +217,7 @@ function AuditExport() {
     event.preventDefault();
     setInputError("");
     if (!/^[0-9a-fA-F]{64}$/.test(hash) || !/^\d+$/.test(sequence)) {
-      setInputError(
-        "Enter a nonnegative checkpoint sequence and its 64-character SHA-256 hexadecimal hash.",
-      );
+      setInputError("Enter the last export's sequence number and its 64-character SHA-256 hash.");
       return;
     }
     const afterHash = Uint8Array.from({ length: 32 }, (_, index) =>
@@ -243,27 +235,19 @@ function AuditExport() {
   }
   return (
     <form onSubmit={queue} className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
-      <h3 className="text-lg font-semibold">Tamper-evident audit export</h3>
-      <p className="text-sm">Continue from an externally retained signed checkpoint.</p>
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">
-          Checkpoint and verification requirements
-        </summary>
-        <p className="mt-2">
-          Genesis is sequence 0 with an all-zero hash. Verify the manifest with an independently
-          pinned signer key; a key included in a download is not itself trusted. Large histories
-          require multiple consecutive exports.
-        </p>
-      </details>
+      <h3 className="text-lg font-semibold">Export audit log</h3>
+      <p className="text-sm">
+        Continue from your last export. For the first export, use sequence 0 and a hash of 64 zeros.
+      </p>
       {action.feedback}
       {inputError ? (
         <Alert variant="destructive">
-          <AlertTitle>Check export details</AlertTitle>
+          <AlertTitle>Check the export details</AlertTitle>
           <AlertDescription>{inputError}</AlertDescription>
         </Alert>
       ) : null}
       <fieldset disabled={action.blocked} className="grid min-w-0 gap-3">
-        <Label htmlFor="audit-sequence">Previous checkpoint sequence</Label>
+        <Label htmlFor="audit-sequence">Last export sequence number</Label>
         <Input
           id="audit-sequence"
           required
@@ -271,7 +255,7 @@ function AuditExport() {
           value={sequence}
           onChange={(e) => setSequence(e.target.value)}
         />
-        <Label htmlFor="audit-hash">Previous checkpoint SHA-256 (hex)</Label>
+        <Label htmlFor="audit-hash">Last export SHA-256 hash</Label>
         <Input id="audit-hash" required value={hash} onChange={(e) => setHash(e.target.value)} />
         <Label htmlFor="audit-events">Maximum events</Label>
         <Input
@@ -281,7 +265,7 @@ function AuditExport() {
           value={maxEvents}
           onChange={(e) => setMaxEvents(Number(e.target.value))}
         />
-        <Label htmlFor="audit-retention">Export retention (days)</Label>
+        <Label htmlFor="audit-retention">Keep export for (days)</Label>
         <Input
           id="audit-retention"
           required
@@ -289,14 +273,14 @@ function AuditExport() {
           value={retention}
           onChange={(e) => setRetention(Number(e.target.value))}
         />
-        <Label htmlFor="audit-export-reason">Audit reason</Label>
+        <Label htmlFor="audit-export-reason">Reason</Label>
         <Input
           id="audit-export-reason"
           required
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
-        <Button type="submit">Queue audit export</Button>
+        <Button type="submit">Start export</Button>
       </fieldset>
     </form>
   );
@@ -334,18 +318,17 @@ function Artifacts() {
         );
         lifetime.signal.throwIfAborted();
         total += response.data.length;
-        if (total > 32 * 1024 * 1024)
-          throw new Error("Artifact exceeds the bounded download size.");
+        if (total > 32 * 1024 * 1024) throw new Error("This report is too large to download here.");
         parts.push(Uint8Array.from(response.data).buffer);
         if (response.finished) {
           finished = true;
           break;
         }
         if (response.nextChunkIndex !== index + 1)
-          throw new Error("Artifact chunk sequence changed.");
+          throw new Error("The report changed while downloading. Try again.");
       }
       if (!finished || BigInt(total) !== artifact.byteCount)
-        throw new Error("Artifact download was incomplete.");
+        throw new Error("The download didn't finish. Try again.");
       saveBlob(
         new Blob(parts, {
           type:
@@ -376,23 +359,23 @@ function Artifacts() {
       aria-busy={list.isFetching}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold">Durable report artifacts</h3>
+        <h3 className="text-lg font-semibold">Reports</h3>
         <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-          Refresh artifacts
+          Refresh reports
         </Button>
       </div>
       {error ? <RpcError failure={error} /> : null}
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading artifacts…</span>
+          <span className="text-sm text-muted-foreground">Loading reports…</span>
           <Skeleton className="h-32 w-full" />
         </div>
       ) : null}
       {list.data?.artifacts.length === 0 ? (
         <EmptyState
-          title="No report artifacts on this page"
-          description="Generated reports appear here after a scheduled run or audit export."
+          title="No reports yet"
+          description="Reports appear here after a scheduled run or an audit export."
         />
       ) : null}
       {list.data?.artifacts.map((artifact) => (
@@ -418,7 +401,7 @@ function Artifacts() {
                 : "Unknown"}
             </StatusBadge>
           </div>
-          <p className="break-all font-mono text-xs">{artifact.id}</p>
+          <TechnicalDetails items={[{ label: "Report ID", value: artifact.id }]} />
           <p className="text-sm">
             {artifact.rowCount.toString()} rows · {artifact.byteCount.toString()} bytes · expires{" "}
             {formatTimestamp(artifact.expiresAt).local}
@@ -434,7 +417,7 @@ function Artifacts() {
               disabled={artifact.state !== "published" || !!downloading}
               onClick={() => void download(artifact)}
             >
-              {downloading === artifact.id ? "Downloading…" : "Download artifact"}
+              {downloading === artifact.id ? "Downloading…" : "Download"}
             </Button>
             <Button
               variant="outline"
@@ -449,7 +432,7 @@ function Artifacts() {
                 );
               }}
             >
-              Download signed manifest
+              Download signature
             </Button>
           </div>
         </article>

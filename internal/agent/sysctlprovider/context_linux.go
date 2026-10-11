@@ -21,8 +21,8 @@ func nativeBackend(ctx context.Context, platform *resourcev1.PlatformProduct) (*
 	switch platform.GetOsId() {
 	case "ubuntu", "fedora":
 	case "rhel", "almalinux":
-		// Of Enterprise Linux only EL 9 is qualified.
-		if !strings.HasPrefix(platform.GetVersion(), "9.") {
+		// Of Enterprise Linux only EL 9 and EL 10 are qualified.
+		if major, _, _ := strings.Cut(platform.GetVersion(), "."); major != "9" && major != "10" {
 			return nil, ErrUnsupported
 		}
 	default:

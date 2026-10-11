@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	enrollmentv1connect "lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
@@ -49,6 +50,24 @@ type Options struct {
 	GeneratorCPUs     string
 	ServerCPUs        string
 	PostgresCPUs      string
+	// ListenAddress binds the server listeners to one local IPv4 address, for
+	// example a direct-link address reached by a remote generator.
+	ListenAddress string
+	// GeneratorHost/GeneratorBinary run simulated devices on another host via
+	// SSH; empty keeps the co-located in-process generator.
+	GeneratorHost   string
+	GeneratorBinary string
+	// GeneratorSSHConfig optionally selects a private ssh_config (-F) for the
+	// generator connection, e.g. a direct-link HostName and pinned known_hosts.
+	GeneratorSSHConfig string
+	// AdvisoryFeeds is a strict protobuf JSON AdvisoryConfig enabling real feed
+	// refresh and background advisory evaluation in the server under test.
+	AdvisoryFeeds string
+	// PackageBaseline is a protobuf JSON PackageBatch of recorded native
+	// packages placed first in every snapshot; synthetic packages pad the rest.
+	PackageBaseline string
+	// PostgresSettings are allowlisted dedicated-cluster tuning parameters.
+	PostgresSettings []string
 }
 type Sample struct {
 	ElapsedSeconds float64
@@ -73,6 +92,8 @@ type Stage struct {
 	SLOBreached                bool
 	DatabaseProfiles           []DatabaseSample
 	Profiles                   []ProfileArtifact
+	AdvisorySamples            []AdvisorySample
+	AdvisoryMinEvaluatedRatio  float64
 }
 type Result struct {
 	StartedAt              time.Time
@@ -91,6 +112,10 @@ type Result struct {
 	InventorySeconds       int
 	JitterPercent          int
 	GeneratorColocated     bool
+	Generator              *GeneratorIdentity
+	PackageBaselineSHA256  string
+	AdvisoryFeedsSHA256    string
+	AdvisoryFeeds          []AdvisoryFeedStatus
 	Environment            devlab.LoadExperimentEnvironment
 	HostContention         HostContention
 	Stages                 []Stage
@@ -121,7 +146,11 @@ type runner struct {
 	agentProtocol       uint32
 	// effects, when set, journals each simulated service execution before its
 	// report; the HA lane uses it to detect duplicate effects.
-	effects func(device, action string, sequence uint64) error
+	effects       func(device, action string, sequence uint64) error
+	deviceAddress string
+	baseline      []*inventoryv1.Package
+	remote        *remoteGenerator
+	advisories    bool
 }
 
 // prepare composes the same real authority, enrollment and inventory workload for
@@ -162,11 +191,19 @@ func (r *runner) prepare(ctx context.Context) (resultErr error) {
 		return err
 	}
 	r.profile = published.Msg.GetRevision()
+	return r.initDevices(ctx, material.ExecutionRootJSON, material.BootstrapEnvelope, r.fixture.AdminAddress, r.fixture.DeviceAddress, r.baseline)
+}
+
+// initDevices builds only the device-side protocol state shared by the local
+// runner and a remote generator: verified bootstrap, transport roots, the
+// enrollment client and deterministic package batches.
+func (r *runner) initDevices(ctx context.Context, rootJSON, envelope []byte, adminAddress, deviceAddress string, baseline []*inventoryv1.Package) error {
+	var err error
 	r.authority, err = trust.New()
 	if err != nil {
 		return err
 	}
-	r.bootstrap, err = r.authority.VerifyBootstrap(ctx, material.ExecutionRootJSON, material.BootstrapEnvelope, time.Now())
+	r.bootstrap, err = r.authority.VerifyBootstrap(ctx, rootJSON, envelope, time.Now())
 	if err != nil {
 		return err
 	}
@@ -184,9 +221,10 @@ func (r *runner) prepare(ctx context.Context) (resultErr error) {
 	if !r.roots.AppendCertsFromPEM(r.bootstrap.Bundle.GetTransportCaPem()) {
 		return errors.New("missing transport roots")
 	}
-	r.enrollmentTransport = r.transport(r.fixture.AdminAddress, nil)
+	r.deviceAddress = deviceAddress
+	r.enrollmentTransport = r.transport(adminAddress, nil)
 	r.enrollment = enrollmentv1connect.NewEnrollmentServiceClient(&http.Client{Transport: r.enrollmentTransport, Timeout: 30 * time.Second}, r.bootstrap.Bundle.GetEnrollmentOrigin(), connect.WithInterceptors(r.metrics))
-	r.packages, err = packages(r.options.Packages)
+	r.packages, err = packages(r.options.Packages, baseline)
 	return err
 }
 
@@ -206,7 +244,11 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 		}
 		previous = n
 	}
-	result = Result{StartedAt: time.Now().UTC(), Options: options, GoVersion: runtime.Version(), PoolLimit: int(options.PoolSize), HeartbeatSeconds: 60, ManagementSeconds: 20, InventorySeconds: 600, JitterPercent: 10, GeneratorColocated: true}
+	remote := options.GeneratorHost != "" || options.GeneratorBinary != ""
+	if remote && (options.GeneratorHost == "" || options.GeneratorBinary == "" || options.GeneratorCPUs != "") {
+		return result, errors.New("load: remote generation requires -generator-host and -generator-binary and excludes -generator-cpus")
+	}
+	result = Result{StartedAt: time.Now().UTC(), Options: options, GoVersion: runtime.Version(), PoolLimit: int(options.PoolSize), HeartbeatSeconds: 60, ManagementSeconds: 20, InventorySeconds: 600, JitterPercent: 10, GeneratorColocated: !remote}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		if resultErr != nil {
@@ -235,7 +277,21 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 		return result, err
 	}
 	r := &runner{options: options, metrics: &measurements{}}
-	r.fixture, err = devlab.OpenLoadAuthorityFixture(ctx, options.Repository, options.ServerBinary, devlab.LoadAuthorityOptions{DatabaseStorage: options.DatabaseStorage, ServerCPUs: options.ServerCPUs, PostgresCPUs: options.PostgresCPUs})
+	var advisories *configv1.AdvisoryConfig
+	if options.AdvisoryFeeds != "" {
+		advisories, result.AdvisoryFeedsSHA256, err = ReadAdvisoryFeeds(options.AdvisoryFeeds)
+		if err != nil {
+			return result, err
+		}
+		r.advisories = true
+	}
+	if options.PackageBaseline != "" {
+		r.baseline, result.PackageBaselineSHA256, err = readPackageBaseline(options.PackageBaseline, options.Packages)
+		if err != nil {
+			return result, err
+		}
+	}
+	r.fixture, err = devlab.OpenLoadAuthorityFixture(ctx, options.Repository, options.ServerBinary, devlab.LoadAuthorityOptions{DatabaseStorage: options.DatabaseStorage, ServerCPUs: options.ServerCPUs, PostgresCPUs: options.PostgresCPUs, ListenAddress: options.ListenAddress, Advisories: advisories, PostgresSettings: options.PostgresSettings})
 	if err != nil {
 		return result, err
 	}
@@ -272,6 +328,20 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 		defer cancel()
 		resultErr = errors.Join(resultErr, r.owner.Close(cleanup))
 	}()
+	if advisories != nil {
+		result.AdvisoryFeeds, err = r.waitForAdvisoryPublication(ctx, len(advisories.GetFeeds()))
+		if err != nil {
+			return result, err
+		}
+	}
+	if remote {
+		if r.remote, err = r.startGenerator(ctx); err != nil {
+			return result, err
+		}
+		defer func() { resultErr = errors.Join(resultErr, r.remote.close()) }()
+		result.Generator = &r.remote.identity
+		result.GeneratorSHA256 = r.remote.identity.SHA256
+	}
 	defer r.enrollmentTransport.CloseIdleConnections()
 	sampler, err := NewHostSampler(HostSamplerOptions{CPUs: CPUConfig{GeneratorCPUs: options.GeneratorCPUs, ServerCPUs: options.ServerCPUs, PostgresCPUs: options.PostgresCPUs}, ServerPID: r.fixture.ProcessID, Interval: 10 * time.Second})
 	if err != nil {
@@ -290,12 +360,30 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 			d.close()
 		}
 	}()
+	enrolled := 0
 	for _, n := range options.Stages {
 		stage := Stage{Devices: n}
 		start := time.Now()
-		added, err := r.enrollBatch(ctx, len(devices), n)
-		devices = append(devices, added...)
+		if r.remote != nil {
+			err = r.enrollRemote(ctx, enrolled, n)
+			if err == nil {
+				enrolled = n
+			}
+		} else {
+			var added []*simulatedDevice
+			added, err = r.enrollBatch(ctx, len(devices), n)
+			devices = append(devices, added...)
+			enrolled = len(devices)
+		}
 		stage.EnrollmentSeconds = time.Since(start).Seconds()
+		if r.remote != nil {
+			if exported, exportErr := r.remote.call(ctx, generatorRequest{Export: true}); exportErr != nil {
+				err = errors.Join(err, exportErr)
+			} else {
+				err = errors.Join(err, r.metrics.merge(exported.Histograms))
+				r.syncCounters(exported.Counters)
+			}
+		}
 		stage.EnrollmentRPC = r.metrics.snapshot(true)
 		if err != nil {
 			stage.SLOBreached = true
@@ -303,7 +391,7 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 			result.FirstFailingStage = n
 			return result, fmt.Errorf("enroll capacity stage: %w", err)
 		}
-		stage, err = r.stage(ctx, devices, stage, result.ClockTicksPerSecond)
+		stage, err = r.stage(ctx, devices, enrolled, stage, result.ClockTicksPerSecond)
 		result.Stages = append(result.Stages, stage)
 		if err != nil {
 			return result, err
@@ -352,7 +440,77 @@ func (r *runner) enrollBatch(ctx context.Context, start, end int) ([]*simulatedD
 	}
 	return completed, first
 }
-func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, stage Stage, ticks float64) (result Stage, resultErr error) {
+
+// enrollRemote creates each one-use grant here and sends only its secret to the
+// remote generator, then assigns the returned device like a local enrollment.
+func (r *runner) enrollRemote(ctx context.Context, start, end int) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var next atomic.Int64
+	next.Store(int64(start))
+	var wg sync.WaitGroup
+	var first error
+	var once sync.Once
+	for range min(r.options.EnrollmentWorkers, end-start) {
+		wg.Go(func() {
+			for {
+				index := int(next.Add(1)) - 1
+				if index >= end || ctx.Err() != nil {
+					return
+				}
+				call, stop := context.WithTimeout(ctx, 2*time.Minute)
+				err := func() error {
+					secret, err := r.grant(call, index)
+					if err != nil {
+						return err
+					}
+					response, err := r.remote.call(call, generatorRequest{Enroll: &generatorEnroll{Index: index, Secret: secret}})
+					if err != nil {
+						return fmt.Errorf("device %d: remote enrollment: %w", index, err)
+					}
+					return r.assign(call, index, response.DeviceID)
+				}()
+				stop()
+				if err != nil {
+					once.Do(func() { first = err; cancel() })
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	return first
+}
+
+func (r *runner) startGenerator(ctx context.Context) (*remoteGenerator, error) {
+	material, err := r.fixture.ReadAgentFixture(ctx)
+	if err != nil {
+		return nil, err
+	}
+	baseline, err := encodePackageBaseline(r.baseline)
+	if err != nil {
+		return nil, err
+	}
+	g, err := startRemoteGenerator(ctx, r.options.GeneratorHost, r.options.GeneratorBinary, r.options.GeneratorSSHConfig, os.Stderr)
+	if err != nil {
+		return nil, err
+	}
+	call, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	response, err := g.call(call, generatorRequest{Init: &generatorInit{ExecutionRootJSON: material.ExecutionRootJSON, BootstrapEnvelope: material.BootstrapEnvelope, AdminAddress: r.fixture.AdminAddress, DeviceAddress: r.fixture.DeviceAddress, AgentRelease: r.agentRelease, AgentProtocol: r.agentProtocol, Packages: r.options.Packages, Baseline: baseline, Seed: r.options.Seed, AssignmentPercent: r.options.AssignmentPercent}})
+	if err == nil && response.Identity == nil {
+		err = errors.New("remote generator returned no identity")
+	}
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("initialize remote generator: %w", err), g.close())
+	}
+	host := g.identity.Host
+	g.identity = *response.Identity
+	g.identity.Host = host
+	return g, nil
+}
+
+func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, count int, stage Stage, ticks float64) (result Stage, resultErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	before, err := r.sample(ctx)
@@ -363,27 +521,43 @@ func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, stage St
 	initialInventoryCycles := r.inventoryCycles.Load()
 	start := time.Now()
 	until := start.Add(r.options.StageDuration)
-	diagnostics := r.startDiagnostics(ctx, len(devices), start, until)
+	diagnostics := r.startDiagnostics(ctx, count, start, until)
 	defer func() {
 		captured := diagnostics.finish()
 		result.DatabaseProfiles, result.Profiles = captured.Database, captured.Profiles
 		resultErr = errors.Join(resultErr, captured.Err)
 	}()
-	var wg sync.WaitGroup
-	for index, d := range devices {
-		wg.Go(func() { r.deviceLoop(ctx, d, index, until) })
+	done := make(chan error, 1)
+	if r.remote != nil {
+		go func() {
+			response, err := r.remote.call(ctx, generatorRequest{Stage: &generatorStage{Devices: count, Duration: r.options.StageDuration}})
+			if err == nil {
+				r.syncCounters(response.Counters)
+				err = r.metrics.merge(response.Histograms)
+			}
+			done <- err
+		}()
+	} else {
+		var wg sync.WaitGroup
+		for index, d := range devices {
+			wg.Go(func() { r.deviceLoop(ctx, d, index, until) })
+		}
+		go func() { wg.Wait(); done <- nil }()
 	}
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	timer := time.NewTimer(time.Until(until))
-	defer timer.Stop()
+	advisoryTicker := time.NewTicker(30 * time.Second)
+	defer advisoryTicker.Stop()
+	stage.AdvisoryMinEvaluatedRatio = 1
 	for {
 		select {
 		case <-ctx.Done():
-			wg.Wait()
+			<-done
 			return stage, ctx.Err()
-		case <-timer.C:
-			wg.Wait()
+		case err := <-done:
+			if err != nil {
+				return stage, fmt.Errorf("simulated device workload: %w", err)
+			}
 			after, err := r.sample(ctx)
 			if err != nil {
 				return stage, err
@@ -396,24 +570,45 @@ func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, stage St
 			stage.CompletedAssignments = r.completed.Load() - initialCompleted
 			commits := stage.RPC["CommitPackageSnapshot"]
 			stage.CompletedPeriodicSnapshots = commits.Calls - commits.Errors
-			stage.ExpectedPeriodicSnapshots = max(r.inventoryCycles.Load()-initialInventoryCycles, uint64(len(devices))*uint64(r.options.StageDuration/(11*time.Minute)))
+			stage.ExpectedPeriodicSnapshots = max(r.inventoryCycles.Load()-initialInventoryCycles, uint64(count)*uint64(r.options.StageDuration/(11*time.Minute)))
 			stage.SLOBreached = breached(stage.RPC)
 			expected := uint64(0)
-			for index := range devices {
+			for index := range count {
 				if index%100 < r.options.AssignmentPercent {
 					expected++
 				}
 			}
-			stage.SLOBreached = stage.SLOBreached || r.completedDevices.Load() != expected || stage.RPC["GetSyncState"].Calls < uint64(len(devices)) || stage.RPC["GetResourceWork"].Calls < uint64(len(devices))
+			stage.SLOBreached = stage.SLOBreached || r.completedDevices.Load() != expected || stage.RPC["GetSyncState"].Calls < uint64(count) || stage.RPC["GetResourceWork"].Calls < uint64(count)
 			if r.options.StageDuration >= 11*time.Minute && !snapshotsComplete(stage.CompletedPeriodicSnapshots, stage.ExpectedPeriodicSnapshots, 0) {
 				stage.SLOBreached = true
 			}
+			if r.advisories && advisoryFreshnessBreached(stage.AdvisorySamples) {
+				stage.SLOBreached = true
+			}
 			return stage, nil
+		case <-advisoryTicker.C:
+			if !r.advisories {
+				continue
+			}
+			// A failed or timed-out console summary read is recorded and
+			// breaches the plateau; it does not discard the plateau's evidence.
+			sample, err := r.sampleAdvisories(ctx, time.Since(start))
+			if err != nil {
+				if ctx.Err() != nil {
+					<-done
+					return stage, ctx.Err()
+				}
+				sample = AdvisorySample{ElapsedSeconds: time.Since(start).Seconds(), Error: err.Error()}
+			}
+			stage.AdvisorySamples = append(stage.AdvisorySamples, sample)
+			if sample.ElapsedSeconds >= advisoryFreshnessWarmup.Seconds() && sample.Total > 0 {
+				stage.AdvisoryMinEvaluatedRatio = min(stage.AdvisoryMinEvaluatedRatio, float64(sample.Evaluated)/float64(sample.Total))
+			}
 		case <-ticker.C:
 			sample, err := r.sample(ctx)
 			if err != nil {
 				cancel()
-				wg.Wait()
+				<-done
 				return stage, err
 			}
 			stage.Samples = append(stage.Samples, Sample{ElapsedSeconds: time.Since(start).Seconds(), Server: sample})
@@ -425,6 +620,41 @@ func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, stage St
 		}
 	}
 }
+
+// advisoryFreshnessWarmup lets newly enrolled devices' first evaluations drain.
+// Afterwards at least 80% of active devices must have an evaluation binding
+// their current snapshot, host observation and feed revision: at the 10-minute
+// inventory cadence that bounds steady-state evaluation lag near two minutes.
+const advisoryFreshnessWarmup = 5 * time.Minute
+const advisoryMinimumEvaluatedRatio = 0.8
+
+func advisoryFreshnessBreached(samples []AdvisorySample) bool {
+	checked := false
+	for _, sample := range samples {
+		if sample.Error != "" {
+			return true
+		}
+		if sample.ElapsedSeconds < advisoryFreshnessWarmup.Seconds() {
+			continue
+		}
+		checked = true
+		if sample.Total == 0 || float64(sample.Evaluated) < advisoryMinimumEvaluatedRatio*float64(sample.Total) {
+			return true
+		}
+	}
+	return !checked
+}
+
+// syncCounters adopts the remote generator's cumulative device counters, so
+// stage deltas use one source rather than mixing local and remote origins.
+func (r *runner) syncCounters(counters *generatorCounters) {
+	if counters == nil {
+		return
+	}
+	r.completed.Store(counters.Completed)
+	r.completedDevices.Store(counters.CompletedDevices)
+	r.inventoryCycles.Store(counters.InventoryCycles)
+}
 func (r *runner) sample(ctx context.Context) (devlab.AuthorityMetrics, error) {
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -435,7 +665,13 @@ func (r *runner) deviceLoop(ctx context.Context, d *simulatedDevice, index int, 
 	random := rand.New(rand.NewPCG(r.options.Seed, uint64(index)+1))
 	management := now.Add(time.Duration(random.Int64N(int64(20 * time.Second))))
 	heartbeat := now.Add(time.Duration(random.Int64N(int64(time.Minute))))
+	// Inventory continues each device's own cadence from its last collection
+	// (enrollment or the previous plateau), as an agent does; the server
+	// rejects collections closer than its admission interval.
 	inventory := now.Add(jitter(random, 10*time.Minute))
+	if !d.lastInventory.IsZero() {
+		inventory = d.lastInventory.Add(jitter(random, 10*time.Minute))
+	}
 	for {
 		next := minTime(management, heartbeat, inventory)
 		if !next.Before(until) {

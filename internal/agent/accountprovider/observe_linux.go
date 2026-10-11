@@ -32,8 +32,9 @@ func nativeProvider(ctx context.Context, c NativeConfig) (*Provider, error) {
 	case "ubuntu", "debian":
 		version, err = p.run(ctx, nil, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "passwd")
 	case "fedora", "rhel", "almalinux":
-		// Of Enterprise Linux only EL 9 (shadow-utils 4.9) is qualified.
-		if c.Platform.GetOsId() != "fedora" && !strings.HasPrefix(c.Platform.GetVersion(), "9.") {
+		// Of Enterprise Linux only EL 9 (shadow-utils 4.9) and EL 10 (4.15) are
+		// qualified; both use the chroot account root.
+		if c.Platform.GetOsId() != "fedora" && !ChrootAccountRoot(c.Platform) {
 			return nil, ErrUnsupported
 		}
 		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "shadow-utils")

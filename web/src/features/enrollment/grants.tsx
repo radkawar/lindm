@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -43,23 +44,23 @@ export function EnrollmentGrants() {
     <section className="grid gap-4" aria-label="One-time enrollment grants">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          One-time codes for individual devices, including used and expired grants.
+          One-time codes you created, including used and expired ones.
         </p>
         <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-          Refresh grants
+          Refresh
         </Button>
       </div>
       {list.isPending ? (
         <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading grants…</span>
+          <span className="text-sm text-muted-foreground">Loading codes…</span>
           <Skeleton className="h-28 w-full" />
         </div>
       ) : null}
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {!list.error && list.data?.grants.length === 0 ? (
         <EmptyState
-          title="No one-time enrollment grants"
-          description="Choose Enroll one device now above to create a code."
+          title="No one-time codes yet"
+          description="Use Enroll one device now above to create one."
         />
       ) : null}
       {!list.error
@@ -125,7 +126,7 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
       setOpen(false);
       setCaptured(null);
       setReason("");
-      toast.success("One-time enrollment grant revoked");
+      toast.success("Code revoked");
       void client.invalidateQueries({ queryKey: ["enrollment-grants", lifetime.generation] });
     } catch (error) {
       if (!lifetime.signal.aborted) {
@@ -179,28 +180,16 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
           </Link>
         </p>
       ) : null}
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer">Details</summary>
-        <dl className="mt-2 grid gap-2 break-all">
-          <div>
-            <dt>Grant ID</dt>
-            <dd>{grant.grantId}</dd>
-          </div>
-          <div>
-            <dt>Creator ID</dt>
-            <dd>{grant.createdBy}</dd>
-          </div>
-          {grant.consumedDeviceId ? (
-            <div>
-              <dt>Device ID</dt>
-              <dd>{grant.consumedDeviceId}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </details>
+      <TechnicalDetails
+        items={[
+          { label: "Grant ID", value: grant.grantId },
+          { label: "Creator ID", value: grant.createdBy },
+          { label: "Device ID", value: grant.consumedDeviceId },
+        ]}
+      />
       {grant.status === EnrollmentGrantStatus.ACTIVE ? (
         <Button className="w-fit" variant="outline" onClick={() => setOpen(true)}>
-          Revoke grant
+          Revoke code
         </Button>
       ) : null}
       <Dialog
@@ -215,10 +204,9 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
           showCloseButton={!busy && !failure?.ambiguous}
         >
           <DialogHeader>
-            <DialogTitle>Revoke one-time enrollment grant?</DialogTitle>
+            <DialogTitle>Revoke this one-time code?</DialogTitle>
             <DialogDescription>
-              This stops the unused code from enrolling a device. Already enrolled devices are not
-              affected.
+              The code can no longer enroll a device. Devices already enrolled are not affected.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -229,7 +217,7 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
             }}
           >
             <label className="grid gap-2 text-sm font-medium">
-              Revocation reason
+              Reason
               <Textarea
                 required
                 value={reason}
@@ -245,7 +233,7 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
             {failure ? <RpcError failure={failure} /> : null}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" variant="destructive" disabled={busy}>
-                {busy ? "Revoking…" : captured ? "Retry exact revocation" : "Revoke grant"}
+                {busy ? "Revoking…" : captured ? "Try again" : "Revoke code"}
               </Button>
               <Button
                 type="button"

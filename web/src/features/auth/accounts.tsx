@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +52,7 @@ export function Accounts() {
   const [error, setError] = useState<RpcFailure | null>(null);
   const csrf = session.data?.csrfToken ?? "";
 
-  async function perform(action: () => Promise<AccountEnrollment | void>) {
+  async function perform(done: string, action: () => Promise<AccountEnrollment | void>) {
     if (busy || !csrf || lifetime.signal.aborted) return;
     setBusy(true);
     setError(null);
@@ -60,10 +61,8 @@ export function Accounts() {
       const result = await action();
       lifetime.signal.throwIfAborted();
       if (result) setEnrollment(result);
-      toast.success("Account operation completed", {
-        description: result
-          ? "Secure the one-time enrollment secret shown on this page."
-          : undefined,
+      toast.success(done, {
+        description: result ? "Copy the enrollment secret shown on this page." : undefined,
       });
       await client.invalidateQueries({ queryKey: accountsQueryOptions(lifetime).queryKey });
     } catch (failure) {
@@ -75,7 +74,7 @@ export function Accounts() {
           toRpcFailure(
             failure instanceof ConnectError
               ? failure
-              : new ConnectError("Account change could not be confirmed.", Code.Unknown),
+              : new ConnectError("Couldn't confirm the account change.", Code.Unknown),
           ),
         );
       }
@@ -86,7 +85,7 @@ export function Accounts() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void perform(() =>
+    void perform("Account created", () =>
       createAccount(
         create(CreateAccountRequestSchema, {
           username,
@@ -104,25 +103,19 @@ export function Accounts() {
     <section className="grid min-w-0 gap-6" aria-busy={accounts.isFetching || busy}>
       <PageHeader
         title="Local accounts"
-        description="Manage administrator access, roles and authenticators."
+        description="Manage who can sign in to the console and what they can do."
       />
-      <details className="text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer py-1">Authenticator resets</summary>
-        <p className="mt-2">
-          Resetting revokes access and requires a new password and authenticator enrollment.
-        </p>
-      </details>
       <IdentitySettings />
       {error ? (
         <RpcError failure={error}>
           {error.ambiguous ? (
-            <p>Refresh the account list before trying again. The change may have completed.</p>
+            <p>The change may have gone through. Refresh the list before trying again.</p>
           ) : null}
         </RpcError>
       ) : null}
       {busy ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm text-muted-foreground">
-          Submitting account operation…
+          Saving…
         </p>
       ) : null}
       {enrollment ? (
@@ -131,10 +124,10 @@ export function Accounts() {
           aria-label="One-time enrollment secret"
         >
           <h2 className="font-semibold">Save this enrollment secret now</h2>
-          <p className="break-all font-mono text-xs">Account: {enrollment.accountId}</p>
+          <TechnicalDetails items={[{ label: "Account ID", value: enrollment.accountId }]} />
           <p className="max-w-3xl text-sm">
-            Give the account holder this secret through a trusted channel and direct them to
-            /enroll. It is shown only in this tab and is not recoverable.
+            Send it to the account holder privately and have them open /enroll. It won't be shown
+            again.
           </p>
           <code className="border bg-background p-3 break-all select-all">{enrollment.secret}</code>
           <p className="text-sm">
@@ -179,14 +172,14 @@ export function Accounts() {
               if (event.target.checked) setRole("owner");
             }}
           />
-          Designated break-glass owner
+          Emergency (break-glass) owner
         </label>
         <Button
           className="w-fit"
           type="submit"
           disabled={busy || !accounts.data?.roles.includes(role)}
         >
-          Create and issue enrollment secret
+          Create account
         </Button>
       </form>
       {accounts.isPending ? (
@@ -198,13 +191,13 @@ export function Accounts() {
       ) : null}
       {accounts.isError ? (
         <RpcError failure={toRpcFailure(accounts.error)}>
-          {accounts.data ? <p>The accounts below are from the last successful refresh.</p> : null}
+          {accounts.data ? <p>Showing the accounts from the last refresh.</p> : null}
         </RpcError>
       ) : null}
       {!accounts.isError && accounts.data?.accounts.length === 0 ? (
         <EmptyState
           title="No local accounts"
-          description="Create an account to grant console access."
+          description="Create an account to give someone console access."
         />
       ) : null}
       <div className="grid min-w-0 gap-4">
@@ -215,7 +208,7 @@ export function Accounts() {
             roles={accounts.data?.roles ?? []}
             busy={busy}
             onSave={(enabled, selectedRole, breakGlass, selectedScopes) =>
-              void perform(() =>
+              void perform("Account saved", () =>
                 updateAccount(
                   create(UpdateAccountRequestSchema, {
                     accountId: account.id,
@@ -232,10 +225,12 @@ export function Accounts() {
             onReset={() => {
               if (
                 window.confirm(
-                  `Reset ${account.username}? Existing sessions and authenticator will be revoked.`,
+                  `Reset ${account.username}? They'll be signed out and must set up their password and authenticator again.`,
                 )
               )
-                void perform(() => resetAccount(account.id, csrf, lifetime.signal));
+                void perform("Credentials reset", () =>
+                  resetAccount(account.id, csrf, lifetime.signal),
+                );
             }}
           />
         ))}
@@ -276,11 +271,9 @@ function AccountEditor({
             {account.enabled ? "Enabled" : "Disabled"}
           </StatusBadge>
           <StatusBadge status={account.enrolled ? "success" : "warning"}>
-            {account.enrolled ? "Authenticator enrolled" : "Awaiting enrollment"}
+            {account.enrolled ? "Set up" : "Not set up yet"}
           </StatusBadge>
-          {account.breakGlass ? (
-            <StatusBadge status="warning">Break-glass owner</StatusBadge>
-          ) : null}
+          {account.breakGlass ? <StatusBadge status="warning">Emergency owner</StatusBadge> : null}
         </div>
       </div>
       <label className="grid gap-2 text-sm font-medium">
@@ -317,7 +310,7 @@ function AccountEditor({
             if (event.target.checked) setRole("owner");
           }}
         />
-        Designated break-glass owner
+        Emergency (break-glass) owner
       </label>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy || !roles.includes(role)}>
