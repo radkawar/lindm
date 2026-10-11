@@ -907,6 +907,9 @@ version, architecture/storage and firmware bytes/version. Reuse reauthenticates 
 source ISO and checks local disk integrity; the derived disk is not vendor-signed,
 and repository packages reflect the signed suite at installation time rather than
 a reproducible snapshot. Each normal run uses a fresh overlay and SSH credentials.
+Recipe `debian-netinst-v2` resets the credential writer's umask 077 before the
+system files and the emptied `/etc/machine-id` (v1 left it mode 0600, unreadable
+to unprivileged D-Bus readers on first boot); only the source marker stays root-only.
 These maintained paths are not passing Debian lifecycle or physical-validation
 claims until their native commands complete and evidence is recorded.
 

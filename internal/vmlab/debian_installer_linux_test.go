@@ -68,6 +68,14 @@ func TestDebianPreseedBindsUnencryptedTargetAndCredentials(t *testing.T) {
 						t.Fatalf("installed provisioning lost %q", want)
 					}
 				}
+				// The SSH credential writer leaves umask 077. An emptied machine-id
+				// created under it stays mode 0600, unreadable to unprivileged
+				// D-Bus readers on first boot; only the source marker stays root-only.
+				inner := string(payload)
+				reset, machineID := strings.Index(inner, "umask 022\n"), strings.Index(inner, "touch /etc/machine-id")
+				if reset < strings.Index(inner, "umask 077") || machineID < reset || !strings.Contains(inner, "(umask 077 && printf") {
+					t.Fatal("installed system files inherit the credential umask")
+				}
 				for _, script := range []string{late, string(payload)} {
 					cmd := exec.Command("/bin/sh", "-n")
 					cmd.Stdin = strings.NewReader(script)

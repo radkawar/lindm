@@ -13,7 +13,7 @@ import (
 	"lindm/internal/platform"
 )
 
-const debianInstallerRecipeVersion = "debian-netinst-v1"
+const debianInstallerRecipeVersion = "debian-netinst-v2"
 
 func debianSuite(version string) (string, error) {
 	switch version {
@@ -54,9 +54,12 @@ func debianInstallerRecipe(version, disk, architecture, sourceDigest, login, hos
 		return nil, errors.New("debian installer requires verified source SHA256")
 	}
 	provision := "set -eu\n" + encryptedInstallerProvision(login, hostPrivate, hostPublic)
+	// The credential writer leaves umask 077; system files, including the
+	// emptied machine-id the first boot fills, must stay world-readable.
+	provision += "umask 022\n"
 	provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d /etc/default/grub.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
 	provision += "printf '%s\\n' 'GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0 console=" + console + "\"' > /etc/default/grub.d/99-lindm-lab.cfg\nupdate-grub\n"
-	provision += "printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + "\n"
+	provision += "(umask 077 && printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + ")\n"
 	provision += "systemctl enable ssh\ncloud-init clean --logs\nrm -f /etc/machine-id\ntouch /etc/machine-id\n"
 	return debianPreseed(suite, disk, "regular", "", "standard, ssh-server", "openssh-server sudo cloud-init ca-certificates", provision), nil
 }
