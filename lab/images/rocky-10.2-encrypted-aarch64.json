@@ -1,0 +1,19 @@
+{
+  "id": "rocky-10.2-dvd-encrypted-aarch64",
+  "distribution": "rocky",
+  "version": "10.2",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "10.2",
+  "imageFilename": "Rocky-10.2-aarch64-dvd1.iso",
+  "imageUrl": "https://www.mirrorservice.org/sites/download.rockylinux.org/pub/rocky/10/isos/aarch64/Rocky-10.2-aarch64-dvd1.iso",
+  "checksumUrl": "https://download.rockylinux.org/pub/rocky/10/isos/aarch64/CHECKSUM",
+  "signatureUrl": "https://download.rockylinux.org/pub/rocky/10/isos/aarch64/CHECKSUM.asc",
+  "keyUrl": "https://dl.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-10",
+  "sha256": "3b8253987604df1bc5e1c33c838ff3ee9ce4a8f02ed9e27e300ecff58c0c9588",
+  "signerFingerprint": "FC226859C0860BF0DDB95B085B106C736FEDFC85",
+  "imageSizeBytes": "9659678720",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://rockylinux.org/resources/gpg-key-info",
+  "releaseProvenanceUrl": "https://download.rockylinux.org/pub/rocky/10/isos/aarch64/"
+}

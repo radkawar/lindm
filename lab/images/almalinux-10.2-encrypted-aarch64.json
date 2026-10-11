@@ -1,0 +1,18 @@
+{
+  "id": "almalinux-10.2-dvd-encrypted-aarch64",
+  "distribution": "almalinux",
+  "version": "10.2",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "10.2",
+  "imageFilename": "AlmaLinux-10.2-aarch64-dvd.iso",
+  "imageUrl": "https://repo.almalinux.org/almalinux/10/isos/aarch64/AlmaLinux-10.2-aarch64-dvd.iso",
+  "checksumUrl": "https://repo.almalinux.org/almalinux/10/isos/aarch64/CHECKSUM",
+  "keyUrl": "https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-10",
+  "sha256": "bc3790b1200254790e03f1d941162a9f9082d46dcdff841b83f348501625b29e",
+  "signerFingerprint": "EE6DB7B98F5BF5EDD9DA0DE5DEE5C11CC2A1E572",
+  "imageSizeBytes": "9588244480",
+  "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+  "signerProvenanceUrl": "https://wiki.almalinux.org/release-notes/10.2.html",
+  "releaseProvenanceUrl": "https://repo.almalinux.org/almalinux/10/isos/aarch64/"
+}

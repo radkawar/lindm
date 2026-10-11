@@ -135,6 +135,22 @@ var (
 	}
 	rhelTPMPackages   = []string{"tpm2-tools", "tpm2-tss"}
 	reasonRHELPending = "native qualification on the pinned RHEL minor not yet passed"
+	// Rocky Linux and AlmaLinux 9.8/10.2 also install only from their vendor
+	// DVD, but their unregistered systems keep the free vendor repositories,
+	// so the lanes install action and owned-boot prerequisites with DNF. Only
+	// "Server with GUI" carries GNOME on every pinned DVD: the aarch64 comps
+	// have no workstation-product-environment (Anaconda stopped on it).
+	elRebuildDesktops = map[string][]string{"gnome": {"@^graphical-server-environment"}}
+	elRebuildCapture  = []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell", "mutter"}
+	elRebuildSession9 = LabSession{
+		Desktops: elRebuildDesktops, GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+		Terminal: []string{"gnome-terminal", "--"}, Capture: elRebuildCapture,
+	}
+	elRebuildSession10 = LabSession{
+		Desktops: elRebuildDesktops, GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+		Terminal: []string{"ptyxis", "--new-window", "--"}, Capture: elRebuildCapture,
+	}
+	reasonELRebuildRecovery = "owned-boot recovery sanitize not yet natively qualified on the pinned minor"
 	// Debian's netinst installs desktops as tasksel tasks; its gdm3 reads
 	// daemon.conf (Ubuntu patches it to custom.conf).
 	debianSession = LabSession{
@@ -312,9 +328,10 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
 	},
 	{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
@@ -322,9 +339,10 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
 	},
 	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux", ""),
 	{
@@ -333,9 +351,10 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9"},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
 	},
 	{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
@@ -343,9 +362,10 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10"},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
 	},
 	{
 		Key: "centos-stream-9", Name: "CentOS Stream 9", Distribution: "CentOS Stream", ID: "centos", Version: Exact("9"),

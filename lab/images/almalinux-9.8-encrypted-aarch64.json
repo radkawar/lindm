@@ -1,0 +1,18 @@
+{
+  "id": "almalinux-9.8-dvd-encrypted-aarch64",
+  "distribution": "almalinux",
+  "version": "9.8",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "9.8",
+  "imageFilename": "AlmaLinux-9.8-aarch64-dvd.iso",
+  "imageUrl": "https://repo.almalinux.org/almalinux/9/isos/aarch64/AlmaLinux-9.8-aarch64-dvd.iso",
+  "checksumUrl": "https://repo.almalinux.org/almalinux/9/isos/aarch64/CHECKSUM",
+  "keyUrl": "https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9",
+  "sha256": "916ec3ec8ceff4ea206daf1a030af77f811cdfcbef598c58639b6ddf39aeaf0f",
+  "signerFingerprint": "BF18AC2876178908D6E71267D36CB86CB86B3716",
+  "imageSizeBytes": "13012508672",
+  "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+  "signerProvenanceUrl": "https://wiki.almalinux.org/release-notes/9.8.html",
+  "releaseProvenanceUrl": "https://repo.almalinux.org/almalinux/9/isos/aarch64/"
+}
