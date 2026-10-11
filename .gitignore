@@ -7,3 +7,6 @@ artifacts/
 .tools/
 .tanstack/
 web/dist/
+
+# Locally built binaries (go build ./cmd/dev at the root)
+/dev
