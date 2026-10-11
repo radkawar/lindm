@@ -260,7 +260,8 @@ var registry = []*Release{
 		// (device_action_esp_insufficient), as on Fedora 44. The ESP is not resized
 		// and no vendor file or kernel is substituted.
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
-		Gates:    without(gates(), OSUpdate),
+		// No later Ubuntu LTS exists to upgrade to; 24.04 upgrades into this row.
+		Gates: without(gates(string(ReleaseUpgrade), "no successor release: the next Ubuntu LTS is not released"), OSUpdate),
 	},
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",

@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS | Ubuntu 26.04 LTS                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------- |
-| inventory         | implemented                                                                                             | implemented      | implemented                               |
-| lifecycle         | implemented                                                                                             | implemented      | implemented                               |
-| dispatch          | implemented                                                                                             | implemented      | implemented                               |
-| packages          | implemented                                                                                             | implemented      | implemented                               |
-| accounts          | implemented                                                                                             | implemented      | implemented                               |
-| sysctl            | implemented                                                                                             | implemented      | implemented                               |
-| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented      | implemented                               |
-| password          | implemented                                                                                             | implemented      | implemented                               |
-| firewall          | implemented                                                                                             | implemented      | implemented                               |
-| encryption        | implemented                                                                                             | implemented      | implemented                               |
-| wipe              | implemented                                                                                             | implemented      | implemented                               |
-| report-loss       | implemented                                                                                             | implemented      | implemented                               |
-| lock              | implemented                                                                                             | implemented      | implemented                               |
-| recovery-sanitize | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented      | implemented                               |
-| self-update       | implemented                                                                                             | implemented      | implemented                               |
-| assistance        | implemented                                                                                             | implemented      | implemented                               |
-| advisories        | implemented                                                                                             | implemented      | implemented                               |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented      | implemented                               |
-| release-upgrade   | gated: release upgrade is not implemented                                                               | implemented      | gated: release upgrade is not implemented |
+| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS | Ubuntu 26.04 LTS                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| inventory         | implemented                                                                                             | implemented      | implemented                                                      |
+| lifecycle         | implemented                                                                                             | implemented      | implemented                                                      |
+| dispatch          | implemented                                                                                             | implemented      | implemented                                                      |
+| packages          | implemented                                                                                             | implemented      | implemented                                                      |
+| accounts          | implemented                                                                                             | implemented      | implemented                                                      |
+| sysctl            | implemented                                                                                             | implemented      | implemented                                                      |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented      | implemented                                                      |
+| password          | implemented                                                                                             | implemented      | implemented                                                      |
+| firewall          | implemented                                                                                             | implemented      | implemented                                                      |
+| encryption        | implemented                                                                                             | implemented      | implemented                                                      |
+| wipe              | implemented                                                                                             | implemented      | implemented                                                      |
+| report-loss       | implemented                                                                                             | implemented      | implemented                                                      |
+| lock              | implemented                                                                                             | implemented      | implemented                                                      |
+| recovery-sanitize | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented      | implemented                                                      |
+| self-update       | implemented                                                                                             | implemented      | implemented                                                      |
+| assistance        | implemented                                                                                             | implemented      | implemented                                                      |
+| advisories        | implemented                                                                                             | implemented      | implemented                                                      |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented      | implemented                                                      |
+| release-upgrade   | gated: release upgrade is not implemented                                                               | implemented      | gated: no successor release: the next Ubuntu LTS is not released |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -53,25 +53,128 @@ SHA-256 `601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f`,
 and the Ubuntu CD image key `843938DF228D22F7B3742BC0D94AA3F0EFE21092`, as the
 Noble live-server manifests are. All three passed `lab images fetch` on 2026-10-11.
 A verified image is an input, not a successful installation, desktop, encryption or
-agent lifecycle result. The lab admits that desktop media to the encryption, wipe,
-report-loss, lock and assistance lanes (its own dracut 110 initramfs with the split
-`systemd-cryptsetup` module, no network packages); recovery-sanitize stays gated
-until the owned-boot recovery fixture is maintained for 26.04. Admission is not
-qualification.
+agent lifecycle result.
 
-Observed Ubuntu 26.04 x86_64 cloud lanes, under
-`$HOME/.cache/lindm-platformlanes-20261009/`:
+## Ubuntu 26.04.1 (Resolute Raccoon)
 
-| Lane                                                        | Evidence file                      | SHA-256                                                            |
-| ----------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| Automatic control-plane trust, signed 0.5.0→0.5.1 lifecycle | `ubuntu26-trust-platform2.json`    | `8a53652f7a2068710ce07726cb9b337709e6a67091a93b387bb9d4dcb33b6148` |
-| Connected service dispatch                                  | `ubuntu26-dispatch-platform2.json` | `a255d80d4df67104f017c4262f3adb8f62a0c681df0d975d50d153ba0ee8e441` |
+Every Ubuntu 24.04 x86_64 lane and every 24.04 aarch64 cloud lane has a native
+26.04.1 record; names, digests, commands and failed attempts are in
+[verification](../verification.md#ubuntu-26041-parity-records-2026-10-11). Cloud
+lanes ran on both architectures (local KVM x86_64, dgx20/dgx21 KVM aarch64 with
+AAVMF); the desktop lanes ran on x86_64 from the amd64 desktop ISO. The aarch64
+desktop cells that 24.04 has (encryption, GNOME assistance) are not yet recorded
+for 26.04. This is VM evidence, not physical-machine or air-gap qualification.
+The earlier `ubuntu26-trust-platform2.json`/`ubuntu26-dispatch-platform2.json`
+records (release-20260927 amd64, before the resource-provider cutover) are
+superseded by those records.
 
-The trust record contains five 679-package publications, collection-denial retention,
-authority rotation/revocation, reboot/reinstall retention, spool recovery and final
-revocation/missing-journal hold. These supersede the earlier failed reboot/trust
-attempts only for that lane. They do not qualify the later resource-provider cutover,
-physical machines, ARM, desktops or air-gap operation; consult verification before reuse.
+### Native deltas from 24.04
+
+Observed from native dpkg inventories, read-only image inspection and lane behaviour
+(the per-slice notes are referenced from verification):
+
+| Area              | 26.04.1                                                                                                                                                                                                                                                                                                                                                          | Consequence                                                                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Kernel            | Cloud image `linux-image-7.0.0-34-generic`; the desktop install and the release upgrade end on `7.0.0-38-generic` (security pocket); desktop ISO ships `7.0.0-30`                                                                                                                                                                                                | Larger vendor kernel (17.3 MB) feeds the recovery ESP budget below.                                                                                                                                                                        |
+| systemd           | `259.5-0ubuntu3.4`, built `-UTMP` (Ubuntu `debian/rules`); a `Class=manager` logind session (`Service=systemd-user`) accompanies each user session                                                                                                                                                                                                               | Session oracles filter `Class=user`. Without utmp, SSH logins register in logind with an empty `TTY` ([LP 2168583](https://bugs.launchpad.net/bugs/2168583)), so `wall` (and logind's scheduled-shutdown wall) cannot reach SSH terminals. |
+| Initramfs         | `dracut 110-11ubuntu0.1` is the default generator (non-hostonly; 72,091,068-byte cloud initrd vs 30,699,974 with 24.04's initramfs-tools); dracut ships the `update-initramfs` wrapper and splits `systemd-cryptsetup` out of `crypt`                                                                                                                            | Encrypted recipe must not install `cryptsetup-initramfs` (it would pull initramfs-tools and remove dracut); TPM recipe adds the `systemd-cryptsetup` module and `tpm2-tools`. Upgraded 24.04 systems keep initramfs-tools.                 |
+| sudo              | `sudo-rs 0.2.13` is `/usr/bin/sudo` (`/etc/alternatives/sudo → /usr/lib/cargo/bin/sudo`); GNU `sudo 1.9.17p2` remains installed                                                                                                                                                                                                                                  | Every lane drives the guest with `sudo -n …`/`sudo -n -u USER …`/`/etc/sudoers.d` NOPASSWD; all passed unchanged.                                                                                                                          |
+| coreutils         | `coreutils-from-uutils` → `rust-coreutils 0.10.0` (0.8.0 on the desktop ISO); `cp`/`mv`/`rm` stay GNU (`gnucp`…), `gnu-coreutils 9.7` installed alongside                                                                                                                                                                                                        | No lane or product change; `install -o/-g/-m`, `stat`, `sha256sum`, `timeout`, `date -u` behaved identically.                                                                                                                              |
+| APT/dpkg          | `apt 3.2.0`, `dpkg 1.23.7ubuntu1`; images ship `gpgv 2.4.8` and no `sqv`                                                                                                                                                                                                                                                                                         | APT verifies with gpgv. APT 3/OpenSSL requires TLS `close_notify` from HTTPS repositories (lab fixture fixed). Self-update staging semantics are unchanged from 2.8.3 ([Updates](#updates)).                                               |
+| Shadow/PAM        | `passwd 1:4.17.4`, `login` from util-linux 2.41.3, `libpam-modules 1.7.0-5ubuntu3.2`, `libpwquality 1.4.5-5build1`, PAM manager `pam-auth-update`                                                                                                                                                                                                                | Password pins in the registry row; the account helper's `--prefix`/`--root` probe selects tooling, no code change.                                                                                                                         |
+| Firewall          | `ufw 0.36.2` on `iptables 1.8.11` (nft), `nftables 1.1.6`                                                                                                                                                                                                                                                                                                        | Coexistence unchanged: UFW's `ip`/`ip6 filter` tables stay byte-identical across zone operations.                                                                                                                                          |
+| GNOME             | `gnome-shell 50.1`, `gdm3 50.1`, `libmutter-18-0`/`mutter-common 50.1`, Wayland only (no `xsessions`), terminal **Ptyxis 50.1** (no gnome-terminal), `xdg-desktop-portal 1.21.1`/`-gnome 50.0` (ScreenCast v5, RemoteDesktop v2), PipeWire 1.6.2, GStreamer 1.28.2; new user unit `gnome-initial-setup-upgrade-login.service` ("Welcome to Ubuntu 26.04.1 LTS!") | Registry `Lab.Session` selects Ptyxis, records `libmutter-18-0` and pre-creates `~/.config/gnome-initial-setup/upgrade-26.04-done` in disposable lab users only. Portal dialogs, wording and geometry are unchanged from GNOME 46.         |
+| Desktop installer | `ubuntu-desktop-bootstrap` snap rev 665 (Flutter UI, subiquity backend); one `Try or Install Ubuntu` GRUB entry; system and GNOME come from on-media squashfs layers; optional "enhanced-secureboot" (core-boot, snapd-sealed TPM FDE) source variation                                                                                                          | The lab seeds subiquity autoinstall through nocloud on the media; no network packages. The core-boot TPM FDE is not used: lindm manages systemd-cryptenroll TPM2 tokens on LUKS2 with the vendor GRUB chain, not snapd-sealed keys.        |
+| Other             | `openssh 1:10.2p1`, `openssl 3.5.5`, `cloud-init 26.1`, `snapd 2.76.3`, `apparmor 5.0.2`, `chrony 4.8`, `shim-signed 1.59+15.8`, GRUB 2.14, `ubuntu-release-upgrader 1:26.04.25`; arm64 sources use `archive.ubuntu.com`/`security.ubuntu.com` (no `ports`)                                                                                                      | Snap inventory now returns successful (empty) collection; restricted-network cloud guests settle `degraded` only through `systemd-networkd-wait-online` (no slirp router) and that unit is now named in inspect records.                   |
+
+Lab fixture finding: `systemctl mask --now` on an active timer reloads before it
+stops, and systemd 259 then fails the masked timer (`Unit to trigger vanished`);
+the cloud fixture now stops before masking.
+
+### Encryption, recovery and device actions
+
+The encrypted golden is installed from the official desktop ISO (edition
+`desktop-encrypted-lab`), keeping the vendor shim/GRUB/kernel, Secure Boot and
+swtpm. The stock variant uses the installer's own dracut initramfs; the TPM-capable
+variant adds the dracut drop-in (`systemd crypt tpm2-tss lvm systemd-cryptsetup`,
+`/etc/crypttab` with `tpm2-device=auto`) and `tpm2-tools`, which dracut's
+`tpm2-tss` module requires and the desktop media lack. systemd 259's
+`systemd-cryptsetup` in the dracut initrd reports a rejected passphrase only in the
+journal, so the registry marks the console as silent (`CryptsetupConsole`), as for
+Debian 13 and Fedora. Encryption scenarios 1–5, compliance, live erase, report-loss
+and GDM lock/quarantine passed on this golden.
+
+Recovery sanitize in owned-UKI mode is refused natively on the stock cloud image:
+the ordinary UKI built from the vendor kernel and the generic 72 MB dracut initrd
+leaves 13,998,592 bytes of the 105 MiB ESP, and the signed recovery image needs
+50,653,240, so pre-approval readiness reports `device_action_esp_insufficient`. A
+dracut `--hostonly` ordinary UKI (the RHEL fixture variant) still leaves only
+42,247,680 bytes against 46.7–50.4 MB, so UKI mode stays a native refusal.
+`RECOVERY_BOOT_MODE_MEASURED_GRUB` (below) stages on the 1 GB ext4 `/boot` and passed
+NVMe format and SATA overwrite. Linux 7.0's EFI stub appends two PCR 9
+`EV_EVENT_TAG` events (LoadOptions and initrd) after GRUB's measurements; the parser
+accepts them in order, at most once, bound to the GRUB initrd digest. GRUB 2.14's
+LoadOptions digest includes the trailing U+0000 that 24.04's GRUB 2.12 omits.
+
+### Updates and OS patch policy
+
+APT 3.2.0 keeps the canonical archive name, the existing-archive size check,
+`--no-download` and simulation output that self-update relies on (pinned
+[3.2.0 acquire-item.cc](https://salsa.debian.org/apt-team/apt/-/blob/3.2.0/apt-pkg/acquire-item.cc#L3549),
+[private-install.cc](https://salsa.debian.org/apt-team/apt/-/blob/3.2.0/apt-private/private-install.cc#L256)).
+3.x substitutes `Architecture-Variant` for the architecture in archive names when a
+package declares one; the agent DEB declares none. The OS patch policy runs with
+`unattended-upgrades 2.12ubuntu9`, `needrestart 3.11-1ubuntu2` and
+`update-notifier-common 3.207.2`. Its reboot notice reaches local PAM/TTY sessions;
+SSH sessions do not receive it on 26.04 (empty logind `TTY`, above), and
+`PatchRunSummary.notified_sessions` counts graphical recipients only, never wall
+delivery.
+
+### Advisories
+
+Configure resolute numerically (`release: "26.04"`); `noble` remains the only
+codename alias. The canonical export's resolute records are `Ubuntu:26.04:LTS`
+(91,587 affected entries in the 2026-10-10 archive); `Ubuntu:Pro:26.04:LTS`
+(`esm-apps/resolute`) is a separate, unconfigured product; the 15 development-series
+`Ubuntu:26.04` records are all withdrawn and dropped. No resolute record is
+malformed. Publication admitted 529,408 claims per architecture with zero rejections.
+
+## Release upgrade 24.04 → 26.04
+
+`lab vm resources -phase release-upgrade` enrolls a 24.04 cloud guest, converges a
+package, file, sysctl and service profile, publishes both the 24.04 and 26.04 OSV
+feeds, then runs the supported `do-release-upgrade -f DistUpgradeViewNonInteractive`
+in a transient unit and reboots. The registry row `ubuntu-24.04` names
+`UpgradeTo: ubuntu-26.04`; `ubuntu-26.04` has no successor and keeps the
+release-upgrade gate. Observed behaviour (upgrader `1:26.04.25`):
+
+- Identity: the installation, device, enrollment generation, certificate and session
+  epoch are unchanged; there is no re-enrollment. Both agent units stay active with
+  the same sandbox properties and unit files. The server records `os_version` 26.04
+  from fresh authenticated inventory equal to native dpkg truth.
+- The upgrader disables the third-party agent source
+  (`/etc/apt/sources.list.d/lindm-agent.sources` gets `Enabled: no`, "unknown
+  mirror"/"unknown dist", even with `--allow-third-party`, because suite `stable`
+  is not in its mirror map). lindm does not re-enable or edit operator APT sources;
+  agent self-update uses signed TUF targets through the protected transaction cache,
+  not that source. Re-enable it after re-verifying its key if APT installs from it
+  are wanted.
+- `lindm-agent` is reported foreign and skipped by obsolete/purge handling, so it
+  survives. Owned `/etc/apt/preferences.d/lindm-*` pins do not block the upgrade and
+  keep their inode and content.
+- While the upgrader holds dpkg's frontend lock, package staging, database reads and
+  the pre-effect commit check return busy: the executor signs
+  `RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY` before its effect gate and lindmd records
+  `BLOCKED`/`native_package_manager_busy`, re-dispatching one reconcile interval later.
+  Releases refused this way report `release_conflict/native_package_manager_busy`.
+  After the reboot every resource re-converges; only the changed package needs an
+  effect.
+- Advisory findings switch from the 24.04 feed to the 26.04 feed with none
+  attributed to any other feed.
+- `do-release-upgrade` itself refuses pending non-phased updates and a pending
+  kernel/libc reboot; the lane runs `apt-get full-upgrade` and reboots first.
+
+The cloud lane does not cover a GNOME 46→50 desktop or an encrypted-root upgrade.
 
 ## Packaging, signing, repositories, paths and LSM
 
@@ -222,7 +325,7 @@ repositories are built into bundles but not exercised.
 
 ## Encryption and recovery
 
-Ubuntu's stock encrypted installer uses `cryptsetup-initramfs`, `CRYPTSETUP=y` and
+Ubuntu 24.04's stock encrypted installer uses `cryptsetup-initramfs`, `CRYPTSETUP=y` and
 `update-initramfs -u -k all`. TPM boot is a distinct lab variant: after curtin finishes,
 it installs dracut/systemd/TPM dependencies, removes `cryptsetup-initramfs` and rebuilds
 initrds with dracut. Noble's dracut conflicts with initramfs-tools; do not silently
@@ -286,6 +389,8 @@ arm64, GRUB measures the gzip `vmlinuz` decompressed, and the release's
 `.kernel` target uses that form. Ubuntu 24.04 passed natively: amd64 SATA and
 NVMe, plus additional arm64 NVMe on `dgx21`. Record hashes are in
 [verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains).
+Ubuntu 26.04.1 amd64 NVMe and SATA also passed
+([26.04 section](#encryption-recovery-and-device-actions)).
 
 Stable storage selection is hardware-dependent, not an Ubuntu guarantee. The encrypted
 demo's virtio disk supplies serial `lindm-demo-encrypted` at
@@ -608,8 +713,9 @@ guest's device/media traffic routed over the LAN to the workstation and the
 console selecting the SSH-forwarded TURN TCP URL; the linked record binds the
 route, media statistics, expected end causes and audit evidence.
 This is not a physical ARM desktop claim.
-Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays or
-multi-user seats.
+Ubuntu 26.04.1 x86_64 GNOME 50 Wayland passed the same five scenarios
+([26.04 deltas](#native-deltas-from-2404)). Not qualified: KDE/Kubuntu, X11,
+26.04 aarch64 desktops, physical displays or multi-user seats.
 
 ### Commercial assistance capability roadmap
 
@@ -792,7 +898,8 @@ authenticator failure still fails the gate.
 - The encrypted read-only transient prerequisite is not yet a published 0.1.2 inventory
   or selectable-target proof at this handoff.
 - Agent self-update and systemd service lanes do not qualify the new generic native
-  package provider, whole-OS upgrades, rollback, all device actions or LSM policy.
+  package provider, rollback, all device actions or LSM policy. The release-upgrade
+  lane covers cloud 24.04→26.04 only, not desktop or encrypted-root upgrades.
 - Stock initramfs/passphrase, TPM-token unlock, recovery rotation and wipe require
   separate evidence. Missing target identity is a safety refusal, not permission to
   choose `/dev/vda` manually.
