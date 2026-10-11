@@ -461,6 +461,13 @@ An offline individual CSAF import can be digest-pinned but gains neither a
 signature timestamp nor complete coverage; a lone compressed archive is refused
 rather than treated as the authenticated paired distribution.
 
+The held-demo advisory configuration derives RHEL 9's paired CSAF archives from
+registry facts, with standard-stream coverage for x86_64 and aarch64 and a
+seven-day maximum age. Its controller-owned `advisory-cache` revalidates the
+vendor exports and publishes through the production parser before waiting for a
+current device evaluation. This feed configuration does not bypass the RHEL
+assistance session-recipe gate or establish new graphical qualification.
+
 Each JSON document is capped at **128 MiB**, independently of the
 512 MiB compressed-archive and **32 GiB expanded-archive** limits. The measured
 2026-10-04 signed advisory distribution contains four documents above the former

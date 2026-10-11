@@ -18,14 +18,24 @@ let config;
 let driver;
 let ui;
 
-// Wraps RTCPeerConnection only to observe the console's own peer: the remote
-// offer, its data channels and standard statistics. Behaviour is unchanged.
-function observePeers() {
+// Observe the console's own peer. Split lanes additionally restrict TURN URLs
+// to the SSH-forwarded endpoint to model a browser outside the controller LAN;
+// the console's relay-only policy and all other RTC configuration stay intact.
+function observePeers(forwardedTURNURL) {
   const Native = window.RTCPeerConnection;
   const peers = [];
   Object.defineProperty(window, "__lindmLabPeers", { value: peers });
   window.RTCPeerConnection = class extends Native {
     constructor(configuration, ...rest) {
+      if (forwardedTURNURL) {
+        configuration = {
+          ...configuration,
+          iceServers: (configuration?.iceServers ?? []).flatMap((server) => {
+            const urls = [server.urls].flat().filter((url) => url === forwardedTURNURL);
+            return urls.length ? [{ ...server, urls }] : [];
+          }),
+        };
+      }
       super(configuration, ...rest);
       const record = {
         pc: this,
@@ -52,6 +62,7 @@ async function observeMedia(surface) {
     dataChannels: [...(record?.channels ?? [])],
     localCandidateType: "",
     localRelayProtocol: "",
+    localCandidateURL: "",
     remoteCandidateType: "",
     controlButton: [...document.querySelectorAll("button")].some((node) =>
       /^Control (on|off)$/.test(node.innerText.trim()),
@@ -70,6 +81,7 @@ async function observeMedia(surface) {
     result.localCandidateType = stats.get(pair.localCandidateId)?.candidateType ?? "";
     result.remoteCandidateType = stats.get(pair.remoteCandidateId)?.candidateType ?? "";
     result.localRelayProtocol = stats.get(pair.localCandidateId)?.relayProtocol ?? "";
+    result.localCandidateURL = stats.get(pair.localCandidateId)?.url ?? "";
   }
   return result;
 }
@@ -95,7 +107,7 @@ const commands = {
   async start() {
     driver = new ChromiumDriver();
     await driver.open(config);
-    await driver.context.addInitScript(observePeers);
+    await driver.context.addInitScript(observePeers, config.forwardedTurnUrl ?? "");
     ui = new UI(driver, config.actionTimeoutMs);
     await driver.goto(config.origin);
     await driver.authenticator([]);

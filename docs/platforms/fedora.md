@@ -492,6 +492,16 @@ The first login on the golden shows gnome-tour's welcome dialog and the overview
 and idle lock is enabled. The lab disables both for the session; the product does
 not change them.
 
+Held Fedora 44 assistance demos configure the registry's complete RPM
+repomd/updateinfo exports for the guest's x86_64 or aarch64 architecture, with
+online refresh and a one-day maximum age. The controller's persistent
+`advisory-cache` revalidates vendor bytes before production publication. The demo
+announces readiness only after the first refresh and a current, non-unknown
+device evaluation, reporting real paginated finding counts. SSH-native hosts use
+the workstation control plane and forwarded admin path described in the
+[held-demo instructions](../engineering.md); `-colocated` retains host-local
+placement. Feed support does not qualify an ARM graphical desktop.
+
 Qualified: emulated x86_64 GNOME/Wayland consent, view, control, operator and local
 stop, decline, portal cancel and lock termination, with audit, in
 [`fedora44-assistance-03`](../verification.md#built-in-graphical-remote-assistance-l09-l12).

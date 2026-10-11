@@ -108,6 +108,10 @@ func trustClient(dir string) (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return trustClientPEM(ca)
+}
+
+func trustClientPEM(ca []byte) (*tls.Config, error) {
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(ca) {
 		return nil, fmt.Errorf("invalid development transport CA")

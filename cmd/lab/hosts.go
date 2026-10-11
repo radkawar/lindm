@@ -180,6 +180,9 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		if buildRepo := labhost.FlagValue(clean, "build-repo"); buildRepo != "" {
 			repo = buildRepo
 		}
+		if splitAssistance(chosen, clean) {
+			return runSplitAssistance(ctx, chosen, arch, repo, clean, stdout, stderr)
+		}
 		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Hold: held, Stdout: stdout, Stderr: stderr}).Run(ctx)
 	}
 	slots, err := labhost.OpenSlots(chosen)
@@ -196,6 +199,13 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 		clean = labhost.SetFlag(clean, workFlag, work)
+	}
+	if held && labhost.FlagValue(clean, "advisory-cache") == "" {
+		work, err := labhost.ResolveWorkDirectory(chosen)
+		if err != nil {
+			return err
+		}
+		clean = labhost.SetFlag(clean, "advisory-cache", filepath.Join(work, "advisory-cache"))
 	}
 	return slots.RunAdmitted(ctx, vmGuestCount(clean[1], clean), laneTiming(held), laneWaitReporter(stderr, chosen.Name), func(ctx context.Context) error {
 		return runUnscheduled(ctx, clean, stdout, stderr)
@@ -238,7 +248,7 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance", "updates":
+	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -342,7 +352,10 @@ func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.W
 		}
 	}
 	args = labhost.SetFlag(args, "cache", persistentCache)
-	if lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance" {
+	if lane == "assistance" && vmHolds(args[1:]) && labhost.FlagValue(args, "advisory-cache") == "" {
+		args = labhost.SetFlag(args, "advisory-cache", filepath.Join(work, "advisory-cache"))
+	}
+	if (lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance") && labhost.FlagValue(args, "control-plane") == "" {
 		repo := labhost.FlagValue(args, "repo")
 		if repo == "" {
 			return errors.New("remote control-plane lane requires staged -repo")

@@ -538,12 +538,25 @@ not change them.
 
 The arm64 lane uses the independently signed encrypted installer manifest
 `lab/images/ubuntu-noble-encrypted-arm64.json`, package-pinned AAVMF and native
-KVM on an SSH lab host. Its isolated PostgreSQL/trust fixture, server, relay,
-QEMU and operator Chromium are host-local; only control and returned evidence
-cross SSH. Remote browser prerequisites are user-owned pinned Node and
+KVM on an SSH lab host. It now defaults to a split topology: the controller
+workstation owns PostgreSQL, `lindmd` and TURN; QEMU and operator Chromium stay
+on the Spark. Guest device and relay traffic leaves QEMU user NAT over the
+routed LAN. Admin HTTPS and TURN TCP use SSH reverse forwards; the owner's
+browser uses corresponding local forwards to the controller. `-colocated`
+retains the explicitly host-local fixture used by the older records below.
+Remote browser prerequisites are user-owned pinned Node and
 package-lock-selected Playwright Chromium; the lane does not install system
 libraries. See the [held-demo instructions](../engineering.md) for access,
 secret custody and choosing a free Spark without changing manifest identity.
+
+Held Ubuntu 24.04 demos derive the complete Ubuntu OSV export from the platform
+registry, scoped to the guest's amd64/arm64 architecture, with online refresh and
+a one-day maximum age. The first production refresh is bounded to 4 GiB and two
+hours and uses the controller's persistent `advisory-cache` with ETag/
+Last-Modified revalidation and content-digest verification. Cached bytes alone
+never establish current vendor freshness. The running banner waits for a current,
+non-unknown device evaluation and reports real paginated finding counts.
+Rows without maintained feed facts and unsupported architectures fail explicitly.
 
 Qualified: virtual x86_64 and native-KVM aarch64 GNOME/Wayland consent, view,
 control, operator and local stop, decline, portal cancel and lock termination,
@@ -554,7 +567,15 @@ The arm64 run used GNOME Shell 46.0, Mutter 46.2
 GStreamer 1.24.2 and host-local Chromium 156.0.8078.4, with console TURN over
 TCP and guest TURN over UDP. An SSH-native held demo also passed startup,
 remote guest screenshot response and clean teardown with credentials excluded
-from returned evidence. This is not a physical ARM desktop claim.
+from returned evidence. The
+[split held smoke](../verification.md#routed-split-topology-assistance) additionally
+observed Spark-to-workstation device connections, real advisory publication and
+evaluation, screenshot response and complete process/listener/database teardown.
+The same split lane passed all five assistance scenarios on `dgx20`, with the
+guest's device/media traffic routed over the LAN to the workstation and the
+console selecting the SSH-forwarded TURN TCP URL; the linked record binds the
+route, media statistics, expected end causes and audit evidence.
+This is not a physical ARM desktop claim.
 Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays or
 multi-user seats.
 

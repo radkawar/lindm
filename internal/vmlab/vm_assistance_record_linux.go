@@ -30,6 +30,7 @@ type VMAssistanceResult struct {
 	Runtime           *vmRuntimeEvidence            `json:"runtime"`
 	RecipeVersion     string                        `json:"installer_recipe_version"`
 	Database          string                        `json:"isolated_database"`
+	Topology          string                        `json:"topology"`
 	DeviceID          string                        `json:"device_id"`
 	Relay             assistanceRelayEvidence       `json:"relay"`
 	Guest             *assistanceGuestEvidence      `json:"guest"`
@@ -67,6 +68,7 @@ type assistanceRelayEvidence struct {
 type assistanceGuestEvidence struct {
 	Desktop                *actionDesktopEvidence `json:"desktop"`
 	LocalhostResolution    string                 `json:"localhost_resolution"`
+	ControllerRoute        string                 `json:"controller_route,omitempty"`
 	ExecutorSocket         string                 `json:"executor_session_socket"`
 	SessionUnitState       string                 `json:"session_unit_state"`
 	SessionUnitAutoStarted bool                   `json:"session_unit_auto_started"`
@@ -107,6 +109,7 @@ type assistanceMediaEvidence struct {
 	RemoteCandidateType string   `json:"selected_remote_candidate_type"`
 	ControlButton       bool     `json:"control_button_present"`
 	LocalRelayProtocol  string   `json:"selected_local_relay_protocol"`
+	LocalCandidateURL   string   `json:"selected_local_candidate_url"`
 }
 
 type assistanceClickEvidence struct {

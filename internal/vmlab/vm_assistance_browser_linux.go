@@ -40,6 +40,7 @@ type assistanceBrowserConfig struct {
 	EvidenceDirectory string `json:"evidenceDirectory"`
 	ActionTimeoutMS   int    `json:"actionTimeoutMs"`
 	TURNTCPOnly       bool   `json:"turnTcpOnly"`
+	ForwardedTURNURL  string `json:"forwardedTurnUrl,omitempty"`
 }
 
 type assistanceBrowserReply struct {

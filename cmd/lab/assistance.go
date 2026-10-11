@@ -43,6 +43,10 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	scenarios := flags.String("scenarios", "", "comma-separated subset of control,view,decline,portal-cancel,lock; -hold defaults to none")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	flags.BoolVar(&options.ConsoleTURNTCP, "console-turn-tcp", false, "restrict the operator Chromium to TURN over TCP (a remote console behind an SSH forward) and require a TCP relay pair")
+	controlPlane := flags.String("control-plane", "", "private single-use controller handle (internal SSH lane input)")
+	flags.Bool("colocated", false, "keep lindmd, PostgreSQL and TURN on the SSH lab host instead of the controller")
+	flags.String("controller-address", "", "override the routed controller IPv4 address for an SSH-native split run")
+	flags.StringVar(&options.AdvisoryCache, "advisory-cache", "", "persistent revalidating feed cache for held demos; defaults to the configured lab work directory")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -74,11 +78,20 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		return err
 	}
 	options.EvidenceDir = *evidence
+	if *controlPlane != "" {
+		options.ControlPlane, err = vmlab.ReadAssistanceControlPlane(*controlPlane)
+		if err != nil {
+			return err
+		}
+	}
 	options.Encrypted.Desktop = "gnome"
 	options.Encrypted.TPMBoot = true
 	options.Encrypted.Hardware = hardware
 	if *hold {
 		options.Hold = func(access *vmlab.AssistanceHold) error { return writeAssistanceHold(stdout, *evidence, access) }
+		if options.ControlPlane != nil {
+			options.Hold = func(access *vmlab.AssistanceHold) error { return publishAssistanceHeld(*evidence, access) }
+		}
 		_, err := vmlab.AssistanceVM(ctx, manifest, options)
 		return err
 	}
@@ -113,18 +126,26 @@ func writeAssistanceHold(stdout io.Writer, dir string, access *vmlab.AssistanceH
 	if err != nil {
 		return err
 	}
+	relayAddress, controllerHost, labHost, respondDir := "localhost", "<this-host>", "<this-host>", dir
+	if access.ControllerAddress != "" {
+		relayAddress, controllerHost, labHost = access.ControllerAddress, "<controller-host>", "<lab-host>"
+		executable, respondDir = access.RespondBinary, access.RemoteEvidenceDir
+	}
 	_, err = fmt.Fprintf(stdout, `Remote-assistance demo is running; Ctrl-C stops lindmd and the VM and removes their state.
 Console: %s (trust .cache/dev/transport-ca.crt in a dedicated browser profile)
-Relay: TURN on loopback port %d (UDP and TCP)
-Remote browser: ssh -L %s:localhost:%s -L %d:localhost:%d <user>@<this-host>, then open the console URL; media uses TURN over TCP through the forward
+Relay: TURN on %s port %d (UDP and TCP)
+Remote browser: ssh -L %s:localhost:%s -L %d:%s:%d <user>@%s, then open the console URL; media uses TURN over TCP through the forward
 Owner enrollment: %s/enroll as %s, expires %s; the one-time secret is in %s
 Device: %s (%s), GNOME Wayland, GDM autologin as %s; its password is in the same file
 Guest display (TigerVNC >= 1.11, Unix socket, no TCP listener): vncviewer %s
-On this host: %s vm assistance-respond -evidence %s {%s}
-From another host: ssh <user>@<this-host> %s vm assistance-respond -evidence %s {%s}
+On the lab host: %s vm assistance-respond -evidence %s {%s}
+From another host: ssh <user>@%s %s vm assistance-respond -evidence %s {%s}
   allow = Allow + Share in the desktop dialog (+ Allow Remote Interaction for a Control request); decline; stop; screenshot.
 Request assistance from the device page; consent is the guest user's own Allow/Decline.
-`, access.ConsoleOrigin, access.RelayPort, origin.Port(), origin.Port(), access.RelayPort, access.RelayPort, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket, executable, dir, strings.Join(vmlab.AssistanceRespondActions, "|"), executable, dir, strings.Join(vmlab.AssistanceRespondActions, "|"))
+`, access.ConsoleOrigin, relayAddress, access.RelayPort, origin.Port(), origin.Port(), access.RelayPort, relayAddress, access.RelayPort, controllerHost, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"), labHost, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"))
+	if err == nil && access.Findings != nil {
+		_, err = fmt.Fprintf(stdout, "Advisory evaluation ready: %d affected, %d accepted, %d unknown, %d clear findings (%s).\n", access.Findings.Affected, access.Findings.Accepted, access.Findings.Unknown, access.Findings.Clear, access.Findings.Freshness.GetState())
+	}
 	return err
 }
 

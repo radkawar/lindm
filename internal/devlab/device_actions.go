@@ -27,6 +27,9 @@ import (
 // capability is granted. Call once before actions;
 // restarting preserves all accounts, sessions and the isolated database.
 func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1.UpdateExecutionTrustRequest, error) {
+	if f.connected != nil {
+		return nil, errors.New("device action configuration requires controller-owned authority fixture")
+	}
 	if f.closed || f.local == nil {
 		return nil, errors.New("device actions require an open local authority fixture")
 	}

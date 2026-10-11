@@ -75,7 +75,7 @@ is on port 18445. Development ports are loopback-only.
 | `make dev-trust`          | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                                         |
 | `make dev-down`           | Stop this checkout's lab services while preserving credentials and volumes                                                                                                |
 | `make fmt`                | Apply repository formatting                                                                                                                                               |
-| `lab vm assistance -hold` | Hands-on remote-assistance demo: one enrolled GNOME VM, local console and guest display until Ctrl-C (`docs/engineering.md`)                                              |
+| `lab vm assistance -hold` | Hands-on remote-assistance demo: one enrolled GNOME VM until Ctrl-C; SSH hosts default to a workstation control plane and forwarded admin access (`docs/engineering.md`)  |
 
 The lab uses `.cache/dev` with mode 0700 and secret files with mode 0600. Never commit
 or copy these credentials. Development-only certificates last five years. Moved,

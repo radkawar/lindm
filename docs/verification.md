@@ -3948,7 +3948,7 @@ The final run's native `lab` SHA-256 is
 Reproduce with the usual binary/cache paths for your checkout:
 
 ```sh
-lab vm assistance -host dgx20 \
+lab vm assistance -host dgx20 -colocated \
   -manifest lab/images/ubuntu-noble-encrypted-arm64.json \
   -repo . -lab artifacts/bin/lab -lindmd artifacts/bin/lindmd \
   -cache .cache/lab/images -require-cached-golden -console-turn-tcp \
@@ -4008,6 +4008,96 @@ the worker and release its lease only after teardown. A transport error while
 checking returned evidence retains the remote directory rather than treating
 the error as an absent file. No Spark demo was left running.
 
+#### Routed split-topology assistance
+
+SSH-native assistance now defaults to a workstation control plane; use
+`-colocated` to reproduce the older host-local records above. The workstation
+owns the isolated PostgreSQL database, `lindmd` and embedded TURN. The Spark
+owns the encrypted KVM guest, QMP and operator Chromium. The controller address
+is the source IPv4 route to the SSH host, or explicit `-controller-address IP`.
+Its device TLS leaf is run-scoped, signed by the development transport CA and
+covers that IP without modifying the shared certificate fixtures.
+
+The guest's one-time enrollment uses the signed localhost console origin through
+QEMU's host alias and the SSH reverse admin forward. Thereafter device mTLS and
+TURN use the real controller LAN address through QEMU user NAT on the Spark.
+The record reports `topology: split`, the routed device/TURN endpoints and the
+guest's observed `ip route get` result.
+Admin HTTPS and TURN TCP use
+`-R 127.0.0.1:ADMIN:127.0.0.1:ADMIN -R 127.0.0.1:TURN:CONTROLLER_IP:TURN`.
+The operator test driver filters only ICE server URLs to the forwarded
+`turn:localhost:TURN?transport=tcp`, modeling a browser outside the controller
+LAN. It preserves the console's own relay-only policy and requires both the
+selected local relay candidate URL and `relayProtocol: tcp`. This filtering is
+disclosed in the record's boundaries; it is not a product protocol change.
+
+**Passed on 2026-10-11:** the full five-scenario lane on `dgx20`, recorded at
+`$HOME/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-assistance-split-03/assistance.json`,
+SHA-256 `4177c9d6d2b0a02c9cef0669079a5c1afd3c31f2d5277de168215db8b75e916e`.
+This was native aarch64 KVM, Ubuntu 24.04 GNOME 46 Wayland, encrypted storage,
+Secure Boot and emulated TPM 2.0, with Chromium 156.0.8078.4 on the Spark.
+The guest reported `192.168.0.109 via 10.0.2.2 dev enp0s2 src 10.0.2.15`;
+device mTLS reached `https://192.168.0.109:46643`, and the workstation TURN
+listener was `192.168.0.109:43905`. Control, view and lock each selected relay/relay
+candidates with local URL `turn:localhost:43905?transport=tcp` and relay protocol
+`tcp`, decoding 16, 18 and 20 frames respectively. Control delivered the nonce to
+the guest; view had no data channel or control permission. Decline, portal
+cancel, operator stop, local stop and lock all produced their expected end
+causes and audit records; capture stopped for the three live scenarios.
+
+The record binds native lab SHA-256
+`4ee2e7092b93588919c05bef31b56e4609736f2cef0645ca1c4fdcec641e073a` and controller
+`lindmd` SHA-256 `f364f585726746fba528633b26e44126da637170bba1a3eff0b489530edf835b`.
+Reproduce with the aarch64 command above, omitting `-host dgx20` for FIFO host
+selection and omitting `-colocated`; choose a fresh evidence directory. The lane
+reserves a controller address and ports per run, so these recorded ports are
+evidence, not configuration defaults.
+
+The owner's browser uses matching SSH local forwards to the workstation.
+For `-hold`, only the workstation creates and stores the owner's console
+enrollment in `owner-access` (0400); the remote lane uses its own pre-enrolled
+account and never receives the owner's enrollment secret.
+The banner waits for real online advisory publication and current device
+evaluation, then reports finding counts. A private held marker transfers guest
+desktop access and is consumed over SSH, excluded from returned evidence.
+
+The separate split held smoke **passed** on 2026-10-11. Its observed report is
+`$HOME/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-held-split-01/smoke.json`,
+SHA-256 `cf90f58bf377330efac3ade07c37237ca36a02bd77d2517907aa6226e86b2a07`.
+The workstation saw three established device connections from Spark
+`192.168.0.20` to `192.168.0.109:45225`; device
+`553e6656-36a5-450a-bec7-b37f6606062b` was active with a current presence timestamp
+and published inventory. The console stayed at `https://localhost:38345`, with
+TURN on `192.168.0.109:34025`.
+
+The first real Ubuntu OSV refresh published 2,157,314 unique records (four
+rejected), taking 5m14.943s; the banner waited for evaluation and reported 33,509
+affected, zero accepted, zero unknown and zero clear findings. These are actual
+finding counts, not a clean-device claim. The owner's access file was 0400 on
+the workstation. The printed SSH `assistance-respond ... screenshot` command
+succeeded; returned `guest-respond-20261011T115750.899Z-screenshot.png` has SHA-256
+`1c72e45ee155d586b686aa40dae76f5f3e19edf36aec3631d38aef97e536d00d`.
+Ctrl-C exited 0. Read-only checks found no owned controller process, no listener
+on any of those three ports, no owned QEMU or remote run directory, and zero
+matching `pg_database` rows (one before teardown). The unrelated owner's Spark
+demo was not stopped or modified.
+
+Retained non-passing attempts under the same evidence root:
+
+- `ubuntu24-aarch64-assistance-split-01/assistance.json`, SHA-256
+  `a68a962df642c99660552a8e6c9a18f57c9e91070a99cf24294513a53bdbc8a3`: explicitly
+  interrupted during guest SSH readiness to apply the enrollment-origin review
+  correction; not qualification.
+- `ubuntu24-aarch64-assistance-split-02/assistance.json`, SHA-256
+  `ebf40983a55acbcc41504b95e293b39a9ed199c5048abef88048c127721b06ee`: control
+  passed, including the forwarded TCP candidate URL and typed nonce; view
+  reached OFFERED but not ANSWERED/ACTIVE before its 90-second bound. Its guest
+  portal and offer succeeded. The lane now preserves a final console screenshot
+  on scenario failure; the earlier awaiting-consent screenshot did not show
+  that negotiation failure. No bound or consent/media gate was relaxed. The
+  instrumented `split-03` run passed; the earlier stall's root cause remains
+  undetermined, and the passing record is not a claimed fix for that failure.
+
 #### Qualification boundaries
 
 An earlier Ubuntu run exposed a product race. GNOME 46 closes the portal session
@@ -4023,12 +4113,14 @@ These runs do not qualify any of the following:
   shared seats, or suspend/resume.
 - Accessibility, or logout and helper-loss paths. Those are covered by broker race
   tests only.
-- Network interruption, NAT or multi-host relay paths, TURN-over-TLS, bandwidth,
-  latency or video quality.
+- Network interruption, public-Internet NAT traversal, TURN-over-TLS, bandwidth,
+  latency or video quality. Only the routed LAN split path described above is
+  qualified across separate lab and controller hosts.
 - Air-gapped L16 operation, browsers other than Chromium, or replicated `lindmd`.
 
-The guest reached the relay through QEMU user networking at host loopback. GNOME
-idle lock was disabled in the lab session.
+The older co-located guests reached the relay through QEMU user networking at
+host loopback; the split guest used QEMU user NAT and the routed LAN. GNOME idle
+lock was disabled in the lab session.
 
 #### Commercial assistance capability qualification
 

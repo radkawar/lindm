@@ -110,7 +110,7 @@ func (f *AuthorityFixture) newLocalSession(account *localAccount) (*OwnerSession
 	if f.closed || account == nil {
 		return nil, errors.New("local authority fixture is unavailable")
 	}
-	tlsConfig, err := trustClient(FixturePath(f.repository))
+	tlsConfig, err := f.localTLSConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,11 @@ func (f *AuthorityFixture) newLocalSession(account *localAccount) (*OwnerSession
 	if err != nil {
 		return nil, err
 	}
-	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: ownerDialContext(f.AdminAddress), MaxIdleConns: 4, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
+	dial := ownerDialContext(f.AdminAddress)
+	if f.connected != nil {
+		dial = f.connectedDialContext()
+	}
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: dial, MaxIdleConns: 4, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
 	client := &http.Client{Transport: transport, Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	session := &OwnerSession{client: client, transport: transport, local: account, AccountID: account.id, origin: f.ConsoleOrigin}
 	session.Admin = adminv1connect.NewAdminServiceClient(client, f.ConsoleOrigin, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
@@ -216,7 +220,7 @@ func (s *OwnerSession) localCeremonyRole(ctx context.Context, secret, role strin
 	return nil
 }
 
-func (f *AuthorityFixture) enrollLocalOwners(ctx context.Context, secret string) (resultErr error) {
+func (f *AuthorityFixture) enrollLocalOwners(ctx context.Context, secret, approverName string) (resultErr error) {
 	session, err := f.newLocalSession(f.local.owner)
 	if err != nil {
 		return err
@@ -229,8 +233,12 @@ func (f *AuthorityFixture) enrollLocalOwners(ctx context.Context, secret string)
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, session.Close(ctx)) }()
+	return f.enrollLocalApprover(ctx, session, approverName)
+}
+
+func (f *AuthorityFixture) enrollLocalApprover(ctx context.Context, session *OwnerSession, approverName string) error {
 	enrollment := new(authv1.AccountEnrollment)
-	if err := session.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: "approver", Role: "owner"}, enrollment, http.StatusOK); err != nil {
+	if err := session.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: approverName, Role: "owner"}, enrollment, http.StatusOK); err != nil {
 		return err
 	}
 	defer func() { enrollment.Secret = "" }()
@@ -238,7 +246,7 @@ func (f *AuthorityFixture) enrollLocalOwners(ctx context.Context, secret string)
 	if err != nil || id == uuid.Nil || strings.TrimSpace(enrollment.GetSecret()) == "" {
 		return errors.New("invalid fixture approver enrollment")
 	}
-	f.local.approver, err = newLocalAccount("approver", id.String())
+	f.local.approver, err = newLocalAccount(approverName, id.String())
 	if err != nil {
 		return err
 	}

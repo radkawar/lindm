@@ -56,23 +56,11 @@ type AcceptanceFeedResult struct {
 // Fedora publishes RPM updateinfo, not CSAF; Red Hat's paired CSAF archives are
 // fetched separately. HTTP revalidation preserves vendor freshness on cache hits.
 func (f *AuthorityFixture) RefreshAcceptanceFeeds(ctx context.Context, cacheDirectory string, byteBudget int64, duration time.Duration) (*AcceptanceFeedResult, error) {
-	var feeds []*advisoryv1.FeedSource
-	for _, feed := range []struct {
-		release string
-		source  *advisoryv1.FeedSource
-	}{
-		{"ubuntu-24.04", &advisoryv1.FeedSource{Id: "acceptance-ubuntu", Architecture: "amd64", Url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP, MaxAgeSeconds: 86400}},
-		{"fedora-44", &advisoryv1.FeedSource{Id: "acceptance-fedora", Architecture: "x86_64", Url: "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD, MaxAgeSeconds: 86400}},
-		{"rhel-9", &advisoryv1.FeedSource{Id: "acceptance-rhel", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800}},
-	} {
-		release, ok := platform.Lookup(feed.release)
-		if !ok {
-			return nil, fmt.Errorf("acceptance feed release %s is not in the platform registry", feed.release)
-		}
-		feed.source.Distro, feed.source.Release = release.ID, release.Version.Value
-		feeds = append(feeds, feed.source)
+	cfg, err := acceptanceAdvisories()
+	if err != nil {
+		return nil, err
 	}
-	return f.RefreshVendorFeeds(ctx, cacheDirectory, byteBudget, duration, feeds)
+	return f.RefreshVendorFeeds(ctx, cacheDirectory, byteBudget, duration, cfg.Feeds)
 }
 
 // RefreshVendorFeeds configures exactly feeds (disabling any other configured
@@ -118,4 +106,32 @@ func (f *AuthorityFixture) RefreshVendorFeeds(ctx context.Context, cacheDirector
 	refreshErr := service.Refresh(ctx)
 	result.Feeds, err = service.Feeds(ctx)
 	return result, errors.Join(refreshErr, err)
+}
+
+func acceptanceAdvisories() (*configv1.AdvisoryConfig, error) {
+	cfg := &configv1.AdvisoryConfig{}
+	for _, target := range []struct{ release, id string }{
+		{"ubuntu-24.04", "acceptance-ubuntu"},
+		{"fedora-44", "acceptance-fedora"},
+		{"rhel-9", "acceptance-rhel"},
+	} {
+		release, ok := platform.Lookup(target.release)
+		if !ok {
+			return nil, fmt.Errorf("acceptance feed release %s is not in the platform registry", target.release)
+		}
+		derived, err := HeldAdvisories(*release, "x86_64")
+		if err != nil {
+			return nil, err
+		}
+		if len(derived.GetFeeds()) != 1 {
+			return nil, fmt.Errorf("acceptance feed release %s requires exactly one maintained export", target.release)
+		}
+		source := derived.Feeds[0]
+		source.Id = target.id
+		// Acceptance retains its existing parser archive default; held demos
+		// opt into the registry's larger archive allowance separately.
+		source.MaxArchiveBytes = nil
+		cfg.Feeds = append(cfg.Feeds, source)
+	}
+	return cfg, nil
 }

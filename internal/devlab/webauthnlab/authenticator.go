@@ -9,10 +9,12 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
 )
@@ -37,6 +39,39 @@ func New(rpID string) (*Authenticator, error) {
 	if _, err := rand.Read(a.id[:]); err != nil {
 		return nil, err
 	}
+	return a, nil
+}
+
+// Export transfers this laboratory credential as an ID and PKCS#8 private key.
+// The caller must protect and clear the returned key; only one authenticator may
+// advance the credential's counter after transfer.
+func (a *Authenticator) Export() (credentialID, privateKey []byte, err error) {
+	if a == nil || a.key == nil {
+		return nil, nil, errors.New("webauthnlab: missing export credential")
+	}
+	encoded, err := x509.MarshalPKCS8PrivateKey(a.key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("webauthnlab: encode credential: %w", err)
+	}
+	return append([]byte(nil), a.id[:]...), encoded, nil
+}
+
+// Import restores a laboratory credential exported for the same relying party.
+// It retains no reference to the supplied buffers; callers may clear them.
+func Import(rpID string, credentialID, privateKey []byte) (*Authenticator, error) {
+	if rpID == "" || len(credentialID) != 32 {
+		return nil, errors.New("webauthnlab: invalid relying party or credential ID")
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("webauthnlab: parse credential: %w", err)
+	}
+	key, ok := parsed.(*ecdsa.PrivateKey)
+	if !ok || key.Curve != elliptic.P256() {
+		return nil, errors.New("webauthnlab: credential requires a P-256 key")
+	}
+	a := &Authenticator{key: key, rpHash: sha256.Sum256([]byte(rpID))}
+	copy(a.id[:], credentialID)
 	return a, nil
 }
 

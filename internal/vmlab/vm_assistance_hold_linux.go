@@ -33,12 +33,17 @@ type AssistanceHold struct {
 	DisplaySocket   string
 	DesktopUser     string
 	DesktopPassword string
+	// Split handoff metadata identifies the two hosts without disclosing secrets.
+	ControllerAddress string
+	RemoteEvidenceDir string
+	RespondBinary     string
+	Findings          *devlab.DeviceFindingCounts
 }
 
 // holdAssistance hands the owner a fresh console enrollment and the guest's
 // display and login, then keeps lindmd and the VM running until ctx ends.
 // Consent stays the guest user's own click; nothing is seeded for the device.
-func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, screen *assistanceScreen, result *VMAssistanceResult, hold func(*AssistanceHold) error) error {
+func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, screen *assistanceScreen, result *VMAssistanceResult, hold func(*AssistanceHold) error, split bool, findings *devlab.DeviceFindingCounts) error {
 	hostname, err := vm.Run(ctx, "hostname", nil)
 	if err != nil {
 		return err
@@ -55,6 +60,7 @@ func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.Author
 	// GDM autologin owns the session and locking is off; the password only
 	// matters if the owner locks or logs out, so it is set now and handed over.
 	access := &AssistanceHold{ConsoleOrigin: fixture.ConsoleOrigin, RelayPort: result.Relay.ListenerPort, DeviceID: result.DeviceID, Hostname: strings.TrimSpace(string(hostname)), DisplaySocket: filepath.Join(vm.dir, "display.sock"), DesktopUser: actionDesktopUser, DesktopPassword: rand.Text()}
+	access.Findings = findings
 	defer func() { access.EnrollmentSecret, access.DesktopPassword = "", "" }()
 	line := []byte(actionDesktopUser + ":" + access.DesktopPassword + "\n")
 	_, err = vm.Run(ctx, "sudo -n chpasswd", bytes.NewReader(line))
@@ -62,12 +68,14 @@ func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.Author
 	if err != nil {
 		return fmt.Errorf("set demo desktop password: %w", err)
 	}
-	enrollment, err := fixture.CreateConsoleEnrollment(ctx)
-	if err != nil {
-		return err
+	if !split {
+		enrollment, err := fixture.CreateConsoleEnrollment(ctx)
+		if err != nil {
+			return err
+		}
+		access.Username, access.EnrollmentSecret, access.ExpiresAt = "console-owner", enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC()
+		enrollment.Secret = ""
 	}
-	access.Username, access.EnrollmentSecret, access.ExpiresAt = "console-owner", enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC()
-	enrollment.Secret = ""
 	if err := hold(access); err != nil {
 		return err
 	}
@@ -82,7 +90,9 @@ func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.Author
 		}
 	}()
 	defer func() { stop(nil); <-watched }()
-	if err := fixture.Wait(held); err != nil {
+	if split {
+		<-held.Done()
+	} else if err := fixture.Wait(held); err != nil {
 		return err
 	}
 	if ctx.Err() == nil {

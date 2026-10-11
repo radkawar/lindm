@@ -42,6 +42,10 @@ type VMAssistanceOptions struct {
 	// ConsoleTURNTCP restricts the operator Chromium to TURN over TCP, as a
 	// remote browser behind an SSH forward is, and requires a TCP relay pair.
 	ConsoleTURNTCP bool
+	// ControlPlane connects to a controller-owned fixture through SSH forwards.
+	ControlPlane *AssistanceControlPlane
+	// AdvisoryCache persists revalidated vendor feeds for hands-on demos.
+	AdvisoryCache string
 }
 
 // assistanceOperator is the console account the browser enrolls and signs in
@@ -73,6 +77,14 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		"Media and control proofs are the console's own WebRTC statistics and decoded frames plus a guest-side typed nonce; video quality, latency and bandwidth are not qualified.",
 		"GNOME idle blanking and automatic lock are disabled in the lab session; the lock scenario uses loginctl lock-session.",
 	}}
+	if options.ControlPlane != nil {
+		options.ConsoleTURNTCP = true
+		result.Topology = "split"
+		result.Boundaries[1] = "One-time enrollment uses the console origin through the lab host's SSH forward. Device mTLS and media traffic dial out through QEMU user NAT and the routed LAN to the controller. The admin browser uses SSH reverse forwards for HTTPS and TURN TCP. Public Internet NAT traversal is not qualified."
+		result.Boundaries = append(result.Boundaries, "The split operator test driver filters only ICE server URLs to the SSH-forwarded localhost TURN TCP endpoint, modeling an admin outside the controller LAN; the console's own relay-only policy is unchanged and the selected candidate URL and TCP protocol are required.")
+	} else {
+		result.Topology = "colocated"
+	}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		if err == nil {
@@ -96,7 +108,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if result.LabSHA256, err = dispatchFileDigest(options.LabBinary); err != nil {
 		return result, err
 	}
-	if result.LindmdSHA256, err = dispatchFileDigest(options.LindmdBinary); err != nil {
+	if options.ControlPlane != nil {
+		result.LindmdSHA256 = options.ControlPlane.LindmdSHA256
+	} else if result.LindmdSHA256, err = dispatchFileDigest(options.LindmdBinary); err != nil {
 		return result, err
 	}
 	packages, err := buildActionNativePackage(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.Encrypted.WorkDir)
@@ -110,34 +124,21 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if _, err := encryptedGolden(ctx, manifest, options.Encrypted); err != nil {
 		return result, err
 	}
-	fixture, err := devlab.OpenDeviceActionAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+	fixture, delegation, relay, err := openAssistanceFixture(ctx, options)
 	if err != nil {
 		return result, err
 	}
 	defer func() { err = errors.Join(err, fixture.Close()) }()
-	result.Database = fixture.DatabaseName
-	// Enrollment imports the same isolated execution authority the native
-	// action lanes use; assistance itself needs no signed action capability.
-	delegation, err := fixture.ConfigureDeviceActions(ctx)
-	if err != nil {
-		return result, fmt.Errorf("configure isolated execution authority: %w", err)
-	}
-	assistance, err := devlab.ReserveAssistanceRelay(options.RelayAddress)
-	if err != nil {
-		return result, err
-	}
-	relay := assistance.GetRelay()
-	result.Relay = assistanceRelayEvidence{ListenerAddress: relay.GetListener().GetAddress(), ListenerPort: relay.GetListener().GetPort(), RelayAddress: relay.GetRelayAddress(), PortMin: relay.GetRelayPortMin(), PortMax: relay.GetRelayPortMax(), URLs: relay.GetUrls(), GuestRoute: "guest localhost -> 10.0.2.2 (QEMU user networking) -> host 127.0.0.1"}
-	if err := fixture.ConfigureAssistance(ctx, assistance); err != nil {
-		return result, fmt.Errorf("enable isolated assistance relay: %w", err)
-	}
+	result.Database, result.Relay = fixture.DatabaseName, relay
 	control, err := openVMControlPlane(ctx, options.Repository, fixture)
 	if err != nil {
 		return result, fmt.Errorf("open isolated assistance control plane: %w", err)
 	}
 	defer func() { err = errors.Join(err, control.Close(context.WithoutCancel(ctx))) }()
-	if err := control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
-		return result, fmt.Errorf("admit isolated execution authority: %w", err)
+	if options.ControlPlane == nil {
+		if err := control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
+			return result, fmt.Errorf("admit isolated execution authority: %w", err)
+		}
 	}
 	vm, err := NewEncryptedVM(ctx, manifest, options.Encrypted)
 	if err != nil {
@@ -170,6 +171,13 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	result.Guest = &assistanceGuestEvidence{ExecutorSocket: "/run/lindm-session/session.sock"}
 	if result.Guest.LocalhostResolution, err = routeAssistanceLocalhost(ctx, vm.guest); err != nil {
 		return result, err
+	}
+	if options.ControlPlane != nil {
+		route, routeErr := vm.guest.run(ctx, "ip route get "+options.ControlPlane.ControllerAddress, nil, 4096, 10*time.Second)
+		if routeErr != nil {
+			return result, routeErr
+		}
+		result.Guest.ControllerRoute = strings.TrimSpace(string(route))
 	}
 	if err := configureAssistanceGuest(ctx, vm.guest); err != nil {
 		return result, err
@@ -209,10 +217,24 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if result.Audit, err = collectAssistanceAudit(ctx, control.session, result.Scenarios); err != nil || options.Hold == nil {
 		return result, err
 	}
+	var findings *devlab.DeviceFindingCounts
+	if options.ControlPlane == nil {
+		advisories, err := devlab.HeldAdvisories(*release, manifest.GetArchitecture())
+		if err != nil {
+			return result, err
+		}
+		if err := fixture.EnableAdvisories(ctx, advisories, options.AdvisoryCache); err != nil {
+			return result, err
+		}
+		findings, err = waitAssistanceFindings(ctx, fixture, result.DeviceID)
+		if err != nil {
+			return result, err
+		}
+	}
 	if !deadline.Stop() {
 		return result, context.Cause(ctx)
 	}
-	return result, holdAssistance(ctx, vm, fixture, screen, result, options.Hold)
+	return result, holdAssistance(ctx, vm, fixture, screen, result, options.Hold, options.ControlPlane != nil, findings)
 }
 
 // runAssistanceScenarios signs the operator browser in and runs each scenario
@@ -223,6 +245,9 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 		return err
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(private)) }()
+	if options.ControlPlane != nil {
+		run.forwardedTURNURL = options.ControlPlane.forwardedTURNURL()
+	}
 	if run.browser, err = openAssistanceOperator(ctx, fixture, options, private); err != nil {
 		return err
 	}
@@ -230,7 +255,14 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 	run.result.Browser.Version = run.browser.version
 	for _, scenario := range scenarios {
 		if err := run.scenario(ctx, scenario); err != nil {
-			return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
+			// Preserve the console's actual negotiation failure before closing
+			// Chromium; an earlier awaiting-consent screenshot cannot explain
+			// a later TURN/signaling failure on the routed admin path.
+			current := run.result.Scenarios[len(run.result.Scenarios)-1]
+			capture, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+			screenshotErr := run.browserScreenshot(capture, current, "failure")
+			cancel()
+			return errors.Join(fmt.Errorf("assistance scenario %s: %w", scenario.name, err), screenshotErr)
 		}
 	}
 	return nil
@@ -263,6 +295,9 @@ func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixtur
 	}
 	defer func() { enrollment.Secret = "" }()
 	cfg := assistanceBrowserConfig{Origin: fixture.ConsoleOrigin, Username: assistanceOperator, Password: rand.Text(), EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: options.EvidenceDir, ActionTimeoutMS: 30000, TURNTCPOnly: options.ConsoleTURNTCP}
+	if options.ControlPlane != nil {
+		cfg.ForwardedTURNURL = options.ControlPlane.forwardedTURNURL()
+	}
 	browser, err := startAssistanceBrowser(ctx, VMBuildRepository(options.Repository, options.BuildRepository), private, cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	return browser, err

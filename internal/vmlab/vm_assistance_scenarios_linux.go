@@ -33,7 +33,8 @@ type assistanceRun struct {
 	deviceID string
 	// turnTCP requires the console's selected relay candidate to use TURN
 	// over TCP, as a remote browser behind an SSH forward must.
-	turnTCP bool
+	turnTCP          bool
+	forwardedTURNURL string
 }
 
 // browserMedia mirrors the runner's camelCase observation.
@@ -50,6 +51,7 @@ type browserMedia struct {
 	RemoteCandidateType string   `json:"remoteCandidateType"`
 	ControlButton       bool     `json:"controlButton"`
 	LocalRelayProtocol  string   `json:"localRelayProtocol"`
+	LocalCandidateURL   string   `json:"localCandidateURL"`
 }
 
 // assistanceNoncePath is written only by the guest terminal's own shell.
@@ -206,6 +208,10 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		return err
 	}
 	scenario.Media = &assistanceMediaEvidence{VideoWidth: media.VideoWidth, VideoHeight: media.VideoHeight, DecodedFrames: media.DecodedFrames, FramesDecoded: media.FramesDecoded, ConnectionState: media.ConnectionState, TransportPolicy: media.TransportPolicy, RemoteApplication: media.RemoteApplication, DataChannels: media.DataChannels, LocalCandidateType: media.LocalCandidateType, RemoteCandidateType: media.RemoteCandidateType, ControlButton: media.ControlButton, LocalRelayProtocol: media.LocalRelayProtocol}
+	scenario.Media.LocalCandidateURL = media.LocalCandidateURL
+	if r.forwardedTURNURL != "" && media.LocalCandidateURL != r.forwardedTURNURL {
+		return fmt.Errorf("console relay candidate URL %q bypassed SSH-forwarded %q", media.LocalCandidateURL, r.forwardedTURNURL)
+	}
 	if err := verifyAssistanceMedia(scenario.Media, control, r.turnTCP); err != nil {
 		return err
 	}

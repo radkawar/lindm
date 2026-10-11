@@ -124,7 +124,7 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context) (*ConsoleDe
 	if err := os.WriteFile(filepath.Join(f.directory, trusted), append(shared, authority...), 0600); err != nil {
 		return nil, err
 	}
-	assistance, err := ReserveAssistanceRelay("127.0.0.1")
+	assistance, err := ReserveAssistanceRelay("127.0.0.1", "127.0.0.1")
 	if err != nil {
 		return nil, err
 	}

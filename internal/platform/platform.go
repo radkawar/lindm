@@ -202,10 +202,25 @@ const (
 	FeedArchASA       Feed = "arch-asa"
 )
 
+// AdvisoryExport is the complete online export of one vendor source.
+type AdvisoryExport struct {
+	URL string
+	// ArchitectureURLs selects the repository for the canonical machine
+	// architecture when a vendor does not publish one cross-architecture export.
+	ArchitectureURLs map[string]string
+	Format           string
+	MaxAgeSeconds    uint64
+	MaxArchiveBytes  uint64
+	PlatformStream   string
+}
+
 // Advisory names the vendor advisory sources the server applies to a release.
 type Advisory struct {
 	// Feeds are the accepted vendor sources, the primary one first.
 	Feeds []Feed
+	// Exports records maintained online acquisition facts for lab provisioning.
+	// A missing entry is unsupported, not permission to guess a vendor URL.
+	Exports map[Feed]AdvisoryExport
 	// Ecosystem is the vendor's product identity: the OSV ecosystem, the
 	// updateinfo product name or the CSAF product CPE, in which a trailing
 	// "spN" stands for the configured SLES service pack.

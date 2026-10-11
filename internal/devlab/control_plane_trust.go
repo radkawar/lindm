@@ -23,16 +23,15 @@ import (
 	"lindm/internal/releaseupdate"
 )
 
-// AuthorityFixture owns a real lindmd process and a disposable PostgreSQL database.
-// Shared development trust and IdP resources are read-only. Ordinary native lanes
-// keep pinned logical origins; browser and action lanes sign their allocated ports.
-// The development offline keys are never part of this server's configuration.
+// AuthorityFixture owns a real lindmd process and a disposable PostgreSQL database,
+// or connects to a controller-owned fixture through an SSH-forwarded admin port.
+// Shared development trust and IdP resources are read-only. The development offline
+// keys are never part of this server's configuration.
 type AuthorityFixture struct {
 	AdminAddress  string
 	DeviceAddress string
 	ConsoleOrigin string
-	// DeviceOrigin is the signed bootstrap bundle's device origin; guests reach
-	// DeviceAddress through this origin's loopback port.
+	// DeviceOrigin is the signed bootstrap bundle's device origin.
 	DeviceOrigin     string
 	DatabaseName     string
 	repository       string
@@ -51,6 +50,8 @@ type AuthorityFixture struct {
 	releasePublisher *releaseupdate.Publisher
 	ha               *haTopology
 	demo             *consoleDemoOrigin
+	connected        *connectedAuthority
+	exportedAccounts []string
 }
 
 type authorityFixtureMode uint8
@@ -176,6 +177,10 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	if options.ListenAddress != "" {
 		listen = options.ListenAddress
 	}
+	deviceListen := listen
+	if options.splitDevice.IsValid() {
+		deviceListen = options.splitDevice.String()
+	}
 	adminAddressToReserve := net.JoinHostPort(listen, "0")
 	if mode == authorityKeycloakConsole {
 		adminAddressToReserve = "127.0.0.1:18444"
@@ -189,7 +194,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			resultErr = errors.Join(resultErr, admin.Close())
 		}
 	}()
-	device, err := net.Listen("tcp4", net.JoinHostPort(listen, "0"))
+	device, err := net.Listen("tcp4", net.JoinHostPort(deviceListen, "0"))
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +211,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	}
 	cfg := proto.CloneOf(document.Proto)
 	cfg.AdminListener = &configv1.ListenerConfig{Address: listen, Port: uint32(adminAddress.Port)}
-	cfg.DeviceListener = &configv1.ListenerConfig{Address: listen, Port: uint32(deviceAddress.Port)}
+	cfg.DeviceListener = &configv1.ListenerConfig{Address: deviceListen, Port: uint32(deviceAddress.Port)}
 	if options.Advisories != nil {
 		cfg.Advisories = proto.CloneOf(options.Advisories)
 	}
@@ -216,6 +221,9 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		cfg.PublicUrl = f.ConsoleOrigin
 		if mode == authorityDeviceActions || mode == authorityHA {
 			deviceOrigin = fmt.Sprintf("https://localhost:%d", deviceAddress.Port)
+		}
+		if options.splitDevice.IsValid() {
+			deviceOrigin = "https://" + f.DeviceAddress
 		}
 		material, err = f.originAgentFixture(ctx, material, deviceOrigin)
 		if err != nil {
@@ -229,6 +237,13 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
 	cfg.Tls.CertificateFile = filepath.Join(shared, "server.crt")
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")
+	if options.splitDevice.IsValid() {
+		if err := writeSplitCertificate(shared, f.directory, options.splitDevice); err != nil {
+			return nil, err
+		}
+		cfg.Tls.CertificateFile = filepath.Join(f.directory, "split-server.crt")
+		cfg.Tls.PrivateKeyFile = filepath.Join(f.directory, "split-server.key")
+	}
 	cfg.DeviceCa.CertificateFile = filepath.Join(shared, "device-ca.crt")
 	cfg.DeviceCa.PrivateKeyFile = filepath.Join(shared, "device-ca.key")
 	if local {
@@ -317,7 +332,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		return nil, err
 	}
 	if local {
-		if err := f.enrollLocalOwners(ctx, enrollmentSecret); err != nil {
+		if err := f.enrollLocalOwners(ctx, enrollmentSecret, "approver"); err != nil {
 			return nil, err
 		}
 	}
@@ -427,6 +442,9 @@ func (f *AuthorityFixture) stop() error {
 
 // Restart preserves the exact private database, config and listener addresses.
 func (f *AuthorityFixture) Restart(ctx context.Context) error {
+	if f.connected != nil {
+		return errors.New("restart requires controller-owned authority fixture")
+	}
 	if f.closed {
 		return errors.New("isolated authority fixture is closed")
 	}
@@ -437,11 +455,19 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 }
 
 func (f *AuthorityFixture) Close() error {
+	if f.connected != nil {
+		f.closed = true
+		if f.local != nil {
+			f.local.close()
+		}
+		return nil
+	}
 	if f.closed && f.process == nil && f.cluster == nil && f.ha == nil {
 		return nil
 	}
+	err := f.disableExportedAccounts()
 	f.closed = true
-	err := f.stop()
+	err = errors.Join(err, f.stop())
 	if f.demo != nil {
 		err = errors.Join(err, f.demo.close())
 		f.demo = nil

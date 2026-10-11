@@ -86,6 +86,9 @@ func (f *AuthorityFixture) configureConsoleEscrow(cfg *configv1.ServerConfig) er
 // RequireConsoleRevealApproval restarts the console server with two-person
 // reveal required, preserving its database, accounts and escrow keys.
 func (f *AuthorityFixture) RequireConsoleRevealApproval(ctx context.Context) error {
+	if f.connected != nil {
+		return errors.New("reveal approval configuration requires controller-owned authority fixture")
+	}
 	document, err := config.Load(f.configPath())
 	if err != nil {
 		return err
@@ -130,6 +133,9 @@ func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (_ *auth
 // ReadAgentFixture returns this live fixture's public provisioning material,
 // including its own signed origins, not necessarily the shared dev origins.
 func (f *AuthorityFixture) ReadAgentFixture(ctx context.Context) (*AgentFixture, error) {
+	if f != nil && f.connected != nil {
+		return f.connectedAgentFixture(ctx)
+	}
 	if f == nil || f.closed || (f.process == nil && (f.ha == nil || !f.ha.running())) || f.database == nil {
 		return nil, errors.New("authority fixture is not live")
 	}
@@ -154,6 +160,9 @@ func (f *AuthorityFixture) ReadAgentFixture(ctx context.Context) (*AgentFixture,
 // Wait holds an interactive fixture until cancellation or unexpected server exit.
 // Like Close and Restart, it must not race another fixture lifecycle operation.
 func (f *AuthorityFixture) Wait(ctx context.Context) error {
+	if f.connected != nil {
+		return errors.New("wait requires controller-owned authority fixture")
+	}
 	if f.closed || f.process == nil {
 		return errors.New("authority fixture is not live")
 	}

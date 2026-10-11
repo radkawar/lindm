@@ -342,10 +342,22 @@ artifacts/bin/lab vm assistance -host local -hold \
 
 It provisions exactly like the lane: an encrypted GNOME (Wayland) clone with the
 signed agent and `lindm-session.service`, an isolated `lindmd` with the embedded
-TURN relay, and GDM autologin with locking off. It then holds one lab slot, with
-no lane deadline, until Ctrl-C tears everything down. Held runs need a native
-lab host (local or SSH) and never write a qualification record. Stdout gets these
-nonsecret details:
+TURN relay, and GDM autologin with locking off. Held demos also enable the
+platform's maintained online advisory feeds, complete an initial real refresh
+and wait for the enrolled device's current evaluation before printing "running"
+and the affected/accepted/unknown/clear finding counts. Missing feed coverage or
+an unknown evaluation is a gate, never an empty successful result.
+Feeds use a persistent revalidating HTTP cache under the configured controller
+lab work directory's `advisory-cache` (the lab host's directory in co-located
+mode), or the explicit `-advisory-cache DIRECTORY` override. An SSH-only host
+configuration requires that override to identify the controller's persistent
+cache. Unchanged vendor exports are reused after revalidation. Only `lindmd`
+restarts when enabling this configuration; the fixture database and enrolled
+device are retained.
+
+The demo holds one lab slot, with no lane deadline, until Ctrl-C tears everything
+down. Held runs need a native lab host (local or SSH) and never write a
+qualification record. Stdout gets these nonsecret details:
 
 - the loopback console origin; trust the development CA as for `lab console`;
 - the loopback TURN port and a placeholder SSH forward line for both ports. The
@@ -398,28 +410,63 @@ artifacts/bin/lab vm assistance -hold \
 
 The scheduler stages the current source and native binaries under the configured
 host work directory (`/home/r/lindm-lab` on the Sparks), reuses its verified image
-and encrypted-golden caches, and keeps the remote lease through teardown. The
-same isolated PostgreSQL/trust bootstrap used by remote device-action lanes runs
-there; `lindmd`, TURN, QEMU, QMP and the scenario browser all stay on that host.
+and encrypted-golden caches, and keeps the remote lease through teardown.
+SSH-native assistance runs default to **split topology**: PostgreSQL, `lindmd`
+and its embedded TURN relay run on the controller workstation; only QEMU, QMP
+and the scenario browser run on the Spark. `-colocated` explicitly restores the
+isolated host-local topology; local-host runs are unchanged.
+
+The controller uses the local source IPv4 address of the route to the SSH
+alias's configured `HostName`; `-controller-address IP` overrides that selection.
+The device listener and TURN bind that specific address, never a wildcard.
+The guest dials out through QEMU user-network NAT, the Spark and the routed LAN
+to the controller device and TURN ports. Steady-state device mTLS traffic never
+uses an SSH tunnel. One-time enrollment retains the signed localhost console
+origin: the guest's localhost alias reaches QEMU's host alias `10.0.2.2` and
+the console's SSH reverse forward. A run-scoped leaf signed by the development
+transport CA covers the controller IP and loopback names; shared development
+certificates are unchanged. The bootstrap signs the real `https://IP:PORT`
+device origin.
+
+The admin listener stays on `127.0.0.1` with WebAuthn origin
+`https://localhost:PORT`. The scheduler opens
+`-R ADMIN:127.0.0.1:ADMIN -R TURN:CONTROLLER_IP:TURN` with
+`ExitOnForwardFailure=yes`, so the Spark's operator browser reaches admin HTTPS
+and TURN TCP through SSH. Split scenarios require TURN TCP and the selected
+localhost candidate URL; their test driver filters ICE server URLs to that
+forwarded endpoint while leaving the console's relay-only policy intact.
 The assistance prerequisite step provisions private SHA-256-pinned Node 24.21.0
-and the package-lock-selected Playwright Chromium under `assistance-browser/`.
+and package-lock-selected Playwright Chromium under `assistance-browser/`.
 It changes neither system packages nor global PATH; missing browser libraries
 are a prerequisite failure, not permission to install packages.
 
-Use the printed `ssh -L … <user>@<this-host>` placeholders with your SSH alias,
-then open the loopback console. Both console HTTPS and TURN TCP ports must be
-forwarded unchanged. `-console-turn-tcp` also exercises that transport in the
-scenario browser. The printed remote `assistance-respond` command acts through
-the guest's QMP display and writes its screenshot on the Spark. Owner credentials
-stay only in the private remote `owner-access` file: retrieve them deliberately
-over SSH, never from logs. On exit the lane returns screenshots and records to
-the workstation's `-evidence` directory, excludes `owner-access`, and removes its
-owned remote run directory. Interrupted transport or failed evidence transfer
-retains that exact remote directory and reports its path instead.
-The SSH worker has its own process group: Ctrl-C cancels the controller, closes
-the worker's stdin lease, and waits for VM/fixture teardown before collecting
-evidence. A failed SSH existence check is a transport failure, never proof that
-the evidence is absent or permission to delete the remote run.
+For the owner, use the printed
+`ssh -L ADMIN:localhost:ADMIN -L TURN:CONTROLLER_IP:TURN <user>@<controller-host>`
+placeholders with your workstation SSH alias, then open the loopback console.
+Both ports must be forwarded unchanged. The printed
+`ssh <user>@<lab-host> … vm assistance-respond -evidence REMOTE_DIR ACTION`
+acts through the guest's QMP display and writes its screenshot on the Spark.
+The controller creates the owner's enrollment only when the remote VM reports
+that it is held. Owner credentials stay in the workstation's private
+`EVIDENCE/owner-access` (0400), never in remote logs or streamed output.
+The remote lane gets a distinct, already-enrolled owner-role account through a
+single-use 0600 control-plane handle containing private lab WebAuthn credentials.
+Pre-enrollment prevents FIFO admission or a cold advisory refresh from consuming
+an enrollment secret's lifetime. The handle is consumed and removed remotely;
+the controller disables this account at teardown. The connected lane cannot
+reconfigure or own the controller fixture. A separate private, atomically
+published held marker transfers the desktop password over SSH and is removed
+after receipt.
+
+On exit the lane returns screenshots and records, excluding `owner-access` and
+the private held marker, then removes its owned remote run directory.
+Interrupted transport or failed evidence transfer retains that exact directory
+and reports its path. In `-colocated` mode the owner's access file remains on the
+lab host, as before; retrieve it deliberately over SSH, never from logs.
+Ctrl-C closes the worker's stdin lease and waits for remote VM teardown before
+closing the controller fixture and dropping its private database. A controller
+server exit cancels the remote lane. A failed SSH existence check is a transport
+failure, never proof that evidence is absent or permission to delete the run.
 
 Console UI review: `make ui-review` replaces the manual console review. It builds the embedded console
 and runs `lab console review -lindmd artifacts/bin/lindmd -evidence NEW_DIR` from the

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -39,6 +40,7 @@ type LoadAuthorityOptions struct {
 	// network namespace (shared by the caller) instead of publishing a port.
 	networkContainer string
 	airgap           *AirgapAuthorityOptions
+	splitDevice      netip.Addr
 	// ListenAddress binds admin/device listeners to one local IPv4 address
 	// (default loopback) so a generator on another host can reach them. TLS
 	// names and signed origins are unchanged; clients dial this address.
