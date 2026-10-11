@@ -57,13 +57,14 @@ agent lifecycle result.
 
 ## Ubuntu 26.04.1 (Resolute Raccoon)
 
-Every Ubuntu 24.04 x86_64 lane and every 24.04 aarch64 cloud lane has a native
-26.04.1 record; names, digests, commands and failed attempts are in
+Every Ubuntu 24.04 lane except the air-gap bundle and console-enrollment lanes has a
+native 26.04.1 record, plus aarch64 desktop wipe, report-loss, lock and compliance
+cells that 24.04 lacks; names, digests, commands and failed attempts are in
 [verification](../verification.md#ubuntu-26041-parity-records-2026-10-11). Cloud
 lanes ran on both architectures (local KVM x86_64, dgx20/dgx21 KVM aarch64 with
-AAVMF); the desktop lanes ran on x86_64 from the amd64 desktop ISO. The aarch64
-desktop cells that 24.04 has (encryption, GNOME assistance) are not yet recorded
-for 26.04. This is VM evidence, not physical-machine or air-gap qualification.
+AAVMF); desktop lanes ran from the official amd64 desktop ISO on local KVM and from
+the arm64 desktop ISO on dgx21 (AAVMF Secure Boot, swtpm, virtio-gpu). This is VM
+evidence, not physical-machine or air-gap qualification.
 The earlier `ubuntu26-trust-platform2.json`/`ubuntu26-dispatch-platform2.json`
 records (release-20260927 amd64, before the resource-provider cutover) are
 superseded by those records.
@@ -102,7 +103,10 @@ variant adds the dracut drop-in (`systemd crypt tpm2-tss lvm systemd-cryptsetup`
 `systemd-cryptsetup` in the dracut initrd reports a rejected passphrase only in the
 journal, so the registry marks the console as silent (`CryptsetupConsole`), as for
 Debian 13 and Fedora. Encryption scenarios 1–5, compliance, live erase, report-loss
-and GDM lock/quarantine passed on this golden.
+and GDM lock/quarantine passed on this golden. The arm64 desktop ISO uses the same
+recipe on QEMU `virt` with AAVMF Secure Boot: GRUB on the EFI console, the kernel on
+PL011 `ttyAMA0`, virtio-gpu for GNOME; the same cells passed there. Recovery
+sanitize has no aarch64 record.
 
 Recovery sanitize in owned-UKI mode is refused natively on the stock cloud image:
 the ordinary UKI built from the vendor kernel and the generic 72 MB dracut initrd
@@ -729,9 +733,10 @@ guest's device/media traffic routed over the LAN to the workstation and the
 console selecting the SSH-forwarded TURN TCP URL; the linked record binds the
 route, media statistics, expected end causes and audit evidence.
 This is not a physical ARM desktop claim.
-Ubuntu 26.04.1 x86_64 GNOME 50 Wayland passed the same five scenarios
+Ubuntu 26.04.1 GNOME 50 Wayland passed the same five scenarios on x86_64 and on
+native-KVM aarch64 (split topology, dgx21)
 ([26.04 deltas](#native-deltas-from-2404)). Not qualified: KDE/Kubuntu, X11,
-26.04 aarch64 desktops, physical displays or multi-user seats.
+physical displays or multi-user seats.
 
 ### Commercial assistance capability roadmap
 
