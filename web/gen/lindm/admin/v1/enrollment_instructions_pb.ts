@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/enrollment_instructions.proto.
  */
 export const file_lindm_admin_v1_enrollment_instructions: GenFile = /*@__PURE__*/
-  fileDesc("CixsaW5kbS9hZG1pbi92MS9lbnJvbGxtZW50X2luc3RydWN0aW9ucy5wcm90bxIObGluZG0uYWRtaW4udjEiIgogR2V0RW5yb2xsbWVudEluc3RydWN0aW9uc1JlcXVlc3QivQUKIUdldEVucm9sbG1lbnRJbnN0cnVjdGlvbnNSZXNwb25zZRInChFlbnJvbGxtZW50X29yaWdpbhgBIAEoCUIMukgJcgeAtRgBiAEBEigKDWRldmljZV9vcmlnaW4YAiABKAlCDLpICXIHgLUYAYgBAUgAiAEBEi0KEmV4ZWN1dGlvbl9yb290X3VybBgDIAEoCUIMukgJcgeItRgBiAEBSAGIAQESLwoUYm9vdHN0cmFwX2J1bmRsZV91cmwYBCABKAlCDLpICXIHiLUYAYgBAUgCiAEBEj8KDmFwdF9yZXBvc2l0b3J5GAUgASgLMicubGluZG0uYWRtaW4udjEuRW5yb2xsbWVudEFQVFJlcG9zaXRvcnkSPwoOZG5mX3JlcG9zaXRvcnkYBiABKAsyJy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50RE5GUmVwb3NpdG9yeRIfCg1ncmFudF9jb21tYW5kGAcgASgJQgi6SAVyAxiAIBImChRwcm92aXNpb25pbmdfY29tbWFuZBgIIAEoCUIIukgFcgMYgCASIAoOcmVzdW1lX2NvbW1hbmQYCSABKAlCCLpIBXIDGIAgOrUBukixARquAQomZW5yb2xsbWVudF9pbnN0cnVjdGlvbnMuYm9vdHN0cmFwX3BhaXISRGV4ZWN1dGlvbiByb290IGFuZCBzaWduZWQgYm9vdHN0cmFwIFVSTHMgbXVzdCBiZSBjb25maWd1cmVkIHRvZ2V0aGVyGj5oYXModGhpcy5leGVjdXRpb25fcm9vdF91cmwpID09IGhhcyh0aGlzLmJvb3RzdHJhcF9idW5kbGVfdXJsKUIQCg5fZGV2aWNlX29yaWdpbkIVChNfZXhlY3V0aW9uX3Jvb3RfdXJsQhcKFV9ib290c3RyYXBfYnVuZGxlX3VybCKlAgoXRW5yb2xsbWVudEFQVFJlcG9zaXRvcnkSHgoIYmFzZV91cmwYASABKAlCDLpICXIHiLUYAYgBARIlCg9zaWduaW5nX2tleV91cmwYAiABKAlCDLpICXIHiLUYAYgBARJFChdzaWduaW5nX2tleV9maW5nZXJwcmludBgDIAEoCUIkukghch8yHV4oWzAtOUEtRl17NDB9fFswLTlBLUZdezY0fSkkEjUKBXN1aXRlGAQgASgJQia6SCNyIRiAATIcXltBLVphLXowLTldW0EtWmEtejAtOS5fLV0qJBJFCgpjb21wb25lbnRzGAUgAygJQjG6SC6SASsIARAQGAEiI3IhGIABMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokIqcBChdFbnJvbGxtZW50RE5GUmVwb3NpdG9yeRIeCghiYXNlX3VybBgBIAEoCUIMukgJcgeItRgBiAEBEiUKD3NpZ25pbmdfa2V5X3VybBgCIAEoCUIMukgJcgeItRgBiAEBEkUKF3NpZ25pbmdfa2V5X2ZpbmdlcnByaW50GAMgASgJQiS6SCFyHzIdXihbMC05QS1GXXs0MH18WzAtOUEtRl17NjR9KSRCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("CixsaW5kbS9hZG1pbi92MS9lbnJvbGxtZW50X2luc3RydWN0aW9ucy5wcm90bxIObGluZG0uYWRtaW4udjEiIgogR2V0RW5yb2xsbWVudEluc3RydWN0aW9uc1JlcXVlc3QiuwoKIUdldEVucm9sbG1lbnRJbnN0cnVjdGlvbnNSZXNwb25zZRInChFlbnJvbGxtZW50X29yaWdpbhgBIAEoCUIMukgJcgeAtRgBiAEBEigKDWRldmljZV9vcmlnaW4YAiABKAlCDLpICXIHgLUYAYgBAUgAiAEBEi0KEmV4ZWN1dGlvbl9yb290X3VybBgDIAEoCUIMukgJcgeItRgBiAEBSAGIAQESLwoUYm9vdHN0cmFwX2J1bmRsZV91cmwYBCABKAlCDLpICXIHiLUYAYgBAUgCiAEBEj8KDmFwdF9yZXBvc2l0b3J5GAUgASgLMicubGluZG0uYWRtaW4udjEuRW5yb2xsbWVudEFQVFJlcG9zaXRvcnkSPwoOZG5mX3JlcG9zaXRvcnkYBiABKAsyJy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50RE5GUmVwb3NpdG9yeRIfCg1ncmFudF9jb21tYW5kGAcgASgJQgi6SAVyAxiAIBImChRwcm92aXNpb25pbmdfY29tbWFuZBgIIAEoCUIIukgFcgMYgCASIAoOcmVzdW1lX2NvbW1hbmQYCSABKAlCCLpIBXIDGIAgEjkKFWV4ZWN1dGlvbl9yb290X3NoYTI1NhgKIAEoCUIVukgSchAyDl5bYS1mMC05XXs2NH0kSAOIAQESIgoKdGxzX2NhX3BlbRgLIAEoCUIJukgGcgQYgIAESASIAQESMQoNdGxzX2NhX3NoYTI1NhgMIAEoCUIVukgSchAyDl5bYS1mMC05XXs2NH0kSAWIAQESQAoJcGxhdGZvcm1zGA0gAygLMiIubGluZG0uYWRtaW4udjEuRW5yb2xsbWVudFBsYXRmb3JtQgm6SAaSAQMQgAESNgoJcmVhZGluZXNzGA4gASgLMiMubGluZG0uYWRtaW4udjEuRW5yb2xsbWVudFJlYWRpbmVzcxJBCg9hcmNoX3JlcG9zaXRvcnkYDyABKAsyKC5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50QXJjaFJlcG9zaXRvcnk6qQO6SKUDGv0BCiZlbnJvbGxtZW50X2luc3RydWN0aW9ucy5ib290c3RyYXBfcGFpchJPZXhlY3V0aW9uIHJvb3QsIHJvb3QgaGFzaCBhbmQgc2lnbmVkIGJvb3RzdHJhcCBVUkxzIG11c3QgYmUgY29uZmlndXJlZCB0b2dldGhlchqBAWhhcyh0aGlzLmV4ZWN1dGlvbl9yb290X3VybCkgPT0gaGFzKHRoaXMuYm9vdHN0cmFwX2J1bmRsZV91cmwpICYmIGhhcyh0aGlzLmV4ZWN1dGlvbl9yb290X3VybCkgPT0gaGFzKHRoaXMuZXhlY3V0aW9uX3Jvb3Rfc2hhMjU2KRqiAQolZW5yb2xsbWVudF9pbnN0cnVjdGlvbnMuaHR0cHNfY2FfcGFpchJIcHJpdmF0ZSBIVFRQUyBDQSBhbmQgY2VydGlmaWNhdGUgZmluZ2VycHJpbnQgbXVzdCBiZSBjb25maWd1cmVkIHRvZ2V0aGVyGi9oYXModGhpcy50bHNfY2FfcGVtKSA9PSBoYXModGhpcy50bHNfY2Ffc2hhMjU2KUIQCg5fZGV2aWNlX29yaWdpbkIVChNfZXhlY3V0aW9uX3Jvb3RfdXJsQhcKFV9ib290c3RyYXBfYnVuZGxlX3VybEIYChZfZXhlY3V0aW9uX3Jvb3Rfc2hhMjU2Qg0KC190bHNfY2FfcGVtQhAKDl90bHNfY2Ffc2hhMjU2IlgKE0Vucm9sbG1lbnRSZWFkaW5lc3MSDQoFcmVhZHkYASABKAgSGAoGcmVhc29uGAIgASgJQgi6SAVyAxiAARIYCgZyZW1lZHkYAyABKAlCCLpIBXIDGIAIIugCChJFbnJvbGxtZW50UGxhdGZvcm0SFAoCaWQYASABKAlCCLpIBXIDGIABEhcKBWxhYmVsGAIgASgJQgi6SAVyAxiAAhIXCgVvc19pZBgDIAEoCUIIukgFcgMYgAESHQoLdmVyc2lvbl9pZHMYBCADKAlCCLpIBZIBAhAgEh0KC3ZhcmlhbnRfaWRzGAUgAygJQgi6SAWSAQIQEBIfCg5wYWNrYWdlX2ZhbWlseRgGIAEoCUIHukgEcgIYIBIxCg1hcmNoaXRlY3R1cmVzGAcgAygJQhq6SBeSARQQAiIQcg5SBWFtZDY0UgVhcm02NBI2CglyZWFkaW5lc3MYCCABKAsyIy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50UmVhZGluZXNzEkAKDHZlcnNpb25fcnVsZRgJIAEoCUIqukgnciVSBWV4YWN0UgVtYWpvclIGYWJzZW50UghzbmFwc2hvdFIDYW55IqUCChdFbnJvbGxtZW50QVBUUmVwb3NpdG9yeRIeCghiYXNlX3VybBgBIAEoCUIMukgJcgeItRgBiAEBEiUKD3NpZ25pbmdfa2V5X3VybBgCIAEoCUIMukgJcgeItRgBiAEBEkUKF3NpZ25pbmdfa2V5X2ZpbmdlcnByaW50GAMgASgJQiS6SCFyHzIdXihbMC05QS1GXXs0MH18WzAtOUEtRl17NjR9KSQSNQoFc3VpdGUYBCABKAlCJrpII3IhGIABMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEkUKCmNvbXBvbmVudHMYBSADKAlCMbpILpIBKwgBEBAYASIjciEYgAEyHF5bQS1aYS16MC05XVtBLVphLXowLTkuXy1dKiQipwEKF0Vucm9sbG1lbnRETkZSZXBvc2l0b3J5Eh4KCGJhc2VfdXJsGAEgASgJQgy6SAlyB4i1GAGIAQESJQoPc2lnbmluZ19rZXlfdXJsGAIgASgJQgy6SAlyB4i1GAGIAQESRQoXc2lnbmluZ19rZXlfZmluZ2VycHJpbnQYAyABKAlCJLpIIXIfMh1eKFswLTlBLUZdezQwfXxbMC05QS1GXXs2NH0pJCLPAQoYRW5yb2xsbWVudEFyY2hSZXBvc2l0b3J5Eh4KCGJhc2VfdXJsGAEgASgJQgy6SAlyB4i1GAGIAQESJQoPc2lnbmluZ19rZXlfdXJsGAIgASgJQgy6SAlyB4i1GAGIAQESRQoXc2lnbmluZ19rZXlfZmluZ2VycHJpbnQYAyABKAlCJLpIIXIfMh1eKFswLTlBLUZdezQwfXxbMC05QS1GXXs2NH0pJBIlCg9yZXBvc2l0b3J5X25hbWUYBCABKAlCDLpICXIHCgVsaW5kbUIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.GetEnrollmentInstructionsRequest
@@ -28,8 +28,8 @@ export const GetEnrollmentInstructionsRequestSchema: GenMessage<GetEnrollmentIns
   messageDesc(file_lindm_admin_v1_enrollment_instructions, 0);
 
 /**
- * Deployment configuration, not inferred browser/listener addresses. Missing
- * optional fields and repository messages mean explicitly not configured.
+ * Deployment-owned installation metadata and explicit readiness. Native package
+ * URLs are always on the configured lindmd public HTTPS origin.
  *
  * @generated from message lindm.admin.v1.GetEnrollmentInstructionsResponse
  */
@@ -45,8 +45,8 @@ export type GetEnrollmentInstructionsResponse = Message<"lindm.admin.v1.GetEnrol
   deviceOrigin?: string | undefined;
 
   /**
-   * Public download is delivery only. Authenticate the initial execution root
-   * through the deployment owner's independent trusted installation channel.
+   * Authenticate these exact bytes with execution_root_sha256, delivered by
+   * this authenticated RPC, before trusting the signed bootstrap bundle.
    *
    * @generated from field: optional string execution_root_url = 3;
    */
@@ -86,6 +86,40 @@ export type GetEnrollmentInstructionsResponse = Message<"lindm.admin.v1.GetEnrol
    * @generated from field: string resume_command = 9;
    */
   resumeCommand: string;
+
+  /**
+   * @generated from field: optional string execution_root_sha256 = 10;
+   */
+  executionRootSha256?: string | undefined;
+
+  /**
+   * Private HTTPS CA from configured certificate material, not a fetched key.
+   *
+   * @generated from field: optional string tls_ca_pem = 11;
+   */
+  tlsCaPem?: string | undefined;
+
+  /**
+   * SHA-256 of the single CA certificate's DER encoding, not its PEM text.
+   *
+   * @generated from field: optional string tls_ca_sha256 = 12;
+   */
+  tlsCaSha256?: string | undefined;
+
+  /**
+   * @generated from field: repeated lindm.admin.v1.EnrollmentPlatform platforms = 13;
+   */
+  platforms: EnrollmentPlatform[];
+
+  /**
+   * @generated from field: lindm.admin.v1.EnrollmentReadiness readiness = 14;
+   */
+  readiness?: EnrollmentReadiness | undefined;
+
+  /**
+   * @generated from field: lindm.admin.v1.EnrollmentArchRepository arch_repository = 15;
+   */
+  archRepository?: EnrollmentArchRepository | undefined;
 };
 
 /**
@@ -94,6 +128,97 @@ export type GetEnrollmentInstructionsResponse = Message<"lindm.admin.v1.GetEnrol
  */
 export const GetEnrollmentInstructionsResponseSchema: GenMessage<GetEnrollmentInstructionsResponse> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_enrollment_instructions, 1);
+
+/**
+ * @generated from message lindm.admin.v1.EnrollmentReadiness
+ */
+export type EnrollmentReadiness = Message<"lindm.admin.v1.EnrollmentReadiness"> & {
+  /**
+   * @generated from field: bool ready = 1;
+   */
+  ready: boolean;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: string remedy = 3;
+   */
+  remedy: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.EnrollmentReadiness.
+ * Use `create(EnrollmentReadinessSchema)` to create a new message.
+ */
+export const EnrollmentReadinessSchema: GenMessage<EnrollmentReadiness> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_enrollment_instructions, 2);
+
+/**
+ * Exact registry identities; ID_LIKE is never an enrollment selector. Empty
+ * version_ids identifies a rolling release. Architectures use Go/DEB names.
+ *
+ * @generated from message lindm.admin.v1.EnrollmentPlatform
+ */
+export type EnrollmentPlatform = Message<"lindm.admin.v1.EnrollmentPlatform"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: string os_id = 3;
+   */
+  osId: string;
+
+  /**
+   * @generated from field: repeated string version_ids = 4;
+   */
+  versionIds: string[];
+
+  /**
+   * Empty accepts any VARIANT_ID; otherwise match one value exactly.
+   *
+   * @generated from field: repeated string variant_ids = 5;
+   */
+  variantIds: string[];
+
+  /**
+   * @generated from field: string package_family = 6;
+   */
+  packageFamily: string;
+
+  /**
+   * @generated from field: repeated string architectures = 7;
+   */
+  architectures: string[];
+
+  /**
+   * @generated from field: lindm.admin.v1.EnrollmentReadiness readiness = 8;
+   */
+  readiness?: EnrollmentReadiness | undefined;
+
+  /**
+   * exact, major (value or value.N), absent, snapshot (YYYYMMDD), or any.
+   *
+   * @generated from field: string version_rule = 9;
+   */
+  versionRule: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.EnrollmentPlatform.
+ * Use `create(EnrollmentPlatformSchema)` to create a new message.
+ */
+export const EnrollmentPlatformSchema: GenMessage<EnrollmentPlatform> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_enrollment_instructions, 3);
 
 /**
  * @generated from message lindm.admin.v1.EnrollmentAPTRepository
@@ -130,7 +255,7 @@ export type EnrollmentAPTRepository = Message<"lindm.admin.v1.EnrollmentAPTRepos
  * Use `create(EnrollmentAPTRepositorySchema)` to create a new message.
  */
 export const EnrollmentAPTRepositorySchema: GenMessage<EnrollmentAPTRepository> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_enrollment_instructions, 2);
+  messageDesc(file_lindm_admin_v1_enrollment_instructions, 4);
 
 /**
  * Requires signatures for both RPM packages and repository metadata.
@@ -159,5 +284,39 @@ export type EnrollmentDNFRepository = Message<"lindm.admin.v1.EnrollmentDNFRepos
  * Use `create(EnrollmentDNFRepositorySchema)` to create a new message.
  */
 export const EnrollmentDNFRepositorySchema: GenMessage<EnrollmentDNFRepository> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_enrollment_instructions, 3);
+  messageDesc(file_lindm_admin_v1_enrollment_instructions, 5);
+
+/**
+ * Requires signatures for both packages and the pacman sync database.
+ *
+ * @generated from message lindm.admin.v1.EnrollmentArchRepository
+ */
+export type EnrollmentArchRepository = Message<"lindm.admin.v1.EnrollmentArchRepository"> & {
+  /**
+   * @generated from field: string base_url = 1;
+   */
+  baseUrl: string;
+
+  /**
+   * @generated from field: string signing_key_url = 2;
+   */
+  signingKeyUrl: string;
+
+  /**
+   * @generated from field: string signing_key_fingerprint = 3;
+   */
+  signingKeyFingerprint: string;
+
+  /**
+   * @generated from field: string repository_name = 4;
+   */
+  repositoryName: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.EnrollmentArchRepository.
+ * Use `create(EnrollmentArchRepositorySchema)` to create a new message.
+ */
+export const EnrollmentArchRepositorySchema: GenMessage<EnrollmentArchRepository> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_enrollment_instructions, 6);
 

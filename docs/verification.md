@@ -144,36 +144,37 @@ the dispatch lane's systemd service evidence.
 
 <!-- BEGIN GENERATED lab-matrix -->
 
-| Release             | Inventory                                   | Lifecycle                    | Dispatch                     | Resources                                                                 | Encryption                                  | Wipe/loss/lock                                 | Recovery sanitize | Self-update                        | Assistance                           | Advisories | OS update | Release upgrade        |
-| ------------------- | ------------------------------------------- | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- | ----------------- | ---------------------------------- | ------------------------------------ | ---------- | --------- | ---------------------- |
-| Ubuntu 22.04 LTS    | x86_64 [pass][r1]; aarch64 —                | x86_64 —; aarch64 [pass][r2] | x86_64 —; aarch64 [pass][r2] | —                                                                         | —                                           | —                                              | gated             | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
-| Ubuntu 24.04 LTS    | x86_64 [pass][r3]; aarch64 [pass (TCG)][r3] | pass                         | pass                         | x86_64 [pass (seven kinds, no firewall)][r4]; aarch64 [pass (subset)][r5] | x86_64 [pass (TPM scenario)][r6]; aarch64 — | x86_64 [pass (selected phases)][r6]; aarch64 — | —                 | x86_64 [pass][r7]; aarch64 no lane | x86_64 [pass (GNOME)][r8]; aarch64 — | no lane    | —         | x86_64 —; aarch64 pass |
-| Ubuntu 26.04 LTS    | x86_64 [pass][r9]; aarch64 —                | —                            | —                            | —                                                                         | x86_64 —; aarch64 no image                  | x86_64 —; aarch64 no image                     | gated             | x86_64 —; aarch64 no lane          | x86_64 —; aarch64 no image           | no lane    | —         | gated                  |
-| Debian 12           | x86_64 —; aarch64 [pass][r1]                | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | no image                                    | no image                                       | gated             | x86_64 no lane; aarch64 [pass][r2] | no image                             | no lane    | gated     | gated                  |
-| Debian 13           | x86_64 —; aarch64 [pass][r1]                | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | no image                                    | no image                                       | no image          | x86_64 no lane; aarch64 [pass][r2] | no image                             | no lane    | gated     | gated                  |
-| Fedora 43           | x86_64 [pass][r9]; aarch64 no image         | x86_64 —; aarch64 no image   | x86_64 —; aarch64 no image   | no lane                                                                   | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
-| Fedora 44           | x86_64 [pass][r3]; aarch64 [pass][r1]       | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass][r5] | x86_64 —; aarch64 [pass (subset)][r5]                                     | x86_64 [pass][r6]; aarch64 —                | x86_64 [pass (selected phases)][r6]; aarch64 — | —                 | x86_64 [pass][r7]; aarch64 no lane | x86_64 [pass (GNOME)][r8]; aarch64 — | no lane    | —         | gated                  |
-| RHEL 9              | x86_64 [pass][r9]; aarch64 —                | x86_64 [pass][r1]; aarch64 — | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (eight kinds)][r4]                                | no image                                    | no image                                       | no image          | x86_64 —; aarch64 no lane          | gated                                | no lane    | —         | gated                  |
-| RHEL 10             | —                                           | x86_64 [pass][r1]; aarch64 — | x86_64 [pass][r1]; aarch64 — | —                                                                         | no image                                    | no image                                       | no image          | x86_64 —; aarch64 no lane          | gated                                | no lane    | —         | gated                  |
-| Rocky Linux 9       | [pass][r1]                                  | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
-| Rocky Linux 10      | [pass][r1]                                  | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
-| AlmaLinux 9         | [pass][r1]                                  | —                            | [pass][r1]                   | x86_64 —; aarch64 [pass (eight kinds)][r4]                                | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
-| AlmaLinux 10        | [pass][r1]                                  | [pass][r1]                   | [pass][r1]                   | x86_64 —; aarch64 [pass (all kinds)][r4]                                  | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
-| Linux Mint 22.3     | —                                           | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | —                                  | gated                                | no lane    | gated     | gated                  |
-| Pop!\_OS 24.04 LTS  | —                                           | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | —                                  | —                                    | no lane    | gated     | gated                  |
-| Arch Linux          | [pass][r1]                                  | [pass][r1]                   | [pass][r1]                   | gated                                                                     | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
-| Omarchy 4.0.4       | —                                           | —                            | —                            | gated                                                                     | —                                           | —                                              | gated             | —                                  | gated                                | gated      | gated     | gated                  |
-| openSUSE Tumbleweed | x86_64 —; aarch64 [pass][r1]                | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | gated                                                                     | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
+| Release             | Inventory                                   | Enroll from console                                                                                                          | Lifecycle                    | Dispatch                     | Resources                                                                 | Encryption                                  | Wipe/loss/lock                                 | Recovery sanitize | Self-update                        | Assistance                           | Advisories | OS update | Release upgrade        |
+| ------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- | ----------------- | ---------------------------------- | ------------------------------------ | ---------- | --------- | ---------------------- |
+| Ubuntu 22.04 LTS    | x86_64 [pass][r1]; aarch64 —                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r2] | x86_64 —; aarch64 [pass][r2] | —                                                                         | —                                           | —                                              | gated             | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
+| Ubuntu 24.04 LTS    | x86_64 [pass][r3]; aarch64 [pass (TCG)][r3] | x86_64 —; aarch64 [pass (Bare VM; exact console clipboard; signed own-server APT; real console Enrolled; owned cleanup)][r4] | pass                         | pass                         | x86_64 [pass (seven kinds, no firewall)][r5]; aarch64 [pass (subset)][r6] | x86_64 [pass (TPM scenario)][r7]; aarch64 — | x86_64 [pass (selected phases)][r7]; aarch64 — | —                 | x86_64 [pass][r8]; aarch64 no lane | x86_64 [pass (GNOME)][r9]; aarch64 — | no lane    | —         | x86_64 —; aarch64 pass |
+| Ubuntu 26.04 LTS    | x86_64 [pass][r10]; aarch64 —               | no lane                                                                                                                      | —                            | —                            | —                                                                         | x86_64 —; aarch64 no image                  | x86_64 —; aarch64 no image                     | gated             | x86_64 —; aarch64 no lane          | x86_64 —; aarch64 no image           | no lane    | —         | gated                  |
+| Debian 12           | x86_64 —; aarch64 [pass][r1]                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | no image                                    | no image                                       | gated             | x86_64 no lane; aarch64 [pass][r2] | no image                             | no lane    | gated     | gated                  |
+| Debian 13           | x86_64 —; aarch64 [pass][r1]                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | no image                                    | no image                                       | no image          | x86_64 no lane; aarch64 [pass][r2] | no image                             | no lane    | gated     | gated                  |
+| Fedora 43           | x86_64 [pass][r10]; aarch64 no image        | no lane                                                                                                                      | x86_64 —; aarch64 no image   | x86_64 —; aarch64 no image   | no lane                                                                   | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
+| Fedora 44           | x86_64 [pass][r3]; aarch64 [pass][r1]       | x86_64 —; aarch64 [pass (Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup)][r4] | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass][r6] | x86_64 —; aarch64 [pass (subset)][r6]                                     | x86_64 [pass][r7]; aarch64 —                | x86_64 [pass (selected phases)][r7]; aarch64 — | —                 | x86_64 [pass][r8]; aarch64 no lane | x86_64 [pass (GNOME)][r9]; aarch64 — | no lane    | —         | gated                  |
+| RHEL 9              | x86_64 [pass][r10]; aarch64 —               | no lane                                                                                                                      | x86_64 [pass][r1]; aarch64 — | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (eight kinds)][r5]                                | no image                                    | no image                                       | no image          | x86_64 —; aarch64 no lane          | gated                                | no lane    | —         | gated                  |
+| RHEL 10             | —                                           | no lane                                                                                                                      | x86_64 [pass][r1]; aarch64 — | x86_64 [pass][r1]; aarch64 — | —                                                                         | no image                                    | no image                                       | no image          | x86_64 —; aarch64 no lane          | gated                                | no lane    | —         | gated                  |
+| Rocky Linux 9       | [pass][r1]                                  | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | —                                                                         | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
+| Rocky Linux 10      | [pass][r1]                                  | no lane                                                                                                                      | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
+| AlmaLinux 9         | [pass][r1]                                  | no lane                                                                                                                      | —                            | [pass][r1]                   | x86_64 —; aarch64 [pass (eight kinds)][r5]                                | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
+| AlmaLinux 10        | [pass][r1]                                  | no lane                                                                                                                      | [pass][r1]                   | [pass][r1]                   | x86_64 —; aarch64 [pass (all kinds)][r5]                                  | —                                           | —                                              | —                 | x86_64 no lane; aarch64 [pass][r2] | —                                    | no lane    | gated     | gated                  |
+| Linux Mint 22.3     | —                                           | no lane                                                                                                                      | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | —                                  | gated                                | no lane    | gated     | gated                  |
+| Pop!\_OS 24.04 LTS  | —                                           | no lane                                                                                                                      | —                            | —                            | —                                                                         | —                                           | —                                              | —                 | —                                  | —                                    | no lane    | gated     | gated                  |
+| Arch Linux          | [pass][r1]                                  | no lane                                                                                                                      | [pass][r1]                   | [pass][r1]                   | gated                                                                     | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
+| Omarchy 4.0.4       | —                                           | no lane                                                                                                                      | —                            | —                            | gated                                                                     | —                                           | —                                              | gated             | —                                  | gated                                | gated      | gated     | gated                  |
+| openSUSE Tumbleweed | x86_64 —; aarch64 [pass][r1]                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass][r1] | gated                                                                     | gated                                       | gated                                          | gated             | no lane                            | gated                                | no lane    | gated     | gated                  |
 
 [r1]: #1-launch-platform-qualification
 [r2]: #tier-1-parity-records-2026-10-11
 [r3]: #inventory-hardware-observations-2026-10-10
-[r4]: #all-resource-kinds-in-one-connected-lane
-[r5]: #generic-resource-executor-cutover-phase-2
-[r6]: #encryption-and-imperative-action-evidence-l10-l13-l15
-[r7]: #3-acceptance-scenario-families
-[r8]: #built-in-graphical-remote-assistance-l09-l12
-[r9]: #branch-allocation
+[r4]: #bare-machine-console-enrollment-2026-10-11
+[r5]: #all-resource-kinds-in-one-connected-lane
+[r6]: #generic-resource-executor-cutover-phase-2
+[r7]: #encryption-and-imperative-action-evidence-l10-l13-l15
+[r8]: #3-acceptance-scenario-families
+[r9]: #built-in-graphical-remote-assistance-l09-l12
+[r10]: #branch-allocation
 
 <!-- END GENERATED lab-matrix -->
 
@@ -4210,6 +4211,145 @@ retention/access controls; never archive grant values or encryption keys. Result
 are machine-readable JSON/JUnit plus a concise human report. Preserve reproducible
 seeds. Automatic reruns retain the first failure and cannot turn an unexplained
 flaky security/destructive scenario into a passing release gate.
+
+### Bare-machine console enrollment (2026-10-11)
+
+The initial `lab vm enroll-from-console` observer installed the agent and local
+identity on fresh Ubuntu 24.04 and Fedora 44 arm64 cloud guests on `dgx20`, but
+**did not qualify enrollment**: it destroyed each guest before the first server
+check-in. Neither guest had an agent, identity or enrollment configuration before
+the command. After guest
+readiness, Chromium signed into the production console with the existing local
+owner and native virtual passkey, selected the exact registry OS, clicked **Copy
+install command**, and handed the clipboard bytes unchanged to the guest's shell.
+The recorded command digest equals the browser-capture digest in each record.
+No separately reconstructed install command, preinstalled agent, skipped TLS
+verification or externally hosted agent repository was used.
+
+Authenticated inspection subsequently found both devices **Waiting to enroll**,
+with no recorded contact. `initial-device-state.json`, SHA-256
+`55cf64a46fd02049ce7021153284d2a253189ed13ca38987c41f0aec8273278c`,
+records those real console observations. The initial records below are retained
+as incomplete evidence, with failed matrix verdicts, not end-to-end passes.
+The corrected observer must confirm the exact device's server-side **Enrolled**
+state through the authenticated console while the guest is still alive.
+
+Private records and redacted screenshots are under
+`$HOME/.cache/lindm-self-hosted-install-20261011/`:
+
+| Guest               | Initial lane record   | Record SHA-256                                                     | Local device identity                  |
+| ------------------- | --------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| Ubuntu 24.04, arm64 | `ubuntu-console.json` | `4a5e0a390eb8544314d35c73ea355827c07ebb7d62317baed7480a025c5f0c5d` | `d0d9e735-42b7-48d5-b7e2-30893f574626` |
+| Fedora 44, aarch64  | `fedora-console.json` | `f9f22009886975f8794d2ff5581e1f4338998869b4a94690d8009d5b62c40b3f` | `71daa436-fc77-47a2-8a35-02653df1fcdc` |
+
+Both commands installed the same agent payload, SHA-256
+`0924f146d572f77967e7c90457057224bdd0766ffc961061e4ef9ee120ba4da5`,
+from the customer's own `lindmd` origin. Ubuntu used the signed APT InRelease,
+architecture-specific Packages index and deb822 `Signed-By` source; Fedora used
+signed RPM metadata and packages with both signature checks enabled. The DEB
+digest is `2d4ef89b79b919a2cc0372a717c396bd0d30297745eff0a90f6c5832c9e2d588`;
+the signed RPM digest is
+`2583beeb079f408792a43836dc10ce525961b332b2995665e10a4169fe46cca1`.
+The publication record `publication-final.json` has SHA-256
+`e9d36593f4efff32304813f861cc92700db506c60ca15999f5e003988b3cce0f`.
+The public signed repository bytes are retained in the evidence directory's
+`repo/`; private signing custody is not part of that evidence.
+
+The native runner and production server were built from
+`b5371c876b48a9eecdae167a7eea39119c36027a`, with the recorded source delta
+`native-source-delta.patch` (SHA-256
+`fb545444690aaf4ca46d0bcf2e1fc960ca825019868aad162dc5f7d7ff8f486c`).
+`native-build.json` binds the exact binaries and has SHA-256
+`91463f1cabb7e001ae0e32bc3ef6cd811531e864d723f5c52a276b6b7c88a602`.
+The runner executed on `dgx20` with its normal five-slot admission namespace and
+owned cleanup completed. SSH reverse forwards preserved the configured HTTPS
+admin/device origins; the copied command still authenticated the server CA,
+package signer and execution root. This was QEMU 8.2.2 on native aarch64 KVM,
+package-pinned AAVMF `2024.02-2ubuntu0.10`, UEFI SetupMode with Secure Boot disabled,
+virtio-blk, no TPM or desktop, and explicit user egress. It is not physical,
+Secure Boot, full lifecycle or complete release-acceptance qualification.
+
+`ubuntu-screenshots/` and `fedora-screenshots/` contain the copied-command dialog
+and Settings repository readiness in light/dark desktop/mobile variants. For
+example, `chromium-grant-grant-apt-light-desktop.png` and
+`chromium-grant-grant-dnf-dark-mobile.png` show the corresponding OS selection.
+Editable and command regions are deliberately masked; no enrollment code,
+password, passkey state or copied script belongs in published screenshots.
+The matrix cell is `enroll-from-console`; its browser configuration is private and
+the [engineering runbook](engineering.md#bare-machine-enrollment-from-the-console)
+describes the fixture and maintained command.
+
+**Corrected end-to-end runs passed** on both fresh arm64 guests. The maintained
+SSH-native runner now invokes the real console a second time before teardown,
+signs in with the same owner's updated virtual passkey, and waits for the exact
+installed device's lifecycle badge to become **Enrolled** after its real check-in.
+That read-only confirmation is mandatory; a local identity alone cannot publish
+a passing record. The native installation command is unchanged.
+
+| Guest               | Final lane record               | Record SHA-256                                                     | Server-confirmed enrolled device       |
+| ------------------- | ------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| Ubuntu 24.04, arm64 | `ubuntu-console-qualified.json` | `f635617984f558831883501a018f2f88d3cc256db30ef7adf7b3bec15f710e51` | `f35e8a28-28b7-4115-b4e5-1d47b309c614` |
+| Fedora 44, aarch64  | `fedora-console-qualified.json` | `51ece6fc1c1a4da9d730f930fc2a8a18f9b26e63542089d9ef221d2df8c99bd4` | `e7bdd37d-4f22-42c2-aa80-37928cd08fec` |
+
+Each final record includes `pristine: true`, `owned_cleanup_complete: true`,
+matching `command_sha256`/`browser_capture.command_sha256`, and
+`console_enrollment.lifecycle: "Enrolled"` bound to that device ID.
+Both installed the exact payload
+`ef9ff5476f835796bb90972306ca88022e2e73b5952bf5315e8dea3e65f85995`.
+The signed native publication record `publication-qualified.json` has SHA-256
+`8235db40db7453a0e985ca2af14f9f89f069ae50a1176bb70b33e96f0c0ea477`;
+DEB digest `c3f83d6e488cadc93e2674eee1229059228b4f9cf1e30015df3f80a633b3f5fd`,
+signed RPM digest `39b742406947c769ca02eebb01cec23775895aab72285adbb2d32eeb0bc61657`.
+The served repository bytes are retained under `qualified-repo/`.
+
+Source is `ca1e8d72bf559c9ef3105a41cd081a5559ca0e47` plus
+`qualified-source-delta.patch`, SHA-256
+`30ca483ce55c981a4c12579015d3235c22c9d0d361ea07c8b3b64dda08585c65`.
+`qualified-build.json` binds local runner/server binaries and publication, with
+SHA-256 `ece3ad9f2658033e7798163886013bd2f105bba457c6f191f22f5f6730e6e1a1`.
+Both lane records carry `lab_host` provenance for `dgx20`, SSH transport and native
+runtime. The normal remote adapter cross-builds the guest observer, provisions
+the pinned user-owned Chromium runtime, preserves both HTTPS origins through
+reverse forwards, privately returns the updated passkey counter, relocates every
+nested screenshot reference to its returned local copy, and removes its owned
+remote run. Firmware/hardware boundaries remain those stated above.
+
+Final dialog/Settings captures are in `ubuntu-qualified-screenshots/` and
+`fedora-qualified-screenshots/`, including light/dark desktop/mobile variants.
+Each directory also contains
+`chromium-enrollment-status-confirm_enrolled_device.png`, showing the real
+**Enrolled** badge, observed OS/architecture, hostname, current contact and
+inventory on that device. The dialog variants now use viewport screenshots,
+with advanced credential details collapsed and sensitive command areas masked.
+
+The final maintained visual gate
+`make ui-review UI_REVIEW_REPO=/home/r/dev/minor/lindm
+UI_REVIEW_EVIDENCE=/home/r/.cache/lindm-self-hosted-install-20261011/ui-review-03`
+passed **168 of 168 captures**, with zero findings. It used the actual unpublished
+demo fixture for configuration remedies and a separate real signed APT/RPM
+publication for enabled OS selection, clipboard equality and trust disclosure.
+`ui-review-03/report.json` has SHA-256
+`552acce9f851f01f73605e60171929aeba31080765b52604b4a0a2866b071f08`;
+the contact sheet `ui-review-03/index.html` has SHA-256
+`5f21901adf3acfef1b6bbdddc2431902b54f2387381508b9f81ac2b23ff43a4f`.
+The earlier `ui-review-02` reported scrolled Settings rows occluded by the sticky
+header as overlaps. The review now restores its initial viewport after disclosure
+interaction before applying unchanged layout, accessibility and copy checks;
+no tolerance or overlap rule was weakened.
+
+Required design review: **decision—pass** (choose the target OS, copy one install
+and enroll command); **evidence—pass** (real signed publications, both native
+clipboard lanes and exact server-side Enrolled state); **restraint—pass** (one
+primary installation action, technical trust/credential detail disclosed on
+demand); **safety—pass** (single-use secret masking, protected stdin/file delivery,
+CA/signer/root verification and explicit setup gates); **craft—pass** (light/dark
+desktop/mobile review and bounded command field); **human editing—pass** (the
+initial full-height command field was reduced, advanced details collapsed in the
+default capture, and misleading full-page mobile captures replaced by viewport
+captures). Before-edit captures are in `owner-screenshots/`, after-edit native
+captures in the two `*-qualified-screenshots/` directories and the final contact
+sheet. There are no recorded unresolved owner annotations for this slice;
+automated green does not constitute owner design approval.
 
 ### Customer-journey release acceptance
 

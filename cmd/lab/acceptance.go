@@ -61,6 +61,10 @@ type acceptanceBrowserConfig struct {
 	StorageNotApplicableReason string                   `json:"storageNotApplicableReason,omitempty"`
 	IgnoreHTTPSErrors          bool                     `json:"ignoreHTTPSErrors"`
 	PasswordProbe              *acceptancePasswordProbe `json:"passwordProbe,omitempty"`
+	EnrollmentPlatforms        map[string]string        `json:"enrollmentPlatforms,omitempty"`
+	EnrollmentCommandPaths     map[string]string        `json:"enrollmentCommandPaths,omitempty"`
+	RequireRepositories        bool                     `json:"requireRepositories,omitempty"`
+	EnrollmentScreenshots      bool                     `json:"enrollmentScreenshots,omitempty"`
 }
 
 type acceptancePasswordProbe struct {

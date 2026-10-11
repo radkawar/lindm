@@ -23,11 +23,9 @@ import { downloadEnrollmentFile } from "./download";
 import { enrollmentInstructionsQueryOptions } from "./queries";
 import {
   enrollmentInstallScript,
-  grantFormats,
   grantSnippet,
   provisioningFormats,
   provisioningSnippet,
-  type GrantFormat,
   type ProvisioningFormat,
 } from "./snippets";
 
@@ -56,7 +54,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   const [secret, setSecret] = useState(credential.deliveryUnknown ? null : credential.secret);
   const [open, setOpen] = useState(true);
   const [format, setFormat] = useState<ProvisioningFormat>("cloud-init");
-  const [family, setFamily] = useState<GrantFormat>("apt");
+  const [platformId, setPlatformId] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const [copyFailed, setCopyFailed] = useState(false);
   const mounted = useRef(true);
@@ -120,18 +118,22 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   const provisioning = credential.kind === "provisioning";
   const title = provisioning ? "Provisioning token" : "One-time enrollment code";
   const unavailable = credential.deliveryUnknown || !secret;
-  const packageFamily = provisioning
+  const platforms = instructions.data?.platforms ?? [];
+  const platform = platforms.find((item) => item.id === platformId) ?? platforms[0];
+  const formatFamily = provisioning
     ? format === "kickstart"
       ? "dnf"
       : format === "autoinstall"
         ? "apt"
-        : format === "cloud-init"
-          ? family
+        : format === "autoyast"
+          ? "zypper"
           : null
-    : family;
-  const installScript = packageFamily
-    ? enrollmentInstallScript(instructions.data, packageFamily)
-    : "";
+    : null;
+  const formatMismatch = !!formatFamily && platform?.packageFamily !== formatFamily;
+  const installScript = formatMismatch ? "" : enrollmentInstallScript(instructions.data, platform);
+  const readiness = !instructions.data?.readiness?.ready
+    ? instructions.data?.readiness
+    : platform?.readiness;
   const snippet =
     secret && instructions.isSuccess
       ? provisioning
@@ -197,14 +199,14 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 />
               </div>
             ) : null}
-            {!provisioning || format === "cloud-init" ? (
+            {(!provisioning || format !== "nixos") && platforms.length ? (
               <div className="grid gap-1.5">
-                <Label htmlFor="enrollment-package-family">Package manager</Label>
+                <Label htmlFor="enrollment-platform">Operating system</Label>
                 <SelectField
-                  id="enrollment-package-family"
-                  value={family}
-                  options={grantFormats}
-                  onValueChange={(value) => setFamily(value as GrantFormat)}
+                  id="enrollment-platform"
+                  value={platform?.id ?? ""}
+                  options={platforms.map((item) => ({ value: item.id, label: item.label }))}
+                  onValueChange={setPlatformId}
                 />
               </div>
             ) : null}
@@ -223,35 +225,48 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             ) : null}
             <p className="text-sm text-muted-foreground">
               {instructions.isPending
-                ? "Loading install steps…"
+                ? "Loading install command…"
                 : instructions.isError
-                  ? "Couldn't load install steps. Try again before copying."
-                  : installScript
-                    ? "Installs the lindm agent from your repository, then enrolls."
-                    : packageFamily
-                      ? `No ${packageFamily.toUpperCase()} repository is set up. Install the lindm agent first, then run this.`
-                      : "Install the lindm agent separately for this format."}
+                  ? "Couldn't load install instructions. Try again before copying."
+                  : provisioning && format === "nixos"
+                    ? "Use your verified NixOS derivation and protected, target-bound token."
+                    : installScript
+                      ? "Installs the signed agent from this server, then enrolls this device."
+                      : formatMismatch
+                        ? "Choose an operating system that matches this installer format."
+                        : readiness?.remedy ||
+                          "Ask your server administrator to configure releaseRepository and publish signed packages and deployment trust."}
+            </p>
+            {!installScript && !(provisioning && format === "nixos") && instructions.isSuccess ? (
+              <StatusBadge status="warning" className="w-fit">
+                Install command unavailable
+              </StatusBadge>
+            ) : null}
+            <p className="text-sm">
+              {provisioning
+                ? "This installer input contains a reusable secret. Keep it out of images and logs."
+                : "Run on the intended device with sudo access and shell history disabled. This command contains a single-use secret."}
             </p>
             <Textarea
               data-sensitive="true"
               aria-label={
-                provisioning ? `${format} provisioning snippet` : `${family} enrollment snippet`
+                provisioning ? `${format} provisioning snippet` : "Install and enroll command"
               }
               readOnly
               spellCheck={false}
               autoComplete="off"
-              className="min-h-64 font-mono text-xs"
+              className="field-sizing-fixed h-48 min-h-48 font-mono text-xs"
               value={snippet}
             />
             <div className="flex flex-wrap gap-2">
               <Button
-                variant="outline"
+                variant="default"
                 disabled={!snippet}
                 onClick={() =>
-                  void copy(snippet, `${provisioning ? format : family.toUpperCase()} snippet`)
+                  void copy(snippet, provisioning ? `${format} snippet` : "Install command")
                 }
               >
-                Copy {provisioning ? format : family.toUpperCase()} snippet
+                Copy {provisioning ? `${format} snippet` : "install command"}
               </Button>
               {provisioning && format === "nixos" ? (
                 <Button variant="outline" onClick={downloadToken}>
@@ -266,6 +281,32 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             ) : null}
           </div>
         )}
+        {!unavailable && !(provisioning && format === "nixos") ? (
+          <details className="text-sm">
+            <summary className="cursor-pointer">What this does</summary>
+            <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
+              <li>Checks the selected operating system and available package architecture.</li>
+              <li>
+                Installs package tools from the device's existing distribution sources.
+                {instructions.data?.tlsCaPem
+                  ? " Verifies the supplied private HTTPS CA fingerprint, then adds it to system trust."
+                  : " Uses the device's system HTTPS trust."}
+              </li>
+              <li>
+                Authenticates the package signing key, adds only this server's signed agent
+                repository, and installs lindm-agent.
+              </li>
+              <li>
+                Verifies the execution root fingerprint and downloads the signed bootstrap bundle.
+              </li>
+              <li>
+                Starts the agent and enrolls with this{" "}
+                {provisioning ? "token on first boot" : "code"}. Approval may be required; waiting
+                stops after one hour without claiming enrollment.
+              </li>
+            </ol>
+          </details>
+        ) : null}
         <details className="text-sm">
           <summary className="cursor-pointer">Credential details and safe delivery</summary>
           <div className="mt-2 grid gap-2 text-muted-foreground">
@@ -285,10 +326,12 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                   Keep the secret out of command lines, logs, URLs and images. Delete copies after
                   use.
                 </p>
-                <p>
-                  The device needs /etc/lindm/execution-root.json and /etc/lindm/bootstrap.dsse.json
-                  from you.
-                </p>
+                {!(provisioning && format === "nixos") ? (
+                  <p>
+                    The command pins the HTTPS CA when needed, the package signer and the execution
+                    root. Downloading a file alone does not authenticate it.
+                  </p>
+                ) : null}
                 {instructions.data?.executionRootUrl ? (
                   <a
                     className="underline"
@@ -309,10 +352,13 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                     Download signed bootstrap bundle
                   </a>
                 ) : null}
-                {instructions.data && !instructions.data.bootstrapBundleUrl ? (
-                  <p>
-                    Download links aren't set up. Get these files from whoever runs this deployment.
+                {instructions.data?.executionRootSha256 ? (
+                  <p className="break-all">
+                    Execution root SHA-256: {instructions.data.executionRootSha256}
                   </p>
+                ) : null}
+                {readiness?.reason ? (
+                  <p className="break-all">Readiness: {readiness.reason}</p>
                 ) : null}
                 <p>
                   If enrollment times out, run /usr/libexec/lindm/lindm-agent resume -wait-seconds

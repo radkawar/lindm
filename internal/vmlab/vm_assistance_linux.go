@@ -129,7 +129,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if _, err := encryptedGolden(ctx, manifest, options.Encrypted); err != nil {
 		return result, err
 	}
-	fixture, delegation, relay, err := openAssistanceFixture(ctx, options)
+	fixture, delegation, relay, err := openAssistanceFixture(ctx, options, packages.artifact.Architecture.GOARCH)
 	if err != nil {
 		return result, err
 	}

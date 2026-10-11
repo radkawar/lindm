@@ -140,12 +140,17 @@ weaken the existing global enrollment-management boundary.
 
 `GetEnrollmentInstructions` takes an empty request and returns deployment-owned
 onboarding metadata: `enrollment_origin`, optional `device_origin`,
-`execution_root_url` and `bootstrap_bundle_url`, and optional `apt_repository`
-and `dnf_repository` records. Both repository records contain `base_url`,
-`signing_key_url` and `signing_key_fingerprint`; APT additionally supplies `suite`
-and `components`. Missing optional fields mean not configured, not permission to
-guess a repository, trust download or endpoint from the console URL. Instructions
-are not executable authority, and this response contains no enrollment secret.
+`execution_root_url`, `execution_root_sha256` and `bootstrap_bundle_url`, plus
+available `apt_repository` and `dnf_repository` records. Native repository URLs
+always point to the customer's own `lindmd` HTTPS origin under `/repo/`; agents
+are never distributed through an external package host. Repository records carry
+the full independently pinned `signing_key_fingerprint`; APT additionally supplies
+`suite` and `components`. Registry-backed `platforms` identify the install method
+and each platform's readiness/remedy. Missing artifacts block the command with a
+configuration remedy, never an instruction to find packages elsewhere.
+Private HTTPS bootstrap also supplies `tls_ca_pem` and its DER SHA-256
+`tls_ca_sha256`, authenticated through this authorized console response.
+Instructions are not executable authority and contain no enrollment secret.
 The response also supplies `grant_command`, `provisioning_command` and
 `resume_command` templates for the installed agent. The grant template reads
 `/run/lindm-enrollment/grant`; the provisioning template reads
@@ -155,12 +160,16 @@ file paths, never bearer values, and do not establish that prerequisites exist.
 
 Configured public bootstrap resources are served by unauthenticated GET/HEAD at
 `public_url` plus `/bootstrap/execution-root.json` and
-`/bootstrap/bootstrap.dsse.json`, not by a general directory server. Independently
-authenticate the execution root before using it; downloading a root does not
-establish its trust. The bootstrap bundle remains the existing signed DSSE
-document and must verify against that authenticated root. Native package
-installation must verify the repository signing key fingerprint; DNF requires
-signed repository metadata as well as signed packages.
+`/bootstrap/bootstrap.dsse.json`, not by a general directory server. The copied
+console command authenticates the execution root against the digest carried by
+the administrator's trusted console session; downloading a root alone does not
+establish trust. The bootstrap bundle remains the existing signed DSSE document
+and must verify against that authenticated root. Before repository trust is
+installed, the command verifies the full signing-key fingerprint and any private
+server CA fingerprint. HTTPS hostname/chain verification remains enabled. DNF
+requires signed repository metadata as well as signed packages. See the
+[install runbook](security-and-operations.md#enrollment-installation-from-your-server)
+and [threat model](architecture.md#trust-bootstrap-from-the-customers-server).
 
 After verified package installation and protected placement of the authenticated
 deployment material, the one-time grant path is:

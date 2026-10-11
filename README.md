@@ -110,6 +110,26 @@ Maintained proofs: `lab vm server -manifest lab/images/ubuntu-noble-amd64.json`
 and `lab server compose`, each with `-record NEW_FILE`. See
 [engineering prerequisites and scope](docs/engineering.md#server-deployment-laboratory).
 
+### Install and enroll a device
+
+Agents always come from the customer's own `lindmd` server. There is no public
+Lindm package service, external repository requirement or hosting decision to make.
+The server serves the release pipeline's signed packages and native repository
+metadata at its configured HTTPS origin, under `/repo/apt` and `/repo/rpm`.
+Air-gapped installations retain their signed offline-bundle workflow.
+
+In the console, choose **Enroll**, select the target operating system, then copy
+the single install-and-enroll command to the bare machine. The command authenticates
+the server and package signer, installs the agent and consumes the enrollment code.
+**What this does** explains the changes. If packages are missing, follow the
+repository setup remedy in the dialog and Settings rather than installing an
+unverified package or disabling signature checks.
+
+The [installation runbook](docs/security-and-operations.md#enrollment-installation-from-your-server)
+covers artifact publication, trust bootstrap and replica consistency. Installation
+availability is not platform qualification; consult the matching
+[platform page](docs/platforms/README.md) and its native evidence.
+
 ### Reproducible releases and agent updates
 
 `lab release build` compares two clean builds of server/agent/CLI DEB/RPM packages
@@ -123,7 +143,7 @@ Mutable-host unattended updates are an explicit protected-config opt-in.
 Unprivileged transport supplies bytes; root verifies TUF and invokes a separately
 supervised native package transaction with persistent interrupted-update recovery.
 Offline artifact keys remain separate from online rollout authority. Follow the
-[update and compatibility runbook](docs/security-and-operations.md#7-hosted-agent-updates-and-release-compatibility)
+[update and compatibility runbook](docs/security-and-operations.md#7-agent-updates-from-your-server-and-release-compatibility)
 and [native qualification lane](docs/engineering.md#native-unattended-update-verification-p20l08l17);
 archive reproducibility does not certify an untested platform or transaction.
 

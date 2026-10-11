@@ -69,6 +69,13 @@ installed both as `/etc/apt/trusted.gpg.d/linuxmint-keyring.gpg` (identical to
 The ISO ships `mintupdate 7.1.4` and `timeshift 25.12.4+zena`; their effect on
 OS patch policy and wipe/rollback remains unqualified.
 
+Choose Linux Mint in the console to install and enroll from the customer's own
+`lindmd` HTTPS `/repo/apt` endpoint. The one command authenticates the repository
+signer and server/bootstrap trust and writes a dedicated deb822 `Signed-By`
+source. No external agent repository is used. Missing artifacts produce an
+explicit setup remedy; successful Ubuntu installation does not qualify Mint.
+See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+
 ## Installer and golden recipe
 
 Media: [`linuxmint-22.3-cinnamon-amd64.json`](../../lab/images/linuxmint-22.3-cinnamon-amd64.json)

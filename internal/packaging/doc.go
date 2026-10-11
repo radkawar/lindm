@@ -12,9 +12,10 @@
 // -X lindm/internal/agent/buildinfo.Revision. Revision is not part of that line.
 //
 // DEB authentication is an APT repository: signed InRelease, hashed Packages,
-// and a separate Signed-By key. A built .deb is not an APT authentication
-// claim. RPM artifacts are signed and checked in a private rpmdb. PublishRPM
-// is the only path that writes repodata, and only with createrepo_c.
+// and a separate Signed-By key. PublishAPT accepts amd64 and arm64 together and
+// signs separate per-architecture indexes in one Release. A built .deb is not an
+// APT authentication claim. RPM artifacts are signed and checked in a private
+// rpmdb. PublishRPM is the only path that writes repodata, with createrepo_c.
 // RPM signing pins the primary key and freezes signature time at the later of
 // SourceDateEpoch and key creation. Only deterministic RSA/EdDSA signing keys are
 // accepted, after checking present-day validity. Reproducing bytes requires the

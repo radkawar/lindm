@@ -65,8 +65,6 @@ type ServerConfig struct {
 	Profiling *ProfilingConfig `protobuf:"bytes,19,opt,name=profiling,proto3" json:"profiling,omitempty"`
 	// Public signed repository; private signing keys are outside this directory.
 	ReleaseRepository *ReleaseRepositoryConfig `protobuf:"bytes,20,opt,name=release_repository,json=releaseRepository,proto3" json:"release_repository,omitempty"`
-	// Optional native installation repositories advertised by the enrollment console.
-	EnrollmentInstructions *EnrollmentInstructionsConfig `protobuf:"bytes,21,opt,name=enrollment_instructions,json=enrollmentInstructions,proto3" json:"enrollment_instructions,omitempty"`
 	// Independent native firewall probe peers, provisioned by the server operator.
 	// The enrolled device endpoint only confirms these exact external targets.
 	ConnectivityProbes []*v11.ConnectivityProbeTarget `protobuf:"bytes,22,rep,name=connectivity_probes,json=connectivityProbes,proto3" json:"connectivity_probes,omitempty"`
@@ -249,13 +247,6 @@ func (x *ServerConfig) GetReleaseRepository() *ReleaseRepositoryConfig {
 	return nil
 }
 
-func (x *ServerConfig) GetEnrollmentInstructions() *EnrollmentInstructionsConfig {
-	if x != nil {
-		return x.EnrollmentInstructions
-	}
-	return nil
-}
-
 func (x *ServerConfig) GetConnectivityProbes() []*v11.ConnectivityProbeTarget {
 	if x != nil {
 		return x.ConnectivityProbes
@@ -277,197 +268,6 @@ func (x *ServerConfig) GetOfflineBundles() *OfflineBundleConfig {
 	return nil
 }
 
-// Absent repositories are explicitly not configured, never inferred from a host.
-type EnrollmentInstructionsConfig struct {
-	state         protoimpl.MessageState         `protogen:"open.v1"`
-	AptRepository *EnrollmentAPTRepositoryConfig `protobuf:"bytes,1,opt,name=apt_repository,json=aptRepository,proto3" json:"apt_repository,omitempty"`
-	DnfRepository *EnrollmentDNFRepositoryConfig `protobuf:"bytes,2,opt,name=dnf_repository,json=dnfRepository,proto3" json:"dnf_repository,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *EnrollmentInstructionsConfig) Reset() {
-	*x = EnrollmentInstructionsConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EnrollmentInstructionsConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EnrollmentInstructionsConfig) ProtoMessage() {}
-
-func (x *EnrollmentInstructionsConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EnrollmentInstructionsConfig.ProtoReflect.Descriptor instead.
-func (*EnrollmentInstructionsConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *EnrollmentInstructionsConfig) GetAptRepository() *EnrollmentAPTRepositoryConfig {
-	if x != nil {
-		return x.AptRepository
-	}
-	return nil
-}
-
-func (x *EnrollmentInstructionsConfig) GetDnfRepository() *EnrollmentDNFRepositoryConfig {
-	if x != nil {
-		return x.DnfRepository
-	}
-	return nil
-}
-
-type EnrollmentAPTRepositoryConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BaseUrl       string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
-	SigningKeyUrl string                 `protobuf:"bytes,2,opt,name=signing_key_url,json=signingKeyUrl,proto3" json:"signing_key_url,omitempty"`
-	// Full uppercase OpenPGP v4 or v6 fingerprint, not a short key ID.
-	SigningKeyFingerprint string   `protobuf:"bytes,3,opt,name=signing_key_fingerprint,json=signingKeyFingerprint,proto3" json:"signing_key_fingerprint,omitempty"`
-	Suite                 string   `protobuf:"bytes,4,opt,name=suite,proto3" json:"suite,omitempty"`
-	Components            []string `protobuf:"bytes,5,rep,name=components,proto3" json:"components,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
-}
-
-func (x *EnrollmentAPTRepositoryConfig) Reset() {
-	*x = EnrollmentAPTRepositoryConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EnrollmentAPTRepositoryConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EnrollmentAPTRepositoryConfig) ProtoMessage() {}
-
-func (x *EnrollmentAPTRepositoryConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EnrollmentAPTRepositoryConfig.ProtoReflect.Descriptor instead.
-func (*EnrollmentAPTRepositoryConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *EnrollmentAPTRepositoryConfig) GetBaseUrl() string {
-	if x != nil {
-		return x.BaseUrl
-	}
-	return ""
-}
-
-func (x *EnrollmentAPTRepositoryConfig) GetSigningKeyUrl() string {
-	if x != nil {
-		return x.SigningKeyUrl
-	}
-	return ""
-}
-
-func (x *EnrollmentAPTRepositoryConfig) GetSigningKeyFingerprint() string {
-	if x != nil {
-		return x.SigningKeyFingerprint
-	}
-	return ""
-}
-
-func (x *EnrollmentAPTRepositoryConfig) GetSuite() string {
-	if x != nil {
-		return x.Suite
-	}
-	return ""
-}
-
-func (x *EnrollmentAPTRepositoryConfig) GetComponents() []string {
-	if x != nil {
-		return x.Components
-	}
-	return nil
-}
-
-// Both package and repository metadata signatures must be published and checked.
-type EnrollmentDNFRepositoryConfig struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	BaseUrl               string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
-	SigningKeyUrl         string                 `protobuf:"bytes,2,opt,name=signing_key_url,json=signingKeyUrl,proto3" json:"signing_key_url,omitempty"`
-	SigningKeyFingerprint string                 `protobuf:"bytes,3,opt,name=signing_key_fingerprint,json=signingKeyFingerprint,proto3" json:"signing_key_fingerprint,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
-}
-
-func (x *EnrollmentDNFRepositoryConfig) Reset() {
-	*x = EnrollmentDNFRepositoryConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EnrollmentDNFRepositoryConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EnrollmentDNFRepositoryConfig) ProtoMessage() {}
-
-func (x *EnrollmentDNFRepositoryConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EnrollmentDNFRepositoryConfig.ProtoReflect.Descriptor instead.
-func (*EnrollmentDNFRepositoryConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *EnrollmentDNFRepositoryConfig) GetBaseUrl() string {
-	if x != nil {
-		return x.BaseUrl
-	}
-	return ""
-}
-
-func (x *EnrollmentDNFRepositoryConfig) GetSigningKeyUrl() string {
-	if x != nil {
-		return x.SigningKeyUrl
-	}
-	return ""
-}
-
-func (x *EnrollmentDNFRepositoryConfig) GetSigningKeyFingerprint() string {
-	if x != nil {
-		return x.SigningKeyFingerprint
-	}
-	return ""
-}
-
 type ReleaseRepositoryConfig struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Directory string                 `protobuf:"bytes,1,opt,name=directory,proto3" json:"directory,omitempty"`
@@ -476,13 +276,16 @@ type ReleaseRepositoryConfig struct {
 	// Private persistent TUF verification checkpoint, outside the public repository.
 	// Required to admit recovery handoff; root trust comes from execution_bootstrap.
 	VerificationStateDirectory *string `protobuf:"bytes,3,opt,name=verification_state_directory,json=verificationStateDirectory,proto3,oneof" json:"verification_state_directory,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// Immutable native publications beneath directory/repo/{apt,rpm,arch}, served
+	// exclusively from this server's public_url. Keys are public exports only.
+	NativeRepositories *NativeRepositoriesConfig `protobuf:"bytes,4,opt,name=native_repositories,json=nativeRepositories,proto3" json:"native_repositories,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ReleaseRepositoryConfig) Reset() {
 	*x = ReleaseRepositoryConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -494,7 +297,7 @@ func (x *ReleaseRepositoryConfig) String() string {
 func (*ReleaseRepositoryConfig) ProtoMessage() {}
 
 func (x *ReleaseRepositoryConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -507,7 +310,7 @@ func (x *ReleaseRepositoryConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseRepositoryConfig.ProtoReflect.Descriptor instead.
 func (*ReleaseRepositoryConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{4}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ReleaseRepositoryConfig) GetDirectory() string {
@@ -527,6 +330,74 @@ func (x *ReleaseRepositoryConfig) GetSigning() *ReleaseRepositorySigning {
 func (x *ReleaseRepositoryConfig) GetVerificationStateDirectory() string {
 	if x != nil && x.VerificationStateDirectory != nil {
 		return *x.VerificationStateDirectory
+	}
+	return ""
+}
+
+func (x *ReleaseRepositoryConfig) GetNativeRepositories() *NativeRepositoriesConfig {
+	if x != nil {
+		return x.NativeRepositories
+	}
+	return nil
+}
+
+type NativeRepositoriesConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Independently configured full OpenPGP signer pins, never short key IDs.
+	AptSigningKeyFingerprint  *string `protobuf:"bytes,1,opt,name=apt_signing_key_fingerprint,json=aptSigningKeyFingerprint,proto3,oneof" json:"apt_signing_key_fingerprint,omitempty"`
+	RpmSigningKeyFingerprint  *string `protobuf:"bytes,2,opt,name=rpm_signing_key_fingerprint,json=rpmSigningKeyFingerprint,proto3,oneof" json:"rpm_signing_key_fingerprint,omitempty"`
+	ArchSigningKeyFingerprint *string `protobuf:"bytes,3,opt,name=arch_signing_key_fingerprint,json=archSigningKeyFingerprint,proto3,oneof" json:"arch_signing_key_fingerprint,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *NativeRepositoriesConfig) Reset() {
+	*x = NativeRepositoriesConfig{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NativeRepositoriesConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NativeRepositoriesConfig) ProtoMessage() {}
+
+func (x *NativeRepositoriesConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NativeRepositoriesConfig.ProtoReflect.Descriptor instead.
+func (*NativeRepositoriesConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *NativeRepositoriesConfig) GetAptSigningKeyFingerprint() string {
+	if x != nil && x.AptSigningKeyFingerprint != nil {
+		return *x.AptSigningKeyFingerprint
+	}
+	return ""
+}
+
+func (x *NativeRepositoriesConfig) GetRpmSigningKeyFingerprint() string {
+	if x != nil && x.RpmSigningKeyFingerprint != nil {
+		return *x.RpmSigningKeyFingerprint
+	}
+	return ""
+}
+
+func (x *NativeRepositoriesConfig) GetArchSigningKeyFingerprint() string {
+	if x != nil && x.ArchSigningKeyFingerprint != nil {
+		return *x.ArchSigningKeyFingerprint
 	}
 	return ""
 }
@@ -554,7 +425,7 @@ type OfflineBundleConfig struct {
 
 func (x *OfflineBundleConfig) Reset() {
 	*x = OfflineBundleConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -566,7 +437,7 @@ func (x *OfflineBundleConfig) String() string {
 func (*OfflineBundleConfig) ProtoMessage() {}
 
 func (x *OfflineBundleConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -579,7 +450,7 @@ func (x *OfflineBundleConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfflineBundleConfig.ProtoReflect.Descriptor instead.
 func (*OfflineBundleConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{5}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *OfflineBundleConfig) GetSigningPublicKeyFile() string {
@@ -628,7 +499,7 @@ type ReleaseRepositorySigning struct {
 
 func (x *ReleaseRepositorySigning) Reset() {
 	*x = ReleaseRepositorySigning{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -640,7 +511,7 @@ func (x *ReleaseRepositorySigning) String() string {
 func (*ReleaseRepositorySigning) ProtoMessage() {}
 
 func (x *ReleaseRepositorySigning) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -653,7 +524,7 @@ func (x *ReleaseRepositorySigning) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseRepositorySigning.ProtoReflect.Descriptor instead.
 func (*ReleaseRepositorySigning) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{6}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ReleaseRepositorySigning) GetDirectory() string {
@@ -675,7 +546,7 @@ type AdvisoryConfig struct {
 
 func (x *AdvisoryConfig) Reset() {
 	*x = AdvisoryConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -687,7 +558,7 @@ func (x *AdvisoryConfig) String() string {
 func (*AdvisoryConfig) ProtoMessage() {}
 
 func (x *AdvisoryConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -700,7 +571,7 @@ func (x *AdvisoryConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdvisoryConfig.ProtoReflect.Descriptor instead.
 func (*AdvisoryConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{7}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AdvisoryConfig) GetFeeds() []*v12.FeedSource {
@@ -742,7 +613,7 @@ type IntegrationsConfig struct {
 
 func (x *IntegrationsConfig) Reset() {
 	*x = IntegrationsConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -754,7 +625,7 @@ func (x *IntegrationsConfig) String() string {
 func (*IntegrationsConfig) ProtoMessage() {}
 
 func (x *IntegrationsConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -767,7 +638,7 @@ func (x *IntegrationsConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationsConfig.ProtoReflect.Descriptor instead.
 func (*IntegrationsConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{8}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *IntegrationsConfig) GetEncryptionKeyFile() string {
@@ -790,7 +661,7 @@ type EscrowConfig struct {
 
 func (x *EscrowConfig) Reset() {
 	*x = EscrowConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -802,7 +673,7 @@ func (x *EscrowConfig) String() string {
 func (*EscrowConfig) ProtoMessage() {}
 
 func (x *EscrowConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -815,7 +686,7 @@ func (x *EscrowConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EscrowConfig.ProtoReflect.Descriptor instead.
 func (*EscrowConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{9}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EscrowConfig) GetTransportKeyFile() string {
@@ -849,7 +720,7 @@ type ExecutionBootstrapConfig struct {
 
 func (x *ExecutionBootstrapConfig) Reset() {
 	*x = ExecutionBootstrapConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -861,7 +732,7 @@ func (x *ExecutionBootstrapConfig) String() string {
 func (*ExecutionBootstrapConfig) ProtoMessage() {}
 
 func (x *ExecutionBootstrapConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -874,7 +745,7 @@ func (x *ExecutionBootstrapConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecutionBootstrapConfig.ProtoReflect.Descriptor instead.
 func (*ExecutionBootstrapConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{10}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ExecutionBootstrapConfig) GetRootFile() string {
@@ -903,7 +774,7 @@ type ExecutionSigningConfig struct {
 
 func (x *ExecutionSigningConfig) Reset() {
 	*x = ExecutionSigningConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -915,7 +786,7 @@ func (x *ExecutionSigningConfig) String() string {
 func (*ExecutionSigningConfig) ProtoMessage() {}
 
 func (x *ExecutionSigningConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -928,7 +799,7 @@ func (x *ExecutionSigningConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecutionSigningConfig.ProtoReflect.Descriptor instead.
 func (*ExecutionSigningConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{11}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ExecutionSigningConfig) GetPlanKeyFile() string {
@@ -957,7 +828,7 @@ type ListenerConfig struct {
 
 func (x *ListenerConfig) Reset() {
 	*x = ListenerConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[12]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -969,7 +840,7 @@ func (x *ListenerConfig) String() string {
 func (*ListenerConfig) ProtoMessage() {}
 
 func (x *ListenerConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[12]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -982,7 +853,7 @@ func (x *ListenerConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListenerConfig.ProtoReflect.Descriptor instead.
 func (*ListenerConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{12}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListenerConfig) GetAddress() string {
@@ -1016,7 +887,7 @@ type ProfilingConfig struct {
 
 func (x *ProfilingConfig) Reset() {
 	*x = ProfilingConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[13]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1028,7 +899,7 @@ func (x *ProfilingConfig) String() string {
 func (*ProfilingConfig) ProtoMessage() {}
 
 func (x *ProfilingConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[13]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1041,7 +912,7 @@ func (x *ProfilingConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfilingConfig.ProtoReflect.Descriptor instead.
 func (*ProfilingConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{13}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ProfilingConfig) GetListener() *ListenerConfig {
@@ -1085,7 +956,7 @@ type DatabaseConfig struct {
 
 func (x *DatabaseConfig) Reset() {
 	*x = DatabaseConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[14]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +968,7 @@ func (x *DatabaseConfig) String() string {
 func (*DatabaseConfig) ProtoMessage() {}
 
 func (x *DatabaseConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[14]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +981,7 @@ func (x *DatabaseConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DatabaseConfig.ProtoReflect.Descriptor instead.
 func (*DatabaseConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{14}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DatabaseConfig) GetUrlFile() string {
@@ -1144,7 +1015,7 @@ type TLSConfig struct {
 
 func (x *TLSConfig) Reset() {
 	*x = TLSConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[15]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +1027,7 @@ func (x *TLSConfig) String() string {
 func (*TLSConfig) ProtoMessage() {}
 
 func (x *TLSConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[15]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +1040,7 @@ func (x *TLSConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TLSConfig.ProtoReflect.Descriptor instead.
 func (*TLSConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{15}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TLSConfig) GetCertificateFile() string {
@@ -1196,7 +1067,7 @@ type DeviceCAConfig struct {
 
 func (x *DeviceCAConfig) Reset() {
 	*x = DeviceCAConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[16]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1208,7 +1079,7 @@ func (x *DeviceCAConfig) String() string {
 func (*DeviceCAConfig) ProtoMessage() {}
 
 func (x *DeviceCAConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[16]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1221,7 +1092,7 @@ func (x *DeviceCAConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceCAConfig.ProtoReflect.Descriptor instead.
 func (*DeviceCAConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{16}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DeviceCAConfig) GetCertificateFile() string {
@@ -1255,7 +1126,7 @@ type AuthenticationConfig struct {
 
 func (x *AuthenticationConfig) Reset() {
 	*x = AuthenticationConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[17]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1267,7 +1138,7 @@ func (x *AuthenticationConfig) String() string {
 func (*AuthenticationConfig) ProtoMessage() {}
 
 func (x *AuthenticationConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[17]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1280,7 +1151,7 @@ func (x *AuthenticationConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthenticationConfig.ProtoReflect.Descriptor instead.
 func (*AuthenticationConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{17}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AuthenticationConfig) GetPrimary() isAuthenticationConfig_Primary {
@@ -1385,7 +1256,7 @@ type LocalAuthentication struct {
 
 func (x *LocalAuthentication) Reset() {
 	*x = LocalAuthentication{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[18]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1397,7 +1268,7 @@ func (x *LocalAuthentication) String() string {
 func (*LocalAuthentication) ProtoMessage() {}
 
 func (x *LocalAuthentication) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[18]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1410,7 +1281,7 @@ func (x *LocalAuthentication) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAuthentication.ProtoReflect.Descriptor instead.
 func (*LocalAuthentication) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{18}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{16}
 }
 
 type KeycloakDirectory struct {
@@ -1428,7 +1299,7 @@ type KeycloakDirectory struct {
 
 func (x *KeycloakDirectory) Reset() {
 	*x = KeycloakDirectory{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[19]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1311,7 @@ func (x *KeycloakDirectory) String() string {
 func (*KeycloakDirectory) ProtoMessage() {}
 
 func (x *KeycloakDirectory) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[19]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1324,7 @@ func (x *KeycloakDirectory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeycloakDirectory.ProtoReflect.Descriptor instead.
 func (*KeycloakDirectory) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{19}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *KeycloakDirectory) GetIssuer() string {
@@ -1512,7 +1383,7 @@ type EntraDirectory struct {
 
 func (x *EntraDirectory) Reset() {
 	*x = EntraDirectory{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[20]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1524,7 +1395,7 @@ func (x *EntraDirectory) String() string {
 func (*EntraDirectory) ProtoMessage() {}
 
 func (x *EntraDirectory) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[20]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1537,7 +1408,7 @@ func (x *EntraDirectory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntraDirectory.ProtoReflect.Descriptor instead.
 func (*EntraDirectory) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{20}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EntraDirectory) GetTenantId() string {
@@ -1591,7 +1462,7 @@ type OktaDirectory struct {
 
 func (x *OktaDirectory) Reset() {
 	*x = OktaDirectory{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[21]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1603,7 +1474,7 @@ func (x *OktaDirectory) String() string {
 func (*OktaDirectory) ProtoMessage() {}
 
 func (x *OktaDirectory) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[21]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1616,7 +1487,7 @@ func (x *OktaDirectory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OktaDirectory.ProtoReflect.Descriptor instead.
 func (*OktaDirectory) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{21}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *OktaDirectory) GetIssuer() string {
@@ -1685,7 +1556,7 @@ type GoogleDirectory struct {
 
 func (x *GoogleDirectory) Reset() {
 	*x = GoogleDirectory{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[22]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1697,7 +1568,7 @@ func (x *GoogleDirectory) String() string {
 func (*GoogleDirectory) ProtoMessage() {}
 
 func (x *GoogleDirectory) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[22]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1710,7 +1581,7 @@ func (x *GoogleDirectory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GoogleDirectory.ProtoReflect.Descriptor instead.
 func (*GoogleDirectory) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{22}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GoogleDirectory) GetClientId() string {
@@ -1775,7 +1646,7 @@ type KeycloakBrokerUpstream struct {
 
 func (x *KeycloakBrokerUpstream) Reset() {
 	*x = KeycloakBrokerUpstream{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[23]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1787,7 +1658,7 @@ func (x *KeycloakBrokerUpstream) String() string {
 func (*KeycloakBrokerUpstream) ProtoMessage() {}
 
 func (x *KeycloakBrokerUpstream) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[23]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1800,7 +1671,7 @@ func (x *KeycloakBrokerUpstream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeycloakBrokerUpstream.ProtoReflect.Descriptor instead.
 func (*KeycloakBrokerUpstream) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{23}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *KeycloakBrokerUpstream) GetAlias() string {
@@ -1848,7 +1719,7 @@ type SCIMConfig struct {
 
 func (x *SCIMConfig) Reset() {
 	*x = SCIMConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[24]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1860,7 +1731,7 @@ func (x *SCIMConfig) String() string {
 func (*SCIMConfig) ProtoMessage() {}
 
 func (x *SCIMConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[24]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1873,7 +1744,7 @@ func (x *SCIMConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SCIMConfig.ProtoReflect.Descriptor instead.
 func (*SCIMConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{24}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SCIMConfig) GetConnectors() []*SCIMConnector {
@@ -1893,7 +1764,7 @@ type SCIMConnector struct {
 
 func (x *SCIMConnector) Reset() {
 	*x = SCIMConnector{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[25]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1905,7 +1776,7 @@ func (x *SCIMConnector) String() string {
 func (*SCIMConnector) ProtoMessage() {}
 
 func (x *SCIMConnector) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[25]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1918,7 +1789,7 @@ func (x *SCIMConnector) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SCIMConnector.ProtoReflect.Descriptor instead.
 func (*SCIMConnector) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{25}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SCIMConnector) GetId() string {
@@ -1946,7 +1817,7 @@ type SCIMCorrelation struct {
 
 func (x *SCIMCorrelation) Reset() {
 	*x = SCIMCorrelation{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[26]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1958,7 +1829,7 @@ func (x *SCIMCorrelation) String() string {
 func (*SCIMCorrelation) ProtoMessage() {}
 
 func (x *SCIMCorrelation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[26]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1971,7 +1842,7 @@ func (x *SCIMCorrelation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SCIMCorrelation.ProtoReflect.Descriptor instead.
 func (*SCIMCorrelation) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{26}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SCIMCorrelation) GetProviderId() string {
@@ -2009,7 +1880,7 @@ type BreakGlassPolicy struct {
 
 func (x *BreakGlassPolicy) Reset() {
 	*x = BreakGlassPolicy{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2021,7 +1892,7 @@ func (x *BreakGlassPolicy) String() string {
 func (*BreakGlassPolicy) ProtoMessage() {}
 
 func (x *BreakGlassPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2034,7 +1905,7 @@ func (x *BreakGlassPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BreakGlassPolicy.ProtoReflect.Descriptor instead.
 func (*BreakGlassPolicy) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{27}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *BreakGlassPolicy) GetAllowedPermissions() []string {
@@ -2079,7 +1950,7 @@ type AssistanceConfig struct {
 
 func (x *AssistanceConfig) Reset() {
 	*x = AssistanceConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2091,7 +1962,7 @@ func (x *AssistanceConfig) String() string {
 func (*AssistanceConfig) ProtoMessage() {}
 
 func (x *AssistanceConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2104,7 +1975,7 @@ func (x *AssistanceConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistanceConfig.ProtoReflect.Descriptor instead.
 func (*AssistanceConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{28}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AssistanceConfig) GetRelay() *AssistanceRelayConfig {
@@ -2139,7 +2010,7 @@ type AssistanceRelayConfig struct {
 
 func (x *AssistanceRelayConfig) Reset() {
 	*x = AssistanceRelayConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[29]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2151,7 +2022,7 @@ func (x *AssistanceRelayConfig) String() string {
 func (*AssistanceRelayConfig) ProtoMessage() {}
 
 func (x *AssistanceRelayConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[29]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2164,7 +2035,7 @@ func (x *AssistanceRelayConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistanceRelayConfig.ProtoReflect.Descriptor instead.
 func (*AssistanceRelayConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{29}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AssistanceRelayConfig) GetListener() *ListenerConfig {
@@ -2213,7 +2084,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc1\x1c\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xf8\x1b\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -2239,8 +2110,7 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\rauthorization\x18\x11 \x01(\v2\".lindm.auth.v1.AuthorizationPolicyR\rauthorization\x125\n" +
 	"\x06escrow\x18\x12 \x01(\v2\x1d.lindm.config.v1.EscrowConfigR\x06escrow\x12>\n" +
 	"\tprofiling\x18\x13 \x01(\v2 .lindm.config.v1.ProfilingConfigR\tprofiling\x12W\n" +
-	"\x12release_repository\x18\x14 \x01(\v2(.lindm.config.v1.ReleaseRepositoryConfigR\x11releaseRepository\x12f\n" +
-	"\x17enrollment_instructions\x18\x15 \x01(\v2-.lindm.config.v1.EnrollmentInstructionsConfigR\x16enrollmentInstructions\x12b\n" +
+	"\x12release_repository\x18\x14 \x01(\v2(.lindm.config.v1.ReleaseRepositoryConfigR\x11releaseRepository\x12b\n" +
 	"\x13connectivity_probes\x18\x16 \x03(\v2'.lindm.agent.v1.ConnectivityProbeTargetB\b\xbaH\x05\x92\x01\x02\x10 R\x12connectivityProbes\x12A\n" +
 	"\n" +
 	"assistance\x18\x18 \x01(\v2!.lindm.config.v1.AssistanceConfigR\n" +
@@ -2254,27 +2124,20 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\"offline_bundles.release_repository\x12;offline bundle import requires a signing release repository\x1a\x85\x01!has(this.offline_bundles) || (has(this.release_repository) && has(this.release_repository.signing) && has(this.execution_bootstrap))\x1a\xed\x01\n" +
 	"\x1dconnectivity_probes.authority\x12]native connectivity confirmation requires configured signing and at least four approved peers\x1amthis.connectivity_probes.size() == 0 || (has(this.execution_signing) && this.connectivity_probes.size() >= 4)B\x19\n" +
 	"\x17_inventory_budget_bytesB\x14\n" +
-	"\x12_device_public_url\"\xcc\x01\n" +
-	"\x1cEnrollmentInstructionsConfig\x12U\n" +
-	"\x0eapt_repository\x18\x01 \x01(\v2..lindm.config.v1.EnrollmentAPTRepositoryConfigR\raptRepository\x12U\n" +
-	"\x0ednf_repository\x18\x02 \x01(\v2..lindm.config.v1.EnrollmentDNFRepositoryConfigR\rdnfRepository\"\xed\x02\n" +
-	"\x1dEnrollmentAPTRepositoryConfig\x12'\n" +
-	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
-	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
-	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\x12<\n" +
-	"\x05suite\x18\x04 \x01(\tB&\xbaH#r!\x18\x80\x012\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\x05suite\x12Q\n" +
-	"\n" +
-	"components\x18\x05 \x03(\tB1\xbaH.\x92\x01+\b\x01\x10\x10\x18\x01\"#r!\x18\x80\x012\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\n" +
-	"components\"\xdc\x01\n" +
-	"\x1dEnrollmentDNFRepositoryConfig\x12'\n" +
-	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
-	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
-	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\"\xfa\x01\n" +
+	"\x12_device_public_urlJ\x04\b\x15\x10\x16R\x17enrollment_instructions\"\xd6\x02\n" +
 	"\x17ReleaseRepositoryConfig\x12'\n" +
 	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\x12C\n" +
 	"\asigning\x18\x02 \x01(\v2).lindm.config.v1.ReleaseRepositorySigningR\asigning\x12P\n" +
-	"\x1cverification_state_directory\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x1averificationStateDirectory\x88\x01\x01B\x1f\n" +
-	"\x1d_verification_state_directory\"\xea\x02\n" +
+	"\x1cverification_state_directory\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x1averificationStateDirectory\x88\x01\x01\x12Z\n" +
+	"\x13native_repositories\x18\x04 \x01(\v2).lindm.config.v1.NativeRepositoriesConfigR\x12nativeRepositoriesB\x1f\n" +
+	"\x1d_verification_state_directory\"\xbb\x03\n" +
+	"\x18NativeRepositoriesConfig\x12h\n" +
+	"\x1bapt_signing_key_fingerprint\x18\x01 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$H\x00R\x18aptSigningKeyFingerprint\x88\x01\x01\x12h\n" +
+	"\x1brpm_signing_key_fingerprint\x18\x02 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$H\x01R\x18rpmSigningKeyFingerprint\x88\x01\x01\x12j\n" +
+	"\x1carch_signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$H\x02R\x19archSigningKeyFingerprint\x88\x01\x01B\x1e\n" +
+	"\x1c_apt_signing_key_fingerprintB\x1e\n" +
+	"\x1c_rpm_signing_key_fingerprintB\x1f\n" +
+	"\x1d_arch_signing_key_fingerprint\"\xea\x02\n" +
 	"\x13OfflineBundleConfig\x12@\n" +
 	"\x17signing_public_key_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x14signingPublicKeyFile\x12;\n" +
 	"\x0esigning_key_id\x18\x02 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\fsigningKeyId\x12W\n" +
@@ -2435,85 +2298,81 @@ func file_lindm_config_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_config_v1_config_proto_rawDescData
 }
 
-var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_lindm_config_v1_config_proto_goTypes = []any{
-	(*ServerConfig)(nil),                  // 0: lindm.config.v1.ServerConfig
-	(*EnrollmentInstructionsConfig)(nil),  // 1: lindm.config.v1.EnrollmentInstructionsConfig
-	(*EnrollmentAPTRepositoryConfig)(nil), // 2: lindm.config.v1.EnrollmentAPTRepositoryConfig
-	(*EnrollmentDNFRepositoryConfig)(nil), // 3: lindm.config.v1.EnrollmentDNFRepositoryConfig
-	(*ReleaseRepositoryConfig)(nil),       // 4: lindm.config.v1.ReleaseRepositoryConfig
-	(*OfflineBundleConfig)(nil),           // 5: lindm.config.v1.OfflineBundleConfig
-	(*ReleaseRepositorySigning)(nil),      // 6: lindm.config.v1.ReleaseRepositorySigning
-	(*AdvisoryConfig)(nil),                // 7: lindm.config.v1.AdvisoryConfig
-	(*IntegrationsConfig)(nil),            // 8: lindm.config.v1.IntegrationsConfig
-	(*EscrowConfig)(nil),                  // 9: lindm.config.v1.EscrowConfig
-	(*ExecutionBootstrapConfig)(nil),      // 10: lindm.config.v1.ExecutionBootstrapConfig
-	(*ExecutionSigningConfig)(nil),        // 11: lindm.config.v1.ExecutionSigningConfig
-	(*ListenerConfig)(nil),                // 12: lindm.config.v1.ListenerConfig
-	(*ProfilingConfig)(nil),               // 13: lindm.config.v1.ProfilingConfig
-	(*DatabaseConfig)(nil),                // 14: lindm.config.v1.DatabaseConfig
-	(*TLSConfig)(nil),                     // 15: lindm.config.v1.TLSConfig
-	(*DeviceCAConfig)(nil),                // 16: lindm.config.v1.DeviceCAConfig
-	(*AuthenticationConfig)(nil),          // 17: lindm.config.v1.AuthenticationConfig
-	(*LocalAuthentication)(nil),           // 18: lindm.config.v1.LocalAuthentication
-	(*KeycloakDirectory)(nil),             // 19: lindm.config.v1.KeycloakDirectory
-	(*EntraDirectory)(nil),                // 20: lindm.config.v1.EntraDirectory
-	(*OktaDirectory)(nil),                 // 21: lindm.config.v1.OktaDirectory
-	(*GoogleDirectory)(nil),               // 22: lindm.config.v1.GoogleDirectory
-	(*KeycloakBrokerUpstream)(nil),        // 23: lindm.config.v1.KeycloakBrokerUpstream
-	(*SCIMConfig)(nil),                    // 24: lindm.config.v1.SCIMConfig
-	(*SCIMConnector)(nil),                 // 25: lindm.config.v1.SCIMConnector
-	(*SCIMCorrelation)(nil),               // 26: lindm.config.v1.SCIMCorrelation
-	(*BreakGlassPolicy)(nil),              // 27: lindm.config.v1.BreakGlassPolicy
-	(*AssistanceConfig)(nil),              // 28: lindm.config.v1.AssistanceConfig
-	(*AssistanceRelayConfig)(nil),         // 29: lindm.config.v1.AssistanceRelayConfig
-	(*v1.AuthorizationPolicy)(nil),        // 30: lindm.auth.v1.AuthorizationPolicy
-	(*v11.ConnectivityProbeTarget)(nil),   // 31: lindm.agent.v1.ConnectivityProbeTarget
-	(*v12.FeedSource)(nil),                // 32: lindm.advisory.v1.FeedSource
-	(*durationpb.Duration)(nil),           // 33: google.protobuf.Duration
+	(*ServerConfig)(nil),                // 0: lindm.config.v1.ServerConfig
+	(*ReleaseRepositoryConfig)(nil),     // 1: lindm.config.v1.ReleaseRepositoryConfig
+	(*NativeRepositoriesConfig)(nil),    // 2: lindm.config.v1.NativeRepositoriesConfig
+	(*OfflineBundleConfig)(nil),         // 3: lindm.config.v1.OfflineBundleConfig
+	(*ReleaseRepositorySigning)(nil),    // 4: lindm.config.v1.ReleaseRepositorySigning
+	(*AdvisoryConfig)(nil),              // 5: lindm.config.v1.AdvisoryConfig
+	(*IntegrationsConfig)(nil),          // 6: lindm.config.v1.IntegrationsConfig
+	(*EscrowConfig)(nil),                // 7: lindm.config.v1.EscrowConfig
+	(*ExecutionBootstrapConfig)(nil),    // 8: lindm.config.v1.ExecutionBootstrapConfig
+	(*ExecutionSigningConfig)(nil),      // 9: lindm.config.v1.ExecutionSigningConfig
+	(*ListenerConfig)(nil),              // 10: lindm.config.v1.ListenerConfig
+	(*ProfilingConfig)(nil),             // 11: lindm.config.v1.ProfilingConfig
+	(*DatabaseConfig)(nil),              // 12: lindm.config.v1.DatabaseConfig
+	(*TLSConfig)(nil),                   // 13: lindm.config.v1.TLSConfig
+	(*DeviceCAConfig)(nil),              // 14: lindm.config.v1.DeviceCAConfig
+	(*AuthenticationConfig)(nil),        // 15: lindm.config.v1.AuthenticationConfig
+	(*LocalAuthentication)(nil),         // 16: lindm.config.v1.LocalAuthentication
+	(*KeycloakDirectory)(nil),           // 17: lindm.config.v1.KeycloakDirectory
+	(*EntraDirectory)(nil),              // 18: lindm.config.v1.EntraDirectory
+	(*OktaDirectory)(nil),               // 19: lindm.config.v1.OktaDirectory
+	(*GoogleDirectory)(nil),             // 20: lindm.config.v1.GoogleDirectory
+	(*KeycloakBrokerUpstream)(nil),      // 21: lindm.config.v1.KeycloakBrokerUpstream
+	(*SCIMConfig)(nil),                  // 22: lindm.config.v1.SCIMConfig
+	(*SCIMConnector)(nil),               // 23: lindm.config.v1.SCIMConnector
+	(*SCIMCorrelation)(nil),             // 24: lindm.config.v1.SCIMCorrelation
+	(*BreakGlassPolicy)(nil),            // 25: lindm.config.v1.BreakGlassPolicy
+	(*AssistanceConfig)(nil),            // 26: lindm.config.v1.AssistanceConfig
+	(*AssistanceRelayConfig)(nil),       // 27: lindm.config.v1.AssistanceRelayConfig
+	(*v1.AuthorizationPolicy)(nil),      // 28: lindm.auth.v1.AuthorizationPolicy
+	(*v11.ConnectivityProbeTarget)(nil), // 29: lindm.agent.v1.ConnectivityProbeTarget
+	(*v12.FeedSource)(nil),              // 30: lindm.advisory.v1.FeedSource
+	(*durationpb.Duration)(nil),         // 31: google.protobuf.Duration
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
-	12, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
-	12, // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
-	14, // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
-	15, // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
-	16, // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
-	17, // 5: lindm.config.v1.ServerConfig.authentication:type_name -> lindm.config.v1.AuthenticationConfig
-	10, // 6: lindm.config.v1.ServerConfig.execution_bootstrap:type_name -> lindm.config.v1.ExecutionBootstrapConfig
-	11, // 7: lindm.config.v1.ServerConfig.execution_signing:type_name -> lindm.config.v1.ExecutionSigningConfig
-	27, // 8: lindm.config.v1.ServerConfig.break_glass:type_name -> lindm.config.v1.BreakGlassPolicy
-	7,  // 9: lindm.config.v1.ServerConfig.advisories:type_name -> lindm.config.v1.AdvisoryConfig
-	8,  // 10: lindm.config.v1.ServerConfig.integrations:type_name -> lindm.config.v1.IntegrationsConfig
-	30, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
-	9,  // 12: lindm.config.v1.ServerConfig.escrow:type_name -> lindm.config.v1.EscrowConfig
-	13, // 13: lindm.config.v1.ServerConfig.profiling:type_name -> lindm.config.v1.ProfilingConfig
-	4,  // 14: lindm.config.v1.ServerConfig.release_repository:type_name -> lindm.config.v1.ReleaseRepositoryConfig
-	1,  // 15: lindm.config.v1.ServerConfig.enrollment_instructions:type_name -> lindm.config.v1.EnrollmentInstructionsConfig
-	31, // 16: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
-	28, // 17: lindm.config.v1.ServerConfig.assistance:type_name -> lindm.config.v1.AssistanceConfig
-	5,  // 18: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
-	2,  // 19: lindm.config.v1.EnrollmentInstructionsConfig.apt_repository:type_name -> lindm.config.v1.EnrollmentAPTRepositoryConfig
-	3,  // 20: lindm.config.v1.EnrollmentInstructionsConfig.dnf_repository:type_name -> lindm.config.v1.EnrollmentDNFRepositoryConfig
-	6,  // 21: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
-	32, // 22: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
-	12, // 23: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	18, // 24: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
-	19, // 25: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
-	20, // 26: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
-	21, // 27: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
-	22, // 28: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
-	24, // 29: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
-	23, // 30: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
-	25, // 31: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
-	26, // 32: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
-	33, // 33: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
-	29, // 34: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
-	12, // 35: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	10, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
+	10, // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
+	12, // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
+	13, // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
+	14, // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
+	15, // 5: lindm.config.v1.ServerConfig.authentication:type_name -> lindm.config.v1.AuthenticationConfig
+	8,  // 6: lindm.config.v1.ServerConfig.execution_bootstrap:type_name -> lindm.config.v1.ExecutionBootstrapConfig
+	9,  // 7: lindm.config.v1.ServerConfig.execution_signing:type_name -> lindm.config.v1.ExecutionSigningConfig
+	25, // 8: lindm.config.v1.ServerConfig.break_glass:type_name -> lindm.config.v1.BreakGlassPolicy
+	5,  // 9: lindm.config.v1.ServerConfig.advisories:type_name -> lindm.config.v1.AdvisoryConfig
+	6,  // 10: lindm.config.v1.ServerConfig.integrations:type_name -> lindm.config.v1.IntegrationsConfig
+	28, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
+	7,  // 12: lindm.config.v1.ServerConfig.escrow:type_name -> lindm.config.v1.EscrowConfig
+	11, // 13: lindm.config.v1.ServerConfig.profiling:type_name -> lindm.config.v1.ProfilingConfig
+	1,  // 14: lindm.config.v1.ServerConfig.release_repository:type_name -> lindm.config.v1.ReleaseRepositoryConfig
+	29, // 15: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
+	26, // 16: lindm.config.v1.ServerConfig.assistance:type_name -> lindm.config.v1.AssistanceConfig
+	3,  // 17: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
+	4,  // 18: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
+	2,  // 19: lindm.config.v1.ReleaseRepositoryConfig.native_repositories:type_name -> lindm.config.v1.NativeRepositoriesConfig
+	30, // 20: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
+	10, // 21: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	16, // 22: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
+	17, // 23: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
+	18, // 24: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
+	19, // 25: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
+	20, // 26: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
+	22, // 27: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
+	21, // 28: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
+	23, // 29: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
+	24, // 30: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
+	31, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	27, // 32: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
+	10, // 33: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }
@@ -2522,10 +2381,11 @@ func file_lindm_config_v1_config_proto_init() {
 		return
 	}
 	file_lindm_config_v1_config_proto_msgTypes[0].OneofWrappers = []any{}
-	file_lindm_config_v1_config_proto_msgTypes[4].OneofWrappers = []any{}
-	file_lindm_config_v1_config_proto_msgTypes[7].OneofWrappers = []any{}
-	file_lindm_config_v1_config_proto_msgTypes[14].OneofWrappers = []any{}
-	file_lindm_config_v1_config_proto_msgTypes[17].OneofWrappers = []any{
+	file_lindm_config_v1_config_proto_msgTypes[1].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[2].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[5].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[12].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[15].OneofWrappers = []any{
 		(*AuthenticationConfig_Local)(nil),
 		(*AuthenticationConfig_Keycloak)(nil),
 		(*AuthenticationConfig_Entra)(nil),
@@ -2538,7 +2398,7 @@ func file_lindm_config_v1_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_config_v1_config_proto_rawDesc), len(file_lindm_config_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

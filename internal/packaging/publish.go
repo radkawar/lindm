@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -95,29 +96,23 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 		return nil, err
 	}
 	repo := filepath.Join(work, "apt")
-	dist := filepath.Join(repo, "dists", APTDistribution, "main", "binary-amd64")
-	if err := mkdir(dist, epoch); err != nil {
-		return nil, err
-	}
-	arch, err := stageDEBs(ctx, work, repo, req.DEBs, epoch)
+	architectures, err := stageDEBs(ctx, work, repo, req.DEBs, epoch)
 	if err != nil {
 		return nil, err
 	}
-	binaryDir := filepath.Join(repo, "dists", APTDistribution, "main", "binary-"+arch)
-	if arch != "amd64" {
-		if err := os.RemoveAll(dist); err != nil {
-			return nil, err
-		}
+	indexes := make(map[string]string, len(architectures))
+	for _, arch := range architectures {
+		binaryDir := filepath.Join(repo, "dists", APTDistribution, "main", "binary-"+arch)
 		if err := mkdir(binaryDir, epoch); err != nil {
 			return nil, err
 		}
-	} else {
-		binaryDir = dist
+		index := filepath.Join(binaryDir, "Packages")
+		if err := writeAPTPackages(ctx, work, repo, index, arch); err != nil {
+			return nil, err
+		}
+		indexes[arch] = filepath.Join(req.OutputDir, "apt", "dists", APTDistribution, "main", "binary-"+arch, "Packages")
 	}
-	if err := writeAPTPackages(ctx, work, repo, filepath.Join(binaryDir, "Packages")); err != nil {
-		return nil, err
-	}
-	releasePath, err := writeAPTRelease(ctx, work, repo, key, arch, epoch)
+	releasePath, err := writeAPTRelease(ctx, work, repo, key, strings.Join(architectures, " "), epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +143,7 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 		Component:            APTComponent,
 		InRelease:            filepath.Join(final, "dists", APTDistribution, "InRelease"),
 		Release:              filepath.Join(final, "dists", APTDistribution, "Release"),
-		Packages:             filepath.Join(final, "dists", APTDistribution, "main", "binary-"+arch, "Packages"),
+		Packages:             indexes,
 		PublicKey:            filepath.Join(final, filepath.Base(binaryKey)),
 		PublicKeyArmor:       filepath.Join(final, filepath.Base(armorKey)),
 		Fingerprint:          key.Fingerprint,
@@ -159,26 +154,26 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 	}, nil
 }
 
-// stageDEBs copies each supported product deb into the repository pool and
-// returns their single shared architecture (amd64 or arm64).
-func stageDEBs(ctx context.Context, work, repo string, debs []string, epoch int64) (string, error) {
-	var arch string
+// stageDEBs copies supported products into the pool and returns their sorted
+// native architectures. Each architecture receives its own signed index.
+func stageDEBs(ctx context.Context, work, repo string, debs []string, epoch int64) ([]string, error) {
+	var architectures []string
 	for _, deb := range debs {
-		var err error
-		if arch, err = stageDEB(ctx, work, repo, deb, arch, epoch); err != nil {
-			return "", err
+		arch, err := stageDEB(ctx, work, repo, deb, epoch)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(architectures, arch) {
+			architectures = append(architectures, arch)
 		}
 	}
-	if arch != "amd64" && arch != "arm64" {
-		return "", fmt.Errorf("%w: unsupported deb architecture", ErrArchitecture)
-	}
-	return arch, nil
+	slices.Sort(architectures)
+	return architectures, nil
 }
 
-// stageDEB checks that deb is a supported product named after its package and,
-// once arch is known, shares it; then copies it into pool/main/l/<package>. It
-// returns the deb's architecture.
-func stageDEB(ctx context.Context, work, repo, deb, arch string, epoch int64) (string, error) {
+// stageDEB checks the product and architecture, then copies the archive into
+// pool/main/l/<package>. It returns the deb's architecture.
+func stageDEB(ctx context.Context, work, repo, deb string, epoch int64) (string, error) {
 	file, err := openRegular(deb)
 	if err != nil {
 		return "", err
@@ -200,8 +195,11 @@ func stageDEB(ctx context.Context, work, repo, deb, arch string, epoch int64) (s
 	if len(fields) != 2 || !supportedProduct(fields[0]) || !strings.HasPrefix(name, fields[0]+"_") || !strings.HasSuffix(name, ".deb") {
 		return "", fmt.Errorf("%w: unexpected deb product or filename", ErrArtifact)
 	}
-	if arch != "" && arch != fields[1] {
-		return "", fmt.Errorf("%w: mixed deb architectures", ErrArtifact)
+	if fields[1] != "amd64" && fields[1] != "arm64" {
+		return "", fmt.Errorf("%w: unsupported deb architecture", ErrArchitecture)
+	}
+	if !strings.HasSuffix(name, "_"+fields[1]+".deb") {
+		return "", fmt.Errorf("%w: deb filename architecture differs from package identity", ErrArtifact)
 	}
 	pool := filepath.Join(repo, "pool", "main", "l", fields[0])
 	if err := mkdir(pool, epoch); err != nil {
@@ -213,12 +211,12 @@ func stageDEB(ctx context.Context, work, repo, deb, arch string, epoch int64) (s
 	return fields[1], nil
 }
 
-// writeAPTPackages generates and verifies the SHA-256 Packages index for the
-// pool, then writes its reproducible gzip copy.
-func writeAPTPackages(ctx context.Context, work, repo, packagesPath string) error {
+// writeAPTPackages generates and verifies one architecture's SHA-256 Packages
+// index, then writes its reproducible gzip copy.
+func writeAPTPackages(ctx context.Context, work, repo, packagesPath, arch string) error {
 	if err := runToolToFile(ctx, work, packagesPath, toolCmd{
 		Name: "apt-ftparchive",
-		Args: []string{"--sha256", "packages", "pool"},
+		Args: []string{"--sha256", "--arch", arch, "packages", "pool"},
 		Dir:  repo,
 	}); err != nil {
 		return err

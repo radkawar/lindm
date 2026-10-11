@@ -50,11 +50,12 @@ const (
 	// LaneEncryptedAcceptance its vendor-installer encrypted variant.
 	LaneAcceptance          LabLane = "acceptance"
 	LaneEncryptedAcceptance LabLane = "encrypted-acceptance"
+	LaneEnrollFromConsole   LabLane = "enroll-from-console"
 )
 
 // LabLanes lists every lane whose recipes are tracked per release; a lane
 // outside this list needs no per-release recipe.
-var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance}
+var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole}
 
 // LabLane returns nil when the release has a maintained recipe for the lane.
 func (r *Release) LabLane(l LabLane) error {

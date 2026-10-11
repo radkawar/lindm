@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"slices"
 	"strconv"
@@ -10,6 +12,8 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/config"
+	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 const (
@@ -17,15 +21,16 @@ const (
 	bootstrapBundlePath = "/bootstrap/bootstrap.dsse.json"
 )
 
-// enrollmentInstructions projects only configured public metadata. Native
-// repositories are distinct from the TUF update repository and never inferred.
-func enrollmentInstructions(resources *config.Resources) *adminv1.GetEnrollmentInstructionsResponse {
+// enrollmentInstructions projects a verified publication snapshot and registry
+// identities; no listener address, Host header or external repository is used.
+func enrollmentInstructions(resources *config.Resources, native *nativeRepositories) *adminv1.GetEnrollmentInstructionsResponse {
 	cfg := resources.Proto
 	response := &adminv1.GetEnrollmentInstructionsResponse{
 		EnrollmentOrigin:    cfg.GetPublicUrl(),
 		GrantCommand:        "/usr/libexec/lindm/lindm-agent bootstrap -root /etc/lindm/execution-root.json -bundle /etc/lindm/bootstrap.dsse.json -grant /run/lindm-enrollment/grant",
 		ProvisioningCommand: "/usr/libexec/lindm/lindm-agent bootstrap -root /etc/lindm/execution-root.json -bundle /etc/lindm/bootstrap.dsse.json -provisioning-token-file /etc/lindm/provisioning-token",
 		ResumeCommand:       "/usr/libexec/lindm/lindm-agent resume -wait-seconds 3600",
+		Readiness:           &adminv1.EnrollmentReadiness{Ready: true},
 	}
 	if cfg.DevicePublicUrl != nil {
 		response.DeviceOrigin = proto.String(cfg.GetDevicePublicUrl())
@@ -34,22 +39,104 @@ func enrollmentInstructions(resources *config.Resources) *adminv1.GetEnrollmentI
 		origin := strings.TrimSuffix(cfg.GetPublicUrl(), "/")
 		response.ExecutionRootUrl = proto.String(origin + executionRootPath)
 		response.BootstrapBundleUrl = proto.String(origin + bootstrapBundlePath)
+		digest := sha256.Sum256(resources.ExecutionBootstrap.RootJSON)
+		response.ExecutionRootSha256 = proto.String(hex.EncodeToString(digest[:]))
 	}
-	configured := cfg.GetEnrollmentInstructions()
-	if apt := configured.GetAptRepository(); apt != nil {
+	if resources.EnrollmentTLSCAPEM != "" {
+		response.TlsCaPem = proto.String(resources.EnrollmentTLSCAPEM)
+		response.TlsCaSha256 = proto.String(resources.EnrollmentTLSCASHA256)
+	}
+	switch {
+	case resources.ExecutionBootstrap == nil:
+		response.Readiness = enrollmentNotReady("execution_bootstrap_missing", "Configure executionBootstrap with the authenticated execution root and signed bootstrap bundle, then restart lindmd.")
+	case cfg.GetDevicePublicUrl() == "":
+		response.Readiness = enrollmentNotReady("device_origin_missing", "Configure the device HTTPS public origin and restart lindmd.")
+	case resources.EnrollmentTLSUnavailable:
+		response.Readiness = enrollmentNotReady("https_trust_unavailable", "Provide the administrative HTTPS CA in the TLS certificate chain or trustedCaFile, with a certificate covering both public origins, then restart lindmd.")
+	}
+	origin := strings.TrimSuffix(cfg.GetPublicUrl(), "/")
+	pins := cfg.GetReleaseRepository().GetNativeRepositories()
+	if native.apt.err == nil {
 		response.AptRepository = &adminv1.EnrollmentAPTRepository{
-			BaseUrl: apt.GetBaseUrl(), SigningKeyUrl: apt.GetSigningKeyUrl(),
-			SigningKeyFingerprint: apt.GetSigningKeyFingerprint(),
-			Suite:                 apt.GetSuite(), Components: slices.Clone(apt.GetComponents()),
+			BaseUrl: origin + "/repo/apt", SigningKeyUrl: origin + "/repo/apt/" + nativePublicKey,
+			SigningKeyFingerprint: pins.GetAptSigningKeyFingerprint(),
+			Suite:                 packaging.APTDistribution, Components: []string{packaging.APTComponent},
 		}
 	}
-	if dnf := configured.GetDnfRepository(); dnf != nil {
+	if native.rpm.err == nil {
 		response.DnfRepository = &adminv1.EnrollmentDNFRepository{
-			BaseUrl: dnf.GetBaseUrl(), SigningKeyUrl: dnf.GetSigningKeyUrl(),
-			SigningKeyFingerprint: dnf.GetSigningKeyFingerprint(),
+			BaseUrl: origin + "/repo/rpm", SigningKeyUrl: origin + "/repo/rpm/" + nativePublicKey,
+			SigningKeyFingerprint: pins.GetRpmSigningKeyFingerprint(),
 		}
+	}
+	if native.arch.err == nil {
+		response.ArchRepository = &adminv1.EnrollmentArchRepository{
+			BaseUrl: origin + "/repo/arch", SigningKeyUrl: origin + "/repo/arch/" + nativePublicKey,
+			SigningKeyFingerprint: pins.GetArchSigningKeyFingerprint(), RepositoryName: "lindm",
+		}
+	}
+	for _, release := range platform.Releases() {
+		choice := &adminv1.EnrollmentPlatform{
+			Id: release.Key, Label: release.Name, OsId: release.ID,
+			VariantIds: slices.Clone(release.Variants),
+			Readiness:  proto.CloneOf(response.Readiness),
+		}
+		switch release.Version.Rule {
+		case platform.VersionExact:
+			choice.VersionRule, choice.VersionIds = "exact", []string{release.Version.Value}
+		case platform.VersionMajor:
+			choice.VersionRule, choice.VersionIds = "major", []string{release.Version.Value}
+		case platform.VersionAbsent:
+			choice.VersionRule = "absent"
+		case platform.VersionSnapshot:
+			choice.VersionRule = "snapshot"
+		case platform.VersionAny:
+			choice.VersionRule = "any"
+		}
+		var repository *nativeRepository
+		switch release.Native().Packages.Backend {
+		case platform.BackendAPT:
+			choice.PackageFamily, repository = "apt", native.apt
+		case platform.BackendDNF4, platform.BackendDNF5:
+			choice.PackageFamily, repository = "dnf", native.rpm
+		case platform.BackendZypper:
+			choice.PackageFamily, repository = "zypper", native.rpm
+		case platform.BackendPacman:
+			choice.PackageFamily, repository = "pacman", native.arch
+		default:
+			choice.PackageFamily = string(release.Family)
+		}
+		if choice.Readiness.Ready {
+			switch {
+			case !release.Supported(platform.Lifecycle):
+				choice.Readiness = enrollmentNotReady("platform_installation_gated", release.GateReason(platform.Lifecycle)+". Select a registry platform with a supported native installation method.")
+			case repository == nil:
+				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish a signed native agent repository for this package family on lindmd.")
+			case repository.err != nil:
+				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish the signed native agent repository beneath releaseRepository.directory/repo, configure its full signing fingerprint, and restart every lindmd replica with identical artifacts.")
+			}
+		}
+		if repository != nil && repository.err == nil {
+			for _, arch := range release.Architectures {
+				normalized := nativeArchitecture(arch)
+				if containsArchitecture(repository.architectures, normalized) {
+					choice.Architectures = append(choice.Architectures, normalized)
+				}
+			}
+			if choice.Readiness.Ready && len(choice.Architectures) == 0 {
+				choice.Readiness = enrollmentNotReady("native_architecture_unavailable", "Publish signed agent metadata and packages for an architecture supported by this platform, then restart every lindmd replica.")
+			}
+		}
+		response.Platforms = append(response.Platforms, choice)
+	}
+	if response.Readiness.Ready && response.AptRepository == nil && response.DnfRepository == nil && response.ArchRepository == nil {
+		response.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish signed native agent repositories beneath releaseRepository.directory/repo, configure their full signing fingerprints, and restart every lindmd replica with identical artifacts.")
 	}
 	return response
+}
+
+func enrollmentNotReady(reason, remedy string) *adminv1.EnrollmentReadiness {
+	return &adminv1.EnrollmentReadiness{Reason: reason, Remedy: remedy}
 }
 
 // bootstrapMaterialHandler serves only the two exact public documents already

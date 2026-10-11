@@ -1,6 +1,7 @@
 package labhost
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -321,7 +322,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" || args[1] == "assistance" {
 		args = SetFlag(args, "golden-cache", filepath.Join(work, "encrypted"))
 	}
-	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "command-file", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
+	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
 		value := FlagValue(args, name)
 		if value == "" {
 			continue
@@ -361,6 +362,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			}
 		}
 	}
+	if args[1] == "enroll-from-console" && FlagValue(args, "browser-config") != "" {
+		browserConfig, err := stage.enrollmentBrowser(FlagValue(args, "browser-config"), outputs)
+		if err != nil {
+			return fmt.Errorf("stage enrollment browser: %w", err)
+		}
+		args = SetFlag(args, "browser-config", browserConfig)
+	}
 	config, err := protojson.Marshal(&labv1.LabConfig{Hosts: []*labv1.LabHost{r.Host}})
 	if err != nil {
 		return err
@@ -378,7 +386,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		command[i] = QuoteShell(s)
 	}
 	script := "cd " + QuoteShell(remote+"/source") + " && exec env " + QuoteShell("TMPDIR="+remote+"/work") + " " + strings.Join(command, " ")
-	if args[1] == "assistance" {
+	if args[1] == "assistance" || (args[1] == "enroll-from-console" && FlagValue(args, "browser-config") != "") {
 		browserEnv, err := stage.assistanceBrowser(work, nativeArch)
 		if err != nil {
 			return err
@@ -465,7 +473,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	// InventoryRecordPath) are rewritten to their local copies; the record is
 	// returned last so it never names a local file that has not been copied.
 	relocated := map[string]string{}
-	for _, name := range []string{"evidence", "inventory-record", "diagnostics", "fixture-output", "record"} {
+	for _, name := range []string{"browser-credential", "evidence", "inventory-record", "diagnostics", "fixture-output", "record"} {
 		destination, ok := outputs[name]
 		if !ok {
 			continue
@@ -486,6 +494,10 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			if e := collectAssistanceEvidence(copyCtx, r.Host.SshAlias, remotePath, destination, r.Stderr); e != nil {
 				err = errors.Join(err, e)
 				preserveRemote = true
+			} else if absolute, e := filepath.Abs(destination); e != nil {
+				err = errors.Join(err, e)
+			} else {
+				relocated[remotePath] = absolute
 			}
 			continue
 		}
@@ -507,6 +519,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		if e := copyCmd.Run(); e != nil {
 			err = errors.Join(err, e)
 			preserveRemote = true
+			continue
+		}
+		if name == "browser-credential" {
+			if e := returnEnrollmentCredential(target, destination); e != nil {
+				err = errors.Join(err, e)
+				preserveRemote = true
+			}
 			continue
 		}
 		if name == "record" {
@@ -611,26 +630,17 @@ func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time
 	if err != nil {
 		return err
 	}
-	var record map[string]json.RawMessage
-	if err = json.Unmarshal(data, &record); err != nil {
+	var record map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err = decoder.Decode(&record); err != nil {
 		return err
 	}
-	metadata, err := json.Marshal(map[string]any{"name": host.Name, "transport": host.Transport, "ssh_alias": host.SshAlias, "runtime": host.Runtime, "runner_image": host.RunnerImage, "started_at": start, "finished_at": end, "elapsed_seconds": end.Sub(start).Seconds(), "source_revision": revision, "source_diff_sha256": diffDigest})
-	if err != nil {
-		return err
+	if record == nil || len(bytes.TrimSpace(data[decoder.InputOffset():])) != 0 {
+		return errors.New("remote lane record must contain exactly one JSON object")
 	}
-	record["lab_host"] = metadata
-	for key, value := range record {
-		var remotePath string
-		if json.Unmarshal(value, &remotePath) != nil {
-			continue
-		}
-		if local, ok := relocated[remotePath]; ok {
-			if record[key], err = json.Marshal(local); err != nil {
-				return err
-			}
-		}
-	}
+	record["lab_host"] = map[string]any{"name": host.Name, "transport": host.Transport, "ssh_alias": host.SshAlias, "runtime": host.Runtime, "runner_image": host.RunnerImage, "started_at": start, "finished_at": end, "elapsed_seconds": end.Sub(start).Seconds(), "source_revision": revision, "source_diff_sha256": diffDigest}
+	relocateReturnedRecord(record, relocated)
 	data, err = json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return err
@@ -652,6 +662,35 @@ func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time
 		return err
 	}
 	return os.Rename(annotated.Name(), path)
+}
+
+func relocateReturnedRecord(value any, relocated map[string]string) any {
+	switch value := value.(type) {
+	case map[string]any:
+		for key, item := range value {
+			value[key] = relocateReturnedRecord(item, relocated)
+		}
+	case []any:
+		for index, item := range value {
+			value[index] = relocateReturnedRecord(item, relocated)
+		}
+	case string:
+		var source, destination string
+		for remote, local := range relocated {
+			if len(remote) <= len(source) {
+				continue
+			}
+			if value == remote {
+				source, destination = remote, local
+			} else if relative, ok := strings.CutPrefix(value, remote+"/"); ok && filepath.IsLocal(relative) {
+				source, destination = remote, filepath.Join(local, relative)
+			}
+		}
+		if source != "" {
+			return destination
+		}
+	}
+	return value
 }
 
 func publishRecord(source, destination string) (err error) {
@@ -789,8 +828,26 @@ func (s *remoteStage) record(path string) (string, error) {
 				if key == "root" || key == "tools" {
 					continue
 				}
+				if key == "packages" {
+					indexes, ok := item.(map[string]any)
+					if !ok {
+						return errors.New("APT packages record must name architecture-specific indexes")
+					}
+					for architecture, index := range indexes {
+						path, ok := index.(string)
+						if !ok || path == "" {
+							return errors.New("APT architecture index path is missing")
+						}
+						target, e := s.input(path)
+						if e != nil {
+							return e
+						}
+						indexes[architecture] = target
+					}
+					continue
+				}
 				text, ok := item.(string)
-				if ok && text != "" && (key == "path" || key == "public_key" || key == "public_key_armor" || key == "signature_path" || key == "binary" || key == "inrelease" || key == "release" || key == "packages" || key == "database" || key == "database_signature" || key == "repomd") {
+				if ok && text != "" && (key == "path" || key == "public_key" || key == "public_key_armor" || key == "signature_path" || key == "binary" || key == "inrelease" || key == "release" || key == "database" || key == "database_signature" || key == "repomd") {
 					target, e := s.input(text)
 					if e != nil {
 						return e

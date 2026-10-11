@@ -75,6 +75,15 @@ physical machines, ARM, desktops or air-gap operation; consult verification befo
 
 ## Packaging, signing, repositories, paths and LSM
 
+For a bare Ubuntu machine, choose Ubuntu in the console's enrollment dialog and
+run its single install-and-enroll command. Agent packages come only from the
+customer's own `lindmd` HTTPS `/repo/apt` endpoint. The command pins the repository
+signer and server/bootstrap trust before writing the deb822 `Signed-By` source;
+it never substitutes an external agent repository. Missing packages or architecture
+coverage have a server-configuration remedy. See the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+This delivery path does not transfer qualification between Ubuntu releases.
+
 Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
 signature check. Authentication is signed `InRelease` → hashed `Packages` → archive
 SHA-256; the DEB does not carry an embedded package signature. The generated deb822

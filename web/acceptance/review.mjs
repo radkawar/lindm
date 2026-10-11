@@ -17,6 +17,7 @@ import {
 } from "./private-files.mjs";
 import { installProbes } from "./review-probes.mjs";
 import { contactSheet } from "./review-report.mjs";
+import { reviewEnrollmentFixtures } from "./review-enrollment.mjs";
 
 process.umask(0o077);
 
@@ -635,7 +636,15 @@ async function main() {
   ])
     if (typeof config[key] !== "string" || !config[key])
       throw new Error("required_configuration_missing");
-  secrets = [config.password, config.enrollmentSecret];
+  for (const key of ["origin", "username", "password", "enrollmentSecret"])
+    if (typeof config.enrollmentFixture?.[key] !== "string" || !config.enrollmentFixture[key])
+      throw new Error("published_enrollment_fixture_required");
+  secrets = [
+    config.password,
+    config.enrollmentSecret,
+    config.enrollmentFixture.password,
+    config.enrollmentFixture.enrollmentSecret,
+  ];
   config.evidenceDirectory = resolve(config.evidenceDirectory);
   await privateDirectory(config.evidenceDirectory);
   config.copyRules = JSON.parse(
@@ -729,6 +738,23 @@ async function main() {
       }),
     );
     report.sessions = sessions;
+    const enrollmentResults = await reviewEnrollmentFixtures({
+      driver,
+      pages,
+      combos,
+      config,
+      screenshot,
+      axe,
+      probe,
+      settle,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
+    });
+    for (const entry of enrollmentResults) {
+      summarize(entry);
+      report.results.push(entry);
+    }
     // Seeded sessions belong to the seeding owner and have ended. Request a
     // control-mode session through the device page as the signed-in owner, so the
     // live viewer (Take control and its disabled reason) is reviewed in every theme

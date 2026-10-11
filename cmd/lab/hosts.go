@@ -183,7 +183,14 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		if splitAssistance(chosen, clean) {
 			return runSplitAssistance(ctx, chosen, arch, repo, clean, stdout, stderr)
 		}
-		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Hold: held, Stdout: stdout, Stderr: stderr}).Run(ctx)
+		var forwards []string
+		if clean[1] == "enroll-from-console" && chosen.Transport == "ssh" {
+			forwards, err = consoleEnrollmentReverseForwards(clean)
+			if err != nil {
+				return err
+			}
+		}
+		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Hold: held, ReverseForwards: forwards, Stdout: stdout, Stderr: stderr}).Run(ctx)
 	}
 	slots, err := labhost.OpenSlots(chosen)
 	if err != nil {

@@ -126,19 +126,19 @@ type APTRequest struct {
 
 // APTRepository is an isolated archive. Install it with APTSources, not dpkg -i.
 type APTRepository struct {
-	Root                 string        `json:"root"`
-	Distribution         string        `json:"distribution"`
-	Component            string        `json:"component"`
-	InRelease            string        `json:"inrelease"`
-	Release              string        `json:"release"`
-	Packages             string        `json:"packages"`
-	PublicKey            string        `json:"public_key"`
-	PublicKeyArmor       string        `json:"public_key_armor"`
-	Fingerprint          string        `json:"fingerprint"`
-	Custody              Custody       `json:"custody"`
-	InReleaseVerified    bool          `json:"inrelease_verified"`
-	PackagesHashVerified bool          `json:"packages_hash_verified"`
-	Tools                []ToolVersion `json:"tools"`
+	Root                 string            `json:"root"`
+	Distribution         string            `json:"distribution"`
+	Component            string            `json:"component"`
+	InRelease            string            `json:"inrelease"`
+	Release              string            `json:"release"`
+	Packages             map[string]string `json:"packages"`
+	PublicKey            string            `json:"public_key"`
+	PublicKeyArmor       string            `json:"public_key_armor"`
+	Fingerprint          string            `json:"fingerprint"`
+	Custody              Custody           `json:"custody"`
+	InReleaseVerified    bool              `json:"inrelease_verified"`
+	PackagesHashVerified bool              `json:"packages_hash_verified"`
+	Tools                []ToolVersion     `json:"tools"`
 }
 
 // RPMRequest publishes signed RPMs. It fails before writing if createrepo_c

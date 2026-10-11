@@ -27,9 +27,14 @@ import (
 // Resources contains resolved dependencies, not a second serialized schema.
 // HTTPClient owns its transport; close idle connections during server shutdown.
 type Resources struct {
-	Proto                       *configv1.ServerConfig
-	Database                    *pgxpool.Config
-	ServerCertificate           tls.Certificate
+	Proto             *configv1.ServerConfig
+	Database          *pgxpool.Config
+	ServerCertificate tls.Certificate
+	// Enrollment HTTPS trust is selected from verified server certificate
+	// material, not from the independently provisioned device-client CA.
+	EnrollmentTLSCAPEM          string
+	EnrollmentTLSCASHA256       string
+	EnrollmentTLSUnavailable    bool
 	DeviceCACertificate         *x509.Certificate
 	DeviceCAKey                 crypto.Signer
 	HTTPClient                  *http.Client
@@ -145,6 +150,9 @@ func (d *Document) Resolve() (*Resources, error) {
 		return nil, err
 	}
 	result.ExecutionBootstrap = bootstrap
+	if err := d.resolveEnrollmentTLS(result); err != nil {
+		return nil, fmt.Errorf("resolve enrollment HTTPS trust: %w", err)
+	}
 	result.ExecutionSigning, err = d.executionSigning(verifier)
 	if err != nil {
 		return nil, err

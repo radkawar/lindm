@@ -61,6 +61,13 @@ aarch64 or physical hardware by family resemblance
 
 ## Packaging, signing, repositories, paths and LSM
 
+Console enrollment explicitly gates these platforms on their native installation
+prerequisites. A mutable APT/DNF/zypper command is not offered as a substitute for
+rpm-ostree or a Nix generation. Agent distribution remains the customer's own
+`lindmd` only; missing native packaging is not solved by an external repository.
+See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server)
+for the supported mutable-family path and trust model.
+
 Mutable package builders are not an atomic deployment or Nix closure builder.
 The current packaging package documents DEB/RPM and explicit Arch agent artifacts
 ([`internal/packaging/doc.go`](../../internal/packaging/doc.go):3-6,14-42).

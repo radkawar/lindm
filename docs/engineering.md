@@ -352,6 +352,14 @@ enable the platform's maintained online advisory feeds, complete an initial real
 refresh and wait for the enrolled device's current evaluation before printing
 "running" and the affected/accepted/unknown/clear finding counts. Missing feed
 coverage or an unknown evaluation is a gate, never an empty successful result.
+Before starting either a co-located or split held `lindmd`, the fixture also
+publishes the current source build's signed APT/RPM agent packages for the guest
+architecture at its own HTTPS `/repo` endpoints. Subsequent **Enroll** commands
+therefore install from that customer's demo server; no external agent hosting is
+required. `-build-repo` selects the source when development trust lives in a
+different checkout. The initial assistance guest's existing signed-package
+installation path is unchanged; holding the fixture makes the console install
+path available for additional devices.
 Feeds use a persistent revalidating HTTP cache under the configured controller
 lab work directory's `advisory-cache` (the lab host's directory in co-located
 mode), or the explicit `-advisory-cache DIRECTORY` override. An SSH-only host
@@ -484,6 +492,15 @@ through the real password and WebAuthn flow (CDP virtual authenticator). Credent
 stay in a private 0600 file that is removed afterwards; the report is redacted and
 screenshots mask sensitive and password fields. `lab console -demo` serves the same
 seeded fleet interactively.
+
+From a private worktree, use
+`make ui-review UI_REVIEW_REPO=/path/to/development-trust-checkout`.
+Only fixture trust and the running development PostgreSQL connection come from
+that directory; the embedded console, browser runner and published agent packages
+come from the checkout under review. The review also opens a separate real signed
+APT/RPM fixture for the OS chooser, clipboard command and trust disclosure. The
+unpublished fixture covers missing-artifact remedies and Settings readiness, so a
+mocked repository response cannot make this review pass.
 
 The demo seed (`loadlab.SeedDemo`) is deterministic and uses only product RPCs on
 the isolated fixture: synthetic-labelled Ubuntu, Fedora, RHEL and Debian devices
@@ -1204,7 +1221,7 @@ Before recovery approval, publish the signed UKI through
 -target recovery/<lowercase-sha256>.efi=/path/signed.efi`. This requires the
 offline targets quorum, not merely online rollout signers. Configure the
 server's `releaseRepository.verificationStateDirectory` as a protected private
-directory outside the published repository for its TUF rollback checkpoint.
+directory outside the server's release-content directory for its TUF rollback checkpoint.
 The deployment's verified execution bootstrap supplies the release-root anchor;
 an absent catalog or readiness observation refuses approval rather than trusting
 a client-supplied image size. The maintained action fixture creates its own
@@ -1805,6 +1822,55 @@ file references to single unencrypted PKCS#8 Ed25519 private keys. Loading exclu
 pinned transport/root/release keys and TLS/device-CA identity keys. It does not
 delegate authority or enable an issuer; current authority and admission must still
 authorize every later issuance. Absent configuration provides no signing fallback.
+
+### Bare-machine enrollment from the console
+
+`lab console-enrollment` holds an initially empty local-auth console with the
+current source checkout's real signed native packages. Keep the development trust
+fixture and the source being qualified explicit:
+
+```sh
+artifacts/bin/lab console-enrollment \
+  -repo "$FIXTURE" -code "$SOURCE" -lindmd "$SOURCE/artifacts/bin/lindmd" \
+  -architectures arm64 -publication-record "$PRIVATE/publication.json"
+```
+
+The printed one-time owner enrollment and all copied device commands are secrets.
+Use the production console to issue a fresh device code and select the exact
+target OS. `lab vm enroll-from-console` boots a verified fresh cloud image and
+refuses a preinstalled agent or prior identity. It requires `-browser-config FILE`:
+an owned mode-0600 Chromium owner configuration with `origin`, `username`,
+`password`, `credentialPath` and a new `evidenceDirectory`. Enroll the disposable
+browser owner first through the maintained
+[browser runner](verification.md#customer-journey-release-acceptance), retaining
+its private virtual-passkey state. After guest readiness the lane selects the
+manifest's exact OS, presses **Copy install command**, captures redacted
+screenshots and runs those exact clipboard bytes over private SSH stdin.
+Records retain command SHA-256, not the code, and bind the capture digest to the
+executed bytes. Only afterward may the lane upload its read-only observer to
+require the local identity and active agent units. Before guest teardown, the
+browser signs in again and confirms the exact device's server-side **Enrolled**
+state, retaining a redacted screenshot. Package installation or a local identity
+alone is not a pass; there is no command-file-only mode that bypasses this proof.
+
+The `enroll-from-console` matrix cell targets Ubuntu 24.04 and Fedora 44, including
+native aarch64 on a configured Spark. Use the declared pinned AAVMF arguments and
+normal host admission; never substitute an amd64 guest or pre-provision CA, agent
+packages or bootstrap trust into the machine under test. The copied command must
+perform those steps. Fixture loopback ports can be forwarded without changing
+their signed HTTPS origins. Keep browser capture inputs and command files private,
+retain redacted light/dark desktop/mobile dialog screenshots separately, and link
+completed native records in [verification](verification.md).
+
+For `lab matrix run`, use `-console-browser-config-dir DIR` containing
+`ubuntu-24.04-aarch64.json` and `fedora-44-aarch64.json`, plus
+`-console-admin-address 127.0.0.1:PORT` and
+`-console-device-address 127.0.0.1:PORT` for a loopback fixture.
+The remote runner preserves those HTTPS ports with explicit IPv4-loopback
+reverse forwards. It stages browser credentials privately, returns the updated
+authenticator counter to its original protected file, and returns only redacted
+screenshots through the evidence directory. Run lanes sharing one authenticator
+sequentially; never share its mutable state between concurrent browsers.
 
 ### Lab qualification matrix
 

@@ -44,6 +44,15 @@ not proof of the stock Workstation installer.
 
 ## Packaging, signing, repositories, paths and LSM
 
+Choose mutable Fedora in the console's enrollment dialog and run the single
+install-and-enroll command. It obtains the agent only from the customer's own
+`lindmd` HTTPS `/repo/rpm` endpoint, authenticates the signer and server/bootstrap
+trust, then uses DNF with both package and repository signature checks enabled.
+Missing artifacts or architecture coverage have an explicit server setup remedy.
+See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+Fedora Atomic is separately gated; a mutable DNF install is not an rpm-ostree
+deployment or evidence for another Fedora release.
+
 Use native signed RPM delivery. The builder signs and independently verifies the
 RPM before publishing its digest
 ([`internal/packaging/rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).

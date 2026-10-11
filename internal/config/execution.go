@@ -18,6 +18,7 @@ type ExecutionBootstrap struct {
 	RootJSON        []byte
 	Envelope        []byte
 	ReleaseRootJSON []byte
+	TransportCAPEM  []byte
 }
 
 func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap, *trust.ExecutionVerifier, error) {
@@ -76,5 +77,5 @@ func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap
 	if err != nil {
 		return nil, nil, fmt.Errorf("execution bootstrap reuses a server TLS key: %w", err)
 	}
-	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope, ReleaseRootJSON: verified.Bundle.GetReleaseRootJson()}, verifier, nil
+	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope, ReleaseRootJSON: verified.Bundle.GetReleaseRootJson(), TransportCAPEM: verified.Bundle.GetTransportCaPem()}, verifier, nil
 }

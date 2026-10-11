@@ -114,6 +114,14 @@ the [Arch](arch.md) path, installed through the lab's isolated pacman keyring an
 a single `[lindm]` repository. Omarchy's own repositories are untouched; no
 partial upgrade is performed.
 
+Console enrollment uses the registry's explicit Omarchy identity and pacman
+packaging prerequisites. Agent artifacts must come from the customer's own
+`lindmd`; an absent signed repository is a visible setup gate, never permission
+to substitute an external agent host or AUR package. Signer and server/bootstrap
+trust must be authenticated before installation. See the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+Arch packaging alone is not native Omarchy qualification.
+
 ## Updates
 
 Agent self-update uses the `pacman` native manager (`pacman -U` of the

@@ -352,8 +352,20 @@ func rejectionSnapshotAPT(ctx context.Context, work string, input *APTRepository
 		return nil, err
 	}
 	dist := filepath.Join("dists", APTDistribution)
-	packages := filepath.Join(dist, APTComponent, "binary-"+deb.Architecture.Debian, "Packages")
-	for _, rel := range []string{filepath.Join(dist, "Release"), filepath.Join(dist, "InRelease"), filepath.Join(dist, "Release.gpg"), packages, packages + ".gz"} {
+	if len(input.Packages) == 0 || len(input.Packages) > 2 {
+		return nil, fmt.Errorf("%w: positive APT architecture count rejected", ErrArtifact)
+	}
+	indexes := make(map[string]string, len(input.Packages))
+	paths := []string{filepath.Join(dist, "Release"), filepath.Join(dist, "InRelease"), filepath.Join(dist, "Release.gpg")}
+	for arch := range input.Packages {
+		if arch != "amd64" && arch != "arm64" {
+			return nil, fmt.Errorf("%w: positive APT architecture rejected", ErrArtifact)
+		}
+		rel := filepath.Join(dist, APTComponent, "binary-"+arch, "Packages")
+		indexes[arch] = filepath.Join(root, rel)
+		paths = append(paths, rel, rel+".gz")
+	}
+	for _, rel := range paths {
 		if err := rejectionCopyPath(filepath.Join(input.Root, rel), filepath.Join(root, rel), toolOutputLimit); err != nil {
 			return nil, err
 		}
@@ -363,41 +375,17 @@ func rejectionSnapshotAPT(ctx context.Context, work string, input *APTRepository
 			return nil, err
 		}
 	}
-	index, err := os.ReadFile(filepath.Join(root, packages))
-	if err != nil {
-		return nil, err
-	}
 	seen := map[string]bool{}
 	found := false
-	for _, block := range strings.Split(string(index), "\n\n") {
-		if strings.TrimSpace(block) == "" {
-			continue
-		}
-		fields := map[string]string{}
-		for _, line := range strings.Split(block, "\n") {
-			k, v, ok := strings.Cut(line, ": ")
-			if ok {
-				fields[k] = v
-			}
-		}
-		rel := fields["Filename"]
-		canonical := filepath.Join("pool", "main", "l", PackageName, filepath.Base(rel))
-		if rel != canonical || fields["Package"] != PackageName || !strings.HasSuffix(rel, ".deb") || seen[rel] || len(seen) >= 8 {
-			return nil, fmt.Errorf("%w: positive Packages filename/count rejected", ErrArtifact)
-		}
-		seen[rel] = true
-		if err := rejectionCopyPath(filepath.Join(input.Root, rel), filepath.Join(root, rel), maxBinaryBytes); err != nil {
+	for _, index := range indexes {
+		matched, err := rejectionSnapshotPackages(input.Root, root, index, deb, seen)
+		if err != nil {
 			return nil, err
 		}
-		if filepath.Base(rel) == filepath.Base(deb.Path) {
-			found = fields["SHA256"] == deb.SHA256 && fields["Size"] == strconv.FormatInt(deb.Size, 10) && fields["Version"] == deb.Version && fields["Architecture"] == deb.Architecture.Debian
-		}
+		found = found || matched
 	}
 	if !found {
 		return nil, fmt.Errorf("%w: positive repository does not contain the requested DEB", ErrArtifact)
-	}
-	if err := verifyPackageIndex(root, filepath.Join(root, packages)); err != nil {
-		return nil, err
 	}
 	release := filepath.Join(root, dist, "Release")
 	if err := verifyReleaseHashes(filepath.Dir(release), release); err != nil {
@@ -417,7 +405,43 @@ func rejectionSnapshotAPT(ctx context.Context, work string, input *APTRepository
 	if _, _, err := runTool(ctx, work, toolCmd{Name: "gpgv", Args: []string{"--keyring", public, release + ".gpg", release}}); err != nil {
 		return nil, err
 	}
-	return &APTRepository{Root: root, Distribution: APTDistribution, Component: APTComponent, InRelease: filepath.Join(root, dist, "InRelease"), Release: release, Packages: filepath.Join(root, packages), PublicKey: filepath.Join(root, filepath.Base(public)), PublicKeyArmor: filepath.Join(root, filepath.Base(armor)), Fingerprint: input.Fingerprint, Custody: CustodyDevelopment}, nil
+	return &APTRepository{Root: root, Distribution: APTDistribution, Component: APTComponent, InRelease: filepath.Join(root, dist, "InRelease"), Release: release, Packages: indexes, PublicKey: filepath.Join(root, filepath.Base(public)), PublicKeyArmor: filepath.Join(root, filepath.Base(armor)), Fingerprint: input.Fingerprint, Custody: CustodyDevelopment}, nil
+}
+
+func rejectionSnapshotPackages(source, root, indexPath string, deb Artifact, seen map[string]bool) (bool, error) {
+	index, err := os.ReadFile(indexPath)
+	if err != nil {
+		return false, err
+	}
+	found := false
+	for _, block := range strings.Split(string(index), "\n\n") {
+		if strings.TrimSpace(block) == "" {
+			continue
+		}
+		fields := map[string]string{}
+		for _, line := range strings.Split(block, "\n") {
+			k, v, ok := strings.Cut(line, ": ")
+			if ok {
+				fields[k] = v
+			}
+		}
+		rel := fields["Filename"]
+		canonical := filepath.Join("pool", "main", "l", PackageName, filepath.Base(rel))
+		if rel != canonical || fields["Package"] != PackageName || !strings.HasSuffix(rel, ".deb") || seen[rel] || len(seen) >= 8 {
+			return false, fmt.Errorf("%w: positive Packages filename/count rejected", ErrArtifact)
+		}
+		seen[rel] = true
+		if err := rejectionCopyPath(filepath.Join(source, rel), filepath.Join(root, rel), maxBinaryBytes); err != nil {
+			return false, err
+		}
+		if filepath.Base(rel) == filepath.Base(deb.Path) {
+			found = fields["SHA256"] == deb.SHA256 && fields["Size"] == strconv.FormatInt(deb.Size, 10) && fields["Version"] == deb.Version && fields["Architecture"] == deb.Architecture.Debian
+		}
+	}
+	if err := verifyPackageIndex(root, indexPath); err != nil {
+		return false, err
+	}
+	return found, nil
 }
 
 func rejectionCopyAPT(source *APTRepository, destination string) (*APTRepository, error) {
@@ -449,11 +473,16 @@ func rejectionCopyAPT(source *APTRepository, destination string) (*APTRepository
 }
 
 func rejectionRebaseAPT(repo *APTRepository, root string) {
-	for _, path := range []*string{&repo.InRelease, &repo.Release, &repo.Packages, &repo.PublicKey, &repo.PublicKeyArmor} {
+	for _, path := range []*string{&repo.InRelease, &repo.Release, &repo.PublicKey, &repo.PublicKeyArmor} {
 		if *path != "" {
 			*path = root + strings.TrimPrefix(*path, repo.Root)
 		}
 	}
+	indexes := make(map[string]string, len(repo.Packages))
+	for arch, path := range repo.Packages {
+		indexes[arch] = root + strings.TrimPrefix(path, repo.Root)
+	}
+	repo.Packages = indexes
 	repo.Root = root
 	repo.InReleaseVerified = false
 	repo.PackagesHashVerified = false

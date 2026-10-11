@@ -2,6 +2,8 @@
 // cookie import, synthetic WebAuthn API or alternate application implementation.
 
 import { setTimeout as delay } from "node:timers/promises";
+import { createHash } from "node:crypto";
+import { writePrivate } from "./private-files.mjs";
 
 export async function enroll(ui, config) {
   await ui.click({ role: "link", text: "Enroll a local administrator account" });
@@ -25,7 +27,7 @@ export async function signOut(ui) {
   await ui.wait({ label: "Username" });
 }
 
-async function captureCredential(ui, kind, config) {
+async function captureCredential(ui, kind, config, captureScreens) {
   const provisioning = kind === "token";
   const title = provisioning ? "Provisioning token" : "One-time enrollment code";
   const secret = await ui.nonemptyValue({ label: title, dialog: true });
@@ -47,29 +49,47 @@ async function captureCredential(ui, kind, config) {
     };
   });
   if (!details.id) throw new Error("credential_id_missing");
+  await ui.click({ css: "summary", text: "Credential details and safe delivery", dialog: true });
   const commands = {};
+  const commandSHA256 = {};
+  const commandSources = {};
   const repositoryConfigured = {};
-  for (const [family, label] of [
-    ["apt", "Debian / Ubuntu (APT)"],
-    ["dnf", "Fedora / RHEL (DNF)"],
-  ]) {
-    await ui.select("Package manager", label, true);
-    const name = provisioning ? "cloud-init provisioning snippet" : `${family} enrollment snippet`;
-    const command = await ui.nonemptyValue({ label: name, dialog: true });
+  const choices = config.enrollmentPlatforms ?? { apt: "Ubuntu 24.04 LTS", dnf: "Fedora 44" };
+  for (const [family, label] of Object.entries(choices)) {
+    await ui.select("Operating system", label, true);
+    const name = provisioning ? "cloud-init provisioning snippet" : "Install and enroll command";
+    let command = await ui.nonemptyValue({ label: name, dialog: true });
+    const commandPath = config.enrollmentCommandPaths?.[family];
+    if (!provisioning && commandPath) {
+      await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
+      await ui.click({ role: "button", text: "Copy install command", dialog: true });
+      await ui.wait({ role: "status", contains: "Install command copied.", dialog: true });
+      const copied = await ui.driver.browserTask(() => navigator.clipboard.readText());
+      if (!copied || copied !== command) throw new Error("clipboard_command_mismatch");
+      command = copied;
+      commandSHA256[family] = createHash("sha256").update(copied, "utf8").digest("hex");
+      commandSources[family] = "browser-clipboard";
+      await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
+    }
     const key = provisioning ? `cloud-init-${family}` : family;
+    if (captureScreens) await captureScreens(`${kind}-${family}`);
     commands[key] = command;
-    repositoryConfigured[family] = command.includes(
-      "# Install only from this deployment's configured signed repository.",
-    );
+    repositoryConfigured[family] =
+      command.includes("/repo/") &&
+      command.includes("sha256sum --check --status") &&
+      command.includes("gpg --batch --with-colons --show-keys");
     if (config.requireRepositories && !repositoryConfigured[family]) {
       throw new Error("signed_repository_instructions_missing");
     }
+    if (commandPath) await writePrivate(commandPath, command);
   }
   if (provisioning) {
-    for (const [format, label] of [
-      ["kickstart", "Kickstart"],
-      ["autoinstall", "Ubuntu autoinstall"],
+    for (const [format, label, family] of [
+      ["kickstart", "Kickstart", "dnf"],
+      ["autoinstall", "Ubuntu autoinstall", "apt"],
     ]) {
+      if (!choices[family]) continue;
+      await ui.select("Operating system", choices[family], true);
       await ui.select("Installer format", label, true);
       commands[format] = await ui.nonemptyValue({
         label: `${format} provisioning snippet`,
@@ -77,10 +97,10 @@ async function captureCredential(ui, kind, config) {
       });
     }
   }
-  return { ...details, secret, commands, repositoryConfigured };
+  return { ...details, secret, commands, commandSHA256, commandSources, repositoryConfigured };
 }
 
-export async function createGrant(ui, config) {
+export async function createGrant(ui, config, captureScreens) {
   await ui.driver.goto(`${config.origin}/enrollment`);
   await ui.click({ role: "button", text: "Create one-time code" });
   await ui.select("Code expires after", "15 minutes", true);
@@ -89,12 +109,12 @@ export async function createGrant(ui, config) {
     "Release acceptance native single-device enrollment",
   );
   await ui.click({ role: "button", text: "Create one-time code", dialog: true });
-  const grant = await captureCredential(ui, "grant", config);
+  const grant = await captureCredential(ui, "grant", config, captureScreens);
   await ui.click({ role: "button", text: "Done, forget secret", dialog: true });
   return grant;
 }
 
-export async function createToken(ui, config) {
+export async function createToken(ui, config, captureScreens) {
   await ui.click({ role: "button", text: "Create provisioning token" });
   await ui.fill(
     { label: "Purpose / audit reason", dialog: true },
@@ -106,9 +126,46 @@ export async function createToken(ui, config) {
   // direct-enrollment option rather than approving the owner's own request.
   await ui.click({ css: 'input[name="approval"]', dialog: true });
   await ui.click({ role: "button", text: "Create provisioning token", dialog: true });
-  const token = await captureCredential(ui, "token", config);
+  const token = await captureCredential(ui, "token", config, captureScreens);
   await ui.click({ role: "button", text: "Done, forget secret", dialog: true });
   return token;
+}
+
+export async function confirmEnrolledDevice(ui, config) {
+  const path = `/devices/${encodeURIComponent(config.deviceId)}`;
+  await ui.driver.goto(`${config.origin}${path}`);
+  const deadline = Date.now() + 180_000;
+  let nextRefresh = 0;
+  while (Date.now() < deadline) {
+    const state = await ui.driver.observe((expectedPath) => {
+      const section = document.querySelector("#main section[aria-busy]");
+      // The first badge in the device heading is its authoritative lifecycle,
+      // not an enrollment-history row or a phrase elsewhere on the page.
+      const badge = section?.querySelector('[data-slot="badge"]');
+      const visible = badge && badge.getClientRects().length > 0;
+      const refresh = [...(section?.querySelectorAll("button") ?? [])].find(
+        (button) => button.textContent.trim() === "Refresh page",
+      );
+      return {
+        exactDevicePage: location.pathname === expectedPath,
+        lifecycle: visible ? badge.textContent.trim() : "",
+        busy: section?.getAttribute("aria-busy") !== "false",
+        canRefresh: !!refresh && !refresh.disabled,
+      };
+    }, path);
+    if (!state.exactDevicePage) throw new Error("enrollment_device_page_mismatch");
+    if (!state.busy && state.lifecycle === "Enrolled")
+      return { deviceId: config.deviceId, lifecycle: "Enrolled" };
+    if (state.lifecycle === "Revoked" || state.lifecycle === "Recovery hold")
+      throw new Error("enrollment_device_not_active");
+    if (state.canRefresh && Date.now() >= nextRefresh) {
+      // Read-only query refresh, never Request inventory or an enrollment retry.
+      await ui.click({ role: "button", text: "Refresh page" });
+      nextRefresh = Date.now() + 2_000;
+    }
+    await delay(250);
+  }
+  throw new Error("enrollment_device_checkin_timeout");
 }
 
 export async function assignProfile(ui, config) {

@@ -26,11 +26,12 @@ import (
 // OpenSplitDeviceActionAuthorityFixture keeps admin on loopback and serves devices
 // on the specified LAN IPv4. Its run-owned TLS leaf covers that IP and localhost;
 // its signed bootstrap carries the actual device origin. Close owns all resources.
-func OpenSplitDeviceActionAuthorityFixture(ctx context.Context, repository, binary string, device netip.Addr) (*AuthorityFixture, error) {
+func OpenSplitDeviceActionAuthorityFixture(ctx context.Context, repository, binary string, device netip.Addr, options LoadAuthorityOptions) (*AuthorityFixture, error) {
 	if err := validateSplitDevice(device); err != nil {
 		return nil, err
 	}
-	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityDeviceActions, LoadAuthorityOptions{splitDevice: device})
+	options.splitDevice = device
+	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityDeviceActions, options)
 }
 
 // ControlPlaneHandle transfers public trust and a pre-enrolled lane-only owner.

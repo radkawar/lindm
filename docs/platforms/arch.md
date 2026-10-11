@@ -52,6 +52,14 @@ architecture boundary and upstream policy reference are retained in
 
 ## Packaging, signing, repositories, paths and LSM
 
+Console enrollment selects pacman for Arch only when the customer's own `lindmd`
+has the signed native repository for that architecture. The command authenticates
+the signer and server/bootstrap trust before installing and enrolling; missing
+packages or signed database produce an explicit setup gate, not an AUR or
+external-agent-host fallback. See the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+The APT/RPM console-enrollment lanes do not qualify pacman enrollment.
+
 Arch agent packaging explicitly selects `FormatArch`; default builds remain
 DEB/RPM. The deterministic `.pkg.tar.zst` contains `.PKGINFO`, `.MTREE`,
 `.BUILDINFO` and fixed `.INSTALL` lifecycle callbacks. The build record describes

@@ -50,6 +50,14 @@ These boundaries are recorded in `docs/verification.md:177-220,267-304`.
 
 ## Packaging, signing, repositories, paths and LSM
 
+Select the exact openSUSE release in the console for the zypper install-and-enroll
+command. It uses signed RPM packages and metadata from the customer's own `lindmd`
+HTTPS `/repo/rpm` endpoint, never an external agent repository or a DNF command
+guessed from RPM identity. Signer and server/bootstrap trust are pinned before
+installation. Missing release artifacts produce an explicit server setup remedy.
+See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+APT/Fedora command evidence does not qualify this zypper path.
+
 The mutable lab selects **zypper**, with canonical **RPM** package identity, only
 for explicit `opensuse-leap` and `opensuse-tumbleweed` IDs. It does not route
 `ID_LIKE` or unknown/immutable distributions through DNF

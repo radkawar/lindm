@@ -107,8 +107,14 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "server" && args[1] == "compose" {
 		return runServerCompose(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "console-enrollment" {
+		return runConsoleEnrollment(ctx, args[1:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "enroll-unattended" {
 		return runVMEnrollUnattended(ctx, args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "enroll-from-console" {
+		return runVMEnrollFromConsole(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "lifecycle" {
 		return runVMLifecycle(ctx, args[2:], stdout, stderr)

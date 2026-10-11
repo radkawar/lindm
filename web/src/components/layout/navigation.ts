@@ -8,6 +8,7 @@ import {
   LockKeyholeIcon,
   MonitorIcon,
   RocketIcon,
+  SettingsIcon,
   ShieldAlertIcon,
   UsersIcon,
   UserRoundCogIcon,
@@ -98,6 +99,13 @@ export const navigation = [
     label: "Integrations",
     icon: BlocksIcon,
     permission: "integrations.manage",
+    group: "Administration",
+  },
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: SettingsIcon,
+    permission: "enrollment.manage",
     group: "Administration",
   },
 ] as const;

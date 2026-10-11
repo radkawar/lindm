@@ -93,7 +93,12 @@ func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, 
 	if repository == "" {
 		repository = "."
 	}
-	controller, err := vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name)
+	var enrollment devlab.LoadAuthorityOptions
+	if vmHolds(args) {
+		enrollment.NativeEnrollmentArchitectures = []string{packagingArchitecture(architecture)}
+		enrollment.NativeEnrollmentSourceRepository = buildRepository
+	}
+	controller, err := vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name, enrollment)
 	if err != nil {
 		return err
 	}

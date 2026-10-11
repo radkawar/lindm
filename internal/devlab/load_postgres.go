@@ -50,6 +50,10 @@ type LoadAuthorityOptions struct {
 	// PostgresSettings are allowlisted durable-safe server parameters for the
 	// dedicated cluster (name=value), recorded with the experiment.
 	PostgresSettings []string
+	// NativeEnrollmentArchitectures publishes current-build native packages
+	// before this isolated connected fixture starts; never used by airgap.
+	NativeEnrollmentArchitectures    []string
+	NativeEnrollmentSourceRepository string
 }
 
 // loadPostgresSettingNames admits capacity tuning only; durability-reducing

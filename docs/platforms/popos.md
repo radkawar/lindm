@@ -153,6 +153,13 @@ installation time.
 
 ## Packaging
 
+Choose Pop!\_OS in the console to install and enroll from the customer's own
+`lindmd` HTTPS `/repo/apt` endpoint. The one command authenticates the repository
+signer and server/bootstrap trust before writing a dedicated deb822 `Signed-By`
+source. No external agent repository is used. Missing artifacts produce an
+explicit setup remedy; successful Ubuntu installation does not qualify Pop!\_OS.
+See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+
 The Ubuntu-base DEB is expected to apply through authenticated APT. Not yet
 recorded on Pop!\_OS.
 

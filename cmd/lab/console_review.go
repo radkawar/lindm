@@ -20,14 +20,22 @@ import (
 )
 
 type consoleReviewConfig struct {
-	Origin            string            `json:"origin"`
-	Username          string            `json:"username"`
-	Password          string            `json:"password"`
-	EnrollmentSecret  string            `json:"enrollmentSecret"`
-	EvidenceDirectory string            `json:"evidenceDirectory"`
-	Checkout          string            `json:"checkout"`
-	Demo              loadlab.Demo      `json:"demo"`
-	Build             map[string]string `json:"build"`
+	Origin            string                         `json:"origin"`
+	Username          string                         `json:"username"`
+	Password          string                         `json:"password"`
+	EnrollmentSecret  string                         `json:"enrollmentSecret"`
+	EvidenceDirectory string                         `json:"evidenceDirectory"`
+	Checkout          string                         `json:"checkout"`
+	Demo              loadlab.Demo                   `json:"demo"`
+	Build             map[string]string              `json:"build"`
+	EnrollmentFixture consoleReviewEnrollmentFixture `json:"enrollmentFixture"`
+}
+
+type consoleReviewEnrollmentFixture struct {
+	Origin           string `json:"origin"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	EnrollmentSecret string `json:"enrollmentSecret"`
 }
 
 // consoleReviewReport is the subset of the runner's sanitized report.json that
@@ -93,6 +101,18 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return fmt.Errorf("seed demo console: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, presence.Stop()) }()
+	// Build publication from the checkout under review, never from the separate
+	// directory that supplies development database/TLS trust.
+	enrollmentFixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64"})
+	if err != nil {
+		return fmt.Errorf("open published enrollment review fixture: %w", err)
+	}
+	defer func() { resultErr = errors.Join(resultErr, enrollmentFixture.Close()) }()
+	publishedEnrollment, err := enrollmentFixture.CreateConsoleEnrollment(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { publishedEnrollment.Secret = "" }()
 	enrollment, err := fixture.CreateConsoleEnrollment(ctx)
 	if err != nil {
 		return err
@@ -105,11 +125,17 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		Origin: fixture.ConsoleOrigin, Username: "console-owner", Password: hex.EncodeToString(password[:]),
 		EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: directory, Checkout: checkout, Demo: demo,
 		Build: map[string]string{"lindmdSHA256": serverDigest},
+		EnrollmentFixture: consoleReviewEnrollmentFixture{
+			Origin: enrollmentFixture.ConsoleOrigin, Username: "console-owner",
+			Password: hex.EncodeToString(password[:]), EnrollmentSecret: publishedEnrollment.GetSecret(),
+		},
 	}
 	enrollment.Secret = ""
+	publishedEnrollment.Secret = ""
 	clear(password[:])
 	encoded, err := json.Marshal(cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
+	cfg.EnrollmentFixture.Password, cfg.EnrollmentFixture.EnrollmentSecret = "", ""
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,12 @@ export function contactSheet(report) {
           const dialogs = (entry.screenshots.dialogs ?? [])
             .map((path, index) => `<a href="${escape(path)}">dialog ${index + 1}</a>`)
             .join(" ");
-          return `<td class="${entry.passed ? "pass" : "fail"}"><a href="${escape(entry.screenshots.full)}"><img loading="lazy" src="${escape(entry.screenshots.viewport)}" alt="${escape(`${row.id} ${theme} ${viewport}`)}"></a><div>${entry.passed ? "Pass" : "Fail"} · <a href="${escape(entry.screenshots.full)}">full page</a> ${dialogs}</div>${findings ? `<details><summary>${entry.passed ? "" : "Findings"}</summary><ul>${findings}</ul></details>` : ""}</td>`;
+          const preview = entry.screenshots.viewport ?? entry.screenshots.failure;
+          const primary = entry.screenshots.full ?? preview;
+          const details = entry.screenshots.details
+            ? `<a href="${escape(entry.screenshots.details)}">details</a>`
+            : "";
+          return `<td class="${entry.passed ? "pass" : "fail"}"><a href="${escape(primary)}"><img loading="lazy" src="${escape(preview)}" alt="${escape(`${row.id} ${theme} ${viewport}`)}"></a><div>${entry.passed ? "Pass" : "Fail"} · <a href="${escape(primary)}">${entry.screenshots.full ? "full page" : "viewport"}</a> ${dialogs} ${details}</div>${findings ? `<details><summary>${entry.passed ? "" : "Findings"}</summary><ul>${findings}</ul></details>` : ""}</td>`;
         })
         .join("");
       return `<tr><th scope="row">${escape(row.id)}<br><small>${escape(row.url)}</small></th>${cells}</tr>`;

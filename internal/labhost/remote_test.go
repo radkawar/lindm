@@ -78,13 +78,54 @@ func TestReturnedRecordNamesLocalOutputCopies(t *testing.T) {
 	}
 }
 
+func TestReturnedBrowserCaptureNamesLocalScreenshots(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record.json")
+	remote := "/remote/records/evidence"
+	input := map[string]any{
+		"sequence": json.Number("18446744073709551615"),
+		"browser_capture": map[string]any{"screenshots": []string{
+			remote + "/dialog.png",
+			remote + "-other/unchanged.png",
+			remote + "/../private/unchanged",
+		}},
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := annotateRemoteRecord(path, &labv1.LabHost{Name: "dgx20"}, time.Unix(0, 0), time.Unix(1, 0), "rev", "diff", map[string]string{remote: "/local/screenshots"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Sequence uint64
+		Capture  struct{ Screenshots []string } `json:"browser_capture"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Sequence != ^uint64(0) || len(got.Capture.Screenshots) != 3 || got.Capture.Screenshots[0] != "/local/screenshots/dialog.png" || got.Capture.Screenshots[1] != remote+"-other/unchanged.png" || got.Capture.Screenshots[2] != remote+"/../private/unchanged" {
+		t.Fatalf("returned browser evidence = %s", data)
+	}
+}
+
 func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
 	root := t.TempDir()
 	name := "lindm-agent_0.7.0_arm64.deb"
 	build := filepath.Join(root, "build", name)
 	repository := filepath.Join(root, "repository")
 	pool := filepath.Join(repository, "pool", "main", "l", "lindm-agent", name)
-	for _, path := range []string{build, pool} {
+	indexes := map[string]string{
+		"amd64": filepath.Join(repository, "dists", "stable", "main", "binary-amd64", "Packages"),
+		"arm64": filepath.Join(repository, "dists", "stable", "main", "binary-arm64", "Packages"),
+	}
+	for _, path := range []string{build, pool, indexes["amd64"], indexes["arm64"]} {
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +142,7 @@ func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
 		t.Fatalf("package basename changed: %s", stagedBuild)
 	}
 	record := filepath.Join(root, "record.json")
-	input := map[string]any{"artifact": map[string]string{"path": build}, "apt": map[string]string{"root": repository}}
+	input := map[string]any{"artifact": map[string]string{"path": build}, "apt": map[string]any{"root": repository, "packages": indexes}}
 	data, err := json.Marshal(input)
 	if err != nil {
 		t.Fatal(err)
@@ -119,10 +160,21 @@ func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
 	}
 	var relocated struct {
 		Artifact struct{ Path string }
-		APT      struct{ Root string }
+		APT      struct {
+			Root     string
+			Packages map[string]string
+		}
 	}
 	if err := json.Unmarshal(data, &relocated); err != nil {
 		t.Fatal(err)
+	}
+	for architecture := range indexes {
+		index := relocated.APT.Packages[architecture]
+		want := filepath.Join(relocated.APT.Root, "dists", "stable", "main", "binary-"+architecture, "Packages")
+		content, err := os.ReadFile(index)
+		if index != want || err != nil || string(content) != "unchanged artifact bytes" {
+			t.Fatalf("relocated %s Packages index unavailable or changed: %s, %v", architecture, index, err)
+		}
 	}
 	// The lifecycle validator derives this path from the artifact basename.
 	poolArtifact := filepath.Join(relocated.APT.Root, "pool", "main", "l", "lindm-agent", filepath.Base(relocated.Artifact.Path))

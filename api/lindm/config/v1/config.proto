@@ -86,8 +86,8 @@ message ServerConfig {
   ProfilingConfig profiling = 19;
   // Public signed repository; private signing keys are outside this directory.
   ReleaseRepositoryConfig release_repository = 20;
-  // Optional native installation repositories advertised by the enrollment console.
-  EnrollmentInstructionsConfig enrollment_instructions = 21;
+  reserved 21;
+  reserved "enrollment_instructions";
   // Independent native firewall probe peers, provisioned by the server operator.
   // The enrolled device endpoint only confirms these exact external targets.
   repeated lindm.agent.v1.ConnectivityProbeTarget connectivity_probes = 22 [(buf.validate.field).repeated.max_items = 32];
@@ -108,53 +108,6 @@ message ServerConfig {
   };
 }
 
-// Absent repositories are explicitly not configured, never inferred from a host.
-message EnrollmentInstructionsConfig {
-  EnrollmentAPTRepositoryConfig apt_repository = 1;
-  EnrollmentDNFRepositoryConfig dnf_repository = 2;
-}
-
-message EnrollmentAPTRepositoryConfig {
-  string base_url = 1 [
-    (buf.validate.field).string.uri = true,
-    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
-  ];
-  string signing_key_url = 2 [
-    (buf.validate.field).string.uri = true,
-    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
-  ];
-  // Full uppercase OpenPGP v4 or v6 fingerprint, not a short key ID.
-  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
-  string suite = 4 [
-    (buf.validate.field).string.max_len = 128,
-    (buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-  ];
-  repeated string components = 5 [
-    (buf.validate.field).repeated = {
-      min_items: 1
-      max_items: 16
-      unique: true
-    },
-    (buf.validate.field).repeated.items.string = {
-      max_len: 128
-      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-    }
-  ];
-}
-
-// Both package and repository metadata signatures must be published and checked.
-message EnrollmentDNFRepositoryConfig {
-  string base_url = 1 [
-    (buf.validate.field).string.uri = true,
-    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
-  ];
-  string signing_key_url = 2 [
-    (buf.validate.field).string.uri = true,
-    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
-  ];
-  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
-}
-
 message ReleaseRepositoryConfig {
   string directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   // Absent signing disables mutation but still permits verified update retrieval.
@@ -162,6 +115,16 @@ message ReleaseRepositoryConfig {
   // Private persistent TUF verification checkpoint, outside the public repository.
   // Required to admit recovery handoff; root trust comes from execution_bootstrap.
   optional string verification_state_directory = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Immutable native publications beneath directory/repo/{apt,rpm,arch}, served
+  // exclusively from this server's public_url. Keys are public exports only.
+  NativeRepositoriesConfig native_repositories = 4;
+}
+
+message NativeRepositoriesConfig {
+  // Independently configured full OpenPGP signer pins, never short key IDs.
+  optional string apt_signing_key_fingerprint = 1 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  optional string rpm_signing_key_fingerprint = 2 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  optional string arch_signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
 }
 // Every authority below is independently provisioned out of band; nothing in a
 // bundle can replace these pins.

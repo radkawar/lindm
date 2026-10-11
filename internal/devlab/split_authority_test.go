@@ -87,7 +87,7 @@ func TestOpenSplitAuthorityRejectsInvalidDeviceBeforeResources(t *testing.T) {
 			if address != "" {
 				device = netip.MustParseAddr(address)
 			}
-			_, err := OpenSplitDeviceActionAuthorityFixture(t.Context(), "unused", "unused", device)
+			_, err := OpenSplitDeviceActionAuthorityFixture(t.Context(), "unused", "unused", device, LoadAuthorityOptions{})
 			if err == nil || !strings.Contains(err.Error(), "IPv4 address") {
 				t.Fatalf("invalid device must fail before resource setup: %v", err)
 			}

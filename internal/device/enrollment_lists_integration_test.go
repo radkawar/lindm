@@ -226,10 +226,12 @@ func TestEnrollmentListsRequireFreshUnrestrictedAuthority(t *testing.T) {
 func TestEnrollmentInstructionsReturnsIsolatedPublicMetadata(t *testing.T) {
 	f := newProvisioningFixture(t)
 	f.service.EnrollmentInstructions = &adminv1.GetEnrollmentInstructionsResponse{
-		EnrollmentOrigin:   "https://enroll.example.test",
-		DeviceOrigin:       proto.String("https://devices.example.test"),
-		ExecutionRootUrl:   proto.String("https://enroll.example.test/bootstrap/execution-root.json"),
-		BootstrapBundleUrl: proto.String("https://enroll.example.test/bootstrap/bootstrap.dsse.json"),
+		EnrollmentOrigin:    "https://enroll.example.test",
+		DeviceOrigin:        proto.String("https://devices.example.test"),
+		ExecutionRootUrl:    proto.String("https://enroll.example.test/bootstrap/execution-root.json"),
+		BootstrapBundleUrl:  proto.String("https://enroll.example.test/bootstrap/bootstrap.dsse.json"),
+		ExecutionRootSha256: proto.String("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+		Readiness:           &adminv1.EnrollmentReadiness{Reason: "native_repository_unavailable", Remedy: "Publish signed native packages on lindmd."},
 	}
 	response, err := f.service.GetEnrollmentInstructions(f.ownerCtx, connect.NewRequest(&adminv1.GetEnrollmentInstructionsRequest{}))
 	if err != nil {
@@ -239,7 +241,11 @@ func TestEnrollmentInstructionsReturnsIsolatedPublicMetadata(t *testing.T) {
 		t.Fatal("instructions changed configured public metadata or allowed caching")
 	}
 	response.Msg.EnrollmentOrigin = "https://untrusted.example.test"
+	response.Msg.Readiness.Remedy = "untrusted change"
 	if f.service.EnrollmentInstructions.GetEnrollmentOrigin() != "https://enroll.example.test" {
 		t.Fatal("response mutation changed deployment instructions")
+	}
+	if f.service.EnrollmentInstructions.GetReadiness().GetRemedy() != "Publish signed native packages on lindmd." {
+		t.Fatal("response mutation changed deployment readiness")
 	}
 }

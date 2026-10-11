@@ -9,13 +9,18 @@ option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 message GetEnrollmentInstructionsRequest {}
 
-// Deployment configuration, not inferred browser/listener addresses. Missing
-// optional fields and repository messages mean explicitly not configured.
+// Deployment-owned installation metadata and explicit readiness. Native package
+// URLs are always on the configured lindmd public HTTPS origin.
 message GetEnrollmentInstructionsResponse {
   option (buf.validate.message).cel = {
     id: "enrollment_instructions.bootstrap_pair"
-    message: "execution root and signed bootstrap URLs must be configured together"
-    expression: "has(this.execution_root_url) == has(this.bootstrap_bundle_url)"
+    message: "execution root, root hash and signed bootstrap URLs must be configured together"
+    expression: "has(this.execution_root_url) == has(this.bootstrap_bundle_url) && has(this.execution_root_url) == has(this.execution_root_sha256)"
+  };
+  option (buf.validate.message).cel = {
+    id: "enrollment_instructions.https_ca_pair"
+    message: "private HTTPS CA and certificate fingerprint must be configured together"
+    expression: "has(this.tls_ca_pem) == has(this.tls_ca_sha256)"
   };
   string enrollment_origin = 1 [
     (buf.validate.field).string.uri = true,
@@ -25,8 +30,8 @@ message GetEnrollmentInstructionsResponse {
     (buf.validate.field).string.uri = true,
     (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
   ];
-  // Public download is delivery only. Authenticate the initial execution root
-  // through the deployment owner's independent trusted installation channel.
+  // Authenticate these exact bytes with execution_root_sha256, delivered by
+  // this authenticated RPC, before trusting the signed bootstrap bundle.
   optional string execution_root_url = 3 [
     (buf.validate.field).string.uri = true,
     (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
@@ -43,6 +48,46 @@ message GetEnrollmentInstructionsResponse {
   string grant_command = 7 [(buf.validate.field).string.max_len = 4096];
   string provisioning_command = 8 [(buf.validate.field).string.max_len = 4096];
   string resume_command = 9 [(buf.validate.field).string.max_len = 4096];
+  optional string execution_root_sha256 = 10 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  // Private HTTPS CA from configured certificate material, not a fetched key.
+  optional string tls_ca_pem = 11 [(buf.validate.field).string.max_len = 65536];
+  // SHA-256 of the single CA certificate's DER encoding, not its PEM text.
+  optional string tls_ca_sha256 = 12 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  repeated EnrollmentPlatform platforms = 13 [(buf.validate.field).repeated.max_items = 128];
+  EnrollmentReadiness readiness = 14;
+  EnrollmentArchRepository arch_repository = 15;
+}
+
+message EnrollmentReadiness {
+  bool ready = 1;
+  string reason = 2 [(buf.validate.field).string.max_len = 128];
+  string remedy = 3 [(buf.validate.field).string.max_len = 1024];
+}
+
+// Exact registry identities; ID_LIKE is never an enrollment selector. Empty
+// version_ids identifies a rolling release. Architectures use Go/DEB names.
+message EnrollmentPlatform {
+  string id = 1 [(buf.validate.field).string.max_len = 128];
+  string label = 2 [(buf.validate.field).string.max_len = 256];
+  string os_id = 3 [(buf.validate.field).string.max_len = 128];
+  repeated string version_ids = 4 [(buf.validate.field).repeated.max_items = 32];
+  // Empty accepts any VARIANT_ID; otherwise match one value exactly.
+  repeated string variant_ids = 5 [(buf.validate.field).repeated.max_items = 16];
+  string package_family = 6 [(buf.validate.field).string.max_len = 32];
+  repeated string architectures = 7 [
+    (buf.validate.field).repeated.max_items = 2,
+    (buf.validate.field).repeated.items.string.in = "amd64",
+    (buf.validate.field).repeated.items.string.in = "arm64"
+  ];
+  EnrollmentReadiness readiness = 8;
+  // exact, major (value or value.N), absent, snapshot (YYYYMMDD), or any.
+  string version_rule = 9 [
+    (buf.validate.field).string.in = "exact",
+    (buf.validate.field).string.in = "major",
+    (buf.validate.field).string.in = "absent",
+    (buf.validate.field).string.in = "snapshot",
+    (buf.validate.field).string.in = "any"
+  ];
 }
 
 message EnrollmentAPTRepository {
@@ -83,4 +128,18 @@ message EnrollmentDNFRepository {
     (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
   ];
   string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+}
+
+// Requires signatures for both packages and the pacman sync database.
+message EnrollmentArchRepository {
+  string base_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  string repository_name = 4 [(buf.validate.field).string.const = "lindm"];
 }

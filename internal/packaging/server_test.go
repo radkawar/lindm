@@ -163,11 +163,82 @@ func TestServerSignedNativeReproducibilityAndAPT(t *testing.T) {
 	if err != nil || digest != debs[0].SHA256 {
 		t.Fatalf("published server package differs: %s, %v", digest, err)
 	}
-	index, err := os.ReadFile(repo.Packages)
+	index, err := os.ReadFile(repo.Packages["amd64"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Contains(index, []byte("Package: lindmd\n")) || bytes.Contains(index, []byte("Package: lindm-agent\n")) {
 		t.Fatal("signed repository identifies the wrong product")
+	}
+}
+
+func TestAPTPublicationSeparatesNativeArchitectures(t *testing.T) {
+	requireNativeTools(t, "dpkg-deb", "gpg", "gpgconf", "gpg-connect-agent", "gpgv", "apt-ftparchive", "gzip")
+	work := t.TempDir()
+	if err := os.Chmod(work, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key, guard, err := generateDevelopmentSigner(ctx, work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := guard.close(ctx, work); err != nil {
+			t.Error(err)
+		}
+	}()
+	var archives []string
+	var artifacts []Artifact
+	for _, arch := range []Architecture{{Debian: "amd64", RPM: "x86_64"}, {Debian: "arm64", RPM: "aarch64"}} {
+		buildWork := filepath.Join(work, arch.Debian)
+		if err := os.Mkdir(buildWork, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		product := agentProduct()
+		payload, staged, digest := stageProductFixture(t, buildWork, product)
+		artifact, err := buildDEB(ctx, buildWork, payload, "0.1.0", arch, DefaultSourceDateEpoch, staged, digest, product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		archives = append(archives, artifact.Path)
+		artifacts = append(artifacts, artifact)
+	}
+	if err := guard.close(ctx, work); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(work, "published")
+	if err := os.Mkdir(out, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := PublishAPT(ctx, APTRequest{OutputDir: out, DEBs: archives, Signer: *key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.Packages) != 2 || !repo.InReleaseVerified || !repo.PackagesHashVerified {
+		t.Fatal("multiarchitecture publication omitted authenticated indexes")
+	}
+	for arch, path := range repo.Packages {
+		index, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Count(index, []byte("Architecture: ")) != 1 || !bytes.Contains(index, []byte("Architecture: "+arch+"\n")) {
+			t.Fatalf("%s index contains another architecture: %s", arch, index)
+		}
+	}
+	release, err := os.ReadFile(repo.Release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(release, []byte("Architectures: amd64 arm64\n")) {
+		t.Fatal("signed Release omitted a native architecture")
+	}
+	snapshot, err := rejectionSnapshotAPT(ctx, work, repo, artifacts[1], repo.PublicKey, repo.PublicKeyArmor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Packages) != 2 {
+		t.Fatal("rejection snapshot omitted another architecture's signed index")
 	}
 }

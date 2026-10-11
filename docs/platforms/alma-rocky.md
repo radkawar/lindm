@@ -46,6 +46,15 @@ replace the pinned image with the latest object behind a vendor directory.
 
 ## Packaging, signing, repositories, paths and LSM
 
+Select the exact AlmaLinux or Rocky Linux release in the console for one DNF
+install-and-enroll command. Agents come only from the customer's own `lindmd`
+HTTPS `/repo/rpm` endpoint, with pinned signer and server/bootstrap trust and
+both package and repository signature verification. Missing artifacts or target
+architecture coverage have an explicit server setup remedy. See the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+This common delivery method does not transfer RHEL/Fedora or cross-derivative
+qualification.
+
 Use native RPMs, independently verified against the configured package signer.
 The builder signs then verifies before recording the release artifact
 ([`packaging/rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).

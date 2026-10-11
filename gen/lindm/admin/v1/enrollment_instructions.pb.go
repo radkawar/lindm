@@ -59,14 +59,14 @@ func (*GetEnrollmentInstructionsRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{0}
 }
 
-// Deployment configuration, not inferred browser/listener addresses. Missing
-// optional fields and repository messages mean explicitly not configured.
+// Deployment-owned installation metadata and explicit readiness. Native package
+// URLs are always on the configured lindmd public HTTPS origin.
 type GetEnrollmentInstructionsResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	EnrollmentOrigin string                 `protobuf:"bytes,1,opt,name=enrollment_origin,json=enrollmentOrigin,proto3" json:"enrollment_origin,omitempty"`
 	DeviceOrigin     *string                `protobuf:"bytes,2,opt,name=device_origin,json=deviceOrigin,proto3,oneof" json:"device_origin,omitempty"`
-	// Public download is delivery only. Authenticate the initial execution root
-	// through the deployment owner's independent trusted installation channel.
+	// Authenticate these exact bytes with execution_root_sha256, delivered by
+	// this authenticated RPC, before trusting the signed bootstrap bundle.
 	ExecutionRootUrl *string `protobuf:"bytes,3,opt,name=execution_root_url,json=executionRootUrl,proto3,oneof" json:"execution_root_url,omitempty"`
 	// Exact verified DSSE envelope; never an unsigned replacement bundle.
 	BootstrapBundleUrl *string                  `protobuf:"bytes,4,opt,name=bootstrap_bundle_url,json=bootstrapBundleUrl,proto3,oneof" json:"bootstrap_bundle_url,omitempty"`
@@ -74,11 +74,19 @@ type GetEnrollmentInstructionsResponse struct {
 	DnfRepository      *EnrollmentDNFRepository `protobuf:"bytes,6,opt,name=dnf_repository,json=dnfRepository,proto3" json:"dnf_repository,omitempty"`
 	// Exact installed agent CLI, with protected local filenames, never credentials.
 	// Commands are templates, not proof that the optional prerequisites are ready.
-	GrantCommand        string `protobuf:"bytes,7,opt,name=grant_command,json=grantCommand,proto3" json:"grant_command,omitempty"`
-	ProvisioningCommand string `protobuf:"bytes,8,opt,name=provisioning_command,json=provisioningCommand,proto3" json:"provisioning_command,omitempty"`
-	ResumeCommand       string `protobuf:"bytes,9,opt,name=resume_command,json=resumeCommand,proto3" json:"resume_command,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	GrantCommand        string  `protobuf:"bytes,7,opt,name=grant_command,json=grantCommand,proto3" json:"grant_command,omitempty"`
+	ProvisioningCommand string  `protobuf:"bytes,8,opt,name=provisioning_command,json=provisioningCommand,proto3" json:"provisioning_command,omitempty"`
+	ResumeCommand       string  `protobuf:"bytes,9,opt,name=resume_command,json=resumeCommand,proto3" json:"resume_command,omitempty"`
+	ExecutionRootSha256 *string `protobuf:"bytes,10,opt,name=execution_root_sha256,json=executionRootSha256,proto3,oneof" json:"execution_root_sha256,omitempty"`
+	// Private HTTPS CA from configured certificate material, not a fetched key.
+	TlsCaPem *string `protobuf:"bytes,11,opt,name=tls_ca_pem,json=tlsCaPem,proto3,oneof" json:"tls_ca_pem,omitempty"`
+	// SHA-256 of the single CA certificate's DER encoding, not its PEM text.
+	TlsCaSha256    *string                   `protobuf:"bytes,12,opt,name=tls_ca_sha256,json=tlsCaSha256,proto3,oneof" json:"tls_ca_sha256,omitempty"`
+	Platforms      []*EnrollmentPlatform     `protobuf:"bytes,13,rep,name=platforms,proto3" json:"platforms,omitempty"`
+	Readiness      *EnrollmentReadiness      `protobuf:"bytes,14,opt,name=readiness,proto3" json:"readiness,omitempty"`
+	ArchRepository *EnrollmentArchRepository `protobuf:"bytes,15,opt,name=arch_repository,json=archRepository,proto3" json:"arch_repository,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetEnrollmentInstructionsResponse) Reset() {
@@ -174,6 +182,220 @@ func (x *GetEnrollmentInstructionsResponse) GetResumeCommand() string {
 	return ""
 }
 
+func (x *GetEnrollmentInstructionsResponse) GetExecutionRootSha256() string {
+	if x != nil && x.ExecutionRootSha256 != nil {
+		return *x.ExecutionRootSha256
+	}
+	return ""
+}
+
+func (x *GetEnrollmentInstructionsResponse) GetTlsCaPem() string {
+	if x != nil && x.TlsCaPem != nil {
+		return *x.TlsCaPem
+	}
+	return ""
+}
+
+func (x *GetEnrollmentInstructionsResponse) GetTlsCaSha256() string {
+	if x != nil && x.TlsCaSha256 != nil {
+		return *x.TlsCaSha256
+	}
+	return ""
+}
+
+func (x *GetEnrollmentInstructionsResponse) GetPlatforms() []*EnrollmentPlatform {
+	if x != nil {
+		return x.Platforms
+	}
+	return nil
+}
+
+func (x *GetEnrollmentInstructionsResponse) GetReadiness() *EnrollmentReadiness {
+	if x != nil {
+		return x.Readiness
+	}
+	return nil
+}
+
+func (x *GetEnrollmentInstructionsResponse) GetArchRepository() *EnrollmentArchRepository {
+	if x != nil {
+		return x.ArchRepository
+	}
+	return nil
+}
+
+type EnrollmentReadiness struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ready         bool                   `protobuf:"varint,1,opt,name=ready,proto3" json:"ready,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Remedy        string                 `protobuf:"bytes,3,opt,name=remedy,proto3" json:"remedy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnrollmentReadiness) Reset() {
+	*x = EnrollmentReadiness{}
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnrollmentReadiness) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnrollmentReadiness) ProtoMessage() {}
+
+func (x *EnrollmentReadiness) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnrollmentReadiness.ProtoReflect.Descriptor instead.
+func (*EnrollmentReadiness) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *EnrollmentReadiness) GetReady() bool {
+	if x != nil {
+		return x.Ready
+	}
+	return false
+}
+
+func (x *EnrollmentReadiness) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *EnrollmentReadiness) GetRemedy() string {
+	if x != nil {
+		return x.Remedy
+	}
+	return ""
+}
+
+// Exact registry identities; ID_LIKE is never an enrollment selector. Empty
+// version_ids identifies a rolling release. Architectures use Go/DEB names.
+type EnrollmentPlatform struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Label      string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	OsId       string                 `protobuf:"bytes,3,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
+	VersionIds []string               `protobuf:"bytes,4,rep,name=version_ids,json=versionIds,proto3" json:"version_ids,omitempty"`
+	// Empty accepts any VARIANT_ID; otherwise match one value exactly.
+	VariantIds    []string             `protobuf:"bytes,5,rep,name=variant_ids,json=variantIds,proto3" json:"variant_ids,omitempty"`
+	PackageFamily string               `protobuf:"bytes,6,opt,name=package_family,json=packageFamily,proto3" json:"package_family,omitempty"`
+	Architectures []string             `protobuf:"bytes,7,rep,name=architectures,proto3" json:"architectures,omitempty"`
+	Readiness     *EnrollmentReadiness `protobuf:"bytes,8,opt,name=readiness,proto3" json:"readiness,omitempty"`
+	// exact, major (value or value.N), absent, snapshot (YYYYMMDD), or any.
+	VersionRule   string `protobuf:"bytes,9,opt,name=version_rule,json=versionRule,proto3" json:"version_rule,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnrollmentPlatform) Reset() {
+	*x = EnrollmentPlatform{}
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnrollmentPlatform) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnrollmentPlatform) ProtoMessage() {}
+
+func (x *EnrollmentPlatform) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnrollmentPlatform.ProtoReflect.Descriptor instead.
+func (*EnrollmentPlatform) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *EnrollmentPlatform) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EnrollmentPlatform) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *EnrollmentPlatform) GetOsId() string {
+	if x != nil {
+		return x.OsId
+	}
+	return ""
+}
+
+func (x *EnrollmentPlatform) GetVersionIds() []string {
+	if x != nil {
+		return x.VersionIds
+	}
+	return nil
+}
+
+func (x *EnrollmentPlatform) GetVariantIds() []string {
+	if x != nil {
+		return x.VariantIds
+	}
+	return nil
+}
+
+func (x *EnrollmentPlatform) GetPackageFamily() string {
+	if x != nil {
+		return x.PackageFamily
+	}
+	return ""
+}
+
+func (x *EnrollmentPlatform) GetArchitectures() []string {
+	if x != nil {
+		return x.Architectures
+	}
+	return nil
+}
+
+func (x *EnrollmentPlatform) GetReadiness() *EnrollmentReadiness {
+	if x != nil {
+		return x.Readiness
+	}
+	return nil
+}
+
+func (x *EnrollmentPlatform) GetVersionRule() string {
+	if x != nil {
+		return x.VersionRule
+	}
+	return ""
+}
+
 type EnrollmentAPTRepository struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	BaseUrl               string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
@@ -187,7 +409,7 @@ type EnrollmentAPTRepository struct {
 
 func (x *EnrollmentAPTRepository) Reset() {
 	*x = EnrollmentAPTRepository{}
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[2]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +421,7 @@ func (x *EnrollmentAPTRepository) String() string {
 func (*EnrollmentAPTRepository) ProtoMessage() {}
 
 func (x *EnrollmentAPTRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[2]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +434,7 @@ func (x *EnrollmentAPTRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentAPTRepository.ProtoReflect.Descriptor instead.
 func (*EnrollmentAPTRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{2}
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *EnrollmentAPTRepository) GetBaseUrl() string {
@@ -262,7 +484,7 @@ type EnrollmentDNFRepository struct {
 
 func (x *EnrollmentDNFRepository) Reset() {
 	*x = EnrollmentDNFRepository{}
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -274,7 +496,7 @@ func (x *EnrollmentDNFRepository) String() string {
 func (*EnrollmentDNFRepository) ProtoMessage() {}
 
 func (x *EnrollmentDNFRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -287,7 +509,7 @@ func (x *EnrollmentDNFRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentDNFRepository.ProtoReflect.Descriptor instead.
 func (*EnrollmentDNFRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{3}
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EnrollmentDNFRepository) GetBaseUrl() string {
@@ -311,12 +533,81 @@ func (x *EnrollmentDNFRepository) GetSigningKeyFingerprint() string {
 	return ""
 }
 
+// Requires signatures for both packages and the pacman sync database.
+type EnrollmentArchRepository struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	BaseUrl               string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	SigningKeyUrl         string                 `protobuf:"bytes,2,opt,name=signing_key_url,json=signingKeyUrl,proto3" json:"signing_key_url,omitempty"`
+	SigningKeyFingerprint string                 `protobuf:"bytes,3,opt,name=signing_key_fingerprint,json=signingKeyFingerprint,proto3" json:"signing_key_fingerprint,omitempty"`
+	RepositoryName        string                 `protobuf:"bytes,4,opt,name=repository_name,json=repositoryName,proto3" json:"repository_name,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *EnrollmentArchRepository) Reset() {
+	*x = EnrollmentArchRepository{}
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnrollmentArchRepository) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnrollmentArchRepository) ProtoMessage() {}
+
+func (x *EnrollmentArchRepository) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnrollmentArchRepository.ProtoReflect.Descriptor instead.
+func (*EnrollmentArchRepository) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *EnrollmentArchRepository) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+func (x *EnrollmentArchRepository) GetSigningKeyUrl() string {
+	if x != nil {
+		return x.SigningKeyUrl
+	}
+	return ""
+}
+
+func (x *EnrollmentArchRepository) GetSigningKeyFingerprint() string {
+	if x != nil {
+		return x.SigningKeyFingerprint
+	}
+	return ""
+}
+
+func (x *EnrollmentArchRepository) GetRepositoryName() string {
+	if x != nil {
+		return x.RepositoryName
+	}
+	return ""
+}
+
 var File_lindm_admin_v1_enrollment_instructions_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\n" +
 	",lindm/admin/v1/enrollment_instructions.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\"\n" +
-	" GetEnrollmentInstructionsRequest\"\xd3\x06\n" +
+	" GetEnrollmentInstructionsRequest\"\xa3\f\n" +
 	"!GetEnrollmentInstructionsResponse\x129\n" +
 	"\x11enrollment_origin\x18\x01 \x01(\tB\f\xbaH\tr\a\x80\xb5\x18\x01\x88\x01\x01R\x10enrollmentOrigin\x126\n" +
 	"\rdevice_origin\x18\x02 \x01(\tB\f\xbaH\tr\a\x80\xb5\x18\x01\x88\x01\x01H\x00R\fdeviceOrigin\x88\x01\x01\x12?\n" +
@@ -326,11 +617,39 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x0ednf_repository\x18\x06 \x01(\v2'.lindm.admin.v1.EnrollmentDNFRepositoryR\rdnfRepository\x12-\n" +
 	"\rgrant_command\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\fgrantCommand\x12;\n" +
 	"\x14provisioning_command\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\x13provisioningCommand\x12/\n" +
-	"\x0eresume_command\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\rresumeCommand:\xb5\x01\xbaH\xb1\x01\x1a\xae\x01\n" +
-	"&enrollment_instructions.bootstrap_pair\x12Dexecution root and signed bootstrap URLs must be configured together\x1a>has(this.execution_root_url) == has(this.bootstrap_bundle_url)B\x10\n" +
+	"\x0eresume_command\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\rresumeCommand\x12N\n" +
+	"\x15execution_root_sha256\x18\n" +
+	" \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$H\x03R\x13executionRootSha256\x88\x01\x01\x12,\n" +
+	"\n" +
+	"tls_ca_pem\x18\v \x01(\tB\t\xbaH\x06r\x04\x18\x80\x80\x04H\x04R\btlsCaPem\x88\x01\x01\x12>\n" +
+	"\rtls_ca_sha256\x18\f \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$H\x05R\vtlsCaSha256\x88\x01\x01\x12K\n" +
+	"\tplatforms\x18\r \x03(\v2\".lindm.admin.v1.EnrollmentPlatformB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\tplatforms\x12A\n" +
+	"\treadiness\x18\x0e \x01(\v2#.lindm.admin.v1.EnrollmentReadinessR\treadiness\x12Q\n" +
+	"\x0farch_repository\x18\x0f \x01(\v2(.lindm.admin.v1.EnrollmentArchRepositoryR\x0earchRepository:\xa9\x03\xbaH\xa5\x03\x1a\xfd\x01\n" +
+	"&enrollment_instructions.bootstrap_pair\x12Oexecution root, root hash and signed bootstrap URLs must be configured together\x1a\x81\x01has(this.execution_root_url) == has(this.bootstrap_bundle_url) && has(this.execution_root_url) == has(this.execution_root_sha256)\x1a\xa2\x01\n" +
+	"%enrollment_instructions.https_ca_pair\x12Hprivate HTTPS CA and certificate fingerprint must be configured together\x1a/has(this.tls_ca_pem) == has(this.tls_ca_sha256)B\x10\n" +
 	"\x0e_device_originB\x15\n" +
 	"\x13_execution_root_urlB\x17\n" +
-	"\x15_bootstrap_bundle_url\"\xe7\x02\n" +
+	"\x15_bootstrap_bundle_urlB\x18\n" +
+	"\x16_execution_root_sha256B\r\n" +
+	"\v_tls_ca_pemB\x10\n" +
+	"\x0e_tls_ca_sha256\"o\n" +
+	"\x13EnrollmentReadiness\x12\x14\n" +
+	"\x05ready\x18\x01 \x01(\bR\x05ready\x12 \n" +
+	"\x06reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06reason\x12 \n" +
+	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xc7\x03\n" +
+	"\x12EnrollmentPlatform\x12\x18\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x02id\x12\x1e\n" +
+	"\x05label\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05label\x12\x1d\n" +
+	"\x05os_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x04osId\x12)\n" +
+	"\vversion_ids\x18\x04 \x03(\tB\b\xbaH\x05\x92\x01\x02\x10 R\n" +
+	"versionIds\x12)\n" +
+	"\vvariant_ids\x18\x05 \x03(\tB\b\xbaH\x05\x92\x01\x02\x10\x10R\n" +
+	"variantIds\x12.\n" +
+	"\x0epackage_family\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x18 R\rpackageFamily\x12@\n" +
+	"\rarchitectures\x18\a \x03(\tB\x1a\xbaH\x17\x92\x01\x14\x10\x02\"\x10r\x0eR\x05amd64R\x05arm64R\rarchitectures\x12A\n" +
+	"\treadiness\x18\b \x01(\v2#.lindm.admin.v1.EnrollmentReadinessR\treadiness\x12M\n" +
+	"\fversion_rule\x18\t \x01(\tB*\xbaH'r%R\x05exactR\x05majorR\x06absentR\bsnapshotR\x03anyR\vversionRule\"\xe7\x02\n" +
 	"\x17EnrollmentAPTRepository\x12'\n" +
 	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
@@ -342,7 +661,13 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x17EnrollmentDNFRepository\x12'\n" +
 	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
-	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprintB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\"\x8e\x02\n" +
+	"\x18EnrollmentArchRepository\x12'\n" +
+	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
+	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
+	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\x125\n" +
+	"\x0frepository_name\x18\x04 \x01(\tB\f\xbaH\tr\a\n" +
+	"\x05lindmR\x0erepositoryNameB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_enrollment_instructions_proto_rawDescOnce sync.Once
@@ -356,21 +681,28 @@ func file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescData
 }
 
-var file_lindm_admin_v1_enrollment_instructions_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_lindm_admin_v1_enrollment_instructions_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_lindm_admin_v1_enrollment_instructions_proto_goTypes = []any{
 	(*GetEnrollmentInstructionsRequest)(nil),  // 0: lindm.admin.v1.GetEnrollmentInstructionsRequest
 	(*GetEnrollmentInstructionsResponse)(nil), // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse
-	(*EnrollmentAPTRepository)(nil),           // 2: lindm.admin.v1.EnrollmentAPTRepository
-	(*EnrollmentDNFRepository)(nil),           // 3: lindm.admin.v1.EnrollmentDNFRepository
+	(*EnrollmentReadiness)(nil),               // 2: lindm.admin.v1.EnrollmentReadiness
+	(*EnrollmentPlatform)(nil),                // 3: lindm.admin.v1.EnrollmentPlatform
+	(*EnrollmentAPTRepository)(nil),           // 4: lindm.admin.v1.EnrollmentAPTRepository
+	(*EnrollmentDNFRepository)(nil),           // 5: lindm.admin.v1.EnrollmentDNFRepository
+	(*EnrollmentArchRepository)(nil),          // 6: lindm.admin.v1.EnrollmentArchRepository
 }
 var file_lindm_admin_v1_enrollment_instructions_proto_depIdxs = []int32{
-	2, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
-	3, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
+	5, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
+	3, // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse.platforms:type_name -> lindm.admin.v1.EnrollmentPlatform
+	2, // 3: lindm.admin.v1.GetEnrollmentInstructionsResponse.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
+	6, // 4: lindm.admin.v1.GetEnrollmentInstructionsResponse.arch_repository:type_name -> lindm.admin.v1.EnrollmentArchRepository
+	2, // 5: lindm.admin.v1.EnrollmentPlatform.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_enrollment_instructions_proto_init() }
@@ -385,7 +717,7 @@ func file_lindm_admin_v1_enrollment_instructions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc), len(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

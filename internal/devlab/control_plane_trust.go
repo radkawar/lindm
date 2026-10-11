@@ -31,6 +31,9 @@ type AuthorityFixture struct {
 	AdminAddress  string
 	DeviceAddress string
 	ConsoleOrigin string
+	// NativeRepository is actual package/metadata publication evidence, when
+	// this fixture was explicitly opened for console installation.
+	NativeRepository *NativeEnrollmentRepository
 	// DeviceOrigin is the signed bootstrap bundle's device origin.
 	DeviceOrigin     string
 	DatabaseName     string
@@ -272,6 +275,15 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	}
 	if mode == authorityReleaseUpdates || mode == authorityDeviceActions {
 		if err := f.configureReleaseRepository(ctx, cfg, material); err != nil {
+			return nil, err
+		}
+	}
+	if len(options.NativeEnrollmentArchitectures) != 0 {
+		if mode != authorityDeviceActions {
+			return nil, errors.New("native enrollment publication requires the connected device-action authority fixture")
+		}
+		f.NativeRepository, err = ConfigureNativeEnrollmentRepository(ctx, cfg, options.NativeEnrollmentSourceRepository, filepath.Join(f.directory, "native-package-custody"), options.NativeEnrollmentArchitectures)
+		if err != nil {
 			return nil, err
 		}
 	}

@@ -15,6 +15,7 @@ import {
   signOut,
   createGrant,
   createToken,
+  confirmEnrolledDevice,
   assignProfile,
   storageSelection,
 } from "./journey.mjs";
@@ -39,7 +40,7 @@ function failure(error) {
   };
 }
 
-async function screenshot(name) {
+async function screenshot(name, fullPage = true) {
   if (!driver) return;
   // Mask all editable/secret/command regions, including failure screenshots.
   // No trace, HAR, console capture or raw DOM dump is ever persisted.
@@ -53,7 +54,12 @@ async function screenshot(name) {
   });
   try {
     const path = join(config.evidenceDirectory, `${config.engine}-${config.mode}-${name}.png`);
-    await writePrivate(path, await driver.screenshot());
+    await writePrivate(
+      path,
+      fullPage
+        ? await driver.screenshot()
+        : await driver.page.screenshot({ fullPage: false, timeout: 10_000 }),
+    );
     result.screenshots.push(path);
   } finally {
     await driver.observe(() => {
@@ -62,6 +68,50 @@ async function screenshot(name) {
         delete node.dataset.acceptanceOldVisibility;
       }
     });
+  }
+}
+
+async function enrollmentScreenshots(name) {
+  // Visual review only: vary theme/viewport without issuing another credential.
+  // Reuse the runner's secret masking; these are not native-install evidence.
+  const viewport = driver.page.viewportSize();
+  const original = await driver.observe(() => ({
+    dark: document.documentElement.classList.contains("dark"),
+    colorScheme: document.documentElement.style.colorScheme,
+  }));
+  await driver.page.getByRole("listbox").waitFor({ state: "hidden" });
+  try {
+    for (const [size, width, height] of [
+      ["desktop", 1440, 1000],
+      ["mobile", 390, 844],
+    ]) {
+      await driver.page.setViewportSize({ width, height });
+      for (const theme of ["light", "dark"]) {
+        await driver.observe((value) => {
+          document.documentElement.classList.toggle("dark", value === "dark");
+          document.documentElement.style.colorScheme = value;
+          window.scrollTo(0, 0);
+          const dialog = document.querySelector('[role="dialog"]');
+          if (dialog) dialog.scrollTop = 0;
+        }, theme);
+        await driver.page.evaluate(async () => {
+          await document.fonts.ready;
+          await Promise.all(
+            document.getAnimations().map((animation) => animation.finished.catch(() => {})),
+          );
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+        });
+        await screenshot(`${name}-${theme}-${size}`, false);
+      }
+    }
+  } finally {
+    await driver.page.setViewportSize(viewport);
+    await driver.observe((value) => {
+      document.documentElement.classList.toggle("dark", value.dark);
+      document.documentElement.style.colorScheme = value.colorScheme;
+    }, original);
   }
 }
 
@@ -85,8 +135,29 @@ function validate(value) {
       throw new Error("required_configuration_missing");
   }
   if (!["chromium", "firefox", "webkit"].includes(value.engine)) throw new Error("invalid_engine");
-  if (!["enroll", "credentials", "grant", "native", "login"].includes(value.mode))
+  if (
+    !["enroll", "credentials", "grant", "native", "login", "enrollment-status"].includes(value.mode)
+  )
     throw new Error("invalid_mode");
+  if (value.enrollmentScreenshots && value.engine !== "chromium")
+    throw new Error("enrollment_screenshots_require_chromium");
+  if (value.enrollmentCommandPaths) {
+    if (value.engine !== "chromium" || value.mode !== "grant" || !value.enrollmentScreenshots)
+      throw new Error("clipboard_capture_requires_chromium_grant_screenshots");
+    const paths = Object.entries(value.enrollmentCommandPaths);
+    const platforms = Object.entries(value.enrollmentPlatforms ?? {});
+    if (
+      paths.length !== 1 ||
+      platforms.length !== 1 ||
+      paths[0][0] !== platforms[0][0] ||
+      !["apt", "dnf", "zypper", "pacman"].includes(paths[0][0]) ||
+      typeof paths[0][1] !== "string" ||
+      !paths[0][1] ||
+      typeof platforms[0][1] !== "string" ||
+      !platforms[0][1]
+    )
+      throw new Error("clipboard_capture_requires_one_named_platform");
+  }
   if (value.mode === "enroll" && !value.enrollmentSecret)
     throw new Error("enrollment_secret_required");
   const origin = new URL(value.origin);
@@ -99,6 +170,8 @@ function validate(value) {
     throw new Error("https_origin_required");
   if (value.mode === "native" && (!value.deviceId || !value.profileRevisionId))
     throw new Error("native_target_required");
+  if (value.mode === "enrollment-status" && (typeof value.deviceId !== "string" || !value.deviceId))
+    throw new Error("enrollment_status_device_required");
   for (const kind of value.storageActions ?? ["escrowRotate", "cryptoErase"]) {
     if (!["escrowRotate", "cryptoErase", "tpm2Bind", "sanitize"].includes(kind))
       throw new Error("invalid_storage_action");
@@ -118,6 +191,11 @@ async function journey() {
   driver = config.engine === "chromium" ? new ChromiumDriver() : new WebDriver();
   activeStep = "browser_start";
   await driver.open(config);
+  if (config.enrollmentCommandPaths) {
+    await driver.context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: config.origin,
+    });
+  }
   result.versions = driver.metadata;
   const ui = new UI(driver, config.actionTimeoutMs);
   await step("sign_in_page", () => driver.goto(config.origin));
@@ -245,11 +323,26 @@ async function journey() {
   await step("owner_fresh_sign_in", () => signIn(ui, config));
   await saveCredential();
   if (["enroll", "credentials", "grant"].includes(config.mode)) {
-    result.grant = await step("create_one_time_grant", () => createGrant(ui, config));
+    const capture = config.enrollmentScreenshots ? enrollmentScreenshots : undefined;
+    result.grant = await step("create_one_time_grant", () => createGrant(ui, config, capture));
     // Persist shown-once output before beginning the next irreversible issuance.
     await writePrivateJSON(config.resultPath, result);
     if (config.mode !== "grant")
-      result.token = await step("create_provisioning_token", () => createToken(ui, config));
+      result.token = await step("create_provisioning_token", () =>
+        createToken(ui, config, capture),
+      );
+    if (capture) {
+      await driver.goto(`${config.origin}/settings`);
+      await ui.wait({ role: "heading", text: "Agent repository" });
+      await ui.wait({ css: "summary", text: "Repository and trust details" });
+      await capture("settings-agent-repository");
+    }
+  }
+  if (config.mode === "enrollment-status") {
+    result.enrolledDevice = await step("confirm_enrolled_device", () =>
+      confirmEnrolledDevice(ui, config),
+    );
+    await writePrivateJSON(config.resultPath, result);
   }
   if (config.mode === "native") {
     result.assignment = await step("assign_native_profile", () => assignProfile(ui, config));

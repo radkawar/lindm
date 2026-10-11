@@ -182,6 +182,45 @@ releasing its old key. These are software-identity collision signals, not a clai
 to distinguish physically different machines sharing a compromised key, journal
 and coordinated state.
 
+### Trust bootstrap from the customer's server
+
+Agent distribution is part of the customer's `lindmd`, not a public Lindm service
+or an external package host. The configured administrative HTTPS origin serves
+signed APT and RPM repository bytes under `/repo/apt` and `/repo/rpm`. The release
+pipeline, not the online HTTP handler, owns package and repository signing.
+Air-gap bundle import remains a separate authenticated delivery path.
+
+The administrator's authenticated console session is the out-of-band trust channel
+for a new machine: the copied command carries the expected package signer
+fingerprint, execution-root digest and, where needed, server CA material and its
+certificate fingerprint. Those values are not accepted from an unauthenticated
+package download. The command checks them before installing repository trust or
+invoking agent bootstrap. HTTPS still verifies the configured server name and
+certificate chain; no HTTP fallback or disabled TLS verification is permitted.
+APT uses a dedicated `Signed-By` keyring and signed `InRelease`/`Packages` hashes.
+RPM requires both signed metadata and signed packages. The agent then verifies
+the DSSE deployment bootstrap against the authenticated execution root, preserving
+the separate execution and TUF trust domains.
+
+This prevents an on-path attacker or untrusted content store from substituting a
+new repository signer, execution root or server CA. It does not defend against a
+compromised authenticated console, a malicious authorized administrator, a stolen
+unused enrollment code, a compromised approved signing key, or root compromise on
+the destination. Treat the entire copied command as secret, keep it out of logs and
+shared clipboard history, and use the normal code expiry/revocation boundary.
+Availability attacks remain possible; signature failure is not permission to retry
+with verification disabled.
+
+Repository reads require no admin session or device identity: package bytes are
+not confidential, and signatures establish content trust. Unauthenticated access
+does not mean Internet exposure; deployments can keep the HTTPS origin on their
+own network. Serving is read-only, path- and resource-bounded, without directory
+listings or private signing custody. Every replica must receive the identical
+signed release snapshot before traffic is enabled; request routing must not
+alternate between different package catalogs. Runtime HTTP serving never builds,
+signs or repairs packages. Missing artifacts are an actionable setup failure, not
+an invitation to download an agent from another host.
+
 ## 4. Admin identity and authorization
 
 Lindm authenticates people **to Lindm only**. It is not an identity provider, never

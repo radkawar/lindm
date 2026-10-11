@@ -50,6 +50,16 @@ the arm64 Sparks lab hosts and keeps independent results from x86_64.
 
 ## Packaging, signing, repositories, paths and LSM
 
+Choose the target RHEL release in the console for one install-and-enroll command
+using DNF and the customer's own `lindmd` HTTPS `/repo/rpm` endpoint. The command
+authenticates the signer and server/bootstrap trust and requires package plus
+repository signatures. It never redirects agent installation to an external
+repository. RHEL vendor dependency access still requires the appropriate local
+repositories or entitlement; lindmd does not redistribute the operating system.
+Missing agent artifacts have an explicit server setup remedy. See the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+Fedora evidence does not qualify this RHEL path.
+
 The agent is a signed native RPM; building, signing and independent verification
 precede publication ([`rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).
 RPM configuration is `%config(noreplace)` and systemd lifecycle scriptlets are

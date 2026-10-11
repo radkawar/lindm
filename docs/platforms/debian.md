@@ -57,6 +57,15 @@ lifecycle or encrypted/desktop installs. Exact records appear in the lab section
 
 ## Packaging, signing, repositories, paths and LSM
 
+Choose Debian in the console's enrollment dialog for one command that installs
+from the customer's own `lindmd` HTTPS `/repo/apt` endpoint and enrolls the device.
+The command verifies the pinned signer and server/bootstrap trust before creating
+the deb822 `Signed-By` source. There is no external agent repository. Missing
+release artifacts or architecture coverage block installation with a configuration
+remedy. Follow the
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server);
+Ubuntu installation evidence does not qualify Debian.
+
 Agent packaging uses DEB/APT, not an RPM-derived path. Authentication is repository
 `InRelease` signature → `Packages` hashes → exact archive digest; a built `.deb` is
 not independently signed. Use a dedicated independently trusted `Signed-By` key, not

@@ -31,7 +31,7 @@ func TestSplitAuthorityExportConnect(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
-	controller, err := OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, device)
+	controller, err := OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, device, LoadAuthorityOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

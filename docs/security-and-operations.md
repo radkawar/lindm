@@ -41,14 +41,18 @@ local offline-compatible option. Offline release root/targets signing custody is
 never bundled into the online server image. Provide rotation/revocation drills with
 overlap, missed rotations, old agents, expired certs and lost keys.
 
-### Public enrollment installation material
+### Enrollment installation from your server
+
+Agents always come from the customer's own `lindmd` server. There is no public
+Lindm package repository, external hosting option or separate hosting prerequisite.
+The signed air-gap bundle workflow is unchanged.
 
 `GetEnrollmentInstructions` requires fresh, unrestricted `enrollment.manage`
 authority. It returns the configured `public_url` enrollment origin and optional
-`device_public_url`, never a browser Host header, listener bind address, or guessed
-hostname. The API's optional device origin, bootstrap URLs and repository messages
-remain absent when not configured; the console must show **Not configured** rather
-than invent a usable installation command.
+`device_public_url`, never a browser Host header, listener bind address or guessed
+hostname. It also returns registry-backed OS choices and repository readiness.
+Missing release artifacts block installation with a specific remedy in both the
+enrollment dialog and Settings; they never produce an install-first fallback.
 
 When `execution_bootstrap` is configured, startup reads its `root_file` and
 `bootstrap_file` through the existing bounded, ownership-checked resource loader.
@@ -68,47 +72,116 @@ session for initial installation or expose local configuration directories.
 Documents are the startup-verified snapshot; replacing referenced files requires
 restarting the server and passing the same verification again.
 
-**Delivery is not initial trust.** Downloading a root and a bundle signed by that
-same root does not authenticate either to a new device. Supply or independently
-authenticate the initial execution root through the deployment owner's trusted
-installation channel. The agent verifies the downloaded DSSE bundle against that
-authenticated root, including expiry and exact deployment/transport bindings.
-Never use `curl -k`, unsigned trust substitution, or downloaded root self-signatures
-as a replacement for this provenance.
+**Delivery is not initial trust.** The administrator obtains the command through
+the authenticated console, providing the new machine an independent trusted
+channel for the package signing-key fingerprint, execution-root SHA-256 and any
+private server CA certificate/fingerprint. The command verifies these pins before
+writing repository trust or bootstrapping. It uses HTTPS with hostname and chain
+verification throughout. The agent verifies the downloaded DSSE bundle against the
+authenticated execution root, including expiry and exact deployment bindings.
+Never replace this with HTTP, disabled certificate checks, a short OpenPGP key ID
+or a root fetched and trusted solely because it signs its own bundle.
 
-Native APT/DNF installation sources are optional and separate from
-`release_repository` (the TUF update repository). Configure the following strict
-protobuf-JSON fields inside `ServerConfig` to advertise sources that the operator
-has actually published:
+#### Prepare the server's installation repository
+
+Use the same signed release artifacts produced by the release pipeline. Publish
+native metadata with `internal/packaging`'s APT/RPM publishers, retaining the signed
+`InRelease`, `Packages` indexes, DEB archives, signed `repomd.xml`, RPM archives and
+exported signing key. Do not rebuild or re-sign packages in `lindmd`.
+
+On the release signing workstation, set `SIGNER_HOME`, `SIGNER_FINGERPRINT` and
+`SIGNER_PASSPHRASE_FILE` to the protected production package-signing inputs;
+set the four `AGENT_*` paths below to the already built release artifacts.
+`STAGING` must be a new private directory under a trusted parent. The maintained
+publication commands create `STAGING/apt` and `STAGING/rpm`:
+
+```sh
+go run ./cmd/lab packages apt -output "$STAGING" \
+  -signer-home "$SIGNER_HOME" -fingerprint "$SIGNER_FINGERPRINT" \
+  -passphrase-file "$SIGNER_PASSPHRASE_FILE" \
+  "$AGENT_DEB_AMD64" "$AGENT_DEB_ARM64"
+go run ./cmd/lab packages rpm -output "$STAGING" \
+  -signer-home "$SIGNER_HOME" -fingerprint "$SIGNER_FINGERPRINT" \
+  -passphrase-file "$SIGNER_PASSPHRASE_FILE" \
+  "$AGENT_RPM_AMD64" "$AGENT_RPM_ARM64"
+```
+
+APT emits separate amd64/arm64 package indexes covered by one signed Release;
+RPM metadata carries both native architectures. Transfer only those completed
+repository directories to the server's `repo/` subtree, never the signing home
+or passphrase file. `-development-key` is reserved for disposable lab fixtures,
+not production publication.
+
+Configure the existing release directory and independently pinned native package
+signer fingerprints in strict protobuf JSON:
 
 ```json
 {
-  "enrollmentInstructions": {
-    "aptRepository": {
-      "baseUrl": "https://packages.example/apt",
-      "signingKeyUrl": "https://packages.example/package-signing.asc",
-      "signingKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567",
-      "suite": "stable",
-      "components": ["main"]
-    },
-    "dnfRepository": {
-      "baseUrl": "https://packages.example/rpm",
-      "signingKeyUrl": "https://packages.example/package-signing.asc",
-      "signingKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567"
+  "releaseRepository": {
+    "directory": "/var/lib/lindm/releases",
+    "nativeRepositories": {
+      "aptSigningKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567",
+      "rpmSigningKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567"
     }
   }
 }
 ```
 
-These are illustrative origins and fingerprints, not a published Lindm service or
-trusted key. Replace them with deployment-owned values. Repository/key URLs must
-be HTTPS without credentials, queries or fragments. Fingerprints must be the full
-uppercase 40-hex or 64-hex OpenPGP fingerprint, never a short key ID. APT suite and
-component tokens are bounded and cannot inject additional source-file fields.
-An absent repository means that installation method is not configured; a present
-but incomplete repository is rejected during configuration validation.
-The server advertises these values but does not fetch, host or prove availability
-of native packages or repository keys.
+The fingerprint above is illustrative, not trusted release material. Obtain the
+full uppercase 40-hex or 64-hex primary-key fingerprint through the release owner's
+trusted channel. Keep all private signing keys outside the served directory.
+Install the complete APT publisher output under
+`/var/lib/lindm/releases/repo/apt` and RPM publisher output under
+`/var/lib/lindm/releases/repo/rpm`. Include the target machine architectures;
+an amd64-only publication cannot install an arm64 device. Server startup/readiness
+checks do not replace native signature verification by the package manager.
+
+For packaged Arch installations, publish the signed `.pkg.tar.zst` archives and
+adjacent signatures with `lab packages arch`, using the same explicit signer
+options. Place its output at `releaseRepository.directory/repo/arch` and configure
+`nativeRepositories.archSigningKeyFingerprint`. The console's pacman path uses
+`/repo/arch`, requiring signed packages and sync database with the exact trusted
+key; absent Arch artifacts remain a visible gate. The RPM publication serves both
+DNF and zypper clients; the registry, not the file extension, selects the command.
+
+All replicas must mount or receive the identical signed snapshot before serving
+traffic. Publish complete snapshots atomically, never update individual metadata
+and package files underneath active readers. Preserve signed metadata lifetimes,
+retain packages referenced by installed snapshots and restart replicas together
+when replacing native repository snapshots or pinned bootstrap material. Startup
+authenticates and captures a bounded file allowlist; changed or replaced files are
+not silently admitted until restart. Stable metadata URLs revalidate against
+content-digest ETags rather than caching changing names as immutable. For native
+enrollment, the server needs read access only, not signing custody or repository
+write access.
+
+The server exposes the matching `/repo/apt/` and `/repo/rpm/` paths on its configured
+HTTPS origin. Preserve unauthenticated `GET`/`HEAD` access through any reverse proxy.
+Unauthenticated means a bare device can download packages; it does not require
+Internet exposure. Directory listings, writes and private-key retrieval are not
+supported. No repository URL supplied by a browser or external package host is
+used.
+
+#### Copy and run the enrollment command
+
+1. Open **Settings** and resolve any repository-readiness remedy. Configure the
+   execution bootstrap and the server's externally reachable HTTPS origin as well
+   as the signed artifacts above.
+2. Choose **Enroll**, issue a single-use code and select the target OS. The platform
+   registry selects APT, DNF, zypper or a separately available pacman path. A gated
+   platform explains its missing packaging prerequisite instead of guessing.
+3. Copy the one command to the bare target machine and run it with administrative
+   privileges. It authenticates server and signer trust, adds only this server's
+   repository, installs the agent, checks bootstrap trust and enrolls using the
+   protected code file. Expand **What this does** before running if needed.
+4. Confirm the device is **Enrolled** in the console. Command acceptance or package
+   installation alone is not proof of completed enrollment.
+
+Keep the shown-once command private: it contains the bearer enrollment code.
+Do not paste it into tickets, shared shell transcripts or chat, and do not save
+the code in images or browser storage. Revoke an exposed unused code and issue
+a new one. A trust or signature failure requires correcting configuration or
+publication, never disabling checks.
 
 Before installing, verify the downloaded primary signing key's complete fingerprint
 against the authoritative deployment value. APT must use a dedicated `Signed-By`
@@ -1413,10 +1486,11 @@ rolling upgrades, native agents (devices are simulated), separate hosts or the
 dedicated reference hardware. Recovery here is seconds against the five-minute
 target; a production claim still needs the replicated L18 load/failover gate.
 
-## 7. Hosted agent updates and release compatibility
+## 7. Agent updates from your server and release compatibility
 
-`lindmd` can host a previously published TUF repository on its administrative TLS
-origin at `/updates/`. Add the following to the strict protobuf JSON server config
+The customer's `lindmd` also serves its signed TUF update repository on its
+administrative TLS origin at `/updates/`, separately from native first-install
+metadata at `/repo/`. Add the following to the strict protobuf JSON server config
 and apply the normal `lindmd migrate -config FILE` before starting the server:
 
 ```json
@@ -1443,14 +1517,15 @@ ReadWritePaths=/var/lib/lindm/releases
 
 Then run `systemctl daemon-reload` and restart after validating configuration.
 The directory must already exist. Keep `ProtectSystem=strict` and all other
-confinement; grant only this public repository subtree, never `/etc`, key custody
-or all of `/var/lib`. Read-only hosting needs no writable drop-in. With OCI, mount
-the public repository as a dedicated writable volume only for online publication,
+confinement; grant only this server's release-content subtree, never `/etc`, key custody
+or all of `/var/lib`. Read-only serving needs no writable drop-in. With OCI, mount
+the release-content directory as a dedicated writable volume only for online publication,
 and online signing files separately read-only; retain the read-only rootfs and
 nonroot identity. Back up published metadata/targets and custody separately.
 
-The repository contains only public `metadata/` and `targets/` material. Signing
-custody must resolve outside that directory. The optional signing directory holds
+The TUF subtree contains only non-secret `metadata/` and `targets/` material;
+native first-install repositories occupy `repo/`. Signing custody must resolve
+outside that directory. The optional signing directory holds
 distinct protected PKCS#8 `rollout.pem`, `snapshot.pem` and `timestamp.pem` files.
 `root.pem` and `targets.pem` stay offline and must not be present in the configured
 online directory; startup rejects either filename, including a symlink. Do not

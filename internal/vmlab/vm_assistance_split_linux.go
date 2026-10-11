@@ -41,8 +41,8 @@ type AssistanceController struct {
 	control *vmControlPlane
 }
 
-func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string) (_ *AssistanceController, err error) {
-	fixture, err := devlab.OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, address)
+func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (_ *AssistanceController, err error) {
+	fixture, err := devlab.OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, address, enrollment)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func ReadAssistanceControlPlane(path string) (_ *AssistanceControlPlane, err err
 	return &handle, nil
 }
 
-func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions) (_ *devlab.AuthorityFixture, _ *agentv1.UpdateExecutionTrustRequest, _ assistanceRelayEvidence, err error) {
+func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, architecture string) (_ *devlab.AuthorityFixture, _ *agentv1.UpdateExecutionTrustRequest, _ assistanceRelayEvidence, err error) {
 	if handle := options.ControlPlane; handle != nil {
 		delegation := new(agentv1.UpdateExecutionTrustRequest)
 		if err := protojson.Unmarshal(handle.Delegation, delegation); err != nil {
@@ -163,7 +163,12 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions) (_ 
 		fixture, err := devlab.ConnectAuthorityFixture(ctx, handle.Authority)
 		return fixture, delegation, handle.Relay, err
 	}
-	fixture, err := devlab.OpenDeviceActionAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+	var fixture *devlab.AuthorityFixture
+	if options.Hold != nil {
+		fixture, err = devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.Repository, VMBuildRepository(options.Repository, options.BuildRepository), options.LindmdBinary, []string{architecture})
+	} else {
+		fixture, err = devlab.OpenDeviceActionAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+	}
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}

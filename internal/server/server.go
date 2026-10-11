@@ -180,14 +180,15 @@ func Run(ctx context.Context, resources *config.Resources) error {
 
 // controlPlane holds the domain services one Run composes and serves.
 type controlPlane struct {
-	auth           *identity.Service
-	devices        *device.Service
-	deliveries     *integrations.Service
-	reporting      *reports.Service
-	releaseHandler http.Handler
-	relay          *assistrelay.Relay
-	supervisor     *jobs.Supervisor
-	console        http.Handler
+	auth               *identity.Service
+	devices            *device.Service
+	deliveries         *integrations.Service
+	reporting          *reports.Service
+	releaseHandler     http.Handler
+	nativeRepositories *nativeRepositories
+	relay              *assistrelay.Relay
+	supervisor         *jobs.Supervisor
+	console            http.Handler
 }
 
 // newControlPlane initializes every configured domain service against a checked
@@ -220,6 +221,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 			return nil, fmt.Errorf("initialize assistance relay: %w", err)
 		}
 	}
+	native := loadNativeRepositories(ctx, resources)
 	devices, err := device.New(pool, devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
@@ -236,7 +238,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 		ServerRelease:                buildinfo.Current().Version,
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
-		EnrollmentInstructions:       enrollmentInstructions(resources),
+		EnrollmentInstructions:       enrollmentInstructions(resources, native),
 		Assistance:                   relay,
 	})
 	if err != nil {
@@ -257,6 +259,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 	return &controlPlane{
 		auth: auth, devices: devices, deliveries: deliveries, reporting: reporting,
 		releaseHandler: releaseHandler, relay: relay, supervisor: supervisor, console: console,
+		nativeRepositories: native,
 	}, nil
 }
 
@@ -304,6 +307,13 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 	// Initial installations have no session or device certificate. Only verified
 	// public installation documents are exposed here, never a filesystem tree.
 	mux.Handle("/bootstrap/", bootstrapMaterialHandler(resources.ExecutionBootstrap))
+	// Native publication files are authenticated before admission; serving
+	// never requires an admin session, device certificate or signing key.
+	if p.nativeRepositories != nil {
+		mux.Handle("/repo/apt/", http.StripPrefix("/repo/apt/", p.nativeRepositories.apt))
+		mux.Handle("/repo/rpm/", http.StripPrefix("/repo/rpm/", p.nativeRepositories.rpm))
+		mux.Handle("/repo/arch/", http.StripPrefix("/repo/arch/", p.nativeRepositories.arch))
+	}
 	path, handler := p.devices.AdminHandler()
 	mux.Handle(path, p.auth.RequireSession(handler))
 	path, handler = p.devices.ReleaseManagementHandler()

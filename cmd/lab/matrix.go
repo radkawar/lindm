@@ -315,6 +315,7 @@ var matrixVersions = [2]string{"0.1.0", "0.1.1"}
 // matrixRun holds the shared inputs one run prepares for every cell.
 type matrixRun struct {
 	root, repo, cache, evidence, self, lindmd, agent, redhatToken, revision string
+	consoleBrowsers, consoleAdmin, consoleDevice                            string
 	signer                                                                  *packaging.SigningKey
 	archArgs                                                                map[string]*labv1.MatrixArgs
 	// lifecycle inputs per packaging architecture and format.
@@ -329,14 +330,15 @@ type matrixRun struct {
 // laneInputs lists the shared inputs each lane takes; everything else comes
 // from the matrix cell's fixed arguments.
 var laneInputs = map[string][]string{
-	"inspect":        {"agent", "record"},
-	"lifecycle":      {"repo", "packages", "redhat-token-file", "record"},
-	"dispatch":       {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
-	"resources":      {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
-	"encrypted":      {"record"},
-	"device-actions": {"repo", "build-repo", "lab", "lindmd", "recovery-manifest", "record"},
-	"updates":        {"repo", "build-repo", "lab", "record"},
-	"assistance":     {"repo", "build-repo", "lab", "lindmd", "evidence"},
+	"inspect":             {"agent", "record"},
+	"lifecycle":           {"repo", "packages", "redhat-token-file", "record"},
+	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
+	"resources":           {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
+	"encrypted":           {"record"},
+	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "recovery-manifest", "record"},
+	"updates":             {"repo", "build-repo", "lab", "record"},
+	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
+	"enroll-from-console": {"console-browser", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -348,6 +350,9 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.repo, "repo", ".", "checkout with the running development fixture")
 	flags.StringVar(&run.cache, "cache", ".cache/lab/images", "verified image cache")
 	flags.StringVar(&run.redhatToken, "redhat-token-file", "", "protected Red Hat offline-token file; required for entitled releases")
+	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs: PLATFORM-ARCH.json, each owned mode0600")
+	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
+	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -373,6 +378,11 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 			return err
 		}
 	}
+	if run.consoleBrowsers != "" {
+		if run.consoleBrowsers, err = filepath.Abs(run.consoleBrowsers); err != nil {
+			return err
+		}
+	}
 	run.root, run.evidence, run.archArgs = selection.root, *evidence, in.Matrix.GetArchitectureArgs()
 	if run.self, err = os.Executable(); err != nil {
 		return err
@@ -381,6 +391,9 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		return err
 	}
 	for _, c := range cells {
+		if c.Spec.GetLane() == "enroll-from-console" && run.consoleBrowsers == "" {
+			return errors.New("enroll-from-console requires -console-browser-config-dir for actual clipboard capture and screenshots")
+		}
 		if c.Release.Native().Lab.Entitlement && run.redhatToken == "" && slices.Contains(laneInputs[c.Spec.GetLane()], "redhat-token-file") {
 			return fmt.Errorf("%s %s needs -redhat-token-file", c.Release.Key, c.Spec.GetName())
 		}
@@ -660,6 +673,14 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			args = append(args, "-lab", r.self)
 		case "lindmd":
 			args = append(args, "-lindmd", r.lindmd)
+		case "console-browser":
+			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, c.Release.Key+"-"+c.Architecture+".json"))
+			if r.consoleAdmin != "" {
+				args = append(args, "-admin-address", r.consoleAdmin)
+			}
+			if r.consoleDevice != "" {
+				args = append(args, "-device-address", r.consoleDevice)
+			}
 		case "record":
 			args = append(args, "-record", base+".json")
 		case "evidence":

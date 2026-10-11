@@ -24,6 +24,7 @@ import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authent
 import { Route as AuthenticatedProfilesRouteImport } from './routes/_authenticated/profiles'
 import { Route as AuthenticatedRolloutsRouteImport } from './routes/_authenticated/rollouts'
 import { Route as AuthenticatedSecretsRouteImport } from './routes/_authenticated/secrets'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDevicesDeviceIdRouteImport } from './routes/_authenticated/devices_.$deviceId'
 import { Route as AuthenticatedProfilesProfileIdRouteImport } from './routes/_authenticated/profiles_.$profileId'
 import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenticated/profiles_.new'
@@ -109,6 +110,11 @@ const AuthenticatedSecretsRoute = AuthenticatedSecretsRouteImport.update({
   path: '/secrets',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDevicesDeviceIdRoute =
   AuthenticatedDevicesDeviceIdRouteImport.update({
     id: '/devices_/$deviceId',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/profiles': typeof AuthenticatedProfilesRoute
   '/rollouts': typeof AuthenticatedRolloutsRoute
   '/secrets': typeof AuthenticatedSecretsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/profiles': typeof AuthenticatedProfilesRoute
   '/rollouts': typeof AuthenticatedRolloutsRoute
   '/secrets': typeof AuthenticatedSecretsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/_authenticated/profiles': typeof AuthenticatedProfilesRoute
   '/_authenticated/rollouts': typeof AuthenticatedRolloutsRoute
   '/_authenticated/secrets': typeof AuthenticatedSecretsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/devices_/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/_authenticated/profiles_/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/_authenticated/profiles_/new': typeof AuthenticatedProfilesNewRoute
@@ -258,6 +267,7 @@ export interface FileRouteTypes {
     | '/profiles'
     | '/rollouts'
     | '/secrets'
+    | '/settings'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/profiles'
     | '/rollouts'
     | '/secrets'
+    | '/settings'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profiles'
     | '/_authenticated/rollouts'
     | '/_authenticated/secrets'
+    | '/_authenticated/settings'
     | '/_authenticated/devices_/$deviceId'
     | '/_authenticated/profiles_/$profileId'
     | '/_authenticated/profiles_/new'
@@ -433,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSecretsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/devices_/$deviceId': {
       id: '/_authenticated/devices_/$deviceId'
       path: '/devices/$deviceId'
@@ -512,6 +531,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProfilesRoute: typeof AuthenticatedProfilesRoute
   AuthenticatedRolloutsRoute: typeof AuthenticatedRolloutsRoute
   AuthenticatedSecretsRoute: typeof AuthenticatedSecretsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedDevicesDeviceIdRoute: typeof AuthenticatedDevicesDeviceIdRoute
   AuthenticatedProfilesProfileIdRoute: typeof AuthenticatedProfilesProfileIdRoute
   AuthenticatedProfilesNewRoute: typeof AuthenticatedProfilesNewRoute
@@ -536,6 +556,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProfilesRoute: AuthenticatedProfilesRoute,
   AuthenticatedRolloutsRoute: AuthenticatedRolloutsRoute,
   AuthenticatedSecretsRoute: AuthenticatedSecretsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedDevicesDeviceIdRoute: AuthenticatedDevicesDeviceIdRoute,
   AuthenticatedProfilesProfileIdRoute: AuthenticatedProfilesProfileIdRoute,
   AuthenticatedProfilesNewRoute: AuthenticatedProfilesNewRoute,

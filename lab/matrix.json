@@ -8,6 +8,13 @@
       "lane": "inspect"
     },
     {
+      "name": "enroll-from-console",
+      "title": "Enroll from console",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "enroll-from-console"
+    },
+    {
       "name": "lifecycle",
       "title": "Lifecycle",
       "capabilities": ["lifecycle"],

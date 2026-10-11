@@ -122,3 +122,20 @@ func TestAppendKeepsEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
+	cell := &labv1.MatrixCell{Name: "enroll-from-console", Title: "Enroll from console", Capabilities: []string{"lifecycle"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: string(platform.LaneEnrollFromConsole)}
+	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{
+		entry("ubuntu-24.04", "lifecycle", "aarch64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now()),
+	}}}
+	for _, key := range []string{"ubuntu-24.04", "fedora-44"} {
+		r := release(t, key)
+		in.Manifests = append(in.Manifests, &Manifest{Image: &labv1.ImageManifest{Id: key, Edition: "server-cloudimg"}, Release: r, Architecture: "aarch64"})
+		if got := in.cell(r, cell, "aarch64"); got.State != NotRun {
+			t.Fatalf("%s console enrollment inherited another lane's qualification: %s", key, got.State)
+		}
+	}
+	if got := in.cell(release(t, "debian-12"), cell, "aarch64"); got.State != NoLane {
+		t.Fatalf("unsupported console enrollment recipe became runnable: %s", got.State)
+	}
+}

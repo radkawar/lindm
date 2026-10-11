@@ -90,10 +90,14 @@ Server-host qualification is a separate
   [`lindm-agent.service`](../../internal/packaging/assets/lindm-agent.service):9-50.
 - **Do not collapse trust domains.** Native package/repository signing, vendor image
   signing, TUF agent-release metadata and signed execution authority solve different
-  problems. Enrollment repository instructions are deployment configuration, not a
-  guessed URL derived from the console origin; see
-  [enrollment instructions](../agent-enrollment.md) and
-  [security and operations](../security-and-operations.md).
+  problems. Agent packages always come from the customer's own `lindmd`, at its
+  configured HTTPS origin, never from an external agent repository or a URL guessed
+  from browser headers. The console uses the registry's exact OS/architecture to
+  select APT, DNF, zypper or available pacman packaging and gives an explicit remedy
+  when artifacts are missing. Copied commands carry authenticated signer,
+  execution-root and private-CA pins. See the
+  [install runbook](../security-and-operations.md#enrollment-installation-from-your-server)
+  and [bootstrap threat model](../architecture.md#trust-bootstrap-from-the-customers-server).
 - **Equality is not health.** The native oracle rejects matching permission errors,
   timeouts, invalid output and command failures. An optional `UNAVAILABLE` field
   needs its exact capability-backed explanation: for example absent Flatpak requires
