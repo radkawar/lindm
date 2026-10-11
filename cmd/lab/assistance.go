@@ -24,6 +24,7 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&hardware.Architecture, "architecture", "x86_64", "emulated architecture; manifest and installer must qualify it")
 	flags.StringVar(&hardware.Accelerator, "accelerator", "kvm", "kvm or explicit tcg; never an implicit fallback")
 	flags.StringVar(&hardware.StorageBus, "storage-bus", "virtio-scsi", "virtio-scsi, sata, nvme or virtio-blk")
+	flags.BoolVar(&hardware.TPM, "tpm", true, "swtpm2 present; false selects the TPM-absent golden where the guest kernel cannot observe QEMU's TPM (Debian arm64)")
 	flags.StringVar(&options.Repository, "repo", ".", "repository with initialized dev PostgreSQL and trust fixture")
 	flags.StringVar(&options.BuildRepository, "build-repo", "", "package and browser-driver source checkout with installed npm dependencies; defaults to -repo")
 	flags.StringVar(&options.LabBinary, "lab", "", "prebuilt Linux lab executable for installed guest probes")

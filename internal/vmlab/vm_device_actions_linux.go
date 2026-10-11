@@ -3,6 +3,7 @@
 package vmlab
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -141,12 +142,9 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	// this service's normal diagnostics to the lab console so a wrong-key test
 	// observes an explicit authentication failure, never infers one from timeout.
 	// Modify the disposable clone, not the immutable golden or product package.
-	if platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Lab.Guest.CryptsetupConsole {
-		const consoleSetup = `mkdir -p /etc/systemd/system/systemd-cryptsetup@.service.d
-printf '[Service]\nStandardOutput=journal+console\nStandardError=journal+console\nEnvironment=SYSTEMD_LOG_TARGET=console\n' > /etc/systemd/system/systemd-cryptsetup@.service.d/lab-console.conf
-dracut --force --include /etc/systemd/system/systemd-cryptsetup@.service.d /etc/systemd/system/systemd-cryptsetup@.service.d`
-		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(consoleSetup), nil); err != nil {
-			return nil, fmt.Errorf("enable cryptsetup rejection oracle: %w", err)
+	if guest := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Lab.Guest; guest.CryptsetupConsole {
+		if err := enableCryptsetupConsole(ctx, vm.guest, guest.Initrd); err != nil {
+			return nil, err
 		}
 	}
 	if _, err := observeEncryptedGuest(ctx, vm, options.Encrypted.Firmware.SecureBoot); err != nil {
@@ -744,4 +742,25 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return err
 	}
 	return nativeTPMMismatch(ctx, manifest, options, packages, fixture, control, delegation, result)
+}
+
+// enableCryptsetupConsole rebuilds the running kernel's registry-named initrd
+// with the console drop-in. Debian's dracut reports its progress on stderr
+// (Fedora's is silent), so success is the exit status, not empty stderr.
+func enableCryptsetupConsole(ctx context.Context, vm *guestVM, initrd string) error {
+	result, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(cryptsetupConsoleScript(initrd)), nil, 64<<10, 10*time.Minute)
+	if err != nil {
+		return fmt.Errorf("enable cryptsetup rejection oracle: %w", err)
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("enable cryptsetup rejection oracle: exit %d: %s", result.ExitCode, bytes.TrimSpace(result.Stderr))
+	}
+	return nil
+}
+
+func cryptsetupConsoleScript(initrd string) string {
+	return `mkdir -p /etc/systemd/system/systemd-cryptsetup@.service.d
+printf '[Service]\nStandardOutput=journal+console\nStandardError=journal+console\nEnvironment=SYSTEMD_LOG_TARGET=console\n' > /etc/systemd/system/systemd-cryptsetup@.service.d/lab-console.conf
+kernel=$(uname -r)
+dracut --quiet --force --include /etc/systemd/system/systemd-cryptsetup@.service.d /etc/systemd/system/systemd-cryptsetup@.service.d "$(printf ` + nativeQuote(initrd) + ` "$kernel")" "$kernel"`
 }

@@ -55,3 +55,13 @@ func TestAssistanceHoldKeepsCredentialsOutOfStreamedOutput(t *testing.T) {
 		t.Fatal("existing owner access was overwritten")
 	}
 }
+
+// Debian's arm64 kernels cannot observe QEMU virt's TPM, so their encrypted
+// goldens are TPM-absent; the assistance lane must be able to select them.
+func TestAssistanceAcceptsTPMAbsentVariant(t *testing.T) {
+	var stderr bytes.Buffer
+	err := runVMAssistance(t.Context(), []string{"-tpm=false"}, &bytes.Buffer{}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "vm assistance requires -manifest") || strings.Contains(stderr.String(), "flag provided but not defined") {
+		t.Fatalf("-tpm=false was not accepted: %v: %s", err, stderr.String())
+	}
+}

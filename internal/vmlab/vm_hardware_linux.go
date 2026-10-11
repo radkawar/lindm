@@ -114,6 +114,11 @@ func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareO
 	if h.ExtraDisks < 0 || h.ExtraDisks > 4 {
 		return h, errors.New("VM extra disks must be between zero and four")
 	}
+	if h.Architecture == "aarch64" && h.StorageBus == "sata" {
+		// ArmVirtQemu (AAVMF) has no AHCI driver: the firmware lists no disk
+		// and falls through to network boot, so the guest could never start.
+		return h, errors.New("aarch64 AAVMF cannot boot from the SATA (AHCI) controller; use nvme, virtio-scsi or virtio-blk")
+	}
 	if h.Architecture == "aarch64" && h.Firmware == nil {
 		return h, errors.New("aarch64 VM requires explicit pinned EFI firmware")
 	}

@@ -443,3 +443,17 @@ func TestVMCloseReapsTPMBeforeRemovingPrivateState(t *testing.T) {
 		t.Fatalf("cleanup touched unrelated state: %v", err)
 	}
 }
+
+// AAVMF 2024.02 enumerated no disk on ich9-ahci and fell through to PXE/HTTP
+// boot (aarch64-aavmf-sata-boot-diagnosis-01); refuse instead of timing out.
+func TestVMHardwareRefusesUnbootableARMSATA(t *testing.T) {
+	firmware := &EncryptedFirmwareOptions{Code: "code", Vars: "vars", Package: "qemu-efi-aarch64", Version: "pinned"}
+	if _, err := resolveVMHardware(&VMHardwareOptions{Architecture: "aarch64", StorageBus: "sata", Firmware: firmware}, "arm64"); err == nil || !strings.Contains(err.Error(), "AHCI") {
+		t.Fatalf("accepted an aarch64 SATA guest AAVMF cannot boot: %v", err)
+	}
+	for _, bus := range []string{"virtio-blk", "virtio-scsi", "nvme"} {
+		if _, err := resolveVMHardware(&VMHardwareOptions{Architecture: "aarch64", StorageBus: bus, Firmware: firmware}, "arm64"); err != nil {
+			t.Fatalf("rejected bootable aarch64 %s: %v", bus, err)
+		}
+	}
+}

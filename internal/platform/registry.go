@@ -164,6 +164,13 @@ var (
 		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
+	// trixie's systemd 257 cryptsetup reports a rejected recovery key only in
+	// the journal (bookworm's 252 prints it on the console), so the lab routes
+	// its diagnostics to the console like Fedora/EL.
+	debianTrixieGuest = LabGuest{
+		Initrd: debianGuest.Initrd, CryptsetupConsole: true,
+		Actions: debianGuest.Actions, OwnedBoot: debianGuest.OwnedBoot, MeasuredBoot: debianGuest.MeasuredBoot,
+	}
 	// Debian's arm64 kernels build TPM CRB but not the TIS platform driver,
 	// QEMU virt's only TPM device.
 	debianArmNoTIS = []string{"aarch64"}
@@ -256,7 +263,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(),
