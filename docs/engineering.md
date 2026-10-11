@@ -1536,9 +1536,16 @@ golangci-lint with `--allow-parallel-runners` and a cache reserved for those
 gates (`~/.cache/lindm-clean-golangci`), so concurrent interactive lint runs
 neither block nor fail it.
 
-Integration runs (`dev test-integration` and `dev signoff`) first take the
-exclusive host lock `~/.cache/lindm-integration.lock`, printing its holder while
-they queue, because every run shares the one fixed-port dev PostgreSQL.
+Integration runs (`dev test-integration` and `dev signoff`) pass heavy-job
+admission first and then take the exclusive host lock
+`~/.cache/lindm-integration.lock`, printing its holder while they queue, because
+every run shares the one fixed-port dev PostgreSQL. The run under the lock is
+bounded by `-timeout` (default 40m), and larger values are rejected: no run may
+hold the lock for more than 45 minutes, and a slower suite needs fixing or
+sharding instead. While it holds the lock, the run prints each package result as
+`[n/total] ok|FAIL pkg seconds`, with a failing package's output, and writes the
+latest of these lines into the lock's holder record, which queued runs and
+`dev status` show.
 `dev test-integration`, `dev signoff` and `dev pre-push` run their race-enabled
 suites (integration and clean-worktree `make check`) after heavy-job admission on
 the local lab host. Gates do not take a lab slot or queue in the lanes' FIFO,

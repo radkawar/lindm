@@ -52,7 +52,7 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   gate-commit -m MSG  Under the landing lock, make check, then commit if green.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
-40m for test-integration).
+for test-integration 40m, max 45m, counted only while it holds the integration lock).
 Init/up accept -authentication local|keycloak (default keycloak). A fixture's mode
 is immutable. Local mode does not start or contact an IdP.
 Reset and recreate-database accept -confirm-delete. Requires Linux, Go, Docker
@@ -104,13 +104,14 @@ func run() error {
 	flags := flag.NewFlagSet(verb, flag.ContinueOnError)
 	root := flags.String("root", ".", "repository root")
 	// The integration suite runs every package under -race against real
-	// PostgreSQL with a 15-minute per-binary deadline, so its overall deadline
-	// must exceed that; lab operations keep the shorter default.
+	// PostgreSQL with a 30-minute per-binary deadline. Its -timeout bounds the
+	// run while it holds the host-wide integration lock (queueing is not
+	// counted) and is capped so no run can monopolize the lock.
 	defaultTimeout := 10 * time.Minute
 	if verb == "test-integration" {
 		defaultTimeout = 40 * time.Minute
 	}
-	timeout := flags.Duration("timeout", defaultTimeout, "overall command deadline")
+	timeout := flags.Duration("timeout", defaultTimeout, "command deadline; for test-integration, the run under the integration lock (max 45m)")
 	var confirm bool
 	authentication := "keycloak"
 	if verb == "init" || verb == "up" {
@@ -137,6 +138,9 @@ func run() error {
 	if *timeout <= 0 {
 		return fmt.Errorf("timeout must be positive")
 	}
+	if verb == "test-integration" && *timeout > integrationLockCap {
+		return fmt.Errorf("test-integration -timeout %s exceeds the %s cap: the run holds the host-wide integration lock that every other integration run queues on; a suite slower than that needs fixing or sharding, not a longer lock", *timeout, integrationLockCap)
+	}
 	if verb == "reset" && !confirm {
 		return fmt.Errorf("reset requires -confirm-delete; this destroys lab data and login credentials")
 	}
@@ -153,8 +157,14 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ctx, cancel := context.WithTimeout(ctx, *timeout)
-	defer cancel()
+	// test-integration bounds only its locked run (testIntegration); queueing
+	// for the lock ends on interrupt.
+	runTimeout := *timeout
+	if verb != "test-integration" {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
 	operations := map[string]func(context.Context, string) error{
 		"init":  func(ctx context.Context, root string) error { return devlab.Init(ctx, root, authentication) },
 		"up":    func(ctx context.Context, root string) error { return devlab.Up(ctx, root, authentication) },
@@ -162,13 +172,13 @@ func run() error {
 		"down":  devlab.Down, "reset": devlab.Reset,
 		"test-integration": func(ctx context.Context, root string) error {
 			if code == "" {
-				return testIntegration(ctx, root, root)
+				return testIntegration(ctx, root, root, runTimeout)
 			}
 			codeRoot, err := filepath.Abs(code)
 			if err != nil {
 				return err
 			}
-			return testIntegration(ctx, root, codeRoot)
+			return testIntegration(ctx, root, codeRoot, runTimeout)
 		},
 		"trust": devlab.Trust,
 		"recreate-database": func(ctx context.Context, root string) error {

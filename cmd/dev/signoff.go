@@ -100,7 +100,7 @@ func runSignoff(args []string) (resultErr error) {
 		if err := makeCheck(ctx, clean); err != nil {
 			return err
 		}
-		return testIntegration(ctx, checkout, clean)
+		return testIntegration(ctx, checkout, clean, integrationLockCap)
 	}); err != nil {
 		return err
 	}
@@ -164,10 +164,19 @@ func stream(ctx context.Context, dir string, env []string, name string, args ...
 	return nil
 }
 
+// integrationLockCap bounds how long one run may hold the integration lock.
+const integrationLockCap = 45 * time.Minute
+
 // testIntegration runs the integration suite exclusively among integration
-// runs on this host, which share the one fixed-port dev PostgreSQL, then
-// passes heavy-job admission (local memory guard, nice 10).
-func testIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultErr error) {
+// runs on this host, which share the one fixed-port dev PostgreSQL. Heavy-job
+// admission (local memory guard, nice 10) comes first, so a run never holds
+// the lock while waiting on the host; the run under the lock is bounded by
+// limit (at most integrationLockCap), and its per-package progress replaces
+// the lock's holder record so waiters and dev status see how far it is.
+func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit time.Duration) (resultErr error) {
+	if err := admitHeavyJob(ctx, "test-integration", os.Stderr); err != nil {
+		return err
+	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return err
@@ -180,8 +189,12 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultE
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	if err := admitHeavyJob(ctx, "test-integration", os.Stderr); err != nil {
-		return err
-	}
-	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot)
+	ctx, cancel := context.WithTimeout(ctx, min(limit, integrationLockCap))
+	defer cancel()
+	started := time.Now()
+	holder := fmt.Sprintf("pid %d test-integration of %s since %s", os.Getpid(), codeRoot, started.UTC().Format(time.RFC3339))
+	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot, func(line string) {
+		// Diagnostic only: the flock, not this record, is the lock.
+		_ = os.WriteFile(lock, []byte(holder+": "+line+"\n"), 0o600)
+	})
 }

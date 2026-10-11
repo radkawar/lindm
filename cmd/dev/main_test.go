@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -24,5 +25,14 @@ func TestRecreateDatabaseArguments(t *testing.T) {
 	os.Args = []string{"dev", "recreate-database", "-confirm-delete", "-root", t.TempDir()}
 	if err := run(); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("confirmed command did not reach fixture validation: %v", err)
+	}
+}
+
+func TestIntegrationTimeoutIsCapped(t *testing.T) {
+	original := os.Args
+	t.Cleanup(func() { os.Args = original })
+	os.Args = []string{"dev", "test-integration", "-timeout", "46m", "-root", t.TempDir()}
+	if err := run(); err == nil || !strings.Contains(err.Error(), "cap") {
+		t.Fatalf("a 46m integration lock hold was accepted: %v", err)
 	}
 }
