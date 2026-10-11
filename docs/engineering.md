@@ -290,6 +290,8 @@ order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
 Each administrator keeps at most 256 live search cursors (15 minutes each); a new
 search evicts that administrator's oldest, so browsing never locks the list. A page
 of an expired or evicted search fails as `page_expired` with a Start a new search action.
+Search cursor resumption and byte-bounded row projection are separate transaction
+steps; both list and export pages retain the same scope binding and expiry checks.
 Revocation is a row action dialog retaining its existing approval/reason flow and
 ambiguous request identity after dismissal. The device header has one permission-aware
 Actions menu. Short actions open dialogs; storage, encryption and recovery actions

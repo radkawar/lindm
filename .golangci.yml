@@ -120,9 +120,6 @@ linters:
       - path: '(^|/)internal/agent/sysctlprovider/native_linux\.go$'
         text: "Function 'ApplyNative' is too long"
         linters: [funlen]
-      - path: '(^|/)internal/device/directory/admin_search\.go$'
-        text: "Function 'searchDevicePage' is too long"
-        linters: [funlen]
 formatters:
   enable:
     - gofmt

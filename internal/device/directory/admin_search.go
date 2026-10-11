@@ -129,39 +129,8 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 			params.SeenUntil = core.Timestamptz(filter.GetLastSeenUntil().AsTime())
 		}
 		if token != "" {
-			idText, position, ok := strings.Cut(token, ".")
-			if !ok {
-				return core.Invalid("page_token")
-			}
-			id, err := core.ParseUUID(idText)
-			if err != nil {
-				return core.Invalid("page_token")
-			}
-			cursor, err = q.GetDeviceSearchCursor(ctx, id)
-			if err == pgx.ErrNoRows {
-				// Purged after expiry or evicted for a newer search of this actor.
-				return core.ErrPageExpired
-			}
-			if err != nil {
+			if err := resumeDeviceSearchCursor(ctx, q, &cursor, &params, actor.ID, digest, token, now); err != nil {
 				return err
-			}
-			if cursor.ActorID != actor.ID || !bytes.Equal(cursor.FilterDigest, digest) {
-				return core.Invalid("page_token")
-			}
-			expires, ok := core.FiniteTime(cursor.ExpiresAt)
-			if !ok {
-				return core.ErrInternalState
-			}
-			if !now.Before(expires) {
-				return core.ErrPageExpired
-			}
-			if position != "" {
-				when, deviceID, err := core.DecodeCursor(position)
-				if err != nil {
-					return err
-				}
-				params.HasCursor = true
-				params.CursorEnrolledAt, params.CursorID = core.Timestamptz(when), deviceID
 			}
 		}
 		params.UpperEnrolledAt = cursor.UpperEnrolledAt
@@ -169,45 +138,9 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		if err != nil {
 			return err
 		}
-		var budget core.ResponsePageBudget
 		var content bytes.Buffer
-		switch format {
-		case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON:
-			content.WriteByte('[')
-		case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_CSV:
-			content.WriteString("id,hostname,os_id,os_version,architecture,state,enrolled_at,last_seen_at,labels,owner_principal_id,owner_text,attributes,compliance,last_verified_at\n")
-		}
-		for _, row := range rows {
-			if len(page.devices) == int(limit) {
-				break
-			}
-			item, err := searchDevice(row)
-			if err != nil {
-				return err
-			}
-			if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED {
-				fits, err := budget.Take(item)
-				if err != nil {
-					return err
-				}
-				if !fits {
-					break
-				}
-			} else {
-				encoded, err := exportDeviceRow(item, format)
-				if err != nil {
-					return err
-				}
-				// bytes use base64 in Connect JSON; reserve its expansion and envelope.
-				if content.Len()+len(encoded)+2 > (core.MaxMessageBytes-core.PageEnvelopeBytes)*3/4 {
-					break
-				}
-				if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON && len(page.devices) > 0 {
-					content.WriteByte(',')
-				}
-				content.Write(encoded)
-			}
-			page.devices = append(page.devices, item)
+		if err := appendDeviceSearchRows(page, rows, limit, format, &content); err != nil {
+			return err
 		}
 		if token == "" && (len(page.devices) < len(rows) || format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED) {
 			// Serialize capacity admission without holding a lock on fleet rows.
@@ -258,6 +191,87 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		return nil
 	})
 	return page, err
+}
+
+func resumeDeviceSearchCursor(ctx context.Context, q *devicedb.Queries, cursor *devicedb.DeviceSearchCursor, params *devicedb.SearchDevicesParams, actorID uuid.UUID, digest []byte, token string, now time.Time) error {
+	idText, position, ok := strings.Cut(token, ".")
+	if !ok {
+		return core.Invalid("page_token")
+	}
+	id, err := core.ParseUUID(idText)
+	if err != nil {
+		return core.Invalid("page_token")
+	}
+	*cursor, err = q.GetDeviceSearchCursor(ctx, id)
+	if err == pgx.ErrNoRows {
+		// Purged after expiry or evicted for a newer search of this actor.
+		return core.ErrPageExpired
+	}
+	if err != nil {
+		return err
+	}
+	if cursor.ActorID != actorID || !bytes.Equal(cursor.FilterDigest, digest) {
+		return core.Invalid("page_token")
+	}
+	expires, ok := core.FiniteTime(cursor.ExpiresAt)
+	if !ok {
+		return core.ErrInternalState
+	}
+	if !now.Before(expires) {
+		return core.ErrPageExpired
+	}
+	if position != "" {
+		when, deviceID, err := core.DecodeCursor(position)
+		if err != nil {
+			return err
+		}
+		params.HasCursor = true
+		params.CursorEnrolledAt, params.CursorID = core.Timestamptz(when), deviceID
+	}
+	return nil
+}
+
+func appendDeviceSearchRows(page *deviceSearchPage, rows []devicedb.SearchDevicesRow, limit int32, format adminv1.DeviceExportFormat, content *bytes.Buffer) error {
+	var budget core.ResponsePageBudget
+	switch format {
+	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON:
+		content.WriteByte('[')
+	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_CSV:
+		content.WriteString("id,hostname,os_id,os_version,architecture,state,enrolled_at,last_seen_at,labels,owner_principal_id,owner_text,attributes,compliance,last_verified_at\n")
+	}
+	for _, row := range rows {
+		if len(page.devices) == int(limit) {
+			break
+		}
+		item, err := searchDevice(row)
+		if err != nil {
+			return err
+		}
+		if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED {
+			fits, err := budget.Take(item)
+			if err != nil {
+				return err
+			}
+			if !fits {
+				break
+			}
+		} else {
+			encoded, err := exportDeviceRow(item, format)
+			if err != nil {
+				return err
+			}
+			// bytes use base64 in Connect JSON; reserve its expansion and envelope.
+			if content.Len()+len(encoded)+2 > (core.MaxMessageBytes-core.PageEnvelopeBytes)*3/4 {
+				break
+			}
+			if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON && len(page.devices) > 0 {
+				content.WriteByte(',')
+			}
+			content.Write(encoded)
+		}
+		page.devices = append(page.devices, item)
+	}
+	return nil
 }
 
 func searchDevice(row devicedb.SearchDevicesRow) (*adminv1.Device, error) {
