@@ -1121,6 +1121,8 @@ Before signing a start grant, the server requires all of:
   measurement of the TUF-approved kernel digest, the PCR 8 `kernel_cmdline`
   equal to that kernel path plus the handoff options, one `initrd` command for
   the staged path and the PCR 9 measurement of the approved initramfs digest.
+  GRUB `echo` commands (Debian's `Loading …` messages) are skipped anywhere in
+  that sequence only when their text hashes to their digest; they load nothing.
   The only later PCR 8/9 events accepted are the vendor kernel's own EFI stub
   `EV_EVENT_TAG` events in PCR 9, in the stub's order and at most once each:
   `LOADED_IMAGE::LoadOptions`, whose digest must be SHA-256 of the UTF-16LE

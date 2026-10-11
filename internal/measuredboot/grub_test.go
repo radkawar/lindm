@@ -260,3 +260,39 @@ func TestFinalGRUBBootRejectsForeignStubEvents(t *testing.T) {
 		})
 	}
 }
+
+// Debian 13 amd64 (signed shim+GRUB 2.12, kernel 6.12, /boot on the ext4
+// root): 10_linux echoes "Loading …" between kernel_cmdline and initrd.
+func TestFinalGRUBBootSkipsDigestBoundEcho(t *testing.T) {
+	data, err := os.ReadFile("testdata/debian13-amd64-stock.eventlog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := ParseEventLog(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := FinalGRUBBoot(events)
+	if err != nil || loaded.KernelPath != "/boot/vmlinuz-6.12.107+deb13-amd64" || loaded.InitrdPath != "/boot/initrd.img-6.12.107+deb13-amd64" {
+		t.Fatalf("Debian 13 FinalGRUBBoot = %+v, %v", loaded, err)
+	}
+	// An echo label that does not hash to its digest is not skipped.
+	forged := -1
+	for i, event := range events {
+		if text, ok := eventText(event); ok && text == "grub_cmd: echo Loading initial ramdisk ..." {
+			forged = i
+		}
+	}
+	if forged < 0 {
+		t.Fatal("fixture lacks the initrd echo")
+	}
+	tampered := events[forged]
+	tampered.SHA256 = bytes.Repeat([]byte{9}, sha256.Size)
+	if _, err := FinalGRUBBoot(replaceEvents(events, forged, forged+1, tampered)); !errors.Is(err, errGRUBMeasurementMismatch) {
+		t.Fatalf("mislabeled echo accepted: %v", err)
+	}
+	// A non-echo command in the same place still breaks the sequence.
+	if _, err := FinalGRUBBoot(replaceEvents(events, forged, forged+1, grubCommand(t, "grub_cmd: insmod evil"))); err == nil {
+		t.Fatal("extra GRUB command between kernel_cmdline and initrd accepted")
+	}
+}

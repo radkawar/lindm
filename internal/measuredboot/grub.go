@@ -71,10 +71,12 @@ type Loaded struct {
 // PCR 9 kernel file, the PCR 8 kernel_cmdline with identical options, one PCR 8
 // "grub_cmd: initrd" with a single path and the PCR 9 initramfs file, all on the
 // same GRUB device, or all without one. PCR 8 text must hash to its SHA-256
-// digest, so the matched strings are bound to the replayed PCR value. The only
-// later PCR 8/9 events accepted are the measured kernel's own EFI stub events:
-// at most one load-options event, then at most one initrd event whose digest is
-// the GRUB-measured initramfs digest.
+// digest, so the matched strings are bound to the replayed PCR value. GRUB
+// `echo` commands (Debian's "Loading …" messages) may appear anywhere after
+// `linux`; they load nothing and are skipped only when their text matches its
+// digest. The only later PCR 8/9 events accepted are the measured kernel's own
+// EFI stub events: at most one load-options event, then at most one initrd
+// event whose digest is the GRUB-measured initramfs digest.
 func FinalGRUBBoot(events []Event) (*Loaded, error) {
 	last := -1
 	for i, event := range events {
@@ -102,6 +104,11 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 	count := 0
 	for _, event := range events[last+1:] {
 		if event.PCR != grubCommandPCR && event.PCR != grubFilePCR {
+			continue
+		}
+		if echo, err := grubEcho(event); err != nil {
+			return nil, err
+		} else if echo {
 			continue
 		}
 		if count < len(sequence) {
@@ -171,6 +178,19 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 		InitrdPath:    initrdPath,
 		InitrdSHA256:  bytes.Clone(initrdSHA256),
 	}, nil
+}
+
+// grubEcho reports whether a PCR 8 event is a digest-bound `grub_cmd: echo`.
+// An echo label whose digest does not match its text is rejected outright.
+func grubEcho(event Event) (bool, error) {
+	text, ok := eventText(event)
+	if event.PCR != grubCommandPCR || !ok || (text != grubCommandPrefix+"echo" && !strings.HasPrefix(text, grubCommandPrefix+"echo ")) {
+		return false, nil
+	}
+	if _, err := measuredCommand(event, grubCommandPrefix, errGRUBMeasurementMismatch); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // checkStubEvents admits only the Linux EFI stub's tagged PCR 9 events, in the
