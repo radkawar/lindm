@@ -3856,6 +3856,12 @@ all stamped `0.1.0`.
 | `rhel98-recovery-nvme-02.json`          | `68fee06938ed2801e41096a16b8ba1e4e8fb83a99770d5e9b591caa2c4690241` | Same probe-directory failure.                                                                                                                                                                                                                 |
 | `rhel98-recovery-sata-03.json`          | `247207a1d8a26505cfc11c260a6153e63c23374d3e43f89593a8737caa6811d0` | Registration, entitled install, unregistration and key deletion succeeded; the owned ordinary UKI upload then failed (see below). No action.                                                                                                  |
 | `rhel98-recovery-nvme-03.json`          | `f3eac0693af6213735ccd76c40284c7f2a6b1ff7b0260776be4f866b5c694a33` | Same owned ordinary UKI failure.                                                                                                                                                                                                              |
+| `rhel98-recovery-sata-04.json`          | `0606531234893f924040cab24548d6b15f5ec826bd6f1feb3eb5fcdf18f4e2f0` | Transient: Red Hat SSO HTTPS authentication request failed before registration (nothing registered). Not a product result.                                                                                                                    |
+| `rhel98-recovery-nvme-04.json`          | `55b79a7913b84d7692db9bca4cd4a831aed5c517df9e6e6f79a3696904d703b6` | Hostonly owned UKI built and booted; post-reboot `bootctl status` stderr refused (systemd's BLS `Unknown line` notices for grub keys, fixed in `89d5756c`). Registration cleaned up.                                                          |
+| `rhel98-recovery-sata-05.json`          | `28403f9d59257d33140f7228f9a69406c79bccd7c476120fa3e2efda774c9665` | **SATA original-device recovery sanitize passed.**                                                                                                                                                                                            |
+| `rhel98-recovery-nvme-05.json`          | `df07c739101599234fccff9415fe3ce86af1b25f01d7928ef932a013ea9853b2` | Two-human approval succeeded, then `CreateDeviceAction` refused `device_action_storage_target_mismatch`; no action. Under diagnosis (see below).                                                                                              |
+| `rhel102-recovery-sata-04.json`         | `914c714b8ee81638ffccc51f7684e152bc2ee972c68062aba766c4b1f7a633d6` | **SATA original-device recovery sanitize passed.**                                                                                                                                                                                            |
+| `rhel102-recovery-nvme-04.json`         | `38454aeaf3faf13e2ead17e5a09f510dffb8541c38616ec5e2bb9e6700bc5754` | **NVMe original-device recovery sanitize passed.**                                                                                                                                                                                            |
 | `rhel98-live-report-loss-01.json`       | `4e33999ba1a32d1f635390630964a72e8a02375a411c83a1cf1fff06c4ca9753` | **Live-root report-loss passed.**                                                                                                                                                                                                             |
 | `rhel102-live-report-loss-01.json`      | none (no record)                                                   | Not a product result: `context deadline exceeded` exactly 3 h after start with no record written, so the lane never returned a result; consistent with waiting for a local lease (inference). Ran on the pre-fix binary.                      |
 | `rhel102-lock-quarantine-01.json`       | `5294527d651a9810d6ce61ab1598f07e862203440c4c30f08ddc953fb28199c8` | **Lock, release, account disable and quarantine passed** with a real GDM Wayland session.                                                                                                                                                     |
@@ -3919,6 +3925,28 @@ with `cat: write error: No space left on device` on the guest's `/run` tmpfs
 (registry `Lab.Guest.OwnedBootHostonly`); the installed initramfs is unchanged.
 Each `-03` record retains the maintained registration's public run name,
 consumer UUID, unregistration and activation-key deletion.
+
+The three passing recovery records use runner `lab-actions-08` (SHA-256
+`dd119538cc6c6bdd9703e94ba20e0651b5c5c2d389cb141f10f25a8536e5c493`) and
+`lindmd-actions-08` (`dd2c74b960a1b94ce9aad9a4b1be2e278ea2dfea211e2d2cd2ddaa81715e619a`),
+built from main with the Go PID 1 recovery init. Each proves fresh readiness on
+the unchanged vendor ESP, distinct requester/approver, the signed recovery UKI
+booted on the original device under Secure Boot (SecureBoot=1/SetupMode=0), a
+server-verified scoped result `SUCCEEDED`, closed-image power-off, independent
+stopped-disk samples all equal to the zero block, and the registration's
+unregistration and activation-key deletion. SATA overwrote the exact
+10,737,418,240-byte target with 257 zero-read samples; NVMe formatted user data
+with unchanged controller-serial/NSID 1 scope and every formerly nonzero sample
+changed.
+
+| Release / bus | Signed image bytes | Rounded need / ESP available bytes | Kernel                         |
+| ------------- | -----------------: | ---------------------------------: | ------------------------------ |
+| 9.8 SATA      |         45,834,808 |           45,838,336 / 150,827,008 | `5.14.0-687.5.3.el9_8.x86_64`  |
+| 10.2 SATA     |         47,172,664 |           47,173,632 / 139,493,376 | `6.12.0-211.7.3.el10_2.x86_64` |
+| 10.2 NVMe     |         51,365,944 |           51,367,936 / 139,333,632 | `6.12.0-211.7.3.el10_2.x86_64` |
+
+The available space is what remains of the 200 MiB vendor ESP after the owned
+signed systemd-boot and hostonly ordinary UKI; the vendor ESP was not resized.
 
 Self-update passed on unregistered vendor KVM images: `rhel98-updates-01.json` and
 `rhel102-updates-01.json` under `$HOME/.cache/lindm-rhel-updates/` (hashes in the

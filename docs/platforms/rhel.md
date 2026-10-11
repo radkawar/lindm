@@ -391,7 +391,12 @@ maintained registration (`vm device-actions -redhat-token-file`), held only for
 that transaction. RHEL ships no BusyBox and no sbsigntools, and the recovery
 image needs neither: its `/init` is the static lindm-agent and Authenticode is
 verified in-process. It still needs a `CONFIG_RD_GZIP=y` kernel, the unchanged
-distro-signed modules and host-side signing to build the image.
+distro-signed modules and host-side signing to build the image. The KVM image's
+generic initramfs (about 240 MB) cannot fit the ESP in an ordinary UKI, so the
+owned-boot fixture embeds a `dracut --hostonly` image instead. The signed
+recovery UKI is 45.8–51.4 MB and fits the remaining ESP space. SATA passed on
+9.8 and 10.2 and NVMe on 10.2; see
+[verification](../verification.md#rhel-encrypted-device-actions-and-self-update).
 
 Original-device recovery sanitize on stock RHEL would use
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` with the BLS flavor (shim+GRUB `blscfg`,

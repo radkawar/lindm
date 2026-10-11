@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -57,6 +58,9 @@ type actionSignedHandoffEvidence struct {
 	RecoveryKernelSHA256 string                            `json:"recovery_vendor_kernel_sha256,omitempty"`
 	// Present only for the TPM-less capability refusal phase.
 	AttestationRefusal *actionAttestationRefusal `json:"attestation_refusal,omitempty"`
+	// ServerStorageTargets is the server's public candidate list, retained only
+	// when it refuses the requested target so the identity difference is visible.
+	ServerStorageTargets json.RawMessage `json:"server_storage_targets_at_refusal,omitempty"`
 }
 
 type actionAttestationRefusal struct {
@@ -318,6 +322,9 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	evidence.ApprovalID, evidence.RequesterID, evidence.ApproverID = request.ApprovalId, control.session.AccountID, approver.AccountID
 	created, err := control.session.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
 	if err != nil {
+		if rpcreason.Get(err) == "device_action_storage_target_mismatch" {
+			evidence.ServerStorageTargets, err = actionServerStorageTargets(ctx, control.session, evidence.DeviceID, err)
+		}
 		return evidence, err
 	}
 	evidence.ActionID = created.Msg.GetAction().GetActionId()
@@ -460,4 +467,15 @@ func nativeAttestationRefusal(ctx context.Context, vm *guestVM, owner, approver 
 		return evidence, errors.New("TPM-less measured recovery left an action or staged boot state")
 	}
 	return evidence, nil
+}
+
+// actionServerStorageTargets reads the server's public sanitize candidates
+// (identity, size and NVMe scope; no key material) after a target refusal.
+func actionServerStorageTargets(ctx context.Context, owner *devlab.OwnerSession, deviceID string, refusal error) (json.RawMessage, error) {
+	response, err := owner.Admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: deviceID, ActionKind: "sanitize"}))
+	if err != nil {
+		return nil, errors.Join(refusal, fmt.Errorf("read server storage targets after refusal: %w", err))
+	}
+	data, err := protojson.Marshal(response.Msg)
+	return data, errors.Join(refusal, err)
 }
