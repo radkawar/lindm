@@ -288,7 +288,7 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories":
+	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -408,7 +408,7 @@ func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.W
 	if lane == "assistance" && vmHolds(args[1:]) && labhost.FlagValue(args, "advisory-cache") == "" {
 		args = labhost.SetFlag(args, "advisory-cache", filepath.Join(work, "advisory-cache"))
 	}
-	if (lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance" || lane == "advisories") && labhost.FlagValue(args, "control-plane") == "" {
+	if (lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance" || lane == "advisories" || lane == "airgap") && labhost.FlagValue(args, "control-plane") == "" {
 		repo := labhost.FlagValue(args, "repo")
 		if repo == "" {
 			return errors.New("remote control-plane lane requires staged -repo")

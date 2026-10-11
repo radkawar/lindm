@@ -225,7 +225,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	guestProbe := remote + "/bin/lab"
 	if r.Architecture != nativeArch {
 		switch args[1] {
-		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance", "advisories":
+		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance", "advisories", "airgap":
 			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
 			guestProbe = remote + "/bin/lab-guest"
 		}
@@ -233,7 +233,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	switch args[1] {
 	case "inspect", "inspect-storage":
 		executables = append(executables, executable{"lindm-agent", r.Architecture, "./cmd/lindm-agent"})
-	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle", "assistance", "advisories":
+	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle", "assistance", "advisories", "airgap":
 		executables = append(executables, executable{"lindmd", nativeArch, "./cmd/lindmd"})
 	}
 	for _, item := range executables {
@@ -350,7 +350,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			args = SetFlag(args, "retained-metadata", remote+"/snapshot-metadata")
 		}
 	}
-	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
+	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections", "first-bundle", "second-bundle", "expired-bundle", "replay-bundle", "bundle-public-key", "release-public-key", "release-root", "release-online-keys", "package-public-key", "advisories"} {
 		value := FlagValue(args, name)
 		if value == "" {
 			continue

@@ -289,7 +289,8 @@ var registry = []*Release{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 259,
 		Desktop: gnomeGDM3, Firewall: ufw,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute",
+			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// The 26.04 desktop ISO carries dracut 110, systemd-cryptsetup and the

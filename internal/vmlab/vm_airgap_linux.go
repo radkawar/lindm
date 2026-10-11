@@ -52,6 +52,7 @@ type VMAirgapOptions struct {
 	ReleaseRoot, ReleaseOnlineCustody    string
 	PackagePublicKey, PackageFingerprint string
 	Advisories                           string
+	Hardware                             *VMHardwareOptions
 }
 
 // VMAirgapImport is the nonsecret outcome of one operator import attempt.
@@ -117,7 +118,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 	}
 	distribution := manifest.GetDistribution()
 	release := manifestRelease(manifest)
-	if err := release.LabLane(platform.LaneAirgap); err != nil {
+	if err := release.LabLaneOn(platform.LaneAirgap, manifest.GetArchitecture()); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 75*time.Minute)
@@ -216,7 +217,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 	if err != nil {
 		return result, err
 	}
-	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, true)
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, options.Hardware)
 	if err != nil {
 		return result, err
 	}
@@ -267,7 +268,11 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 	if err != nil {
 		return result, err
 	}
-	guest := &nativeGuestPackages{vm: vm}
+	backend, err := nativeBackend(release)
+	if err != nil {
+		return result, err
+	}
+	guest := &nativeGuestPackages{vm: vm, backend: backend}
 	for path, data := range map[string][]byte{airgapGuestDir + "/signer.asc": keyArmor, airgapGuestDir + "/site-ca.crt": caPEM} {
 		if err := guest.uploadBytes(ctx, path, data); err != nil {
 			return result, err

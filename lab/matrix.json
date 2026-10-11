@@ -15,6 +15,13 @@
       "lane": "enroll-from-console"
     },
     {
+      "name": "airgap",
+      "title": "Air-gap bundle",
+      "capabilities": ["lifecycle", "self-update", "advisories"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "airgap"
+    },
+    {
       "name": "lifecycle",
       "title": "Lifecycle",
       "capabilities": ["lifecycle"],

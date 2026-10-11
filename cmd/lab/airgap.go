@@ -27,8 +27,9 @@ func runVMAirgap(ctx context.Context, args []string, stdout, stderr io.Writer, s
 	flags := flag.NewFlagSet("vm airgap", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMAirgapOptions
-	manifestPath := flags.String("manifest", "", "verified Ubuntu 24.04 or Fedora 44 manifest (image must already be cached)")
+	manifestPath := flags.String("manifest", "", "verified manifest with a maintained airgap lane (image must already be cached)")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the development fixture trust")
+	flags.String("build-repo", "", "source checkout for remote binary staging; default is -repo")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "existing private working parent on the bundles' filesystem")
 	flags.StringVar(&options.DiagnosticsDir, "diagnostics", "", "private owned failure diagnostics parent")
@@ -49,6 +50,7 @@ func runVMAirgap(ctx context.Context, args []string, stdout, stderr io.Writer, s
 	flags.StringVar(&options.Advisories, "advisories", "", "site AdvisoryConfig protobuf JSON (feeds identical to the bundles')")
 	flags.StringVar(&options.NetworkContainer, "network-container", "", "internal: namespace holder already entered")
 	record := flags.String("record", "", "write nonsecret evidence to a new private file")
+	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -75,6 +77,7 @@ func runVMAirgap(ctx context.Context, args []string, stdout, stderr io.Writer, s
 	if err != nil {
 		return err
 	}
+	options.Hardware = hardware.options()
 	result, runErr := vmlab.AirgapVM(ctx, manifest, options)
 	if result == nil {
 		return runErr

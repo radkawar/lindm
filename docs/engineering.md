@@ -2320,8 +2320,12 @@ build. It prepares shared inputs once in the new `-evidence` directory:
 release-stamped `lindmd` and `lindm-agent` built from `-root` (native fixtures
 refuse unstamped servers) and, through the in-process `lab packages` paths, a
 development signer, agent versions 0.1.0 and 0.1.1 in every needed format and
-architecture, the APT and pacman repositories and the rejection fixtures. Each
-selected runnable cell then runs as a child
+architecture, the APT and pacman repositories and the rejection fixtures. The
+`airgap` cell additionally builds both complete attested releases with the
+maintained release builder, then exports B1/B2/B3 and an expired signed bundle
+with independent bundle/package/attestation/TUF custody and registry-derived
+advisories. The development OCI exports pin the fixture transport CA, not the
+host's ambient trust store. Each selected runnable cell then runs as a child
 `lab vm <lane>` through the normal host admission (`-parallel`, default 4, bounds
 concurrent cells; host slots still bound guests). The child's output is kept in
 `<platform>/<cell>-<arch>.log` beside its record. Every finished cell appends one
@@ -2811,6 +2815,11 @@ same-size repository byte change and an unsigned manifest edit, imports the seco
 bundle, waits for device findings bound to each signed acquisition time and starts
 the audited rollout. The image must already be in the verified cache; the lane never
 downloads inside the namespace.
+The matrix cell requires Docker, passwordless namespace entry and the cached
+images on the execution host. SSH execution stages the signed bundles and public
+pins plus only the three online TUF keys; offline signing custody stays on the
+station. The lane accepts the same explicit hardware/EFI flags as other cloud
+lanes, including the pinned aarch64 AAVMF inputs.
 
 ```sh
 artifacts/bin/lab vm airgap -manifest lab/images/ubuntu-noble-amd64.json \

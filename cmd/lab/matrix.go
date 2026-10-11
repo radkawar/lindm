@@ -349,6 +349,7 @@ type matrixRun struct {
 	consoleBrowsers, consoleAdmin, consoleDevice                            string
 	signer                                                                  *packaging.SigningKey
 	archArgs                                                                map[string]*labv1.MatrixArgs
+	airgap                                                                  map[string][]string
 	// lifecycle inputs per packaging architecture and format.
 	builds     map[string][2]string
 	apt        map[string]string
@@ -372,6 +373,7 @@ var laneInputs = map[string][]string{
 	"enroll-from-console": {"console-browser", "record"},
 	"services":            {"record"},
 	"advisories":          {"repo", "build-repo", "lab", "lindmd", "record"},
+	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -502,7 +504,7 @@ func (r *matrixRun) prepare(ctx context.Context, cells []*labmatrix.Cell, stderr
 		}
 	}
 	if len(formats) == 0 {
-		return nil
+		return r.prepareAirgap(ctx, cells, stderr)
 	}
 	keyDir := filepath.Join(r.evidence, "inputs", "key")
 	if err := os.MkdirAll(keyDir, 0o700); err != nil {
@@ -565,7 +567,7 @@ func (r *matrixRun) prepare(ctx context.Context, cells []*labmatrix.Cell, stderr
 			r.rejections[arch][string(packaging.FormatArch)] = fixtures
 		}
 	}
-	return nil
+	return r.prepareAirgap(ctx, cells, stderr)
 }
 
 func appendMissing(list []string, values ...string) []string {
@@ -640,6 +642,11 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 		return fmt.Errorf("%s: retain snapshot manifest: %w", name, err)
 	}
 	args = labhost.SetFlag(args, "manifest", pinned)
+	if diagnostics := labhost.FlagValue(args, "diagnostics"); diagnostics != "" {
+		if err := os.Mkdir(diagnostics, 0o700); err != nil {
+			return err
+		}
+	}
 	if slices.Contains(laneInputs[c.Spec.GetLane()], "evidence") {
 		record = filepath.Join(base, c.Spec.GetLane()+".json")
 	}
@@ -770,6 +777,9 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			args = append(args, "-lab", r.self)
 		case "lindmd":
 			args = append(args, "-lindmd", r.lindmd)
+		case "airgap":
+			args = append(args, r.airgap[c.Release.Key+"/"+c.Architecture]...)
+			args = append(args, "-work-dir", r.evidence, "-diagnostics", base+"-diagnostics")
 		case "console-browser":
 			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, c.Release.Key+"-"+c.Architecture+".json"))
 			if r.consoleAdmin != "" {

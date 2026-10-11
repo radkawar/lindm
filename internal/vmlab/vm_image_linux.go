@@ -13,10 +13,6 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 )
 
-func newVerifiedGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool) (*guestVM, *VerifiedImage, error) {
-	return newVerifiedGuestWithHardware(ctx, manifest, cacheDir, workDir, allowReboot, nil)
-}
-
 func newVerifiedGuestWithHardware(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions) (vm *guestVM, verified *VerifiedImage, err error) {
 	return newVerifiedSeededGuest(ctx, manifest, cacheDir, workDir, allowReboot, hardware, nil)
 }

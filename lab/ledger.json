@@ -2047,6 +2047,30 @@
       "verified": true,
       "manifestSha256": "57f17e1bf6b7926bd56fb50c10deed97f48305bbe32bfa9051dd84ae7d41a9af",
       "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "airgap",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-resolute-20260927-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/u26ag05/ubuntu-26.04/airgap-aarch64.json",
+      "sha256": "8ff8a0d363a7147408d2a30a3661297decc5d04d678845f9f0eb35361c2fd511",
+      "recorded": "2026-10-11T20:39:27.415392302Z",
+      "revision": "c948cfd6a3f0e448c0e670d88624bf2c5e15dde6",
+      "source": "MATRIX_SOURCE_RUN"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "airgap",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-20260927-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/u26ag06/ubuntu-26.04/airgap-x86_64.json",
+      "sha256": "2b7ac01bf75fc111b2c3df57c56a8dd5238872fac6bb94c650b8813b87d73bc2",
+      "recorded": "2026-10-11T21:57:55.212450126Z",
+      "revision": "c948cfd6a3f0e448c0e670d88624bf2c5e15dde6-dirty",
+      "source": "MATRIX_SOURCE_RUN"
     }
   ]
 }
