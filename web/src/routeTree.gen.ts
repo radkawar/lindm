@@ -16,6 +16,7 @@ import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAdvisoriesRouteImport } from './routes/_authenticated/advisories'
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
+import { Route as AuthenticatedAuthorizationRouteImport } from './routes/_authenticated/authorization'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
 import { Route as AuthenticatedEnrollmentRouteImport } from './routes/_authenticated/enrollment'
@@ -69,6 +70,12 @@ const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAuthorizationRoute =
+  AuthenticatedAuthorizationRouteImport.update({
+    id: '/authorization',
+    path: '/authorization',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/advisories': typeof AuthenticatedAdvisoriesRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/authorization': typeof AuthenticatedAuthorizationRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -203,6 +211,7 @@ export interface FileRoutesByTo {
   '/advisories': typeof AuthenticatedAdvisoriesRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/authorization': typeof AuthenticatedAuthorizationRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -231,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/advisories': typeof AuthenticatedAdvisoriesRoute
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/authorization': typeof AuthenticatedAuthorizationRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
   '/_authenticated/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -259,6 +269,7 @@ export interface FileRouteTypes {
     | '/advisories'
     | '/approvals'
     | '/audit'
+    | '/authorization'
     | '/dashboard'
     | '/devices'
     | '/enrollment'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/advisories'
     | '/approvals'
     | '/audit'
+    | '/authorization'
     | '/dashboard'
     | '/devices'
     | '/enrollment'
@@ -312,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/advisories'
     | '/_authenticated/approvals'
     | '/_authenticated/audit'
+    | '/_authenticated/authorization'
     | '/_authenticated/dashboard'
     | '/_authenticated/devices'
     | '/_authenticated/enrollment'
@@ -387,6 +400,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/authorization': {
+      id: '/_authenticated/authorization'
+      path: '/authorization'
+      fullPath: '/authorization'
+      preLoaderRoute: typeof AuthenticatedAuthorizationRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -523,6 +543,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdvisoriesRoute: typeof AuthenticatedAdvisoriesRoute
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedAuthorizationRoute: typeof AuthenticatedAuthorizationRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
   AuthenticatedEnrollmentRoute: typeof AuthenticatedEnrollmentRoute
@@ -548,6 +569,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdvisoriesRoute: AuthenticatedAdvisoriesRoute,
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedAuthorizationRoute: AuthenticatedAuthorizationRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
   AuthenticatedEnrollmentRoute: AuthenticatedEnrollmentRoute,

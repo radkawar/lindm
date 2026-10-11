@@ -391,6 +391,7 @@ func inFlightLimit(pool *pgxpool.Pool) int {
 // buf.validate rules the device RPC surfaces enforce.
 func validatedMessages() []proto.Message {
 	return []proto.Message{
+		&adminv1.GetAuthorizationRequest{}, &adminv1.UpdateAuthorizationRequest{},
 		&releasemanagementv1.GetRolloutRequest{},
 		&releasemanagementv1.SetRolloutRequest{},
 		&releasemanagementv1.RegisterReleaseSeriesRequest{},

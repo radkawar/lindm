@@ -104,11 +104,11 @@ func TestPolicyValidationAndSourceExclusivity(t *testing.T) {
 	}
 	policy := testPolicy(t, Config{Policy: valid})
 	s := &Service{policy: policy}
-	local := s.snapshotPrincipal(directorySnapshot{Local: true, Groups: []string{"/fleet"}}, RoleHelpdesk)
+	local := s.snapshotPrincipal(directorySnapshot{policy: s.policy, Local: true, Groups: []string{"/fleet"}}, RoleHelpdesk)
 	if len(local.Bindings) != 1 || local.Bindings[0].Role != RoleHelpdesk || len(local.Bindings[0].Scopes) != 0 {
 		t.Fatal("directory mapping leaked into local authority")
 	}
-	directory := s.snapshotPrincipal(directorySnapshot{Groups: []string{"/fleet"}}, RoleOwner)
+	directory := s.snapshotPrincipal(directorySnapshot{policy: s.policy, Groups: []string{"/fleet"}}, RoleOwner)
 	if Authorize(directory, PermissionManageAccounts) || len(directory.Bindings) != 1 || directory.Bindings[0].Role != "custom" {
 		t.Fatal("local/display role leaked into directory authority")
 	}
@@ -129,7 +129,7 @@ func TestConfiguredSensitiveApprovalPermissions(t *testing.T) {
 		PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionRevealSecrets,
 	} {
 		t.Run(string(permission), func(t *testing.T) {
-			service := &Service{policy: testPolicy(t, Config{Local: true})}
+			service := Principal{policy: testPolicy(t, Config{Local: true})}
 			if service.ApprovalRequired(permission) {
 				t.Fatal("optional approval required without configuration")
 			}

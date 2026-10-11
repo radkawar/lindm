@@ -200,7 +200,7 @@ func (s *Service) approveCLI(ctx context.Context, cookie, binding string, actor 
 		if err != nil {
 			return err
 		}
-		if decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap).Kind != accessOK {
+		if decideAccess(s.clock(), s.accessIssuer(snap), snap.policy, snap).Kind != accessOK {
 			return errUnauthenticated
 		}
 		session, err := q.GetSessionByTokenHash(ctx, sessionHash(cookie))
@@ -269,7 +269,7 @@ func (s *Service) exchangeCLI(ctx context.Context, request *authv1.CLIExchangeRe
 		if err != nil {
 			return err
 		}
-		if decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap).Kind != accessOK || row.AuthorizationVersion != code.AuthorizationVersion || (session.BreakGlass && s.breakGlass.GetConsoleOnly()) {
+		if decideAccess(s.clock(), s.accessIssuer(snap), snap.policy, snap).Kind != accessOK || row.AuthorizationVersion != code.AuthorizationVersion || (session.BreakGlass && s.breakGlass.GetConsoleOnly()) {
 			return errUnauthenticated
 		}
 		if _, err := q.ConsumeCLICode(ctx, identitydb.ConsumeCLICodeParams{CodeHash: hash, CodeChallenge: base64.RawURLEncoding.EncodeToString(challenge[:]), RedirectUri: request.GetRedirectUri()}); err != nil {

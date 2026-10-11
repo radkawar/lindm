@@ -87,11 +87,29 @@
     },
     {
       "username": "helpdesk",
-      "role": "demo-helpdesk"
+      "role": "demo-helpdesk",
+      "scopes": [
+        {
+          "groupIds": [
+            "26d5407e-0035-5ae1-b4c9-83d105e13915",
+            "9b1eb9f4-dee7-54b3-839d-4e0938f5a579",
+            "ce806573-be05-59fa-9891-8b152b22efb3"
+          ]
+        }
+      ]
     },
     {
       "username": "analyst",
-      "role": "demo-security-analyst"
+      "role": "demo-security-analyst",
+      "scopes": [
+        {
+          "groupIds": [
+            "26d5407e-0035-5ae1-b4c9-83d105e13915",
+            "9b1eb9f4-dee7-54b3-839d-4e0938f5a579",
+            "ce806573-be05-59fa-9891-8b152b22efb3"
+          ]
+        }
+      ]
     },
     {
       "username": "auditor",

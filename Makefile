@@ -99,6 +99,7 @@ ACCEPTANCE_FLAGS ?=
 BROWSER_BASELINE_RECORD ?= $(CURDIR)/artifacts/browser-baseline-$(shell date -u +%Y%m%dT%H%M%SZ).json
 UI_REVIEW_EVIDENCE ?= $(CURDIR)/artifacts/ui-review-$(shell date -u +%Y%m%dT%H%M%SZ)
 UI_REVIEW_REPO ?= .
+UI_REVIEW_FLAGS ?=
 
 acceptance-build: web-assets
 	go build -trimpath -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0' -o artifacts/bin/lindmd ./cmd/lindmd
@@ -116,7 +117,7 @@ acceptance: acceptance-build
 	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
 
 ui-review: acceptance-build
-	artifacts/bin/lab console review -repo "$(UI_REVIEW_REPO)" -lindmd artifacts/bin/lindmd -evidence "$(UI_REVIEW_EVIDENCE)"
+	artifacts/bin/lab console review -repo "$(UI_REVIEW_REPO)" -lindmd artifacts/bin/lindmd -evidence "$(UI_REVIEW_EVIDENCE)" $(UI_REVIEW_FLAGS)
 
 # Local CI (basecamp/gh-signoff): cmd/dev signoff refuses an unpushed HEAD,
 # runs the gates in a temporary clean worktree of that SHA (integration and

@@ -20,6 +20,10 @@ type emptyOrganizationCatalog struct {
 	adminv1connect.AdminServiceClient
 }
 
+func (emptyOrganizationCatalog) GetAuthorization(context.Context, *connect.Request[adminv1.GetAuthorizationRequest]) (*connect.Response[adminv1.GetAuthorizationResponse], error) {
+	return connect.NewResponse(&adminv1.GetAuthorizationResponse{}), nil
+}
+
 func (emptyOrganizationCatalog) ListDeviceGroups(context.Context, *connect.Request[adminv1.ListDeviceGroupsRequest]) (*connect.Response[adminv1.ListDeviceGroupsResponse], error) {
 	return connect.NewResponse(&adminv1.ListDeviceGroupsResponse{}), nil
 }

@@ -11,13 +11,16 @@ import (
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/identity/identitydb"
 )
 
 type authorizationPolicy struct {
+	definition          *authv1.AuthorizationPolicy
 	roles               map[string]*authv1.RoleBinding
 	groups              map[string][]*authv1.RoleBinding
 	names               []string
@@ -34,7 +37,7 @@ func compilePolicy(cfg Config, rules protovalidate.Validator) (*authorizationPol
 		return nil, fmt.Errorf("identity: authorization policy: %w", err)
 	}
 	definition = proto.CloneOf(definition)
-	policy := &authorizationPolicy{roles: make(map[string]*authv1.RoleBinding), groups: make(map[string][]*authv1.RoleBinding), approvalPermissions: definition.GetApprovalRequiredPermissions()}
+	policy := &authorizationPolicy{definition: definition, roles: make(map[string]*authv1.RoleBinding), groups: make(map[string][]*authv1.RoleBinding), approvalPermissions: definition.GetApprovalRequiredPermissions()}
 	for _, name := range []string{RoleOwner, RoleAdmin, RoleOperator, RoleHelpdesk, RoleAuditor} {
 		policy.roles[name] = &authv1.RoleBinding{Role: name, Permissions: builtinPermissions(name)}
 	}
@@ -43,21 +46,6 @@ func compilePolicy(cfg Config, rules protovalidate.Validator) (*authorizationPol
 	}
 	for _, binding := range definition.GetGroupBindings() {
 		group := binding.GetGroup()
-		if cfg.Local {
-			return nil, fmt.Errorf("identity: local authority cannot include directory mappings")
-		}
-		if cfg.EntraTenantID != "" {
-			id, err := uuid.Parse(group)
-			if err != nil || id == uuid.Nil || id.String() != group {
-				return nil, fmt.Errorf("identity: Entra mapping requires a canonical group object ID")
-			}
-		} else if cfg.Okta != nil || cfg.Google != nil {
-			if strings.ContainsAny(group, "/@ \t\r\n") {
-				return nil, fmt.Errorf("identity: directory mapping requires an immutable group ID")
-			}
-		} else if !strings.HasPrefix(group, "/") || group == "/" {
-			return nil, fmt.Errorf("identity: Keycloak mapping requires an exact group path")
-		}
 		role := policy.roles[binding.GetRole()]
 		if role == nil {
 			return nil, fmt.Errorf("identity: unknown mapped role %q", binding.GetRole())
@@ -82,6 +70,14 @@ func compilePolicy(cfg Config, rules protovalidate.Validator) (*authorizationPol
 		fingerprint.Authentication.Primary = &configv1.AuthenticationConfig_Google{Google: &configv1.GoogleDirectory{HostedDomain: cfg.Google.GetHostedDomain(), DelegatedSubject: cfg.Google.GetDelegatedSubject()}}
 	default:
 		fingerprint.Authentication.Primary = &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{Issuer: cfg.Issuer, Upstream: cfg.Broker}}
+	}
+	// Reuse the configuration's source-dependent CEL rules. This is an authority
+	// projection, not listener/credential configuration: validate its root rules
+	// only; the complete policy itself was validated above.
+	if err := rules.Validate(fingerprint, protovalidate.WithFilter(protovalidate.FilterFunc(func(_ protoreflect.Message, descriptor protoreflect.Descriptor) bool {
+		return descriptor.FullName() == "lindm.config.v1.ServerConfig"
+	}))); err != nil {
+		return nil, fmt.Errorf("identity: authorization source: %w", err)
 	}
 	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(fingerprint)
 	if err != nil {
@@ -161,14 +157,25 @@ func (s *Service) activatePolicy(ctx context.Context) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := identitydb.New(tx)
-	previous, err := q.LockAuthorizationPolicyUpdate(ctx)
+	previous, err := q.LockRuntimeAuthorizationUpdate(ctx)
 	if err != nil {
 		return s.dbErr(err)
 	}
 	if err := s.checkOwnerAuthenticationMode(ctx, q); err != nil {
 		return err
 	}
-	if !bytes.Equal(previous, s.policy.digest) {
+	if previous.Definition != nil {
+		definition := new(authv1.AuthorizationPolicy)
+		if err := proto.Unmarshal(previous.Definition, definition); err != nil {
+			return s.dbErr(err)
+		}
+		policy, err := compilePolicy(s.policyConfiguration(definition), s.rules)
+		if err != nil {
+			return err
+		}
+		s.policy = policy
+	}
+	if !bytes.Equal(previous.Digest, s.policy.digest) {
 		if err := q.SetAuthorizationPolicy(ctx, s.policy.digest); err != nil {
 			return s.dbErr(err)
 		}
@@ -184,24 +191,66 @@ func (s *Service) lockPolicy(ctx context.Context, q *identitydb.Queries) error {
 	if err != nil {
 		return s.dbErr(err)
 	}
-	if s.policy == nil || !bytes.Equal(current, s.policy.digest) {
-		return ErrAuthorizationChanged
-	}
-	return nil
-}
-
-func (s *Service) checkPolicy(ctx context.Context, q *identitydb.Queries) error {
-	current, err := q.GetAuthorizationPolicy(ctx)
+	policy, err := s.currentPolicy(ctx, q)
 	if err != nil {
-		return s.dbErr(err)
+		return err
 	}
-	if s.policy == nil || !bytes.Equal(current, s.policy.digest) {
+	if !bytes.Equal(current, policy.digest) {
 		return ErrAuthorizationChanged
 	}
 	return nil
 }
 
-// ApprovalRequired reports the concrete sensitive operations enabled by policy.
-func (s *Service) ApprovalRequired(permission Permission) bool {
-	return permission == PermissionRevokeDevice || permission == PermissionExecuteDestructive || s != nil && s.policy != nil && slices.Contains(s.policy.approvalPermissions, string(permission))
+// currentPolicy reads the database on every authority boundary. The cache only
+// avoids recompiling an immutable definition; it never decides which revision wins.
+func (s *Service) currentPolicy(ctx context.Context, q *identitydb.Queries) (*authorizationPolicy, error) {
+	row, err := q.ReadRuntimeAuthorization(ctx)
+	if err != nil {
+		return nil, s.dbErr(err)
+	}
+	if s.policy != nil && bytes.Equal(row.Digest, s.policy.digest) {
+		return s.policy, nil
+	}
+	if cached := s.runtimePolicy.Load(); cached != nil && bytes.Equal(row.Digest, cached.digest) {
+		return cached, nil
+	}
+	if row.Definition == nil {
+		return nil, ErrAuthorizationChanged
+	}
+	definition := new(authv1.AuthorizationPolicy)
+	if err := proto.Unmarshal(row.Definition, definition); err != nil {
+		return nil, errStore
+	}
+	policy, err := compilePolicy(s.policyConfiguration(definition), s.rules)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(row.Digest, policy.digest) {
+		return nil, ErrAuthorizationChanged
+	}
+	s.runtimePolicy.Store(policy)
+	return policy, nil
+}
+
+func (s *Service) policyConfiguration(definition *authv1.AuthorizationPolicy) Config {
+	tenant := ""
+	if s.entraTenant != uuid.Nil {
+		tenant = s.entraTenant.String()
+	}
+	var broker *configv1.KeycloakBrokerUpstream
+	if s.broker != nil {
+		broker = s.policyBroker
+	}
+	return Config{Local: s.localPrimary, Issuer: s.issuer, EntraTenantID: tenant,
+		Okta: s.okta, Google: s.google, Broker: broker, BreakGlass: s.breakGlass, Policy: definition}
+}
+
+// ApprovalRequired describes the immutable authority snapshot. Mutation callers
+// must fence its Authorization before relying on an optional approval decision.
+func (p Principal) ApprovalRequired(permission Permission) bool {
+	return permission == PermissionRevokeDevice || permission == PermissionExecuteDestructive || p.policy != nil && slices.Contains(p.policy.approvalPermissions, string(permission))
+}
+
+func runtimeAuthorizationState(definition *authv1.AuthorizationPolicy, revision int64, runtime bool) *adminv1.AuthorizationState {
+	return &adminv1.AuthorizationState{Policy: proto.CloneOf(definition), Revision: uint64(revision), Runtime: runtime}
 }

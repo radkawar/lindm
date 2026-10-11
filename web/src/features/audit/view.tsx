@@ -31,6 +31,7 @@ import { useListPagination } from "@/hooks/use-list-pagination";
 
 const ACTION_LABELS: Record<string, string> = {
   "device_action.escrow_receipt": "Recovery secret storage confirmed",
+  "identity.authorization_updated": "Organization access policy changed",
 };
 
 export function AuditView({

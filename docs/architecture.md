@@ -433,6 +433,27 @@ scoped metadata grant: otherwise an operator could relabel a visible device into
 more privileged execution scope. Ownership and attribute edits still use their
 scoped inventory permission.
 
+Server configuration supplies only the bootstrap authorization policy. The first
+`AdminService.UpdateAuthorization` persists a complete runtime replacement;
+PostgreSQL, not process-start configuration, is thereafter authoritative, including
+for an empty definition. Fresh unrestricted account-management authority and a live
+authenticated browser or CLI session are required. An expected-revision CAS and
+actor-bound request receipt atomically bind replacement, audit and revocation.
+Historical exact replay rechecks current authority and returns the original result,
+not current state; changed payloads and stale revisions do not mutate policy.
+Every instance reads the current definition, and mutation transactions fence the
+same immutable policy snapshot they used to authorize and determine approval.
+Policy replacement invalidates old worker grants/directory observations and ends
+non-owner sessions; only unrestricted built-in local recovery owners and the pinned
+deployment owner retain their sessions. It never resurrects old approvals.
+
+The Accounts organization import is a browser-only HTTP adapter over the existing
+`orgapply` engine. Review binds the typed declaration, CAS heads and account
+observations; apply checks live browser authority before each mutation and applies
+runtime authorization before accounts using its custom roles. Partial outcomes and
+shown-once secrets remain available when a later mutation fails. This does not
+promote CLI credentials, make imports atomic or add replayable account secrets.
+
 Fleet search, pagination, counts and exports apply the same database scope predicate
 before producing results. Target reads and mutations enforce the permission-specific
 scope, and mutation transactions serialize against label and group changes.

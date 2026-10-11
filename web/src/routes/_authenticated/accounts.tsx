@@ -6,7 +6,7 @@ import { canPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   beforeLoad: ({ context }) => {
-    if (!canPermission(context.principal, "accounts.manage"))
+    if (!canPermission(context.principal, "accounts.manage", true))
       throw new Error("Account management is not authorized.");
   },
   component: AccountsPage,

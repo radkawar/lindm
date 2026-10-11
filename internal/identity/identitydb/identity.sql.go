@@ -106,17 +106,6 @@ func (q *Queries) DeleteStaleAuthFlows(ctx context.Context) error {
 	return err
 }
 
-const getAuthorizationPolicy = `-- name: GetAuthorizationPolicy :one
-SELECT digest FROM authorization_policy WHERE id = true
-`
-
-func (q *Queries) GetAuthorizationPolicy(ctx context.Context) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getAuthorizationPolicy)
-	var digest []byte
-	err := row.Scan(&digest)
-	return digest, err
-}
-
 const getLineageByPrincipalID = `-- name: GetLineageByPrincipalID :one
 SELECT principal_id, broker_issuer, broker_subject, upstream_provider, upstream_subject,
   directory_connector, upstream_observed_at, created_at
@@ -475,17 +464,6 @@ func (q *Queries) LockAuthorizationPolicy(ctx context.Context) ([]byte, error) {
 	return digest, err
 }
 
-const lockAuthorizationPolicyUpdate = `-- name: LockAuthorizationPolicyUpdate :one
-SELECT digest FROM authorization_policy WHERE id = true FOR UPDATE
-`
-
-func (q *Queries) LockAuthorizationPolicyUpdate(ctx context.Context) ([]byte, error) {
-	row := q.db.QueryRow(ctx, lockAuthorizationPolicyUpdate)
-	var digest []byte
-	err := row.Scan(&digest)
-	return digest, err
-}
-
 const lockDeploymentIdentity = `-- name: LockDeploymentIdentity :one
 SELECT id, deployment_id, owner_principal_id, initialized_at
 FROM deployment_identity
@@ -593,7 +571,7 @@ func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash []byte
 }
 
 const setAuthorizationPolicy = `-- name: SetAuthorizationPolicy :exec
-UPDATE authorization_policy SET digest = $1 WHERE id = true
+UPDATE authorization_policy SET digest = $1, updated_at = clock_timestamp() WHERE id = true
 `
 
 func (q *Queries) SetAuthorizationPolicy(ctx context.Context, digest []byte) error {

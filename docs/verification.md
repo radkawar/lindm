@@ -2270,6 +2270,117 @@ navigation, account scopes, static groups, a different-human approval, rejection
 expiry, and exact approved execution. Unit/SQL assertions do not replace that
 browser evidence.
 
+#### Runtime authorization and organization accounts
+
+The real-server group comprises `TestOrganizationApplyRealServer`,
+`TestRuntimeAuthorizationRealServer`, `TestRuntimeAuthorizationDirectoryRealServer`,
+`TestOrganizationBrowserAuthorityBoundaryRealServer` and
+`TestOrganizationAccountCapabilityRechecksRealSession` in `internal/devlab`.
+Supply `LINDM_NATIVE_SERVER_BINARY` and `LINDM_NATIVE_REPOSITORY` through the
+maintained integration runner; absent native-server prerequisites must not be
+reported as a pass. These tests use actual migrated databases, TLS endpoints,
+browser-kind sessions and CLI credentials. Directory coverage maps a real,
+test-owned Keycloak membership to runtime roles without adding OAuth permissions
+or substituting static device groups for identity groups.
+The account-capability regression checks a genuine live browser session, actual
+account-disable revocation and logout against `GET /auth/accounts`; the fixture's
+`CheckSession` adapter must not translate a CLI bearer or return a cached success.
+The unchanged demo declaration is applied only after real protocol enrollment and
+fresh inventory for its department cohorts. Those synthetic observations qualify
+server apply/cohort handling, not native device effects.
+
+Identity regressions separately require stale-revision denial, exact historical
+replay without a second audit event, changed-request rejection, fresh session and
+worker fences, and an assigned custom role deleted from the current policy.
+A scoped local owner must lose its session on replacement; only the unrestricted
+built-in recovery owner and pinned deployment owner retain recovery sessions.
+Restart with a different bootstrap policy and a second real server process must
+observe the persisted complete runtime definition.
+
+`lab vm dispatch -runtime-authorization -local-authority` adds the actual installed,
+signed native agent to this authority scenario. Supply a pinned image manifest,
+built server and new `-record` path; ARM also requires the host baseline's explicit
+pinned firmware flags. Its record keeps the server's OS/architecture separate from
+the guest's OS/kernel and binds the agent, runner and server hashes. Require two
+distinct local humans, enrolled-device scope allow/deny, audited runtime mutation,
+reviewed browser organization apply with shown-once and partial-result secrets,
+and explicit CLI rejection at browser-only account/import endpoints. A server-only
+integration result is not native enrolled-device evidence, and this lane does not
+qualify server package installation or another server-host platform.
+
+On 2026-10-11, native checkpoint
+`34f74f75f4f69343cc072ba626cee9673bb7826d` passed all thirteen checks on `dgx21`.
+The colocated server was Ubuntu 24.04.4 arm64; the enrolled guest was Ubuntu
+24.04.5 arm64, kernel `6.8.0-142-generic`. Record
+`$HOME/.cache/lindm-org-runtime-20261011/runtime-authorization-arm64-a7.json`,
+SHA-256 `6bf4347354847e86106a758f51047798c4123012db5dfbee9fc313c46e3838e7`,
+contains two distinct human IDs, the enrolled device, revision 0→6 and six
+`identity.authorization_updated` audit events. Revision 3→4 records one revoked
+session; exact historical replay adds no event. It also records the ordinary CLI's
+runtime apply and refusal at browser-only account/import endpoints.
+
+The signed package hash is
+`9528ea726e7bc0b361e7025e3f1098bee99e76b54ee3d8d92b7aa26fd8296af4`;
+runner `fe6c334912617db0177ca0a89291abe20bccbd84ad0399d5f161840bbddf6d00`;
+server `1033777d816c9559efcd1840da7f80b42d609ecd5e41f968b04bd4924f648875`.
+This was native aarch64 KVM with QEMU 8.2.2, package-pinned AAVMF
+`2024.02-2ubuntu0.10`, virtio-blk, Secure Boot disabled/SetupMode and no TPM or
+desktop. It qualifies server authorization against an actually enrolled native
+agent, not physical hardware, a graphical guest journey or arm64 server-package
+support. Fedora is not a separate requirement for these server-only effects.
+
+Earlier records in the same directory remain failures, not partial passes:
+`runtime-authorization-arm64-a4.json` stopped before boot for missing explicit
+firmware (`b25bc4b87099d98b911a01e8b8291b40c8af79ca245eded0974824f0dd97221d`);
+`runtime-authorization-arm64-a5.json` refused enrollment because the dynamic
+console origin lacked its corresponding guest forward
+(`f077d761e241f598c1dec618bb8512a9c8c2075d9caae097d7c5f4442cbd8b1e`);
+`runtime-authorization-arm64-a6.json` exercised the enrolled-device fences but
+failed the ordinary CLI transport against a tunnel-only origin
+(`1213f79198cf4ddb95ab6a985b35c8056320e0af3306296569de46a4a18e1ec1`).
+The corrected lane forwards the actual signed console origin into the guest;
+it does not replace CLI transport, credentials or authorization.
+
+`lab console review -directory-authorization` additionally uses a disposable
+directory-primary server and owned real Keycloak user/group objects. All four
+light/dark desktop/mobile variants must exercise known-group selection,
+source-issued Advanced references, named device scopes, actual policy save,
+scoped-reader denial and exclusion of an existing device. The settings-read fault
+is an actual browser transport failure, not a claim of upstream-provider outage
+coverage. Keep those results distinct from the local Accounts import, ambiguous
+policy-response recovery and shown-once secret captures. A green automated report
+still requires the [human design review](design.md#required-design-review-in-every-console-landing-note).
+
+The complete review on 2026-10-11 passed **184/184** captures with no findings:
+`$HOME/.cache/lindm-org-runtime-20261011/ui-after-a8/report.json`, SHA-256
+`07a095ba70c8e77b8586fb5e57d8f7b7e98915a79d7856f15c80a8daf56c0d42`;
+contact sheet `index.html`, SHA-256
+`3cbe520353285b7d4e5918d6f24454199ccf11b278ff2af50ce23359e1b9fb72`.
+It used Chromium `156.0.8078.4`, Playwright `1.64.0` and axe `4.13.0`;
+the embedded-console server hash was
+`1d8169a1768bf4881e2039a6352ffe4ffceb96ccba6264ed9664ff6bf918c9c7`.
+All four variants cover actual known-reference selection, role changes, named
+device/group scope selection, source-issued Advanced setup and policy replacement,
+plus a separate real Keycloak code/PKCE reader session proving in-scope reads,
+restricted policy management and server `not_found` for an excluded existing
+device. Browser DNS maps the configured public origin to the owned listener so
+the complete redirect chain reaches the real server; response bodies, authentication
+and cookies are not fabricated.
+
+The local account-import captures include actual partial completion with shown-once
+secrets and an intentionally lost mutation response followed by the identical
+request replay. Secret values are masked in retained images. Before screenshots
+are in `$HOME/.cache/lindm-org-gaps-20261011/ui-before`; that 164/168 baseline failed
+only the pre-existing audit caption in four variants, not Accounts. Earlier
+`ui-after-a2` through `ui-after-a7` remain failed diagnostics, not passes:
+toast/secret mobile layout and contrast, callback transport routing, then a generic
+permission-error page's keyboard recovery were corrected without excluding checks.
+The final denied state names the missing authority and offers dashboard recovery,
+not an ineffective retry. Automated and visual checks are complete; **awaiting
+owner edit pass** using the contact-sheet review. New external identity references
+still require Advanced setup because the configured providers do not supply a
+complete selectable group catalog; no broader OAuth scopes were added.
+
 ### L02 external directories, broker lineage and SCIM
 
 `go test -race ./internal/identity ./internal/config` exercises TLS fixture shapes,

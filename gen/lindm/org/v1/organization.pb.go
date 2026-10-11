@@ -26,8 +26,8 @@ const (
 )
 
 // Organization composes product API messages; it is not a second policy language.
-// Omitted objects are not deleted. Accounts require a browser-kind session and
-// authorization is server configuration, never mutable through AdminService.
+// Omitted objects are not deleted. Accounts require a browser-kind session.
+// Authorization replaces the complete persisted runtime policy through AdminService.
 type Organization struct {
 	state              protoimpl.MessageState   `protogen:"open.v1"`
 	Name               string                   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -41,7 +41,7 @@ type Organization struct {
 	AdvisoryExceptions []*AdvisoryException     `protobuf:"bytes,9,rep,name=advisory_exceptions,json=advisoryExceptions,proto3" json:"advisory_exceptions,omitempty"`
 	// Browser scoped: CLI reports requires console session without changing these.
 	Accounts []*v12.CreateAccountRequest `protobuf:"bytes,10,rep,name=accounts,proto3" json:"accounts,omitempty"`
-	// Server scoped: the caller that owns server configuration applies this policy.
+	// Applied before accounts, so newly declared custom roles are available.
 	Authorization *v12.AuthorizationPolicy `protobuf:"bytes,11,opt,name=authorization,proto3" json:"authorization,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

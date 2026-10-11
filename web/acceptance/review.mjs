@@ -21,6 +21,8 @@ import { reviewEnrollmentFixtures } from "./review-enrollment.mjs";
 import { routeContracts, destructiveCoverage } from "./review-contracts.mjs";
 import { editManifest, editSheet, annotationTemplate } from "./review-edit-sheet.mjs";
 import { taskWalkthroughs, taskAuditSheet } from "./review-journeys.mjs";
+import { reviewAuthorization } from "./review-authorization.mjs";
+import { reviewDirectoryAuthorization } from "./review-directory-authorization.mjs";
 
 process.umask(0o077);
 
@@ -715,6 +717,27 @@ async function main() {
     });
   }
 
+  const combos = themes.flatMap((theme) => viewports.map((viewport) => ({ theme, viewport })));
+  if (config.directoryFixture) {
+    const directoryResults = await reviewDirectoryAuthorization({
+      config,
+      combos,
+      screenshot,
+      axe,
+      probe,
+      settle,
+      keyboard,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
+    });
+    for (const entry of directoryResults) {
+      summarize(entry);
+      report.results.push(entry);
+    }
+  }
+  if (report.results.some((entry) => !entry.passed))
+    throw new Error("directory_authorization_review_failed");
   const driver = new ChromiumDriver();
   await driver.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000 });
   try {
@@ -731,7 +754,6 @@ async function main() {
         /* Storage disabled: system preference applies. */
       }
     });
-    const combos = themes.flatMap((theme) => viewports.map((viewport) => ({ theme, viewport })));
     const publicRoutes = report.routes.filter((route) => !route.authenticated);
     const privateRoutes = report.routes.filter((route) => route.authenticated);
     await Promise.all(
@@ -857,6 +879,22 @@ async function main() {
     });
     for (const job of report.walkthroughs.results) {
       if (job.failure) report.failures.push(`task ${job.id}: ${job.failure}`);
+    }
+    const authorizationResults = await reviewAuthorization({
+      pages,
+      combos,
+      config,
+      screenshot,
+      axe,
+      probe,
+      settle,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
+    });
+    for (const entry of authorizationResults) {
+      summarize(entry);
+      report.results.push(entry);
     }
   } finally {
     await driver.close();

@@ -42,6 +42,11 @@ func Apply(ctx context.Context, client adminv1connect.AdminServiceClient, plan *
 			result.Outcomes = append(result.Outcomes, outcome)
 			continue
 		}
+		if opts.AccountClient != nil {
+			if err := opts.AccountClient.CheckSession(ctx); err != nil {
+				return result, fmt.Errorf("browser session no longer authorizes import: %w", err)
+			}
+		}
 		request := proto.Clone(op.request)
 		if a, ok := request.(*authv1.CreateAccountRequest); ok {
 			if opts.AccountClient != nil {
@@ -64,6 +69,11 @@ func Apply(ctx context.Context, client adminv1connect.AdminServiceClient, plan *
 		result.Outcomes = append(result.Outcomes, outcome)
 	}
 	if len(plan.spec.GetAssignments()) > 0 {
+		if opts.AccountClient != nil {
+			if err := opts.AccountClient.CheckSession(ctx); err != nil {
+				return result, fmt.Errorf("browser session no longer authorizes activation: %w", err)
+			}
+		}
 		if err := activate(ctx, client, plan, result); err != nil {
 			return result, err
 		}
@@ -90,6 +100,9 @@ func completeRequest(org, kind, id string, request proto.Message) error {
 
 func applyRequest(ctx context.Context, client adminv1connect.AdminServiceClient, request proto.Message, outcome *Outcome, result *Result, revisions map[string]string) error {
 	switch r := request.(type) {
+	case *adminv1.UpdateAuthorizationRequest:
+		_, err := client.UpdateAuthorization(ctx, connect.NewRequest(r))
+		return err
 	case *adminv1.SetDeviceGroupRequest:
 		_, err := client.SetDeviceGroup(ctx, connect.NewRequest(r))
 		if err != nil {

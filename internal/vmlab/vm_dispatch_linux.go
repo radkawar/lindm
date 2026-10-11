@@ -56,6 +56,7 @@ type VMDispatchOptions struct {
 	// LocalAuthority uses the real password/WebAuthn authority without an IdP.
 	LocalAuthority        bool
 	PowerActions          bool
+	RuntimeAuthorization  bool
 	Resources             bool
 	ResourceExecutionOnly bool
 	// ResourceKinds selects connected lane kind groups; see resourceKindSelection.
@@ -111,6 +112,7 @@ type VMDispatchResult struct {
 	RecoveryReadiness      *VMRecoveryReadinessEvidence    `json:"recovery_readiness,omitempty"`
 	Architecture           string                          `json:"architecture,omitempty"`
 	ReleaseUpgrade         *VMReleaseUpgradeEvidence       `json:"release_upgrade,omitempty"`
+	RuntimeAuthorization   *VMRuntimeAuthorizationEvidence `json:"runtime_authorization,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -122,6 +124,9 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	if options.ResourceExecutionOnly && !options.Resources {
 		return nil, errors.New("direct resource execution requires the resource lane")
+	}
+	if options.RuntimeAuthorization && (!options.LocalAuthority || options.Resources || options.PowerActions || options.Hold != 0 || options.ReleaseUpgrade) {
+		return nil, errors.New("runtime authorization requires local authority without another dispatch scenario")
 	}
 	release := manifestRelease(manifest)
 	if options.Resources {
@@ -343,6 +348,9 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.LocalAuthority {
 		openFixture = devlab.OpenLocalAuthorityFixture
 	}
+	if options.RuntimeAuthorization {
+		openFixture = devlab.OpenLocalConsoleAuthorityFixture
+	}
 	if options.Hold > 0 {
 		if options.LocalAuthority {
 			return result, errors.New("local-authority dispatch does not reserve the shared console origin")
@@ -385,7 +393,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 		result.Resources.Fixture = append(result.Resources.Fixture, peer...)
 	}
-	forwards, err := openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
+	guestAddresses := [2]string{"127.0.0.1:18444", "127.0.0.1:18445"}
+	if options.RuntimeAuthorization {
+		// Console sessions and the ordinary CLI use the actual dynamic origin.
+		// Forward its signed enrollment port, not the legacy fixture alias.
+		guestAddresses[0] = fixture.AdminAddress
+	}
+	forwards, err := openGuestForwards(ctx, vm, guestAddresses, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
 	if err != nil {
 		return result, err
 	}
@@ -440,6 +454,10 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			return result, err
 		}
 		err = exerciseSignedNativeResources(ctx, packages, resourceSigner, result)
+		return result, err
+	}
+	if options.RuntimeAuthorization {
+		err = exerciseRuntimeAuthorization(ctx, vm, fixture, result)
 		return result, err
 	}
 	if options.Resources {

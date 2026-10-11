@@ -20,15 +20,16 @@ import (
 )
 
 type consoleReviewConfig struct {
-	Origin            string                         `json:"origin"`
-	Username          string                         `json:"username"`
-	Password          string                         `json:"password"`
-	EnrollmentSecret  string                         `json:"enrollmentSecret"`
-	EvidenceDirectory string                         `json:"evidenceDirectory"`
-	Checkout          string                         `json:"checkout"`
-	Demo              loadlab.Demo                   `json:"demo"`
-	Build             map[string]string              `json:"build"`
-	EnrollmentFixture consoleReviewEnrollmentFixture `json:"enrollmentFixture"`
+	Origin            string                                     `json:"origin"`
+	Username          string                                     `json:"username"`
+	Password          string                                     `json:"password"`
+	EnrollmentSecret  string                                     `json:"enrollmentSecret"`
+	EvidenceDirectory string                                     `json:"evidenceDirectory"`
+	Checkout          string                                     `json:"checkout"`
+	Demo              loadlab.Demo                               `json:"demo"`
+	Build             map[string]string                          `json:"build"`
+	EnrollmentFixture consoleReviewEnrollmentFixture             `json:"enrollmentFixture"`
+	DirectoryFixture  *devlab.DirectoryAuthorizationReviewConfig `json:"directoryFixture,omitempty"`
 }
 
 type consoleReviewEnrollmentFixture struct {
@@ -59,6 +60,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	binary := flags.String("lindmd", "", "prebuilt real lindmd executable with the console under review embedded")
 	evidence := flags.String("evidence", "", "new private directory for report.json, index.html and screenshots")
 	hostObservation := flags.String("host-observation", "", "optional captured HostObservation protobuf JSON to replay on one demo device")
+	directoryAuthorization := flags.Bool("directory-authorization", false, "include real Keycloak group-role editing and scoped browser authorization")
 	timeout := flags.Duration("timeout", time.Hour, "overall review deadline")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -101,6 +103,24 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return fmt.Errorf("seed demo console: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, presence.Stop()) }()
+	var directoryReviewConfig *devlab.DirectoryAuthorizationReviewConfig
+	if *directoryAuthorization {
+		directoryFixture, err := devlab.OpenAuthorityFixture(ctx, *repo, *binary)
+		if err != nil {
+			return fmt.Errorf("open real directory review fixture: %w", err)
+		}
+		defer func() { resultErr = errors.Join(resultErr, directoryFixture.Close()) }()
+		directoryDevices, err := loadlab.Populate(ctx, directoryFixture, loadlab.PopulateOptions{Devices: 2, Packages: 1, AssignmentPercent: 1, EnrollmentWorkers: 1})
+		if err != nil {
+			return fmt.Errorf("populate synthetic directory review devices: %w", err)
+		}
+		directoryReview, err := directoryFixture.OpenDirectoryAuthorizationReview(ctx, directoryDevices.DeviceIDs)
+		if err != nil {
+			return fmt.Errorf("prepare directory authorization review: %w", err)
+		}
+		defer func() { resultErr = errors.Join(resultErr, directoryReview.Close(context.WithoutCancel(ctx))) }()
+		directoryReviewConfig = &directoryReview.Config
+	}
 	// Build publication from the checkout under review, never from the separate
 	// directory that supplies development database/TLS trust.
 	enrollmentFixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64"})
@@ -124,7 +144,8 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	cfg := consoleReviewConfig{
 		Origin: fixture.ConsoleOrigin, Username: "console-owner", Password: hex.EncodeToString(password[:]),
 		EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: directory, Checkout: checkout, Demo: demo,
-		Build: map[string]string{"lindmdSHA256": serverDigest},
+		Build:            map[string]string{"lindmdSHA256": serverDigest},
+		DirectoryFixture: directoryReviewConfig,
 		EnrollmentFixture: consoleReviewEnrollmentFixture{
 			Origin: enrollmentFixture.ConsoleOrigin, Username: "console-owner",
 			Password: hex.EncodeToString(password[:]), EnrollmentSecret: publishedEnrollment.GetSecret(),
@@ -136,6 +157,12 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	encoded, err := json.Marshal(cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	cfg.EnrollmentFixture.Password, cfg.EnrollmentFixture.EnrollmentSecret = "", ""
+	if cfg.DirectoryFixture != nil {
+		cfg.DirectoryFixture.ReaderPassword = ""
+		for i := range cfg.DirectoryFixture.OwnerCookies {
+			cfg.DirectoryFixture.OwnerCookies[i].Value = ""
+		}
+	}
 	if err != nil {
 		return err
 	}

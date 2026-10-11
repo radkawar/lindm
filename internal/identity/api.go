@@ -43,6 +43,7 @@ type Config struct {
 // Principal is the authenticated admin stored in the request context.
 // GET /auth/session encodes authv1.SessionPrincipal, not this struct.
 type Principal struct {
+	policy             *authorizationPolicy
 	ID                 uuid.UUID
 	Issuer             string
 	Subject            string

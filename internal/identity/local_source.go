@@ -41,6 +41,10 @@ func deploymentLocalIssuer(ctx context.Context, pool *pgxpool.Pool) (string, err
 }
 
 func (s *Service) readLocalSnapshot(ctx context.Context, q *identitydb.Queries, row identitydb.Principal) (directorySnapshot, error) {
+	policy, err := s.currentPolicy(ctx, q)
+	if err != nil {
+		return directorySnapshot{}, err
+	}
 	account, err := q.GetLocalAccount(ctx, row.ID)
 	if err != nil {
 		return directorySnapshot{}, s.dbErr(err)
@@ -54,7 +58,7 @@ func (s *Service) readLocalSnapshot(ctx context.Context, q *identitydb.Queries, 
 		return directorySnapshot{}, errStore
 	}
 	enabled := account.Enabled && (s.localPrimary || (account.BreakGlass && account.Role == RoleOwner && s.breakGlass != nil))
-	return directorySnapshot{PrincipalID: row.ID, Issuer: row.Issuer, Subject: row.Subject,
+	return directorySnapshot{policy: policy, PrincipalID: row.ID, Issuer: row.Issuer, Subject: row.Subject,
 		DisplayName: account.Username, Enabled: enabled, Observed: true, ObservedAt: now,
 		Qualified: row.Subject == row.ID.String(), AuthorizationVersion: row.AuthorizationVersion,
 		AuthorizationRole: account.Role, Local: true, BreakGlass: !s.localPrimary, Scopes: scopes.GetScopes(), ServiceAccount: row.ServiceAccount}, nil
@@ -68,15 +72,15 @@ func (s *Service) accessIssuer(snapshot directorySnapshot) string {
 }
 
 func (s *Service) snapshotPrincipal(snapshot directorySnapshot, role string) Principal {
-	p := Principal{ID: snapshot.PrincipalID, Issuer: snapshot.Issuer, Subject: snapshot.Subject,
+	p := Principal{policy: snapshot.policy, ID: snapshot.PrincipalID, Issuer: snapshot.Issuer, Subject: snapshot.Subject,
 		DisplayName: snapshot.DisplayName, Role: role, BreakGlass: snapshot.BreakGlass, ServiceAccount: snapshot.ServiceAccount}
 	p.Bindings = make([]*authv1.RoleBinding, 0)
 	if snapshot.Local {
-		if binding := s.policy.role(role); binding != nil {
+		if binding := snapshot.policy.role(role); binding != nil {
 			p.Bindings = append(p.Bindings, &authv1.RoleBinding{Role: role, Permissions: binding.GetPermissions(), Scopes: snapshot.Scopes})
 		}
 	} else {
-		p.Bindings = s.policy.bindings(snapshot.PinnedRole, snapshot.Groups)
+		p.Bindings = snapshot.policy.bindings(snapshot.PinnedRole, snapshot.Groups)
 	}
 	if p.BreakGlass {
 		p.AllowedPermissions = s.breakGlass.GetAllowedPermissions()

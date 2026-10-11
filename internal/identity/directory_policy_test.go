@@ -9,7 +9,7 @@ import (
 )
 
 func TestDirectoryPolicyPinsAuthorityNamespace(t *testing.T) {
-	definition := &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: "immutable-group-id", Role: RoleAdmin}}}
+	definition := &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: "00g12345678901234567", Role: RoleAdmin}}}
 	okta := Config{Issuer: "https://login.example/oauth2/custom", Okta: &configv1.OktaDirectory{OrgUrl: "https://org.example"}, Policy: definition}
 	before := testPolicy(t, okta)
 	okta.Okta = &configv1.OktaDirectory{OrgUrl: "https://different-org.example"}

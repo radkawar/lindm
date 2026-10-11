@@ -109,16 +109,21 @@ func (s *Service) touch(ctx context.Context, cookie string) error {
 }
 
 func (s *Service) loadSnapshot(ctx context.Context, id uuid.UUID) (directorySnapshot, error) {
-	q := identitydb.New(s.pool)
-	row, err := q.GetPrincipalByID(ctx, id)
-	if err != nil {
-		return directorySnapshot{}, s.dbErr(err)
-	}
-	return s.readSnapshot(ctx, q, row)
+	var snapshot directorySnapshot
+	err := s.withTx(ctx, func(q *identitydb.Queries) error {
+		row, err := q.GetPrincipalForUpdate(ctx, id)
+		if err != nil {
+			return s.dbErr(err)
+		}
+		snapshot, err = s.readSnapshot(ctx, q, row)
+		return err
+	})
+	return snapshot, err
 }
 
 func (s *Service) readSnapshot(ctx context.Context, q *identitydb.Queries, row identitydb.Principal) (directorySnapshot, error) {
-	if err := s.checkPolicy(ctx, q); err != nil {
+	policy, err := s.currentPolicy(ctx, q)
+	if err != nil {
 		return directorySnapshot{}, err
 	}
 	if row.Issuer == s.localIssuer {
@@ -136,7 +141,9 @@ func (s *Service) readSnapshot(ctx context.Context, q *identitydb.Queries, row i
 	if err != nil {
 		return directorySnapshot{}, s.dbErr(err)
 	}
-	return s.snapshotFrom(row, lin, groups), nil
+	snapshot := s.snapshotFrom(row, lin, groups)
+	snapshot.policy = policy
+	return snapshot, nil
 }
 
 func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, principalID uuid.UUID, obs directoryObservation) (directorySnapshot, error) {
@@ -146,6 +153,10 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	}
 	if row.Issuer == s.localIssuer {
 		return s.readLocalSnapshot(ctx, q, row)
+	}
+	policy, err := s.currentPolicy(ctx, q)
+	if err != nil {
+		return directorySnapshot{}, err
 	}
 	if cutoff, valid := timeFrom(row.LifecycleNotBefore); valid && !obs.AcquiredAt.After(cutoff) {
 		return directorySnapshot{}, errStaleObservation
@@ -197,11 +208,11 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	}
 	nextRole := ""
 	if granted {
-		nextRole = effectiveRole(row.PinnedRole, w.groups, s.policy)
+		nextRole = effectiveRole(row.PinnedRole, w.groups, policy)
 	}
 	var bindings []*authv1.RoleBinding
 	if nextRole != "" {
-		bindings = s.policy.bindings(row.PinnedRole, w.groups)
+		bindings = policy.bindings(row.PinnedRole, w.groups)
 	}
 	digest, err := bindingsDigest(bindings)
 	if err != nil {
@@ -215,6 +226,7 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		return directorySnapshot{}, err
 	}
 	return directorySnapshot{
+		policy:               policy,
 		PrincipalID:          row.ID,
 		Issuer:               row.Issuer,
 		Subject:              row.Subject,
@@ -509,7 +521,7 @@ func (s *Service) revokePrincipal(ctx context.Context, id uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		dec := decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap)
+		dec := decideAccess(s.clock(), s.accessIssuer(snap), snap.policy, snap)
 		if !dec.RevokeSessions {
 			return nil
 		}
@@ -699,7 +711,22 @@ func (s *Service) observeDirectory(ctx context.Context, subject string) (directo
 	if err != nil {
 		return directoryObservation{}, err
 	}
-	obs, err := s.directory.Observe(ctx, subject)
+	source := s.directory
+	if google, ok := source.(*googleSource); ok {
+		policy, err := s.currentPolicy(ctx, identitydb.New(s.pool))
+		if err != nil {
+			return directoryObservation{}, err
+		}
+		// Google queries configured immutable IDs rather than listing memberships.
+		// Keep the source immutable while each observation captures the runtime set.
+		current := *google
+		current.groups = make([]string, 0, len(policy.groups))
+		for group := range policy.groups {
+			current.groups = append(current.groups, group)
+		}
+		source = &current
+	}
+	obs, err := source.Observe(ctx, subject)
 	if err != nil {
 		return directoryObservation{}, err
 	}

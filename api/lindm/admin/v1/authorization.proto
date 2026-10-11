@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/auth/v1/authorization.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Runtime authority replaces the complete bootstrap policy, never merges with it.
+message AuthorizationState {
+  lindm.auth.v1.AuthorizationPolicy policy = 1;
+  uint64 revision = 2;
+  bool runtime = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+message GetAuthorizationRequest {}
+message GetAuthorizationResponse {
+  AuthorizationState authorization = 1;
+}
+message UpdateAuthorizationRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 expected_revision = 2 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  lindm.auth.v1.AuthorizationPolicy policy = 3 [(buf.validate.field).required = true];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message UpdateAuthorizationResponse {
+  // Exact historical result on replay, not a claim about the current policy.
+  AuthorizationState authorization = 1;
+}

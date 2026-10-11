@@ -20,7 +20,9 @@ import (
 )
 
 func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
-	f := newProvisioningFixture(t)
+	// Runtime organization policy requires an actual browser session, not the
+	// database-inserted principal used by isolated device-service fixtures.
+	f := newSecretFixture(t)
 	encoded, err := os.ReadFile(filepath.Join("..", "..", "lab", "demo", "org.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -29,11 +31,11 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := orgapply.Plan(f.ownerCtx, f.service, spec)
+	plan, err := orgapply.Plan(f.stepUp, f.svc, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	initial, err := orgapply.Apply(f.ownerCtx, f.service, plan, orgapply.Options{})
+	initial, err := orgapply.Apply(f.stepUp, f.svc, plan, orgapply.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,32 +49,32 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 		t.Fatal("engineering enrollment token missing")
 	}
 	request, key := provisionIntent(t, token)
-	enrolled, err := f.service.Provision(t.Context(), connect.NewRequest(request))
+	enrolled, err := f.svc.Provision(t.Context(), connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
-	principal, err := f.service.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), parseCertPEM(t, enrolled.Msg.GetCertificatePem()))
+	principal, err := f.svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), parseCertPEM(t, enrolled.Msg.GetCertificatePem()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof, err := f.service.Authority.Sign(t.Context(), &agentv1.SessionAcquisition{
-		DeploymentId: f.service.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
+	proof, err := f.svc.Authority.Sign(t.Context(), &agentv1.SessionAcquisition{
+		DeploymentId: f.svc.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
 		RequestId: uuid.NewString(), Incarnation: uuid.NewString(), BootId: uuid.NewString(), InstallationId: request.GetInstallationId(),
 	}, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.service.AcquireSession(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(&devicev1.AcquireSessionRequest{AuthorityProof: proof})); err != nil {
+	if _, err := f.svc.AcquireSession(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(&devicev1.AcquireSessionRequest{AuthorityProof: proof})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.service.ReportHostObservation(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "org-engineering"))); err != nil {
+	if _, err := f.svc.ReportHostObservation(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "org-engineering"))); err != nil {
 		t.Fatal(err)
 	}
-	plan, err = orgapply.Plan(f.ownerCtx, f.service, spec)
+	plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := orgapply.Apply(f.ownerCtx, f.service, plan, orgapply.Options{})
+	result, err := orgapply.Apply(f.stepUp, f.svc, plan, orgapply.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +87,7 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if !activated {
 		t.Fatal("matching enrolled device not activated")
 	}
-	state, err := f.service.GetDeviceResourceState(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: enrolled.Msg.GetDeviceId()}))
+	state, err := f.svc.GetDeviceResourceState(f.stepUp, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: enrolled.Msg.GetDeviceId()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,11 +95,11 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if head == "" || state.Msg.GetActiveTargetPreview() == nil {
 		t.Fatal("active target evidence missing")
 	}
-	plan, err = orgapply.Plan(f.ownerCtx, f.service, spec)
+	plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err = orgapply.Apply(f.ownerCtx, f.service, plan, orgapply.Options{})
+	result, err = orgapply.Apply(f.stepUp, f.svc, plan, orgapply.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +111,7 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if len(result.Secrets) != 0 {
 		t.Fatal("second apply reissued secrets")
 	}
-	state, err = f.service.GetDeviceResourceState(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: enrolled.Msg.GetDeviceId()}))
+	state, err = f.svc.GetDeviceResourceState(f.stepUp, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: enrolled.Msg.GetDeviceId()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,11 +121,11 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	// An absent-group plan may race enrollment. The create-only API guard must not
 	// rewrite the now-populated group's authorization membership.
 	group := spec.GetGroups()[0]
-	_, err = f.service.SetDeviceGroup(f.ownerCtx, connect.NewRequest(&adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: group.GetId(), Name: group.GetName(), CreateOnly: true, Reason: "stale absent group plan regression"}))
+	_, err = f.svc.SetDeviceGroup(f.stepUp, connect.NewRequest(&adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: group.GetId(), Name: group.GetName(), CreateOnly: true, Reason: "stale absent group plan regression"}))
 	if connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("create-only existing group: %v", err)
 	}
-	groups, err := f.service.ListDeviceGroups(f.ownerCtx, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{}))
+	groups, err := f.svc.ListDeviceGroups(f.stepUp, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}

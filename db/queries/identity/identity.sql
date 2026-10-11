@@ -222,17 +222,11 @@ RETURNING authorization_version;
 -- name: ReadAuthorizationClock :one
 SELECT clock_timestamp()::timestamptz;
 
--- name: GetAuthorizationPolicy :one
-SELECT digest FROM authorization_policy WHERE id = true;
-
 -- name: LockAuthorizationPolicy :one
 SELECT digest FROM authorization_policy WHERE id = true FOR SHARE;
 
--- name: LockAuthorizationPolicyUpdate :one
-SELECT digest FROM authorization_policy WHERE id = true FOR UPDATE;
-
 -- name: SetAuthorizationPolicy :exec
-UPDATE authorization_policy SET digest = sqlc.arg(digest) WHERE id = true;
+UPDATE authorization_policy SET digest = sqlc.arg(digest), updated_at = clock_timestamp() WHERE id = true;
 
 -- name: InvalidatePolicyAuthorizations :exec
 UPDATE principals SET authorization_version = authorization_version + 1;

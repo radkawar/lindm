@@ -77,7 +77,7 @@ func (s *Service) CreateProvisioningToken(ctx context.Context, req *connect.Requ
 	if err := provisioningAssignmentAuthority(authorization.Principal(), req.Msg); err != nil {
 		return nil, err
 	}
-	if (req.Msg.GetApprovalRequired() && authorization.Principal().ServiceAccount) || (len(req.Msg.GetProfileRevisionIds()) != 0 && s.Identity.ApprovalRequired(identity.PermissionAssignResources) && !req.Msg.GetApprovalRequired()) {
+	if (req.Msg.GetApprovalRequired() && authorization.Principal().ServiceAccount) || (len(req.Msg.GetProfileRevisionIds()) != 0 && authorization.ApprovalRequired(identity.PermissionAssignResources) && !req.Msg.GetApprovalRequired()) {
 		return nil, ApprovalError(identity.ErrApprovalRequired)
 	}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(req.Msg)
@@ -272,7 +272,7 @@ func (s *Service) provisioningAuthorization(ctx context.Context, token devicedb.
 	if err := provisioningAssignmentAuthority(authorization.Principal(), assignment); err != nil {
 		return nil, nil, err
 	}
-	if len(assignment.GetProfileRevisionIds()) != 0 && s.Identity.ApprovalRequired(identity.PermissionAssignResources) && !token.ApprovalRequired {
+	if len(assignment.GetProfileRevisionIds()) != 0 && authorization.ApprovalRequired(identity.PermissionAssignResources) && !token.ApprovalRequired {
 		return nil, nil, ApprovalError(identity.ErrApprovalRequired)
 	}
 	return authorization, assignment, nil

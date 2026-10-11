@@ -28,12 +28,16 @@ func runVMDispatch(ctx context.Context, args []string, stdout, stderr io.Writer)
 	hold := flags.Duration("hold", 0, "hold the live console before revocation for up to one hour; timeout or SIGINT resumes revocation and cleanup")
 	localAuthority := flags.Bool("local-authority", false, "use isolated local password/WebAuthn authority instead of Keycloak")
 	powerActions := flags.Bool("power-actions", false, "qualify signed restart, refresh inventory and shutdown instead of service scenarios")
+	runtimeAuthorization := flags.Bool("runtime-authorization", false, "qualify runtime authorization and browser organization apply with two local humans on Ubuntu 24.04")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 || *manifestPath == "" || *server == "" {
 		return errors.New("vm dispatch requires -manifest and -lindmd; no positional arguments")
+	}
+	if *runtimeAuthorization && *record == "" {
+		return errors.New("runtime authorization qualification requires a new -record evidence path")
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {
@@ -46,9 +50,13 @@ func runVMDispatch(ctx context.Context, args []string, stdout, stderr io.Writer)
 			return err
 		}
 	}
-	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, Hold: *hold, Progress: stderr, LocalAuthority: *localAuthority, PowerActions: *powerActions})
+	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, Hold: *hold, Progress: stderr, LocalAuthority: *localAuthority, PowerActions: *powerActions, RuntimeAuthorization: *runtimeAuthorization})
 	if result != nil {
-		runErr = errors.Join(runErr, writeLabEvidence(stdout, *record, result))
+		recordErr := writeLabEvidence(stdout, *record, result)
+		runErr = errors.Join(runErr, recordErr)
+		if *runtimeAuthorization && recordErr == nil {
+			runErr = errors.Join(runErr, os.Chmod(*record, 0400))
+		}
 	}
 	return runErr
 }

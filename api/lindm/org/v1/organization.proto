@@ -15,8 +15,8 @@ import "lindm/policy/v1/targeting.proto";
 option go_package = "lindm/gen/lindm/org/v1;orgv1";
 
 // Organization composes product API messages; it is not a second policy language.
-// Omitted objects are not deleted. Accounts require a browser-kind session and
-// authorization is server configuration, never mutable through AdminService.
+// Omitted objects are not deleted. Accounts require a browser-kind session.
+// Authorization replaces the complete persisted runtime policy through AdminService.
 message Organization {
   option (buf.validate.message).cel = {
     id: "organization.unique_ids"
@@ -63,7 +63,7 @@ message Organization {
   repeated AdvisoryException advisory_exceptions = 9 [(buf.validate.field).repeated.max_items = 100];
   // Browser scoped: CLI reports requires console session without changing these.
   repeated lindm.auth.v1.CreateAccountRequest accounts = 10 [(buf.validate.field).repeated.max_items = 100];
-  // Server scoped: the caller that owns server configuration applies this policy.
+  // Applied before accounts, so newly declared custom roles are available.
   lindm.auth.v1.AuthorizationPolicy authorization = 11;
 }
 

@@ -527,8 +527,8 @@ example is [`lab/demo/org.json`](../lab/demo/org.json).
 | `rollouts`                     | Product rollout specifications with stable IDs; existing specifications are immutable                                                             |
 | `provisioningTokens`, `grants` | Stable names plus product request templates; omit engine-owned request IDs, reasons and names                                                     |
 | `advisoryExceptions`           | Exact hostname/advisory/package selectors plus the product acceptance reason and absolute expiry; omit engine-resolved request/device/finding IDs |
-| `accounts`                     | Product account requests; CLI reports `requires console session` without creating accounts                                                        |
-| `authorization`                | Product authorization policy; CLI reports `requires server configuration` without changing server configuration                                   |
+| `accounts`                     | Product account requests; CLI directs the operator to Accounts → Import organization in a browser session without creating accounts               |
+| `authorization`                | Complete runtime role/group/approval policy, read and replaced through AdminService with an observed revision and durable request replay          |
 
 The demo declares Engineering, Finance, IT/Helpdesk and Contractors static groups
 and matching label-based dynamic groups. Each group's provisioning token applies
@@ -574,11 +574,14 @@ not infer equivalent packages or repositories on other distributions.
 Configure `demo-helpdesk` with `fleet.read`, `remote_assistance.run` and `actions.lock`;
 configure `demo-security-analyst` with `fleet.read`, `advisory_exceptions.manage`,
 `approvals.manage` and `actions.lock`. Set `approval_required_permissions` to include
-`actions.lock` in the server authorization policy before using the demo accounts.
+`actions.lock` in the runtime authorization policy. Organization apply installs this
+policy before accounts; no server-file edit or restart is required. Helpdesk and
+analyst are scoped to the demo's Engineering, Finance and IT/Helpdesk device groups.
 Helpdesk requests a lock; a different analyst can approve it because they have both
 approval and lock authority. The requester cannot approve their own action.
-Owner and auditor use their built-in roles. Create/enroll these accounts through the
-console after configuring the custom roles; apply's CLI bearer cannot do this.
+Owner and auditor use their built-in roles. Import the organization from Accounts
+in the console to create these accounts and save their shown-once enrollment secrets;
+the CLI bearer deliberately cannot do this.
 Remote assistance still requires device-user consent.
 
 Advisory exception examples select `demo-engineering-01` and `demo-finance-01`.
@@ -586,6 +589,60 @@ Their expiries are 45 and 60 days after 2026-10-11; review the dates and reasons
 before use. These are illustrative selectors, not a claim that either host is
 vulnerable. Missing or ambiguous hosts/findings remain pending; no finding is
 fabricated and no unrelated finding is accepted.
+
+#### Runtime authorization and browser account import
+
+`GetAuthorization` and `UpdateAuthorization` require fresh unrestricted
+`accounts.manage`, including for exact historical replay. CLI PKCE credentials may
+use these AdminService operations; they do **not** become browser credentials.
+The Accounts import workflow posts the typed organization to
+`/auth/organization/apply`, requiring a live browser-kind session, exact Origin and
+CSRF token. The server runs the same `internal/orgapply` planner and applier used by
+`lindmctl`. Review binds the document, observed CAS heads and named account state;
+changed review inputs require a new preview. It applies authorization before
+accounts so new custom roles are available. Existing profile, scope, approval and
+secret-delivery boundaries remain authoritative.
+
+The import is not atomic. Earlier outcomes and issued secrets remain visible when
+a later operation fails. Secrets stay only in component memory, never browser
+storage, URLs or query caches. Download or copy them privately before leaving.
+Omitting accounts never deletes them. An account entry creates or enables that named
+account and replaces its role, device scopes and emergency designation; updating
+access revokes its existing sessions. Account creation/reset has no durable secret
+replay, so a lost response needs explicit recovery, not a new automatic issuance.
+The browser capability is rechecked between mutations. If a runtime replacement
+ends the importing session, the import stops with its committed outcomes rather
+than continuing through in-process server calls.
+
+`ServerConfig.authorization` is bootstrap-only after the first runtime write.
+Persisted runtime policy replaces it completely, including when the saved policy is
+empty. There is no merge, fallback-on-error or reset-to-config switch. Restart and
+other replicas read the persisted policy; stale configuration cannot overwrite it.
+Authentication source, emergency restrictions and built-in grants remain in the
+authority fingerprint. Source changes still require valid server configuration
+and owner-recovery checks.
+
+Each accepted replacement atomically advances the policy revision and all actor
+authorization versions, fences pre-change directory observations, ends non-owner
+browser and CLI sessions, and records `identity.authorization_updated` with the
+operator reason, old/new revisions, policy digest and revoked-session count.
+Unrestricted built-in local owners and the pinned deployment owner retain recovery
+sessions; their old worker grants are still invalid. Restoring a policy does not
+restore revoked sessions or earlier approvals. Mutations lock policy before
+principals and evaluate optional approval requirements from the same immutable,
+fresh authorization snapshot fenced at commit. Exact request replay returns its
+historical result, not the current policy; a changed payload with that request ID is
+rejected, and a stale expected revision requires review.
+
+Directory group bindings are active only under directory-primary authentication.
+Local accounts use direct roles and device scopes; static device groups are never
+substituted for directory identity groups. The console selects known configured
+bindings. New external groups require a source-issued path/reference in Advanced
+setup because there is no directory catalog API; no extra provider OAuth scopes or
+fabricated group names are introduced. Keycloak uses an exact group path, Entra an
+immutable tenant group object ID, and Okta/Google their immutable group references.
+The provider-specific reference-entry limitation remains a design-owner decision,
+not a claim of searchable upstream catalog coverage.
 
 #### Declarative organization gaps
 
@@ -624,8 +681,16 @@ fabricated and no unrelated finding is accepted.
   deployment history. Use a new stable rollout ID and update its assignments.
   In-place changes remain gated on a versioned rollout contract that preserves
   historical specifications and verifies concurrent deployment behavior.
-- Account mutation requires a console session, and its API has no compare-and-swap
-  or replay receipt. Server authorization configuration is outside AdminService.
+- **Gate: concurrent account edits and uncertain enrollment issuance.** Console
+  import is implemented, and runtime authorization has audited CAS and exact
+  replay. Account endpoints intentionally retain browser-only, last-writer-wins
+  updates and non-replayable issuance. The reviewed import digest detects changes
+  before apply, but does not serialize a concurrent authorized account writer
+  after that check. Coordinate account edits; after a lost response, refresh
+  accounts and reset enrollment deliberately if needed, never automatically retry
+  issuance. Closing this residual gate requires per-account revisions and
+  secret-free issuance receipts with explicit recovery, not a claim of atomic
+  account apply or promotion of CLI credentials to browser authority.
 
 ## 3. Dangerous actions
 

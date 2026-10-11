@@ -29,6 +29,7 @@ import { sessionQueryKey, sessionQueryOptions } from "./queries";
 import type { DeviceScope } from "../../../gen/lindm/auth/v1/authorization_pb";
 import { normalizedScopes, ScopeEditor } from "./scope-editor";
 import { IdentitySettings } from "./identity-settings";
+import { OrganizationImport } from "./organization-import";
 
 export function accountsQueryOptions(lifetime: AuthLifetime) {
   return queryOptions({
@@ -109,10 +110,11 @@ export function Accounts({
   return (
     <section className="grid min-w-0 gap-6" aria-busy={accounts.isFetching || busy}>
       <PageHeader
-        title="Local accounts"
-        description="Manage who can sign in to the console and what they can do."
+        title="Accounts"
+        description="Review console access, import organization changes and enroll local account holders."
       />
       <IdentitySettings />
+      <OrganizationImport devicePicker={devicePicker} groupPicker={groupPicker} />
       {error ? (
         <RpcError failure={error}>
           {error.ambiguous ? (

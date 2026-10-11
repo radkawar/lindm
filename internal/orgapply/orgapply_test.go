@@ -138,8 +138,8 @@ func TestStrictValidationAndBrowserBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Outcomes[0].Status != "pending" || !strings.Contains(result.Outcomes[0].Detail, "console session") || result.Outcomes[1].Status != "unsupported" {
-		t.Fatal("CLI claimed to apply browser/server sections")
+	if result.Outcomes[0].Status != "updated" || result.Outcomes[1].Status != "pending" || !strings.Contains(result.Outcomes[1].Detail, "browser session") {
+		t.Fatal("CLI failed runtime policy or claimed browser account authority")
 	}
 }
 

@@ -97,7 +97,11 @@ func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries,
 		return Enrollment{}, err
 	}
 	username, role, breakGlass := request.GetUsername(), request.GetRole(), request.GetBreakGlass()
-	if s.policy.role(role) == nil {
+	policy, err := s.currentPolicy(ctx, q)
+	if err != nil {
+		return Enrollment{}, err
+	}
+	if policy.role(role) == nil {
 		return Enrollment{}, ErrAuthorizationDenied
 	}
 	scopeBinding, err := protojson.Marshal(&authv1.RoleBinding{Scopes: request.GetScopes()})
@@ -176,6 +180,10 @@ func (s *Service) resetLocalCredentials(ctx context.Context, q *identitydb.Queri
 }
 
 func (s *Service) bumpLocalAuthorization(ctx context.Context, q *identitydb.Queries, id uuid.UUID, role string) error {
+	policy, err := s.currentPolicy(ctx, q)
+	if err != nil {
+		return err
+	}
 	account, err := q.GetLocalAccount(ctx, id)
 	if err != nil {
 		return s.dbErr(err)
@@ -185,7 +193,7 @@ func (s *Service) bumpLocalAuthorization(ctx context.Context, q *identitydb.Quer
 		return errStore
 	}
 	var bindings []*authv1.RoleBinding
-	if definition := s.policy.role(role); definition != nil {
+	if definition := policy.role(role); definition != nil {
 		binding.Role, binding.Permissions = role, definition.GetPermissions()
 		bindings = []*authv1.RoleBinding{binding}
 	}

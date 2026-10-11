@@ -43,7 +43,7 @@ func TestApplyDryRunAndStrictInput(t *testing.T) {
 					if spec.GetName() != "demo" {
 						t.Fatal("lost organization")
 					}
-					return &orgapply.ChangePlan{Outcomes: []orgapply.Outcome{{Kind: "account", Name: "owner", Status: "unsupported", Detail: "requires console session"}, {Kind: "authorization", Status: "unsupported", Detail: "requires server configuration"}}}, nil
+					return &orgapply.ChangePlan{Outcomes: []orgapply.Outcome{{Kind: "account", Name: "owner", Status: "pending", Detail: "requires console session"}, {Kind: "authorization", Status: "updated", Detail: "replace runtime authorization"}}}, nil
 				},
 				apply: func(context.Context, adminv1connect.AdminServiceClient, *orgapply.ChangePlan, orgapply.Options) (*orgapply.Result, error) {
 					t.Fatal("dry-run mutated")
@@ -59,7 +59,7 @@ func TestApplyDryRunAndStrictInput(t *testing.T) {
 			if err != nil && strings.Contains(err.Error(), "private-value") {
 				t.Fatal("decoder leaked input")
 			}
-			if tc.valid && (!strings.Contains(out.String(), "requires console session") || !strings.Contains(out.String(), "requires server configuration")) {
+			if tc.valid && (!strings.Contains(out.String(), "requires console session") || !strings.Contains(out.String(), "replace runtime authorization")) {
 				t.Fatal("missing authority boundaries")
 			}
 		})

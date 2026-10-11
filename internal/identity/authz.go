@@ -34,6 +34,7 @@ type accessDecision struct {
 // process successfully read the authoritative directory, not a token timestamp
 // and not a broker import read.
 type directorySnapshot struct {
+	policy               *authorizationPolicy
 	PrincipalID          uuid.UUID
 	Issuer               string
 	Subject              string

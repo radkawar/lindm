@@ -325,6 +325,11 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 	identityHandler := p.auth.Handler()
 	mux.Handle("/auth/", identityHandler)
 	mux.Handle("/scim/v2/", identityHandler)
+	organization, err := organizationHandler(p.auth, p.consoleDevices)
+	if err != nil {
+		return nil, fmt.Errorf("initialize organization apply: %w", err)
+	}
+	mux.Handle("POST /auth/organization/apply", organization)
 	// Initial installations have no session or device certificate. Only verified
 	// public installation documents are exposed here, never a filesystem tree.
 	mux.Handle("/bootstrap/", bootstrapMaterialHandler(resources.ExecutionBootstrap))

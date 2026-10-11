@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package lindm.org.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/org/v1/organization.proto";
+
+option go_package = "lindm/gen/lindm/org/v1;orgv1";
+
+// Browser-only HTTP /auth/organization/apply; cookie, exact Origin and CSRF required.
+message ApplyOrganizationRequest {
+  option (buf.validate.message).cel = {
+    id: "organization.apply_preview"
+    message: "apply must bind the reviewed plan"
+    expression: "!this.apply || size(this.expected_plan_sha256) == 32"
+  };
+  Organization organization = 1 [(buf.validate.field).required = true];
+  bool apply = 2;
+  bytes expected_plan_sha256 = 3 [(buf.validate.field).bytes.max_len = 32];
+}
+message OrganizationOutcome {
+  string kind = 1;
+  string name = 2;
+  string id = 3;
+  string status = 4;
+  string detail = 5;
+}
+message OrganizationSecret {
+  string kind = 1;
+  string name = 2;
+  string id = 3;
+  string secret = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+message ApplyOrganizationResponse {
+  bytes plan_sha256 = 1;
+  repeated OrganizationOutcome outcomes = 2;
+  // Original issuance responses only. Never cache, log or persist in the browser.
+  repeated OrganizationSecret secrets = 3;
+  // A failed apply retains already-committed outcomes and shown-once secrets.
+  string failure_code = 4;
+  string failure_reason = 5;
+}

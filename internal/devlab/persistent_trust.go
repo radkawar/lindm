@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protojson"
+	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
-	"lindm/internal/config"
 )
 
 func (f *AuthorityFixture) transportTrustDirectory() string {
@@ -83,32 +84,27 @@ func (f *AuthorityFixture) snapshotPersistentTrust(shared string, cfg *configv1.
 	return os.WriteFile(path, []byte(dsn.String()), 0600)
 }
 
-// ConfigureAuthorization restarts only lindmd on the same database. Sessions,
-// enrollment and device state remain product-owned PostgreSQL data. A no-op
-// policy update does not restart the process.
-func (f *AuthorityFixture) ConfigureAuthorization(ctx context.Context, policy *authv1.AuthorizationPolicy) error {
+// ConfigureAuthorization applies runtime policy through the ordinary owner
+// AdminService session. Configuration stays bootstrap-only and no restart occurs.
+func (f *AuthorityFixture) ConfigureAuthorization(ctx context.Context, policy *authv1.AuthorizationPolicy) (result error) {
 	if f.closed || f.connected != nil {
-		return errors.New("authorization configuration requires an open controller fixture")
+		return errors.New("authorization update requires an open controller fixture")
 	}
-	document, err := config.Load(f.configPath())
+	owner, err := f.OpenOwnerSession(ctx)
 	if err != nil {
 		return err
 	}
-	if proto.Equal(document.Proto.GetAuthorization(), policy) {
+	defer func() { result = errors.Join(result, owner.Close(context.WithoutCancel(ctx))) }()
+	current, err := owner.Admin.GetAuthorization(ctx, connect.NewRequest(&adminv1.GetAuthorizationRequest{}))
+	if err != nil {
+		return err
+	}
+	if current.Msg.GetAuthorization().GetRuntime() && proto.Equal(current.Msg.GetAuthorization().GetPolicy(), policy) {
 		return nil
 	}
-	document.Proto.Authorization = proto.CloneOf(policy)
-	resources, err := document.Resolve()
-	if err != nil {
-		return err
-	}
-	resources.HTTPClient.CloseIdleConnections()
-	data, err := protojson.Marshal(document.Proto)
-	if err != nil {
-		return err
-	}
-	if err := f.writeConfig(data); err != nil {
-		return err
-	}
-	return f.Restart(ctx)
+	_, err = owner.Admin.UpdateAuthorization(ctx, connect.NewRequest(&adminv1.UpdateAuthorizationRequest{
+		RequestId: uuid.NewString(), ExpectedRevision: current.Msg.GetAuthorization().GetRevision(),
+		Policy: policy, Reason: "Configure laboratory organization access",
+	}))
+	return err
 }

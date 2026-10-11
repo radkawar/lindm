@@ -11,6 +11,12 @@ import (
 	authv1 "lindm/gen/lindm/auth/v1"
 )
 
+// CheckSession checks live browser account-management authority for orgapply.
+func (s *OwnerSession) CheckSession(ctx context.Context) error {
+	_, err := s.ListAccounts(ctx)
+	return err
+}
+
 // ListAccounts reads the existing browser-only account endpoint. OwnerSession is
 // a cookie/CSRF session; this adapter never accepts or translates CLI bearers.
 func (s *OwnerSession) ListAccounts(ctx context.Context) (*authv1.ListAccountsResponse, error) {

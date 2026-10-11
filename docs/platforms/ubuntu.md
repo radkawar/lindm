@@ -912,6 +912,32 @@ phase `unqualified_upstream_prerequisite` and it no longer fails the release
 gate. The WebKit Origin/Referrer diagnostic remains mandatory; any other WebKit
 authenticator failure still fails the gate.
 
+### Runtime organization authorization
+
+The maintained `lab vm dispatch -runtime-authorization -local-authority` passed
+on `dgx21` with an Ubuntu 24.04.4 arm64 server and an actually enrolled Ubuntu
+24.04.5 arm64 guest (kernel `6.8.0-142-generic`). Source checkpoint
+`34f74f75f4f69343cc072ba626cee9673bb7826d` and the
+[runtime authority receipt](../verification.md#runtime-authorization-and-organization-accounts)
+bind the signed package, server and runner. The record
+`$HOME/.cache/lindm-org-runtime-20261011/runtime-authorization-arm64-a7.json` has
+SHA-256 `6bf4347354847e86106a758f51047798c4123012db5dfbee9fc313c46e3838e7`.
+
+All thirteen checks passed: two-human runtime CAS/replay, changed-request refusal,
+persisted precedence after changed bootstrap config and server restart, another
+real server instance, enrolled-device scope/session fencing, browser-session
+organization account apply including partial shown-once secrets, CLI runtime
+apply without browser account authority, and the six audited policy revisions.
+The native fixture must forward the actual dynamic signed console origin as well
+as the device endpoint; a fixed legacy enrollment alias does not qualify the normal
+CLI. Earlier missing-firmware and transport failures are retained in verification.
+
+This is native aarch64 KVM/QEMU 8.2.2 with pinned AAVMF
+`2024.02-2ubuntu0.10`, virtio-blk, Secure Boot disabled/SetupMode, no TPM and no
+desktop. It does not expand the server deployment matrix to arm64 packages or
+claim physical or graphical qualification. Runtime authorization has no
+distribution-specific agent effect requiring a separate Fedora run.
+
 ## Gaps
 
 - Desktop GNOME/KDE, aarch64, physical hardware and air-gap gates beyond the amd64

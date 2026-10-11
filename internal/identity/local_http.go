@@ -148,21 +148,7 @@ func accountStatus(err error) int {
 	return statusFor(err)
 }
 func (s *Service) handleAccounts(w http.ResponseWriter, r *http.Request) {
-	response := &authv1.ListAccountsResponse{Roles: append([]string(nil), s.policy.names...)}
-	err := s.accountTransaction(r.Context(), func(q *identitydb.Queries, _ Principal) error {
-		rows, err := q.ListLocalAccounts(r.Context())
-		if err != nil {
-			return s.dbErr(err)
-		}
-		for _, row := range rows {
-			binding := &authv1.RoleBinding{}
-			if err := protojson.Unmarshal(row.ScopeBinding, binding); err != nil {
-				return errStore
-			}
-			response.Accounts = append(response.Accounts, &authv1.LocalAccount{Id: row.ID.String(), Username: row.Username, Role: row.Role, Enabled: row.Enabled, BreakGlass: row.BreakGlass, Enrolled: row.Enrolled, Scopes: binding.GetScopes()})
-		}
-		return nil
-	})
+	response, err := s.BrowserAccounts().ListAccounts(r.Context())
 	if err != nil {
 		writeStatus(w, accountStatus(err))
 		return
@@ -177,67 +163,19 @@ func (s *Service) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	if !s.readAuthRequest(w, r, request) {
 		return
 	}
-	var enrollment Enrollment
-	err := s.accountTransaction(r.Context(), func(q *identitydb.Queries, actor Principal) error {
-		var err error
-		enrollment, err = s.createLocalAccount(r.Context(), q, request)
-		if err != nil {
-			return err
-		}
-		return s.insertAudit(r.Context(), q, &actor.ID, "identity.local_account_created", principalResource(enrollment.AccountID), "")
-	})
+	enrollment, err := s.BrowserAccounts().CreateAccount(r.Context(), request)
 	if err != nil {
 		writeStatus(w, accountStatus(err))
 		return
 	}
-	writeProto(w, enrollmentProto(enrollment))
+	writeProto(w, enrollment)
 }
 func (s *Service) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	request := &authv1.UpdateAccountRequest{}
 	if !s.readAuthRequest(w, r, request) {
 		return
 	}
-	if s.policy.role(request.GetRole()) == nil {
-		writeStatus(w, http.StatusBadRequest)
-		return
-	}
-	id, err := uuid.Parse(request.GetAccountId())
-	if err != nil {
-		writeStatus(w, http.StatusBadRequest)
-		return
-	}
-	err = s.accountTransaction(r.Context(), func(q *identitydb.Queries, actor Principal) error {
-		if _, err := q.GetPrincipalForUpdate(r.Context(), id); err != nil {
-			return s.dbErr(err)
-		}
-		account, err := q.GetLocalAccount(r.Context(), id)
-		if err != nil {
-			return s.dbErr(err)
-		}
-		previous := &authv1.RoleBinding{}
-		if err := protojson.Unmarshal(account.ScopeBinding, previous); err != nil {
-			return errStore
-		}
-		binding := &authv1.RoleBinding{Scopes: request.GetScopes()}
-		encoded, err := protojson.Marshal(binding)
-		if err != nil {
-			return err
-		}
-		if account.Enabled == request.GetEnabled() && account.Role == request.GetRole() && account.BreakGlass == request.GetBreakGlass() && proto.Equal(previous, binding) {
-			return nil
-		}
-		if err := q.UpdateLocalAccount(r.Context(), identitydb.UpdateLocalAccountParams{ID: id, Enabled: request.GetEnabled(), Role: request.GetRole(), BreakGlass: request.GetBreakGlass(), ScopeBinding: encoded}); err != nil {
-			return s.dbErr(err)
-		}
-		role := request.GetRole()
-		if !request.GetEnabled() {
-			role = ""
-		}
-		if err := s.invalidateLocalAccount(r.Context(), q, id, role); err != nil {
-			return err
-		}
-		return s.insertSystemAudit(r.Context(), q, &actor.ID, "identity.local_account_updated", principalResource(id), "sessions and pending authority revoked")
-	})
+	err := s.BrowserAccounts().UpdateAccount(r.Context(), request)
 	if err != nil {
 		writeStatus(w, accountStatus(err))
 		return

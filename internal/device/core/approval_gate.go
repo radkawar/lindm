@@ -29,7 +29,7 @@ func (s *Service) PrepareActionApproval(ctx context.Context, actor identity.Prin
 	if s.Identity == nil {
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
-	if !s.Identity.ApprovalRequired(permission) && id == "" {
+	if !actor.ApprovalRequired(permission) && id == "" {
 		return nil, nil
 	}
 	if actor.ServiceAccount {
@@ -53,7 +53,7 @@ func (s *Service) LockActionApproval(ctx context.Context, tx pgx.Tx, consumption
 		}
 		return s.Identity.LockAuthorization(ctx, tx, authorization, permission)
 	}
-	if s.Identity.ApprovalRequired(permission) {
+	if authorization.ApprovalRequired(permission) {
 		return identity.ErrApprovalRequired
 	}
 	return s.Identity.LockAuthorization(ctx, tx, authorization, permission)

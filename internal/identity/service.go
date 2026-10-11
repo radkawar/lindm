@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -37,6 +38,8 @@ type Service struct {
 	publicOrigin  string
 	redirectURI   string
 	policy        *authorizationPolicy
+	runtimePolicy atomic.Pointer[authorizationPolicy]
+	policyBroker  *configv1.KeycloakBrokerUpstream
 	localIssuer   string
 	localPrimary  bool
 	breakGlass    *configv1.BreakGlassPolicy
@@ -84,6 +87,8 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
 		&authv1.CLIAuthorizationRequest{}, &authv1.CLIExchangeRequest{},
 		&authv1.AuthorizationPolicy{}, &authv1.DeviceScope{},
+		&adminv1.UpdateAuthorizationRequest{},
+		&configv1.ServerConfig{},
 		&authv1.RotateSCIMCredentialRequest{}, &configv1.SCIMConfig{},
 		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.ListApprovalsRequest{},
 		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
@@ -155,6 +160,7 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		publicOrigin:  origin,
 		redirectURI:   redirect,
 		policy:        policy,
+		policyBroker:  cfg.Broker,
 		localIssuer:   localIssuer,
 		breakGlass:    cfg.BreakGlass,
 		webauthn:      webAuthn,
@@ -301,7 +307,7 @@ func (s *Service) resolveKind(ctx context.Context, cookie, kind string) (Princip
 			snap = refreshed
 		}
 	}
-	dec := decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap)
+	dec := decideAccess(s.clock(), s.accessIssuer(snap), snap.policy, snap)
 	// snap may predate a re-enable. Revocation rechecks under the principal lock.
 	if dec.RevokeSessions {
 		if err := s.revokePrincipal(ctx, snap.PrincipalID); err != nil {
@@ -546,7 +552,7 @@ func (s *Service) completeLogin(ctx context.Context, subject string, obs directo
 		if err != nil {
 			return err
 		}
-		dec := decideAccess(s.clock(), s.issuer, s.policy, snap)
+		dec := decideAccess(s.clock(), s.issuer, snap.policy, snap)
 		actor := row.ID
 		if dec.Kind != accessOK {
 			denied = true

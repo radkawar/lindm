@@ -264,6 +264,17 @@ paths; Entra mappings use immutable group object IDs, never display names.
 The old top-level `oidc` and provider-specific administrator-group fields are
 rejected, not migrated implicitly.
 
+The server-file `authorization` examples below are bootstrap policy, not a runtime
+override. After the first audited runtime replacement, the complete policy stored
+in PostgreSQL takes precedence, even if it is empty and even after restart. Use the
+console's Authorization task or `lindmctl apply` with the organization
+`authorization` field to manage it. Only a browser session may import organization
+accounts through Accounts; CLI credentials do not acquire account issuance authority.
+Local-primary deployments assign roles and device scopes directly to accounts and
+reject directory-group bindings. See
+[runtime authorization](docs/security-and-operations.md#runtime-authorization-and-browser-account-import)
+for revision/replay, session revocation and recovery-owner semantics.
+
 The development fixture defaults to Keycloak to preserve the real SSO and
 `check-fresh` lanes. To create a fresh local-only fixture instead:
 

@@ -28,6 +28,7 @@ func organizationFixture() *orgv1.Organization {
 
 type fakeAdmin struct {
 	adminv1connect.AdminServiceClient
+	authorization   *adminv1.AuthorizationState
 	groups          []*adminv1.DeviceGroup
 	profiles        map[string]*adminv1.ProfileRevision
 	assignments     []*policyv1.TargetCandidate
@@ -46,6 +47,17 @@ type fakeAdmin struct {
 
 func newFakeAdmin() *fakeAdmin {
 	return &fakeAdmin{profiles: make(map[string]*adminv1.ProfileRevision)}
+}
+func (f *fakeAdmin) GetAuthorization(context.Context, *connect.Request[adminv1.GetAuthorizationRequest]) (*connect.Response[adminv1.GetAuthorizationResponse], error) {
+	return connect.NewResponse(&adminv1.GetAuthorizationResponse{Authorization: proto.CloneOf(f.authorization)}), nil
+}
+func (f *fakeAdmin) UpdateAuthorization(_ context.Context, request *connect.Request[adminv1.UpdateAuthorizationRequest]) (*connect.Response[adminv1.UpdateAuthorizationResponse], error) {
+	if request.Msg.GetExpectedRevision() != f.authorization.GetRevision() {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("stale authorization"))
+	}
+	f.requests = append(f.requests, proto.CloneOf(request.Msg))
+	f.authorization = &adminv1.AuthorizationState{Policy: proto.CloneOf(request.Msg.GetPolicy()), Runtime: true, Revision: request.Msg.GetExpectedRevision() + 1}
+	return connect.NewResponse(&adminv1.UpdateAuthorizationResponse{Authorization: proto.CloneOf(f.authorization)}), nil
 }
 func (f *fakeAdmin) ListDeviceGroups(context.Context, *connect.Request[adminv1.ListDeviceGroupsRequest]) (*connect.Response[adminv1.ListDeviceGroupsResponse], error) {
 	return connect.NewResponse(&adminv1.ListDeviceGroupsResponse{Groups: f.groups}), nil

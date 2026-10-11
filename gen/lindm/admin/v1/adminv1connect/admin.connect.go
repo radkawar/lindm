@@ -33,6 +33,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// AdminServiceGetAuthorizationProcedure is the fully-qualified name of the AdminService's
+	// GetAuthorization RPC.
+	AdminServiceGetAuthorizationProcedure = "/lindm.admin.v1.AdminService/GetAuthorization"
+	// AdminServiceUpdateAuthorizationProcedure is the fully-qualified name of the AdminService's
+	// UpdateAuthorization RPC.
+	AdminServiceUpdateAuthorizationProcedure = "/lindm.admin.v1.AdminService/UpdateAuthorization"
 	// AdminServiceListDevicesProcedure is the fully-qualified name of the AdminService's ListDevices
 	// RPC.
 	AdminServiceListDevicesProcedure = "/lindm.admin.v1.AdminService/ListDevices"
@@ -271,6 +277,8 @@ const (
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
 type AdminServiceClient interface {
+	GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error)
+	UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
 	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
@@ -365,6 +373,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 	baseURL = strings.TrimRight(baseURL, "/")
 	adminServiceMethods := v1.File_lindm_admin_v1_admin_proto.Services().ByName("AdminService").Methods()
 	return &adminServiceClient{
+		getAuthorization: connect.NewClient[v1.GetAuthorizationRequest, v1.GetAuthorizationResponse](
+			httpClient,
+			baseURL+AdminServiceGetAuthorizationProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetAuthorization")),
+			connect.WithClientOptions(opts...),
+		),
+		updateAuthorization: connect.NewClient[v1.UpdateAuthorizationRequest, v1.UpdateAuthorizationResponse](
+			httpClient,
+			baseURL+AdminServiceUpdateAuthorizationProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("UpdateAuthorization")),
+			connect.WithClientOptions(opts...),
+		),
 		listDevices: connect.NewClient[v1.ListDevicesRequest, v1.ListDevicesResponse](
 			httpClient,
 			baseURL+AdminServiceListDevicesProcedure,
@@ -844,6 +864,8 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
+	getAuthorization                     *connect.Client[v1.GetAuthorizationRequest, v1.GetAuthorizationResponse]
+	updateAuthorization                  *connect.Client[v1.UpdateAuthorizationRequest, v1.UpdateAuthorizationResponse]
 	listDevices                          *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
 	getFleetSummary                      *connect.Client[v1.GetFleetSummaryRequest, v1.GetFleetSummaryResponse]
 	getDevice                            *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
@@ -923,6 +945,16 @@ type adminServiceClient struct {
 	listAdvisorySummary                  *connect.Client[v1.ListAdvisorySummaryRequest, v1.ListAdvisorySummaryResponse]
 	listAdvisoryFeeds                    *connect.Client[v1.ListAdvisoryFeedsRequest, v1.ListAdvisoryFeedsResponse]
 	acceptAdvisoryFinding                *connect.Client[v1.AcceptAdvisoryFindingRequest, v1.AcceptAdvisoryFindingResponse]
+}
+
+// GetAuthorization calls lindm.admin.v1.AdminService.GetAuthorization.
+func (c *adminServiceClient) GetAuthorization(ctx context.Context, req *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error) {
+	return c.getAuthorization.CallUnary(ctx, req)
+}
+
+// UpdateAuthorization calls lindm.admin.v1.AdminService.UpdateAuthorization.
+func (c *adminServiceClient) UpdateAuthorization(ctx context.Context, req *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error) {
+	return c.updateAuthorization.CallUnary(ctx, req)
 }
 
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
@@ -1325,6 +1357,8 @@ func (c *adminServiceClient) AcceptAdvisoryFinding(ctx context.Context, req *con
 
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
+	GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error)
+	UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
 	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
@@ -1415,6 +1449,18 @@ type AdminServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	adminServiceMethods := v1.File_lindm_admin_v1_admin_proto.Services().ByName("AdminService").Methods()
+	adminServiceGetAuthorizationHandler := connect.NewUnaryHandler(
+		AdminServiceGetAuthorizationProcedure,
+		svc.GetAuthorization,
+		connect.WithSchema(adminServiceMethods.ByName("GetAuthorization")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceUpdateAuthorizationHandler := connect.NewUnaryHandler(
+		AdminServiceUpdateAuthorizationProcedure,
+		svc.UpdateAuthorization,
+		connect.WithSchema(adminServiceMethods.ByName("UpdateAuthorization")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceListDevicesHandler := connect.NewUnaryHandler(
 		AdminServiceListDevicesProcedure,
 		svc.ListDevices,
@@ -1891,6 +1937,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case AdminServiceGetAuthorizationProcedure:
+			adminServiceGetAuthorizationHandler.ServeHTTP(w, r)
+		case AdminServiceUpdateAuthorizationProcedure:
+			adminServiceUpdateAuthorizationHandler.ServeHTTP(w, r)
 		case AdminServiceListDevicesProcedure:
 			adminServiceListDevicesHandler.ServeHTTP(w, r)
 		case AdminServiceGetFleetSummaryProcedure:
@@ -2057,6 +2107,14 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 
 // UnimplementedAdminServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAdminServiceHandler struct{}
+
+func (UnimplementedAdminServiceHandler) GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAuthorization is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateAuthorization is not implemented"))
+}
 
 func (UnimplementedAdminServiceHandler) ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDevices is not implemented"))

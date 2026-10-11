@@ -637,8 +637,10 @@ Reusable APIs live in `internal/devlab` and `internal/vmlab`:
 `DestroyPersistentFixture`, `ExportControlPlane`,
 `ConnectPersistentAuthorityFixture` and `DestroyPersistentAuthorityFixture`
 separate controller and lane ownership. `AssistanceConfiguration` restores TURN
-ports; `ConfigureAssistance`, `EnableAdvisories` and `ConfigureAuthorization`
-restart only `lindmd` when configuration changes, against the same database.
+ports; `ConfigureAssistance` and `EnableAdvisories` restart only `lindmd` when
+configuration changes, against the same database. `ConfigureAuthorization` uses a
+real owner AdminService session to replace persisted runtime policy without restart;
+it never rewrites bootstrap configuration or silently reactivates old sessions.
 Unchanged advisory configuration retains its existing publications; the ordinary
 server worker refreshes when due. Resume still waits for current, non-unknown
 device findings before reporting ready.
@@ -680,6 +682,20 @@ come from the checkout under review. The review also opens a separate real signe
 APT/RPM fixture for the OS chooser, clipboard command and trust disclosure. The
 unpublished fixture covers missing-artifact remedies and Settings readiness, so a
 mocked repository response cannot make this review pass.
+
+Runtime authorization landings additionally run
+`make ui-review UI_REVIEW_FLAGS=-directory-authorization` with the real development
+Keycloak fixture available. This adds a disposable directory-primary server, an
+independently authenticated test-owned human and source-issued group paths.
+The browser commits role/device-scope changes, selects configured bindings and
+uses Advanced setup for the actual new provider group. A separate real code/PKCE
+login proves authorized and excluded synthetic-device reads and denied policy
+editing in all four display variants. A deliberately failed source-settings HTTP
+read proves that the editor does not assume a replacement policy; it is a transport
+fault, not evidence of an upstream provider outage. The runner only reroutes the
+logical console host to its private server, preserving Origin, cookies and real
+responses. It creates no provider catalog and changes no OAuth scopes or shared
+directory group; all owned users, groups and databases are removed afterwards.
 
 The demo seed (`loadlab.SeedDemo`) is deterministic and uses only product RPCs on
 the isolated fixture: synthetic-labelled Ubuntu, Fedora, RHEL and Debian devices
@@ -1749,6 +1765,26 @@ The generated protobuf-JSON HTTP contract is `GET /auth/options`, plus
 `/auth/accounts/update`, `/auth/accounts/reset`. Unsafe requests require the exact
 configured origin; account mutations additionally require the session CSRF token.
 Responses are no-store. Enrollment finishes without creating a session.
+
+`POST /auth/organization/apply` is a browser-only, protobuf-JSON review/apply
+adapter over `internal/orgapply`; it is deliberately outside the CLI bearer
+allowlist. Preview is non-mutating and binds document/CAS/account observations.
+The result preserves earlier outcomes and original shown-once secrets on partial
+failure. Browser account capability checks the authenticated session proof again
+inside the policy/principal-fenced transaction.
+
+`GetAuthorization`/`UpdateAuthorization` are normal AdminService RPCs requiring
+fresh unrestricted `accounts.manage`. Migration `00030_runtime_authorization`
+stores the full policy, monotonically increasing revision and actor/request replay
+result. The first runtime write supersedes bootstrap configuration, including empty
+policy. All instances read the authoritative database revision; a bounded cache
+only avoids recompiling an identical immutable definition. Runtime mutations hold
+the policy update lock before principals, invalidate worker authority and prior
+directory observations, revoke non-owner sessions, and append one audit record.
+Existing builtin unrestricted local owner/pinned deployment-owner sessions remain
+available for recovery; their pending worker authorizations do not survive.
+Optional approval policy is carried by the same fresh snapshot used by the final
+mutation fence, never read from a stale process-start policy.
 
 Identity schema `00001_identity.sql` owns `local_accounts` (the same immutable UUID
 as its principal), `local_credentials`, hash-only `local_enrollments` and

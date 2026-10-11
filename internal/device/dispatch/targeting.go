@@ -73,7 +73,7 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 			}); err != nil {
 				return err
 			}
-		} else if needsApproval && s.Identity.ApprovalRequired(permission) {
+		} else if needsApproval && authorization.ApprovalRequired(permission) {
 			return identity.ErrApprovalRequired
 		}
 		if err := s.Identity.LockAuthorization(ctx, tx, authorization, permission); err != nil {

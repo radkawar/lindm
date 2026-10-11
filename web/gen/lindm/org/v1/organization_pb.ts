@@ -31,8 +31,8 @@ export const file_lindm_org_v1_organization: GenFile = /*@__PURE__*/
 
 /**
  * Organization composes product API messages; it is not a second policy language.
- * Omitted objects are not deleted. Accounts require a browser-kind session and
- * authorization is server configuration, never mutable through AdminService.
+ * Omitted objects are not deleted. Accounts require a browser-kind session.
+ * Authorization replaces the complete persisted runtime policy through AdminService.
  *
  * @generated from message lindm.org.v1.Organization
  */
@@ -90,7 +90,7 @@ export type Organization = Message<"lindm.org.v1.Organization"> & {
   accounts: CreateAccountRequest[];
 
   /**
-   * Server scoped: the caller that owns server configuration applies this policy.
+   * Applied before accounts, so newly declared custom roles are available.
    *
    * @generated from field: lindm.auth.v1.AuthorizationPolicy authorization = 11;
    */

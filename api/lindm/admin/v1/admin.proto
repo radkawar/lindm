@@ -8,6 +8,7 @@ import "lindm/admin/v1/advisories.proto";
 import "lindm/admin/v1/approvals.proto";
 import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/assistance.proto";
+import "lindm/admin/v1/authorization.proto";
 import "lindm/admin/v1/authz_groups.proto";
 import "lindm/admin/v1/device_actions.proto";
 import "lindm/admin/v1/enrollment_grants.proto";
@@ -30,6 +31,8 @@ import "lindm/validation/v1/string_rules.proto";
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 service AdminService {
+  rpc GetAuthorization(GetAuthorizationRequest) returns (GetAuthorizationResponse);
+  rpc UpdateAuthorization(UpdateAuthorizationRequest) returns (UpdateAuthorizationResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc GetFleetSummary(GetFleetSummaryRequest) returns (GetFleetSummaryResponse);
   rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse);

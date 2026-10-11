@@ -57,7 +57,9 @@ type ServerConfig struct {
 	// No network requests occur unless refresh_enabled is explicitly true.
 	Advisories *AdvisoryConfig `protobuf:"bytes,15,opt,name=advisories,proto3" json:"advisories,omitempty"`
 	// Enables integrations and report workers on this replica.
-	Integrations  *IntegrationsConfig     `protobuf:"bytes,16,opt,name=integrations,proto3" json:"integrations,omitempty"`
+	Integrations *IntegrationsConfig `protobuf:"bytes,16,opt,name=integrations,proto3" json:"integrations,omitempty"`
+	// Bootstrap policy only. Once AdminService persists runtime authorization,
+	// that complete policy takes precedence, including an explicitly empty policy.
 	Authorization *v1.AuthorizationPolicy `protobuf:"bytes,17,opt,name=authorization,proto3" json:"authorization,omitempty"`
 	// Separate recovery transport and at-rest custody; absent disables escrow.
 	Escrow *EscrowConfig `protobuf:"bytes,18,opt,name=escrow,proto3" json:"escrow,omitempty"`

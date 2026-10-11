@@ -28,7 +28,9 @@ export function Toaster(props: ToasterProps) {
           "--border-radius": "var(--radius)",
         } as CSSProperties
       }
-      toastOptions={{ classNames: { toast: "cn-toast" } }}
+      toastOptions={{
+        classNames: { toast: "cn-toast", description: "text-popover-foreground!" },
+      }}
       closeButton
       {...props}
     />

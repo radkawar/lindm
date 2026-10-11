@@ -45,7 +45,7 @@ func (s *Service) handleIdentitySettings(w http.ResponseWriter, r *http.Request)
 		MaxSnapshotAgeSeconds:  uint32(directoryFreshnessLimit.Seconds()),
 		ScimEnabled:            s.scim != nil && len(s.scim.connectors) != 0, BrokerEnabled: s.broker != nil,
 		BreakGlassEnabled: s.breakGlass != nil, LocalAuthority: snapshot.Local,
-		Current: decideAccess(s.clock(), s.accessIssuer(snapshot), s.policy, snapshot).Kind == accessOK,
+		Current: decideAccess(s.clock(), s.accessIssuer(snapshot), snapshot.policy, snapshot).Kind == accessOK,
 	}
 	if s.localPrimary {
 		result.PrimarySource = "local"

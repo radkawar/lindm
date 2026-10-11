@@ -192,7 +192,7 @@ func (k *deviceActionStart) authorize(ctx context.Context, s *Service) error {
 		return core.ExecutionError(identity.ErrAuthorizationChanged)
 	}
 	if k.captured.ApprovalID == nil {
-		if DestructiveDeviceAction(k.intent.GetSpec()) || s.Identity.ApprovalRequired(k.permission) && !policyMintedAction(k.intent.GetSpec()) {
+		if DestructiveDeviceAction(k.intent.GetSpec()) || k.authorization.ApprovalRequired(k.permission) && !policyMintedAction(k.intent.GetSpec()) {
 			return core.ApprovalError(identity.ErrApprovalRequired)
 		}
 		return nil

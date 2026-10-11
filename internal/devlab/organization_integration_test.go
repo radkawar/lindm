@@ -1,6 +1,6 @@
 //go:build integration
 
-package devlab
+package devlab_test
 
 import (
 	"bytes"
@@ -14,10 +14,14 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
+	orgv1 "lindm/gen/lindm/org/v1"
 	"lindm/internal/ctl"
+	"lindm/internal/devlab"
+	"lindm/internal/loadlab"
 	"lindm/internal/orgapply"
 )
 
@@ -25,10 +29,13 @@ import (
 // uses devlab's disposable database rather than a testdb schema. All organization
 // mutations and authentication flow through the actual TLS product endpoints.
 func TestOrganizationApplyRealServer(t *testing.T) {
-	binary, repository := nativeServer(t)
-	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
+	binary, repository := os.Getenv("LINDM_NATIVE_SERVER_BINARY"), os.Getenv("LINDM_NATIVE_REPOSITORY")
+	if binary == "" || repository == "" {
+		t.Fatal("native-server integration requires LINDM_NATIVE_SERVER_BINARY and LINDM_NATIVE_REPOSITORY")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
 	defer cancel()
-	fixture, err := OpenLocalConsoleAuthorityFixture(ctx, repository, binary)
+	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, repository, binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,6 +44,12 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 			t.Error(err)
 		}
 	}()
+	// Exercise real enrollment/inventory before the full declaration's rollout
+	// captures a cohort. These are synthetic protocol devices, not native proof.
+	population, err := loadlab.Populate(ctx, fixture, loadlab.PopulateOptions{Devices: 4, Packages: 1, AssignmentPercent: 1, EnrollmentWorkers: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Read from the tested checkout, not the shared fixture repository (which may
 	// be at a different commit during a private-worktree integration gate).
 	specPath := filepath.Join("..", "..", "lab", "demo", "org.json")
@@ -48,9 +61,6 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := fixture.ConfigureOrganizationAuthorization(ctx, spec.GetAuthorization()); err != nil {
-		t.Fatal(err)
-	}
 	owner, err := fixture.OpenOwnerSession(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -60,35 +70,50 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	var _ orgapply.AccountClient = owner
-	plan, err := orgapply.Plan(ctx, owner.Admin, spec)
+	for index, label := range []string{"department/engineering", "department/finance", "department/it-helpdesk", "department/contractors"} {
+		if _, err := owner.Admin.SetDeviceMetadata(ctx, connect.NewRequest(&adminv1.SetDeviceMetadataRequest{
+			RequestId: uuid.NewString(), DeviceId: population.DeviceIDs[index],
+			Metadata: &adminv1.DeviceMetadata{Labels: []string{label}},
+			Reason:   "qualify unchanged demo organization against real enrolled inventory cohorts",
+		})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Authorization and accounts use the same browser-only reviewed-plan route
+	// as the console, rather than rewriting the server's bootstrap config.
+	preview, err := owner.ApplyOrganization(ctx, &orgv1.ApplyOrganizationRequest{Organization: spec})
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := orgapply.Apply(ctx, owner.Admin, plan, orgapply.Options{AccountClient: owner})
+	first, err := owner.ApplyOrganization(ctx, &orgv1.ApplyOrganizationRequest{Organization: spec, Apply: true, ExpectedPlanSha256: preview.GetPlanSha256()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Secrets) != len(spec.GetProvisioningTokens())+len(spec.GetGrants())+len(spec.GetAccounts())-1 {
-		t.Fatalf("unexpected first-apply secret count %d", len(first.Secrets))
+	defer clearOrganizationSecrets(first)
+	if first.GetFailureCode() != "" || len(first.GetSecrets()) != len(spec.GetProvisioningTokens())+len(spec.GetGrants())+len(spec.GetAccounts())-1 {
+		t.Fatalf("unexpected first apply: failure %q (%s), %d secrets, outcomes %+v", first.GetFailureCode(), first.GetFailureReason(), len(first.GetSecrets()), first.GetOutcomes())
 	}
-	secondPlan, err := orgapply.Plan(ctx, owner.Admin, spec)
+	state, err := owner.Admin.GetAuthorization(ctx, connect.NewRequest(&adminv1.GetAuthorizationRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := orgapply.Apply(ctx, owner.Admin, secondPlan, orgapply.Options{AccountClient: owner})
+	if !state.Msg.GetAuthorization().GetRuntime() || !proto.Equal(state.Msg.GetAuthorization().GetPolicy(), spec.GetAuthorization()) {
+		t.Fatal("organization authorization did not become runtime authority")
+	}
+	secondPreview, err := owner.ApplyOrganization(ctx, &orgv1.ApplyOrganizationRequest{Organization: spec})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(second.Secrets) != 0 {
-		t.Fatal("second apply reissued secrets")
+	second, err := owner.ApplyOrganization(ctx, &orgv1.ApplyOrganizationRequest{Organization: spec, Apply: true, ExpectedPlanSha256: secondPreview.GetPlanSha256()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearOrganizationSecrets(second)
+	if second.GetFailureCode() != "" || len(second.GetSecrets()) != 0 {
+		t.Fatal("second apply failed or reissued secrets")
 	}
 	for _, o := range second.Outcomes {
 		switch o.Kind {
-		case "authorization":
-			if o.Status != "unsupported" {
-				t.Fatalf("authorization: %+v", o)
-			}
 		case "advisory_exception":
 			if o.Status != "pending" {
 				t.Fatalf("exception without findings: %+v", o)
@@ -112,7 +137,7 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(directory, "cli.json")
-	ca, err := os.ReadFile(filepath.Join(FixturePath(repository), "transport-ca.crt"))
+	ca, err := os.ReadFile(filepath.Join(devlab.FixturePath(repository), "transport-ca.crt"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,8 +166,8 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 		if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 			t.Fatal(err)
 		}
-		for _, secret := range first.Secrets {
-			if strings.Contains(output.String(), secret.Value) {
+		for _, secret := range first.GetSecrets() {
+			if strings.Contains(output.String(), secret.GetSecret()) {
 				t.Fatal("CLI output exposed a secret")
 			}
 		}
@@ -156,4 +181,11 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 	if err := ctl.Run(ctx, []string{"logout", "-config", configPath}, &output, nil); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func clearOrganizationSecrets(response *orgv1.ApplyOrganizationResponse) {
+	for _, secret := range response.GetSecrets() {
+		secret.Secret = ""
+	}
+	response.Secrets = nil
 }

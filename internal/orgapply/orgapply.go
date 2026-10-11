@@ -33,10 +33,11 @@ type Outcome struct {
 // ChangePlan retains the immutable desired document and observed CAS versions.
 // Create a fresh plan after a conflict; Apply never retries a mutation.
 type ChangePlan struct {
-	Outcomes   []Outcome `json:"outcomes"`
-	spec       *orgv1.Organization
-	operations []operation
-	revisions  map[string]string
+	Outcomes        []Outcome `json:"outcomes"`
+	spec            *orgv1.Organization
+	operations      []operation
+	revisions       map[string]string
+	accountSnapshot []*authv1.LocalAccount
 }
 
 type operation struct {
@@ -66,6 +67,8 @@ type Result struct {
 // AccountClient is deliberately separate from AdminService. Implementations use
 // browser-kind sessions with the existing account endpoints and CSRF checks.
 type AccountClient interface {
+	// CheckSession fences continued browser authority between independent mutations.
+	CheckSession(context.Context) error
 	ListAccounts(context.Context) (*authv1.ListAccountsResponse, error)
 	CreateAccount(context.Context, *authv1.CreateAccountRequest) (*authv1.AccountEnrollment, error)
 	UpdateAccount(context.Context, *authv1.UpdateAccountRequest) error

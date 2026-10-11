@@ -128,6 +128,9 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
   integrations?: IntegrationsConfig | undefined;
 
   /**
+   * Bootstrap policy only. Once AdminService persists runtime authorization,
+   * that complete policy takes precedence, including an explicitly empty policy.
+   *
    * @generated from field: lindm.auth.v1.AuthorizationPolicy authorization = 17;
    */
   authorization?: AuthorizationPolicy | undefined;

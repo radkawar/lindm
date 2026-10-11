@@ -33,6 +33,9 @@ func Plan(ctx context.Context, client adminv1connect.AdminServiceClient, spec *o
 		}
 		profile.Spec = normalized
 	}
+	if err := p.authorization(ctx, client); err != nil {
+		return nil, err
+	}
 	if err := p.groups(ctx, client); err != nil {
 		return nil, err
 	}
@@ -54,12 +57,28 @@ func Plan(ctx context.Context, client adminv1connect.AdminServiceClient, spec *o
 		return nil, err
 	}
 	for _, a := range p.spec.GetAccounts() {
-		p.add("account", a.GetUsername(), "", "pending", "requires console session", a)
-	}
-	if p.spec.GetAuthorization() != nil {
-		p.add("authorization", p.spec.GetName(), "", "unsupported", "requires server configuration; API cannot read or change authorization policy", nil)
+		p.add("account", a.GetUsername(), "", "pending", "Open Accounts in the console and import this organization file using your browser session.", a)
 	}
 	return p, nil
+}
+
+func (p *ChangePlan) authorization(ctx context.Context, client adminv1connect.AdminServiceClient) error {
+	if p.spec.GetAuthorization() == nil {
+		return nil
+	}
+	response, err := client.GetAuthorization(ctx, connect.NewRequest(&adminv1.GetAuthorizationRequest{}))
+	if err != nil {
+		return fmt.Errorf("read authorization: %w", err)
+	}
+	current := response.Msg.GetAuthorization()
+	if current.GetRuntime() && proto.Equal(current.GetPolicy(), p.spec.GetAuthorization()) {
+		p.add("authorization", p.spec.GetName(), "", "unchanged", "", nil)
+		return nil
+	}
+	p.add("authorization", p.spec.GetName(), "", "updated", "Replaces runtime roles and group bindings; non-owner sessions must sign in again.", &adminv1.UpdateAuthorizationRequest{
+		ExpectedRevision: current.GetRevision(), Policy: p.spec.GetAuthorization(), Reason: reason(p.spec),
+	})
+	return nil
 }
 
 func (p *ChangePlan) groups(ctx context.Context, client adminv1connect.AdminServiceClient) error {

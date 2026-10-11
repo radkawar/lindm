@@ -56,6 +56,12 @@ func (a *Authorization) Version() uint64 {
 	return uint64(a.version)
 }
 
+// ApprovalRequired reads the policy captured with this authority. LockAuthorization
+// must still fence the snapshot inside the mutation transaction.
+func (a *Authorization) ApprovalRequired(permission Permission) bool {
+	return a != nil && a.principal.ApprovalRequired(permission)
+}
+
 // Principal returns a detached copy of the authority captured by AuthorizeFresh.
 // Target scope checks must use this principal and the fenced permission.
 func (a *Authorization) Principal() Principal {
@@ -142,7 +148,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 		if err != nil {
 			return err
 		}
-		decision := decideAccess(now, s.accessIssuer(snapshot), s.policy, snapshot)
+		decision := decideAccess(now, s.accessIssuer(snapshot), snapshot.policy, snapshot)
 		principal := s.snapshotPrincipal(snapshot, decision.Role)
 		if decision.Kind != accessOK || !Authorize(principal, permission) {
 			denied = ErrAuthorizationDenied
@@ -213,6 +219,16 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if err := s.lockPolicy(ctx, q); err != nil {
 		return err
 	}
+	if authorization.principal.policy == nil {
+		return ErrAuthorizationDenied
+	}
+	current, err := q.ReadRuntimeAuthorization(ctx)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	if !bytes.Equal(current.Digest, authorization.principal.policy.digest) {
+		return ErrAuthorizationChanged
+	}
 	row, err := q.GetPrincipalForUpdate(ctx, authorization.actorID)
 	if err != nil {
 		return s.authorizationStoreError(err)
@@ -237,7 +253,7 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if authorization.observedAt.IsZero() || now.Before(authorization.observedAt) || now.Before(snapshot.ObservedAt) || !now.Before(authorization.expiresAt) || authorization.expiresAt.After(authorization.observedAt.Add(dispatchAuthorizationWindow)) || !authorization.expiresAt.After(authorization.observedAt) {
 		return ErrAuthorizationExpired
 	}
-	decision := decideAccess(now, s.accessIssuer(snapshot), s.policy, snapshot)
+	decision := decideAccess(now, s.accessIssuer(snapshot), snapshot.policy, snapshot)
 	principal := s.snapshotPrincipal(snapshot, decision.Role)
 	if decision.Kind != accessOK || !Authorize(principal, authorization.permission) {
 		return ErrAuthorizationDenied

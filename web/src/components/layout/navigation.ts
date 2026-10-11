@@ -88,6 +88,13 @@ export const navigation = [
     group: "Administration",
   },
   {
+    to: "/authorization",
+    label: "Authorization",
+    icon: LockKeyholeIcon,
+    permission: "accounts.manage",
+    group: "Administration",
+  },
+  {
     to: "/groups",
     label: "Groups",
     icon: UsersIcon,
@@ -116,7 +123,10 @@ export function visibleNavigation(principal: SessionPrincipal) {
       canPermission(
         principal,
         item.permission,
-        item.to === "/groups" || item.to === "/integrations",
+        item.to === "/groups" ||
+          item.to === "/integrations" ||
+          item.to === "/authorization" ||
+          item.to === "/accounts",
       ) ||
       (item.to === "/groups" && canPermission(principal, "inventory.manage", true)) ||
       (item.to === "/approvals" &&

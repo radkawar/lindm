@@ -188,7 +188,7 @@ func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 		parsed, _ := uuid.Parse(req.Msg.GetApprovalId())
 		approvalID = &parsed
 	}
-	if (DestructiveDeviceAction(req.Msg.GetSpec()) || s.Identity.ApprovalRequired(permission)) && approvalID == nil {
+	if (DestructiveDeviceAction(req.Msg.GetSpec()) || authorization.ApprovalRequired(permission)) && approvalID == nil {
 		return nil, core.ApprovalError(identity.ErrApprovalRequired)
 	}
 	count, err := q.DeviceActionCount(ctx, generationID)
