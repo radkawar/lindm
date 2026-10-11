@@ -1443,7 +1443,12 @@ prettier/markdownlint on touched docs and web files, `generate-docs -check`
 always, and race tests of the touched packages plus every module package whose
 build or tests import them, directly or transitively), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
-restores the local branch and the checkout. `gate-commit` is the post-hoc full
+restores the local branch and the checkout. From apply until commit, rollback or
+refusal, `<main>/.git/lindm-landing.current` records the landing's owner, pid,
+worktree, message, files and start time; `go run ./cmd/dev status` prints it
+(flagged stale if no process holds the landing lock) together with HEAD against
+upstream, the landing and integration lock holders and uncommitted files, and
+`worktree audit` prints it first. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits any remaining change only
 when green.
 

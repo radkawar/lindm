@@ -175,11 +175,33 @@ func TestLandCommitsPushesAndRollsBack(t *testing.T) {
 	gitT(t, repo.Main, "merge", "--quiet", "--ff-only", "lindm/"+Trunk)
 	// A local gate-commit ahead of upstream is pushed with the landing.
 	gitT(t, repo.Main, "commit", "--quiet", "--allow-empty", "-m", "local gate-commit")
-	if err := repo.Land(ctx, change, "land the work", pass); err != nil {
+	var during *Landing
+	observe := func([]string) error {
+		var err error
+		during, err = repo.CurrentLanding()
+		return err
+	}
+	unlock, err := repo.Lock(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Land(ctx, change, "land the work", observe); err != nil {
+		t.Fatal(err)
+	}
+	if err := unlock(); err != nil {
 		t.Fatal(err)
 	}
 	if status := gitT(t, repo.Main, "status", "--porcelain"); status != "" {
 		t.Fatalf("landing left %q", status)
+	}
+	if during == nil || during.Worktree != path || during.Message != "land the work" || !slices.Equal(during.Files, change.Files) {
+		t.Fatalf("landing marker during the gate: %+v", during)
+	}
+	if during.Stale {
+		t.Fatal("marker reported stale while the lander held the lock")
+	}
+	if after, err := repo.CurrentLanding(); err != nil || after != nil {
+		t.Fatalf("marker left after landing: %+v %v", after, err)
 	}
 	if pushed := gitT(t, repo.Main, "--git-dir", remote, "log", "-1", "--format=%s", Trunk); pushed != "land the work" {
 		t.Fatalf("remote tip %q", pushed)

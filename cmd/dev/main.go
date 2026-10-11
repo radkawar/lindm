@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|worktree|signoff|pre-push|land|gate-commit|generate-docs> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|worktree|signoff|pre-push|land|gate-commit|status|generate-docs> [options]
 
   generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
          fails instead when any block is stale (make generate / make lint).
@@ -46,6 +46,9 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
          unless it already has a green signoff/unit; see pre-push -h.
   land -from WORKTREE  Under the landing lock, apply a worktree's change to the
          shared tree, gate the touched files, roll back on failure; see land -h.
+  status  Shared checkout HEAD vs upstream, the landing in progress (marker
+         .git/lindm-landing.current), landing/integration lock holders, and
+         uncommitted files.
   gate-commit -m MSG  Under the landing lock, make check, then commit if green.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
@@ -90,6 +93,8 @@ func run() error {
 		return runPrePush(os.Args[2:])
 	case "land":
 		return runLand(os.Args[2:])
+	case "status":
+		return runStatus(os.Args[2:])
 	case "gate-commit":
 		return runGateCommit(os.Args[2:])
 	}

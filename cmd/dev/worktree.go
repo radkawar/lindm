@@ -190,6 +190,10 @@ func size(bytes int64) string {
 }
 
 func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []string) error {
+	// A landing in progress explains files that look stray in the shared checkout.
+	if err := printLanding(repo); err != nil {
+		return err
+	}
 	var audits []worktree.Audit
 	table := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
 	if _, err := fmt.Fprintln(table, "VERDICT\tOWNER\tPATH\tCHANGED\tUNLANDED"); err != nil {

@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -64,15 +65,16 @@ func LockFile(ctx context.Context, path string, waiting func(holder string)) (un
 // Change is a worktree's complete change against Trunk: commits since its
 // merge base plus staged, unstaged and untracked non-ignored files.
 type Change struct {
-	Base  string   // merge base with Trunk
-	Patch []byte   // binary patch with rename detection
-	Files []string // every path the patch creates, modifies or deletes
+	Source string   // worktree the change comes from
+	Base   string   // merge base with Trunk
+	Patch  []byte   // binary patch with rename detection
+	Files  []string // every path the patch creates, modifies or deletes
 }
 
 // Change computes the change of the worktree at path, limited to paths when
 // any are given. The worktree's own index is never modified.
 func (r *Repository) Change(ctx context.Context, path string, paths []string) (Change, error) {
-	var change Change
+	change := Change{Source: path}
 	if _, ok, err := r.registered(ctx, path); err != nil || !ok {
 		return change, errors.Join(err, fmt.Errorf("%s is not a registered worktree of %s", path, r.Main))
 	}
@@ -205,6 +207,12 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 	if _, err := git(ctx, r.Main, "merge-base", "--is-ancestor", strings.TrimSpace(upstream), "HEAD"); err != nil {
 		return fmt.Errorf("refused: %s %s at %.12s does not contain %s; bring the shared checkout up to %s first", Trunk, r.Main, prior, strings.TrimSpace(upstream), strings.TrimSpace(upstream))
 	}
+	// The marker tells anyone looking at the shared checkout mid-landing whose
+	// applied files they see; it disappears on commit, rollback or refusal.
+	if err := r.writeLanding(change, message); err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(r.landingPath()) }()
 	if err := r.Apply(ctx, change.Patch, false); err != nil {
 		return fmt.Errorf("refused, nothing applied (rebase the worktree onto %s): %w", Trunk, err)
 	}
@@ -235,4 +243,81 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		return restore(fmt.Errorf("push to %s failed: %w", strings.TrimSpace(upstream), err))
 	}
 	return nil
+}
+
+// Landing describes the dev land in progress in the main checkout.
+type Landing struct {
+	Owner     string    `json:"owner"`
+	PID       int       `json:"pid"`
+	Worktree  string    `json:"worktree"`
+	Message   string    `json:"message"`
+	Files     []string  `json:"files"`
+	StartedAt time.Time `json:"started_at"`
+	// Stale is set by CurrentLanding when no process holds the landing lock,
+	// i.e. the lander died before removing its marker.
+	Stale bool `json:"stale,omitempty"`
+}
+
+func (r *Repository) landingPath() string {
+	return filepath.Join(r.Main, ".git", "lindm-landing.current")
+}
+
+func (r *Repository) writeLanding(change Change, message string) error {
+	data, err := json.MarshalIndent(Landing{Owner: owner(change.Source), PID: os.Getpid(), Worktree: change.Source, Message: message, Files: change.Files, StartedAt: time.Now().UTC()}, "", "  ")
+	if err != nil {
+		return err
+	}
+	temporary := r.landingPath() + ".tmp"
+	if err := os.WriteFile(temporary, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(temporary, r.landingPath())
+}
+
+// CurrentLanding returns the landing in progress, or nil when there is none.
+func (r *Repository) CurrentLanding() (*Landing, error) {
+	data, err := os.ReadFile(r.landingPath())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	landing := new(Landing)
+	if err := json.Unmarshal(data, landing); err != nil {
+		return nil, fmt.Errorf("landing marker %s: %w", r.landingPath(), err)
+	}
+	_, held, err := LockHolder(r.LockPath())
+	if err != nil {
+		return nil, err
+	}
+	landing.Stale = !held
+	return landing, nil
+}
+
+// String renders the landing for status output.
+func (l *Landing) String() string {
+	state := "in progress"
+	if l.Stale {
+		state = "STALE marker (no lander holds the lock)"
+	}
+	return fmt.Sprintf("landing %s since %s by %s (pid %d) from %s: %q, %d files: %s", state, l.StartedAt.Format(time.RFC3339), l.Owner, l.PID, l.Worktree, l.Message, len(l.Files), strings.Join(l.Files, " "))
+}
+
+// LockHolder reports whether some process holds the flock on path and the
+// holder it recorded. It never waits and never keeps the lock.
+func LockHolder(path string) (holder string, held bool, err error) {
+	file, err := os.OpenFile(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	defer func() { _ = file.Close() }()
+	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil {
+		return "", false, syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	}
+	recorded, err := os.ReadFile(path)
+	return strings.TrimSpace(string(recorded)), true, err
 }
