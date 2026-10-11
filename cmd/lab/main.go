@@ -125,6 +125,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "assistance" {
 		return runVMAssistance(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "assistance-respond" {
+		return runVMAssistanceRespond(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "inspect-storage" {
 		return runVMInspectStorage(ctx, args[2:], stdout, stderr)
 	}

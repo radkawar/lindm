@@ -106,6 +106,7 @@ type assistanceMediaEvidence struct {
 	LocalCandidateType  string   `json:"selected_local_candidate_type"`
 	RemoteCandidateType string   `json:"selected_remote_candidate_type"`
 	ControlButton       bool     `json:"control_button_present"`
+	LocalRelayProtocol  string   `json:"selected_local_relay_protocol"`
 }
 
 type assistanceClickEvidence struct {

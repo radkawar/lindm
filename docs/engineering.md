@@ -330,24 +330,83 @@ artifacts/bin/lab vm assistance -host local -hold \
 It provisions exactly like the lane: an encrypted GNOME (Wayland) clone with the
 signed agent and `lindm-session.service`, an isolated `lindmd` with the embedded
 TURN relay, and GDM autologin with locking off. It then holds one lab slot, with
-no lane deadline, until Ctrl-C tears everything down. Held runs need a local lab
-host and never write a qualification record. Stdout gets these nonsecret details:
+no lane deadline, until Ctrl-C tears everything down. Held runs need a native
+lab host (local or SSH) and never write a qualification record. Stdout gets these
+nonsecret details:
 
 - the loopback console origin; trust the development CA as for `lab console`;
+- the loopback TURN port and a placeholder SSH forward line for both ports. The
+  relay advertises TURN over UDP and TCP; an SSH `-L` forward carries only TCP,
+  so a remote browser reaches the relay with TURN over TCP while the console
+  stays relay-only;
 - the `console-owner` enrollment URL and its expiry;
 - the device hostname and ID;
 - `vncviewer SOCKET` for the guest display. This is QEMU's VNC server on a Unix
   socket inside the VM's private 0700 directory, with no TCP listener. It needs
   TigerVNC 1.11 or later (`tigervnc-viewer`); `remote-viewer` cannot open VNC
-  sockets.
+  sockets;
+- for headless hosts, `lab vm assistance-respond -evidence DIR ACTION`. It acts
+  as the guest's local user through the held VM's QMP display, exactly like the
+  lane. `allow` completes consent in one step: **Allow** on the notification,
+  then in the desktop's own dialog **Allow Remote Interaction** when the dialog
+  offers it (a Control request's RemoteDesktop dialog; a view request's
+  ScreenCast dialog has no such switch) and **Share**. `decline` and `stop`
+  answer the consent and in-progress notifications, and `screenshot` only
+  captures. `share`, `share-control` and `cancel` answer an already open dialog,
+  for debugging. Each run saves a guest screenshot in `DIR`. `allow`, `decline`
+  and `stop` click whichever notification is showing, so take a screenshot first.
 
 The one-time enrollment secret and a fresh desktop-user password go only to
 `EVIDENCE/owner-access` (mode 0400). Nothing is seeded for the device. Every
 request still needs the guest user's own **Allow** and the portal dialog. To
-check the path before handing it over, add `-scenarios decline`. The lane's
-`assistance-operator` browser then requests a session and declines it in the
-guest, which leaves that real declined session in history. Its console and guest
-screenshots go to the same directory.
+check the path before handing it over, add `-scenarios decline` (or `control`).
+The lane's `assistance-operator` browser then runs that scenario in the guest,
+which leaves that real session in history. Its console and guest screenshots go
+to the same directory. Add `-console-turn-tcp` to restrict that browser to TURN
+over TCP, as behind an SSH forward; the scenario then also requires the selected
+console relay candidate to use TCP.
+
+When the local x86 host is full, choose the arm64 manifest explicitly. With no
+`-host`, the scheduler prefers a free matching native KVM host, so the configured
+Sparks are selected without waiting for local capacity. An explicit amd64 manifest
+is never silently replaced by arm64 media. To force one Spark, add `-host dgx20`
+or `-host dgx21`:
+
+```sh
+artifacts/bin/lab vm assistance -hold \
+  -manifest lab/images/ubuntu-noble-encrypted-arm64.json \
+  -repo . -lab artifacts/bin/lab -lindmd artifacts/bin/lindmd \
+  -cache .cache/lab/images \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.ms.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -secure-boot -evidence /new/private/dir
+```
+
+The scheduler stages the current source and native binaries under the configured
+host work directory (`/home/r/lindm-lab` on the Sparks), reuses its verified image
+and encrypted-golden caches, and keeps the remote lease through teardown. The
+same isolated PostgreSQL/trust bootstrap used by remote device-action lanes runs
+there; `lindmd`, TURN, QEMU, QMP and the scenario browser all stay on that host.
+The assistance prerequisite step provisions private SHA-256-pinned Node 24.21.0
+and the package-lock-selected Playwright Chromium under `assistance-browser/`.
+It changes neither system packages nor global PATH; missing browser libraries
+are a prerequisite failure, not permission to install packages.
+
+Use the printed `ssh -L … <user>@<this-host>` placeholders with your SSH alias,
+then open the loopback console. Both console HTTPS and TURN TCP ports must be
+forwarded unchanged. `-console-turn-tcp` also exercises that transport in the
+scenario browser. The printed remote `assistance-respond` command acts through
+the guest's QMP display and writes its screenshot on the Spark. Owner credentials
+stay only in the private remote `owner-access` file: retrieve them deliberately
+over SSH, never from logs. On exit the lane returns screenshots and records to
+the workstation's `-evidence` directory, excludes `owner-access`, and removes its
+owned remote run directory. Interrupted transport or failed evidence transfer
+retains that exact remote directory and reports its path instead.
+The SSH worker has its own process group: Ctrl-C cancels the controller, closes
+the worker's stdin lease, and waits for VM/fixture teardown before collecting
+evidence. A failed SSH existence check is a transport failure, never proof that
+the evidence is absent or permission to delete the remote run.
 
 Organize `web/src` around working product features:
 
@@ -636,6 +695,17 @@ conservative for lanes using less RAM. Each held slot records its admission
 timestamp, PID, available/guest/headroom bytes, swap counters and sample duration.
 Admissions are serialized and count still-held slots outside a reduced configured
 limit, so lowering capacity does not silently ignore existing guests.
+
+A lane takes one slot per concurrent guest (the firewall resource lane boots a
+probe peer, so it needs two) and admits them all at once or not at all; the
+memory guard covers the sum of its guests. Taking leases one at a time was a
+hold-and-wait deadlock: two pair lanes on a three-slot host could each hold one
+slot forever. Waiting lanes are served first come, first served: each holds a
+flocked `waiter-<arrival>-<pid>-<guests>.lock` ticket (locked before it is
+published), and a lane is admitted only if the slots left after older waiters'
+demand cover its own guests, so a stream of single-guest lanes cannot starve a
+pair. A ticket whose holder died has no flock and is swept. Lanes report their
+current wait reason (slots held, memory, older waiters) when it changes.
 
 For example, from a pinned source checkout with built embedded web assets:
 

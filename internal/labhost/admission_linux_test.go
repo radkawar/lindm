@@ -44,7 +44,7 @@ func TestAdmissionMemoryAndSwap(t *testing.T) {
 			slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
 				return memoryAdmission{AvailableBytes: tc.available, SwapOutPagesBefore: tc.before, SwapOutPagesAfter: tc.after}, nil
 			}
-			leases, wait, err := slots.tryAcquireN(context.Background(), 1)
+			leases, wait, err := slots.tryAcquireN(context.Background(), 1, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -118,7 +118,7 @@ func TestAdmissionCountsRetiredSlots(t *testing.T) {
 	if active, err := reduced.Count(); err != nil || active != 2 {
 		t.Fatalf("retired active=%d %v", active, err)
 	}
-	if leases, _, err := reduced.tryAcquireN(ctx, 1); err != nil || leases != nil {
+	if leases, _, err := reduced.tryAcquireN(ctx, 1, ""); err != nil || leases != nil {
 		for _, lease := range leases {
 			_ = lease.Close()
 		}
@@ -195,9 +195,10 @@ func TestConcurrentMultiGuestLanesDoNotDeadlock(t *testing.T) {
 	}
 }
 
-// The deterministic core of the deadlock: with a single free slot, a two-guest
-// lane must keep waiting without taking it, so other lanes can still use it.
-func TestMultiGuestLaneNeverHoldsPartialCapacity(t *testing.T) {
+// With one free slot, a waiting two-guest lane must hold nothing (no partial
+// reservation), and single-guest lanes arriving after it must not overtake
+// it: otherwise a steady stream of single lanes starves the pair forever.
+func TestWaitingMultiGuestLaneHoldsNothingAndIsNotStarved(t *testing.T) {
 	host := fixtureHost("partial", t.TempDir())
 	host.MaxGuests = 3
 	slots, err := openFixtureSlots(host)
@@ -208,37 +209,77 @@ func TestMultiGuestLaneNeverHoldsPartialCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		for _, lease := range held {
-			_ = lease.Close()
-		}
-	}()
-	// A pair lane waits for capacity concurrently with a single-guest lane.
-	waiting, stop := context.WithCancel(context.Background())
-	pair := make(chan error, 1)
+	pair := make(chan []*Lease, 1)
+	pairErr := make(chan error, 1)
 	go func() {
-		leases, err := slots.AcquireN(waiting, 2)
-		for _, lease := range leases {
-			err = errors.Join(err, lease.Close(), errors.New("pair admitted into one free slot"))
-		}
-		pair <- err
+		leases, err := slots.AcquireN(context.Background(), 2)
+		pair <- leases
+		pairErr <- err
 	}()
-	// While the pair is waiting, the one free slot remains admissible; a
-	// lease-at-a-time pair would have taken it and starved this lane.
+	waitFor(t, func() bool { waiters, _, err := slots.olderWaiters(""); return err == nil && waiters == 1 })
+	if active, err := slots.Count(); err != nil || active != 2 {
+		t.Fatalf("waiting pair lane retained a slot: active=%d %v", active, err)
+	}
+	// A younger single-guest lane must queue behind the pair, not take the slot.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if single, err := slots.Acquire(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		if single != nil {
+			_ = single.Close()
+		}
+		t.Fatalf("younger single-guest lane overtook the waiting pair: %v", err)
+	}
+	// Freeing one slot admits the pair (two free slots), ahead of later lanes.
+	if err := held[0].Close(); err != nil {
+		t.Fatal(err)
+	}
+	leases := <-pair
+	if err := <-pairErr; err != nil || len(leases) != 2 {
+		t.Fatalf("pair lane not admitted when capacity freed: %d %v", len(leases), err)
+	}
+	for _, lease := range append(leases, held[1]) {
+		if err := lease.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if waiters, _, err := slots.olderWaiters(""); err != nil || waiters != 0 {
+		t.Fatalf("admitted waiter left a live ticket: %d %v", waiters, err)
+	}
+}
+
+// A waiter that died without removing its ticket must not block admission.
+func TestStaleWaiterTicketIsSwept(t *testing.T) {
+	host := fixtureHost("stale", t.TempDir())
+	host.MaxGuests = 1
+	slots, err := openFixtureSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(slots.directory, fmt.Sprintf("%s%020d-%010d-1.lock", waiterPrefix, 1, 1))
+	if err := os.WriteFile(stale, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	single, err := slots.Acquire(ctx)
+	lease, err := slots.Acquire(ctx)
 	if err != nil {
-		t.Fatalf("free slot unavailable while a pair lane waits: %v", err)
+		t.Fatalf("stale ticket blocked admission: %v", err)
 	}
-	stop()
-	if err := <-pair; !errors.Is(err, context.Canceled) {
-		t.Fatalf("waiting pair lane: %v", err)
+	_ = lease.Close()
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stale ticket not swept: %v", err)
 	}
-	if active, err := slots.Count(); err != nil || active != 3 {
-		t.Fatalf("active=%d %v", active, err)
+}
+
+func waitFor(t *testing.T, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !condition() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not reached")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	_ = single.Close()
 }
 
 func TestMultiGuestAdmissionGuardsSummedMemoryAndCapacity(t *testing.T) {
@@ -253,7 +294,7 @@ func TestMultiGuestAdmissionGuardsSummedMemoryAndCapacity(t *testing.T) {
 	slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
 		return memoryAdmission{AvailableBytes: 13 << 30}, nil
 	}
-	leases, wait, err := slots.tryAcquireN(context.Background(), 2)
+	leases, wait, err := slots.tryAcquireN(context.Background(), 2, "")
 	if err != nil || leases != nil {
 		t.Fatalf("two guests admitted against one guest's memory: %d %v", len(leases), err)
 	}
@@ -263,12 +304,12 @@ func TestMultiGuestAdmissionGuardsSummedMemoryAndCapacity(t *testing.T) {
 	if active, err := slots.Count(); err != nil || active != 0 {
 		t.Fatalf("refused admission retained slots: %d %v", active, err)
 	}
-	one, _, err := slots.tryAcquireN(context.Background(), 1)
+	one, _, err := slots.tryAcquireN(context.Background(), 1, "")
 	if err != nil || len(one) != 1 {
 		t.Fatalf("single guest refused: %v", err)
 	}
 	defer func() { _ = one[0].Close() }()
-	if _, _, err := slots.tryAcquireN(context.Background(), 4); err == nil {
+	if _, _, err := slots.tryAcquireN(context.Background(), 4, ""); err == nil {
 		t.Fatal("lane larger than the host was not refused")
 	}
 }

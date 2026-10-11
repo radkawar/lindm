@@ -39,6 +39,7 @@ type assistanceBrowserConfig struct {
 	EnrollmentSecret  string `json:"enrollmentSecret"`
 	EvidenceDirectory string `json:"evidenceDirectory"`
 	ActionTimeoutMS   int    `json:"actionTimeoutMs"`
+	TURNTCPOnly       bool   `json:"turnTcpOnly"`
 }
 
 type assistanceBrowserReply struct {

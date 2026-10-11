@@ -126,14 +126,26 @@ func (s *Slots) AcquireN(ctx context.Context, guests uint32) ([]*Lease, error) {
 }
 
 // AcquireNReporting is AcquireN that calls report, when non-nil, each time the
-// reason admission is waiting changes.
-func (s *Slots) AcquireNReporting(ctx context.Context, guests uint32, report func(reason string)) ([]*Lease, error) {
+// reason admission is waiting changes. Waiters are admitted in arrival order.
+func (s *Slots) AcquireNReporting(ctx context.Context, guests uint32, report func(reason string)) (admitted []*Lease, resultErr error) {
+	ticket, leave, err := s.queue(guests)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := leave(); err != nil {
+			for _, lease := range admitted {
+				err = errors.Join(err, lease.Close())
+			}
+			admitted, resultErr = nil, errors.Join(resultErr, err)
+		}
+	}()
 	var last string
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		leases, wait, err := s.tryAcquireN(ctx, guests)
+		leases, wait, err := s.tryAcquireN(ctx, guests, ticket)
 		if err != nil || leases != nil {
 			return leases, err
 		}

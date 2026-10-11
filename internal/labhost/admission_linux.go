@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 const memoryHeadroomBytes uint64 = 8 << 30
@@ -98,9 +101,12 @@ func (m memoryAdmission) allows(guestBytes uint64) bool {
 // outside the new range. Never unlink those identities while holders may exist.
 // A lane's guests are admitted together or not at all: holding one slot while
 // waiting for another is a hold-and-wait deadlock once two multi-guest lanes
-// share a host. Memory admission covers the sum of the requested guests. A nil
-// result with a nil error carries the reason admission must wait.
-func (s *Slots) tryAcquireN(ctx context.Context, guests uint32) (_ []*Lease, wait string, resultErr error) {
+// share a host. Admission is first come, first served: capacity demanded by
+// older live waiters is reserved, so a stream of single-guest lanes cannot
+// starve a multi-guest lane. Memory admission covers the sum of the requested
+// guests. A nil result with a nil error carries the reason admission must wait.
+// An empty ticket queues behind every live waiter.
+func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (_ []*Lease, wait string, resultErr error) {
 	if guests == 0 || guests > s.capacity {
 		return nil, "", fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, s.capacity)
 	}
@@ -117,7 +123,14 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32) (_ []*Lease, wai
 	if err != nil {
 		return nil, "", err
 	}
-	if active > s.capacity-guests {
+	older, demand, err := s.olderWaiters(ticket)
+	if err != nil {
+		return nil, "", err
+	}
+	if active > s.capacity-guests || demand > s.capacity-guests-active {
+		if older != 0 {
+			return nil, fmt.Sprintf("behind %d older waiters (%d guests); %d of %d slots held", older, demand, active, s.capacity), nil
+		}
 		return nil, fmt.Sprintf("%d of %d slots held; %d needed", active, s.capacity, guests), nil
 	}
 	observation, err := s.memoryProbe(ctx)
@@ -175,6 +188,78 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32) (_ []*Lease, wai
 		return release(nil)
 	}
 	return leases, "", nil
+}
+
+const waiterPrefix = "waiter-"
+
+// queue publishes a first-come ticket held by an exclusive flock while the
+// caller waits. Names sort by arrival; the demanded guests are in the name.
+// The ticket is locked under a private name before it is renamed into the
+// queue, so a reader never mistakes a just-created ticket for a stale one.
+// A ticket whose holder died loses its flock and is swept by later readers.
+func (s *Slots) queue(guests uint32) (string, func() error, error) {
+	name := fmt.Sprintf("%s%020d-%010d-%d.lock", waiterPrefix, time.Now().UnixNano(), os.Getpid(), guests)
+	pending := filepath.Join(s.directory, "pending-"+name)
+	file, err := s.openName("pending-" + name)
+	if err != nil {
+		return "", nil, err
+	}
+	if locked, err := lockSlot(file); err != nil || !locked {
+		return "", nil, errors.Join(errors.New("lab hosts: waiter ticket is held"), err, file.Close(), os.Remove(pending))
+	}
+	if err := os.Rename(pending, filepath.Join(s.directory, name)); err != nil {
+		return "", nil, errors.Join(err, file.Close(), os.Remove(pending))
+	}
+	return name, func() error {
+		removeErr := os.Remove(filepath.Join(s.directory, name))
+		if errors.Is(removeErr, os.ErrNotExist) {
+			removeErr = nil
+		}
+		return errors.Join(removeErr, file.Close())
+	}, nil
+}
+
+// olderWaiters counts live tickets queued before ticket and the guests they
+// demand. The caller holds the admission lock.
+func (s *Slots) olderWaiters(ticket string) (waiters, guests uint32, err error) {
+	entries, err := os.ReadDir(s.directory)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, waiterPrefix) || name == ticket || (ticket != "" && name > ticket) {
+			continue
+		}
+		fields := strings.Split(strings.TrimSuffix(strings.TrimPrefix(name, waiterPrefix), ".lock"), "-")
+		demand, parseErr := strconv.ParseUint(fields[len(fields)-1], 10, 32)
+		if len(fields) != 3 || parseErr != nil {
+			return 0, 0, fmt.Errorf("invalid waiter ticket %q", name)
+		}
+		path := filepath.Join(s.directory, name)
+		file, err := os.OpenFile(path, os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return 0, 0, err
+		}
+		stale, lockErr := lockSlot(file)
+		if stale {
+			// The waiter exited without removing its ticket.
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				lockErr = errors.Join(lockErr, err)
+			}
+		}
+		if err := errors.Join(lockErr, file.Close()); err != nil {
+			return 0, 0, err
+		}
+		if !stale {
+			waiters++
+			guests += uint32(demand)
+		}
+	}
+	return waiters, guests, nil
 }
 
 func (s *Slots) indices() ([]uint32, error) {

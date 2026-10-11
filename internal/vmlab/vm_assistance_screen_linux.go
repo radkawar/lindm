@@ -150,6 +150,9 @@ func (s *assistanceScreen) waitDialog(ctx context.Context, timeout time.Duration
 		previous = dialog
 		select {
 		case <-ctx.Done():
+			if _, saveErr := s.save(fmt.Sprintf("missing-portal-%d", time.Now().Unix()), img); saveErr != nil {
+				return img, image.Rectangle{}, errors.Join(saveErr, ctx.Err())
+			}
 			return img, image.Rectangle{}, fmt.Errorf("portal share dialog did not appear: %w", ctx.Err())
 		case <-time.After(screenPollInterval):
 		}
@@ -199,9 +202,41 @@ func (s *assistanceScreen) waitCentreWindow(ctx context.Context, timeout time.Du
 
 // click performs one local-seat click, records it, and parks the pointer.
 func (s *assistanceScreen) click(ctx context.Context, display image.Rectangle, point image.Point, target string, scenario *assistanceScenarioEvidence) error {
+	if err := s.waitPointerHover(ctx, point, target); err != nil {
+		return err
+	}
 	if err := s.vm.pointerClick(ctx, display, point, "left"); err != nil {
 		return fmt.Errorf("click %s: %w", target, err)
 	}
 	scenario.Clicks = append(scenario.Clicks, assistanceClickEvidence{Target: target, X: point.X, Y: point.Y})
 	return s.vm.pointerMove(ctx, display, parkPoint(display))
+}
+
+func (s *assistanceScreen) waitPointerHover(ctx context.Context, point image.Point, target string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	before, err := s.vm.screendump(ctx)
+	if err != nil {
+		return err
+	}
+	if err := s.vm.pointerMove(ctx, before.Bounds(), point); err != nil {
+		return err
+	}
+	previous := before
+	for {
+		current, err := s.vm.screendump(ctx)
+		if err != nil {
+			return err
+		}
+		if pointerHoverSettled(before, previous, current, point) {
+			return nil
+		}
+		previous = current
+		select {
+		case <-ctx.Done():
+			_, saveErr := s.save(fmt.Sprintf("missing-hover-%s-%d", target, time.Now().Unix()), current)
+			return errors.Join(fmt.Errorf("guest pointer hover did not settle on %s: %w", target, ctx.Err()), saveErr)
+		case <-time.After(screenPollInterval):
+		}
+	}
 }

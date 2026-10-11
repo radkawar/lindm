@@ -96,7 +96,7 @@ var (
 		Desktops:  map[string][]string{"gnome": {"ubuntu-desktop-minimal"}, "kde": {"kubuntu-desktop"}},
 		GDMConfig: "/etc/gdm3/custom.conf", Name: "ubuntu", Terminal: []string{"gnome-terminal", "--"},
 		UpgradePrompt: "/etc/update-manager/release-upgrades",
-		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell"},
+		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell", "mutter-common"},
 	}
 	ubuntuGuest = LabGuest{
 		Initrd:    "/boot/initrd.img-%s",
@@ -107,7 +107,7 @@ var (
 	fedoraSession   = LabSession{
 		Desktops:  map[string][]string{"gnome": slices.Concat(fedoraGraphical, []string{"gnome-desktop"}), "kde": slices.Concat(fedoraGraphical, []string{"kde-desktop"})},
 		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"ptyxis", "--new-window", "--"},
-		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell"},
+		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell", "mutter"},
 	}
 	fedoraGuest = LabGuest{
 		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
@@ -138,7 +138,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
-			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest,
+			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
 		Gates:    without(gates(), OSUpdate),
@@ -365,6 +365,11 @@ var registry = []*Release{
 func withPins(q Quirks, pins []PasswordPins) Quirks {
 	q.Password = pins
 	return q
+}
+
+func withCapture(session LabSession, packages ...string) LabSession {
+	session.Capture = slices.Concat(session.Capture, packages)
+	return session
 }
 
 func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {

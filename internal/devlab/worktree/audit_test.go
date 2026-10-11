@@ -27,7 +27,7 @@ func TestAuditRecognizesCopyLandedWork(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	snapshot, copied, partial, unlanded := add("snapshot"), add("copied"), add("partial"), add("unlanded")
+	snapshot, copied, partial, unlanded, superseded, snapshotMidEdit := add("snapshot"), add("copied"), add("partial"), add("unlanded"), add("superseded"), add("midedit")
 	// copied: a committed edit and an untracked file, both later copied into main by hand.
 	write(copied, "README", "shared edit\n")
 	gitT(t, copied, "commit", "--quiet", "-am", "private commit")
@@ -35,17 +35,24 @@ func TestAuditRecognizesCopyLandedWork(t *testing.T) {
 	write(partial, "README", "shared edit\n")
 	write(partial, "private.txt", "only here\n")
 	write(unlanded, "package.json", "private change\n")
+	write(superseded, "package-lock.json", "copied then rewritten\n")
+	write(snapshotMidEdit, "README", "line one landed\nline two landed\n")
 	write(repo.Main, "README", "shared edit\n")
 	write(repo.Main, "added.txt", "new file\n")
 	write(repo.Main, "later.txt", "main moved on\n")
 	gitT(t, repo.Main, "add", "README", "added.txt", "later.txt")
 	gitT(t, repo.Main, "commit", "--quiet", "-m", "copy-landed")
+	write(repo.Main, "package-lock.json", "copied then rewritten\n")
+	gitT(t, repo.Main, "commit", "--quiet", "-am", "lane snapshot landed")
+	write(repo.Main, "package-lock.json", "main refactored it later\n")
+	write(repo.Main, "README", "header added by main\nline one landed\nline two landed\nfooter\n")
+	gitT(t, repo.Main, "commit", "--quiet", "-am", "later refactor")
 
 	verdicts := map[string]Audit{}
 	if err := repo.AuditAll(ctx, []string{t.TempDir()}, func(a Audit) error { verdicts[filepath.Base(a.Path)] = a; return nil }); err != nil {
 		t.Fatal(err)
 	}
-	for name, want := range map[string]Verdict{"snapshot": Snapshot, "copied": Landed, "partial": Partial, "unlanded": Unlanded} {
+	for name, want := range map[string]Verdict{"snapshot": Snapshot, "copied": Landed, "partial": Partial, "unlanded": Unlanded, "superseded": Landed, "midedit": Landed} {
 		if got := verdicts[name]; got.Verdict != want {
 			t.Fatalf("%s: %+v, want %s", name, got, want)
 		}

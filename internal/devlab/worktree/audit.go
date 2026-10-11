@@ -57,9 +57,9 @@ func owner(path string) string {
 }
 
 // AuditPath classifies the tree at path. A file is landed when main holds the
-// tree's exact content for it (or also lacks a deleted file), or when the
-// tree's change to it reverse-applies to main, i.e. main already contains
-// every hunk. Copy-landed work is therefore recognized without shared commits.
+// tree's exact content for it (or also lacks a deleted file), held it at any
+// commit since the tree's base (landed, then superseded), or when the tree's
+// change to it reverse-applies to main, i.e. main already contains every hunk. Copy-landed work is therefore recognized without shared commits.
 func (r *Repository) AuditPath(ctx context.Context, path string) Audit {
 	audit := Audit{Path: path, Owner: owner(path)}
 	entry, ok, err := r.registered(ctx, path)
@@ -127,13 +127,19 @@ func (r *Repository) classify(ctx context.Context, audit *Audit, git gitFunc, sc
 	if err != nil {
 		return err
 	}
+	history, err := r.historicalBlobs(ctx, audit.Base, files)
+	if err != nil {
+		return err
+	}
 	var differing []string
 	for _, file := range files {
-		if trunk[file.path] != file.blob {
+		// Main holding this exact content now, or at any commit since the
+		// base, means the work landed (possibly superseded since).
+		if trunk[file.path] != file.blob && !history[file.path][file.blob] {
 			differing = append(differing, file.path)
 		}
 	}
-	unlanded, err := r.notInTrunk(ctx, git, audit.Base, differing)
+	unlanded, err := r.notInTrunk(ctx, git, audit.Base, differing, trunk, history)
 	if err != nil {
 		return err
 	}
@@ -175,9 +181,48 @@ func (r *Repository) trunkBlobs(ctx context.Context, files []changed) (map[strin
 	return blobs, nil
 }
 
-// notInTrunk returns the paths whose change from base does not reverse-apply
-// to Trunk's tree, checked in a scratch index so no checkout is touched.
-func (r *Repository) notInTrunk(ctx context.Context, git gitFunc, base string, paths []string) ([]string, error) {
+// historicalBlobs maps each changed path to every blob (including "" for a
+// deletion) that Trunk's commits since base gave it.
+func (r *Repository) historicalBlobs(ctx context.Context, base string, files []changed) (map[string]map[string]bool, error) {
+	blobs := make(map[string]map[string]bool, len(files))
+	for start := 0; start < len(files); start += 256 {
+		args := []string{"log", "--raw", "-z", "--no-abbrev", "--no-renames", "--format=", base + ".." + Trunk, "--"}
+		for _, file := range files[start:min(start+256, len(files))] {
+			args = append(args, file.path)
+		}
+		out, err := git(ctx, r.Main, args...)
+		if err != nil {
+			return nil, err
+		}
+		tokens := strings.Split(out, "\x00")
+		for i := 0; i+1 < len(tokens); i++ {
+			meta := strings.Fields(strings.TrimSpace(tokens[i]))
+			if len(meta) != 5 || !strings.HasPrefix(meta[0], ":") {
+				continue
+			}
+			blob := meta[3]
+			if strings.Trim(blob, "0") == "" {
+				blob = ""
+			}
+			path := tokens[i+1]
+			if blobs[path] == nil {
+				blobs[path] = map[string]bool{}
+			}
+			blobs[path][blob] = true
+			i++
+		}
+	}
+	return blobs, nil
+}
+
+// notInTrunk returns the paths whose change from base main does not hold. A
+// change is held when it reverse-applies to Trunk's tree (checked in a scratch
+// index so no checkout is touched) or, failing that because main has since
+// moved the surrounding context, when every significant line it adds appears
+// in main's current or historical content for the path (and, for a pure
+// removal, no removed line survives in main). Snapshots of a shared tree taken
+// mid-edit are thereby recognized once their lines landed.
+func (r *Repository) notInTrunk(ctx context.Context, git gitFunc, base string, paths []string, trunk map[string]string, history map[string]map[string]bool) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
@@ -196,11 +241,95 @@ func (r *Repository) notInTrunk(ctx context.Context, git gitFunc, base string, p
 		if err != nil {
 			return nil, err
 		}
-		if _, err := gitWith(ctx, r.Main, env, []byte(patch), "apply", "--cached", "--check", "--reverse", "-"); err != nil {
+		if _, err := gitWith(ctx, r.Main, env, []byte(patch), "apply", "--cached", "--check", "--reverse", "-"); err == nil {
+			continue
+		}
+		held, err := r.linesHeld(ctx, patch, trunk[path], history[path])
+		if err != nil {
+			return nil, err
+		}
+		if !held {
 			unlanded = append(unlanded, path)
 		}
 	}
 	return unlanded, nil
+}
+
+// maxHistoricalBlobs bounds the historical versions read per path.
+const maxHistoricalBlobs = 32
+
+func (r *Repository) linesHeld(ctx context.Context, patch, current string, history map[string]bool) (bool, error) {
+	if strings.Contains(patch, "\nGIT binary patch\n") {
+		return false, nil
+	}
+	var added, removed []string
+	for line := range strings.Lines(patch) {
+		switch {
+		case strings.HasPrefix(line, "+++ "), strings.HasPrefix(line, "--- "):
+		case strings.HasPrefix(line, "+"):
+			if text := significant(line[1:]); text != "" {
+				added = append(added, text)
+			}
+		case strings.HasPrefix(line, "-"):
+			if text := significant(line[1:]); text != "" {
+				removed = append(removed, text)
+			}
+		}
+	}
+	if len(added) == 0 && len(removed) == 0 {
+		return false, nil
+	}
+	lines := map[string]bool{}
+	readBlob := func(blob string) error {
+		if blob == "" {
+			return nil
+		}
+		content, err := git(ctx, r.Main, "cat-file", "blob", blob)
+		if err != nil {
+			return err
+		}
+		for line := range strings.Lines(content) {
+			lines[significant(line)] = true
+		}
+		return nil
+	}
+	if err := readBlob(current); err != nil {
+		return false, err
+	}
+	if len(added) == 0 {
+		for _, line := range removed {
+			if lines[line] {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	count := 0
+	for blob := range history {
+		if count == maxHistoricalBlobs {
+			break
+		}
+		if err := readBlob(blob); err != nil {
+			return false, err
+		}
+		count++
+	}
+	for _, line := range added {
+		if !lines[line] {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// significant normalizes a line for containment, discarding lines too short
+// or generic (braces, blank) to evidence anything.
+func significant(line string) string {
+	text := strings.TrimSpace(line)
+	if len(text) < 4 {
+		return ""
+	}
+	return text
 }
 
 // AuditAll audits every registered worktree except the main checkout, then any

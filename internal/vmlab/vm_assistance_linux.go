@@ -43,6 +43,9 @@ type VMAssistanceOptions struct {
 	// passed; lindmd and the VM then keep running until ctx ends. Any held run
 	// is a hands-on demo, never a qualification record.
 	Hold func(*AssistanceHold) error
+	// ConsoleTURNTCP restricts the operator Chromium to TURN over TCP, as a
+	// remote browser behind an SSH forward is, and requires a TCP relay pair.
+	ConsoleTURNTCP bool
 }
 
 // assistanceRelayPorts is the relay allocation range size; four allocations
@@ -72,7 +75,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		return nil, err
 	}
 	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: manifest.GetDistribution(), Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
-		"One disposable QEMU guest (virtio-gpu, usb-tablet, PS/2 keyboard); local-user consent and stop clicks are QMP absolute-pointer input located from QMP screendumps, not a human at a physical display.",
+		"One disposable QEMU guest (virtio-gpu, usb-tablet, virtual keyboard); local-user consent and stop clicks are QMP absolute-pointer input located from QMP screendumps, not a human at a physical display.",
 		"Relayed media stays on the lab host: guest UDP reaches the embedded TURN listener through QEMU user networking (10.0.2.2 to host loopback); NAT traversal, public relays and multi-host paths are not qualified.",
 		"The operator browser is headless Playwright Chromium on the lab host with a virtual WebAuthn authenticator; other browsers are not qualified by this lane.",
 		"Media and control proofs are the console's own WebRTC statistics and decoded frames plus a guest-side typed nonce; video quality, latency and bandwidth are not qualified.",
@@ -203,7 +206,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Username: assistanceOperator}
 	var scenarioErr error
 	if len(scenarios) != 0 {
-		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, deviceID: result.DeviceID}, fixture, options, scenarios)
+		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, deviceID: result.DeviceID, turnTCP: options.ConsoleTURNTCP}, fixture, options, scenarios)
 	}
 	// Device journals are recorded for failures too: they are the product
 	// slices' diagnostic for a wrong end cause.
@@ -217,7 +220,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if !deadline.Stop() {
 		return result, context.Cause(ctx)
 	}
-	return result, holdAssistance(ctx, vm, fixture, result, options.Hold)
+	return result, holdAssistance(ctx, vm, fixture, screen, result, options.Hold)
 }
 
 // runAssistanceScenarios signs the operator browser in and runs each scenario
@@ -267,7 +270,7 @@ func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixtur
 		return nil, fmt.Errorf("issue assistance operator enrollment: %w", err)
 	}
 	defer func() { enrollment.Secret = "" }()
-	cfg := assistanceBrowserConfig{Origin: fixture.ConsoleOrigin, Username: assistanceOperator, Password: rand.Text(), EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: options.EvidenceDir, ActionTimeoutMS: 30000}
+	cfg := assistanceBrowserConfig{Origin: fixture.ConsoleOrigin, Username: assistanceOperator, Password: rand.Text(), EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: options.EvidenceDir, ActionTimeoutMS: 30000, TURNTCPOnly: options.ConsoleTURNTCP}
 	browser, err := startAssistanceBrowser(ctx, VMBuildRepository(options.Repository, options.BuildRepository), private, cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	return browser, err
@@ -299,8 +302,10 @@ func reserveAssistanceRelay(relayAddress string) (*configv1.AssistanceConfig, er
 			RelayAddress: address.String(),
 			RelayPortMin: uint32(base),
 			RelayPortMax: uint32(base + assistanceRelayPorts - 1),
-			Urls:         []string{"turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=udp"},
-			Realm:        "lindm-lab",
+			// TCP lets a remote console reach the loopback listener through an
+			// SSH -L forward, which cannot carry UDP.
+			Urls:  []string{"turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=udp", "turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=tcp"},
+			Realm: "lindm-lab",
 		}}, nil
 	}
 	return nil, errors.New("no free assistance relay ports on the lab host")

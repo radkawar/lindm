@@ -485,6 +485,10 @@ The 24.04 desktop golden used for qualification had these components:
 - GStreamer 1.24.2.
 - gnome-shell notifications with the `actions` capability.
 
+New assistance records also capture `mutter-common` and, on 24.04, the
+`libmutter-14-0` ABI package version, so the compositor, portal and capture-stack
+tuple is explicit.
+
 In the RemoteDesktop dialog, keyboard and pointer access is the **Allow Remote
 Interaction** switch, which is off by default. Sharing without it grants view only.
 
@@ -496,11 +500,27 @@ The first login on the golden shows the release-upgrade prompt, and idle lock is
 enabled after five minutes. The lab disables both for the session; the product does
 not change them.
 
-Qualified: emulated x86_64 GNOME/Wayland consent, view, control, operator and local
-stop, decline, portal cancel and lock termination, with audit, in
-[`ubuntu24-assistance-06`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
-Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays,
-multi-user seats and ARM desktops.
+The arm64 lane uses the independently signed encrypted installer manifest
+`lab/images/ubuntu-noble-encrypted-arm64.json`, package-pinned AAVMF and native
+KVM on an SSH lab host. Its isolated PostgreSQL/trust fixture, server, relay,
+QEMU and operator Chromium are host-local; only control and returned evidence
+cross SSH. Remote browser prerequisites are user-owned pinned Node and
+package-lock-selected Playwright Chromium; the lane does not install system
+libraries. See the [held-demo instructions](../engineering.md) for access,
+secret custody and choosing a free Spark without changing manifest identity.
+
+Qualified: virtual x86_64 and native-KVM aarch64 GNOME/Wayland consent, view,
+control, operator and local stop, decline, portal cancel and lock termination,
+with audit, in
+[`ubuntu24-assistance-06` and `ubuntu24-aarch64-assistance-04`/`-05`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
+The arm64 run used GNOME Shell 46.0, Mutter 46.2
+(`46.2-1ubuntu0.24.04.18`), portal 1.18.4 / portal-gnome 46.2, PipeWire 1.0.5,
+GStreamer 1.24.2 and host-local Chromium 156.0.8078.4, with console TURN over
+TCP and guest TURN over UDP. An SSH-native held demo also passed startup,
+remote guest screenshot response and clean teardown with credentials excluded
+from returned evidence. This is not a physical ARM desktop claim.
+Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays or
+multi-user seats.
 
 ## Advisory feeds
 

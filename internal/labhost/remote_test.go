@@ -110,3 +110,34 @@ func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
 		t.Fatalf("earlier artifact overwritten: %q, %v", data, err)
 	}
 }
+
+func TestAssistanceEvidenceReturnKeepsOwnerCredentialsRemote(t *testing.T) {
+	source, destination := t.TempDir(), filepath.Join(t.TempDir(), "returned")
+	for name, data := range map[string]string{"assistance.json": "record", "guest.png": "screenshot", "owner-access": "secret"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte(data), 0400); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := collectAssistanceEvidence(t.Context(), "", source, destination, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"assistance.json": "record", "guest.png": "screenshot"} {
+		got, err := os.ReadFile(filepath.Join(destination, name))
+		if err != nil || string(got) != want {
+			t.Fatalf("returned %s = %q, %v", name, got, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(destination, "owner-access")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("owner credentials were returned: %v", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(source, "owner-access")); err != nil || string(got) != "secret" {
+		t.Fatalf("remote owner credentials changed: %q, %v", got, err)
+	}
+	if err := collectAssistanceEvidence(t.Context(), "", source, destination, io.Discard); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("existing qualification was not refused: %v", err)
+	}
+	info, err := os.Stat(destination)
+	if err != nil || info.Mode().Perm() != 0700 {
+		t.Fatalf("returned evidence directory is not private: %v, %v", info, err)
+	}
+}

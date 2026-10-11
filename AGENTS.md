@@ -105,6 +105,14 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
 
 **TypeScript/React**:
 
+- **Console design:** [docs/design.md](docs/design.md) is binding for console changes,
+  including AI-generated UI. It is a DRAFT for owner editing, not permission to
+  ignore its working standards. Read it before changing screens or shared components.
+  Every console landing note must report its **Required design review** checklist:
+  decision, evidence, restraint, safety, craft and human editing, with pass / needs
+  owner decision / not applicable (reason) for each. Include before/after light/dark
+  desktop/mobile screenshots, `make ui-review` evidence and unresolved owner
+  annotations as tasks. Automated green is not owner design approval.
 - Stack: React 19, TanStack Router (file-based) and Query, Connect-ES, shadcn and Tailwind 4. The alias `@/` maps to `web/src`. Prettier uses `printWidth` 100.
 - ESLint enforces import boundaries:
   - `components/`, `lib/` and `hooks/` must not import `features/`, `app/` or `routes/`.

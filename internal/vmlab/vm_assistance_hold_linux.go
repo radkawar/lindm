@@ -19,7 +19,10 @@ import (
 // enrollment secret and desktop password are for the owner only: callers keep
 // them in private files, never in logs.
 type AssistanceHold struct {
-	ConsoleOrigin    string
+	ConsoleOrigin string
+	// RelayPort is the loopback TURN listener (UDP and TCP); a remote console
+	// forwards it over SSH and reaches the relay with TURN over TCP.
+	RelayPort        uint32
 	Username         string
 	EnrollmentSecret string
 	ExpiresAt        time.Time
@@ -35,14 +38,23 @@ type AssistanceHold struct {
 // holdAssistance hands the owner a fresh console enrollment and the guest's
 // display and login, then keeps lindmd and the VM running until ctx ends.
 // Consent stays the guest user's own click; nothing is seeded for the device.
-func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, result *VMAssistanceResult, hold func(*AssistanceHold) error) error {
+func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, screen *assistanceScreen, result *VMAssistanceResult, hold func(*AssistanceHold) error) error {
 	hostname, err := vm.Run(ctx, "hostname", nil)
 	if err != nil {
 		return err
 	}
+	// AssistanceRespond reaches this VM's QMP display through the record.
+	if _, err := screen.evidence.write("held VM directory", heldVMFile, []byte(vm.dir+"\n")); err != nil {
+		return err
+	}
+	// A check scenario's "ended" banner must not linger: the owner's first
+	// prompt is located against the clean desktop.
+	if err := screen.waitNoBanner(ctx, 45*time.Second); err != nil {
+		return err
+	}
 	// GDM autologin owns the session and locking is off; the password only
 	// matters if the owner locks or logs out, so it is set now and handed over.
-	access := &AssistanceHold{ConsoleOrigin: fixture.ConsoleOrigin, DeviceID: result.DeviceID, Hostname: strings.TrimSpace(string(hostname)), DisplaySocket: filepath.Join(vm.dir, "display.sock"), DesktopUser: actionDesktopUser, DesktopPassword: rand.Text()}
+	access := &AssistanceHold{ConsoleOrigin: fixture.ConsoleOrigin, RelayPort: result.Relay.ListenerPort, DeviceID: result.DeviceID, Hostname: strings.TrimSpace(string(hostname)), DisplaySocket: filepath.Join(vm.dir, "display.sock"), DesktopUser: actionDesktopUser, DesktopPassword: rand.Text()}
 	defer func() { access.EnrollmentSecret, access.DesktopPassword = "", "" }()
 	line := []byte(actionDesktopUser + ":" + access.DesktopPassword + "\n")
 	_, err = vm.Run(ctx, "sudo -n chpasswd", bytes.NewReader(line))

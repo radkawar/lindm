@@ -93,6 +93,20 @@ func TestForFeedReleaseConventions(t *testing.T) {
 	}
 }
 
+func TestAssistanceCapturePackagesKeepCompositorABIReleaseSpecific(t *testing.T) {
+	noble := ForManifest("ubuntu", "24.04").Lab.Session.Capture
+	resolute := ForManifest("ubuntu", "26.04").Lab.Session.Capture
+	if !slices.Contains(noble, "libmutter-14-0") || !slices.Contains(noble, "mutter-common") {
+		t.Fatal("Ubuntu 24.04 compositor provenance is incomplete")
+	}
+	if slices.Contains(resolute, "libmutter-14-0") {
+		t.Fatal("Ubuntu 26.04 inherited an unavailable compositor ABI")
+	}
+	if !slices.Contains(ForManifest("fedora", "44").Lab.Session.Capture, "mutter") {
+		t.Fatal("Fedora compositor provenance is incomplete")
+	}
+}
+
 // TestRegistryConsistent catches registry rows that providers cannot act on.
 func TestRegistryConsistent(t *testing.T) {
 	var keys []string

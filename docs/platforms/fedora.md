@@ -413,6 +413,9 @@ The Fedora 44 desktop golden used for qualification had these components:
 - GStreamer 1.28.1 (pipewire-gstreamer 1.6.2).
 - gnome-shell notifications with the `actions` capability.
 
+New assistance records also capture the installed `mutter` package version so
+the compositor, portal and capture-stack tuple is explicit.
+
 In the RemoteDesktop dialog, keyboard and pointer access is the **Allow Remote
 Interaction** switch, which is off by default. Sharing without it grants view only.
 

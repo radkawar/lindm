@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,7 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
 	scenarios := flags.String("scenarios", "", "comma-separated subset of control,view,decline,portal-cancel,lock; -hold defaults to none")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
+	flags.BoolVar(&options.ConsoleTURNTCP, "console-turn-tcp", false, "restrict the operator Chromium to TURN over TCP (a remote console behind an SSH forward) and require a TCP relay pair")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -102,12 +104,51 @@ func writeAssistanceHold(stdout io.Writer, dir string, access *vmlab.AssistanceH
 	if err = errors.Join(err, file.Close()); err != nil {
 		return err
 	}
+	origin, err := url.Parse(access.ConsoleOrigin)
+	if err != nil {
+		return err
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
 	_, err = fmt.Fprintf(stdout, `Remote-assistance demo is running; Ctrl-C stops lindmd and the VM and removes their state.
 Console: %s (trust .cache/dev/transport-ca.crt in a dedicated browser profile)
+Relay: TURN on loopback port %d (UDP and TCP)
+Remote browser: ssh -L %s:localhost:%s -L %d:localhost:%d <user>@<this-host>, then open the console URL; media uses TURN over TCP through the forward
 Owner enrollment: %s/enroll as %s, expires %s; the one-time secret is in %s
 Device: %s (%s), GNOME Wayland, GDM autologin as %s; its password is in the same file
 Guest display (TigerVNC >= 1.11, Unix socket, no TCP listener): vncviewer %s
+On this host: %s vm assistance-respond -evidence %s {%s}
+From another host: ssh <user>@<this-host> %s vm assistance-respond -evidence %s {%s}
+  allow = Allow + Share in the desktop dialog (+ Allow Remote Interaction for a Control request); decline; stop; screenshot.
 Request assistance from the device page; consent is the guest user's own Allow/Decline.
-`, access.ConsoleOrigin, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket)
+`, access.ConsoleOrigin, access.RelayPort, origin.Port(), origin.Port(), access.RelayPort, access.RelayPort, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket, executable, dir, strings.Join(vmlab.AssistanceRespondActions, "|"), executable, dir, strings.Join(vmlab.AssistanceRespondActions, "|"))
+	return err
+}
+
+// runVMAssistanceRespond clicks one local-user control in a held demo's guest
+// and prints the screenshot taken afterwards.
+func runVMAssistanceRespond(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("vm assistance-respond", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	evidence := flags.String("evidence", "", "evidence directory of a running `lab vm assistance -hold`")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *evidence == "" || flags.NArg() != 1 {
+		return fmt.Errorf("usage: lab vm assistance-respond -evidence DIR {%s}; allow completes consent (Allow, Allow Remote Interaction for a Control request, Share)", strings.Join(vmlab.AssistanceRespondActions, "|"))
+	}
+	dir, err := filepath.Abs(*evidence)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	shot, err := vmlab.AssistanceRespond(ctx, dir, flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "Guest screenshot after %s: %s\n", flags.Arg(0), shot)
 	return err
 }

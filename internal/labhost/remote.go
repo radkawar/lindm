@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -30,6 +31,7 @@ type RemoteRun struct {
 	Architecture   string
 	Repository     string
 	Args           []string
+	Hold           bool
 	Stdout, Stderr io.Writer
 }
 
@@ -92,8 +94,14 @@ func SetFlag(args []string, name, value string) []string {
 }
 
 func (r RemoteRun) Run(ctx context.Context) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
-	defer cancel()
+	if len(r.Args) >= 2 && r.Args[1] == "assistance" && r.Host.Runtime != "native" {
+		return errors.New("remote assistance requires a native lab host")
+	}
+	if !r.Hold {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 3*time.Hour)
+		defer cancel()
+	}
 	root, err := filepath.Abs(r.Repository)
 	if err != nil {
 		return err
@@ -173,7 +181,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	guestProbe := remote + "/bin/lab"
 	if r.Architecture != nativeArch {
 		switch args[1] {
-		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "updates":
+		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "updates", "assistance":
 			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
 			guestProbe = remote + "/bin/lab-guest"
 		}
@@ -181,7 +189,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	switch args[1] {
 	case "inspect", "inspect-storage":
 		executables = append(executables, executable{"lindm-agent", r.Architecture, "./cmd/lindm-agent"})
-	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle":
+	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle", "assistance":
 		executables = append(executables, executable{"lindmd", nativeArch, "./cmd/lindmd"})
 	}
 	for _, item := range executables {
@@ -223,16 +231,16 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if args[1] == "inspect" || args[1] == "inspect-storage" {
 		args = SetFlag(args, "agent", remote+"/bin/lindm-agent")
 	}
-	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" || args[1] == "resources" {
+	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "assistance" {
 		args = SetFlag(args, "lab", guestProbe)
 	}
-	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" {
+	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" || args[1] == "assistance" {
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}
 	if args[1] == "enroll-unattended" {
 		args = SetFlag(args, "lab-binary", guestProbe)
 	}
-	if args[1] == "device-actions" && FlagValue(args, "architecture") == "" {
+	if (args[1] == "device-actions" || args[1] == "assistance") && FlagValue(args, "architecture") == "" {
 		architecture := "x86_64"
 		if r.Architecture == "arm64" {
 			architecture = "aarch64"
@@ -270,7 +278,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	} else {
 		args = SetFlag(args, "work-dir", remote+"/work")
 	}
-	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" {
+	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" || args[1] == "assistance" {
 		args = SetFlag(args, "golden-cache", filepath.Join(work, "encrypted"))
 	}
 	for _, name := range []string{"manifest", "recovery-manifest", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
@@ -290,7 +298,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		args = SetFlag(args, name, destination)
 	}
 	outputs := map[string]string{}
-	for _, name := range []string{"record", "inventory-record", "diagnostics", "fixture-output"} {
+	for _, name := range []string{"record", "inventory-record", "diagnostics", "fixture-output", "evidence"} {
 		if value := FlagValue(args, name); value != "" {
 			if name != "diagnostics" {
 				if _, e := os.Lstat(value); !errors.Is(e, os.ErrNotExist) {
@@ -323,6 +331,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		command[i] = QuoteShell(s)
 	}
 	script := "cd " + QuoteShell(remote+"/source") + " && exec env " + QuoteShell("TMPDIR="+remote+"/work") + " " + strings.Join(command, " ")
+	if args[1] == "assistance" {
+		browserEnv, err := stage.assistanceBrowser(work, nativeArch)
+		if err != nil {
+			return err
+		}
+		script = browserEnv + "\n" + script
+	}
 	if r.Host.Runtime == "container" {
 		container := "lindm-lab-" + filepath.Base(remote)
 		defer func() {
@@ -337,21 +352,31 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 		database := ""
 		switch args[1] {
-		case "dispatch", "resources", "device-actions", "updates", "enroll-unattended", "lifecycle":
+		case "dispatch", "resources", "device-actions", "updates", "enroll-unattended", "lifecycle", "assistance":
 			database = " --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock --group-add \"$(stat -c %g /var/run/docker.sock)\""
 		}
 		script = "exec docker run -i --name " + QuoteShell(container) + " --network host --user \"$(id -u):$(id -g)\"" + devices + database + " --mount " + QuoteShell("type=bind,src="+work+",dst="+work) + " --workdir " + QuoteShell(remote+"/source") + " --env " + QuoteShell("TMPDIR="+remote+"/work") + " " + QuoteShell(r.Host.RunnerImage) + " " + strings.Join(command, " ")
 	}
 	started := time.Now().UTC()
 	cmd := executionCommand(ctx, r.Host.SshAlias, script)
+	// A terminal Ctrl-C belongs to the controller, not SSH. Keep SSH alive
+	// while cancellation closes stdin and the worker tears down its lease.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// The open pipe is a lifetime lease. EOF on disconnect cancels the remote
 	// worker, which joins VM children and fixture cleanup before releasing flock.
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
 	}
+	// Let stdin EOF cancel the worker and finish teardown before SSH exits.
+	cmd.Cancel = stdin.Close
+	cmd.WaitDelay = 2 * time.Minute
 	cmd.Stdout, cmd.Stderr = r.Stdout, r.Stderr
 	runErr := cmd.Run()
+	if r.Hold && ctx.Err() != nil && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+		// The worker acknowledged EOF and completed fixture/VM teardown.
+		runErr = nil
+	}
 	var sshExit *exec.ExitError
 	if runErr != nil && (!errors.As(runErr, &sshExit) || sshExit.ExitCode() == 255 || sshExit.ExitCode() < 0) {
 		preserveRemote = true
@@ -366,8 +391,20 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	for name, destination := range outputs {
 		remotePath := remote + "/records/" + name
 		if _, existsErr := runOutput(copyCtx, r.Host.SshAlias, "test -e "+QuoteShell(remotePath)); existsErr != nil {
-			if runErr == nil {
+			var exit *exec.ExitError
+			missing := errors.As(existsErr, &exit) && exit.ExitCode() == 1
+			if !missing {
+				preserveRemote = true
+				err = errors.Join(err, fmt.Errorf("check remote -%s evidence: %w", name, existsErr))
+			} else if runErr == nil {
 				err = errors.Join(err, fmt.Errorf("remote -%s record missing: %w", name, existsErr))
+			}
+			continue
+		}
+		if name == "evidence" {
+			if e := collectAssistanceEvidence(copyCtx, r.Host.SshAlias, remotePath, destination, r.Stderr); e != nil {
+				err = errors.Join(err, e)
+				preserveRemote = true
 			}
 			continue
 		}
@@ -406,6 +443,21 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 	}
 	return err
+}
+
+// collectAssistanceEvidence returns immutable records and screenshots, but never
+// the held owner's credentials. The destination is exclusively created so an
+// existing qualification cannot be overwritten by another run.
+func collectAssistanceEvidence(ctx context.Context, alias, source, destination string, stderr io.Writer) error {
+	if err := os.Mkdir(destination, 0700); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "rsync", "-a", "--protect-args", "--chmod=Du=rwx,Dgo=", "--exclude=/owner-access", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=10", "--", transferPath(alias, source+"/"), destination+"/")
+	cmd.Stdout, cmd.Stderr = stderr, stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("collect assistance evidence: %w", err)
+	}
+	return nil
 }
 
 func removeFlag(args []string, name string) []string {

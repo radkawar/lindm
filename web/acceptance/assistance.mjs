@@ -51,6 +51,7 @@ async function observeMedia(surface) {
     remoteApplication: /^m=application /m.test(record?.pc.remoteDescription?.sdp ?? ""),
     dataChannels: [...(record?.channels ?? [])],
     localCandidateType: "",
+    localRelayProtocol: "",
     remoteCandidateType: "",
     controlButton: [...document.querySelectorAll("button")].some((node) =>
       /^Control (on|off)$/.test(node.innerText.trim()),
@@ -68,6 +69,7 @@ async function observeMedia(surface) {
   if (pair) {
     result.localCandidateType = stats.get(pair.localCandidateId)?.candidateType ?? "";
     result.remoteCandidateType = stats.get(pair.remoteCandidateId)?.candidateType ?? "";
+    result.localRelayProtocol = stats.get(pair.localCandidateId)?.relayProtocol ?? "";
   }
   return result;
 }
@@ -237,6 +239,13 @@ try {
   await privateDirectory(config.evidenceDirectory);
   config.actionTimeoutMs ??= 30_000;
   config.ignoreHTTPSErrors = true; // Owned fixture CA only; origin/CSRF checks stay intact.
+  // A remote console behind an SSH -L forward reaches the relay only with TURN
+  // over TCP; Chromium's own policy reproduces that without touching the page.
+  if (config.turnTcpOnly !== undefined && typeof config.turnTcpOnly !== "boolean")
+    throw new Error("invalid_turn_tcp_only");
+  config.browserArgs = config.turnTcpOnly
+    ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+    : [];
 } catch (error) {
   reply({ id: 0, ok: false, error: failure(error) });
   process.exit(1);

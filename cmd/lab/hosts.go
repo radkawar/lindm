@@ -169,8 +169,8 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if _, err = fmt.Fprintf(stderr, "lab host %s (%s), guest %s, capacity %d\n", chosen.Name, chosen.Transport, arch, chosen.MaxGuests); err != nil {
 		return err
 	}
-	if held && (chosen.Transport == "ssh" || chosen.Runtime == "container") {
-		return errors.New("a held lane serves a loopback console and a local display socket; choose a local lab host")
+	if held && chosen.Runtime == "container" {
+		return errors.New("a held lane requires a native lab host")
 	}
 	if chosen.Transport == "ssh" || chosen.Runtime == "container" {
 		repo := labhost.FlagValue(clean, "repo")
@@ -180,7 +180,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		if buildRepo := labhost.FlagValue(clean, "build-repo"); buildRepo != "" {
 			repo = buildRepo
 		}
-		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Stdout: stdout, Stderr: stderr}).Run(ctx)
+		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Hold: held, Stdout: stdout, Stderr: stderr}).Run(ctx)
 	}
 	slots, err := labhost.OpenSlots(chosen)
 	if err != nil {
@@ -205,9 +205,8 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	return runUnscheduled(ctx, clean, stdout, stderr)
 }
 
-// vmHolds reports a hands-on lane that runs until interrupted (lab vm
-// assistance -hold). It has no lane deadline and runs only on a local host,
-// so its loopback console and display socket reach the owner.
+// vmHolds reports a hands-on assistance lane that keeps its native host lease
+// until interrupted, without a lane deadline.
 func vmHolds(args []string) bool {
 	held := false
 	if len(args) < 2 || args[1] != "assistance" {
@@ -292,8 +291,13 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	if len(cfg.Hosts) != 1 {
 		return errors.New("host-exec requires exactly one host")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if !vmHolds(args[1:]) {
+		var deadlineCancel context.CancelFunc
+		ctx, deadlineCancel = context.WithTimeout(ctx, 3*time.Hour)
+		defer deadlineCancel()
+	}
 	// Reopen as a pollable descriptor: closing a plain blocking inherited stdin
 	// does not necessarily interrupt a concurrent read in the operating system.
 	lifetime, err := os.OpenFile("/proc/self/fd/0", os.O_RDONLY|syscall.O_NONBLOCK, 0)
@@ -332,7 +336,7 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 		}
 	}
 	args = labhost.SetFlag(args, "cache", persistentCache)
-	if lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" {
+	if lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance" {
 		repo := labhost.FlagValue(args, "repo")
 		if repo == "" {
 			return errors.New("remote control-plane lane requires staged -repo")

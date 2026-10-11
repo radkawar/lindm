@@ -3574,9 +3574,11 @@ configuration. It then prepares GDM autologin for a password-enabled desktop use
 and requires `lindm-session.service` to be active in that user's manager.
 
 A real headless Chromium drives the real console. Local-user clicks are QMP
-absolute-pointer input, located from QMP screendumps. Every screenshot and journal
-excerpt is SHA-256 bound in a read-only `assistance.json` and re-verified before
-a pass.
+absolute-pointer input, located from QMP screendumps. The lane observes stable
+hover feedback at the target before its single click; a QMP queue acknowledgment
+alone is not proof that GNOME processed pointer motion. Every screenshot and
+journal excerpt is SHA-256 bound in a read-only `assistance.json` and re-verified
+before a pass.
 
 ```sh
 lab vm assistance -host local \
@@ -3630,6 +3632,89 @@ The common runtime was x86_64 KVM/QEMU 8.2.2 with virtio-gpu, OVMF
 `2024.02-2ubuntu0.10` with Secure Boot enforced, swtpm and Chromium 156.0.8078.4.
 On both distributions the RemoteDesktop dialog shows **Allow Remote Interaction**
 off by default, so control is a second, separately visible local grant.
+
+#### Native aarch64 Spark qualification and held demo
+
+On 2026-10-11, the maintained SSH-native lane also passed on `dgx20` from
+private commit `42ea7d9`, then passed again after the wire-name cutover rebase
+at `73cdb53`, with `lab/images/ubuntu-noble-encrypted-arm64.json` and
+`-console-turn-tcp`. Each run executed all five scenarios without automatic
+retries. The records below are under the same
+`$HOME/.cache/lindm-assistqual-20261011/` evidence root:
+
+| Record                                           | SHA-256                                                            | Result                                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu24-aarch64-assistance-04/assistance.json` | `6669b3f6f6a1486cbaa9ef30d821a58626297e1f30c3f79fa122da6c9388d1d9` | PASS: control, view, decline, portal-cancel and lock; 35 screenshots and three journals SHA-256 bound in the record     |
+| `ubuntu24-aarch64-assistance-05/assistance.json` | `8f8005297ae745a0ad1c2f05dbf74433d3f1a1fcef95ada1495b975d153e4099` | PASS after rebase: all five scenarios; 35 screenshots and three journals; device `6a227f77-e05e-4ae4-8af2-9815ffb751c2` |
+
+The final run's native `lab` SHA-256 is
+`945e1414070fad153dcf5dfb88dda748d819d2a12afeffe3a37af39c8950e3c6`;
+`lindmd` is
+`7124eab7dacde97c3d300ca349fc8af6ab5e008d9c1bba346e780afc48b2e50a`.
+Reproduce with the usual binary/cache paths for your checkout:
+
+```sh
+lab vm assistance -host dgx20 \
+  -manifest lab/images/ubuntu-noble-encrypted-arm64.json \
+  -repo . -lab artifacts/bin/lab -lindmd artifacts/bin/lindmd \
+  -cache .cache/lab/images -require-cached-golden -console-turn-tcp \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.ms.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -secure-boot \
+  -evidence "$HOME/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-assistance-05"
+```
+
+Use a new evidence directory for another invocation; existing records are never
+overwritten. RemoteRun cross-builds the native binaries from the selected source
+checkout rather than sending the workstation's executables.
+
+The tuple is native aarch64 KVM/QEMU 8.2.2, AAVMF
+`qemu-efi-aarch64=2024.02-2ubuntu0.10` with Secure Boot enforced, swtpm 0.7.3,
+virtio-gpu and Ubuntu 24.04.5 GNOME/Wayland. Guest packages were
+`gnome-shell=46.0-0ubuntu6~24.04.15`,
+`libmutter-14-0=mutter-common=46.2-1ubuntu0.24.04.18`,
+`xdg-desktop-portal=1.18.4-1ubuntu2.24.04.3`,
+`xdg-desktop-portal-gnome=46.2-0ubuntu1`,
+`pipewire=1.0.5-1ubuntu3.3` and
+`gstreamer1.0-plugins-good=1.24.2-1ubuntu1.8`.
+The private operator Chromium was 156.0.8078.4 (Playwright 1.64.0, pinned Node
+24.21.0). The Spark had no Node or Chromium on PATH initially; the maintained
+prerequisite step installed them under its configured work directory, and `ldd`
+and real browser launch succeeded with existing system libraries, without apt.
+
+`lindmd`, its isolated PostgreSQL/trust fixture, the embedded TURN relay, QEMU,
+QMP and Chromium all ran on the Spark. The three live scenarios selected
+relay/relay ICE pairs with the console relay using TCP. Control received the
+typed nonce through `lindm-input`; view had neither an application channel nor
+a control button. The expected audited ends were `OPERATOR_STOPPED`,
+`USER_STOPPED`, `DECLINED` (`prompt_declined`), `DECLINED` (`portal_cancelled`)
+and `SESSION_LOCKED`. This remains virtual display evidence, not a physical
+desktop or cross-host media-path qualification.
+
+A pre-fix attempt, `ubuntu24-aarch64-assistance-02/assistance.json` (SHA-256
+`c864cd1d736b6fe7f6909c16da3d51a73eade9696e1fdf8305abe46d7861ca2b`), failed
+because the control prompt remained unaccepted after its recorded QMP click;
+the helper journal contains a prompt but no Allow. The lane now requires stable
+hover feedback at the target before sending its single click and retains a
+screenshot if hover or the portal never appears. The failed attempt is retained,
+not counted as a pass; no product consent, transport or capability gate was
+relaxed.
+
+The separate `ubuntu24-aarch64-held-03` demo used the arm64 manifest without
+`-host`; auto-selection chose `dgx20`. It printed placeholder forwards
+`ssh -L 39929:localhost:39929 -L 34370:localhost:34370 <user>@<this-host>`.
+The printed remote `assistance-respond ... screenshot` command succeeded:
+`guest-respond-20261011T102347.432Z-screenshot.png`, SHA-256
+`79d772c17c204194da19fcbcc2a9795c108522e358c0b78f585f437488452cd2`.
+Ctrl-C completed with exit 0, returned the screenshot without `owner-access`,
+and removed the exact remote run directory; checks found both listeners gone.
+The SSH process is isolated from terminal SIGINT so stdin closure can cancel
+the worker and release its lease only after teardown. A transport error while
+checking returned evidence retains the remote directory rather than treating
+the error as an absent file. No Spark demo was left running.
+
+#### Qualification boundaries
 
 An earlier Ubuntu run exposed a product race. GNOME 46 closes the portal session
 itself on lock, before logind sets `LockedHint`, so the session ended

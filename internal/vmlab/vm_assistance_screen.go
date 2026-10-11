@@ -69,6 +69,16 @@ func screenDiffBounds(reference, current *image.RGBA, region image.Rectangle, th
 	return bounds, count
 }
 
+// pointerHoverSettled requires visible feedback at the intended control, not
+// just QMP's acknowledgment that motion was queued. Two frames must agree after
+// that feedback appears, so a click cannot race the compositor's hover update.
+func pointerHoverSettled(before, previous, current *image.RGBA, point image.Point) bool {
+	region := image.Rect(point.X-20, point.Y-20, point.X+20, point.Y+20)
+	_, changed := screenDiffBounds(before, current, region, 3)
+	_, moving := screenDiffBounds(previous, current, region, 3)
+	return changed >= 16 && moving < 16
+}
+
 // locateNotificationBanner finds a GNOME notification banner in the top-centre
 // banner area by comparing with a clean reference of the same desktop. GNOME
 // draws light banners on Ubuntu's Yaru theme and dark ones on Fedora's Adwaita,
@@ -178,6 +188,28 @@ func portalSwitchOn(img *image.RGBA, dialog image.Rectangle) bool {
 		}
 	}
 	return saturated*10 >= area.Dx()*area.Dy()*3
+}
+
+// portalHasControlSwitch reports whether the dialog is the RemoteDesktop one a
+// Control request opens: its "Allow Remote Interaction" switch track (grey off,
+// accent on) covers the switch area. In the ScreenCast dialog of a view-only
+// request that area is plain dialog background.
+func portalHasControlSwitch(img *image.RGBA, dialog image.Rectangle) bool {
+	centre := portalControlSwitch(dialog)
+	area := image.Rect(centre.X-18, centre.Y-8, centre.X+18, centre.Y+8).Intersect(img.Bounds())
+	if area.Empty() || !image.Pt(dialog.Min.X+16, centre.Y).In(img.Bounds()) {
+		return false
+	}
+	background := pixelLuma(img, dialog.Min.X+16, centre.Y)
+	marked := 0
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			if luma := pixelLuma(img, x, y); luma <= background-16 || luma >= background+16 || pixelSaturation(img, x, y) >= 90 {
+				marked++
+			}
+		}
+	}
+	return marked*10 >= area.Dx()*area.Dy()*3
 }
 
 // centreChanged reports whether a window now covers the display centre, by

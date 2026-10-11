@@ -3,11 +3,13 @@
 package vmlab
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -155,5 +157,32 @@ func TestSelectAssistanceScenariosKeepsLaneOrder(t *testing.T) {
 		if _, err := selectAssistanceScenarios(bad); err == nil {
 			t.Errorf("selection %q accepted", bad)
 		}
+	}
+}
+
+func TestAssistanceRespondRequiresHeldRun(t *testing.T) {
+	_, dir := newTestAssistanceEvidence(t)
+	if _, err := AssistanceRespond(context.Background(), dir, "screenshot"); err == nil || !strings.Contains(err.Error(), "not a held assistance run") {
+		t.Fatalf("respond without held VM = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, heldVMFile), []byte("relative/vm\n"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AssistanceRespond(context.Background(), dir, "allow"); err == nil || !strings.Contains(err.Error(), "clean absolute") {
+		t.Fatalf("respond with relative VM directory = %v", err)
+	}
+}
+
+func TestVerifyAssistanceMediaRequiresTCPRelayWhenAsked(t *testing.T) {
+	media := &assistanceMediaEvidence{VideoWidth: 1280, VideoHeight: 800, DecodedFrames: 30, FramesDecoded: 30, ConnectionState: "connected", TransportPolicy: "relay", LocalCandidateType: "relay", RemoteCandidateType: "relay", LocalRelayProtocol: "udp"}
+	if err := verifyAssistanceMedia(media, false, false); err != nil {
+		t.Fatalf("UDP relay without TCP requirement: %v", err)
+	}
+	if err := verifyAssistanceMedia(media, false, true); err == nil {
+		t.Fatal("UDP relay accepted when TURN over TCP was required")
+	}
+	media.LocalRelayProtocol = "tcp"
+	if err := verifyAssistanceMedia(media, false, true); err != nil {
+		t.Fatalf("TCP relay: %v", err)
 	}
 }

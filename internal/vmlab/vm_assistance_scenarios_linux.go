@@ -31,6 +31,9 @@ type assistanceRun struct {
 	result   *VMAssistanceResult
 	release  *platform.Release
 	deviceID string
+	// turnTCP requires the console's selected relay candidate to use TURN
+	// over TCP, as a remote browser behind an SSH forward must.
+	turnTCP bool
 }
 
 // browserMedia mirrors the runner's camelCase observation.
@@ -46,6 +49,7 @@ type browserMedia struct {
 	LocalCandidateType  string   `json:"localCandidateType"`
 	RemoteCandidateType string   `json:"remoteCandidateType"`
 	ControlButton       bool     `json:"controlButton"`
+	LocalRelayProtocol  string   `json:"localRelayProtocol"`
 }
 
 // assistanceNoncePath is written only by the guest terminal's own shell.
@@ -201,8 +205,8 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if err := r.browser.call(ctx, "media", map[string]any{"minFrames": 15, "timeoutMs": 60000}, &media, 75*time.Second); err != nil {
 		return err
 	}
-	scenario.Media = &assistanceMediaEvidence{VideoWidth: media.VideoWidth, VideoHeight: media.VideoHeight, DecodedFrames: media.DecodedFrames, FramesDecoded: media.FramesDecoded, ConnectionState: media.ConnectionState, TransportPolicy: media.TransportPolicy, RemoteApplication: media.RemoteApplication, DataChannels: media.DataChannels, LocalCandidateType: media.LocalCandidateType, RemoteCandidateType: media.RemoteCandidateType, ControlButton: media.ControlButton}
-	if err := verifyAssistanceMedia(scenario.Media, control); err != nil {
+	scenario.Media = &assistanceMediaEvidence{VideoWidth: media.VideoWidth, VideoHeight: media.VideoHeight, DecodedFrames: media.DecodedFrames, FramesDecoded: media.FramesDecoded, ConnectionState: media.ConnectionState, TransportPolicy: media.TransportPolicy, RemoteApplication: media.RemoteApplication, DataChannels: media.DataChannels, LocalCandidateType: media.LocalCandidateType, RemoteCandidateType: media.RemoteCandidateType, ControlButton: media.ControlButton, LocalRelayProtocol: media.LocalRelayProtocol}
+	if err := verifyAssistanceMedia(scenario.Media, control, r.turnTCP); err != nil {
 		return err
 	}
 	if err := r.browserScreenshot(ctx, scenario, "live"); err != nil {
@@ -266,12 +270,15 @@ func (r *assistanceRun) verifyBinding(scenario *assistanceScenarioEvidence, sess
 
 // verifyAssistanceMedia requires decoded video over a relay-only connection,
 // and an input channel exactly for control sessions.
-func verifyAssistanceMedia(media *assistanceMediaEvidence, control bool) error {
+func verifyAssistanceMedia(media *assistanceMediaEvidence, control, turnTCP bool) error {
 	if media.VideoWidth <= 0 || media.VideoHeight <= 0 || media.DecodedFrames < 15 || media.FramesDecoded <= 0 {
 		return fmt.Errorf("console decoded no live video (%dx%d, %d frames)", media.VideoWidth, media.VideoHeight, media.DecodedFrames)
 	}
 	if media.ConnectionState != "connected" || media.TransportPolicy != "relay" || media.LocalCandidateType != "relay" || media.RemoteCandidateType != "relay" {
 		return fmt.Errorf("console media path is not a connected relay-only pair (%s, policy %s, %s/%s)", media.ConnectionState, media.TransportPolicy, media.LocalCandidateType, media.RemoteCandidateType)
+	}
+	if turnTCP && media.LocalRelayProtocol != "tcp" {
+		return fmt.Errorf("console relay candidate used %q, want TURN over TCP", media.LocalRelayProtocol)
 	}
 	input := slices.Contains(media.DataChannels, "lindm-input")
 	if control && (!media.RemoteApplication || !input || !media.ControlButton) {

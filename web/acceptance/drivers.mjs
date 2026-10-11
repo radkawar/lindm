@@ -98,7 +98,11 @@ export class UI {
 
 export class ChromiumDriver {
   async open(config) {
-    this.browser = await chromium.launch({ headless: true, timeout: 30_000 });
+    this.browser = await chromium.launch({
+      headless: true,
+      timeout: 30_000,
+      args: config.browserArgs ?? [],
+    });
     this.context = await this.browser.newContext({
       ignoreHTTPSErrors: config.ignoreHTTPSErrors === true,
       viewport: { width: 1440, height: 1000 },

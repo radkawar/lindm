@@ -32,6 +32,27 @@ func clone(img *image.RGBA) *image.RGBA {
 	return out
 }
 
+func TestPointerHoverRequiresRenderedStableFeedbackAtTarget(t *testing.T) {
+	before := syntheticWallpaper(color.RGBA{60, 20, 50, 0xff})
+	point := image.Pt(548, 204)
+	if pointerHoverSettled(before, before, before, point) {
+		t.Fatal("queued motion without rendered feedback allowed a click")
+	}
+	hover := clone(before)
+	fill(hover, image.Rect(530, 190, 566, 220), color.RGBA{225, 225, 225, 0xff})
+	if pointerHoverSettled(before, before, hover, point) {
+		t.Fatal("the first changing frame was considered settled")
+	}
+	if !pointerHoverSettled(before, hover, hover, point) {
+		t.Fatal("stable hover feedback was not recognized")
+	}
+	elsewhere := clone(before)
+	fill(elsewhere, image.Rect(600, 8, 700, 24), color.RGBA{255, 255, 255, 0xff})
+	if pointerHoverSettled(before, elsewhere, elsewhere, point) {
+		t.Fatal("an unrelated clock tick allowed a click")
+	}
+}
+
 func TestLocateNotificationBannerOnLightAndDarkThemes(t *testing.T) {
 	for _, theme := range []struct {
 		name               string
@@ -161,5 +182,25 @@ func TestCentreChanged(t *testing.T) {
 	fill(window, image.Rect(275, 148, 1005, 685), color.RGBA{30, 30, 32, 0xff})
 	if !centreChanged(reference, window) {
 		t.Fatal("terminal window over the centre not observed")
+	}
+}
+
+// allow completes consent in one step, so it must tell a Control request's
+// RemoteDesktop dialog from a view-only ScreenCast dialog without the server.
+func TestPortalHasControlSwitchDistinguishesRequestMode(t *testing.T) {
+	wallpaper, bounds := color.RGBA{60, 20, 50, 0xff}, image.Rect(343, 166, 1003, 666)
+	for _, accent := range []bool{false, true} {
+		img := syntheticPortalDialog(wallpaper, bounds, accent)
+		dialog, found := locatePortalDialog(img)
+		if !found || !portalHasControlSwitch(img, dialog) {
+			t.Fatalf("RemoteDesktop dialog (switch on=%t) not recognised: %v %t", accent, dialog, found)
+		}
+	}
+	view := syntheticPortalDialog(wallpaper, bounds, false)
+	centre := portalControlSwitch(bounds)
+	fill(view, image.Rect(centre.X-22, centre.Y-12, centre.X+22, centre.Y+12), color.RGBA{250, 250, 250, 0xff})
+	dialog, found := locatePortalDialog(view)
+	if !found || portalHasControlSwitch(view, dialog) {
+		t.Fatalf("ScreenCast dialog reported a remote interaction switch: %v %t", dialog, found)
 	}
 }
