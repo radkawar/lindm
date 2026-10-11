@@ -1419,12 +1419,13 @@ Integration runs (`dev test-integration` and `dev signoff`) first take the
 exclusive host lock `~/.cache/lindm-integration.lock`, printing its holder while
 they queue, because every run shares the one fixed-port dev PostgreSQL.
 `dev test-integration`, `dev signoff` and `dev pre-push` run their race-enabled
-suites (integration and clean-worktree `make check`) under a heavy-job lease on
-the local lab host: one guest-equivalent slot (`max_vcpus`, `max_memory_mib`)
-admitted through the same flock and memory admission as VM lanes, so lanes and
-suites do not oversubscribe the host. While waiting they print each changed
-reason (slots held, available memory, swap-out during the sample). Suite deadlines
-are not raised to absorb an oversubscribed host.
+suites (integration and clean-worktree `make check`) after heavy-job admission on
+the local lab host. Gates do not take a lab slot or queue in the lanes' FIFO,
+which would hold a signoff behind hours of lanes; they wait only for the host's
+memory admission (one guest-equivalent `max_memory_mib` plus the lab headroom, no
+swap-out during the sample), printing each changed reason, and then run at nice
+10 with all their children, so VM lanes keep CPU priority. Suite deadlines are
+not raised to absorb an oversubscribed host.
 
 The shared main checkout changes only through `go run ./cmd/dev land -from
 WORKTREE -m MSG [-paths a,b]`. It and `go run ./cmd/dev gate-commit -m MSG` hold

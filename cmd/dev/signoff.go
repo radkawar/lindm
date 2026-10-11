@@ -128,8 +128,8 @@ func inClean(ctx context.Context, repo *worktree.Repository, purpose, sha string
 	return gates(clean)
 }
 
-// makeCheck runs make check in a clean worktree under a heavy-job lease on the
-// local lab host, without golangci-lint's
+// makeCheck runs make check in a clean worktree after heavy-job admission
+// (local memory guard, nice 10), without golangci-lint's
 // machine-wide runner lock, using a cache reserved for clean-worktree gates, so
 // agents linting concurrently neither block nor fail the gate. golangci-lint's
 // cache, like Go's build cache, tolerates concurrent writers.
@@ -138,12 +138,11 @@ func makeCheck(ctx context.Context, clean string) error {
 	if err != nil {
 		return err
 	}
-	release, err := heavyJob(ctx, "make check", os.Stderr)
-	if err != nil {
+	if err := admitHeavyJob(ctx, "make check", os.Stderr); err != nil {
 		return err
 	}
 	env := append(os.Environ(), "GOLANGCI_LINT_CACHE="+filepath.Join(cache, "lindm-clean-golangci"))
-	return errors.Join(stream(ctx, clean, env, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners"), release())
+	return stream(ctx, clean, env, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners")
 }
 
 func output(ctx context.Context, dir, name string, args ...string) (string, error) {
@@ -166,10 +165,8 @@ func stream(ctx context.Context, dir string, env []string, name string, args ...
 }
 
 // testIntegration runs the integration suite exclusively among integration
-// runs on this host, which share the one fixed-port dev PostgreSQL, and under a
-// heavy-job lease on the local lab host, so it and VM lanes share one CPU and
-// memory admission. The exclusive lock is taken first so queued runs hold no
-// lab capacity.
+// runs on this host, which share the one fixed-port dev PostgreSQL, then
+// passes heavy-job admission (local memory guard, nice 10).
 func testIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultErr error) {
 	cache, err := os.UserCacheDir()
 	if err != nil {
@@ -183,10 +180,8 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultE
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	release, err := heavyJob(ctx, "test-integration", os.Stderr)
-	if err != nil {
+	if err := admitHeavyJob(ctx, "test-integration", os.Stderr); err != nil {
 		return err
 	}
-	defer func() { resultErr = errors.Join(resultErr, release()) }()
 	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot)
 }

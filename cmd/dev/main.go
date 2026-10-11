@@ -28,8 +28,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   test-integration  Run real PostgreSQL regressions in isolated disposable schemas.
          The fixture comes from -root; -code <checkout> (default -root) selects
          the code under test, so a clean worktree runs against the shared fixture.
-         Queues on the host-wide integration lock, then a heavy-job lease on
-         the local lab host.
+         Queues on the host-wide integration lock, then waits for local lab
+         memory admission and runs at nice 10.
   trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires

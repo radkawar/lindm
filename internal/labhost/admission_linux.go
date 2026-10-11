@@ -97,6 +97,49 @@ func (m memoryAdmission) allows(guestBytes uint64) bool {
 	return m.SwapOutPagesAfter == m.SwapOutPagesBefore && m.AvailableBytes >= guestBytes+memoryHeadroomBytes
 }
 
+// refusal names why the observation does not admit guestBytes for guests, or
+// returns "" when it does.
+func (m memoryAdmission) refusal(guestBytes uint64, guests uint32) string {
+	switch {
+	case m.allows(guestBytes):
+		return ""
+	case m.SwapOutPagesAfter != m.SwapOutPagesBefore:
+		return "host swapped out pages during the admission sample"
+	default:
+		return fmt.Sprintf("%d MiB available < %d MiB needed (%d guests + headroom)", m.AvailableBytes>>20, (guestBytes+memoryHeadroomBytes)>>20, guests)
+	}
+}
+
+// AwaitMemory waits until the host's memory admission would admit guests
+// guest-equivalents, without taking a slot or a FIFO ticket, calling report
+// with each changed wait reason. It is for host jobs that are not guests and
+// must not queue behind lanes, yet must not drive the host into swap.
+func (s *Slots) AwaitMemory(ctx context.Context, guests uint32, report func(reason string)) error {
+	guestBytes := uint64(guests) * (uint64(s.memoryMib) << 20)
+	var last string
+	for {
+		observation, err := s.memoryProbe(ctx)
+		if err != nil {
+			return fmt.Errorf("lab hosts: memory admission: %w", err)
+		}
+		wait := observation.refusal(guestBytes, guests)
+		if wait == "" {
+			return nil
+		}
+		if report != nil && wait != last {
+			report(wait)
+			last = wait
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
 // admissionBusy is the transient wait while another waiter's poll holds the
 // admission guard; it says nothing about the queue, so it is never reported.
 const admissionBusy = "another admission is in progress"
@@ -142,11 +185,8 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 		return nil, "", fmt.Errorf("lab hosts: memory admission: %w", err)
 	}
 	guestBytes := uint64(guests) * (uint64(s.memoryMib) << 20)
-	if !observation.allows(guestBytes) {
-		if observation.SwapOutPagesAfter != observation.SwapOutPagesBefore {
-			return nil, "host swapped out pages during the admission sample", nil
-		}
-		return nil, fmt.Sprintf("%d MiB available < %d MiB needed (%d guests + headroom)", observation.AvailableBytes>>20, (guestBytes+memoryHeadroomBytes)>>20, guests), nil
+	if wait := observation.refusal(guestBytes, guests); wait != "" {
+		return nil, wait, nil
 	}
 	observation.GuestMemoryBytes, observation.HeadroomBytes = guestBytes, memoryHeadroomBytes
 	data, err := json.Marshal(observation)

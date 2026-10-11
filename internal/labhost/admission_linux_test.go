@@ -472,3 +472,38 @@ func TestRunAdmittedStartsLaneDeadlineAfterAdmission(t *testing.T) {
 		t.Fatalf("admission wait beyond its bound returned %v", err)
 	}
 }
+
+func TestAwaitMemoryTakesNoSlotAndReportsChanges(t *testing.T) {
+	host := fixtureHost("await", t.TempDir())
+	host.MaxGuests = 1
+	slots, err := OpenSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := func() (*Lease, error) {
+		slots.memoryProbe = func(context.Context) (memoryAdmission, error) { return memoryAdmission{AvailableBytes: 64 << 30}, nil }
+		return slots.Acquire(context.Background())
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = held.Close() }()
+	observations := make(chan memoryAdmission, 3)
+	observations <- memoryAdmission{AvailableBytes: 1 << 30}
+	observations <- memoryAdmission{AvailableBytes: 1 << 30}
+	observations <- memoryAdmission{AvailableBytes: 64 << 30}
+	slots.memoryProbe = func(context.Context) (memoryAdmission, error) { return <-observations, nil }
+	var reasons []string
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// Every slot is held, yet memory alone admits the host job.
+	if err := slots.AwaitMemory(ctx, 1, func(reason string) { reasons = append(reasons, reason) }); err != nil {
+		t.Fatal(err)
+	}
+	if len(reasons) != 1 || !strings.Contains(reasons[0], "MiB available") {
+		t.Fatalf("reasons %q", reasons)
+	}
+	if active, err := slots.Count(); err != nil || active != 1 {
+		t.Fatalf("host job took a slot: %d %v", active, err)
+	}
+}
