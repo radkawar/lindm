@@ -98,7 +98,10 @@ func TestPruneRemovesOnlyMergedUnusedTreesAndArchivesUnmerged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dirty, "notes"), []byte("untracked\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gitT(t, diverged, "commit", "--quiet", "--allow-empty", "-m", "unmerged")
+	if err := os.WriteFile(filepath.Join(diverged, "README"), []byte("unmerged\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitT(t, diverged, "commit", "--quiet", "-am", "unmerged")
 	sleeper := exec.Command("sleep", "60")
 	sleeper.Dir = busy
 	if err := sleeper.Start(); err != nil {

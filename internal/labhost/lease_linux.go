@@ -122,13 +122,24 @@ func (s *Slots) Acquire(ctx context.Context) (*Lease, error) {
 // AcquireN waits until all guests of one lane are admitted together, holding
 // no slot while it waits; a lane never owns part of its capacity.
 func (s *Slots) AcquireN(ctx context.Context, guests uint32) ([]*Lease, error) {
+	return s.AcquireNReporting(ctx, guests, nil)
+}
+
+// AcquireNReporting is AcquireN that calls report, when non-nil, each time the
+// reason admission is waiting changes.
+func (s *Slots) AcquireNReporting(ctx context.Context, guests uint32, report func(reason string)) ([]*Lease, error) {
+	var last string
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		leases, err := s.tryAcquireN(ctx, guests)
+		leases, wait, err := s.tryAcquireN(ctx, guests)
 		if err != nil || leases != nil {
 			return leases, err
+		}
+		if report != nil && wait != last {
+			report(wait)
+			last = wait
 		}
 		timer := time.NewTimer(50 * time.Millisecond)
 		select {

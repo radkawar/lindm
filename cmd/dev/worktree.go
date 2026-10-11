@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -15,17 +17,26 @@ import (
 	"lindm/internal/devlab/worktree"
 )
 
-const worktreeUsage = `Usage: go run ./cmd/dev worktree <add|list|prune> [options]
+const worktreeUsage = `Usage: go run ./cmd/dev worktree <add|list|audit|prune> [options]
 
   add NAME [-base REV]  Create <main>.worktrees/NAME detached at REV (default
         HEAD), link the main checkout's node_modules when package.json and
         package-lock.json match (otherwise npm ci there), print the path.
   list  Registered worktrees: path, HEAD, ahead/behind main, dirty, last
         modified (newest file outside node_modules), allocated size.
+  audit [PATH...]  Classify every registered worktree (and extra PATHs) by
+        whether main already holds its work, by content rather than commits:
+        its change set (base..HEAD, staged, unstaged, untracked) per file is
+        LANDED when main has that content or the change reverse-applies to
+        main; trees are LANDED, PARTIAL (unlanded files listed), UNLANDED,
+        SNAPSHOT (no change), MISSING or UNREGISTERED, with an owner inferred
+        from the name. Prints a table and writes
+        ~/.cache/lindm-worktree-audit/<ts>.json.
   prune [-older-than D] [-dry-run] [-archive-dirty] [PATH...]
         Remove worktrees (default: every one under <main>.worktrees) that are
-        clean and whose HEAD is an ancestor of main. Dirty or diverged trees
-        are kept unless -archive-dirty, which first saves git diff --binary
+        clean and whose HEAD is an ancestor of main, or dirty/diverged but
+        audited LANDED or SNAPSHOT. Other dirty or diverged trees
+        are kept unless -archive-dirty. Every dirty/diverged removal first saves git diff --binary
         HEAD, the untracked files (tar), the HEAD SHA and a bundle of commits
         main lacks to ~/.cache/lindm-worktree-archive/<name>-<ts>/. A tree that
         any process uses (cwd, root, executable or open file beneath it) or
@@ -41,8 +52,8 @@ func runWorktree(args []string) error {
 		return errors.New("a worktree command is required")
 	}
 	verb := args[0]
-	if verb != "add" && verb != "list" && verb != "prune" {
-		return fmt.Errorf("unknown worktree command %q; use worktree add|list|prune", verb)
+	if verb != "add" && verb != "list" && verb != "audit" && verb != "prune" {
+		return fmt.Errorf("unknown worktree command %q; use worktree add|list|audit|prune", verb)
 	}
 	flags := flag.NewFlagSet("worktree "+verb, flag.ContinueOnError)
 	root := flags.String("root", ".", "any checkout of the repository")
@@ -84,6 +95,8 @@ func runWorktree(args []string) error {
 			return errors.New("worktree list takes no arguments")
 		}
 		return listWorktrees(ctx, repo)
+	case "audit":
+		return auditWorktrees(ctx, repo, positional)
 	}
 	return pruneWorktrees(ctx, repo, positional, worktree.PruneOptions{OlderThan: *olderThan, DryRun: *dryRun, ArchiveDirty: *archiveDirty, Now: time.Now()})
 }
@@ -174,4 +187,57 @@ func size(bytes int64) string {
 		value, suffix = value/unit, suffix+1
 	}
 	return fmt.Sprintf("%.1f%ciB", value, "KMGT"[suffix])
+}
+
+func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []string) error {
+	var audits []worktree.Audit
+	table := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+	if _, err := fmt.Fprintln(table, "VERDICT\tOWNER\tPATH\tCHANGED\tUNLANDED"); err != nil {
+		return err
+	}
+	counts := map[worktree.Verdict]int{}
+	err := repo.AuditAll(ctx, extra, func(audit worktree.Audit) error {
+		audits = append(audits, audit)
+		counts[audit.Verdict]++
+		detail := strings.Join(audit.Unlanded, " ")
+		if audit.Note != "" {
+			detail = strings.TrimSpace(detail + " (" + audit.Note + ")")
+		}
+		_, err := fmt.Fprintf(table, "%s\t%s\t%s\t%d\t%s\n", audit.Verdict, audit.Owner, audit.Path, audit.Changed, detail)
+		return err
+	})
+	if err := errors.Join(err, table.Flush()); err != nil {
+		return err
+	}
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(cache, "lindm-worktree-audit")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	head, err := output(ctx, repo.Main, "git", "rev-parse", worktree.Trunk)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(struct {
+		AuditedAt time.Time        `json:"audited_at"`
+		Main      string           `json:"main"`
+		Trunk     string           `json:"trunk_sha"`
+		Worktrees []worktree.Audit `json:"worktrees"`
+	}{time.Now().UTC(), repo.Main, head, audits}, "", "  ")
+	if err != nil {
+		return err
+	}
+	record := filepath.Join(dir, time.Now().UTC().Format("20060102T150405Z")+".json")
+	if err := os.WriteFile(record, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	var summary []string
+	for _, verdict := range []worktree.Verdict{worktree.Landed, worktree.Snapshot, worktree.Partial, worktree.Unlanded, worktree.Missing, worktree.Unregistered} {
+		summary = append(summary, fmt.Sprintf("%s %d", verdict, counts[verdict]))
+	}
+	_, err = fmt.Printf("%s against %s %.12s; record %s\n", strings.Join(summary, ", "), worktree.Trunk, head, record)
+	return err
 }

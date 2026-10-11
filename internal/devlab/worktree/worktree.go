@@ -83,9 +83,7 @@ func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (
 	}
 	// Commit hooks and gates use the checkout's own pinned .tools; a shared
 	// tool directory would be reinstalled by every newer Makefile.
-	tools := exec.CommandContext(ctx, "make", "--no-print-directory", "tools")
-	tools.Dir, tools.Stdout, tools.Stderr = path, log, log
-	if err := tools.Run(); err != nil {
+	if err := labexec.Run(ctx, labexec.Command{Path: "make", Args: []string{"--no-print-directory", "tools"}, Dir: path, Stdout: log, Stderr: log}); err != nil {
 		return path, fmt.Errorf("make tools in %s: %w", path, err)
 	}
 	return path, nil
@@ -236,6 +234,7 @@ type PruneOptions struct {
 type Decision struct {
 	Path    string
 	Status  *Status // nil when the target was not inspected
+	Audit   *Audit  // set when the tree was dirty or diverged
 	Removed bool    // removed, or would be in a dry run
 	Reason  string
 	Archive string
@@ -243,8 +242,9 @@ type Decision struct {
 
 // Prune decides, and unless DryRun applies, the fate of each target path, or
 // of every worktree under Root when targets is empty. Removal requires a
-// clean tree merged into Trunk, or ArchiveDirty with a completed archive, and
-// no process or running dev fixture using the tree. Git's records of missing
+// clean tree merged into Trunk, or a dirty or diverged tree that the audit
+// finds LANDED or SNAPSHOT (or any with ArchiveDirty) after a completed
+// archive, and no process or running dev fixture using the tree. Git's records of missing
 // worktrees are pruned afterwards.
 func (r *Repository) Prune(ctx context.Context, targets []string, options PruneOptions, report func(Decision) error) error {
 	entries, err := r.List(ctx)
@@ -317,13 +317,22 @@ func (r *Repository) decide(ctx context.Context, entry Entry, options PruneOptio
 	if !status.Merged {
 		unmerged = append(unmerged, fmt.Sprintf("diverged (%d ahead of %s)", status.Ahead, Trunk))
 	}
-	if len(unmerged) != 0 && !options.ArchiveDirty {
-		decision.Reason = strings.Join(unmerged, ", ") + "; -archive-dirty archives then removes"
-		return decision, nil
-	}
 	decision.Removed, decision.Reason = true, "clean and merged into "+Trunk
 	if len(unmerged) != 0 {
-		decision.Reason = strings.Join(unmerged, ", ") + "; archived"
+		// Work copied into main by hand leaves trees dirty or diverged yet
+		// holding nothing main lacks; the audit recognizes it by content.
+		audit := r.AuditPath(ctx, entry.Path)
+		decision.Audit = &audit
+		switch {
+		case audit.Verdict.Disposable():
+			decision.Reason = strings.Join(unmerged, ", ") + "; audit " + string(audit.Verdict) + "; archived"
+		case options.ArchiveDirty:
+			decision.Reason = strings.Join(unmerged, ", ") + "; audit " + string(audit.Verdict) + "; archived (-archive-dirty)"
+		default:
+			decision.Removed = false
+			decision.Reason = fmt.Sprintf("%s; audit %s (%d unlanded files); -archive-dirty archives then removes", strings.Join(unmerged, ", "), audit.Verdict, len(audit.Unlanded))
+			return decision, nil
+		}
 	}
 	if options.DryRun {
 		return decision, nil
@@ -452,8 +461,20 @@ func canonical(path string) string {
 
 // git runs git in dir and returns bounded stdout.
 func git(ctx context.Context, dir string, args ...string) (string, error) {
+	return gitWith(ctx, dir, nil, nil, args...)
+}
+
+// gitWith runs git with extra environment and optional stdin.
+func gitWith(ctx context.Context, dir string, env []string, stdin []byte, args ...string) (string, error) {
 	stdout, stderr := nativeexec.NewBuffer(maxGitOutput), nativeexec.NewBuffer(64<<10)
-	if err := labexec.Run(ctx, labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: stdout, Stderr: stderr}); err != nil {
+	command := labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: stdout, Stderr: stderr}
+	if env != nil {
+		command.Env = append(os.Environ(), env...)
+	}
+	if stdin != nil {
+		command.Stdin = bytes.NewReader(stdin)
+	}
+	if err := labexec.Run(ctx, command); err != nil {
 		return "", fmt.Errorf("git %s in %s: %w: %s", strings.Join(args, " "), dir, err, bytes.TrimSpace(stderr.Bytes()))
 	}
 	if stdout.Truncated() {

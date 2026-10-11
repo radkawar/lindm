@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|pre-push|generate-docs> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|pre-push|land|gate-commit|generate-docs> [options]
 
   generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
          fails instead when any block is stale (make generate / make lint).
@@ -28,6 +28,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   test-integration  Run real PostgreSQL regressions in isolated disposable schemas.
          The fixture comes from -root; -code <checkout> (default -root) selects
          the code under test, so a clean worktree runs against the shared fixture.
+         Queues on the host-wide integration lock, then a heavy-job lease on
+         the local lab host.
   trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires
@@ -39,6 +41,9 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
          statuses for that SHA; see signoff -h.
   pre-push  Git hook body: make check in a clean worktree of each pushed SHA
          unless it already has a green signoff/unit; see pre-push -h.
+  land -from WORKTREE  Under the landing lock, apply a worktree's change to the
+         shared tree, gate the touched files, roll back on failure; see land -h.
+  gate-commit -m MSG  Under the landing lock, make check, then commit if green.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
 40m for test-integration).
@@ -79,6 +84,10 @@ func run() error {
 		return runSignoff(os.Args[2:])
 	case "pre-push":
 		return runPrePush(os.Args[2:])
+	case "land":
+		return runLand(os.Args[2:])
+	case "gate-commit":
+		return runGateCommit(os.Args[2:])
 	}
 	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" {
 		return fmt.Errorf("unknown command %q; use help", verb)
@@ -144,13 +153,13 @@ func run() error {
 		"down":  devlab.Down, "reset": devlab.Reset,
 		"test-integration": func(ctx context.Context, root string) error {
 			if code == "" {
-				return devlab.TestIntegration(ctx, root, root)
+				return testIntegration(ctx, root, root)
 			}
 			codeRoot, err := filepath.Abs(code)
 			if err != nil {
 				return err
 			}
-			return devlab.TestIntegration(ctx, root, codeRoot)
+			return testIntegration(ctx, root, codeRoot)
 		},
 		"trust": devlab.Trust,
 		"recreate-database": func(ctx context.Context, root string) error {

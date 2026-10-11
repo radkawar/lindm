@@ -100,7 +100,7 @@ func runSignoff(args []string) (resultErr error) {
 		if err := makeCheck(ctx, clean); err != nil {
 			return err
 		}
-		return devlab.TestIntegration(ctx, checkout, clean)
+		return testIntegration(ctx, checkout, clean)
 	}); err != nil {
 		return err
 	}
@@ -128,7 +128,8 @@ func inClean(ctx context.Context, repo *worktree.Repository, purpose, sha string
 	return gates(clean)
 }
 
-// makeCheck runs make check in a clean worktree without golangci-lint's
+// makeCheck runs make check in a clean worktree under a heavy-job lease on the
+// local lab host, without golangci-lint's
 // machine-wide runner lock, using a cache reserved for clean-worktree gates, so
 // agents linting concurrently neither block nor fail the gate. golangci-lint's
 // cache, like Go's build cache, tolerates concurrent writers.
@@ -137,8 +138,12 @@ func makeCheck(ctx context.Context, clean string) error {
 	if err != nil {
 		return err
 	}
+	release, err := heavyJob(ctx, "make check", os.Stderr)
+	if err != nil {
+		return err
+	}
 	env := append(os.Environ(), "GOLANGCI_LINT_CACHE="+filepath.Join(cache, "lindm-clean-golangci"))
-	return stream(ctx, clean, env, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners")
+	return errors.Join(stream(ctx, clean, env, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners"), release())
 }
 
 func output(ctx context.Context, dir, name string, args ...string) (string, error) {
@@ -158,4 +163,30 @@ func stream(ctx context.Context, dir string, env []string, name string, args ...
 		return fmt.Errorf("%s %s in %s: %w", name, strings.Join(args, " "), dir, err)
 	}
 	return nil
+}
+
+// testIntegration runs the integration suite exclusively among integration
+// runs on this host, which share the one fixed-port dev PostgreSQL, and under a
+// heavy-job lease on the local lab host, so it and VM lanes share one CPU and
+// memory admission. The exclusive lock is taken first so queued runs hold no
+// lab capacity.
+func testIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultErr error) {
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return err
+	}
+	lock := filepath.Join(cache, "lindm-integration.lock")
+	unlock, err := worktree.LockFile(ctx, lock, func(holder string) {
+		fmt.Fprintf(os.Stderr, "test-integration: waiting for %s: another integration run holds the dev PostgreSQL (%s)\n", lock, holder)
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
+	release, err := heavyJob(ctx, "test-integration", os.Stderr)
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, release()) }()
+	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot)
 }

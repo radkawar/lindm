@@ -37,23 +37,23 @@ flowchart LR
 
 ## Key Directories
 
-| Path                                                               | Purpose                                                                                                                                                                                |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd/lindmd`                                                       | Server CLI: `serve`, `migrate`, `bootstrap-owner`, `check-config` (all take `-config FILE`)                                                                                            |
-| `cmd/lindm-agent`                                                  | Agent CLI: `executor` (root), `run` (network)                                                                                                                                          |
-| `cmd/dev`                                                          | Dev fixture tool: `init`, `up`, `check`, `trust`, `test-integration [-code DIR]`, `down`, `reset -confirm-delete`, `worktree add\|list\|prune`, `signoff`. State lives in `.cache/dev` |
-| `cmd/lab`                                                          | VM/native lab: `packages`, `auth`, `profiles`, `native`, `vm`, `images`, `guest`                                                                                                       |
-| `internal/agent/*`                                                 | `executor`, `journal`, `spool`, `localrpc`, `serviceprovider` (systemd), `inventory`, `enrollment`                                                                                     |
-| `internal/{trust,pki}`                                             | Trust and certificate handling                                                                                                                                                         |
-| `internal/{vmlab,devlab}`                                          | Lab and dev-fixture logic                                                                                                                                                              |
-| `internal/testdb`                                                  | Disposable Postgres schemas for integration tests                                                                                                                                      |
-| `internal/packaging/assets`                                        | Real packaging assets. Top-level `packaging/` holds only empty directories                                                                                                             |
-| `api/lindm/<domain>/v1`                                            | `.proto` sources. Shared validation rules are in `api/lindm/validation/v1`                                                                                                             |
-| `db/migrations`, `db/queries/<domain>`                             | goose SQL migrations (`000NN_name.sql`) and sqlc queries                                                                                                                               |
-| `gen/`, `web/gen/`, `internal/**/*db/`, `web/src/routeTree.gen.ts` | **Generated and committed. Never hand-edit**                                                                                                                                           |
-| `web/src`                                                          | Console: `app/`, `routes/` (thin), `features/<domain>/`, `components/{ui,layout}`, `lib/`, `styles/`                                                                                   |
-| `deploy/dev/compose.yml`                                           | Postgres 18.6 on `:15432` and Keycloak 26.7 on `:18443`. Driven only via `cmd/dev`                                                                                                     |
-| `lab/images/*.json`                                                | Pinned, signed cloud-image manifests                                                                                                                                                   |
+| Path                                                               | Purpose                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd/lindmd`                                                       | Server CLI: `serve`, `migrate`, `bootstrap-owner`, `check-config` (all take `-config FILE`)                                                                                                                               |
+| `cmd/lindm-agent`                                                  | Agent CLI: `executor` (root), `run` (network)                                                                                                                                                                             |
+| `cmd/dev`                                                          | Dev fixture tool: `init`, `up`, `check`, `trust`, `test-integration [-code DIR]`, `down`, `reset -confirm-delete`, `worktree add\|list\|prune`, `signoff`, `pre-push`, `land`, `gate-commit`. State lives in `.cache/dev` |
+| `cmd/lab`                                                          | VM/native lab: `packages`, `auth`, `profiles`, `native`, `vm`, `images`, `guest`                                                                                                                                          |
+| `internal/agent/*`                                                 | `executor`, `journal`, `spool`, `localrpc`, `serviceprovider` (systemd), `inventory`, `enrollment`                                                                                                                        |
+| `internal/{trust,pki}`                                             | Trust and certificate handling                                                                                                                                                                                            |
+| `internal/{vmlab,devlab}`                                          | Lab and dev-fixture logic                                                                                                                                                                                                 |
+| `internal/testdb`                                                  | Disposable Postgres schemas for integration tests                                                                                                                                                                         |
+| `internal/packaging/assets`                                        | Real packaging assets. Top-level `packaging/` holds only empty directories                                                                                                                                                |
+| `api/lindm/<domain>/v1`                                            | `.proto` sources. Shared validation rules are in `api/lindm/validation/v1`                                                                                                                                                |
+| `db/migrations`, `db/queries/<domain>`                             | goose SQL migrations (`000NN_name.sql`) and sqlc queries                                                                                                                                                                  |
+| `gen/`, `web/gen/`, `internal/**/*db/`, `web/src/routeTree.gen.ts` | **Generated and committed. Never hand-edit**                                                                                                                                                                              |
+| `web/src`                                                          | Console: `app/`, `routes/` (thin), `features/<domain>/`, `components/{ui,layout}`, `lib/`, `styles/`                                                                                                                      |
+| `deploy/dev/compose.yml`                                           | Postgres 18.6 on `:15432` and Keycloak 26.7 on `:18443`. Driven only via `cmd/dev`                                                                                                                                        |
+| `lab/images/*.json`                                                | Pinned, signed cloud-image manifests                                                                                                                                                                                      |
 
 ## Development Commands
 
@@ -150,11 +150,11 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
   - Poll with deadlines instead of sleeping.
   - Do not mock OS package transactions or OIDC in tests that claim to cover them.
 - Rules from `docs/verification.md`: a skipped test is not a pass, and VM results do not count as physical validation.
-- Before landing any change in the shared checkout, run in that same tree:
+- Landing in the shared checkout: work and gate in a private worktree, then land **only** with `go run ./cmd/dev land -from ~/dev/minor/lindm.worktrees/NAME [-paths a,b]`. Never copy files into the shared tree by hand. `land` takes the exclusive lock `.git/lindm-landing.lock`. It applies the worktree's whole change against `main` (commits, edits, renames, deletions, untracked files), and on conflict nothing is applied, so rebase and retry. It then runs the quick gate in the shared tree on the touched files and rolls the change back automatically if the gate fails:
   - `go build ./...`
-  - `.tools/bin/golangci-lint run` on every touched package, for both default and `integration` build tags
-  - `.tools/bin/golangci-lint fmt`
-  - `.tools/bin/buf format -w` and `buf lint` if protos changed
+  - `.tools/bin/golangci-lint run` on every touched package, for both default and `integration` build tags, and `golangci-lint fmt --diff`
+  - `buf format --diff` and `buf lint` if protos changed
   - prettier and markdownlint on touched Markdown/web files
   - the touched packages' race tests
+- Commits of the shared checkout go through `go run ./cmd/dev gate-commit -m MSG`. It takes the same lock, runs `make check` and commits everything only if it is green, so no landing can interleave with the gate. After each commit, run `go run ./cmd/dev worktree audit` and route every PARTIAL/UNLANDED tree it lists to its owner.
 - A change that leaves `make check` red is not landed.

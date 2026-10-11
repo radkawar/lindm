@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -43,9 +44,12 @@ func TestAdmissionMemoryAndSwap(t *testing.T) {
 			slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
 				return memoryAdmission{AvailableBytes: tc.available, SwapOutPagesBefore: tc.before, SwapOutPagesAfter: tc.after}, nil
 			}
-			leases, err := slots.tryAcquireN(context.Background(), 1)
+			leases, wait, err := slots.tryAcquireN(context.Background(), 1)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if (wait == "") != tc.allow {
+				t.Fatalf("wait reason %q with allow=%t", wait, tc.allow)
 			}
 			if (leases != nil) != tc.allow {
 				t.Fatalf("admitted=%v expected=%v", leases != nil, tc.allow)
@@ -114,7 +118,7 @@ func TestAdmissionCountsRetiredSlots(t *testing.T) {
 	if active, err := reduced.Count(); err != nil || active != 2 {
 		t.Fatalf("retired active=%d %v", active, err)
 	}
-	if leases, err := reduced.tryAcquireN(ctx, 1); err != nil || leases != nil {
+	if leases, _, err := reduced.tryAcquireN(ctx, 1); err != nil || leases != nil {
 		for _, lease := range leases {
 			_ = lease.Close()
 		}
@@ -249,18 +253,65 @@ func TestMultiGuestAdmissionGuardsSummedMemoryAndCapacity(t *testing.T) {
 	slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
 		return memoryAdmission{AvailableBytes: 13 << 30}, nil
 	}
-	if leases, err := slots.tryAcquireN(context.Background(), 2); err != nil || leases != nil {
+	leases, wait, err := slots.tryAcquireN(context.Background(), 2)
+	if err != nil || leases != nil {
 		t.Fatalf("two guests admitted against one guest's memory: %d %v", len(leases), err)
+	}
+	if !strings.Contains(wait, "MiB available") {
+		t.Fatalf("memory refusal reason %q", wait)
 	}
 	if active, err := slots.Count(); err != nil || active != 0 {
 		t.Fatalf("refused admission retained slots: %d %v", active, err)
 	}
-	one, err := slots.tryAcquireN(context.Background(), 1)
+	one, _, err := slots.tryAcquireN(context.Background(), 1)
 	if err != nil || len(one) != 1 {
 		t.Fatalf("single guest refused: %v", err)
 	}
 	defer func() { _ = one[0].Close() }()
-	if _, err := slots.tryAcquireN(context.Background(), 4); err == nil {
+	if _, _, err := slots.tryAcquireN(context.Background(), 4); err == nil {
 		t.Fatal("lane larger than the host was not refused")
+	}
+}
+
+func TestAcquireReportingNamesEachChangedWaitReasonOnce(t *testing.T) {
+	host := fixtureHost("report", t.TempDir())
+	host.MaxGuests = 1
+	slots, err := OpenSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
+		return memoryAdmission{AvailableBytes: 64 << 30}, nil
+	}
+	held, err := slots.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reasons := make(chan string, 16)
+	admitted := make(chan error, 1)
+	go func() {
+		leases, err := slots.AcquireNReporting(context.Background(), 1, func(reason string) { reasons <- reason })
+		for _, lease := range leases {
+			err = errors.Join(err, lease.Close())
+		}
+		admitted <- err
+	}()
+	if reason := <-reasons; reason != "1 of 1 slots held; 1 needed" {
+		t.Fatalf("wait reason %q", reason)
+	}
+	time.Sleep(300 * time.Millisecond) // several polls with an unchanged reason
+	if len(reasons) != 0 {
+		t.Fatalf("repeated an unchanged reason: %q", <-reasons)
+	}
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-admitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("not admitted after the slot was released")
 	}
 }

@@ -1278,6 +1278,44 @@ golangci-lint with `--allow-parallel-runners` and a cache reserved for those
 gates (`~/.cache/lindm-clean-golangci`), so concurrent interactive lint runs
 neither block nor fail it.
 
+Integration runs (`dev test-integration` and `dev signoff`) first take the
+exclusive host lock `~/.cache/lindm-integration.lock`, printing its holder while
+they queue, because every run shares the one fixed-port dev PostgreSQL.
+`dev test-integration`, `dev signoff` and `dev pre-push` run their race-enabled
+suites (integration and clean-worktree `make check`) under a heavy-job lease on
+the local lab host: one guest-equivalent slot (`max_vcpus`, `max_memory_mib`)
+admitted through the same flock and memory admission as VM lanes, so lanes and
+suites do not oversubscribe the host. While waiting they print each changed
+reason (slots held, available memory, swap-out during the sample). Suite deadlines
+are not raised to absorb an oversubscribed host.
+
+The shared main checkout changes only through `go run ./cmd/dev land -from
+WORKTREE [-paths a,b]` and is committed only through `go run ./cmd/dev gate-commit
+-m MSG`. Both hold the exclusive flock `<main>/.git/lindm-landing.lock`, whose
+file names the holder while it is waited for. `land` computes the worktree's
+complete change against its merge base with `main` using a scratch index (commits,
+staged, unstaged and untracked non-ignored files, renames and deletions; the
+worktree's own index is untouched) and applies it atomically with `git apply`: a
+conflict refuses with nothing applied. It then runs the quick gate on the touched
+files in the shared tree (build, golangci-lint run for both tags and fmt on touched
+packages, buf when protos changed, prettier/markdownlint on touched docs and web
+files, race tests of touched packages) and reverses the patch if the gate fails.
+`gate-commit` runs `make check` under the lock and commits everything only when it
+is green, so no landing appears in the middle of a commit gate.
+
+`go run ./cmd/dev worktree audit [PATH...]` answers whether work is stranded,
+which ahead/dirty counts cannot because most work landed by copying. For every
+registered worktree (and extra PATHs) it snapshots the complete change set against
+the merge base with `main` (commits, staged, unstaged and untracked files) and
+counts a file as landed when `main` holds the same blob, also lacks a deleted
+file, or the file's change reverse-applies to `main` (checked in a scratch index).
+Trees are LANDED, PARTIAL (unlanded files listed), UNLANDED, SNAPSHOT (no change),
+MISSING or UNREGISTERED (separate clone or plain copy), with an owner inferred
+from the directory name; the table is also written to
+`~/.cache/lindm-worktree-audit/<ts>.json`. `worktree prune` uses the same audit:
+a dirty or diverged tree audited LANDED or SNAPSHOT is archived and removed
+without `-archive-dirty`.
+
 The control-plane trust VM lane uses a separate disposable PostgreSQL **database**,
 not `testdb`'s schema. It invokes the real `lindmd` executable, whose protected
 configuration intentionally rejects arbitrary `search_path` parameters. Lab-only
