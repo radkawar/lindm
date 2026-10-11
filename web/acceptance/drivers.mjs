@@ -11,8 +11,12 @@ const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 
 // Only observes DOM state. Actions always use browser input/element endpoints.
 function locate(query) {
+  // A closing Base UI select still has layout while its pointer events are off.
+  // Do not mistake its retained options for the next popup's live choices.
   const visible = (node) =>
-    node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
+    node.getClientRects().length > 0 &&
+    getComputedStyle(node).visibility !== "hidden" &&
+    !node.closest('[data-slot="select-content"][data-closed]');
   const normalize = (value) => value.replace(/\s+/g, " ").trim();
   let root = document;
   if (query.dialog) {

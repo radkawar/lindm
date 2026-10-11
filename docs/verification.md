@@ -4779,6 +4779,17 @@ not change the real browser origin, Referrer-Policy or server CSRF enforcement.
 Raw browser results and generated customer commands contain secrets and must not
 be copied into the public report. `lab acceptance` performs that separation.
 
+Both modes publish real signed amd64 APT and RPM agent repositories from the
+checkout under test into the disposable server fixture. This satisfies the console's
+install-command readiness prerequisite without weakening it or fabricating commands;
+web-only mode still makes no native installation or vendor-feed claim.
+The Origin diagnostic reads the HTTP status token without requiring a particular
+administrator-facing sign-in error sentence. Select locators exclude closed popup
+subtrees retained for exit transitions: Firefox otherwise finds an old option before
+the next popup opens, whose disabled pointer events leave the credential dialog's
+snippet textarea under the click. Waiting for the live option preserves native
+browser clicks, without forced clicks or synthetic input.
+
 The native gate boots the pinned Ubuntu 24.04 and Fedora 44 cloud images, then the
 vendor-installer Ubuntu encrypted image, on virtio-blk without an invented WWN.
 The encrypted guest has an swtpm TPM 2.0 so the escrow-rotation, encrypted-wipe

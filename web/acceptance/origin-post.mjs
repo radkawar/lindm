@@ -45,9 +45,9 @@ export async function originPost(ui, config) {
         );
         unexpectedlyAccepted = true;
       } catch (error) {
-        // The actual application client exposes status in this fixed, secret-free
-        // error. Never retain arbitrary browser errors or authentication bodies.
-        const match = /^Authentication request failed \((\d{3})\)\.$/.exec(error.rawMessage ?? "");
+        // Read only the HTTP status token, not the administrator-facing sentence.
+        // Never retain arbitrary browser errors or authentication bodies.
+        const match = /\((\d{3})\)/.exec(error.rawMessage ?? "");
         if (match) responseStatus = Number(match[1]);
       }
       const timing = performance

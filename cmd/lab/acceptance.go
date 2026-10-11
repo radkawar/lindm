@@ -183,7 +183,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(private)) }()
-	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, options.fixture, options.binary)
+	fixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.fixture, options.repository, options.binary, []string{"amd64"})
 	if err != nil {
 		return err
 	}
