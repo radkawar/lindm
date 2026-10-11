@@ -29,6 +29,7 @@ import (
 	"lindm/internal/jobs"
 	"lindm/internal/offlinebundle"
 	"lindm/internal/reports"
+	"lindm/internal/targeting"
 	"lindm/web"
 )
 
@@ -264,7 +265,11 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 	if err != nil {
 		return nil, err
 	}
-	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, consoleDevices, advisories, deliveries, reporting)})
+	promoter, err := targeting.NewPromoter(pool, auth, devices.Targeting)
+	if err != nil {
+		return nil, fmt.Errorf("initialize rollout promoter: %w", err)
+	}
+	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, consoleDevices, advisories, deliveries, reporting, promoter)})
 	if err != nil {
 		return nil, fmt.Errorf("initialize background jobs: %w", err)
 	}

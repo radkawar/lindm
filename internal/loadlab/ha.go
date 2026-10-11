@@ -86,6 +86,7 @@ type HAResult struct {
 	Leadership      HALeadership             `json:"leadership"`
 	Actions         HAActionSummary          `json:"actions"`
 	Admin           HAAdminSummary           `json:"admin"`
+	Rollout         HARolloutSummary         `json:"rollout_promoter"`
 	Violations      []string                 `json:"violations"`
 	ProxyHealth     []string                 `json:"proxy_health_transitions"`
 	Checks          []HACheck                `json:"checks"`
@@ -598,6 +599,9 @@ func RunHA(ctx context.Context, options HAOptions) (result HAResult, resultErr e
 	}()
 	phaseErr := h.orchestrate(ctx, &result)
 	if phaseErr == nil {
+		phaseErr = h.rolloutFailover(ctx, &result)
+	}
+	if phaseErr == nil {
 		phaseErr = h.quiesce(ctx, &result)
 	}
 	stopAll()
@@ -876,6 +880,9 @@ func (h *haRun) verify(ctx context.Context, result *HAResult) error {
 		return err
 	}
 	result.Actions = summary
+	if result.Rollout.Final, err = h.fixture.ReadHARolloutEvidence(ctx, result.Rollout.Final.ID); err != nil {
+		return err
+	}
 	h.check(result)
 	return nil
 }
@@ -983,6 +990,7 @@ func (h *haRun) check(result *HAResult) {
 	ld := result.Leadership
 	add("single_leader_jobs", ld.MaxOverlapSeconds <= maxLeadershipOverlap.Seconds() && ld.OverlapsOutsideFailover == 0, "max overlap %.1fs, %d overlaps outside database failover", ld.MaxOverlapSeconds, ld.OverlapsOutsideFailover)
 	add("jobs_recovered", ld.AllJobsHeldAtEnd && ld.MaxGapSeconds <= maxLeadershipGap.Seconds(), "all exclusive jobs held at end=%t; longest unheld gap %.1fs", ld.AllJobsHeldAtEnd, ld.MaxGapSeconds)
+	h.checkRollout(result)
 	unexpected := 0
 	for _, instance := range result.Instances {
 		if !instance.Running {

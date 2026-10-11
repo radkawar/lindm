@@ -87,13 +87,16 @@ INSERT INTO target_membership_snapshots(preview_id,group_id,group_revision,devic
 INSERT INTO target_execution_heads(device_id,preview_id) VALUES ($1,$2) ON CONFLICT(device_id) DO UPDATE SET preview_id=EXCLUDED.preview_id;
 
 -- name: InsertRollout :execrows
-INSERT INTO resource_rollouts(id,definition) VALUES ($1,$2) ON CONFLICT(id) DO NOTHING;
+INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING;
 
 -- name: GetRollout :one
-SELECT * FROM resource_rollouts WHERE id=$1 FOR UPDATE;
+SELECT * FROM resource_rollouts WHERE id=$1;
 
 -- name: ListRollouts :many
 SELECT id FROM resource_rollouts WHERE id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT sqlc.arg(row_limit)::int;
+
+-- name: ListActiveRollouts :many
+SELECT id,creator_id,revision FROM resource_rollouts WHERE NOT paused AND id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT 100;
 
 -- name: InsertRolloutStage :exec
 INSERT INTO resource_rollout_stages(rollout_id,ring_index,selected_count,pending_count,excluded_count) VALUES ($1,$2,$3,$4,$5);
@@ -120,15 +123,15 @@ WITH admitted AS MATERIALIZED (
  ORDER BY device_id,ring_index DESC
 )
 SELECT count(*)::bigint AS targeted,
- count(*) FILTER (WHERE m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=sqlc.arg(fresh_after)::timestamptz AND m.health_valid_until>clock_timestamp() AND d.last_seen_at>=sqlc.arg(availability_after)::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS healthy,
- count(*) FILTER (WHERE m.ring_index=sqlc.arg(ring_index)::integer AND m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=sqlc.arg(fresh_after)::timestamptz AND m.health_valid_until>clock_timestamp() AND d.last_seen_at>=sqlc.arg(availability_after)::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS current_healthy,
+ count(*) FILTER (WHERE m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=sqlc.arg(fresh_after)::timestamptz AND m.health_valid_until>sqlc.arg(assessed_at)::timestamptz AND d.last_seen_at>=sqlc.arg(availability_after)::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS healthy,
+ count(*) FILTER (WHERE m.ring_index=sqlc.arg(ring_index)::integer AND m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=sqlc.arg(fresh_after)::timestamptz AND m.health_valid_until>sqlc.arg(assessed_at)::timestamptz AND d.last_seen_at>=sqlc.arg(availability_after)::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS current_healthy,
  count(*) FILTER (WHERE m.health=2 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=sqlc.arg(fresh_after)::timestamptz AND d.last_seen_at>=sqlc.arg(availability_after)::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS failed,
  count(*) FILTER (WHERE (m.health=4 AND h.assignment_id=m.evidence_assignment_id) OR d.last_seen_at IS NULL OR d.last_seen_at<sqlc.arg(availability_after)::timestamptz OR d.state<>'active' OR d.current_generation_id IS DISTINCT FROM m.generation_id)::bigint AS unavailable
 FROM admitted m JOIN devices d ON d.id=m.device_id
 LEFT JOIN resource_assignment_heads h ON h.generation_id=d.current_generation_id;
 
--- name: UpdateRollout :exec
-UPDATE resource_rollouts SET revision=revision+1,ring_index=$2,paused=$3,pause_reason=$4,stage_started_at=$5 WHERE id=$1;
+-- name: UpdateRollout :execrows
+UPDATE resource_rollouts SET revision=revision+1,ring_index=$2,paused=$3,pause_reason=$4,stage_started_at=$5 WHERE id=$1 AND revision=sqlc.arg(expected_revision)::bigint;
 
 -- name: InsertRolloutEvent :exec
 INSERT INTO resource_rollout_events(id,rollout_id,revision,actor_id,reason) VALUES ($1,$2,$3,$4,$5);

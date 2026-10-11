@@ -188,11 +188,9 @@ func (s *Service) GetDynamicGroup(ctx context.Context, r *connect.Request[adminv
 }
 
 func targetingReadOnly(request any) bool {
-	switch r := request.(type) {
-	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.ListTargetAssignmentsRequest:
+	switch request.(type) {
+	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.ListTargetAssignmentsRequest, *adminv1.ListRolloutsRequest:
 		return true
-	case *adminv1.ListRolloutsRequest:
-		return r.GetReadOnly()
 	default:
 		return false
 	}

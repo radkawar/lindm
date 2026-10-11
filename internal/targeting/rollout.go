@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
@@ -51,7 +52,26 @@ func (s *Store) rolloutState(ctx context.Context, q *targetingdb.Queries, id uui
 	if err != nil {
 		return nil, err
 	}
-	return &adminv1.RolloutState{Rollout: spec, Revision: uint64(row.Revision), RingIndex: uint32(row.RingIndex), Paused: row.Paused, PauseReason: row.PauseReason, SelectedCount: uint32(stage.SelectedCount), PendingCount: uint32(stage.PendingCount), ExcludedCount: uint32(stage.ExcludedCount)}, nil
+	counts, now, err := s.rolloutHealth(ctx, q, row, spec.Rings[row.RingIndex])
+	if err != nil {
+		return nil, err
+	}
+	ready, reason := assessRolloutGate(spec.Rings[row.RingIndex], counts, row.StageStartedAt.Time, now)
+	state := &adminv1.RolloutState{
+		Rollout: spec, Revision: uint64(row.Revision), RingIndex: uint32(row.RingIndex),
+		Paused: row.Paused, PauseReason: row.PauseReason, SelectedCount: uint32(stage.SelectedCount),
+		PendingCount: uint32(stage.PendingCount), ExcludedCount: uint32(stage.ExcludedCount),
+		StageStartedAt: timestamppb.New(row.StageStartedAt.Time),
+		HealthyCount:   uint32(counts.Healthy), FailedCount: uint32(counts.Failed),
+		UnknownCount:     uint32(counts.Targeted - counts.Healthy - counts.Failed - counts.Unavailable),
+		UnavailableCount: uint32(counts.Unavailable), GateReason: reason,
+	}
+	ring := spec.Rings[row.RingIndex]
+	if !row.Paused && !ring.ManualPromotion && int(row.RingIndex)+1 < len(spec.Rings) {
+		state.NextPromotionAt = timestamppb.New(row.StageStartedAt.Time.Add(time.Duration(ring.SoakSeconds) * time.Second))
+		state.PromotionReady = ready
+	}
+	return state, nil
 }
 func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.PutRolloutRequest) (*adminv1.PutRolloutResponse, error) {
 	if err := s.validate(r); err != nil {
@@ -79,8 +99,12 @@ func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal,
 	if err != nil {
 		return nil, err
 	}
+	now, err := s.rolloutClock(ctx, q)
+	if err != nil {
+		return nil, err
+	}
 	id := uuid.MustParse(r.Rollout.RolloutId)
-	count, err := q.InsertRollout(ctx, targetingdb.InsertRolloutParams{ID: id, Definition: b})
+	count, err := q.InsertRollout(ctx, targetingdb.InsertRolloutParams{ID: id, Definition: b, CreatorID: p.ID, StageStartedAt: pgtype.Timestamptz{Time: now, Valid: true}})
 	if err != nil {
 		return nil, err
 	}
@@ -185,19 +209,43 @@ func (s *Store) assess(ctx context.Context, q *targetingdb.Queries, id uuid.UUID
 	if err := proto.Unmarshal(row.Definition, spec); err != nil {
 		return false, "", err
 	}
-	ring := spec.Rings[row.RingIndex]
-	now, err := q.TargetingClock(ctx)
+	counts, now, err := s.rolloutHealth(ctx, q, row, spec.Rings[row.RingIndex])
 	if err != nil {
 		return false, "", err
+	}
+	ready, reason := assessRolloutGate(spec.Rings[row.RingIndex], counts, row.StageStartedAt.Time, now)
+	return ready, reason, nil
+}
+
+// Database time is shared across replicas. A constructor-injected clock makes
+// gate boundaries deterministic in tests without weakening production HA time.
+func (s *Store) rolloutClock(ctx context.Context, q *targetingdb.Queries) (time.Time, error) {
+	if s.clock != nil {
+		return s.clock(), nil
+	}
+	now, err := q.TargetingClock(ctx)
+	return now.Time, err
+}
+
+func (s *Store) rolloutHealth(ctx context.Context, q *targetingdb.Queries, row targetingdb.ResourceRollout, ring *policyv1.RolloutRing) (targetingdb.RolloutHealthCountsRow, time.Time, error) {
+	now, err := s.rolloutClock(ctx, q)
+	if err != nil {
+		return targetingdb.RolloutHealthCountsRow{}, time.Time{}, err
 	}
 	proofMaxAge := time.Duration(ring.HealthMaxAgeSeconds) * time.Second
 	availabilityMaxAge := max(proofMaxAge, rolloutAvailabilityMinAge)
-	counts, err := q.RolloutHealthCounts(ctx, targetingdb.RolloutHealthCountsParams{RolloutID: id, RingIndex: row.RingIndex, FreshAfter: pgtype.Timestamptz{Time: now.Time.Add(-proofMaxAge), Valid: true}, AvailabilityAfter: pgtype.Timestamptz{Time: now.Time.Add(-availabilityMaxAge), Valid: true}})
-	if err != nil {
-		return false, "", err
-	}
+	counts, err := q.RolloutHealthCounts(ctx, targetingdb.RolloutHealthCountsParams{
+		RolloutID: row.ID, RingIndex: row.RingIndex,
+		FreshAfter:        pgtype.Timestamptz{Time: now.Add(-proofMaxAge), Valid: true},
+		AvailabilityAfter: pgtype.Timestamptz{Time: now.Add(-availabilityMaxAge), Valid: true},
+		AssessedAt:        pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	return counts, now, err
+}
+
+func assessRolloutGate(ring *policyv1.RolloutRing, counts targetingdb.RolloutHealthCountsRow, started, now time.Time) (bool, string) {
 	unknownCount := counts.Targeted - counts.Healthy - counts.Failed - counts.Unavailable
-	soaked := !now.Time.Before(row.StageStartedAt.Time.Add(time.Duration(ring.SoakSeconds) * time.Second))
+	soaked := !now.Before(started.Add(time.Duration(ring.SoakSeconds) * time.Second))
 	reason := ""
 	if counts.Failed*10000 > counts.Targeted*int64(ring.FailureBasisPoints) {
 		reason = "failure_threshold"
@@ -206,7 +254,7 @@ func (s *Store) assess(ctx context.Context, q *targetingdb.Queries, id uuid.UUID
 	} else if soaked && unknownCount*10000 > counts.Targeted*int64(ring.UnknownBasisPoints) {
 		reason = "unknown_threshold"
 	}
-	return soaked && counts.CurrentHealthy >= int64(ring.MinimumObserved) && reason == "", reason, nil
+	return soaked && counts.CurrentHealthy >= int64(ring.MinimumObserved) && reason == "", reason
 }
 
 // RefreshRollout evaluates native receipt freshness separately from authenticated
@@ -233,13 +281,7 @@ func (s *Store) RefreshRollout(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bo
 	if reason == "" {
 		return ready, nil
 	}
-	if err = q.UpdateRollout(ctx, targetingdb.UpdateRolloutParams{ID: id, RingIndex: row.RingIndex, Paused: true, PauseReason: reason, StageStartedAt: row.StageStartedAt}); err != nil {
-		return false, err
-	}
-	if err = q.InsertRolloutEvent(ctx, targetingdb.InsertRolloutEventParams{ID: uuid.New(), RolloutID: id, Revision: row.Revision + 1, Reason: reason}); err != nil {
-		return false, err
-	}
-	return false, nil
+	return false, pauseRollout(ctx, q, row, reason)
 }
 func (s *Store) ControlRollout(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ControlRolloutRequest) (*adminv1.ControlRolloutResponse, error) {
 	return s.controlRollout(ctx, tx, p, perm, r, false)
@@ -316,15 +358,20 @@ func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 		if err := s.freezeStage(ctx, q, p, perm, spec, index); err != nil {
 			return nil, err
 		}
-		started, err = q.TargetingClock(ctx)
+		now, err := s.rolloutClock(ctx, q)
 		if err != nil {
 			return nil, err
 		}
+		started = pgtype.Timestamptz{Time: now, Valid: true}
 	default:
 		return nil, ErrRejected
 	}
-	if err = q.UpdateRollout(ctx, targetingdb.UpdateRolloutParams{ID: id, RingIndex: index, Paused: paused, PauseReason: reason, StageStartedAt: started}); err != nil {
+	count, err := q.UpdateRollout(ctx, targetingdb.UpdateRolloutParams{ID: id, RingIndex: index, Paused: paused, PauseReason: reason, StageStartedAt: started, ExpectedRevision: row.Revision})
+	if err != nil {
 		return nil, err
+	}
+	if count != 1 {
+		return nil, ErrConflict
 	}
 	actor := p.ID
 	if err = q.InsertRolloutEvent(ctx, targetingdb.InsertRolloutEventParams{ID: uuid.New(), RolloutID: id, Revision: row.Revision + 1, ActorID: &actor, Reason: r.Reason}); err != nil {
@@ -344,11 +391,6 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	if err != nil {
 		return nil, err
 	}
-	if !r.GetReadOnly() {
-		if err := q.LockTargeting(ctx); err != nil {
-			return nil, err
-		}
-	}
 	after := uuid.Nil
 	if r.AfterId != nil {
 		after = uuid.MustParse(*r.AfterId)
@@ -359,28 +401,12 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	}
 	out := new(adminv1.ListRolloutsResponse)
 	for _, id := range ids {
-		ready := false
-		if !r.GetReadOnly() {
-			ready, err = s.RefreshRollout(ctx, tx, id)
-			if err != nil {
-				return nil, err
-			}
-		}
 		state, err := s.rolloutState(ctx, q, id)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		if err != nil {
 			return nil, err
-		}
-		if ready && !state.Paused && !state.Rollout.Rings[state.RingIndex].ManualPromotion && int(state.RingIndex)+1 < len(state.Rollout.Rings) {
-			promoted, err := s.PromoteAutomatic(ctx, tx, p, perm, id)
-			if err != nil && !errors.Is(err, ErrNotReady) {
-				return nil, err
-			}
-			if err == nil {
-				state = promoted
-			}
 		}
 		out.Rollouts = append(out.Rollouts, state)
 	}

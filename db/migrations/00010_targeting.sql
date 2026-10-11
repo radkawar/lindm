@@ -55,6 +55,7 @@ CREATE TABLE target_membership_snapshots (
 );
 CREATE TABLE resource_rollouts (
     id uuid PRIMARY KEY,
+    creator_id uuid NOT NULL REFERENCES principals(id),
     definition bytea NOT NULL CHECK (octet_length(definition) BETWEEN 1 AND 262144),
     revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
     ring_index integer NOT NULL DEFAULT 0 CHECK (ring_index BETWEEN 0 AND 15),
@@ -92,7 +93,8 @@ CREATE TABLE resource_rollout_events (
     revision bigint NOT NULL,
     actor_id uuid REFERENCES principals(id),
     reason text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 512),
-    created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (rollout_id, revision)
 );
 CREATE TABLE targeting_requests (
     actor_id uuid NOT NULL REFERENCES principals(id),
@@ -117,7 +119,7 @@ CREATE TRIGGER immutable_dynamic_group_revision BEFORE UPDATE OR DELETE ON dynam
 CREATE TRIGGER immutable_target_membership BEFORE UPDATE OR DELETE ON target_membership_snapshots FOR EACH ROW EXECUTE FUNCTION reject_targeting_history_mutation();
 CREATE TRIGGER immutable_rollout_stage BEFORE UPDATE OR DELETE ON resource_rollout_stages FOR EACH ROW EXECUTE FUNCTION reject_targeting_history_mutation();
 CREATE TRIGGER immutable_rollout_member BEFORE UPDATE OF rollout_id, ring_index, device_id, generation_id, bucket, membership OR DELETE ON resource_rollout_members FOR EACH ROW EXECUTE FUNCTION reject_targeting_history_mutation();
-CREATE TRIGGER immutable_rollout_definition BEFORE UPDATE OF id, definition OR DELETE ON resource_rollouts FOR EACH ROW EXECUTE FUNCTION reject_targeting_history_mutation();
+CREATE TRIGGER immutable_rollout_definition BEFORE UPDATE OF id, definition, creator_id OR DELETE ON resource_rollouts FOR EACH ROW EXECUTE FUNCTION reject_targeting_history_mutation();
 
 -- +goose Down
 DROP TABLE targeting_requests, resource_rollout_events, resource_rollout_members, resource_rollout_stages, resource_rollouts, target_membership_snapshots, target_execution_heads, target_previews, target_assignment_revisions, target_assignments, dynamic_target_group_revisions, dynamic_target_groups, targeting_lock;

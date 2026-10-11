@@ -17,6 +17,7 @@ type DynamicTargetGroup struct {
 
 type ResourceRollout struct {
 	ID             uuid.UUID
+	CreatorID      uuid.UUID
 	Definition     []byte
 	Revision       int64
 	RingIndex      int32

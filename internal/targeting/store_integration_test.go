@@ -419,7 +419,7 @@ func TestRolloutAutomaticPromotionRetainsCanaryAdmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.transaction(t, func(tx pgx.Tx) error {
-		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100, ReadOnly: true})
+		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100})
 		if err == nil && (len(out.Rollouts) != 1 || out.Rollouts[0].RingIndex != 0 || out.Rollouts[0].Revision != 1 || out.Rollouts[0].Paused) {
 			t.Error("read-only planning changed a promotion-ready rollout")
 		}
@@ -434,9 +434,9 @@ func TestRolloutAutomaticPromotionRetainsCanaryAdmission(t *testing.T) {
 		t.Fatal("read-only rollout projection updated the targeting fence")
 	}
 	if err := f.transaction(t, func(tx pgx.Tx) error {
-		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100})
-		if err == nil && (len(out.Rollouts) != 1 || out.Rollouts[0].RingIndex != 1) {
-			t.Error("authorized list did not promote automatic ring")
+		out, err := f.store.PromoteAutomatic(t.Context(), tx, f.actor, identity.PermissionAssignResources, id)
+		if err == nil && out.RingIndex != 1 {
+			t.Error("automatic promotion did not advance the ring")
 		}
 		return err
 	}); err != nil {

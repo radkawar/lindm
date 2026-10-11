@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	v1 "lindm/gen/lindm/policy/v1"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
@@ -1165,15 +1166,26 @@ func (x *PutRolloutRequest) GetReason() string {
 }
 
 type RolloutState struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Rollout       *v1.RolloutSpec        `protobuf:"bytes,1,opt,name=rollout,proto3" json:"rollout,omitempty"`
-	Revision      uint64                 `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
-	RingIndex     uint32                 `protobuf:"varint,3,opt,name=ring_index,json=ringIndex,proto3" json:"ring_index,omitempty"`
-	Paused        bool                   `protobuf:"varint,4,opt,name=paused,proto3" json:"paused,omitempty"`
-	PauseReason   string                 `protobuf:"bytes,5,opt,name=pause_reason,json=pauseReason,proto3" json:"pause_reason,omitempty"`
-	SelectedCount uint32                 `protobuf:"varint,6,opt,name=selected_count,json=selectedCount,proto3" json:"selected_count,omitempty"`
-	PendingCount  uint32                 `protobuf:"varint,7,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
-	ExcludedCount uint32                 `protobuf:"varint,8,opt,name=excluded_count,json=excludedCount,proto3" json:"excluded_count,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Rollout        *v1.RolloutSpec        `protobuf:"bytes,1,opt,name=rollout,proto3" json:"rollout,omitempty"`
+	Revision       uint64                 `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	RingIndex      uint32                 `protobuf:"varint,3,opt,name=ring_index,json=ringIndex,proto3" json:"ring_index,omitempty"`
+	Paused         bool                   `protobuf:"varint,4,opt,name=paused,proto3" json:"paused,omitempty"`
+	PauseReason    string                 `protobuf:"bytes,5,opt,name=pause_reason,json=pauseReason,proto3" json:"pause_reason,omitempty"`
+	SelectedCount  uint32                 `protobuf:"varint,6,opt,name=selected_count,json=selectedCount,proto3" json:"selected_count,omitempty"`
+	PendingCount   uint32                 `protobuf:"varint,7,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
+	ExcludedCount  uint32                 `protobuf:"varint,8,opt,name=excluded_count,json=excludedCount,proto3" json:"excluded_count,omitempty"`
+	StageStartedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=stage_started_at,json=stageStartedAt,proto3" json:"stage_started_at,omitempty"`
+	// Earliest soak completion for an automatic successor, not a promised start.
+	NextPromotionAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=next_promotion_at,json=nextPromotionAt,proto3" json:"next_promotion_at,omitempty"`
+	// Current health and soak gates only; current creator authority is checked by the worker.
+	PromotionReady   bool   `protobuf:"varint,11,opt,name=promotion_ready,json=promotionReady,proto3" json:"promotion_ready,omitempty"`
+	HealthyCount     uint32 `protobuf:"varint,12,opt,name=healthy_count,json=healthyCount,proto3" json:"healthy_count,omitempty"`
+	FailedCount      uint32 `protobuf:"varint,13,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
+	UnknownCount     uint32 `protobuf:"varint,14,opt,name=unknown_count,json=unknownCount,proto3" json:"unknown_count,omitempty"`
+	UnavailableCount uint32 `protobuf:"varint,15,opt,name=unavailable_count,json=unavailableCount,proto3" json:"unavailable_count,omitempty"`
+	// Live gate assessment; pause_reason is the separately persisted safety decision.
+	GateReason    string `protobuf:"bytes,16,opt,name=gate_reason,json=gateReason,proto3" json:"gate_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1262,6 +1274,62 @@ func (x *RolloutState) GetExcludedCount() uint32 {
 		return x.ExcludedCount
 	}
 	return 0
+}
+
+func (x *RolloutState) GetStageStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StageStartedAt
+	}
+	return nil
+}
+
+func (x *RolloutState) GetNextPromotionAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NextPromotionAt
+	}
+	return nil
+}
+
+func (x *RolloutState) GetPromotionReady() bool {
+	if x != nil {
+		return x.PromotionReady
+	}
+	return false
+}
+
+func (x *RolloutState) GetHealthyCount() uint32 {
+	if x != nil {
+		return x.HealthyCount
+	}
+	return 0
+}
+
+func (x *RolloutState) GetFailedCount() uint32 {
+	if x != nil {
+		return x.FailedCount
+	}
+	return 0
+}
+
+func (x *RolloutState) GetUnknownCount() uint32 {
+	if x != nil {
+		return x.UnknownCount
+	}
+	return 0
+}
+
+func (x *RolloutState) GetUnavailableCount() uint32 {
+	if x != nil {
+		return x.UnavailableCount
+	}
+	return 0
+}
+
+func (x *RolloutState) GetGateReason() string {
+	if x != nil {
+		return x.GateReason
+	}
+	return ""
 }
 
 type PutRolloutResponse struct {
@@ -1429,12 +1497,9 @@ func (x *ControlRolloutResponse) GetRollout() *RolloutState {
 }
 
 type ListRolloutsRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	PageSize uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	AfterId  *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
-	// Read the retained state without refreshing health or promoting any ring.
-	// Authorization is identical to the normal rollout listing.
-	ReadOnly      bool `protobuf:"varint,3,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	AfterId       *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1481,13 +1546,6 @@ func (x *ListRolloutsRequest) GetAfterId() string {
 		return *x.AfterId
 	}
 	return ""
-}
-
-func (x *ListRolloutsRequest) GetReadOnly() bool {
-	if x != nil {
-		return x.ReadOnly
-	}
-	return false
 }
 
 type ListRolloutsResponse struct {
@@ -1538,7 +1596,7 @@ var File_lindm_admin_v1_targeting_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\n" +
-	"\x1elindm/admin/v1/targeting.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a&lindm/validation/v1/string_rules.proto\"\x98\x01\n" +
+	"\x1elindm/admin/v1/targeting.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a&lindm/validation/v1/string_rules.proto\"\x98\x01\n" +
 	"\x10TargetExpression\x12<\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x1a.lindm.admin.v1.TargetNodeB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10@R\x05nodes\x12F\n" +
@@ -1620,7 +1678,7 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12>\n" +
 	"\arollout\x18\x02 \x01(\v2\x1c.lindm.policy.v1.RolloutSpecB\x06\xbaH\x03\xc8\x01\x01R\arollout\x12!\n" +
-	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"\xaf\x02\n" +
+	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"\xa1\x05\n" +
 	"\fRolloutState\x126\n" +
 	"\arollout\x18\x01 \x01(\v2\x1c.lindm.policy.v1.RolloutSpecR\arollout\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\x04R\brevision\x12\x1d\n" +
@@ -1630,7 +1688,17 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\fpause_reason\x18\x05 \x01(\tR\vpauseReason\x12%\n" +
 	"\x0eselected_count\x18\x06 \x01(\rR\rselectedCount\x12#\n" +
 	"\rpending_count\x18\a \x01(\rR\fpendingCount\x12%\n" +
-	"\x0eexcluded_count\x18\b \x01(\rR\rexcludedCount\"L\n" +
+	"\x0eexcluded_count\x18\b \x01(\rR\rexcludedCount\x12D\n" +
+	"\x10stage_started_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x0estageStartedAt\x12F\n" +
+	"\x11next_promotion_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\x0fnextPromotionAt\x12'\n" +
+	"\x0fpromotion_ready\x18\v \x01(\bR\x0epromotionReady\x12#\n" +
+	"\rhealthy_count\x18\f \x01(\rR\fhealthyCount\x12!\n" +
+	"\ffailed_count\x18\r \x01(\rR\vfailedCount\x12#\n" +
+	"\runknown_count\x18\x0e \x01(\rR\funknownCount\x12+\n" +
+	"\x11unavailable_count\x18\x0f \x01(\rR\x10unavailableCount\x12\x1f\n" +
+	"\vgate_reason\x18\x10 \x01(\tR\n" +
+	"gateReason\"L\n" +
 	"\x12PutRolloutResponse\x126\n" +
 	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\x91\x03\n" +
 	"\x15ControlRolloutRequest\x12'\n" +
@@ -1648,12 +1716,11 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\x10OPERATION_RESUME\x10\x02\x12\x15\n" +
 	"\x11OPERATION_PROMOTE\x10\x03\"P\n" +
 	"\x16ControlRolloutResponse\x126\n" +
-	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\x91\x01\n" +
+	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\x85\x01\n" +
 	"\x13ListRolloutsRequest\x12&\n" +
 	"\tpage_size\x18\x01 \x01(\rB\t\xbaH\x06*\x04\x18d(\x01R\bpageSize\x12(\n" +
-	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01\x12\x1b\n" +
-	"\tread_only\x18\x03 \x01(\bR\breadOnlyB\v\n" +
-	"\t_after_id\"P\n" +
+	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01B\v\n" +
+	"\t_after_idJ\x04\b\x03\x10\x04R\tread_only\"P\n" +
 	"\x14ListRolloutsResponse\x128\n" +
 	"\brollouts\x18\x01 \x03(\v2\x1c.lindm.admin.v1.RolloutStateR\brolloutsB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
@@ -1703,6 +1770,7 @@ var file_lindm_admin_v1_targeting_proto_goTypes = []any{
 	(*v1.TargetCandidate)(nil),               // 28: lindm.policy.v1.TargetCandidate
 	(*v1.TargetPreview)(nil),                 // 29: lindm.policy.v1.TargetPreview
 	(*v1.RolloutSpec)(nil),                   // 30: lindm.policy.v1.RolloutSpec
+	(*timestamppb.Timestamp)(nil),            // 31: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_targeting_proto_depIdxs = []int32{
 	3,  // 0: lindm.admin.v1.TargetExpression.nodes:type_name -> lindm.admin.v1.TargetNode
@@ -1721,15 +1789,17 @@ var file_lindm_admin_v1_targeting_proto_depIdxs = []int32{
 	29, // 13: lindm.admin.v1.ActivateTargetPreviewResponse.preview:type_name -> lindm.policy.v1.TargetPreview
 	30, // 14: lindm.admin.v1.PutRolloutRequest.rollout:type_name -> lindm.policy.v1.RolloutSpec
 	30, // 15: lindm.admin.v1.RolloutState.rollout:type_name -> lindm.policy.v1.RolloutSpec
-	20, // 16: lindm.admin.v1.PutRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
-	0,  // 17: lindm.admin.v1.ControlRolloutRequest.operation:type_name -> lindm.admin.v1.ControlRolloutRequest.Operation
-	20, // 18: lindm.admin.v1.ControlRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
-	20, // 19: lindm.admin.v1.ListRolloutsResponse.rollouts:type_name -> lindm.admin.v1.RolloutState
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	31, // 16: lindm.admin.v1.RolloutState.stage_started_at:type_name -> google.protobuf.Timestamp
+	31, // 17: lindm.admin.v1.RolloutState.next_promotion_at:type_name -> google.protobuf.Timestamp
+	20, // 18: lindm.admin.v1.PutRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
+	0,  // 19: lindm.admin.v1.ControlRolloutRequest.operation:type_name -> lindm.admin.v1.ControlRolloutRequest.Operation
+	20, // 20: lindm.admin.v1.ControlRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
+	20, // 21: lindm.admin.v1.ListRolloutsResponse.rollouts:type_name -> lindm.admin.v1.RolloutState
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_targeting_proto_init() }

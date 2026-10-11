@@ -597,6 +597,27 @@ devices and fails visibly above that cap. Minting and granting execution recheck
 current targeting/exclusions/rollout pause without replacing already granted
 unknown effects. A historical result cannot refresh another generation or head.
 
+Automatic promotion is background work, not a side effect of opening the console.
+The exclusive `rollout-promoter` job assesses a keyset page of at most 100 active
+rollouts every 10 seconds, starting immediately on leadership acquisition. It
+monitors manual and final rings for failure, unknown and unavailable budgets but
+advances only automatic rings with a successor and satisfied soak/current-ring
+observations. The frozen plan retains an immutable creator. Before each promotion
+the worker re-authorizes that creator's current unrestricted `resources.assign`
+permission, then fences that authorization before domain locks and before commit,
+as scheduled reports do. Lost authority pauses with
+`rollout_authorization_denied`; a service identity never substitutes for the human.
+Health-budget pauses and authorization pauses persist a rollout event and audit.
+There is no automatic rollback in the current rollout model.
+
+Promotion shares the manual compare-and-swap, frozen-cohort, receipt and audit
+transaction. The scanned revision, updating targeting fence and unique
+rollout/revision event prevent duplicate promotion during leadership overlap.
+List/get projections never refresh persisted health, pause or promote. Rollout
+state exposes stage start, live health counts, gate reason and the earliest
+automatic successor's soak completion; this timestamp is not a promised promotion
+time, and `promotion_ready` does not attest to the creator's current authority.
+
 Availability is separate from native verification: authenticated sync maintains
 durable contact at 60 seconds with jitter, and accepted dispatch/start/result
 transactions also refresh contact. Read-only trust and empty-work polling remain
@@ -1660,7 +1681,7 @@ visible and replayable under authorization.
 
 Every `lindmd serve` process runs the complete background-job inventory in
 `internal/server/jobs.go` under `internal/jobs`. Exclusive jobs (snapshot cleanup,
-advisory maintenance, advisory evaluation and compliance deadlines) run on one
+advisory maintenance, advisory evaluation, compliance deadlines and rollout promotion) run on one
 replica at a time under a PostgreSQL session advisory lock held by a dedicated,
 non-pooled coordination session; replicated jobs (integration deliveries and
 reports) run everywhere and fence their own row leases. Leadership is exclusivity,

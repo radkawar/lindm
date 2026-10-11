@@ -147,7 +147,7 @@ func (p *ChangePlan) rollouts(ctx context.Context, client adminv1connect.AdminSe
 		return nil
 	}
 	existing, err := pages(func(after string) ([]*adminv1.RolloutState, string, error) {
-		r, e := client.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100, AfterId: optional(after), ReadOnly: true}))
+		r, e := client.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100, AfterId: optional(after)}))
 		if e != nil {
 			return nil, "", e
 		}

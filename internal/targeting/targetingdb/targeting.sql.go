@@ -67,7 +67,7 @@ func (q *Queries) GetDynamicGroup(ctx context.Context, id uuid.UUID) (DynamicTar
 }
 
 const getRollout = `-- name: GetRollout :one
-SELECT id, definition, revision, ring_index, paused, pause_reason, stage_started_at FROM resource_rollouts WHERE id=$1 FOR UPDATE
+SELECT id, creator_id, definition, revision, ring_index, paused, pause_reason, stage_started_at FROM resource_rollouts WHERE id=$1
 `
 
 func (q *Queries) GetRollout(ctx context.Context, id uuid.UUID) (ResourceRollout, error) {
@@ -75,6 +75,7 @@ func (q *Queries) GetRollout(ctx context.Context, id uuid.UUID) (ResourceRollout
 	var i ResourceRollout
 	err := row.Scan(
 		&i.ID,
+		&i.CreatorID,
 		&i.Definition,
 		&i.Revision,
 		&i.RingIndex,
@@ -207,16 +208,23 @@ func (q *Queries) InsertDynamicGroupRevision(ctx context.Context, arg InsertDyna
 }
 
 const insertRollout = `-- name: InsertRollout :execrows
-INSERT INTO resource_rollouts(id,definition) VALUES ($1,$2) ON CONFLICT(id) DO NOTHING
+INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING
 `
 
 type InsertRolloutParams struct {
-	ID         uuid.UUID
-	Definition []byte
+	ID             uuid.UUID
+	Definition     []byte
+	CreatorID      uuid.UUID
+	StageStartedAt pgtype.Timestamptz
 }
 
 func (q *Queries) InsertRollout(ctx context.Context, arg InsertRolloutParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertRollout, arg.ID, arg.Definition)
+	result, err := q.db.Exec(ctx, insertRollout,
+		arg.ID,
+		arg.Definition,
+		arg.CreatorID,
+		arg.StageStartedAt,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -386,6 +394,36 @@ func (q *Queries) InsertTargetingRequest(ctx context.Context, arg InsertTargetin
 		arg.Response,
 	)
 	return err
+}
+
+const listActiveRollouts = `-- name: ListActiveRollouts :many
+SELECT id,creator_id,revision FROM resource_rollouts WHERE NOT paused AND id > $1::uuid ORDER BY id LIMIT 100
+`
+
+type ListActiveRolloutsRow struct {
+	ID        uuid.UUID
+	CreatorID uuid.UUID
+	Revision  int64
+}
+
+func (q *Queries) ListActiveRollouts(ctx context.Context, afterID uuid.UUID) ([]ListActiveRolloutsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveRollouts, afterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveRolloutsRow{}
+	for rows.Next() {
+		var i ListActiveRolloutsRow
+		if err := rows.Scan(&i.ID, &i.CreatorID, &i.Revision); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDynamicGroups = `-- name: ListDynamicGroups :many
@@ -565,20 +603,21 @@ func (q *Queries) PutTargetAssignment(ctx context.Context, arg PutTargetAssignme
 const rolloutHealthCounts = `-- name: RolloutHealthCounts :one
 WITH admitted AS MATERIALIZED (
  SELECT DISTINCT ON (device_id) rollout_id, ring_index, device_id, generation_id, bucket, membership, health, received_at, health_valid_until, evidence_assignment_id FROM resource_rollout_members
- WHERE rollout_id=$4::uuid AND ring_index<=$3::integer AND membership=1
+ WHERE rollout_id=$5::uuid AND ring_index<=$4::integer AND membership=1
  ORDER BY device_id,ring_index DESC
 )
 SELECT count(*)::bigint AS targeted,
- count(*) FILTER (WHERE m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND m.health_valid_until>clock_timestamp() AND d.last_seen_at>=$2::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS healthy,
- count(*) FILTER (WHERE m.ring_index=$3::integer AND m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND m.health_valid_until>clock_timestamp() AND d.last_seen_at>=$2::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS current_healthy,
- count(*) FILTER (WHERE m.health=2 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND d.last_seen_at>=$2::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS failed,
- count(*) FILTER (WHERE (m.health=4 AND h.assignment_id=m.evidence_assignment_id) OR d.last_seen_at IS NULL OR d.last_seen_at<$2::timestamptz OR d.state<>'active' OR d.current_generation_id IS DISTINCT FROM m.generation_id)::bigint AS unavailable
+ count(*) FILTER (WHERE m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND m.health_valid_until>$2::timestamptz AND d.last_seen_at>=$3::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS healthy,
+ count(*) FILTER (WHERE m.ring_index=$4::integer AND m.health=1 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND m.health_valid_until>$2::timestamptz AND d.last_seen_at>=$3::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS current_healthy,
+ count(*) FILTER (WHERE m.health=2 AND h.assignment_id=m.evidence_assignment_id AND m.received_at>=$1::timestamptz AND d.last_seen_at>=$3::timestamptz AND d.state='active' AND d.current_generation_id=m.generation_id)::bigint AS failed,
+ count(*) FILTER (WHERE (m.health=4 AND h.assignment_id=m.evidence_assignment_id) OR d.last_seen_at IS NULL OR d.last_seen_at<$3::timestamptz OR d.state<>'active' OR d.current_generation_id IS DISTINCT FROM m.generation_id)::bigint AS unavailable
 FROM admitted m JOIN devices d ON d.id=m.device_id
 LEFT JOIN resource_assignment_heads h ON h.generation_id=d.current_generation_id
 `
 
 type RolloutHealthCountsParams struct {
 	FreshAfter        pgtype.Timestamptz
+	AssessedAt        pgtype.Timestamptz
 	AvailabilityAfter pgtype.Timestamptz
 	RingIndex         int32
 	RolloutID         uuid.UUID
@@ -597,6 +636,7 @@ type RolloutHealthCountsRow struct {
 func (q *Queries) RolloutHealthCounts(ctx context.Context, arg RolloutHealthCountsParams) (RolloutHealthCountsRow, error) {
 	row := q.db.QueryRow(ctx, rolloutHealthCounts,
 		arg.FreshAfter,
+		arg.AssessedAt,
 		arg.AvailabilityAfter,
 		arg.RingIndex,
 		arg.RolloutID,
@@ -792,27 +832,32 @@ func (q *Queries) UpdateDynamicGroup(ctx context.Context, arg UpdateDynamicGroup
 	return result.RowsAffected(), nil
 }
 
-const updateRollout = `-- name: UpdateRollout :exec
-UPDATE resource_rollouts SET revision=revision+1,ring_index=$2,paused=$3,pause_reason=$4,stage_started_at=$5 WHERE id=$1
+const updateRollout = `-- name: UpdateRollout :execrows
+UPDATE resource_rollouts SET revision=revision+1,ring_index=$2,paused=$3,pause_reason=$4,stage_started_at=$5 WHERE id=$1 AND revision=$6::bigint
 `
 
 type UpdateRolloutParams struct {
-	ID             uuid.UUID
-	RingIndex      int32
-	Paused         bool
-	PauseReason    string
-	StageStartedAt pgtype.Timestamptz
+	ID               uuid.UUID
+	RingIndex        int32
+	Paused           bool
+	PauseReason      string
+	StageStartedAt   pgtype.Timestamptz
+	ExpectedRevision int64
 }
 
-func (q *Queries) UpdateRollout(ctx context.Context, arg UpdateRolloutParams) error {
-	_, err := q.db.Exec(ctx, updateRollout,
+func (q *Queries) UpdateRollout(ctx context.Context, arg UpdateRolloutParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateRollout,
 		arg.ID,
 		arg.RingIndex,
 		arg.Paused,
 		arg.PauseReason,
 		arg.StageStartedAt,
+		arg.ExpectedRevision,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateRolloutExecutionHealth = `-- name: UpdateRolloutExecutionHealth :execrows

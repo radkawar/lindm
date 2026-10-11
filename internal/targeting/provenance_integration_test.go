@@ -218,6 +218,15 @@ func TestSupersededResourceHeadCannotPromoteHealthyCampaign(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.transaction(t, func(tx pgx.Tx) error {
+		ready, err := f.store.RefreshRollout(t.Context(), tx, id)
+		if ready {
+			t.Error("superseded healthy evidence was ready for promotion")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.transaction(t, func(tx pgx.Tx) error {
 		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100})
 		if err == nil && (len(out.Rollouts) != 1 || !out.Rollouts[0].Paused || out.Rollouts[0].RingIndex != 0 || out.Rollouts[0].PauseReason != "unknown_threshold") {
 			t.Error("superseded healthy evidence advanced rollout")
@@ -240,7 +249,7 @@ func assertRolloutTargetCount(t *testing.T, f *targetingFixture, id uuid.UUID, w
 		if err != nil {
 			return err
 		}
-		counts, err := q.RolloutHealthCounts(t.Context(), targetingdb.RolloutHealthCountsParams{RolloutID: id, RingIndex: int32(state.RingIndex), FreshAfter: now, AvailabilityAfter: now})
+		counts, err := q.RolloutHealthCounts(t.Context(), targetingdb.RolloutHealthCountsParams{RolloutID: id, RingIndex: int32(state.RingIndex), FreshAfter: now, AvailabilityAfter: now, AssessedAt: now})
 		if err == nil && counts.Targeted != want {
 			t.Errorf("cumulative denominator %d, want %d", counts.Targeted, want)
 		}

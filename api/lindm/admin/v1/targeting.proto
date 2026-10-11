@@ -3,6 +3,7 @@ syntax = "proto3";
 package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "lindm/admin/v1/inventory_management.proto";
 import "lindm/policy/v1/targeting.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -134,6 +135,17 @@ message RolloutState {
   uint32 selected_count = 6;
   uint32 pending_count = 7;
   uint32 excluded_count = 8;
+  google.protobuf.Timestamp stage_started_at = 9;
+  // Earliest soak completion for an automatic successor, not a promised start.
+  google.protobuf.Timestamp next_promotion_at = 10;
+  // Current health and soak gates only; current creator authority is checked by the worker.
+  bool promotion_ready = 11;
+  uint32 healthy_count = 12;
+  uint32 failed_count = 13;
+  uint32 unknown_count = 14;
+  uint32 unavailable_count = 15;
+  // Live gate assessment; pause_reason is the separately persisted safety decision.
+  string gate_reason = 16;
 }
 message PutRolloutResponse {
   RolloutState rollout = 1;
@@ -166,9 +178,8 @@ message ListRolloutsRequest {
     lte: 100
   }];
   optional string after_id = 2 [(buf.validate.field).string.uuid = true];
-  // Read the retained state without refreshing health or promoting any ring.
-  // Authorization is identical to the normal rollout listing.
-  bool read_only = 3;
+  reserved 3;
+  reserved "read_only";
 }
 message ListRolloutsResponse {
   repeated RolloutState rollouts = 1;

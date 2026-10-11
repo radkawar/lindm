@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
@@ -41,11 +42,18 @@ var (
 	ErrNotReady = errors.New("rollout_not_ready")
 )
 
-type Store struct{ rules protovalidate.Validator }
+type Store struct {
+	rules protovalidate.Validator
+	clock func() time.Time
+}
 type Resolver func(context.Context, pgx.Tx, []*policyv1.TargetCandidate) (*policyv1.TargetResolution, error)
 type Activator func(context.Context, pgx.Tx, *policyv1.TargetPreview) error
 
 func New() (*Store, error) {
+	return newStore(nil)
+}
+
+func newStore(clock func() time.Time) (*Store, error) {
 	rules, err := protovalidate.New(protovalidate.WithMessages(
 		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{}, &adminv1.ListTargetAssignmentsRequest{},
@@ -55,7 +63,7 @@ func New() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{rules: rules}, nil
+	return &Store{rules: rules, clock: clock}, nil
 }
 func (s *Store) validate(m proto.Message) error {
 	if m == nil || !m.ProtoReflect().IsValid() {

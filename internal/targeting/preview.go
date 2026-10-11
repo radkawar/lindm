@@ -32,11 +32,20 @@ type groupInput struct {
 	Match                policyv1.TargetMatch
 	UsesLastSeen         bool
 }
+
+// Rollout definition and cohorts are immutable. Revision, admission ring and
+// pause fence the execution input; live health/soak projections do not.
+type rolloutInput struct {
+	Revision  int64
+	RingIndex int32
+	Paused    bool
+}
+
 type inputs struct {
 	Device        targetingdb.TargetingDeviceRow
 	Assignments   []*policyv1.TargetCandidate
 	Groups        map[string]groupInput
-	Rollouts      map[string]*adminv1.RolloutState
+	Rollouts      map[string]*rolloutInput
 	CatalogDigest []byte
 }
 
@@ -99,7 +108,7 @@ func loadInput(ctx context.Context, q *targetingdb.Queries, id uuid.UUID, u bool
 	if err := protojson.Unmarshal(d.Metadata, m); err != nil {
 		return nil, err
 	}
-	return &evaluation{q: q, input: inputs{Device: d, Groups: make(map[string]groupInput), Rollouts: make(map[string]*adminv1.RolloutState)}, metadata: m, now: now.Time, timeLimit: now.Time.Add(15 * time.Minute)}, nil
+	return &evaluation{q: q, input: inputs{Device: d, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}, metadata: m, now: now.Time, timeLimit: now.Time.Add(15 * time.Minute)}, nil
 }
 func (e *evaluation) limit(t time.Time) {
 	if t.After(e.now) && t.Before(e.timeLimit) {
@@ -180,7 +189,7 @@ func (s *Store) collect(ctx context.Context, e *evaluation) error {
 				return err
 			}
 			item := *e
-			item.input = inputs{Device: e.input.Device, Groups: make(map[string]groupInput), Rollouts: make(map[string]*adminv1.RolloutState)}
+			item.input = inputs{Device: e.input.Device, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}
 			match, err := item.target(ctx, a.Target)
 			if err != nil {
 				return err
@@ -214,16 +223,16 @@ func (s *Store) collect(ctx context.Context, e *evaluation) error {
 				match = excluded
 			}
 			if a.RolloutId != nil {
-				state, err := s.rolloutState(ctx, item.q, uuid.MustParse(*a.RolloutId))
+				state, err := item.q.GetRollout(ctx, uuid.MustParse(*a.RolloutId))
 				if err != nil {
 					return err
 				}
-				item.input.Rollouts[*a.RolloutId] = state
+				item.input.Rollouts[*a.RolloutId] = &rolloutInput{Revision: state.Revision, RingIndex: state.RingIndex, Paused: state.Paused}
 				if match != excluded {
 					if state.Paused {
 						match = unknown
 					} else {
-						m, err := item.q.GetRolloutMember(ctx, targetingdb.GetRolloutMemberParams{RolloutID: uuid.MustParse(*a.RolloutId), RingIndex: int32(state.RingIndex), DeviceID: item.input.Device.ID})
+						m, err := item.q.GetRolloutMember(ctx, targetingdb.GetRolloutMemberParams{RolloutID: uuid.MustParse(*a.RolloutId), RingIndex: state.RingIndex, DeviceID: item.input.Device.ID})
 						if errors.Is(err, pgx.ErrNoRows) {
 							match = excluded
 						} else if err != nil {
@@ -296,7 +305,7 @@ func inputDigest(e *evaluation) ([]byte, error) {
 		Device        deviceMembershipInput
 		Assignments   []*policyv1.TargetCandidate
 		Groups        map[string]groupInput
-		Rollouts      map[string]*adminv1.RolloutState
+		Rollouts      map[string]*rolloutInput
 		CatalogDigest []byte
 	}{device, e.input.Assignments, e.input.Groups, e.input.Rollouts, e.input.CatalogDigest})
 	if err != nil {

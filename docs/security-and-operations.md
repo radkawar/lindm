@@ -1067,6 +1067,7 @@ Background jobs (inventory in `internal/server/jobs.go`):
 | `advisory-maintenance`   | Exclusive, key `0x6c696e646d000002`          | Refresh schedule from durable per-feed `attempted_at`; leased publication generations; SKIP LOCKED cleanup |
 | `advisory-evaluation`    | Exclusive, key `0x6c696e646d000003`          | Per-device lock; a repeated evaluation replaces the stored result                                          |
 | `compliance-deadlines`   | Exclusive, key `0x6c696e646d000004`          | SKIP LOCKED assignment lock; events emitted only on state transitions                                      |
+| `rollout-promoter`       | Exclusive, key `0x6c696e646d000005`          | Scanned rollout revision CAS, targeting fence, unique revision event and current creator authorization     |
 | `integration-deliveries` | Replicated (four workers per replica)        | Random token + generation leases; receivers deduplicate the signed `event_id`                              |
 | `reports`                | Replicated                                   | SKIP LOCKED schedule and artifact leases with token and database time                                      |
 
@@ -1102,6 +1103,49 @@ Mixed N/N+1 replicas share the database, advisory keys and protocol during the r
 Devices reconnect through the balancer on connection loss; protocol state lives in
 PostgreSQL, an exact start-authorization retry returns the same grant and an exact
 result-report replay is accepted, so a lost reply never repeats an effect.
+
+### Automatic rollout operations
+
+Rollout progression does not require an open console or a human session. The
+`rollout-promoter` leader checks at most 100 active rollouts per 10-second tick
+(larger inventories continue by keyset cursor). Observe its advisory lock and
+leadership logs using the HA procedure above. A missing leader or repeated
+`rollout promotion failed` log is an operational failure, not a reason to refresh
+the page repeatedly. Restore database/replica health; never bypass the ring gates.
+
+The console/read API shows the retained ring, pause reason and live health counts.
+`next_promotion_at` is the earliest soak completion for an automatic successor,
+not a deadline or proof that promotion will occur. `promotion_ready` covers health
+and soak only; the worker still needs fresh creator authority and a valid next
+cohort. Manual rings require the existing explicit promotion action; the final
+ring remains health-monitored and is not a claim that every device completed.
+
+For a paused rollout:
+
+1. Inspect the persisted pause reason and `targeting.rollout.pause` audit event.
+   Automatic events have no fabricated operator reason; structured
+   `details.context` records `failure_threshold`, `unknown_threshold`,
+   `unavailable_threshold` or `rollout_authorization_denied`.
+2. For health-budget failure, repair the affected devices or observations and
+   obtain fresh native verification. Contact alone does not prove healthy state.
+   Already authorized unknown effects are not replayed or automatically undone;
+   the rollout model has no automatic rollback operation.
+3. For authorization failure, restore the original creator's current unrestricted
+   `resources.assign` authority through the normal account/scope workflow, or
+   create a new human-approved rollout under an eligible creator. A different
+   operator pressing Resume does not transfer ownership, and cannot authorize
+   future automatic promotions on the original creator's behalf.
+4. Explicitly resume with a reason after resolving the cause. Health gates must
+   pass the resume check. The next automatic promotion rechecks creator authority
+   and will pause again if it still cannot be established.
+
+`lab ha` includes automatic promotion before and after killing the actual promoter
+leader, without calling `ListRollouts`. It checks retained stages, promotion
+events, receipts and audits for one transition per revision; leadership alone is
+not accepted as proof of exactly-once progression.
+Its cohort-health rows are explicitly fixture-seeded against current assignment
+heads/generations; heartbeat availability and elapsed soak are real. This is a
+promotion/HA qualification, not evidence of native device-health execution.
 
 ### Air-gap distribution contract
 

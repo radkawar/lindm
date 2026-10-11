@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -29,7 +28,7 @@ func previewDigestFixture() *evaluation {
 		},
 		Assignments:   []*policyv1.TargetCandidate{{Revision: 1, Match: included}},
 		Groups:        map[string]groupInput{"group": {ID: id, Kind: 2, Revision: 1, Definition: []byte("definition"), AttributeDefinitions: map[string][]byte{"rack": []byte("int")}, Match: included}},
-		Rollouts:      map[string]*adminv1.RolloutState{"rollout": {Revision: 1}},
+		Rollouts:      map[string]*rolloutInput{"rollout": {Revision: 1}},
 		CatalogDigest: []byte("catalog"),
 	}}
 }
