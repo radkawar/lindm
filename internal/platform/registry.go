@@ -140,7 +140,7 @@ var (
 		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
 	}
 	rhelGuest = LabGuest{
-		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
+		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true, OwnedBootHostonly: true,
 		Actions:      []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},

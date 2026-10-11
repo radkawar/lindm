@@ -217,4 +217,9 @@ type LabGuest struct {
 	// closure inputs of the measured-BLS fixture, which keeps the vendor
 	// shim+GRUB chain; empty means no maintained measured-recovery recipe.
 	Actions, OwnedBoot, MeasuredBoot []string
+	// OwnedBootHostonly: the stock initramfs is a generic (no-hostonly) image
+	// too large for the owned ordinary UKI (RHEL's KVM image ships ~240 MB,
+	// beyond its 200 MiB ESP), so the fixture embeds a dracut --hostonly
+	// rebuild for the running kernel instead; the installed one is unchanged.
+	OwnedBootHostonly bool
 }

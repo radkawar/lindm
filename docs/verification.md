@@ -3780,6 +3780,12 @@ all stamped `0.1.0`.
 | `rhel102-encryption-01.json`            | `12fe79f67f981fc4315e9ce9185b24dc55c20f9838dc045f8f89883313d4cc0c` | **Scenarios 1–5 passed** in 1,378 s.                                                                                                                                                                                                          |
 | `rhel98-live-erase-01.json`             | `3e524640895630e6a9554ccb0ab13872c5571b97a041d862ee7ad3934864bf8a` | **Live-root crypto-erase passed.**                                                                                                                                                                                                            |
 | `rhel102-live-erase-01.json`            | `ddf2382aa528877307560d4116ef2a8eb95e53f86bb94d2748e181def65d39b8` | Failed before any action: the executor did not start after the data-disk cold boot (see below).                                                                                                                                               |
+| `rhel102-live-erase-03.json`            | `b32dd234236b31877638b93c49ac9c12963a580cdb49a48b596c6257e1d2524a` | **Live-root crypto-erase passed** with the LUKS by-uuid sandbox fix (runner `lab-actions-05` `9a3ce445…5412f962`); two humans, pre-erase data recovery, server `SUCCEEDED` attested before power-off, both headers absent.                    |
+| `rhel102-live-report-loss-03.json`      | `d6b24666a4d595264b7f7f92bca99af85721b7062fa530d6beea25f6ddc6fba4` | **Live-root report-loss passed**: result channel blocked, server `OUTCOME_UNKNOWN`, timer power-off, both headers absent.                                                                                                                     |
+| `rhel98-recovery-sata-02.json`          | `222cb6376e4234124eb61e29d22cbc8a64bb92381bcd149cf6a0e4cf41f60f67` | Lab failure before any action: the registration probe upload needed the native guest directory, which did not exist yet. Fixed (staged then removed around registration).                                                                     |
+| `rhel98-recovery-nvme-02.json`          | `68fee06938ed2801e41096a16b8ba1e4e8fb83a99770d5e9b591caa2c4690241` | Same probe-directory failure.                                                                                                                                                                                                                 |
+| `rhel98-recovery-sata-03.json`          | `247207a1d8a26505cfc11c260a6153e63c23374d3e43f89593a8737caa6811d0` | Registration, entitled install, unregistration and key deletion succeeded; the owned ordinary UKI upload then failed (see below). No action.                                                                                                  |
+| `rhel98-recovery-nvme-03.json`          | `f3eac0693af6213735ccd76c40284c7f2a6b1ff7b0260776be4f866b5c694a33` | Same owned ordinary UKI failure.                                                                                                                                                                                                              |
 | `rhel98-live-report-loss-01.json`       | `4e33999ba1a32d1f635390630964a72e8a02375a411c83a1cf1fff06c4ca9753` | **Live-root report-loss passed.**                                                                                                                                                                                                             |
 | `rhel102-live-report-loss-01.json`      | none (no record)                                                   | Not a product result: `context deadline exceeded` exactly 3 h after start with no record written, so the lane never returned a result; consistent with waiting for a local lease (inference). Ran on the pre-fix binary.                      |
 | `rhel102-lock-quarantine-01.json`       | `5294527d651a9810d6ce61ab1598f07e862203440c4c30f08ddc953fb28199c8` | **Lock, release, account disable and quarantine passed** with a real GDM Wayland session.                                                                                                                                                     |
@@ -3821,7 +3827,8 @@ node (missing or diverging aliases fail closed), and `openTarget` opens that ali
 only when the kernel name is absent, still requiring the same device number, size
 and native identity. A deterministic regression covers matching, missing,
 renumbered, wrong-type and non-LUKS cases; an independent review found no
-blocking issue. The 9.8 pass predates this change and did not exercise it.
+blocking issue. The 9.8 pass predates this change and did not exercise it;
+`rhel102-live-erase-03` exercises it natively.
 
 The RHEL vendor KVM images used by original-device recovery have a 200 MiB vfat
 ESP with 196,772 KiB (9.8) and 195,420 KiB (10.2) free, measured read-only from
@@ -3831,6 +3838,17 @@ therefore entitled BaseOS/AppStream, publish `systemd-boot-unsigned`
 busybox or sbsigntools. The recovery image no longer uses either (static
 lindm-agent `/init`, in-process Authenticode; see the busybox-free recovery init
 records above), so RHEL recovery sanitize awaits only its native qualification run.
+
+The RHEL KVM images ship a generic (no-hostonly) initramfs of 240,001,314 bytes
+(9.8) and 235,583,210 bytes (10.2), measured read-only from the pinned images. An
+owned ordinary UKI embedding it exceeds the 200 MiB ESP. In `recovery-sata-03` and
+`recovery-nvme-03` the signed UKI upload failed with a 42-byte stderr, consistent
+with `cat: write error: No space left on device` on the guest's `/run` tmpfs
+(inference; the message itself was not retained). The fixture now embeds a
+`dracut --hostonly` image for the running kernel in the owned ordinary UKI
+(registry `Lab.Guest.OwnedBootHostonly`); the installed initramfs is unchanged.
+Each `-03` record retains the maintained registration's public run name,
+consumer UUID, unregistration and activation-key deletion.
 
 Self-update passed on unregistered vendor KVM images: `rhel98-updates-01.json` and
 `rhel102-updates-01.json` under `$HOME/.cache/lindm-rhel-updates/` (hashes in the

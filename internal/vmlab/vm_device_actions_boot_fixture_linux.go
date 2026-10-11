@@ -301,8 +301,15 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 		loader, stub, fallback = "systemd-bootaa64.efi", "linuxaa64.efi.stub", "BOOTAA64.EFI"
 	}
 	initrd := fmt.Sprintf(release.Lab.Guest.Initrd, evidence.KernelRelease)
-	prepare := "install -d -m 0700 /run/lindm-native-owned-boot; test -d /boot/efi/EFI; mount -o remount,umask=0077 /boot/efi; ukify build --linux=" + nativeQuote("/boot/vmlinuz-"+evidence.KernelRelease) + " --initrd=" + nativeQuote(initrd) + " --stub=" + nativeQuote("/usr/lib/systemd/boot/efi/"+stub) + " --cmdline=@/proc/cmdline --output=/run/lindm-native-owned-boot/ordinary-unsigned.efi"
-	prepared, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(prepare), nil, 8192, 3*time.Minute)
+	prepare := "install -d -m 0700 /run/lindm-native-owned-boot; test -d /boot/efi/EFI; mount -o remount,umask=0077 /boot/efi; "
+	if release.Lab.Guest.OwnedBootHostonly {
+		// The vendor's generic initramfs would not fit the ESP; the owned
+		// ordinary UKI embeds the vendor dracut's hostonly image instead.
+		initrd = "/run/lindm-native-owned-boot/ordinary-initrd.img"
+		prepare += "dracut --quiet --force --hostonly " + nativeQuote(initrd) + " " + nativeQuote(evidence.KernelRelease) + "; "
+	}
+	prepare += "ukify build --linux=" + nativeQuote("/boot/vmlinuz-"+evidence.KernelRelease) + " --initrd=" + nativeQuote(initrd) + " --stub=" + nativeQuote("/usr/lib/systemd/boot/efi/"+stub) + " --cmdline=@/proc/cmdline --output=/run/lindm-native-owned-boot/ordinary-unsigned.efi"
+	prepared, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(prepare), nil, 8192, 10*time.Minute)
 	if err != nil {
 		return evidence, err
 	}
