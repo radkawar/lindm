@@ -286,18 +286,20 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 	}
 	var allow []struct{ Path, Access string }
 	var writable []string
-	selinux := false
-	for _, property := range grubEnvironmentProperties("/usr/bin/grub2-editenv", []string{"-", "list"}, "/dev/vda3", false, "/boot/grub2", "system_u:system_r:unconfined_service_t:s0") {
+	confinement := map[string]bool{}
+	for _, property := range grubEnvironmentProperties("/usr/bin/grub2-editenv", []string{"-", "list"}, "/dev/vda3", false, "/boot/grub2") {
 		switch property.Name {
 		case "DeviceAllow":
 			allow, _ = property.Value.Value().([]struct{ Path, Access string })
-		case "SELinuxContext":
-			selinux = fmt.Sprint(property.Value.Value()) == "{false system_u:system_r:unconfined_service_t:s0}"
 		case "ReadWritePaths":
 			writable, _ = property.Value.Value().([]string)
-		case "PrivateNetwork", "NoNewPrivileges", "PrivateDevices":
-			if value, _ := property.Value.Value().(bool); !value {
-				t.Fatalf("%s disabled", property.Name)
+		case "SELinuxContext":
+			t.Fatal("grub-editenv unit overrides the policy's own domain")
+		case "PrivateNetwork", "PrivateDevices", "NoNewPrivileges", "RestrictSUIDSGID", "ProtectKernelModules":
+			confinement[property.Name], _ = property.Value.Value().(bool)
+		case "CapabilityBoundingSet":
+			if value, _ := property.Value.Value().(uint64); value != 0 {
+				t.Fatalf("grub-editenv unit keeps capabilities %#x", value)
 			}
 		case "BindPaths":
 			if fmt.Sprint(property.Value.Value()) != "[{/dev/vda3 /dev/vda3 false 0}]" {
@@ -305,13 +307,13 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 			}
 		}
 	}
-	if len(allow) != 1 || allow[0].Path != "/dev/vda3" || allow[0].Access != "r" || len(writable) != 1 || writable[0] != "/boot/grub2" || !selinux {
-		t.Fatalf("grub-editenv unit not scoped: allow=%v writable=%v selinux=%v", allow, writable, selinux)
+	// NoNewPrivileges alone is off so SELinux can enter bootloader_t; every
+	// other confinement stays, and the empty bounding set grants nothing.
+	if !confinement["PrivateNetwork"] || !confinement["PrivateDevices"] || confinement["NoNewPrivileges"] || !confinement["RestrictSUIDSGID"] || !confinement["ProtectKernelModules"] {
+		t.Fatalf("grub-editenv unit confinement: %v", confinement)
 	}
-	for _, property := range grubEnvironmentProperties("/usr/bin/grub-editenv", []string{"-", "list"}, "/dev/vda1", false, "/boot/grub", "") {
-		if property.Name == "SELinuxContext" {
-			t.Fatal("SELinux context set for a release without one")
-		}
+	if len(allow) != 1 || allow[0].Path != "/dev/vda3" || allow[0].Access != "r" || len(writable) != 1 || writable[0] != "/boot/grub2" {
+		t.Fatalf("grub-editenv unit not scoped: allow=%v writable=%v", allow, writable)
 	}
 }
 

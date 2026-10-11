@@ -47,7 +47,7 @@ func (s *Service) grubEnvironment(bootDirectory string, chain platform.GRUBChain
 			return nil, err
 		}
 		defer func() { _ = units.close() }()
-		output, runErr := units.run(call, grubEnvironmentProperties(editenv, args, device, writable, bootDirectory+"/"+chain.ConfigDirectory, chain.SELinuxContext))
+		output, runErr := units.run(call, grubEnvironmentProperties(editenv, args, device, writable, bootDirectory+"/"+chain.ConfigDirectory))
 		if runErr != nil {
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), rootInventoryCleanupTimeout)
 			stopErr := units.stop(cleanup)
@@ -66,13 +66,13 @@ func (s *Service) grubEnvironment(bootDirectory string, chain platform.GRUBChain
 	}
 }
 
-func grubEnvironmentProperties(editenv string, args []string, device string, writable bool, configDirectory, selinuxContext string) []systemdProperty {
+func grubEnvironmentProperties(editenv string, args []string, device string, writable bool, configDirectory string) []systemdProperty {
 	property := newSystemdProperty
 	access := "r"
 	if writable {
 		access = "rw"
 	}
-	properties := []systemdProperty{
+	return []systemdProperty{
 		property("Description", "Lindm recovery GRUB environment"),
 		property("Type", "exec"), property("User", "root"), property("Group", "root"),
 		property("ExecStart", []systemdExec{{Path: editenv, Arguments: append([]string{editenv}, args...)}}),
@@ -87,7 +87,12 @@ func grubEnvironmentProperties(editenv string, args []string, device string, wri
 		}{{device, device, false, 0}}),
 		property("DeviceAllow", []struct{ Path, Access string }{{device, access}}),
 		property("CapabilityBoundingSet", uint64(0)), property("AmbientCapabilities", uint64(0)),
-		property("NoNewPrivileges", true), property("ProtectSystem", "strict"), property("ProtectHome", "yes"),
+		// The one unit without NoNewPrivileges: SELinux targeted policy (Fedora
+		// 44, RHEL 10) transitions grub2-editenv (bootloader_exec_t) into the
+		// confined bootloader_t domain, and NNP refuses that transition (exec
+		// status 203). With an empty bounding set, no setuid or file-capability
+		// gain is possible; PID 1 applies the seccomp filter without implying NNP.
+		property("NoNewPrivileges", false), property("ProtectSystem", "strict"), property("ProtectHome", "yes"),
 		property("ReadWritePaths", []string{configDirectory}),
 		property("PrivateTmp", true), property("PrivateNetwork", true),
 		property("RestrictAddressFamilies", systemdList{AllowList: true, Values: []string{"AF_UNIX"}}),
@@ -109,12 +114,4 @@ func grubEnvironmentProperties(editenv string, args []string, device string, wri
 		property("Restart", "no"), property("CollectMode", "inactive-or-failed"),
 		property("StandardInput", "null"),
 	}
-	if selinuxContext != "" {
-		// SELinux-enabled hosts only; systemd ignores it when SELinux is off.
-		properties = append(properties, property("SELinuxContext", struct {
-			IgnoreErrors bool
-			Context      string
-		}{false, selinuxContext}))
-	}
-	return properties
 }

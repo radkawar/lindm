@@ -1073,10 +1073,10 @@ Staging (root executor, after the existing durable BOOT consumption gate):
    `grub-editenv` runs as a separate short-lived systemd unit with its own
    private `/dev` holding only pseudo devices and the bound `/boot` backing node
    (writable only on btrfs, where GRUB keeps its environment block in the
-   bootloader area), no capabilities, and only the GRUB directory writable. On
-   SELinux releases the registry pins the unit to the executor's own
-   `unconfined_service_t` domain. Otherwise `NoNewPrivileges` would refuse the
-   policy's automatic `bootloader_t` transition.
+   bootloader area), no capabilities, and only the GRUB directory writable. It
+   is the one unit without `NoNewPrivileges`, so SELinux targeted policy can
+   move `grub2-editenv` into its confined `bootloader_t` domain. With an empty
+   capability bounding set, setuid and file capabilities still grant nothing.
 
 The kernel options are a closed grammar, `rdinit=/init panic=10 quiet`, an
 optional qualified serial console and `lindm.recovery.action=<action>`. The

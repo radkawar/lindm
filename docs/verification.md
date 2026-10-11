@@ -3759,9 +3759,9 @@ Not qualified:
   `a471a3a5b2b92332b28a9a7be64c69ff3a0a8621156bb0aca37a41f1ca94db33`). Their
   targeted policy transitions the unit from `init_t` to `bootloader_t` on
   `bootloader_exec_t`, which `NoNewPrivileges` refuses; RHEL 9.8's older
-  policy has no such transition. The registry's BLS chain now pins the unit to
-  `unconfined_service_t`, the domain the executor and its root-inventory
-  helper already use.
+  policy has no such transition. The unit now runs without `NoNewPrivileges`
+  (still with an empty capability bounding set and every other confinement), so
+  the vendor's confined `bootloader_t` domain applies.
 
 RHEL 9.8 passed on the Go init at `d26c5d6f` with a real entitlement:
 `rhel98-mgrub-sata-x86-03.json`
