@@ -719,11 +719,16 @@ console and portable storage modules through the vendor's
 `limine-update`; its single provisioning boot reaches that console because the
 lab first appends it to the LUKS entries' cmdline in the unencrypted ESP
 `limine.conf` (Limine hands it to the UKI stub, honoured with Secure Boot off),
-which `limine-update` then regenerates. The mkinitcpio `encrypt` hook prints
-"A password is required to access the root volume" through plymouth; the
-serial unlock answers only a completed prompt. Omarchy has no TPM early-boot
-variant (registry `Lab.TPM.Unsupported`): the device-action lane binds a real
-TPM2 token and records the observed passphrase prompt as unsupported.
+which `limine-update` then regenerates. In that bootstrap boot the vendor
+initramfs asks through plymouth, whose password display redraws "A password is
+required to access the root volume:" for every keystroke, so the lab submits the
+offline-proven passphrase once and ignores redraws. Provisioning then drops the
+`plymouth` hook from the lab initramfs (`/etc/mkinitcpio.conf.d/zz-lindm-lab.conf`,
+sorted after Omarchy's HOOKS file); the `encrypt` hook's console fallback prompts
+through cryptsetup and reports a wrong key explicitly, which every later cold boot
+relies on. Omarchy has no TPM early-boot variant (registry `Lab.TPM.Unsupported`):
+the device-action lane binds a real TPM2 token and records the observed
+passphrase prompt as unsupported.
 
 The additional `*-aarch64.json` Rocky 8.10/9.8/10.2, AlmaLinux 8.10/9.8/10.2 and
 openSUSE Leap 16.0 manifests independently pin official native cloud-image bytes,

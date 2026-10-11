@@ -80,8 +80,11 @@ symlink on every install and upgrade (except Apple Silicon). Selection is by
   packages (`cloud-init`, and the device-action prerequisites `cryptsetup
 nftables iproute2 iputils tpm2-tools bind curl`) come only from the ISO's
   offline repository with package signatures required; the encrypted golden adds
-  `console=tty0 console=ttyS0,115200` and virtio/AHCI/NVMe modules through the
-  vendor `limine-entry-tool.d` and `mkinitcpio.conf.d` drop-ins.
+  `console=tty0 console=ttyS0,115200`, virtio/AHCI/NVMe modules and removes the
+  `plymouth` initramfs hook (lab-only: plymouth's password display redraws the
+  prompt per keystroke and hides cryptsetup's wrong-key message on the serial
+  console) through the vendor `limine-entry-tool.d` and `mkinitcpio.conf.d`
+  drop-ins.
 
 ## Quirks observed
 

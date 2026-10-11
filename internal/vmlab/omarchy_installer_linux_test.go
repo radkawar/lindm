@@ -3,7 +3,11 @@
 package vmlab
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
+	"io"
+	"net"
 	"strings"
 	"testing"
 
@@ -243,5 +247,56 @@ func TestEncryptedUnlockPromptMkinitcpioEncrypt(t *testing.T) {
 		if got := encryptedUnlockPrompt(text); got != want {
 			t.Errorf("encryptedUnlockPrompt(%q) = %t, want %t", text, got, want)
 		}
+	}
+}
+
+// The vendor plymouth password display redraws its prompt for every
+// keystroke; the bootstrap unlock must submit exactly once and not mistake
+// the redraw for a rejection.
+func TestOmarchyBootstrapUnlockSubmitsOnceAcrossPlymouthRedraws(t *testing.T) {
+	guest, host := net.Pipe()
+	t.Cleanup(func() { _ = guest.Close(); _ = host.Close() })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { result <- omarchyBootstrapUnlock(ctx, host, "lab-secret") }()
+	prompt := "A password is required to access the root volume: "
+	if _, err := io.WriteString(guest, "Starting systemd-udevd\n"+prompt); err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewReader(guest)
+	line, err := reader.ReadString('\r')
+	if err != nil || line != "lab-secret\r" {
+		t.Fatalf("passphrase not submitted once: %q %v", line, err)
+	}
+	for _, redraw := range []string{prompt + "*", prompt + "**********", prompt} {
+		if _, err := io.WriteString(guest, "\r"+redraw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	extra := make(chan string, 1)
+	go func() { data, _ := reader.ReadString('\r'); extra <- data }()
+	cancel()
+	if err := <-result; err != nil {
+		t.Fatalf("redrawn prompt treated as failure: %v", err)
+	}
+	_ = guest.Close()
+	if data := <-extra; data != "" {
+		t.Fatalf("passphrase submitted again after redraw: %q", data)
+	}
+}
+
+func TestOmarchyBootstrapUnlockRequiresPrompt(t *testing.T) {
+	guest, host := net.Pipe()
+	t.Cleanup(func() { _ = guest.Close(); _ = host.Close() })
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- omarchyBootstrapUnlock(ctx, host, "lab-secret") }()
+	if _, err := io.WriteString(guest, "Booting without any encrypted root\n"); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if err := <-result; err == nil {
+		t.Fatal("boot without a LUKS prompt accepted")
 	}
 }

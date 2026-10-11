@@ -52,7 +52,7 @@ const (
 	omarchyHostname        = "omarchy"
 	omarchySudoers         = "/etc/sudoers.d/90-lindm-lab"
 	omarchyConsoleDropIn   = "/etc/limine-entry-tool.d/90-lindm-lab-console.conf"
-	omarchyStorageDropIn   = "/etc/mkinitcpio.conf.d/90-lindm-lab-storage.conf"
+	omarchyStorageDropIn   = "/etc/mkinitcpio.conf.d/zz-lindm-lab.conf"
 	omarchyCloudConfig     = "/etc/cloud/cloud.cfg.d/90-lindm-lab.cfg"
 	// The last console is /dev/console, where the LUKS prompt appears.
 	omarchySerialConsole = "console=tty0 console=ttyS0,115200"
@@ -552,10 +552,14 @@ func omarchyProvisionScript(encrypted bool, actions []string) string {
 		script.WriteString(omarchyOfflineRepositoryCleanup)
 		// Serial console for the lab's prompt-gated LUKS unlock, and storage
 		// modules so the autodetected initramfs also boots the lab's other
-		// emulated controllers. Both go through the vendor's own drop-in
-		// directories and limine-update, which rebuilds the vendor UKI.
+		// emulated controllers. The plymouth hook is dropped from the lab
+		// initramfs: its password display redraws the prompt per keystroke and
+		// hides cryptsetup's rejection, while the encrypt hook's console
+		// fallback reports both. All of it goes through the vendor's own
+		// drop-in directories (the mkinitcpio one sorts after Omarchy's
+		// HOOKS and MODULES files) and limine-update, which rebuilds the UKI.
 		script.WriteString("printf '%s\\n' 'KERNEL_CMDLINE[default]+=\" " + omarchySerialConsole + "\"' > " + omarchyConsoleDropIn + "\n")
-		script.WriteString("printf '%s\\n' 'MODULES+=(virtio_blk virtio_scsi sd_mod ahci nvme)' > " + omarchyStorageDropIn + "\n")
+		script.WriteString("printf '%s\\n' 'MODULES+=(virtio_blk virtio_scsi sd_mod ahci nvme)' '_lindm_hooks=()' 'for _lindm_hook in \"${HOOKS[@]}\"; do [[ $_lindm_hook == plymouth ]] || _lindm_hooks+=(\"$_lindm_hook\"); done' 'HOOKS=(\"${_lindm_hooks[@]}\")' 'unset _lindm_hooks _lindm_hook' > " + omarchyStorageDropIn + "\n")
 		script.WriteString("limine-update\n")
 		script.WriteString("grep -q 'console=ttyS0,115200' /boot/limine.conf\n")
 	} else {
@@ -645,7 +649,11 @@ func omarchyProvisionBoot(ctx context.Context, dir, disk string, iso *os.File, h
 }
 
 // omarchyConnect waits for pinned SSH. With a passphrase it concurrently
-// answers exactly one LUKS prompt on the serial console, like ColdBoot.
+// answers the vendor initramfs's first LUKS prompt on the serial console.
+// This bootstrap boot still runs the vendor plymouth hook, whose password
+// display redraws its prompt for each keystroke, so a redraw is not read as
+// a rejection here: the passphrase was just proven by the offline open, and
+// a failed unlock surfaces as the SSH readiness deadline.
 func omarchyConnect(ctx context.Context, vm *guestVM, passphrase string) error {
 	if passphrase == "" {
 		return vm.connect(ctx)
@@ -670,29 +678,52 @@ func omarchyConnect(ctx context.Context, vm *guestVM, passphrase string) error {
 	defer func() { _ = console.Close() }()
 	boot, stop := context.WithCancel(dial)
 	defer stop()
-	type outcome struct {
-		seen bool
-		err  error
-	}
-	prompt := make(chan outcome, 1)
-	go func() {
-		seen, err := unlockEncryptedSerial(boot, console, passphrase)
-		prompt <- outcome{seen, err}
-		if err != nil {
-			stop()
-		}
-	}()
+	sent := make(chan error, 1)
+	go func() { sent <- omarchyBootstrapUnlock(boot, console, passphrase) }()
 	err := vm.connect(boot)
 	stop()
 	_ = console.SetReadDeadline(time.Now())
-	result := <-prompt
-	if result.err != nil {
-		return result.err
-	}
-	if err == nil && !result.seen {
-		return errors.New("encrypted golden booted without consuming its LUKS passphrase")
+	if unlockErr := <-sent; err == nil && unlockErr != nil {
+		return unlockErr
 	}
 	return err
+}
+
+// omarchyBootstrapUnlock submits the passphrase once, after the first
+// completed prompt, then drains the console until ctx ends.
+func omarchyBootstrapUnlock(ctx context.Context, conn net.Conn, secret string) error {
+	var pending string
+	sent := false
+	buf := make([]byte, 4096)
+	for ctx.Err() == nil {
+		if err := conn.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
+			return err
+		}
+		n, err := conn.Read(buf)
+		if n > 0 && !sent {
+			pending += string(buf[:n])
+			if len(pending) > 8192 {
+				pending = pending[len(pending)-8192:]
+			}
+			if encryptedUnlockPrompt(pending) {
+				if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+					return err
+				}
+				if _, err := io.WriteString(conn, secret+"\r"); err != nil {
+					return errors.New("submit encrypted golden bootstrap passphrase failed")
+				}
+				sent = true
+			}
+		}
+		var timeout net.Error
+		if err != nil && !errors.As(err, &timeout) {
+			break
+		}
+	}
+	if !sent {
+		return errors.New("encrypted golden booted without consuming its LUKS passphrase")
+	}
+	return nil
 }
 
 func omarchyTail(data []byte) string {
