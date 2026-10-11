@@ -180,6 +180,13 @@ type GRUBChain struct {
 	Editenv string
 	// ConfigDirectory is GRUB's directory below /boot, e.g. "grub2".
 	ConfigDirectory string
+	// SELinuxContext is the domain of grub-editenv's transient unit on SELinux
+	// targeted-policy releases: the domain the executor and its root inventory
+	// helper already run in. Without it, Fedora 44 and RHEL 10.2 policy
+	// transitions init_t to bootloader_t on bootloader_exec_t, which
+	// NoNewPrivileges refuses (exec status 203).
+	// Empty where the release has no SELinux policy.
+	SELinuxContext string
 }
 
 // Desktop is the qualified graphical edition of a release.

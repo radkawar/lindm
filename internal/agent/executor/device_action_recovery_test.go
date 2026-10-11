@@ -278,7 +278,7 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 		t.Fatal("refused grub-editenv invocation reached PID 1")
 		return nil, nil
 	}}
-	run := s.grubEnvironment("/boot", "grub2")
+	run := s.grubEnvironment("/boot", platform.GRUBChain{Entries: platform.GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"})
 	for _, call := range [][]string{{"/usr/bin/sh", "-", "list"}, {"/usr/bin/grub2-editenv", "/etc/shadow", "list"}, {"/usr/bin/grub2-editenv", "-", "create"}, {"/usr/bin/grub2-editenv"}} {
 		if _, err := run(t.Context(), call[0], call[1:]...); err == nil {
 			t.Fatalf("grub-editenv invocation %v accepted", call)
@@ -286,10 +286,13 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 	}
 	var allow []struct{ Path, Access string }
 	var writable []string
-	for _, property := range grubEnvironmentProperties("/usr/bin/grub2-editenv", []string{"-", "list"}, "/dev/vda3", false, "/boot/grub2") {
+	selinux := false
+	for _, property := range grubEnvironmentProperties("/usr/bin/grub2-editenv", []string{"-", "list"}, "/dev/vda3", false, "/boot/grub2", "system_u:system_r:unconfined_service_t:s0") {
 		switch property.Name {
 		case "DeviceAllow":
 			allow, _ = property.Value.Value().([]struct{ Path, Access string })
+		case "SELinuxContext":
+			selinux = fmt.Sprint(property.Value.Value()) == "{false system_u:system_r:unconfined_service_t:s0}"
 		case "ReadWritePaths":
 			writable, _ = property.Value.Value().([]string)
 		case "PrivateNetwork", "NoNewPrivileges", "PrivateDevices":
@@ -302,8 +305,13 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 			}
 		}
 	}
-	if len(allow) != 1 || allow[0].Path != "/dev/vda3" || allow[0].Access != "r" || len(writable) != 1 || writable[0] != "/boot/grub2" {
-		t.Fatalf("grub-editenv unit not scoped: allow=%v writable=%v", allow, writable)
+	if len(allow) != 1 || allow[0].Path != "/dev/vda3" || allow[0].Access != "r" || len(writable) != 1 || writable[0] != "/boot/grub2" || !selinux {
+		t.Fatalf("grub-editenv unit not scoped: allow=%v writable=%v selinux=%v", allow, writable, selinux)
+	}
+	for _, property := range grubEnvironmentProperties("/usr/bin/grub-editenv", []string{"-", "list"}, "/dev/vda1", false, "/boot/grub", "") {
+		if property.Name == "SELinuxContext" {
+			t.Fatal("SELinux context set for a release without one")
+		}
 	}
 }
 

@@ -3541,7 +3541,7 @@ Final summary `recovery-time-final-native-evidence.json` has SHA-256
 The four final runs used at most two local guests, retained at least
 55,606,804 KiB available memory and zero swap-out delta, and left zero guests.
 
-#### Measured GRUB recovery on stock Fedora 44
+#### Measured GRUB recovery on stock vendor boot chains
 
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` (see
 [architecture](architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub))
@@ -3588,6 +3588,71 @@ do not exist: `02` waited 60 minutes for a local slot and was stopped by its
 controller deadline before a VM started, and `03` was cancelled while queued.
 These are QEMU/swtpm results, not physical TPM, EK-certified attestation key or
 physical media qualification; the initramfs used the busybox init.
+
+**Measured GRUB after landing, Go PID 1 init (2026-10-11).** Three classes of defect
+were found only by native lanes and fixed on main with regressions:
+
+- The Linux EFI stub's tagged PCR 9 load-options and initrd events (`48300b6`,
+  `fb76a81`). The load-options event is bound to GRUB's UTF-16LE command line,
+  whose terminator differs between GRUB 2.12 and 2.14.
+- gzip arm64 kernels, which GRUB measures decompressed (`3579b8d`).
+- The grub.d `custom.cfg` flavor read the `/boot` UUID through the ESP-only
+  parser (`54cc41f`).
+
+Records are under `$HOME/.cache/lindm-fedoragaps-20261011/`:
+
+| Native record                       | SHA-256                                                            | Outcome                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu24-mgrub-sata-x86-03.json`   | `e8acafca300e1c75edd5367533849e0df8a866408939003ba2ee2c5a311403cf` | **Passed.** Ubuntu 24.04 amd64 stock cloud image (`ubuntu-noble-20260926-amd64`, ext4 `/boot`, grub.d `custom.cfg` flavor) at `54cc41f`: overwrite of the exact SATA target, server `SUCCEEDED`, power-off, stopped-disk samples equal the zero block. Initramfs `4c4407b2…81d5` (29,002,464 bytes), vendor kernel `cd5fcfd2…2f2c`. |
+| `ubuntu24-mgrub-nvme-x86-01.json`   | `2a2a0b85ca9e1e33628698b7989613aa867eeec89edfccfc4bf96270775defcc` | **Passed.** Same tuple with the NVMe controller: native NVMe user-data format with the approved scope, server `SUCCEEDED`, power-off, zero-block samples. Initramfs `6770184f…26fb` (31,740,292 bytes).                                                                                                                             |
+| `ubuntu24-mgrub-nvme-arm64-04.json` | `554338b0d433b02e99fb178c71a285c00696b99706e5d93e9aefe43f7872ceda` | **Passed (additional arm64).** `dgx21` KVM, AAVMF Secure Boot with the Microsoft template, `ubuntu-noble-20260926-arm64`: GRUB measured the decompressed kernel `e989ab36…1914` and the EFI stub's load-options and initrd events; NVMe format, server `SUCCEEDED`, power-off, zero-block samples.                                  |
+| `fedora44-mgrub-notpm-x86-01.json`  | `db46de61c270c3dff761473328d604f4a3c06758e99c454c1de42d090294fd2f` | **Passed refusal** with the Go PID 1 image at `48300b6`: device reason `recovery_readiness_tpm_attestation_unavailable`, server readiness and two-human approval `device_action_recovery_attestation_unavailable`, no action or staged boot files.                                                                                  |
+
+The ordinary Ubuntu 24.04 arm64 event log is the parser fixture
+`internal/measuredboot/testdata/ubuntu2404-arm64-stock.eventlog` (SHA-256
+`3d218503b2c7862630fc518723020531bb48db626e46c13b5a3f6c8610d919af`). Ubuntu
+26.04 amd64's log (`a0a884cb…8bc2`) came from Ubuntu2604's lane.
+
+Not qualified:
+
+- **Fedora 44 aarch64:** the stock cloud image never reaches SSH under AAVMF
+  Secure Boot (`fedora44-mgrub-nvme-arm64-01.json`
+  `67c5b1502dd4de63f2954d266ee354927dad7290615d3509b050d74c04e0c0b2`,
+  `-02.json` `e03a74d147a28825ab7c585c665cf2295636b2142dea6c45fb3251fc00d27716`).
+  The vendor aarch64 kernel has no Authenticode signature table, so shim rejects
+  it ("bad shim signature") before lindm runs (DemoEnv.FedoraArmAssist evidence
+  under `$HOME/.cache/lindm-assistqual-20261011/`). Measured GRUB requires
+  Secure Boot, so the vendor chain makes this cell unsupported.
+- **Ubuntu 22.04 arm64:** the lane stops at the release's existing
+  RecoverySanitize gate (owned-boot fixture needs ukify) before any VM starts.
+  No record was written.
+- **Debian 12/13:** the lab has no Debian cloud recovery image; its goldens are
+  netinst installs.
+- **Fedora 44 x86_64 and RHEL 10.2 on the Go init (pending):** grub-editenv's
+  unit failed natively, first at `54cc41f` (`fedora44-mgrub-sata-x86-03.json`
+  `6abc8765e0ccbd415823da7d8173d3c2472789fa1541a52c1c5c789c576e2480`). The
+  unit diagnostics added in `d26c5d6f` then showed exec status 203 on both
+  releases (`fedora44-mgrub-sata-x86-04.json`
+  `4de6bcb424c3c395e51732ed47321a622c0c3ad89073b2f38b5dee2e199e689d`,
+  `rhel102-mgrub-sata-x86-03.json`
+  `a471a3a5b2b92332b28a9a7be64c69ff3a0a8621156bb0aca37a41f1ca94db33`). Their
+  targeted policy transitions the unit from `init_t` to `bootloader_t` on
+  `bootloader_exec_t`, which `NoNewPrivileges` refuses; RHEL 9.8's older
+  policy has no such transition. The registry's BLS chain now pins the unit to
+  `unconfined_service_t`, the domain the executor and its root-inventory
+  helper already use.
+
+RHEL 9.8 passed on the Go init at `d26c5d6f` with a real entitlement:
+`rhel98-mgrub-sata-x86-03.json`
+`29a5adf417bfcbc4893f9478fb8fc3e0fd8f387e0ac16bc48e847c5c10d891a2`. The tuple
+was the stock `rhel-9.8-kvm-x86-64` image with separate XFS `/boot`, the BLS
+flavor and the grub2-editenv unit with a read-only device. The lane overwrote
+the SATA target, the server reported `SUCCEEDED`, the image powered off, and
+the stopped-disk samples are zero blocks. Registration run
+`lindm-lab-a1d0ef94c4e4c74dced9d310dfce7715`, consumer
+`26174a33-3a9c-4b80-a802-f84f08819bcf`, was unregistered and its activation key
+deleted before the action. The initramfs is `512e3442…8248` (30,479,356 bytes)
+and the vendor kernel is `429e89b3…45fa`.
 
 For encryption-only qualification use `-scenario encryption` and a distinct
 `-record` path. This excludes desktop/network restrictions and destructive erase.

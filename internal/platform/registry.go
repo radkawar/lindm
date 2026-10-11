@@ -89,7 +89,7 @@ var (
 	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
 	elQuirks10 = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
 	// Stock shim+GRUB chains for measured original-device recovery.
-	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}
+	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2", SELinuxContext: "system_u:system_r:unconfined_service_t:s0"}
 	debianGRUB  = GRUBChain{Entries: GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "grub"}
 	el9Pins     = []PasswordPins{{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}}
 	el10Pins    = []PasswordPins{{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}}

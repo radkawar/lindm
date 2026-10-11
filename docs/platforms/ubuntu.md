@@ -272,18 +272,20 @@ above, not stock `cryptsetup-initramfs` TPM unlock; physical TPM/firmware/media,
 Secure Boot off, wipe/recovery-sanitize and assistance after TPM-bound boot
 remain separate qualification.
 
-A stock Ubuntu machine without a deployment key in firmware `db` would use
+A stock Ubuntu machine without a deployment key in firmware `db` uses
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` with the grub.d flavor
 ([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
 Staging writes one `--unrestricted` menuentry to `/boot/grub/custom.cfg`, which
 the vendor `grub.cfg` already sources through `41_custom`. The entry locates the
-separate ext4 `/boot` by filesystem UUID and uses `($root)`-qualified paths, and
-it is armed with `grub-editenv - set next_entry=…`. Staging refuses a pre-existing
-`custom.cfg` and never runs `update-grub`. Ubuntu's signed `grubx64.efi` for
-24.04 and 26.04 contains the `grub_cmd`/`kernel_cmdline` measurement strings.
-Ubuntu's vendor entries pass `linux /vmlinuz-…` without a device, and the event-log
-parser accepts that form only when the kernel, command line and initramfs agree.
-This is unqualified until a native measured lane passes.
+separate ext4 `/boot` by its udev filesystem UUID and uses `($root)`-qualified
+paths, and it is armed with `grub-editenv - set next_entry=…`. Staging refuses a
+pre-existing `custom.cfg` and never runs `update-grub`. Ubuntu's vendor entries
+pass `linux /vmlinuz-…` without a device. The kernel's EFI stub then adds PCR 9
+load-options and initrd events, and both are bound to what GRUB measured. On
+arm64, GRUB measures the gzip `vmlinuz` decompressed, and the release's
+`.kernel` target uses that form. Ubuntu 24.04 passed natively: amd64 SATA and
+NVMe, plus additional arm64 NVMe on `dgx21`. Record hashes are in
+[verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains).
 
 Stable storage selection is hardware-dependent, not an Ubuntu guarantee. The encrypted
 demo's virtio disk supplies serial `lindm-demo-encrypted` at

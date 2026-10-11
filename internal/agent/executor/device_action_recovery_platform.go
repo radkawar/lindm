@@ -151,7 +151,7 @@ func (s *Service) recoveryStageRequest(intent *agentv1.DeviceActionIntent, boot 
 		if request.GRUB, err = chain(); err != nil {
 			return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_grub_chain_unavailable: %w", errResourceRejected, err)
 		}
-		request.GrubEnv = s.grubEnvironment(cfg.ESPPath, request.GRUB.ConfigDirectory)
+		request.GrubEnv = s.grubEnvironment(cfg.ESPPath, request.GRUB)
 	}
 	return request, nil
 }

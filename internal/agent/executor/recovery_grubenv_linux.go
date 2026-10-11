@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"lindm/internal/agent/recoveryboot"
+	"lindm/internal/platform"
 )
 
 // grubEnvironment runs the registry's grub-editenv in a short-lived PID 1
@@ -18,7 +19,7 @@ import (
 // device: only this unit may open the filesystem device backing /boot, read-only
 // unless GRUB keeps its environment in the btrfs bootloader area, and may
 // write only the GRUB configuration directory.
-func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recoveryboot.GrubEnvRunner {
+func (s *Service) grubEnvironment(bootDirectory string, chain platform.GRUBChain) recoveryboot.GrubEnvRunner {
 	return func(ctx context.Context, editenv string, args ...string) ([]byte, error) {
 		if editenv != "/usr/bin/grub2-editenv" && editenv != "/usr/bin/grub-editenv" {
 			return nil, errors.New("recovery grub-editenv path is not a registry tool")
@@ -46,7 +47,7 @@ func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recover
 			return nil, err
 		}
 		defer func() { _ = units.close() }()
-		output, runErr := units.run(call, grubEnvironmentProperties(editenv, args, device, writable, bootDirectory+"/"+configDirectory))
+		output, runErr := units.run(call, grubEnvironmentProperties(editenv, args, device, writable, bootDirectory+"/"+chain.ConfigDirectory, chain.SELinuxContext))
 		if runErr != nil {
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), rootInventoryCleanupTimeout)
 			stopErr := units.stop(cleanup)
@@ -65,13 +66,13 @@ func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recover
 	}
 }
 
-func grubEnvironmentProperties(editenv string, args []string, device string, writable bool, configDirectory string) []systemdProperty {
+func grubEnvironmentProperties(editenv string, args []string, device string, writable bool, configDirectory, selinuxContext string) []systemdProperty {
 	property := newSystemdProperty
 	access := "r"
 	if writable {
 		access = "rw"
 	}
-	return []systemdProperty{
+	properties := []systemdProperty{
 		property("Description", "Lindm recovery GRUB environment"),
 		property("Type", "exec"), property("User", "root"), property("Group", "root"),
 		property("ExecStart", []systemdExec{{Path: editenv, Arguments: append([]string{editenv}, args...)}}),
@@ -108,4 +109,12 @@ func grubEnvironmentProperties(editenv string, args []string, device string, wri
 		property("Restart", "no"), property("CollectMode", "inactive-or-failed"),
 		property("StandardInput", "null"),
 	}
+	if selinuxContext != "" {
+		// SELinux-enabled hosts only; systemd ignores it when SELinux is off.
+		properties = append(properties, property("SELinuxContext", struct {
+			IgnoreErrors bool
+			Context      string
+		}{false, selinuxContext}))
+	}
+	return properties
 }
