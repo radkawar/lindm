@@ -181,6 +181,9 @@ func resourceProperties(kind nativeKind, directory string, request *agentv1.Nati
 	properties = setProperty(properties, "PrivateNetwork", sandbox.privateNetwork)
 	properties = setProperty(properties, "ProtectHome", sandbox.protectHome)
 	properties = setProperty(properties, "ProtectKernelTunables", sandbox.kernelTunables)
+	if sandbox.moduleMetadata {
+		properties = moduleMetadataProperties(properties)
+	}
 	properties = setProperty(properties, "RestrictAddressFamilies", addressFamilies(sandbox.families...))
 	properties = setProperty(properties, "RestrictSUIDSGID", true)
 	properties = setProperty(properties, "NoNewPrivileges", true)
@@ -206,6 +209,17 @@ func resourceProperties(kind nativeKind, directory string, request *agentv1.Nati
 		properties = setProperty(properties, "RuntimeMaxUSec", uint64(sandbox.runtimeMax/time.Microsecond))
 	}
 	return properties, nil
+}
+
+// Reading module metadata does not grant module loading or unloading. Keep the
+// tree read-only, deny all module syscalls, and never add CAP_SYS_MODULE.
+func moduleMetadataProperties(properties []unitProperty) []unitProperty {
+	properties = setProperty(properties, "ProtectKernelModules", false)
+	properties = setProperty(properties, "ReadOnlyPaths", []string{"/lib/modules"})
+	return setProperty(properties, "SystemCallFilter", struct {
+		AllowList bool
+		Syscalls  []string
+	}{false, []string{"@module"}})
 }
 
 // protectedProcEntries are the procfs paths systemd's ProtectKernelTunables

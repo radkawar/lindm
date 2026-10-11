@@ -325,13 +325,13 @@ func extendedDimensionAllowed(action *agentv1.ResourceExecutionRecord, dimension
 		}
 		switch dimension {
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT:
-			return file.Content != nil
+			return file.Content != nil || file.GetKernelModuleBlocklist() != nil
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE:
-			return file.Mode != nil
+			return file.Mode != nil || file.GetKernelModuleBlocklist() != nil
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID:
-			return file.Uid != nil
+			return file.Uid != nil || file.GetKernelModuleBlocklist() != nil
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID:
-			return file.Gid != nil
+			return file.Gid != nil || file.GetKernelModuleBlocklist() != nil
 		default:
 			return false
 		}

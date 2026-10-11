@@ -280,10 +280,14 @@ message ManagedFileChecks {
   bool owner_matches = 4;
   bool ancestry_safe = 5;
   bool converged = 6;
+  optional bool module_loads_blocked = 7;
+  optional bool modules_unloaded = 8;
+  optional bool initramfs_matches = 9;
+  optional bool initramfs_rebuild_succeeded = 10;
   option (buf.validate.message).cel = {
     id: "managed_file_checks.convergence"
     message: "file convergence requires independently read content, metadata and safe ancestry"
-    expression: "!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe)"
+    expression: "!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe && (!has(this.module_loads_blocked) || this.module_loads_blocked) && (!has(this.modules_unloaded) || this.modules_unloaded) && (!has(this.initramfs_matches) || this.initramfs_matches) && (!has(this.initramfs_rebuild_succeeded) || this.initramfs_rebuild_succeeded))"
   };
 }
 message SysctlChecks {

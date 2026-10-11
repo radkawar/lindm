@@ -3,12 +3,16 @@
 package vmlab
 
 import (
+	"bytes"
+	"os/exec"
 	"testing"
 	"time"
 
 	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/resource"
 )
@@ -56,6 +60,76 @@ func TestResourceEvidencePreservesUnprovenFields(t *testing.T) {
 	}
 	if err := qualifyResourceEvidence(kind, []string{"release", "adopt"}); err == nil {
 		t.Fatal("missing required scenario accepted")
+	}
+}
+
+func TestModuleDriftEvidenceRequiresObservedDriftAndAnEffect(t *testing.T) {
+	for _, test := range []struct {
+		name                               string
+		bootOnly, sameFile, stale, granted bool
+		want                               bool
+	}{
+		{"file-repaired", false, false, false, true, true},
+		{"image-repaired", true, true, true, true, true},
+		{"file-noop", false, true, false, true, false},
+		{"image-noop", true, true, false, true, false},
+		{"no-grant", true, true, true, false, false},
+		{"file-not-image-drift", true, false, false, true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hash := bytes.Repeat([]byte{1}, 32)
+			before := &resourcev1.ManagedFileObservation{Exists: true, File: &resourcev1.FileIdentity{Sha256: hash}}
+			after := &resourcev1.ManagedFileObservation{Exists: true, File: &resourcev1.FileIdentity{Sha256: hash}}
+			if !test.sameFile {
+				before.File.Sha256 = bytes.Repeat([]byte{2}, 32)
+			}
+			image := &resourcev1.ModuleInitramfsObservation{BlocklistSha256: before.File.Sha256}
+			if test.stale {
+				image.BlocklistSha256 = nil
+			}
+			before.KernelModuleBlocklist = &resourcev1.KernelModuleBlocklistObservation{Initramfs: []*resourcev1.ModuleInitramfsObservation{image}}
+			s := &VMResourceScenario{Passed: true, Action: &adminv1.ResourceActionSummary{Status: &agentv1.ResourceExecutionStatus{
+				Before:       &resourcev1.ResourceObservation{Observed: &resourcev1.ResourceObservation_ManagedFile{ManagedFile: before}},
+				Verification: &resourcev1.ResourceVerification{After: &resourcev1.ResourceObservation{Observed: &resourcev1.ResourceObservation_ManagedFile{ManagedFile: after}}},
+			}}}
+			if test.granted {
+				s.Action.StartAuthorizedAt = timestamppb.Now()
+			}
+			if err := moduleDriftEvidence(s, test.bootOnly); (err == nil) != test.want || s.Passed != test.want {
+				t.Fatalf("want qualified=%v, got passed=%v err=%v", test.want, s.Passed, err)
+			}
+		})
+	}
+}
+
+func TestModuleNativeOracleChecksCommandsNotEmptyOptionSpacing(t *testing.T) {
+	for _, test := range []struct {
+		output string
+		want   bool
+	}{
+		{"install /bin/false ", true},
+		{"install /bin/false \ninstall /bin/false ", true},
+		{"", false},
+		{"install /bin/false\n\ninstall /bin/false", false},
+		{"insmod /lib/modules/driver.ko\ninstall /bin/false", false},
+		{"install /bin/true", false},
+		{"install /bin/false ; true", false},
+		{"builtin driver", false},
+	} {
+		command := exec.CommandContext(t.Context(), "/bin/sh", "-eu", "-c", "dependencies=$1; "+moduleDependencyOracle, "oracle", test.output)
+		if err := command.Run(); (err == nil) != test.want {
+			t.Errorf("output=%q want accepted=%v, err=%v", test.output, test.want, err)
+		}
+	}
+}
+
+func TestModuleBuiltinFixtureUsesObservedCanonicalEntry(t *testing.T) {
+	desired, entry, err := moduleBuiltinDesired([]byte("not-a-module\nkernel/9p.ko\nkernel/drivers/real-builtin.ko\n"))
+	if err != nil || entry != "kernel/drivers/real-builtin.ko" || desired.GetManagedFile().GetKernelModuleBlocklist().GetModules()[0] != "real_builtin" {
+		t.Fatalf("built-in selection must use real validated entry: desired=%v entry=%q err=%v", desired, entry, err)
+	}
+	if _, _, err := moduleBuiltinDesired([]byte("")); err == nil {
+		t.Fatal("missing native built-in evidence invented a driver")
 	}
 }
 

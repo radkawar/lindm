@@ -54,8 +54,9 @@ type VMResourceEvidence struct {
 	LaunchGateOpen bool `json:"launch_gate_open"`
 	// SecretPassword names the managed secret delivered to Kinds[9]; it
 	// carries metadata only, never material.
-	SecretPassword *VMSecretPasswordEvidence `json:"secret_password,omitempty"`
-	LocalAdmin     *VMLocalAdminEvidence     `json:"local_admin,omitempty"`
+	SecretPassword  *VMSecretPasswordEvidence `json:"secret_password,omitempty"`
+	LocalAdmin      *VMLocalAdminEvidence     `json:"local_admin,omitempty"`
+	ModuleBlocklist *VMResourceKindEvidence   `json:"module_blocklist,omitempty"`
 }
 
 func newVMResourceEvidence() *VMResourceEvidence {

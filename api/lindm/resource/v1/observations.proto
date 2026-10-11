@@ -643,11 +643,32 @@ message ManagedFileObservation {
   // historical observations; missing evidence never authorizes native effects.
   optional bytes security_metadata_sha256 = 5 [(buf.validate.field).bytes.len = 32];
   optional bytes native_identity_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  KernelModuleBlocklistObservation kernel_module_blocklist = 7;
   option (buf.validate.message).cel = {
     id: "managed_file_observation.identity"
     message: "existing regular files require exact identity; absent files have none"
     expression: "!this.path.matches('/[.]{1,2}(/|$)') && (this.exists == has(this.file)) && (!has(this.file) || this.file.path == this.path)"
   };
+}
+
+message KernelModuleObservation {
+  string name = 1 [(buf.validate.field).string.max_bytes = 64];
+  bool loaded = 2;
+  bool built_in = 3;
+  bool modprobe_blocked = 4;
+}
+message ModuleInitramfsObservation {
+  string kernel_release = 1 [(buf.validate.field).string.max_bytes = 255];
+  string path = 2 [(buf.validate.field).string.max_bytes = 1024];
+  bytes sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  optional bytes blocklist_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+}
+message KernelModuleBlocklistObservation {
+  repeated KernelModuleObservation modules = 1 [(buf.validate.field).repeated.max_items = 64];
+  repeated ModuleInitramfsObservation initramfs = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
 }
 message SysctlObservation {
   string key = 1 [(buf.validate.field).string = {

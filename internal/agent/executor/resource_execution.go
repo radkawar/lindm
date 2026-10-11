@@ -120,6 +120,13 @@ func openFileResource(ctx context.Context, o resourceOpen) (nativeResource, erro
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
 		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Files,
 		ProtectedPaths: s.nativeResources.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
+		NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+			result, err := s.observeNativeResource(ctx, desired, o.platform, nil)
+			if err != nil {
+				return nil, err
+			}
+			return result.GetAfter(), nil
+		},
 	})
 }
 

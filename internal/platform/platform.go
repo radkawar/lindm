@@ -266,6 +266,18 @@ func (r *Release) BaseCoverage() *Release {
 	return nil
 }
 
+// ModuleBlocklistTooling names qualified initramfs tooling for a typed blocklist.
+// Empty tooling is an explicit unsupported platform, not a distro-family fallback.
+type ModuleBlocklistTooling struct {
+	Modprobe            string
+	InitramfsPattern    string
+	Rebuild             string
+	RebuildArgs         []string
+	RebuildWithFileArgs []string // Optional fixed inclusion of the owned stanza.
+	WritePaths          []string
+	StateDirectory      string // Native tool state; absent state needs its parent for that invocation.
+}
+
 // Release is one registry row.
 type Release struct {
 	Key  string // stable key, e.g. "ubuntu-24.04"; lab matrix and docs key
@@ -285,17 +297,18 @@ type Release struct {
 	UpgradeTo string
 	Tier      Tier
 	// Page is the docs/platforms page describing the release.
-	Page          string
-	Family        Family
-	Architectures []string
-	Packages      PackageTooling
-	Systemd       int
-	FDE           string
-	Desktop       Desktop
-	Firewall      string
-	Advisory      Advisory
-	Quirks        Quirks
-	Lab           Lab
+	Page            string
+	Family          Family
+	Architectures   []string
+	Packages        PackageTooling
+	Systemd         int
+	FDE             string
+	Desktop         Desktop
+	Firewall        string
+	Advisory        Advisory
+	Quirks          Quirks
+	Lab             Lab
+	ModuleBlocklist ModuleBlocklistTooling
 	// Supports lists the implemented capabilities; every other capability is
 	// gated, with the reason in Gates or a default reason.
 	Supports []Capability

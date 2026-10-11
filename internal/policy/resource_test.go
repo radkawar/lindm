@@ -234,6 +234,42 @@ func TestCanonicalSetPermutationDigestAndMerge(t *testing.T) {
 	}
 }
 
+func TestModuleBlocklistSetPermutationDigestAndMerge(t *testing.T) {
+	item := groupResource(resourceA, "unused")
+	item.Desired = &resourcev1.ResourceDesiredState{
+		Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, CanonicalKey: "/etc/modprobe.d/99-lindm-blocklist.conf"},
+		State: &resourcev1.ResourceDesiredState_ManagedFile{ManagedFile: &resourcev1.ManagedFileDesired{
+			Path: "/etc/modprobe.d/99-lindm-blocklist.conf", Presence: resourcev1.Presence_PRESENCE_PRESENT,
+			KernelModuleBlocklist: &resourcev1.KernelModuleBlocklist{Modules: []string{"usb_storage", "uas"}},
+		}},
+	}
+	left := spec("module set", item)
+	right := proto.CloneOf(left)
+	right.Resources[0].Desired.GetManagedFile().KernelModuleBlocklist.Modules = []string{"uas", "usb_storage"}
+	beforeLeft, beforeRight := proto.CloneOf(left), proto.CloneOf(right)
+	canonical, first, err := CanonicalSpec(t.Context(), left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, second, err := CanonicalSpec(t.Context(), right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || !proto.Equal(canonical, other) {
+		t.Fatal("module order changed immutable profile identity")
+	}
+	assignments := []Assignment{{ProfileID: profileLow, RevisionID: revisionLow, Spec: left}, {ProfileID: profileHigh, RevisionID: revisionHi, Spec: right}}
+	for _, input := range [][]Assignment{assignments, {assignments[1], assignments[0]}} {
+		resolved, err := Resolve(t.Context(), input)
+		if err != nil || len(resolved) != 1 || resolved[0].State != ResolutionReady || !proto.Equal(resolved[0].Resource, canonical.Resources[0]) {
+			t.Fatalf("equal-priority module permutation conflict: %v %v", resolved, err)
+		}
+	}
+	if !proto.Equal(left, beforeLeft) || !proto.Equal(right, beforeRight) {
+		t.Fatal("module canonicalization mutated caller profiles")
+	}
+}
+
 func dnsResource(resourceID string) *policyv1.ProfileResource {
 	item := groupResource(resourceID, "unused")
 	item.Desired = &resourcev1.ResourceDesiredState{

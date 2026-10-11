@@ -55,6 +55,7 @@ type effectSandbox struct {
 	caps           uint64
 	privateNetwork bool
 	kernelTunables bool
+	moduleMetadata bool
 	protectHome    string
 	families       []string
 	accountRoot    string
@@ -104,15 +105,60 @@ var account = nativeKind{
 	},
 }
 
+// The vendor tool may create its own state directory, but only after the helper
+// consumes its effect permit. Sandbox preparation must not create host state.
+func moduleStateWritePath(directory string) (string, error) {
+	info, err := os.Lstat(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		directory = filepath.Dir(directory)
+		info, err = os.Lstat(directory)
+	}
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", fileprovider.ErrUnsupported
+	}
+	return directory, nil
+}
+
 // nativeKinds is the only kind dispatch in the root helper.
 var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativeKind{
 	resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE: {
-		effect: func(s *effectSandbox, _ string, _ *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ResourceDesiredState) error {
+		effect: func(s *effectSandbox, _ string, request *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ResourceDesiredState) error {
 			s.paths = append(s.paths, filepath.Dir(desired.GetManagedFile().GetPath()))
 			s.fileCaps()
+			if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+				tools := platform.Of(request.GetPlan().GetBackend().GetProduct()).ModuleBlocklist
+				if tools.Rebuild == "" {
+					return fileprovider.ErrUnsupported
+				}
+				s.paths = append(s.paths, tools.WritePaths...)
+				if tools.StateDirectory != "" {
+					path, err := moduleStateWritePath(tools.StateDirectory)
+					if err != nil {
+						return err
+					}
+					s.paths = append(s.paths, path)
+				}
+				s.runtimeMax = 12 * time.Minute
+				s.memoryMax = 2 << 30
+				s.moduleMetadata = true
+			}
 			return nil
 		},
 		apply: applyOnly(fileprovider.ApplyNative),
+		observation: func(_ context.Context, properties []unitProperty, request *agentv1.NativeResourceObservationRequest) ([]unitProperty, error) {
+			if request.GetDesired().GetManagedFile().GetKernelModuleBlocklist() == nil {
+				return nil, fileprovider.ErrUnsupported
+			}
+			properties = setProperty(properties, "MemoryMax", uint64(256<<20))
+			return moduleMetadataProperties(properties), nil
+		},
+		observe: func(ctx context.Context, _ *config.Document, env resourceprovider.NativeEnv, request *agentv1.NativeResourceObservationRequest, result *agentv1.NativeHelperResult) (err error) {
+			result.After, err = fileprovider.ObserveNative(ctx, env, request.GetDesired())
+			return err
+		},
 	},
 	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP: account,
 	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:  account,

@@ -287,7 +287,7 @@ message ResourceExecutionRecord {
   option (buf.validate.message).cel = {
     id: "resource_record.read_only_evidence"
     message: "effect-free native evidence must retain a terminal verified finding"
-    expression: "(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))"
+    expression: "(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && (this.verification.disposition in [2, 4] || (has(this.intent.desired.managed_file.kernel_module_blocklist) && this.verification.disposition in [5, 7])))))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))"
   };
   option (buf.validate.message).cel = {
     id: "resource_record.admission_refusal"
@@ -400,7 +400,7 @@ message ResourceExecutionStatus {
   option (buf.validate.message).cel = {
     id: "resource_status.read_only_evidence"
     message: "read-only terminal status distinguishes compliance from execution"
-    expression: "(!this.read_only || (has(this.before) && has(this.verification) && !has(this.started_at) && ((this.state == 4 && this.verification.disposition in [1, 5]) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || this.read_only)"
+    expression: "(!this.read_only || (has(this.before) && has(this.verification) && !has(this.started_at) && ((this.state == 4 && this.verification.disposition in [1, 5]) || (this.state == 5 && this.failure == 10 && (this.verification.disposition in [2, 4] || (has(this.verification.after.managed_file.kernel_module_blocklist) && this.verification.disposition in [5, 7])))))) && (this.failure != 10 || this.read_only)"
   };
   option (buf.validate.message).cel = {
     id: "resource_status.remediation_evidence"

@@ -67,6 +67,7 @@ func isSetField(name protoreflect.FullName) bool {
 	switch name {
 	case "lindm.resource.v1.MemberSet.local_user_names",
 		"lindm.resource.v1.SSHAccessList.names",
+		"lindm.resource.v1.KernelModuleBlocklist.modules",
 		"lindm.resource.v1.CertificateTrustRefs.certificates",
 		"lindm.resource.v1.VerificationPolicy.checks",
 		"lindm.resource.v1.Applicability.products",

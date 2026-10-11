@@ -208,4 +208,9 @@ message ResourceVerification {
     message: "encryption convergence cannot be inferred from absent root evidence"
     expression: "this.disposition != 1 || !has(this.encryption_compliance) || (has(this.after.encryption_compliance.luks_root) && this.after.encryption_compliance.luks_root)"
   };
+  option (buf.validate.message).cel = {
+    id: "resource_verification.module_state"
+    message: "module boot and built-in findings require matching files and initramfs with explicit native module evidence"
+    expression: "!has(this.after.managed_file.kernel_module_blocklist) || !(this.disposition in [5, 7]) || (this.managed_file.presence_matches && this.managed_file.content_matches && this.managed_file.mode_matches && this.managed_file.owner_matches && this.managed_file.ancestry_safe && has(this.managed_file.initramfs_matches) && this.managed_file.initramfs_matches && (!has(this.managed_file.initramfs_rebuild_succeeded) || this.managed_file.initramfs_rebuild_succeeded) && ((this.disposition == 5 && this.after.managed_file.kernel_module_blocklist.modules.exists(m, m.built_in)) || (this.disposition == 7 && has(this.managed_file.module_loads_blocked) && this.managed_file.module_loads_blocked && has(this.managed_file.modules_unloaded) && !this.managed_file.modules_unloaded && this.after.managed_file.kernel_module_blocklist.modules.exists(m, m.loaded) && !this.after.managed_file.kernel_module_blocklist.modules.exists(m, m.built_in))))"
+  };
 }

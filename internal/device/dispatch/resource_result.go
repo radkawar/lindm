@@ -309,7 +309,8 @@ func ResourceResultBinding(intent *agentv1.ResourceExecutionIntent, status *agen
 			return err
 		}
 		if verification.GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE &&
-			(!status.GetReadOnly() || intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
+			(!status.GetReadOnly() || intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) &&
+			intent.GetDesired().GetManagedFile().GetKernelModuleBlocklist() == nil {
 			return errors.New("resource_result_release_mismatch")
 		}
 		digest, err := resource.DesiredDigest(intent.GetDesired())

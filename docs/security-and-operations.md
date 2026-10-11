@@ -589,8 +589,20 @@ fabricated and no unrelated finding is accepted.
 
 #### Declarative organization gaps
 
-- USB-storage modprobe blacklisting has no dispatchable resource kind and cannot
-  be smuggled through a managed file at a forbidden path.
+- USB-storage blocking uses the typed `managedFile.kernelModuleBlocklist` template,
+  never arbitrary content at a forbidden path. The executor must explicitly enable
+  `fileProvider.kernelModuleBlocklist`; the demo baseline blocks `usb_storage` and
+  `uas`. The only path is `/etc/modprobe.d/99-lindm-blocklist.conf`, root:root 0644.
+  Applying rebuilds installed initramfs images, independently reads their embedded
+  stanza and observes native modprobe settings and loaded/built-in modules.
+  Loaded modules require a restart; built-in modules are not applicable. No driver
+  is unloaded automatically, and a restart is never implied by profile publication.
+  Known failed reconcile rebuilds remain failed and require reconciliation; lost
+  helper outcomes retain the existing ownership-unknown hold. Owned release
+  restores the protected baseline and rebuilds boot images, refusing externally
+  changed files. Release retains an unknown hold until its boot-image postcondition
+  is proven, even if the native updater exits zero without rebuilding.
+  See [module qualification and limits](verification.md#typed-kernel-module-blocklist).
 - A separate reboot window is not representable; only the update start window and
   scheduled reboot delay are supported.
 - Remote assistance has one permission for view and control, not separate grants.

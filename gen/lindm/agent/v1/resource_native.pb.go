@@ -84,10 +84,11 @@ func (NativeHelperOutcome) EnumDescriptor() ([]byte, []int) {
 // Root-local provisioning, never part of a remotely supplied profile. Generic
 // files cannot write native authority domains even under an approved root.
 type NativeFileProviderConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AllowedRoots  []string               `protobuf:"bytes,1,rep,name=allowed_roots,json=allowedRoots,proto3" json:"allowed_roots,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AllowedRoots          []string               `protobuf:"bytes,1,rep,name=allowed_roots,json=allowedRoots,proto3" json:"allowed_roots,omitempty"`
+	KernelModuleBlocklist bool                   `protobuf:"varint,2,opt,name=kernel_module_blocklist,json=kernelModuleBlocklist,proto3" json:"kernel_module_blocklist,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *NativeFileProviderConfig) Reset() {
@@ -125,6 +126,13 @@ func (x *NativeFileProviderConfig) GetAllowedRoots() []string {
 		return x.AllowedRoots
 	}
 	return nil
+}
+
+func (x *NativeFileProviderConfig) GetKernelModuleBlocklist() bool {
+	if x != nil {
+		return x.KernelModuleBlocklist
+	}
+	return false
 }
 
 // Protected root-helper operation. The target is recomputed from plan and ledger,
@@ -986,9 +994,11 @@ var File_lindm_agent_v1_resource_native_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/agent/v1/resource_native.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/resource_ownership.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/resource.proto\"\xa3\x02\n" +
-	"\x18NativeFileProviderConfig\x12_\n" +
-	"\rallowed_roots\x18\x01 \x03(\tB:\xbaH7\x92\x014\b\x01\x10 \x18\x01\",r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\fallowedRoots:\xa5\x01\xbaH\xa1\x01\x1a\x9e\x01\n" +
+	"$lindm/agent/v1/resource_native.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/resource_ownership.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/resource.proto\"\x86\x04\n" +
+	"\x18NativeFileProviderConfig\x12]\n" +
+	"\rallowed_roots\x18\x01 \x03(\tB8\xbaH5\x92\x012\x10 \x18\x01\",r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\fallowedRoots\x126\n" +
+	"\x17kernel_module_blocklist\x18\x02 \x01(\bR\x15kernelModuleBlocklist:\xd2\x02\xbaH\xce\x02\x1a\xaa\x01\n" +
+	"\x1enative_file_provider.authority\x12Jfile provider requires approved roots or the closed kernel-module template\x1a<size(this.allowed_roots) > 0 || this.kernel_module_blocklist\x1a\x9e\x01\n" +
 	"$native_file_provider.canonical_roots\x12=approved file roots must not contain dot or parent components\x1a7this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))\"\xb1\x04\n" +
 	" NativeResourceTransactionRequest\x12;\n" +
 	"\x04plan\x18\x01 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanB\x06\xbaH\x03\xc8\x01\x01R\x04plan\x12I\n" +
@@ -1042,7 +1052,7 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\x05ready\x18\x01 \x01(\v2!.lindm.agent.v1.NativeHelperReadyH\x00R\x05ready\x12<\n" +
 	"\x06permit\x18\x02 \x01(\v2\".lindm.agent.v1.NativeEffectPermitH\x00R\x06permit\x12<\n" +
 	"\x06result\x18\x03 \x01(\v2\".lindm.agent.v1.NativeHelperResultH\x00R\x06resultB\x10\n" +
-	"\amessage\x12\x05\xbaH\x02\b\x01\"\x94\t\n" +
+	"\amessage\x12\x05\xbaH\x02\b\x01\"\xf0\t\n" +
 	" NativeResourceObservationRequest\x12I\n" +
 	"\adesired\x18\x01 \x01(\v2'.lindm.resource.v1.ResourceDesiredStateB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12F\n" +
 	"\bplatform\x18\x02 \x01(\v2\".lindm.resource.v1.PlatformProductB\x06\xbaH\x03\xc8\x01\x01R\bplatform\x12;\n" +
@@ -1050,8 +1060,8 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\x0eobservation_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\robservationId\x12\x1d\n" +
 	"\x05nonce\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\x12=\n" +
 	"\abackend\x18\x06 \x01(\v2#.lindm.resource.v1.BackendSelectionR\abackend\x12[\n" +
-	"\x15firewall_verification\x18\a \x01(\v2&.lindm.resource.v1.ResourceObservationR\x14firewallVerification:\xb3\x05\xbaH\xaf\x05\x1a\x94\x01\n" +
-	" native_resource_observation.kind\x12Hnative observation helper accepts only sandbox-inaccessible native facts\x1a&this.desired.ref.kind in [2, 3, 8, 24]\x1a\xe2\x01\n" +
+	"\x15firewall_verification\x18\a \x01(\v2&.lindm.resource.v1.ResourceObservationR\x14firewallVerification:\x8f\x06\xbaH\x8b\x06\x1a\xf0\x01\n" +
+	" native_resource_observation.kind\x12Hnative observation helper accepts only sandbox-inaccessible native facts\x1a\x81\x01this.desired.ref.kind in [2, 3, 8, 24] || (this.desired.ref.kind == 21 && has(this.desired.managed_file.kernel_module_blocklist))\x1a\xe2\x01\n" +
 	"#native_resource_observation.backend\x12Gnative firewall observation must bind the provider and current platform\x1ar(!has(this.backend) || this.backend.product == this.platform) && (this.desired.ref.kind != 8 || has(this.backend))\x1a\xb0\x02\n" +
 	"1native_resource_observation.firewall_verification\x12Cfresh firewall probes bind the exact requested resource observation\x1a\xb5\x01!has(this.firewall_verification) || (this.desired.ref.kind == 8 && this.firewall_verification.ref == this.desired.ref && this.firewall_verification.metadata.backend == this.backend)\"\x8e\x01\n" +
 	"\x1aNativeRootRecoveryEvidence\x12%\n" +

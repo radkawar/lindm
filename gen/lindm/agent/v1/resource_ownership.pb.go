@@ -395,8 +395,11 @@ type ResourceOwnershipSnapshot struct {
 	Firewall           *FirewallNativeSnapshot    `protobuf:"bytes,10,opt,name=firewall,proto3" json:"firewall,omitempty"`
 	AccountNssReceipt  *v1.ProbeReceipt           `protobuf:"bytes,11,opt,name=account_nss_receipt,json=accountNssReceipt,proto3" json:"account_nss_receipt,omitempty"`
 	OsUpdate           *OSUpdateOwnership         `protobuf:"bytes,12,opt,name=os_update,json=osUpdate,proto3" json:"os_update,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Authenticated helper command outcome, separate from independently read
+	// file/archive evidence. Absent means no rebuild was attempted.
+	ModuleInitramfsRebuildSucceeded *bool `protobuf:"varint,14,opt,name=module_initramfs_rebuild_succeeded,json=moduleInitramfsRebuildSucceeded,proto3,oneof" json:"module_initramfs_rebuild_succeeded,omitempty"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *ResourceOwnershipSnapshot) Reset() {
@@ -511,6 +514,13 @@ func (x *ResourceOwnershipSnapshot) GetOsUpdate() *OSUpdateOwnership {
 		return x.OsUpdate
 	}
 	return nil
+}
+
+func (x *ResourceOwnershipSnapshot) GetModuleInitramfsRebuildSucceeded() bool {
+	if x != nil && x.ModuleInitramfsRebuildSucceeded != nil {
+		return *x.ModuleInitramfsRebuildSucceeded
+	}
+	return false
 }
 
 type FirewallNativeSnapshot struct {
@@ -1464,7 +1474,7 @@ var File_lindm_agent_v1_resource_ownership_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xfa\x14\n" +
+	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xf1\x17\n" +
 	"\x19ResourceOwnershipSnapshot\x12P\n" +
 	"\vobservation\x18\x01 \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x12@\n" +
 	"\x14managed_file_content\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x12managedFileContent\x88\x01\x01\x12G\n" +
@@ -1478,7 +1488,9 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\bfirewall\x18\n" +
 	" \x01(\v2&.lindm.agent.v1.FirewallNativeSnapshotR\bfirewall\x12O\n" +
 	"\x13account_nss_receipt\x18\v \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x11accountNssReceipt\x12>\n" +
-	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate:\x86\r\xbaH\x82\r\x1a\xa1\x01\n" +
+	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate\x12P\n" +
+	"\"module_initramfs_rebuild_succeeded\x18\x0e \x01(\bH\x01R\x1fmoduleInitramfsRebuildSucceeded\x88\x01\x01:\x84\x0f\xbaH\x80\x0f\x1a\xfb\x01\n" +
+	"!ownership_snapshot.module_rebuild\x12@module rebuild outcomes belong only to the typed module template\x1a\x93\x01!has(this.module_initramfs_rebuild_succeeded) || (has(this.observation.managed_file) && has(this.observation.managed_file.kernel_module_blocklist))\x1a\xa1\x01\n" +
 	"\x1aownership_snapshot.content\x12<private content is only valid for a managed file observation\x1aE!has(this.managed_file_content) || has(this.observation.managed_file)\x1a\x80\x03\n" +
 	"\x1fownership_snapshot.private_kind\x121private state must match its native resource kind\x1a\xa9\x02(this.managed_file_xattrs.size() == 0 || has(this.observation.managed_file)) && (!has(this.account_private) || has(this.observation.local_user) || has(this.observation.local_group)) && (this.account_member_edges.size() == 0 || has(this.observation.local_user) || has(this.observation.local_group))\x1a\xbe\x02\n" +
 	"#ownership_snapshot.account_planning\x12<native account planning evidence must match its account kind\x1a\xd8\x01(!has(this.account_nss_receipt) || has(this.observation.local_user) || has(this.observation.local_group)) && (!has(this.account_private) || !has(this.account_private.desired_home) || has(this.observation.local_user))\x1a\x9d\x01\n" +
@@ -1487,7 +1499,8 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x1bownership_snapshot.password\x129password private evidence belongs only to password policy\x1aBhas(this.password_policy) == has(this.observation.password_policy)\x1a\x92\x01\n" +
 	"\x1bownership_snapshot.firewall\x128firewall private evidence belongs only to firewall zones\x1a9has(this.firewall) == has(this.observation.firewall_zone)\x1a\x98\x01\n" +
 	"\x1cownership_snapshot.os_update\x12@update policy private evidence belongs only to the update policy\x1a6has(this.os_update) == has(this.observation.os_update)B\x17\n" +
-	"\x15_managed_file_content\"\xdc\a\n" +
+	"\x15_managed_file_contentB%\n" +
+	"#_module_initramfs_rebuild_succeeded\"\xdc\a\n" +
 	"\x16FirewallNativeSnapshot\x123\n" +
 	"\x05table\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x182\x16^lindm_z_[a-f0-9]{32}$R\x05table\x12$\n" +
 	"\buserdata\x18\x02 \x01(\fB\b\xbaH\x05z\x03\x18\x80\x02R\buserdata\x12F\n" +

@@ -430,6 +430,22 @@ owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
 
+The typed kernel-module blocklist is enabled explicitly in the root executor's
+`fileProvider.kernelModuleBlocklist`. Ubuntu 24.04 uses native `modprobe` and
+`update-initramfs -u -k all`; `initramfs-tools` must be installed. Existing dracut
+installations are not guessed compatible. Other Ubuntu releases and derivatives
+do not inherit this setting's qualification, including Ubuntu 26.04 desktops
+whose native tooling is dracut. The provider streams gzip/zstd/newc images to
+check their embedded owned stanza, reports active drivers as pending restart and
+built-in drivers as not applicable, and never unloads drivers.
+If the native tool's state directory is absent, that effect helper receives its
+existing parent `/var/lib` writable so the vendor command can create state after
+the effect permit. Later helpers narrow to `/var/lib/initramfs-tools`; sandbox
+preparation itself never creates it.
+The native arm64 KVM lane passed all ten scenarios, including initially absent
+tool state, actual reboot/load refusal, both drift repairs, built-in `kvm` findings
+and release. See [receipts and limits](../verification.md#typed-kernel-module-blocklist).
+
 Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
 reading `name:hash` on stdin. Ubuntu 24.04 shadow 4.13
 (`passwd 1:4.13+dfsg1-4ubuntu3.2`) has no `chpasswd --prefix`, so the root

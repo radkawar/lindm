@@ -15,7 +15,6 @@ option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 // files cannot write native authority domains even under an approved root.
 message NativeFileProviderConfig {
   repeated string allowed_roots = 1 [(buf.validate.field).repeated = {
-    min_items: 1
     max_items: 32
     unique: true
     items: {
@@ -25,6 +24,12 @@ message NativeFileProviderConfig {
       }
     }
   }];
+  bool kernel_module_blocklist = 2;
+  option (buf.validate.message).cel = {
+    id: "native_file_provider.authority"
+    message: "file provider requires approved roots or the closed kernel-module template"
+    expression: "size(this.allowed_roots) > 0 || this.kernel_module_blocklist"
+  };
   option (buf.validate.message).cel = {
     id: "native_file_provider.canonical_roots"
     message: "approved file roots must not contain dot or parent components"
@@ -175,7 +180,7 @@ message NativeResourceObservationRequest {
   option (buf.validate.message).cel = {
     id: "native_resource_observation.kind"
     message: "native observation helper accepts only sandbox-inaccessible native facts"
-    expression: "this.desired.ref.kind in [2, 3, 8, 24]"
+    expression: "this.desired.ref.kind in [2, 3, 8, 24] || (this.desired.ref.kind == 21 && has(this.desired.managed_file.kernel_module_blocklist))"
   };
   option (buf.validate.message).cel = {
     id: "native_resource_observation.backend"

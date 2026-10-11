@@ -3802,8 +3802,9 @@ type ManagedFileObservation struct {
 	AncestrySha256 []byte                 `protobuf:"bytes,4,opt,name=ancestry_sha256,json=ancestrySha256,proto3" json:"ancestry_sha256,omitempty"`
 	// Native providers require both fingerprints. Optional preserves readable
 	// historical observations; missing evidence never authorizes native effects.
-	SecurityMetadataSha256 []byte `protobuf:"bytes,5,opt,name=security_metadata_sha256,json=securityMetadataSha256,proto3,oneof" json:"security_metadata_sha256,omitempty"`
-	NativeIdentitySha256   []byte `protobuf:"bytes,6,opt,name=native_identity_sha256,json=nativeIdentitySha256,proto3,oneof" json:"native_identity_sha256,omitempty"`
+	SecurityMetadataSha256 []byte                            `protobuf:"bytes,5,opt,name=security_metadata_sha256,json=securityMetadataSha256,proto3,oneof" json:"security_metadata_sha256,omitempty"`
+	NativeIdentitySha256   []byte                            `protobuf:"bytes,6,opt,name=native_identity_sha256,json=nativeIdentitySha256,proto3,oneof" json:"native_identity_sha256,omitempty"`
+	KernelModuleBlocklist  *KernelModuleBlocklistObservation `protobuf:"bytes,7,opt,name=kernel_module_blocklist,json=kernelModuleBlocklist,proto3" json:"kernel_module_blocklist,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -3880,6 +3881,201 @@ func (x *ManagedFileObservation) GetNativeIdentitySha256() []byte {
 	return nil
 }
 
+func (x *ManagedFileObservation) GetKernelModuleBlocklist() *KernelModuleBlocklistObservation {
+	if x != nil {
+		return x.KernelModuleBlocklist
+	}
+	return nil
+}
+
+type KernelModuleObservation struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Loaded          bool                   `protobuf:"varint,2,opt,name=loaded,proto3" json:"loaded,omitempty"`
+	BuiltIn         bool                   `protobuf:"varint,3,opt,name=built_in,json=builtIn,proto3" json:"built_in,omitempty"`
+	ModprobeBlocked bool                   `protobuf:"varint,4,opt,name=modprobe_blocked,json=modprobeBlocked,proto3" json:"modprobe_blocked,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *KernelModuleObservation) Reset() {
+	*x = KernelModuleObservation{}
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KernelModuleObservation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KernelModuleObservation) ProtoMessage() {}
+
+func (x *KernelModuleObservation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KernelModuleObservation.ProtoReflect.Descriptor instead.
+func (*KernelModuleObservation) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *KernelModuleObservation) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *KernelModuleObservation) GetLoaded() bool {
+	if x != nil {
+		return x.Loaded
+	}
+	return false
+}
+
+func (x *KernelModuleObservation) GetBuiltIn() bool {
+	if x != nil {
+		return x.BuiltIn
+	}
+	return false
+}
+
+func (x *KernelModuleObservation) GetModprobeBlocked() bool {
+	if x != nil {
+		return x.ModprobeBlocked
+	}
+	return false
+}
+
+type ModuleInitramfsObservation struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	KernelRelease   string                 `protobuf:"bytes,1,opt,name=kernel_release,json=kernelRelease,proto3" json:"kernel_release,omitempty"`
+	Path            string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Sha256          []byte                 `protobuf:"bytes,3,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	BlocklistSha256 []byte                 `protobuf:"bytes,4,opt,name=blocklist_sha256,json=blocklistSha256,proto3,oneof" json:"blocklist_sha256,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ModuleInitramfsObservation) Reset() {
+	*x = ModuleInitramfsObservation{}
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModuleInitramfsObservation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModuleInitramfsObservation) ProtoMessage() {}
+
+func (x *ModuleInitramfsObservation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModuleInitramfsObservation.ProtoReflect.Descriptor instead.
+func (*ModuleInitramfsObservation) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ModuleInitramfsObservation) GetKernelRelease() string {
+	if x != nil {
+		return x.KernelRelease
+	}
+	return ""
+}
+
+func (x *ModuleInitramfsObservation) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ModuleInitramfsObservation) GetSha256() []byte {
+	if x != nil {
+		return x.Sha256
+	}
+	return nil
+}
+
+func (x *ModuleInitramfsObservation) GetBlocklistSha256() []byte {
+	if x != nil {
+		return x.BlocklistSha256
+	}
+	return nil
+}
+
+type KernelModuleBlocklistObservation struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Modules       []*KernelModuleObservation    `protobuf:"bytes,1,rep,name=modules,proto3" json:"modules,omitempty"`
+	Initramfs     []*ModuleInitramfsObservation `protobuf:"bytes,2,rep,name=initramfs,proto3" json:"initramfs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KernelModuleBlocklistObservation) Reset() {
+	*x = KernelModuleBlocklistObservation{}
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KernelModuleBlocklistObservation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KernelModuleBlocklistObservation) ProtoMessage() {}
+
+func (x *KernelModuleBlocklistObservation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KernelModuleBlocklistObservation.ProtoReflect.Descriptor instead.
+func (*KernelModuleBlocklistObservation) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *KernelModuleBlocklistObservation) GetModules() []*KernelModuleObservation {
+	if x != nil {
+		return x.Modules
+	}
+	return nil
+}
+
+func (x *KernelModuleBlocklistObservation) GetInitramfs() []*ModuleInitramfsObservation {
+	if x != nil {
+		return x.Initramfs
+	}
+	return nil
+}
+
 type SysctlObservation struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Key                    string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -3898,7 +4094,7 @@ type SysctlObservation struct {
 
 func (x *SysctlObservation) Reset() {
 	*x = SysctlObservation{}
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[38]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3910,7 +4106,7 @@ func (x *SysctlObservation) String() string {
 func (*SysctlObservation) ProtoMessage() {}
 
 func (x *SysctlObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[38]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3923,7 +4119,7 @@ func (x *SysctlObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SysctlObservation.ProtoReflect.Descriptor instead.
 func (*SysctlObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{38}
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *SysctlObservation) GetKey() string {
@@ -4017,7 +4213,7 @@ type SystemdDefinitionObservation struct {
 
 func (x *SystemdDefinitionObservation) Reset() {
 	*x = SystemdDefinitionObservation{}
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[39]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4029,7 +4225,7 @@ func (x *SystemdDefinitionObservation) String() string {
 func (*SystemdDefinitionObservation) ProtoMessage() {}
 
 func (x *SystemdDefinitionObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[39]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4042,7 +4238,7 @@ func (x *SystemdDefinitionObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemdDefinitionObservation.ProtoReflect.Descriptor instead.
 func (*SystemdDefinitionObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{39}
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *SystemdDefinitionObservation) GetCanonicalKey() string {
@@ -4184,7 +4380,7 @@ type SystemdEffectiveOptions struct {
 
 func (x *SystemdEffectiveOptions) Reset() {
 	*x = SystemdEffectiveOptions{}
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[40]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4196,7 +4392,7 @@ func (x *SystemdEffectiveOptions) String() string {
 func (*SystemdEffectiveOptions) ProtoMessage() {}
 
 func (x *SystemdEffectiveOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[40]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4209,7 +4405,7 @@ func (x *SystemdEffectiveOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemdEffectiveOptions.ProtoReflect.Descriptor instead.
 func (*SystemdEffectiveOptions) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{40}
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SystemdEffectiveOptions) GetCpuWeight() uint64 {
@@ -4264,7 +4460,7 @@ type EncryptionComplianceObservation struct {
 
 func (x *EncryptionComplianceObservation) Reset() {
 	*x = EncryptionComplianceObservation{}
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[41]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4276,7 +4472,7 @@ func (x *EncryptionComplianceObservation) String() string {
 func (*EncryptionComplianceObservation) ProtoMessage() {}
 
 func (x *EncryptionComplianceObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_observations_proto_msgTypes[41]
+	mi := &file_lindm_resource_v1_observations_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4289,7 +4485,7 @@ func (x *EncryptionComplianceObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncryptionComplianceObservation.ProtoReflect.Descriptor instead.
 func (*EncryptionComplianceObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{41}
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *EncryptionComplianceObservation) GetLuksRoot() bool {
@@ -4761,17 +4957,33 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\treachable\x18\b \x01(\bR\treachable\x12P\n" +
 	"\bmappings\x18\t \x03(\v2*.lindm.resource.v1.DirectoryAccountMappingB\b\xbaH\x05\x92\x01\x02\x10@R\bmappings\x12X\n" +
 	"\x0feffective_login\x18\n" +
-	" \x01(\v2'.lindm.resource.v1.DirectoryLoginPolicyB\x06\xbaH\x03\xc8\x01\x01R\x0eeffectiveLogin\"\x91\x05\n" +
+	" \x01(\v2'.lindm.resource.v1.DirectoryLoginPolicyB\x06\xbaH\x03\xc8\x01\x01R\x0eeffectiveLogin\"\xfe\x05\n" +
 	"\x16ManagedFileObservation\x12C\n" +
 	"\x04path\x18\x01 \x01(\tB/\xbaH,r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\x04path\x12\x16\n" +
 	"\x06exists\x18\x02 \x01(\bR\x06exists\x123\n" +
 	"\x04file\x18\x03 \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\x04file\x120\n" +
 	"\x0fancestry_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x0eancestrySha256\x12F\n" +
 	"\x18security_metadata_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h H\x00R\x16securityMetadataSha256\x88\x01\x01\x12B\n" +
-	"\x16native_identity_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h H\x01R\x14nativeIdentitySha256\x88\x01\x01:\xee\x01\xbaH\xea\x01\x1a\xe7\x01\n" +
+	"\x16native_identity_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h H\x01R\x14nativeIdentitySha256\x88\x01\x01\x12k\n" +
+	"\x17kernel_module_blocklist\x18\a \x01(\v23.lindm.resource.v1.KernelModuleBlocklistObservationR\x15kernelModuleBlocklist:\xee\x01\xbaH\xea\x01\x1a\xe7\x01\n" +
 	"!managed_file_observation.identity\x12Eexisting regular files require exact identity; absent files have none\x1a{!this.path.matches('/[.]{1,2}(/|$)') && (this.exists == has(this.file)) && (!has(this.file) || this.file.path == this.path)B\x1b\n" +
 	"\x19_security_metadata_sha256B\x19\n" +
-	"\x17_native_identity_sha256\"\x9b\x05\n" +
+	"\x17_native_identity_sha256\"\x94\x01\n" +
+	"\x17KernelModuleObservation\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xbaH\x04r\x02(@R\x04name\x12\x16\n" +
+	"\x06loaded\x18\x02 \x01(\bR\x06loaded\x12\x19\n" +
+	"\bbuilt_in\x18\x03 \x01(\bR\abuiltIn\x12)\n" +
+	"\x10modprobe_blocked\x18\x04 \x01(\bR\x0fmodprobeBlocked\"\xda\x01\n" +
+	"\x1aModuleInitramfsObservation\x12/\n" +
+	"\x0ekernel_release\x18\x01 \x01(\tB\b\xbaH\x05r\x03(\xff\x01R\rkernelRelease\x12\x1c\n" +
+	"\x04path\x18\x02 \x01(\tB\b\xbaH\x05r\x03(\x80\bR\x04path\x12\x1f\n" +
+	"\x06sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x06sha256\x127\n" +
+	"\x10blocklist_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h H\x00R\x0fblocklistSha256\x88\x01\x01B\x13\n" +
+	"\x11_blocklist_sha256\"\xcb\x01\n" +
+	" KernelModuleBlocklistObservation\x12N\n" +
+	"\amodules\x18\x01 \x03(\v2*.lindm.resource.v1.KernelModuleObservationB\b\xbaH\x05\x92\x01\x02\x10@R\amodules\x12W\n" +
+	"\tinitramfs\x18\x02 \x03(\v2-.lindm.resource.v1.ModuleInitramfsObservationB\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10 R\tinitramfs\"\x9b\x05\n" +
 	"\x11SysctlObservation\x12A\n" +
 	"\x03key\x18\x01 \x01(\tB/\xbaH,r*(\xff\x012%^[a-z][a-z0-9_]*([.][a-zA-Z0-9_-]+)+$R\x03key\x12#\n" +
 	"\x05value\x18\x02 \x01(\tB\b\xbaH\x05r\x03(\x80 H\x00R\x05value\x88\x01\x01\x128\n" +
@@ -4906,7 +5118,7 @@ func file_lindm_resource_v1_observations_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_resource_v1_observations_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_lindm_resource_v1_observations_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
+var file_lindm_resource_v1_observations_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_lindm_resource_v1_observations_proto_goTypes = []any{
 	(ObservationStatus)(0),                   // 0: lindm.resource.v1.ObservationStatus
 	(NSSOrigin)(0),                           // 1: lindm.resource.v1.NSSOrigin
@@ -4953,145 +5165,151 @@ var file_lindm_resource_v1_observations_proto_goTypes = []any{
 	(*DirectoryAccountMapping)(nil),          // 42: lindm.resource.v1.DirectoryAccountMapping
 	(*DirectoryClientObservation)(nil),       // 43: lindm.resource.v1.DirectoryClientObservation
 	(*ManagedFileObservation)(nil),           // 44: lindm.resource.v1.ManagedFileObservation
-	(*SysctlObservation)(nil),                // 45: lindm.resource.v1.SysctlObservation
-	(*SystemdDefinitionObservation)(nil),     // 46: lindm.resource.v1.SystemdDefinitionObservation
-	(*SystemdEffectiveOptions)(nil),          // 47: lindm.resource.v1.SystemdEffectiveOptions
-	(*EncryptionComplianceObservation)(nil),  // 48: lindm.resource.v1.EncryptionComplianceObservation
-	(*timestamppb.Timestamp)(nil),            // 49: google.protobuf.Timestamp
-	(*BackendSelection)(nil),                 // 50: lindm.resource.v1.BackendSelection
-	(PasswordHashAlgorithm)(0),               // 51: lindm.resource.v1.PasswordHashAlgorithm
-	(*PasswordAging)(nil),                    // 52: lindm.resource.v1.PasswordAging
-	(*SudoPrincipal)(nil),                    // 53: lindm.resource.v1.SudoPrincipal
-	(*SudoCommand)(nil),                      // 54: lindm.resource.v1.SudoCommand
-	(*SSHMatchSelector)(nil),                 // 55: lindm.resource.v1.SSHMatchSelector
-	(*SSHMatch)(nil),                         // 56: lindm.resource.v1.SSHMatch
-	(*SSHServerDesired)(nil),                 // 57: lindm.resource.v1.SSHServerDesired
-	(*Endpoint)(nil),                         // 58: lindm.resource.v1.Endpoint
-	(*TimeSource)(nil),                       // 59: lindm.resource.v1.TimeSource
-	(CertificatePurpose)(0),                  // 60: lindm.resource.v1.CertificatePurpose
-	(*ProbeReceipt)(nil),                     // 61: lindm.resource.v1.ProbeReceipt
-	(TrustStoreScope)(0),                     // 62: lindm.resource.v1.TrustStoreScope
-	(*FirewallRule)(nil),                     // 63: lindm.resource.v1.FirewallRule
-	(*InterfaceSelector)(nil),                // 64: lindm.resource.v1.InterfaceSelector
-	(FirewallVerdict)(0),                     // 65: lindm.resource.v1.FirewallVerdict
-	(*IPAddress)(nil),                        // 66: lindm.resource.v1.IPAddress
-	(*IPRoute)(nil),                          // 67: lindm.resource.v1.IPRoute
-	(*DNSServer)(nil),                        // 68: lindm.resource.v1.DNSServer
-	(*DNSDesired)(nil),                       // 69: lindm.resource.v1.DNSDesired
-	(*ProxyConsumer)(nil),                    // 70: lindm.resource.v1.ProxyConsumer
-	(*PackageIdentity)(nil),                  // 71: lindm.resource.v1.PackageIdentity
-	(*NativeVersion)(nil),                    // 72: lindm.resource.v1.NativeVersion
-	(*ResourceRef)(nil),                      // 73: lindm.resource.v1.ResourceRef
-	(*InstallationBinding)(nil),              // 74: lindm.resource.v1.InstallationBinding
-	(*FlatpakPermissionPolicy)(nil),          // 75: lindm.resource.v1.FlatpakPermissionPolicy
-	(*OSUpdateDesired)(nil),                  // 76: lindm.resource.v1.OSUpdateDesired
-	(*SessionScope)(nil),                     // 77: lindm.resource.v1.SessionScope
-	(*SessionPolicyDesired)(nil),             // 78: lindm.resource.v1.SessionPolicyDesired
-	(*PasswordPolicyDesired)(nil),            // 79: lindm.resource.v1.PasswordPolicyDesired
-	(SnapConfinement)(0),                     // 80: lindm.resource.v1.SnapConfinement
-	(*SnapInterfaceGrant)(nil),               // 81: lindm.resource.v1.SnapInterfaceGrant
-	(*SubjectAlternativeName)(nil),           // 82: lindm.resource.v1.SubjectAlternativeName
-	(*CredentialConsumer)(nil),               // 83: lindm.resource.v1.CredentialConsumer
-	(*CredentialSubjectBinding)(nil),         // 84: lindm.resource.v1.CredentialSubjectBinding
-	(*NativeAccountBinding)(nil),             // 85: lindm.resource.v1.NativeAccountBinding
-	(DirectoryBackend)(0),                    // 86: lindm.resource.v1.DirectoryBackend
-	(*DirectoryLoginPolicy)(nil),             // 87: lindm.resource.v1.DirectoryLoginPolicy
-	(*SystemdDefinitionDesired)(nil),         // 88: lindm.resource.v1.SystemdDefinitionDesired
+	(*KernelModuleObservation)(nil),          // 45: lindm.resource.v1.KernelModuleObservation
+	(*ModuleInitramfsObservation)(nil),       // 46: lindm.resource.v1.ModuleInitramfsObservation
+	(*KernelModuleBlocklistObservation)(nil), // 47: lindm.resource.v1.KernelModuleBlocklistObservation
+	(*SysctlObservation)(nil),                // 48: lindm.resource.v1.SysctlObservation
+	(*SystemdDefinitionObservation)(nil),     // 49: lindm.resource.v1.SystemdDefinitionObservation
+	(*SystemdEffectiveOptions)(nil),          // 50: lindm.resource.v1.SystemdEffectiveOptions
+	(*EncryptionComplianceObservation)(nil),  // 51: lindm.resource.v1.EncryptionComplianceObservation
+	(*timestamppb.Timestamp)(nil),            // 52: google.protobuf.Timestamp
+	(*BackendSelection)(nil),                 // 53: lindm.resource.v1.BackendSelection
+	(PasswordHashAlgorithm)(0),               // 54: lindm.resource.v1.PasswordHashAlgorithm
+	(*PasswordAging)(nil),                    // 55: lindm.resource.v1.PasswordAging
+	(*SudoPrincipal)(nil),                    // 56: lindm.resource.v1.SudoPrincipal
+	(*SudoCommand)(nil),                      // 57: lindm.resource.v1.SudoCommand
+	(*SSHMatchSelector)(nil),                 // 58: lindm.resource.v1.SSHMatchSelector
+	(*SSHMatch)(nil),                         // 59: lindm.resource.v1.SSHMatch
+	(*SSHServerDesired)(nil),                 // 60: lindm.resource.v1.SSHServerDesired
+	(*Endpoint)(nil),                         // 61: lindm.resource.v1.Endpoint
+	(*TimeSource)(nil),                       // 62: lindm.resource.v1.TimeSource
+	(CertificatePurpose)(0),                  // 63: lindm.resource.v1.CertificatePurpose
+	(*ProbeReceipt)(nil),                     // 64: lindm.resource.v1.ProbeReceipt
+	(TrustStoreScope)(0),                     // 65: lindm.resource.v1.TrustStoreScope
+	(*FirewallRule)(nil),                     // 66: lindm.resource.v1.FirewallRule
+	(*InterfaceSelector)(nil),                // 67: lindm.resource.v1.InterfaceSelector
+	(FirewallVerdict)(0),                     // 68: lindm.resource.v1.FirewallVerdict
+	(*IPAddress)(nil),                        // 69: lindm.resource.v1.IPAddress
+	(*IPRoute)(nil),                          // 70: lindm.resource.v1.IPRoute
+	(*DNSServer)(nil),                        // 71: lindm.resource.v1.DNSServer
+	(*DNSDesired)(nil),                       // 72: lindm.resource.v1.DNSDesired
+	(*ProxyConsumer)(nil),                    // 73: lindm.resource.v1.ProxyConsumer
+	(*PackageIdentity)(nil),                  // 74: lindm.resource.v1.PackageIdentity
+	(*NativeVersion)(nil),                    // 75: lindm.resource.v1.NativeVersion
+	(*ResourceRef)(nil),                      // 76: lindm.resource.v1.ResourceRef
+	(*InstallationBinding)(nil),              // 77: lindm.resource.v1.InstallationBinding
+	(*FlatpakPermissionPolicy)(nil),          // 78: lindm.resource.v1.FlatpakPermissionPolicy
+	(*OSUpdateDesired)(nil),                  // 79: lindm.resource.v1.OSUpdateDesired
+	(*SessionScope)(nil),                     // 80: lindm.resource.v1.SessionScope
+	(*SessionPolicyDesired)(nil),             // 81: lindm.resource.v1.SessionPolicyDesired
+	(*PasswordPolicyDesired)(nil),            // 82: lindm.resource.v1.PasswordPolicyDesired
+	(SnapConfinement)(0),                     // 83: lindm.resource.v1.SnapConfinement
+	(*SnapInterfaceGrant)(nil),               // 84: lindm.resource.v1.SnapInterfaceGrant
+	(*SubjectAlternativeName)(nil),           // 85: lindm.resource.v1.SubjectAlternativeName
+	(*CredentialConsumer)(nil),               // 86: lindm.resource.v1.CredentialConsumer
+	(*CredentialSubjectBinding)(nil),         // 87: lindm.resource.v1.CredentialSubjectBinding
+	(*NativeAccountBinding)(nil),             // 88: lindm.resource.v1.NativeAccountBinding
+	(DirectoryBackend)(0),                    // 89: lindm.resource.v1.DirectoryBackend
+	(*DirectoryLoginPolicy)(nil),             // 90: lindm.resource.v1.DirectoryLoginPolicy
+	(*SystemdDefinitionDesired)(nil),         // 91: lindm.resource.v1.SystemdDefinitionDesired
 }
 var file_lindm_resource_v1_observations_proto_depIdxs = []int32{
-	49, // 0: lindm.resource.v1.ObservationMetadata.observed_at:type_name -> google.protobuf.Timestamp
-	50, // 1: lindm.resource.v1.ObservationMetadata.backend:type_name -> lindm.resource.v1.BackendSelection
+	52, // 0: lindm.resource.v1.ObservationMetadata.observed_at:type_name -> google.protobuf.Timestamp
+	53, // 1: lindm.resource.v1.ObservationMetadata.backend:type_name -> lindm.resource.v1.BackendSelection
 	0,  // 2: lindm.resource.v1.ObservationMetadata.observation_status:type_name -> lindm.resource.v1.ObservationStatus
-	49, // 3: lindm.resource.v1.SystemdServiceObservation.observed_at:type_name -> google.protobuf.Timestamp
+	52, // 3: lindm.resource.v1.SystemdServiceObservation.observed_at:type_name -> google.protobuf.Timestamp
 	9,  // 4: lindm.resource.v1.SystemdServiceObservation.install_links:type_name -> lindm.resource.v1.InstallLink
 	1,  // 5: lindm.resource.v1.LocalGroupObservation.origin:type_name -> lindm.resource.v1.NSSOrigin
 	1,  // 6: lindm.resource.v1.LocalUserObservation.origin:type_name -> lindm.resource.v1.NSSOrigin
 	12, // 7: lindm.resource.v1.LocalUserObservation.home:type_name -> lindm.resource.v1.HomeMetadata
-	51, // 8: lindm.resource.v1.LocalUserObservation.password_algorithm:type_name -> lindm.resource.v1.PasswordHashAlgorithm
-	52, // 9: lindm.resource.v1.LocalUserObservation.aging:type_name -> lindm.resource.v1.PasswordAging
-	53, // 10: lindm.resource.v1.SudoPermissionEvidence.subject:type_name -> lindm.resource.v1.SudoPrincipal
-	53, // 11: lindm.resource.v1.SudoPermissionEvidence.run_as:type_name -> lindm.resource.v1.SudoPrincipal
-	54, // 12: lindm.resource.v1.SudoPermissionEvidence.command:type_name -> lindm.resource.v1.SudoCommand
+	54, // 8: lindm.resource.v1.LocalUserObservation.password_algorithm:type_name -> lindm.resource.v1.PasswordHashAlgorithm
+	55, // 9: lindm.resource.v1.LocalUserObservation.aging:type_name -> lindm.resource.v1.PasswordAging
+	56, // 10: lindm.resource.v1.SudoPermissionEvidence.subject:type_name -> lindm.resource.v1.SudoPrincipal
+	56, // 11: lindm.resource.v1.SudoPermissionEvidence.run_as:type_name -> lindm.resource.v1.SudoPrincipal
+	57, // 12: lindm.resource.v1.SudoPermissionEvidence.command:type_name -> lindm.resource.v1.SudoCommand
 	8,  // 13: lindm.resource.v1.SudoRuleObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
 	14, // 14: lindm.resource.v1.SudoRuleObservation.permissions:type_name -> lindm.resource.v1.SudoPermissionEvidence
-	55, // 15: lindm.resource.v1.SSHMatchEvidence.context:type_name -> lindm.resource.v1.SSHMatchSelector
-	56, // 16: lindm.resource.v1.SSHMatchEvidence.effective:type_name -> lindm.resource.v1.SSHMatch
+	58, // 15: lindm.resource.v1.SSHMatchEvidence.context:type_name -> lindm.resource.v1.SSHMatchSelector
+	59, // 16: lindm.resource.v1.SSHMatchEvidence.effective:type_name -> lindm.resource.v1.SSHMatch
 	16, // 17: lindm.resource.v1.SSHServerObservation.includes:type_name -> lindm.resource.v1.SSHIncludeEdge
-	57, // 18: lindm.resource.v1.SSHServerObservation.effective:type_name -> lindm.resource.v1.SSHServerDesired
-	58, // 19: lindm.resource.v1.SSHServerObservation.listeners:type_name -> lindm.resource.v1.Endpoint
+	60, // 18: lindm.resource.v1.SSHServerObservation.effective:type_name -> lindm.resource.v1.SSHServerDesired
+	61, // 19: lindm.resource.v1.SSHServerObservation.listeners:type_name -> lindm.resource.v1.Endpoint
 	17, // 20: lindm.resource.v1.SSHServerObservation.matches:type_name -> lindm.resource.v1.SSHMatchEvidence
-	59, // 21: lindm.resource.v1.TimeSourceEvidence.source:type_name -> lindm.resource.v1.TimeSource
+	62, // 21: lindm.resource.v1.TimeSourceEvidence.source:type_name -> lindm.resource.v1.TimeSource
 	19, // 22: lindm.resource.v1.TimeSyncObservation.sources:type_name -> lindm.resource.v1.TimeSourceEvidence
-	60, // 23: lindm.resource.v1.TrustPurposeEvidence.purpose:type_name -> lindm.resource.v1.CertificatePurpose
-	61, // 24: lindm.resource.v1.TrustPurposeEvidence.chain_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	63, // 23: lindm.resource.v1.TrustPurposeEvidence.purpose:type_name -> lindm.resource.v1.CertificatePurpose
+	64, // 24: lindm.resource.v1.TrustPurposeEvidence.chain_probe:type_name -> lindm.resource.v1.ProbeReceipt
 	8,  // 25: lindm.resource.v1.TrustCAObservation.sources:type_name -> lindm.resource.v1.FileIdentity
-	62, // 26: lindm.resource.v1.TrustCAObservation.scope:type_name -> lindm.resource.v1.TrustStoreScope
+	65, // 26: lindm.resource.v1.TrustCAObservation.scope:type_name -> lindm.resource.v1.TrustStoreScope
 	21, // 27: lindm.resource.v1.TrustCAObservation.purposes:type_name -> lindm.resource.v1.TrustPurposeEvidence
-	63, // 28: lindm.resource.v1.FirewallZoneObservation.persistent_rules:type_name -> lindm.resource.v1.FirewallRule
-	63, // 29: lindm.resource.v1.FirewallZoneObservation.active_rules:type_name -> lindm.resource.v1.FirewallRule
-	64, // 30: lindm.resource.v1.FirewallZoneObservation.bound_interfaces:type_name -> lindm.resource.v1.InterfaceSelector
-	65, // 31: lindm.resource.v1.FirewallZoneObservation.default_ingress:type_name -> lindm.resource.v1.FirewallVerdict
-	65, // 32: lindm.resource.v1.FirewallZoneObservation.default_egress:type_name -> lindm.resource.v1.FirewallVerdict
+	66, // 28: lindm.resource.v1.FirewallZoneObservation.persistent_rules:type_name -> lindm.resource.v1.FirewallRule
+	66, // 29: lindm.resource.v1.FirewallZoneObservation.active_rules:type_name -> lindm.resource.v1.FirewallRule
+	67, // 30: lindm.resource.v1.FirewallZoneObservation.bound_interfaces:type_name -> lindm.resource.v1.InterfaceSelector
+	68, // 31: lindm.resource.v1.FirewallZoneObservation.default_ingress:type_name -> lindm.resource.v1.FirewallVerdict
+	68, // 32: lindm.resource.v1.FirewallZoneObservation.default_egress:type_name -> lindm.resource.v1.FirewallVerdict
 	2,  // 33: lindm.resource.v1.NetworkConnectionObservation.medium:type_name -> lindm.resource.v1.ConnectionMedium
-	64, // 34: lindm.resource.v1.NetworkConnectionObservation.active_device:type_name -> lindm.resource.v1.InterfaceSelector
-	66, // 35: lindm.resource.v1.NetworkConnectionObservation.addresses:type_name -> lindm.resource.v1.IPAddress
-	67, // 36: lindm.resource.v1.NetworkConnectionObservation.routes:type_name -> lindm.resource.v1.IPRoute
-	68, // 37: lindm.resource.v1.DNSLookupEvidence.server:type_name -> lindm.resource.v1.DNSServer
-	61, // 38: lindm.resource.v1.DNSLookupEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	69, // 39: lindm.resource.v1.DNSObservation.effective:type_name -> lindm.resource.v1.DNSDesired
+	67, // 34: lindm.resource.v1.NetworkConnectionObservation.active_device:type_name -> lindm.resource.v1.InterfaceSelector
+	69, // 35: lindm.resource.v1.NetworkConnectionObservation.addresses:type_name -> lindm.resource.v1.IPAddress
+	70, // 36: lindm.resource.v1.NetworkConnectionObservation.routes:type_name -> lindm.resource.v1.IPRoute
+	71, // 37: lindm.resource.v1.DNSLookupEvidence.server:type_name -> lindm.resource.v1.DNSServer
+	64, // 38: lindm.resource.v1.DNSLookupEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	72, // 39: lindm.resource.v1.DNSObservation.effective:type_name -> lindm.resource.v1.DNSDesired
 	25, // 40: lindm.resource.v1.DNSObservation.lookups:type_name -> lindm.resource.v1.DNSLookupEvidence
-	58, // 41: lindm.resource.v1.ProxyRequestEvidence.destination:type_name -> lindm.resource.v1.Endpoint
-	61, // 42: lindm.resource.v1.ProxyRequestEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	70, // 43: lindm.resource.v1.ProxyObservation.consumer:type_name -> lindm.resource.v1.ProxyConsumer
+	61, // 41: lindm.resource.v1.ProxyRequestEvidence.destination:type_name -> lindm.resource.v1.Endpoint
+	64, // 42: lindm.resource.v1.ProxyRequestEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	73, // 43: lindm.resource.v1.ProxyObservation.consumer:type_name -> lindm.resource.v1.ProxyConsumer
 	27, // 44: lindm.resource.v1.ProxyObservation.requests:type_name -> lindm.resource.v1.ProxyRequestEvidence
-	71, // 45: lindm.resource.v1.NativePackageRecord.package:type_name -> lindm.resource.v1.PackageIdentity
-	72, // 46: lindm.resource.v1.NativePackageRecord.version:type_name -> lindm.resource.v1.NativeVersion
-	73, // 47: lindm.resource.v1.NativePackageRecord.source:type_name -> lindm.resource.v1.ResourceRef
-	71, // 48: lindm.resource.v1.NativePackageObservation.package:type_name -> lindm.resource.v1.PackageIdentity
+	74, // 45: lindm.resource.v1.NativePackageRecord.package:type_name -> lindm.resource.v1.PackageIdentity
+	75, // 46: lindm.resource.v1.NativePackageRecord.version:type_name -> lindm.resource.v1.NativeVersion
+	76, // 47: lindm.resource.v1.NativePackageRecord.source:type_name -> lindm.resource.v1.ResourceRef
+	74, // 48: lindm.resource.v1.NativePackageObservation.package:type_name -> lindm.resource.v1.PackageIdentity
 	29, // 49: lindm.resource.v1.NativePackageObservation.record:type_name -> lindm.resource.v1.NativePackageRecord
 	8,  // 50: lindm.resource.v1.NativePackageObservation.pin_file:type_name -> lindm.resource.v1.FileIdentity
 	8,  // 51: lindm.resource.v1.RepositoryObservation.stanzas:type_name -> lindm.resource.v1.FileIdentity
 	8,  // 52: lindm.resource.v1.RepositoryObservation.key_objects:type_name -> lindm.resource.v1.FileIdentity
 	3,  // 53: lindm.resource.v1.RepositoryObservation.ecosystem:type_name -> lindm.resource.v1.RepositoryEcosystem
-	74, // 54: lindm.resource.v1.FlatpakAppObservation.installation:type_name -> lindm.resource.v1.InstallationBinding
-	75, // 55: lindm.resource.v1.FlatpakAppObservation.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
+	77, // 54: lindm.resource.v1.FlatpakAppObservation.installation:type_name -> lindm.resource.v1.InstallationBinding
+	78, // 55: lindm.resource.v1.FlatpakAppObservation.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
 	5,  // 56: lindm.resource.v1.OSUpdateFileObservation.kind:type_name -> lindm.resource.v1.OSUpdateNativeFile
 	44, // 57: lindm.resource.v1.OSUpdateFileObservation.state:type_name -> lindm.resource.v1.ManagedFileObservation
 	4,  // 58: lindm.resource.v1.OSUpdateObservation.backend:type_name -> lindm.resource.v1.OSUpdateBackend
-	76, // 59: lindm.resource.v1.OSUpdateObservation.effective:type_name -> lindm.resource.v1.OSUpdateDesired
+	79, // 59: lindm.resource.v1.OSUpdateObservation.effective:type_name -> lindm.resource.v1.OSUpdateDesired
 	34, // 60: lindm.resource.v1.OSUpdateObservation.files:type_name -> lindm.resource.v1.OSUpdateFileObservation
-	77, // 61: lindm.resource.v1.SessionPolicyObservation.scope:type_name -> lindm.resource.v1.SessionScope
-	78, // 62: lindm.resource.v1.SessionPolicyObservation.effective:type_name -> lindm.resource.v1.SessionPolicyDesired
+	80, // 61: lindm.resource.v1.SessionPolicyObservation.scope:type_name -> lindm.resource.v1.SessionScope
+	81, // 62: lindm.resource.v1.SessionPolicyObservation.effective:type_name -> lindm.resource.v1.SessionPolicyDesired
 	36, // 63: lindm.resource.v1.SessionPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
-	79, // 64: lindm.resource.v1.PasswordPolicyObservation.effective:type_name -> lindm.resource.v1.PasswordPolicyDesired
+	82, // 64: lindm.resource.v1.PasswordPolicyObservation.effective:type_name -> lindm.resource.v1.PasswordPolicyDesired
 	36, // 65: lindm.resource.v1.PasswordPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
-	80, // 66: lindm.resource.v1.SnapAppObservation.confinement:type_name -> lindm.resource.v1.SnapConfinement
-	81, // 67: lindm.resource.v1.SnapAppObservation.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
-	60, // 68: lindm.resource.v1.PublicCertificate.eku:type_name -> lindm.resource.v1.CertificatePurpose
-	82, // 69: lindm.resource.v1.PublicCertificate.sans:type_name -> lindm.resource.v1.SubjectAlternativeName
-	49, // 70: lindm.resource.v1.PublicCertificate.not_before:type_name -> google.protobuf.Timestamp
-	49, // 71: lindm.resource.v1.PublicCertificate.not_after:type_name -> google.protobuf.Timestamp
+	83, // 66: lindm.resource.v1.SnapAppObservation.confinement:type_name -> lindm.resource.v1.SnapConfinement
+	84, // 67: lindm.resource.v1.SnapAppObservation.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
+	63, // 68: lindm.resource.v1.PublicCertificate.eku:type_name -> lindm.resource.v1.CertificatePurpose
+	85, // 69: lindm.resource.v1.PublicCertificate.sans:type_name -> lindm.resource.v1.SubjectAlternativeName
+	52, // 70: lindm.resource.v1.PublicCertificate.not_before:type_name -> google.protobuf.Timestamp
+	52, // 71: lindm.resource.v1.PublicCertificate.not_after:type_name -> google.protobuf.Timestamp
 	40, // 72: lindm.resource.v1.CertificateEnrollmentObservation.chain:type_name -> lindm.resource.v1.PublicCertificate
-	83, // 73: lindm.resource.v1.CertificateEnrollmentObservation.active_consumers:type_name -> lindm.resource.v1.CredentialConsumer
-	84, // 74: lindm.resource.v1.CertificateEnrollmentObservation.subject:type_name -> lindm.resource.v1.CredentialSubjectBinding
-	85, // 75: lindm.resource.v1.DirectoryAccountMapping.account:type_name -> lindm.resource.v1.NativeAccountBinding
-	86, // 76: lindm.resource.v1.DirectoryClientObservation.backend:type_name -> lindm.resource.v1.DirectoryBackend
+	86, // 73: lindm.resource.v1.CertificateEnrollmentObservation.active_consumers:type_name -> lindm.resource.v1.CredentialConsumer
+	87, // 74: lindm.resource.v1.CertificateEnrollmentObservation.subject:type_name -> lindm.resource.v1.CredentialSubjectBinding
+	88, // 75: lindm.resource.v1.DirectoryAccountMapping.account:type_name -> lindm.resource.v1.NativeAccountBinding
+	89, // 76: lindm.resource.v1.DirectoryClientObservation.backend:type_name -> lindm.resource.v1.DirectoryBackend
 	42, // 77: lindm.resource.v1.DirectoryClientObservation.mappings:type_name -> lindm.resource.v1.DirectoryAccountMapping
-	87, // 78: lindm.resource.v1.DirectoryClientObservation.effective_login:type_name -> lindm.resource.v1.DirectoryLoginPolicy
+	90, // 78: lindm.resource.v1.DirectoryClientObservation.effective_login:type_name -> lindm.resource.v1.DirectoryLoginPolicy
 	8,  // 79: lindm.resource.v1.ManagedFileObservation.file:type_name -> lindm.resource.v1.FileIdentity
-	8,  // 80: lindm.resource.v1.SysctlObservation.owned_persistence_file:type_name -> lindm.resource.v1.FileIdentity
-	44, // 81: lindm.resource.v1.SysctlObservation.persistence_file_state:type_name -> lindm.resource.v1.ManagedFileObservation
-	88, // 82: lindm.resource.v1.SystemdDefinitionObservation.effective:type_name -> lindm.resource.v1.SystemdDefinitionDesired
-	8,  // 83: lindm.resource.v1.SystemdDefinitionObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
-	44, // 84: lindm.resource.v1.SystemdDefinitionObservation.file_state:type_name -> lindm.resource.v1.ManagedFileObservation
-	47, // 85: lindm.resource.v1.SystemdDefinitionObservation.effective_options:type_name -> lindm.resource.v1.SystemdEffectiveOptions
-	9,  // 86: lindm.resource.v1.SystemdDefinitionObservation.timer_install_links:type_name -> lindm.resource.v1.InstallLink
-	6,  // 87: lindm.resource.v1.EncryptionComplianceObservation.root_identity_basis:type_name -> lindm.resource.v1.RootStorageIdentityBasis
-	88, // [88:88] is the sub-list for method output_type
-	88, // [88:88] is the sub-list for method input_type
-	88, // [88:88] is the sub-list for extension type_name
-	88, // [88:88] is the sub-list for extension extendee
-	0,  // [0:88] is the sub-list for field type_name
+	47, // 80: lindm.resource.v1.ManagedFileObservation.kernel_module_blocklist:type_name -> lindm.resource.v1.KernelModuleBlocklistObservation
+	45, // 81: lindm.resource.v1.KernelModuleBlocklistObservation.modules:type_name -> lindm.resource.v1.KernelModuleObservation
+	46, // 82: lindm.resource.v1.KernelModuleBlocklistObservation.initramfs:type_name -> lindm.resource.v1.ModuleInitramfsObservation
+	8,  // 83: lindm.resource.v1.SysctlObservation.owned_persistence_file:type_name -> lindm.resource.v1.FileIdentity
+	44, // 84: lindm.resource.v1.SysctlObservation.persistence_file_state:type_name -> lindm.resource.v1.ManagedFileObservation
+	91, // 85: lindm.resource.v1.SystemdDefinitionObservation.effective:type_name -> lindm.resource.v1.SystemdDefinitionDesired
+	8,  // 86: lindm.resource.v1.SystemdDefinitionObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
+	44, // 87: lindm.resource.v1.SystemdDefinitionObservation.file_state:type_name -> lindm.resource.v1.ManagedFileObservation
+	50, // 88: lindm.resource.v1.SystemdDefinitionObservation.effective_options:type_name -> lindm.resource.v1.SystemdEffectiveOptions
+	9,  // 89: lindm.resource.v1.SystemdDefinitionObservation.timer_install_links:type_name -> lindm.resource.v1.InstallLink
+	6,  // 90: lindm.resource.v1.EncryptionComplianceObservation.root_identity_basis:type_name -> lindm.resource.v1.RootStorageIdentityBasis
+	91, // [91:91] is the sub-list for method output_type
+	91, // [91:91] is the sub-list for method input_type
+	91, // [91:91] is the sub-list for extension type_name
+	91, // [91:91] is the sub-list for extension extendee
+	0,  // [0:91] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_observations_proto_init() }
@@ -5112,16 +5330,17 @@ func file_lindm_resource_v1_observations_proto_init() {
 	file_lindm_resource_v1_observations_proto_msgTypes[22].OneofWrappers = []any{}
 	file_lindm_resource_v1_observations_proto_msgTypes[25].OneofWrappers = []any{}
 	file_lindm_resource_v1_observations_proto_msgTypes[37].OneofWrappers = []any{}
-	file_lindm_resource_v1_observations_proto_msgTypes[38].OneofWrappers = []any{}
 	file_lindm_resource_v1_observations_proto_msgTypes[39].OneofWrappers = []any{}
 	file_lindm_resource_v1_observations_proto_msgTypes[41].OneofWrappers = []any{}
+	file_lindm_resource_v1_observations_proto_msgTypes[42].OneofWrappers = []any{}
+	file_lindm_resource_v1_observations_proto_msgTypes[44].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_observations_proto_rawDesc), len(file_lindm_resource_v1_observations_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   42,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -6,16 +6,37 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
+
+// ObserveNative reads the closed module template in a read-only helper whose
+// module metadata is visible. The resident executor keeps ProtectKernelModules.
+func ObserveNative(ctx context.Context, env resourceprovider.NativeEnv, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+	if desired.GetManagedFile().GetKernelModuleBlocklist() == nil {
+		return nil, ErrUnsupported
+	}
+	config := nativeConfig{Native: env.Config.GetFileProvider(), Platform: env.Platform, ExecutorIncarnation: env.ExecutorIncarnation, ProtectedPaths: env.ProtectedPaths}
+	backend, boot, err := nativeContext(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	p := &Provider{config: Config{Native: config.Native, Platform: config.Platform, ExecutorIncarnation: config.ExecutorIncarnation}, backend: backend, boot: boot}
+	if err := p.validateDesired(desired); err != nil {
+		return nil, err
+	}
+	return p.snapshot(ctx, desired)
+}
 
 // ApplyNative is called only by the fixed root transient helper. It does not
 // open the live journal. The parent authenticates the protected request and nonce,
@@ -96,10 +117,42 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 			return nil, ErrConflict
 		}
 	}
-	tx, err := nativefile.Prepare(request.GetBefore(), target)
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+		fresh, err := p.snapshot(ctx, desired)
+		if err != nil {
+			return nil, err
+		}
+		if !sameObserved(fresh.GetObservation(), request.GetBefore().GetObservation()) {
+			return nil, ErrConflict
+		}
+	}
+	tx, err := nativefile.Prepare(moduleFileImage(request.GetBefore()), moduleFileImage(target))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, tx.Close()) }()
-	return tx.Commit(ctx, beforeEffect)
+	after, err := tx.Commit(ctx, beforeEffect)
+	if err != nil || desired.GetManagedFile().GetKernelModuleBlocklist() == nil {
+		return after, err
+	}
+	tools, err := moduleTooling(config.Platform)
+	if err != nil {
+		return nil, err
+	}
+	args := tools.RebuildArgs
+	if target.GetObservation().GetManagedFile().GetExists() && len(tools.RebuildWithFileArgs) != 0 {
+		args = tools.RebuildWithFileArgs
+	}
+	command, rebuildErr := nativeexec.Run(ctx, nativeexec.Command{Path: tools.Rebuild, Args: args, Timeout: 10 * time.Minute, StdoutLimit: 1 << 20, StderrLimit: 1 << 20})
+	if rebuildErr != nil {
+		// The file commit is known, not an unknown helper loss. Preserve its
+		// custody and expose failed rebuild evidence so reconciliation can retry.
+		slog.Error("kernel module initramfs rebuild failed", "error", rebuildErr, "diagnostic", command.Diagnostic())
+	}
+	after, err = p.snapshot(ctx, desired)
+	if err != nil {
+		return nil, err
+	}
+	after.ModuleInitramfsRebuildSucceeded = proto.Bool(rebuildErr == nil)
+	return after, nil
 }

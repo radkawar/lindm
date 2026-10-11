@@ -194,8 +194,11 @@ async function pressAndInspect(page, key, dialogSelector) {
 async function keyboard(page) {
   const findings = [];
   const state = await probe(page, "page");
-  const candidates = await probe(page, "tabbables", null);
+  // Interactive variants may leave a field focused. Measure its unfocused
+  // appearance only after clearing focus and finishing the blur transition.
   await probe(page, "focusStart");
+  await settleAnimations(page);
+  const candidates = await probe(page, "tabbables", null);
   const first = await pressAndInspect(page, "Tab");
   const skip = candidates.find((item) => /Skip to content/.test(item.description));
   if (skip) {
@@ -613,6 +616,14 @@ async function reviewRoute(page, route, theme, viewport) {
         viewport,
         [target.label, variant].filter(Boolean).join(" ") || "",
       );
+    }
+    if (route.path === "/profiles/new") {
+      await visit(page, target.url);
+      await page.getByRole("combobox", { name: "Setting type", exact: true }).first().click();
+      await page.getByRole("option", { name: "Block kernel modules", exact: true }).click();
+      await page.getByLabel("Modules to block", { exact: true }).fill("usb_storage\nuas");
+      await settle(page);
+      await review(page, route, target, theme, viewport, "Block kernel modules");
     }
     record.visits += 1;
   }

@@ -323,6 +323,13 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 			return err
 		}
 	}
+	if selected["modules"] {
+		r.fresh()
+		result.Resources.ModuleBlocklist = &VMResourceKindEvidence{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, Unproven: []string{"typed module blocklist native scenarios incomplete"}}
+		if err := exerciseResourceModules(ctx, r, result.Resources.ModuleBlocklist); err != nil {
+			return err
+		}
+	}
 	if selected["accounts"] {
 		if err := exerciseResourceAccounts(ctx, r, &kinds[2], &kinds[3]); err != nil {
 			return err

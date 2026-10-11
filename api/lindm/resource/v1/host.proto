@@ -23,6 +23,8 @@ message ManagedFileDesired {
   optional uint32 mode = 4 [(buf.validate.field).uint32.lte = 511];
   optional uint32 uid = 5 [(buf.validate.field).uint32.lt = 4294967295];
   optional uint32 gid = 6 [(buf.validate.field).uint32.lt = 4294967295];
+  // Closed template, not permission to supply arbitrary modprobe directives.
+  KernelModuleBlocklist kernel_module_blocklist = 7;
   option (buf.validate.message).cel = {
     id: "managed_file.canonical_path"
     message: "file paths must not contain dot or parent components"
@@ -31,8 +33,29 @@ message ManagedFileDesired {
   option (buf.validate.message).cel = {
     id: "managed_file.dimensions"
     message: "present files require a managed dimension; absent files carry no replacement"
-    expression: "this.presence == 1 ? (has(this.content) || has(this.mode) || has(this.uid) || has(this.gid)) : (!has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid))"
+    expression: "this.presence == 1 ? (has(this.content) || has(this.mode) || has(this.uid) || has(this.gid) || has(this.kernel_module_blocklist)) : (!has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid) && !has(this.kernel_module_blocklist))"
   };
+  option (buf.validate.message).cel = {
+    id: "managed_file.module_template"
+    message: "module blocklists use the fixed owned path and cannot supply raw file dimensions"
+    expression: "!has(this.kernel_module_blocklist) || (this.path == '/etc/modprobe.d/99-lindm-blocklist.conf' && this.presence == 1 && !has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid))"
+  };
+}
+
+// Canonical Linux module names use underscores, never aliases or modprobe text.
+// This prevents future loads; it never unloads an active or built-in driver.
+message KernelModuleBlocklist {
+  repeated string modules = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+    unique: true
+    items: {
+      string: {
+        max_bytes: 64
+        pattern: "^[a-zA-Z][a-zA-Z0-9_]*$"
+      }
+    }
+  }];
 }
 
 // A single kernel key/value, never sysctl configuration text or an include.

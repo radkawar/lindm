@@ -276,7 +276,7 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 		repository.Source = &resourcev1.RepositoryDesired_Apt{Apt: &resourcev1.AptRepository{Uri: "https://127.0.0.1:18449", Suite: "stable", Components: []string{"main"}, Architectures: []string{architecture}, SigningKey: artifact}}
 	}
 	config.PackageProvider = &agentv1.NativePackageProviderConfig{Sources: []*agentv1.NativePackageSource{source}}
-	config.FileProvider = &agentv1.NativeFileProviderConfig{AllowedRoots: []string{resourceFileRoot}}
+	config.FileProvider = &agentv1.NativeFileProviderConfig{AllowedRoots: []string{resourceFileRoot}, KernelModuleBlocklist: selected["modules"]}
 	if selected["accounts"] || selected["sysctl"] || selected["definitions"] || selected["secret-password"] {
 		if err := setupHostResourceFixtures(ctx, packages.vm); err != nil {
 			return err

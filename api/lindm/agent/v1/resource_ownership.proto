@@ -31,6 +31,14 @@ message ResourceOwnershipSnapshot {
   FirewallNativeSnapshot firewall = 10;
   lindm.resource.v1.ProbeReceipt account_nss_receipt = 11;
   OSUpdateOwnership os_update = 12;
+  // Authenticated helper command outcome, separate from independently read
+  // file/archive evidence. Absent means no rebuild was attempted.
+  optional bool module_initramfs_rebuild_succeeded = 14;
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.module_rebuild"
+    message: "module rebuild outcomes belong only to the typed module template"
+    expression: "!has(this.module_initramfs_rebuild_succeeded) || (has(this.observation.managed_file) && has(this.observation.managed_file.kernel_module_blocklist))"
+  };
   option (buf.validate.message).cel = {
     id: "ownership_snapshot.content"
     message: "private content is only valid for a managed file observation"

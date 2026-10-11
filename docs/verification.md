@@ -1375,6 +1375,108 @@ now stores kind/key identities and shows unsupported nonservice resources and
 safe restoration. Phase 2 requires independent generic executor/journal/ownership
 verification; these schemas alone do not qualify it.
 
+#### Typed kernel-module blocklist
+
+`lab vm resources -phase connected -kinds modules` is the disposable installed-agent
+lane for the closed managed-file template. Its separate `module_blocklist` evidence
+does not upgrade the existing generic-file cell. Ten scenarios cover already-loaded
+USB storage drivers (explicit pending restart and effect-free re-observation),
+actual blocked `modprobe` after reboot, idempotency, owned-file drift,
+initramfs-only drift, ownership-safe release, and a built-in driver (effectful
+and effect-free not-applicable findings, never successful blocking) with release.
+Every scenario retains server-accepted signed evidence and an independent native
+record with SHA256. This is VM evidence, not physical USB-device qualification.
+Drift receipts additionally require an actual effect grant and a pre-effect file
+hash change or stale embedded stanza, so a successful no-op cannot count as repair.
+
+Native qualification on 2026-10-11 passed **10/10 scenarios on each platform**:
+installed signed packages, real server assignment/start authority, native root
+helper effects and independent guest oracles. Evidence root:
+`~/.cache/lindm-evidence/org-kernel-modules/`.
+
+| Platform and kernel                                                         | Native receipt         | SHA256                                                             |
+| --------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------ |
+| Ubuntu 24.04 arm64, `6.8.0-142-generic`, dgx20 KVM                          | `ubuntu-arm64-07.json` | `fba9e750f27d23697dc63ac405ca74e6a121c2eb54ea077305cbc6f4f1b37b65` |
+| Fedora 44 aarch64, `6.19.10-300.fc44.aarch64`, dgx21 KVM, SELinux enforcing | `fedora-arm64-07.json` | `f68b0cadc1336fa64a33d1ccae9f2c89166698d9ee75bc880e86abd306cbb709` |
+
+Pinned source media are `ubuntu-noble-20260926-arm64` SHA256
+`1d6bffe64b848468ac97f821d369a4846d983de1800ccf6b5ec8853e85cefc55`
+and `fedora-cloud-44-1.7-aarch64` SHA256
+`55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b`.
+Both receipts bind lab SHA256
+`acbcfd2f970fa463b23bdf5bc963b232073039f39f15f1a6b446b0806eb3a082`
+and server SHA256
+`d9453f48d14d508a24448a59333978d042bbe64ae4df0ddd8bf61f6da038570b`;
+installed DEB/RPM SHA256 respectively
+`0b93edc1ee0d7b237171e990fb5f1cede87053b6ce733c45e4ebc791f2132e07`
+and `f08af45b5162135ef0b754c3c601c142fb7fa2c06b566323867281f29c9206e5`.
+UEFI is EDK II `2024.02-2ubuntu0.10`, observable Secure Boot disabled/setup mode,
+no TPM, virtio-blk; this is arm64 virtual-machine qualification, not x86 or physical
+USB qualification. The initial Ubuntu receipt independently records absent
+vendor state before permitted creation. Both observe real built-in `kvm` as
+not applicable, not blocked compliance. Fedora's initramfs-only drift fixture
+renames within the same parent and asserts device/inode/birth-time continuity;
+it does not copy across btrfs subvolumes or bypass custody checks.
+
+Earlier `*-03` through `*-06` failure receipts remain retained, not counted as
+passes: unobservable firmware selection, missing initial Ubuntu tool state,
+generic dracut omission, kmod empty-option whitespace, an assumed absent built-in,
+and cross-subvolume fixture replacement were corrected without relaxing gates.
+Native rebuild command failure and interrupted/unknown release retain regression
+coverage and the safety limitations below; these successful VM receipts do not
+claim fault-injection qualification.
+
+The provider recognizes only registry-declared tooling: Ubuntu 24.04
+`update-initramfs` and Fedora 44 `dracut`. It checks every installed kernel image
+present under the registry path and streams newc archives, including early
+microcode and gzip/zstd compression. Unsupported compression, missing native
+tools, missing boot images and failed reads fail closed. A profile cannot unload
+an active driver, block a built-in driver, prevent a privileged operator from
+using `insmod`/`modprobe --ignore-install`, or prove bootloader selection of an
+image. Local root remains outside the anti-tamper boundary. Initramfs rebuild
+failures and helper-loss uncertainty are distinct from successful enforcement.
+The resident executor retains `ProtectKernelModules=yes`. Only the closed
+template's helper can read module metadata: its module tree is read-only,
+`CAP_SYS_MODULE` remains absent and all `@module` syscalls are denied.
+Ubuntu's absent vendor state directory requires a writable `/var/lib` parent for
+that effect helper's lifetime; creation is performed only by the permitted native
+command, and later invocations narrow to the existing state directory. Fedora
+uses fixed `--include` source/target arguments while the stanza exists, including
+generic dracut images; removal release uses the base rebuild command.
+Archive names reject interior NULs and noncanonical paths; a bounded symlink
+model rejects aliases into the protected subtree across concatenated archives.
+Release cannot relinquish ownership on a zero-exit updater alone: stale boot
+images retain the existing unknown-outcome safety hold.
+
+Console review: `make -o acceptance-build ui-review` passed **172/172** against the
+already-built reviewed artifacts. Report
+`~/.cache/lindm-org-gaps-20261011/kernel-ui-final/report.json`, SHA256
+`9902416d7a31476a9a34558ee7b2c4af4a4035913aa5e4b5cd292dda77d06cf3`;
+contact sheet `kernel-ui-final/index.html` under the same root. The maintained
+scenario uses the real setting-type control and module textarea. Keyboard
+inspection resets focus before recording unfocused styles; it retains every
+indicator assertion rather than masking an already-focused textarea.
+
+Full screenshots under `kernel-ui-final/screenshots/`:
+
+| `profiles-new-block-kernel-modules-` suffix | SHA256                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| `light-desktop-full.png`                    | `76bccffd300ab37ed635bb1070b7edb6403cddb75c25229a16ccdbff67ed137b` |
+| `dark-desktop-full.png`                     | `d4f7b25e9c4aedf1de9476b5ba289fde65e7be7caaf39b8682d58b86d45680a0` |
+| `light-mobile-full.png`                     | `ef7c5488e689fab314d3b133f46612a2678bfd2393da288c94e1728be5c0c9ea` |
+| `dark-mobile-full.png`                      | `8ea5a77094f7dde67d54cba6959c03221719269d6e5fe46dbab4812464fa7359` |
+
+Before captures are `ui-before/screenshots/profiles-new-{light,dark}-{desktop,mobile}-full.png`
+under the same evidence root (baseline `c0a4b2ed`). Its report SHA256 is
+`e5cef739767edf1e88a83198d7d41e1c2baf1da8f0c161d1b7ce02c23ce42655`;
+164/168 was **not** a green gate: four preexisting audit-copy findings failed,
+while the profile captures passed. Assistant visual review of all four final
+task captures found readable module bounds and restart/built-in consequences,
+one-setting flow and no overflow. Design checklist: decision, evidence,
+restraint, safety and craft pass for this task; editing **needs owner decision**.
+Automated and assistant visual review are not owner design approval; preexisting
+duplicated profile title/copy remains outside this slice.
+
 #### Generic resource executor cutover (Phase 2)
 
 The agent now accepts only the generic signed resource intent, challenge, start

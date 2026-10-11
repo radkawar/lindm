@@ -353,6 +353,20 @@ owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
 
+The typed kernel-module blocklist is enabled explicitly in the root executor's
+`fileProvider.kernelModuleBlocklist`. Fedora 44 uses native `modprobe` and
+`dracut --regenerate-all --force`; both tools must be installed. While the stanza
+exists, fixed `--include` arguments include that same path in generic as well as
+host-only images. Release to an absent baseline omits that inclusion. The fixed
+owned modprobe file retains the native SELinux label. The provider streams
+gzip/zstd/newc images to check their embedded stanza and detects initramfs-only
+drift even when the on-disk modprobe file matches. Loaded drivers remain pending
+restart; built-in drivers are not applicable. No live driver is unloaded and
+Fedora 43, Atomic and derivatives do not inherit this setting's qualification.
+The native aarch64 KVM lane passed all ten scenarios with SELinux enforcing,
+including reboot/load refusal, same-inode initramfs-only drift repair, built-in
+`kvm` findings and release. See [receipts and limits](../verification.md#typed-kernel-module-blocklist).
+
 Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
 reading `name:hash` on stdin with `--prefix` (shadow-utils 4.14 and later).
 With `-e`, Fedora's chpasswd accepts only `$y$`, `$2[abxy]$`, `$6$`, `$5$`, a `!`

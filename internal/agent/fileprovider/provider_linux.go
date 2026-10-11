@@ -64,6 +64,7 @@ type Config struct {
 	EnrollmentGeneration string
 	ProtectedPaths       []string
 	ExecuteNative        func(context.Context, *agentv1.NativeResourceTransactionRequest, func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error)
+	NativeObserve        func(context.Context, *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error)
 }
 
 // ownershipStore is the journal's consumer boundary, with a deterministic test
@@ -137,6 +138,9 @@ func nativeContext(ctx context.Context, config nativeConfig) (*resourcev1.Backen
 		if !filepath.IsAbs(protected) || filepath.Clean(protected) != protected || protected == "/" {
 			return nil, "", ErrUnsafePath
 		}
+		if config.Native.GetKernelModuleBlocklist() && (within(ModuleBlocklistPath, protected) || within(protected, ModuleBlocklistPath)) {
+			return nil, "", ErrUnsafePath
+		}
 		for _, root := range config.Native.GetAllowedRoots() {
 			if within(root, protected) || within(protected, root) {
 				return nil, "", ErrUnsafePath
@@ -188,6 +192,12 @@ func (p *Provider) validateDesired(desired *resourcev1.ResourceDesiredState) err
 	if desired.GetManagedFile() == nil {
 		return ErrUnsupported
 	}
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+		if !p.config.Native.GetKernelModuleBlocklist() {
+			return ErrUnsupported
+		}
+		return nil
+	}
 	if err := allowedPath(p.config.Native, desired.GetManagedFile().GetPath()); err != nil {
 		return err
 	}
@@ -200,9 +210,19 @@ func (p *Provider) snapshot(ctx context.Context, desired *resourcev1.ResourceDes
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil && p.config.NativeObserve != nil {
+		return p.config.NativeObserve(ctx, desired)
+	}
 	snapshot, err = nativefile.Capture(desired.GetManagedFile().GetPath(), observationTemplate(desired.GetRef(), p.backend, p.boot, p.config.ExecutorIncarnation))
 	if err != nil {
 		return nil, err
+	}
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+		modules, err := observeModules(ctx, desired.GetManagedFile(), p.config.Platform, p.backend.GetNativeVersion())
+		if err != nil {
+			return nil, err
+		}
+		snapshot.Observation.GetManagedFile().KernelModuleBlocklist = modules
 	}
 	if err := resource.ValidateObservation(snapshot.GetObservation()); err != nil {
 		return nil, err
@@ -225,7 +245,7 @@ func (p *Provider) Observe(ctx context.Context, desired *resourcev1.ResourceDesi
 	return snapshot.GetObservation(), nil
 }
 func (p *Provider) target(ctx context.Context, desired *resourcev1.ManagedFileDesired, before *agentv1.ResourceOwnershipSnapshot, ledger *agentv1.ResourceOwnershipLedger, operation resourcev1.ResourceOperation) (*agentv1.ResourceOwnershipSnapshot, error) {
-	target, err := targetImage(desired, before, ledger, operation)
+	target, err := targetImage(moduleTemplate(desired), before, ledger, operation)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +300,7 @@ func (p *Provider) makePlan(desired *resourcev1.ResourceDesiredState, operation 
 		return nil, err
 	}
 	change := resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_UPDATE
-	if imageEqual(before, target) {
+	if imageEqual(before, target) && (desired.GetManagedFile().GetKernelModuleBlocklist() == nil || (initramfsMatches(before.GetObservation().GetManagedFile().GetKernelModuleBlocklist(), target) && !moduleRebuildFailed(ledger.GetLastApplied()))) {
 		change = resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_OBSERVE
 	} else if !target.GetObservation().GetManagedFile().GetExists() {
 		change = resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_REMOVE_OWNED
@@ -371,7 +391,7 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 		}
 		requestLedger = proto.CloneOf(ledger)
 	}
-	dimensions := fileDimensions(desired.GetManagedFile(), before)
+	dimensions := fileDimensions(moduleTemplate(desired.GetManagedFile()), before)
 	if plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		dimensions = append([]agentv1.ResourceOwnedDimension(nil), ledger.GetOwnedDimensions()...)
 	}
@@ -395,7 +415,11 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if !consumed || reported == nil {
 		return nil, ErrOutcomeUnknown
 	}
-	finish, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	finishTimeout := 30 * time.Second
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+		finishTimeout = 2 * time.Minute
+	}
+	finish, cancel := context.WithTimeout(context.WithoutCancel(ctx), finishTimeout)
 	defer cancel()
 	after, err := p.snapshot(finish, desired)
 	if err != nil {
@@ -404,12 +428,26 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if !sameObserved(after.GetObservation(), reported.GetObservation()) || !imageEqual(after, target) {
 		return nil, ErrOutcomeUnknown
 	}
+	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+		if reported.ModuleInitramfsRebuildSucceeded == nil {
+			return nil, ErrOutcomeUnknown
+		}
+		after.ModuleInitramfsRebuildSucceeded = proto.Bool(reported.GetModuleInitramfsRebuildSucceeded())
+	}
 	verification, err := fileVerification(plan, after, target)
 	if err != nil {
 		return nil, errors.Join(ErrOutcomeUnknown, err)
 	}
+	// Release is irreversible in the ownership ledger. A successful native
+	// command is not proof that its boot-image postcondition took effect.
+	if plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && !verification.GetManagedFile().GetConverged() {
+		return verification, ErrOutcomeUnknown
+	}
 	if _, err := p.journal.CompleteResourceOwnershipEffect(finish, p.config.ActionID, int64(ledger.GetRevision()), after); err != nil {
 		return verification, errors.Join(ErrOutcomeUnknown, err)
+	}
+	if !verification.GetManagedFile().GetConverged() {
+		return verification, ErrNotConverged
 	}
 	return verification, nil
 }
@@ -502,6 +540,9 @@ func (p *Provider) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*
 			return nil, err
 		}
 	}
+	if moduleRebuildFailed(ledger.GetLastApplied()) {
+		after.ModuleInitramfsRebuildSucceeded = proto.Bool(false)
+	}
 	verification, err := fileVerification(plan, after, target)
 	if err != nil {
 		return nil, err
@@ -515,9 +556,39 @@ func fileVerification(plan *resourcev1.ResourcePlan, after, target *agentv1.Reso
 	a, b := after.GetObservation().GetManagedFile(), target.GetObservation().GetManagedFile()
 	checks := &resourcev1.ManagedFileChecks{PresenceMatches: a.GetExists() == b.GetExists(), ContentMatches: bytes.Equal(a.GetFile().GetSha256(), b.GetFile().GetSha256()), ModeMatches: a.GetFile().GetMode() == b.GetFile().GetMode(), OwnerMatches: a.GetFile().GetUid() == b.GetFile().GetUid() && a.GetFile().GetGid() == b.GetFile().GetGid(), AncestrySafe: len(a.GetAncestrySha256()) == 32 && bytes.Equal(a.GetSecurityMetadataSha256(), b.GetSecurityMetadataSha256())}
 	checks.Converged = checks.GetPresenceMatches() && checks.GetContentMatches() && checks.GetModeMatches() && checks.GetOwnerMatches() && checks.GetAncestrySafe()
+	fileMatches := checks.GetConverged()
+	if plan.GetManagedFile().GetDesired().GetKernelModuleBlocklist() != nil {
+		modules := a.GetKernelModuleBlocklist()
+		blocked, unloaded, builtIn := modules != nil, modules != nil, false
+		for _, module := range modules.GetModules() {
+			blocked = blocked && module.GetModprobeBlocked()
+			unloaded = unloaded && !module.GetLoaded() && !module.GetBuiltIn()
+			builtIn = builtIn || module.GetBuiltIn()
+		}
+		checks.InitramfsMatches = proto.Bool(initramfsMatches(modules, target))
+		if plan.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+			checks.ModuleLoadsBlocked, checks.ModulesUnloaded = proto.Bool(blocked), proto.Bool(unloaded)
+			checks.Converged = checks.Converged && blocked && unloaded && !builtIn
+		}
+		checks.Converged = checks.Converged && checks.GetInitramfsMatches()
+		if after.ModuleInitramfsRebuildSucceeded != nil {
+			checks.InitramfsRebuildSucceeded = proto.Bool(after.GetModuleInitramfsRebuildSucceeded())
+			checks.Converged = checks.Converged && checks.GetInitramfsRebuildSucceeded()
+		}
+	}
 	disposition := resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED
 	if checks.GetConverged() {
 		disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED
+	} else if fileMatches && checks.GetInitramfsMatches() && checks.GetModuleLoadsBlocked() && !checks.GetModulesUnloaded() && (checks.InitramfsRebuildSucceeded == nil || checks.GetInitramfsRebuildSucceeded()) {
+		disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_PENDING_REBOOT
+	}
+	if fileMatches && checks.GetInitramfsMatches() && plan.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && (checks.InitramfsRebuildSucceeded == nil || checks.GetInitramfsRebuildSucceeded()) {
+		for _, module := range a.GetKernelModuleBlocklist().GetModules() {
+			if module.GetBuiltIn() {
+				disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE
+				break
+			}
+		}
 	}
 	pd, err := resource.PlanDigest(plan)
 	if err != nil {

@@ -55,6 +55,23 @@ func ValidatePlanVerification(plan *resourcev1.ResourcePlan, verification *resou
 	if !RefEqual(plan.GetRef(), verification.GetRef()) || !bytes.Equal(plan.GetDesiredSha256(), verification.GetDesiredSha256()) || !bytes.Equal(digest[:], verification.GetPlanSha256()) {
 		return errors.New("resource: verification_plan_binding_mismatch")
 	}
+	if blocklist := plan.GetManagedFile().GetDesired().GetKernelModuleBlocklist(); blocklist != nil {
+		observed := verification.GetAfter().GetManagedFile().GetKernelModuleBlocklist()
+		checks := verification.GetManagedFile()
+		if observed == nil || checks.InitramfsMatches == nil {
+			return errors.New("resource: module_blocklist_evidence_missing")
+		}
+		if plan.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+			if checks.ModuleLoadsBlocked == nil || checks.ModulesUnloaded == nil || len(observed.GetModules()) != len(blocklist.GetModules()) {
+				return errors.New("resource: module_blocklist_evidence_missing")
+			}
+			for i, module := range blocklist.GetModules() {
+				if observed.GetModules()[i].GetName() != module {
+					return errors.New("resource: module_blocklist_evidence_mismatch")
+				}
+			}
+		}
+	}
 	return nil
 }
 

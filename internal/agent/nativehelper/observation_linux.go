@@ -24,13 +24,20 @@ import (
 
 const observationTimeout = 8 * time.Second
 
+func resourceObservationTimeout(request *agentv1.NativeResourceObservationRequest) time.Duration {
+	if request.GetDesired().GetManagedFile().GetKernelModuleBlocklist() != nil {
+		return 2 * time.Minute
+	}
+	return observationTimeout
+}
+
 // ObserveResource opens a separate read-only native boundary only for facts the
 // resident executor cannot read in its unchanged sandbox. It grants no effects.
 func ObserveResource(ctx context.Context, stateDirectory string, input *agentv1.NativeResourceObservationRequest) (_ *agentv1.NativeHelperResult, resultErr error) {
 	if os.Geteuid() != 0 || input == nil {
 		return nil, errors.New("native_observation_root_required")
 	}
-	ctx, cancel := context.WithTimeout(ctx, observationTimeout)
+	ctx, cancel := context.WithTimeout(ctx, resourceObservationTimeout(input))
 	defer cancel()
 	request := proto.CloneOf(input)
 	request.ObservationId = uuid.NewString()
@@ -167,8 +174,6 @@ func RunObservation(ctx context.Context, document *config.Document, observationI
 	if os.Geteuid() != 0 || document == nil {
 		return errors.New("native_observation_root_configuration_required")
 	}
-	ctx, cancel := context.WithTimeout(ctx, observationTimeout)
-	defer cancel()
 	directory, err := resourceDirectory(document.StateDirectory, "resource-observations", observationID, false)
 	if err != nil {
 		return err
@@ -179,6 +184,8 @@ func RunObservation(ctx context.Context, document *config.Document, observationI
 		return err
 	}
 	defer clear(encoded)
+	ctx, cancel := context.WithTimeout(ctx, resourceObservationTimeout(request))
+	defer cancel()
 	custody, err := helperCustody(directory)
 	if err != nil {
 		return err
@@ -241,7 +248,7 @@ func observationProperties(ctx context.Context, directory string, request *agent
 	properties := transientProperties(directory, request.GetObservationId(), "prepare")
 	properties = setProperty(properties, "Description", "Lindm bounded native resource observation")
 	properties = setProperty(properties, "ExecStart", []unitExec{{Path: helperExecutable, Arguments: []string{helperExecutable, "resource-observe", "-observation", request.GetObservationId()}}})
-	properties = setProperty(properties, "RuntimeMaxUSec", uint64(observationTimeout/time.Microsecond))
+	properties = setProperty(properties, "RuntimeMaxUSec", uint64(resourceObservationTimeout(request)/time.Microsecond))
 	properties = setProperty(properties, "TimeoutStopUSec", uint64(time.Second/time.Microsecond))
 	properties = setProperty(properties, "PrivateNetwork", true)
 	properties = setProperty(properties, "RestrictAddressFamilies", addressFamilies("AF_UNIX"))

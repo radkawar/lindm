@@ -3,6 +3,8 @@
 package nativehelper
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/accountprovider"
+	"lindm/internal/agent/fileprovider"
 )
 
 const nativeTestAction = "a2bca405-36e9-4a43-b5b5-d0b82a05e551"
@@ -84,6 +87,75 @@ func TestManagedFileHelperOnlyReceivesSelectedParent(t *testing.T) {
 	}
 	if unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_SYS_ADMIN|uint64(1)<<unix.CAP_NET_ADMIN) != 0 {
 		t.Fatal("managed file helper inherited package privileges")
+	}
+}
+
+func TestModuleHelpersExposeReadOnlyMetadataWithoutModuleAuthority(t *testing.T) {
+	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
+	desired := &resourcev1.ManagedFileDesired{Path: fileprovider.ModuleBlocklistPath, Presence: resourcev1.Presence_PRESENCE_PRESENT, KernelModuleBlocklist: &resourcev1.KernelModuleBlocklist{Modules: []string{"usb_storage"}}}
+	ref := &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, CanonicalKey: desired.Path}
+	plan := &resourcev1.ResourcePlan{Ref: ref, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}}, Plan: &resourcev1.ResourcePlan_ManagedFile{ManagedFile: &resourcev1.ManagedFilePlan{Desired: desired}}}
+	effect := unitValues(t, directory, plan, nil, nil)
+	request := &agentv1.NativeResourceObservationRequest{ObservationId: nativeTestAction, Desired: &resourcev1.ResourceDesiredState{Ref: ref, State: &resourcev1.ResourceDesiredState_ManagedFile{ManagedFile: desired}}}
+	properties, err := observationProperties(t.Context(), directory, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation := make(map[string]any, len(properties))
+	for _, property := range properties {
+		observation[property.Name] = property.Value.Value()
+	}
+	for _, values := range []map[string]any{effect, observation} {
+		if values["ProtectKernelModules"] != false || values["ProtectSystem"] != "strict" || !slices.Equal(unitValue[[]string](t, values, "ReadOnlyPaths"), []string{"/lib/modules"}) {
+			t.Fatal("module metadata is hidden or writable")
+		}
+		if unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_SYS_MODULE|uint64(1)<<unix.CAP_SYS_ADMIN) != 0 {
+			t.Fatal("module observer received load/unload or namespace authority")
+		}
+		filter := unitValue[struct {
+			AllowList bool
+			Syscalls  []string
+		}](t, values, "SystemCallFilter")
+		if filter.AllowList || !slices.Equal(filter.Syscalls, []string{"@module"}) {
+			t.Fatal("module syscalls were not denied independently of capabilities")
+		}
+	}
+	if !slices.Equal(unitValue[[]string](t, observation, "ReadWritePaths"), []string{directory}) {
+		t.Fatal("read-only observer received host write scope")
+	}
+	if !slices.Equal(unitValue[[]string](t, effect, "ReadWritePaths"), []string{directory, "/etc/modprobe.d", "/boot"}) {
+		t.Fatal("template effect escaped its fixed file and registry boot-image scope")
+	}
+	request.Desired.GetManagedFile().KernelModuleBlocklist = nil
+	if _, err := observationProperties(t.Context(), directory, request); err == nil {
+		t.Fatal("raw managed file acquired module metadata observer")
+	}
+}
+
+func TestModuleStateWritePathDoesNotCreateBeforePermit(t *testing.T) {
+	parent := t.TempDir()
+	directory := filepath.Join(parent, "vendor-state")
+	if got, err := moduleStateWritePath(directory); err != nil || got != parent {
+		t.Fatalf("missing state directory: path=%q err=%v", got, err)
+	}
+	if _, err := os.Lstat(directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("sandbox preparation created host state: %v", err)
+	}
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := moduleStateWritePath(directory); err != nil || got != directory {
+		t.Fatalf("existing state directory: path=%q err=%v", got, err)
+	}
+	link := filepath.Join(parent, "state-link")
+	if err := os.Symlink(directory, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := moduleStateWritePath(link); !errors.Is(err, fileprovider.ErrUnsupported) {
+		t.Fatalf("symlink state directory accepted: %v", err)
+	}
+	if _, err := moduleStateWritePath(filepath.Join(parent, "absent", "state")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing parent widened scope recursively: %v", err)
 	}
 }
 
@@ -168,12 +240,12 @@ func TestNativeKindRegistryIsClosed(t *testing.T) {
 			t.Errorf("%s has a native effect", kind)
 		}
 	}
-	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION, resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE} {
+	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION, resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE} {
 		if _, err := observedKind(kind); err == nil {
 			t.Errorf("%s gained a native observer the executor does not need", kind)
 		}
 	}
-	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE} {
+	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE} {
 		if _, err := effectKind(kind); err != nil {
 			t.Errorf("%s lost its native effect: %v", kind, err)
 		}

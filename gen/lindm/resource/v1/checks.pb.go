@@ -1633,15 +1633,19 @@ func (x *DirectoryClientChecks) GetConverged() bool {
 }
 
 type ManagedFileChecks struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	PresenceMatches bool                   `protobuf:"varint,1,opt,name=presence_matches,json=presenceMatches,proto3" json:"presence_matches,omitempty"`
-	ContentMatches  bool                   `protobuf:"varint,2,opt,name=content_matches,json=contentMatches,proto3" json:"content_matches,omitempty"`
-	ModeMatches     bool                   `protobuf:"varint,3,opt,name=mode_matches,json=modeMatches,proto3" json:"mode_matches,omitempty"`
-	OwnerMatches    bool                   `protobuf:"varint,4,opt,name=owner_matches,json=ownerMatches,proto3" json:"owner_matches,omitempty"`
-	AncestrySafe    bool                   `protobuf:"varint,5,opt,name=ancestry_safe,json=ancestrySafe,proto3" json:"ancestry_safe,omitempty"`
-	Converged       bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	PresenceMatches           bool                   `protobuf:"varint,1,opt,name=presence_matches,json=presenceMatches,proto3" json:"presence_matches,omitempty"`
+	ContentMatches            bool                   `protobuf:"varint,2,opt,name=content_matches,json=contentMatches,proto3" json:"content_matches,omitempty"`
+	ModeMatches               bool                   `protobuf:"varint,3,opt,name=mode_matches,json=modeMatches,proto3" json:"mode_matches,omitempty"`
+	OwnerMatches              bool                   `protobuf:"varint,4,opt,name=owner_matches,json=ownerMatches,proto3" json:"owner_matches,omitempty"`
+	AncestrySafe              bool                   `protobuf:"varint,5,opt,name=ancestry_safe,json=ancestrySafe,proto3" json:"ancestry_safe,omitempty"`
+	Converged                 bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
+	ModuleLoadsBlocked        *bool                  `protobuf:"varint,7,opt,name=module_loads_blocked,json=moduleLoadsBlocked,proto3,oneof" json:"module_loads_blocked,omitempty"`
+	ModulesUnloaded           *bool                  `protobuf:"varint,8,opt,name=modules_unloaded,json=modulesUnloaded,proto3,oneof" json:"modules_unloaded,omitempty"`
+	InitramfsMatches          *bool                  `protobuf:"varint,9,opt,name=initramfs_matches,json=initramfsMatches,proto3,oneof" json:"initramfs_matches,omitempty"`
+	InitramfsRebuildSucceeded *bool                  `protobuf:"varint,10,opt,name=initramfs_rebuild_succeeded,json=initramfsRebuildSucceeded,proto3,oneof" json:"initramfs_rebuild_succeeded,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *ManagedFileChecks) Reset() {
@@ -1712,6 +1716,34 @@ func (x *ManagedFileChecks) GetAncestrySafe() bool {
 func (x *ManagedFileChecks) GetConverged() bool {
 	if x != nil {
 		return x.Converged
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetModuleLoadsBlocked() bool {
+	if x != nil && x.ModuleLoadsBlocked != nil {
+		return *x.ModuleLoadsBlocked
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetModulesUnloaded() bool {
+	if x != nil && x.ModulesUnloaded != nil {
+		return *x.ModulesUnloaded
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetInitramfsMatches() bool {
+	if x != nil && x.InitramfsMatches != nil {
+		return *x.InitramfsMatches
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetInitramfsRebuildSucceeded() bool {
+	if x != nil && x.InitramfsRebuildSucceeded != nil {
+		return *x.InitramfsRebuildSucceeded
 	}
 	return false
 }
@@ -2113,15 +2145,24 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x15offline_outage_policy\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x13offlineOutagePolicy\x12K\n" +
 	"\"unrelated_join_artifacts_preserved\x18\x05 \x01(\bR\x1funrelatedJoinArtifactsPreserved\x12\x1c\n" +
 	"\tconverged\x18\x06 \x01(\bR\tconverged:\xb5\x02\xbaH\xb1\x02\x1a\xae\x02\n" +
-	"\x1cdirectory_checks.convergence\x12Idirectory convergence requires a real account fixture and outage behavior\x1a\xc2\x01!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)\"\xf5\x03\n" +
+	"\x1cdirectory_checks.convergence\x12Idirectory convergence requires a real account fixture and outage behavior\x1a\xc2\x01!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)\"\xbf\b\n" +
 	"\x11ManagedFileChecks\x12)\n" +
 	"\x10presence_matches\x18\x01 \x01(\bR\x0fpresenceMatches\x12'\n" +
 	"\x0fcontent_matches\x18\x02 \x01(\bR\x0econtentMatches\x12!\n" +
 	"\fmode_matches\x18\x03 \x01(\bR\vmodeMatches\x12#\n" +
 	"\rowner_matches\x18\x04 \x01(\bR\fownerMatches\x12#\n" +
 	"\rancestry_safe\x18\x05 \x01(\bR\fancestrySafe\x12\x1c\n" +
-	"\tconverged\x18\x06 \x01(\bR\tconverged:\x80\x02\xbaH\xfc\x01\x1a\xf9\x01\n" +
-	"\x1fmanaged_file_checks.convergence\x12Pfile convergence requires independently read content, metadata and safe ancestry\x1a\x83\x01!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe)\"\xeb\x03\n" +
+	"\tconverged\x18\x06 \x01(\bR\tconverged\x125\n" +
+	"\x14module_loads_blocked\x18\a \x01(\bH\x00R\x12moduleLoadsBlocked\x88\x01\x01\x12.\n" +
+	"\x10modules_unloaded\x18\b \x01(\bH\x01R\x0fmodulesUnloaded\x88\x01\x01\x120\n" +
+	"\x11initramfs_matches\x18\t \x01(\bH\x02R\x10initramfsMatches\x88\x01\x01\x12C\n" +
+	"\x1binitramfs_rebuild_succeeded\x18\n" +
+	" \x01(\bH\x03R\x19initramfsRebuildSucceeded\x88\x01\x01:\x88\x04\xbaH\x84\x04\x1a\x81\x04\n" +
+	"\x1fmanaged_file_checks.convergence\x12Pfile convergence requires independently read content, metadata and safe ancestry\x1a\x8b\x03!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe && (!has(this.module_loads_blocked) || this.module_loads_blocked) && (!has(this.modules_unloaded) || this.modules_unloaded) && (!has(this.initramfs_matches) || this.initramfs_matches) && (!has(this.initramfs_rebuild_succeeded) || this.initramfs_rebuild_succeeded))B\x17\n" +
+	"\x15_module_loads_blockedB\x13\n" +
+	"\x11_modules_unloadedB\x14\n" +
+	"\x12_initramfs_matchesB\x1e\n" +
+	"\x1c_initramfs_rebuild_succeeded\"\xeb\x03\n" +
 	"\fSysctlChecks\x12,\n" +
 	"\x12live_value_matches\x18\x01 \x01(\bR\x10liveValueMatches\x12/\n" +
 	"\x13persistence_matches\x18\x02 \x01(\bR\x12persistenceMatches\x12:\n" +
@@ -2227,6 +2268,7 @@ func file_lindm_resource_v1_checks_proto_init() {
 	}
 	file_lindm_resource_v1_common_proto_init()
 	file_lindm_resource_v1_observations_proto_init()
+	file_lindm_resource_v1_checks_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

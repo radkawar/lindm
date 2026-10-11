@@ -124,6 +124,28 @@
         "description": "Shared security baseline; executor file allowed_roots must include /etc/motd.d.",
         "resources": [
           {
+            "resourceId": "9559767f-82ee-44e2-90fb-118a73f67ce9",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_MANAGED_FILE",
+                "canonicalKey": "/etc/modprobe.d/99-lindm-blocklist.conf"
+              },
+              "managedFile": {
+                "path": "/etc/modprobe.d/99-lindm-blocklist.conf",
+                "presence": "PRESENCE_PRESENT",
+                "kernelModuleBlocklist": { "modules": ["usb_storage", "uas"] }
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
             "resourceId": "be829bf4-93b4-514f-b6ef-6edf2f1dbeba",
             "desired": {
               "ref": {

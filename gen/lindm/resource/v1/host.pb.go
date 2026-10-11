@@ -26,15 +26,17 @@ const (
 // domains, symlinks and unsafe ancestry. Release restores a protected journal
 // baseline only while the last-applied identity and managed dimensions match.
 type ManagedFileDesired struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Presence      Presence               `protobuf:"varint,2,opt,name=presence,proto3,enum=lindm.resource.v1.Presence" json:"presence,omitempty"`
-	Content       []byte                 `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
-	Mode          *uint32                `protobuf:"varint,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
-	Uid           *uint32                `protobuf:"varint,5,opt,name=uid,proto3,oneof" json:"uid,omitempty"`
-	Gid           *uint32                `protobuf:"varint,6,opt,name=gid,proto3,oneof" json:"gid,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Path     string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Presence Presence               `protobuf:"varint,2,opt,name=presence,proto3,enum=lindm.resource.v1.Presence" json:"presence,omitempty"`
+	Content  []byte                 `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
+	Mode     *uint32                `protobuf:"varint,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
+	Uid      *uint32                `protobuf:"varint,5,opt,name=uid,proto3,oneof" json:"uid,omitempty"`
+	Gid      *uint32                `protobuf:"varint,6,opt,name=gid,proto3,oneof" json:"gid,omitempty"`
+	// Closed template, not permission to supply arbitrary modprobe directives.
+	KernelModuleBlocklist *KernelModuleBlocklist `protobuf:"bytes,7,opt,name=kernel_module_blocklist,json=kernelModuleBlocklist,proto3" json:"kernel_module_blocklist,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ManagedFileDesired) Reset() {
@@ -109,6 +111,59 @@ func (x *ManagedFileDesired) GetGid() uint32 {
 	return 0
 }
 
+func (x *ManagedFileDesired) GetKernelModuleBlocklist() *KernelModuleBlocklist {
+	if x != nil {
+		return x.KernelModuleBlocklist
+	}
+	return nil
+}
+
+// Canonical Linux module names use underscores, never aliases or modprobe text.
+// This prevents future loads; it never unloads an active or built-in driver.
+type KernelModuleBlocklist struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Modules       []string               `protobuf:"bytes,1,rep,name=modules,proto3" json:"modules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KernelModuleBlocklist) Reset() {
+	*x = KernelModuleBlocklist{}
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KernelModuleBlocklist) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KernelModuleBlocklist) ProtoMessage() {}
+
+func (x *KernelModuleBlocklist) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KernelModuleBlocklist.ProtoReflect.Descriptor instead.
+func (*KernelModuleBlocklist) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *KernelModuleBlocklist) GetModules() []string {
+	if x != nil {
+		return x.Modules
+	}
+	return nil
+}
+
 // A single kernel key/value, never sysctl configuration text or an include.
 // Persistent changes own a derived stanza; release compares both live and
 // persistent last-applied state before restoring the journal baseline.
@@ -123,7 +178,7 @@ type SysctlDesired struct {
 
 func (x *SysctlDesired) Reset() {
 	*x = SysctlDesired{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[1]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -135,7 +190,7 @@ func (x *SysctlDesired) String() string {
 func (*SysctlDesired) ProtoMessage() {}
 
 func (x *SysctlDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[1]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -148,7 +203,7 @@ func (x *SysctlDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SysctlDesired.ProtoReflect.Descriptor instead.
 func (*SysctlDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{1}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SysctlDesired) GetKey() string {
@@ -184,7 +239,7 @@ type DailyTimerSchedule struct {
 
 func (x *DailyTimerSchedule) Reset() {
 	*x = DailyTimerSchedule{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[2]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -196,7 +251,7 @@ func (x *DailyTimerSchedule) String() string {
 func (*DailyTimerSchedule) ProtoMessage() {}
 
 func (x *DailyTimerSchedule) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[2]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -209,7 +264,7 @@ func (x *DailyTimerSchedule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DailyTimerSchedule.ProtoReflect.Descriptor instead.
 func (*DailyTimerSchedule) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{2}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DailyTimerSchedule) GetHour() uint32 {
@@ -239,7 +294,7 @@ type TimerSchedule struct {
 
 func (x *TimerSchedule) Reset() {
 	*x = TimerSchedule{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[3]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -251,7 +306,7 @@ func (x *TimerSchedule) String() string {
 func (*TimerSchedule) ProtoMessage() {}
 
 func (x *TimerSchedule) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[3]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +319,7 @@ func (x *TimerSchedule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimerSchedule.ProtoReflect.Descriptor instead.
 func (*TimerSchedule) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{3}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TimerSchedule) GetSchedule() isTimerSchedule_Schedule {
@@ -320,7 +375,7 @@ type TimerDefinition struct {
 
 func (x *TimerDefinition) Reset() {
 	*x = TimerDefinition{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[4]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +387,7 @@ func (x *TimerDefinition) String() string {
 func (*TimerDefinition) ProtoMessage() {}
 
 func (x *TimerDefinition) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[4]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +400,7 @@ func (x *TimerDefinition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimerDefinition.ProtoReflect.Descriptor instead.
 func (*TimerDefinition) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{4}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TimerDefinition) GetUnit() string {
@@ -389,7 +444,7 @@ type ServiceDropIn struct {
 
 func (x *ServiceDropIn) Reset() {
 	*x = ServiceDropIn{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[5]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -401,7 +456,7 @@ func (x *ServiceDropIn) String() string {
 func (*ServiceDropIn) ProtoMessage() {}
 
 func (x *ServiceDropIn) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[5]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -414,7 +469,7 @@ func (x *ServiceDropIn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceDropIn.ProtoReflect.Descriptor instead.
 func (*ServiceDropIn) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{5}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ServiceDropIn) GetUnit() string {
@@ -466,7 +521,7 @@ type SystemdDefinitionDesired struct {
 
 func (x *SystemdDefinitionDesired) Reset() {
 	*x = SystemdDefinitionDesired{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[6]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -478,7 +533,7 @@ func (x *SystemdDefinitionDesired) String() string {
 func (*SystemdDefinitionDesired) ProtoMessage() {}
 
 func (x *SystemdDefinitionDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[6]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -491,7 +546,7 @@ func (x *SystemdDefinitionDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemdDefinitionDesired.ProtoReflect.Descriptor instead.
 func (*SystemdDefinitionDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{6}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SystemdDefinitionDesired) GetPresence() Presence {
@@ -555,7 +610,7 @@ type EncryptionComplianceDesired struct {
 
 func (x *EncryptionComplianceDesired) Reset() {
 	*x = EncryptionComplianceDesired{}
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[7]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -567,7 +622,7 @@ func (x *EncryptionComplianceDesired) String() string {
 func (*EncryptionComplianceDesired) ProtoMessage() {}
 
 func (x *EncryptionComplianceDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_host_proto_msgTypes[7]
+	mi := &file_lindm_resource_v1_host_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -580,7 +635,7 @@ func (x *EncryptionComplianceDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncryptionComplianceDesired.ProtoReflect.Descriptor instead.
 func (*EncryptionComplianceDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{7}
+	return file_lindm_resource_v1_host_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *EncryptionComplianceDesired) GetRequireLuksRoot() bool {
@@ -608,7 +663,7 @@ var File_lindm_resource_v1_host_proto protoreflect.FileDescriptor
 
 const file_lindm_resource_v1_host_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/resource/v1/host.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a lindm/resource/v1/identity.proto\"\xf1\x05\n" +
+	"\x1clindm/resource/v1/host.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a lindm/resource/v1/identity.proto\"\xd5\t\n" +
 	"\x12ManagedFileDesired\x12C\n" +
 	"\x04path\x18\x01 \x01(\tB/\xbaH,r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\x04path\x12C\n" +
 	"\bpresence\x18\x02 \x01(\x0e2\x1b.lindm.resource.v1.PresenceB\n" +
@@ -616,14 +671,18 @@ const file_lindm_resource_v1_host_proto_rawDesc = "" +
 	"\acontent\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\acontent\x88\x01\x01\x12!\n" +
 	"\x04mode\x18\x04 \x01(\rB\b\xbaH\x05*\x03\x18\xff\x03H\x01R\x04mode\x88\x01\x01\x12\"\n" +
 	"\x03uid\x18\x05 \x01(\rB\v\xbaH\b*\x06\x10\xff\xff\xff\xff\x0fH\x02R\x03uid\x88\x01\x01\x12\"\n" +
-	"\x03gid\x18\x06 \x01(\rB\v\xbaH\b*\x06\x10\xff\xff\xff\xff\x0fH\x03R\x03gid\x88\x01\x01:\x96\x03\xbaH\x92\x03\x1ay\n" +
-	"\x1bmanaged_file.canonical_path\x124file paths must not contain dot or parent components\x1a$!this.path.matches('/[.]{1,2}(/|$)')\x1a\x94\x02\n" +
-	"\x17managed_file.dimensions\x12Lpresent files require a managed dimension; absent files carry no replacement\x1a\xaa\x01this.presence == 1 ? (has(this.content) || has(this.mode) || has(this.uid) || has(this.gid)) : (!has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid))B\n" +
+	"\x03gid\x18\x06 \x01(\rB\v\xbaH\b*\x06\x10\xff\xff\xff\xff\x0fH\x03R\x03gid\x88\x01\x01\x12`\n" +
+	"\x17kernel_module_blocklist\x18\a \x01(\v2(.lindm.resource.v1.KernelModuleBlocklistR\x15kernelModuleBlocklist:\x98\x06\xbaH\x94\x06\x1ay\n" +
+	"\x1bmanaged_file.canonical_path\x124file paths must not contain dot or parent components\x1a$!this.path.matches('/[.]{1,2}(/|$)')\x1a\xdf\x02\n" +
+	"\x17managed_file.dimensions\x12Lpresent files require a managed dimension; absent files carry no replacement\x1a\xf5\x01this.presence == 1 ? (has(this.content) || has(this.mode) || has(this.uid) || has(this.gid) || has(this.kernel_module_blocklist)) : (!has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid) && !has(this.kernel_module_blocklist))\x1a\xb4\x02\n" +
+	"\x1cmanaged_file.module_template\x12Pmodule blocklists use the fixed owned path and cannot supply raw file dimensions\x1a\xc1\x01!has(this.kernel_module_blocklist) || (this.path == '/etc/modprobe.d/99-lindm-blocklist.conf' && this.presence == 1 && !has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid))B\n" +
 	"\n" +
 	"\b_contentB\a\n" +
 	"\x05_modeB\x06\n" +
 	"\x04_uidB\x06\n" +
-	"\x04_gid\"\xc0\x02\n" +
+	"\x04_gid\"^\n" +
+	"\x15KernelModuleBlocklist\x12E\n" +
+	"\amodules\x18\x01 \x03(\tB+\xbaH(\x92\x01%\b\x01\x10@\x18\x01\"\x1dr\x1b(@2\x17^[a-zA-Z][a-zA-Z0-9_]*$R\amodules\"\xc0\x02\n" +
 	"\rSysctlDesired\x12A\n" +
 	"\x03key\x18\x01 \x01(\tB/\xbaH,r*(\xff\x012%^[a-z][a-z0-9_]*([.][a-zA-Z0-9_-]+)+$R\x03key\x128\n" +
 	"\x05value\x18\x02 \x01(\tB\"\xbaH\x1fr\x1d\x10\x01(\x80 2\x16^[a-zA-Z0-9_.,:/+ -]+$R\x05value\x12\x1e\n" +
@@ -686,32 +745,34 @@ func file_lindm_resource_v1_host_proto_rawDescGZIP() []byte {
 	return file_lindm_resource_v1_host_proto_rawDescData
 }
 
-var file_lindm_resource_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_lindm_resource_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_lindm_resource_v1_host_proto_goTypes = []any{
 	(*ManagedFileDesired)(nil),          // 0: lindm.resource.v1.ManagedFileDesired
-	(*SysctlDesired)(nil),               // 1: lindm.resource.v1.SysctlDesired
-	(*DailyTimerSchedule)(nil),          // 2: lindm.resource.v1.DailyTimerSchedule
-	(*TimerSchedule)(nil),               // 3: lindm.resource.v1.TimerSchedule
-	(*TimerDefinition)(nil),             // 4: lindm.resource.v1.TimerDefinition
-	(*ServiceDropIn)(nil),               // 5: lindm.resource.v1.ServiceDropIn
-	(*SystemdDefinitionDesired)(nil),    // 6: lindm.resource.v1.SystemdDefinitionDesired
-	(*EncryptionComplianceDesired)(nil), // 7: lindm.resource.v1.EncryptionComplianceDesired
-	(Presence)(0),                       // 8: lindm.resource.v1.Presence
-	(*ResourceRef)(nil),                 // 9: lindm.resource.v1.ResourceRef
+	(*KernelModuleBlocklist)(nil),       // 1: lindm.resource.v1.KernelModuleBlocklist
+	(*SysctlDesired)(nil),               // 2: lindm.resource.v1.SysctlDesired
+	(*DailyTimerSchedule)(nil),          // 3: lindm.resource.v1.DailyTimerSchedule
+	(*TimerSchedule)(nil),               // 4: lindm.resource.v1.TimerSchedule
+	(*TimerDefinition)(nil),             // 5: lindm.resource.v1.TimerDefinition
+	(*ServiceDropIn)(nil),               // 6: lindm.resource.v1.ServiceDropIn
+	(*SystemdDefinitionDesired)(nil),    // 7: lindm.resource.v1.SystemdDefinitionDesired
+	(*EncryptionComplianceDesired)(nil), // 8: lindm.resource.v1.EncryptionComplianceDesired
+	(Presence)(0),                       // 9: lindm.resource.v1.Presence
+	(*ResourceRef)(nil),                 // 10: lindm.resource.v1.ResourceRef
 }
 var file_lindm_resource_v1_host_proto_depIdxs = []int32{
-	8, // 0: lindm.resource.v1.ManagedFileDesired.presence:type_name -> lindm.resource.v1.Presence
-	2, // 1: lindm.resource.v1.TimerSchedule.daily:type_name -> lindm.resource.v1.DailyTimerSchedule
-	9, // 2: lindm.resource.v1.TimerDefinition.service:type_name -> lindm.resource.v1.ResourceRef
-	3, // 3: lindm.resource.v1.TimerDefinition.schedule:type_name -> lindm.resource.v1.TimerSchedule
-	8, // 4: lindm.resource.v1.SystemdDefinitionDesired.presence:type_name -> lindm.resource.v1.Presence
-	4, // 5: lindm.resource.v1.SystemdDefinitionDesired.timer:type_name -> lindm.resource.v1.TimerDefinition
-	5, // 6: lindm.resource.v1.SystemdDefinitionDesired.drop_in:type_name -> lindm.resource.v1.ServiceDropIn
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	9,  // 0: lindm.resource.v1.ManagedFileDesired.presence:type_name -> lindm.resource.v1.Presence
+	1,  // 1: lindm.resource.v1.ManagedFileDesired.kernel_module_blocklist:type_name -> lindm.resource.v1.KernelModuleBlocklist
+	3,  // 2: lindm.resource.v1.TimerSchedule.daily:type_name -> lindm.resource.v1.DailyTimerSchedule
+	10, // 3: lindm.resource.v1.TimerDefinition.service:type_name -> lindm.resource.v1.ResourceRef
+	4,  // 4: lindm.resource.v1.TimerDefinition.schedule:type_name -> lindm.resource.v1.TimerSchedule
+	9,  // 5: lindm.resource.v1.SystemdDefinitionDesired.presence:type_name -> lindm.resource.v1.Presence
+	5,  // 6: lindm.resource.v1.SystemdDefinitionDesired.timer:type_name -> lindm.resource.v1.TimerDefinition
+	6,  // 7: lindm.resource.v1.SystemdDefinitionDesired.drop_in:type_name -> lindm.resource.v1.ServiceDropIn
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_host_proto_init() }
@@ -721,23 +782,23 @@ func file_lindm_resource_v1_host_proto_init() {
 	}
 	file_lindm_resource_v1_identity_proto_init()
 	file_lindm_resource_v1_host_proto_msgTypes[0].OneofWrappers = []any{}
-	file_lindm_resource_v1_host_proto_msgTypes[3].OneofWrappers = []any{
+	file_lindm_resource_v1_host_proto_msgTypes[4].OneofWrappers = []any{
 		(*TimerSchedule_Daily)(nil),
 		(*TimerSchedule_IntervalSeconds)(nil),
 	}
-	file_lindm_resource_v1_host_proto_msgTypes[5].OneofWrappers = []any{}
-	file_lindm_resource_v1_host_proto_msgTypes[6].OneofWrappers = []any{
+	file_lindm_resource_v1_host_proto_msgTypes[6].OneofWrappers = []any{}
+	file_lindm_resource_v1_host_proto_msgTypes[7].OneofWrappers = []any{
 		(*SystemdDefinitionDesired_Timer)(nil),
 		(*SystemdDefinitionDesired_DropIn)(nil),
 	}
-	file_lindm_resource_v1_host_proto_msgTypes[7].OneofWrappers = []any{}
+	file_lindm_resource_v1_host_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_host_proto_rawDesc), len(file_lindm_resource_v1_host_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

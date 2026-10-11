@@ -3,6 +3,7 @@ import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { Textarea } from "@/components/ui/textarea";
 import { type DraftResource } from "./model";
 import {
   desiredField,
@@ -34,6 +35,8 @@ export function ResourceFields({
   const kind = resourceKinds.find((entry) => entry.arm === arm);
   const field = desiredField(arm);
   const desired = object(document.desired);
+  const moduleBlocklist = object(desired.managedFile).kernelModuleBlocklist !== undefined;
+  const selectedTask = moduleBlocklist ? "blockKernelModules" : arm;
   const id = `resource-${resource.resourceId}`;
   const references: ReferenceChoice[] = resources.flatMap((entry, position) => {
     if (entry.resourceId === resource.resourceId) return [];
@@ -67,25 +70,83 @@ export function ResourceFields({
         <Label htmlFor={`${id}-kind`}>Setting type</Label>
         <SelectField
           id={`${id}-kind`}
-          value={arm}
+          value={selectedTask}
           disabled={locked}
           options={[
             { value: "", label: "Choose a setting type" },
             ...(!kind && arm ? [{ value: arm, label: "Existing setting type" }] : []),
+            { value: "blockKernelModules", label: "Block kernel modules" },
             ...resourceKinds
               .filter((entry) => desiredField(entry.arm))
               .map((entry) => ({ value: entry.arm, label: entry.label })),
           ]}
           onValueChange={(next) => {
-            if (next !== arm)
+            if (next === selectedTask) return;
+            if (next === "blockKernelModules") {
+              update({
+                ...document,
+                desired: {
+                  managedFile: {
+                    path: "/etc/modprobe.d/99-lindm-blocklist.conf",
+                    presence: "PRESENCE_PRESENT",
+                    kernelModuleBlocklist: { modules: ["usb_storage", "uas"] },
+                  },
+                },
+              });
+            } else {
               update({ ...document, desired: next ? { [next]: initialState(next) } : {} });
+            }
           }}
         />
       </div>
-      {kind ? <p className="text-sm text-muted-foreground">{kind.help}</p> : null}
-      {field?.fieldKind === "message" && kind ? (
+      {kind && !moduleBlocklist ? (
+        <p className="text-sm text-muted-foreground">{kind.help}</p>
+      ) : null}
+      {moduleBlocklist ? (
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${id}-modules`}>Modules to block</Label>
+            <Textarea
+              id={`${id}-modules`}
+              value={(
+                (object(object(desired.managedFile).kernelModuleBlocklist).modules as string[]) ??
+                []
+              ).join("\n")}
+              onChange={(event) =>
+                update({
+                  ...document,
+                  desired: {
+                    ...desired,
+                    managedFile: {
+                      ...object(desired.managedFile),
+                      kernelModuleBlocklist: { modules: event.target.value.split("\n") },
+                    },
+                  },
+                })
+              }
+              aria-describedby={`${id}-module-help`}
+            />
+            <p id={`${id}-module-help`} className="text-sm text-muted-foreground">
+              Enter one module name per line, using underscores rather than hyphens.
+            </p>
+          </div>
+          <p className="text-sm">
+            Assigned devices block future loads and rebuild their boot files. Active drivers stay
+            loaded until restart; built-in drivers cannot be blocked.
+          </p>
+        </div>
+      ) : field?.fieldKind === "message" && kind ? (
         <TypedFields
-          schema={field.message}
+          schema={
+            arm === "managedFile"
+              ? {
+                  ...field.message,
+                  fields: field.message.fields.filter(
+                    (entry) => entry.jsonName !== "kernelModuleBlocklist",
+                  ),
+                }
+              : field.message
+          }
           value={object(desired[arm])}
           id={`${id}-desired`}
           references={references}
