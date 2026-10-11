@@ -3,10 +3,12 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Verdict classifies a worktree's work against Trunk.
@@ -35,6 +37,9 @@ type Audit struct {
 	Changed  int      `json:"changed_files"`
 	Unlanded []string `json:"unlanded_files,omitempty"`
 	Note     string   `json:"note,omitempty"`
+	// Active says why the owner is evidently still working in the tree;
+	// such PARTIAL/UNLANDED trees are work in progress, not stranded work.
+	Active string `json:"active,omitempty"`
 }
 
 // maxListedFiles bounds the unlanded paths recorded per tree.
@@ -75,6 +80,9 @@ func (r *Repository) AuditPath(ctx context.Context, path string) Audit {
 		return audit
 	}
 	audit.Head = entry.Head
+	if audit.Active, err = r.activity(ctx, entry.Path); err != nil {
+		audit.Note = "activity unknown: " + err.Error()
+	}
 	if err := r.snapshot(ctx, entry.Path, nil, func(base string, git gitFunc, scope []string) error {
 		audit.Base = base
 		return r.classify(ctx, &audit, git, scope)
@@ -82,6 +90,43 @@ func (r *Repository) AuditPath(ctx context.Context, path string) Audit {
 		audit.Verdict, audit.Note = Unlanded, "audit failed, treated as unlanded: "+err.Error()
 	}
 	return audit
+}
+
+// ActiveWindow is how recently a file must have changed for the audit to
+// treat a tree as being worked on by its live owner.
+const ActiveWindow = 2 * time.Hour
+
+// activity explains why the tree's owner is evidently still working in it: a
+// live process uses it, or a file outside node_modules changed within
+// ActiveWindow. It returns "" for an idle tree.
+func (r *Repository) activity(ctx context.Context, path string) (string, error) {
+	if user, err := r.user(ctx, path); err != nil || user != "" {
+		return user, err
+	}
+	var newest time.Time
+	err := filepath.WalkDir(path, func(file string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && (d.Name() == "node_modules" || d.Name() == ".git") {
+			return filepath.SkipDir
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if age := time.Since(newest); age < ActiveWindow {
+		return "modified " + age.Round(time.Minute).String() + " ago", nil
+	}
+	return "", nil
 }
 
 func unregisteredKind(path string) string {

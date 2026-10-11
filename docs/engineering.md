@@ -1586,9 +1586,13 @@ file, or the file's change reverse-applies to `main` (checked in a scratch index
 Trees are LANDED, PARTIAL (unlanded files listed), UNLANDED, SNAPSHOT (no change),
 MISSING or UNREGISTERED (separate clone or plain copy), with an owner inferred
 from the directory name; the table is also written to
-`~/.cache/lindm-worktree-audit/<ts>.json`. `worktree prune` uses the same audit:
-a dirty or diverged tree audited LANDED or SNAPSHOT is archived and removed
-without `-archive-dirty`.
+`~/.cache/lindm-worktree-audit/<ts>.json`. A PARTIAL/UNLANDED tree whose owner is
+evidently working in it (a live process uses it, or a file outside `.git` and
+`node_modules` changed within two hours) is work in progress: the JSON records
+why, and the table hides it unless `-all`. The audit is the parent's periodic
+job, not a per-landing step. `worktree prune` uses the same audit: a dirty or
+diverged tree audited LANDED or SNAPSHOT is archived and removed without
+`-archive-dirty`.
 
 The control-plane trust VM lane uses a separate disposable PostgreSQL **database**,
 not `testdb`'s schema. It invokes the real `lindmd` executable, whose protected

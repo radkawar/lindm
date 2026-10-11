@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -59,6 +60,10 @@ func TestAuditRecognizesCopyLandedWork(t *testing.T) {
 	}
 	if got := verdicts["partial"].Unlanded; !slices.Equal(got, []string{"private.txt"}) {
 		t.Fatalf("partial unlanded files %v", got)
+	}
+	// Files written moments ago mark the owner as still at work.
+	if active := verdicts["partial"].Active; !strings.HasPrefix(active, "modified ") {
+		t.Fatalf("fresh tree not in progress: %q", active)
 	}
 	unregistered := 0
 	for _, audit := range verdicts {

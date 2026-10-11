@@ -24,13 +24,15 @@ const worktreeUsage = `Usage: go run ./cmd/dev worktree <add|list|audit|prune> [
         package-lock.json match (otherwise npm ci there), print the path.
   list  Registered worktrees: path, HEAD, ahead/behind main, dirty, last
         modified (newest file outside node_modules), allocated size.
-  audit [PATH...]  Classify every registered worktree (and extra PATHs) by
-        whether main already holds its work, by content rather than commits:
+  audit [-all] [PATH...]  Classify every registered worktree (and extra PATHs)
+        by whether main already holds its work, by content rather than commits:
         its change set (base..HEAD, staged, unstaged, untracked) per file is
         LANDED when main has that content or the change reverse-applies to
         main; trees are LANDED, PARTIAL (unlanded files listed), UNLANDED,
         SNAPSHOT (no change), MISSING or UNREGISTERED, with an owner inferred
-        from the name. Prints a table and writes
+        from the name. PARTIAL/UNLANDED trees a live owner is working in (a
+        process uses the tree, or a file changed within 2h) are work in
+        progress and hidden from the table unless -all. Writes every tree to
         ~/.cache/lindm-worktree-audit/<ts>.json.
   prune [-older-than D] [-dry-run] [-archive-dirty] [PATH...]
         Remove worktrees (default: every one under <main>.worktrees) that are
@@ -62,6 +64,7 @@ func runWorktree(args []string) error {
 	olderThan := flags.Duration("older-than", 0, "prune only trees unmodified for this long")
 	dryRun := flags.Bool("dry-run", false, "prune: report decisions without archiving or removing")
 	archiveDirty := flags.Bool("archive-dirty", false, "prune: archive, then remove, dirty or diverged trees")
+	all := flags.Bool("all", false, "audit: also list PARTIAL/UNLANDED trees that are in progress")
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), worktreeUsage) }
 	positional, err := parseInterspersed(flags, args[1:])
@@ -96,7 +99,7 @@ func runWorktree(args []string) error {
 		}
 		return listWorktrees(ctx, repo)
 	case "audit":
-		return auditWorktrees(ctx, repo, positional)
+		return auditWorktrees(ctx, repo, positional, *all)
 	}
 	return pruneWorktrees(ctx, repo, positional, worktree.PruneOptions{OlderThan: *olderThan, DryRun: *dryRun, ArchiveDirty: *archiveDirty, Now: time.Now()})
 }
@@ -189,7 +192,7 @@ func size(bytes int64) string {
 	return fmt.Sprintf("%.1f%ciB", value, "KMGT"[suffix])
 }
 
-func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []string) error {
+func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []string, all bool) error {
 	// A landing in progress explains files that look stray in the shared checkout.
 	if err := printLanding(repo); err != nil {
 		return err
@@ -202,10 +205,20 @@ func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []stri
 	counts := map[worktree.Verdict]int{}
 	err := repo.AuditAll(ctx, extra, func(audit worktree.Audit) error {
 		audits = append(audits, audit)
+		inProgress := audit.Active != "" && (audit.Verdict == worktree.Partial || audit.Verdict == worktree.Unlanded)
+		if inProgress {
+			counts["IN PROGRESS"]++
+			if !all {
+				return nil
+			}
+		}
 		counts[audit.Verdict]++
 		detail := strings.Join(audit.Unlanded, " ")
 		if audit.Note != "" {
 			detail = strings.TrimSpace(detail + " (" + audit.Note + ")")
+		}
+		if inProgress {
+			detail = strings.TrimSpace(detail + " [in progress: " + audit.Active + "]")
 		}
 		_, err := fmt.Fprintf(table, "%s\t%s\t%s\t%d\t%s\n", audit.Verdict, audit.Owner, audit.Path, audit.Changed, detail)
 		return err
@@ -242,6 +255,10 @@ func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []stri
 	for _, verdict := range []worktree.Verdict{worktree.Landed, worktree.Snapshot, worktree.Partial, worktree.Unlanded, worktree.Missing, worktree.Unregistered} {
 		summary = append(summary, fmt.Sprintf("%s %d", verdict, counts[verdict]))
 	}
-	_, err = fmt.Printf("%s against %s %.12s; record %s\n", strings.Join(summary, ", "), worktree.Trunk, head, record)
+	hidden := ""
+	if !all {
+		hidden = fmt.Sprintf(" (%d in-progress PARTIAL/UNLANDED trees not listed; -all shows them)", counts["IN PROGRESS"])
+	}
+	_, err = fmt.Printf("%s%s against %s %.12s; record %s\n", strings.Join(summary, ", "), hidden, worktree.Trunk, head, record)
 	return err
 }
