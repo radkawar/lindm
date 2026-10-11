@@ -82,7 +82,6 @@ func isSetField(name protoreflect.FullName) bool {
 		"lindm.resource.v1.MaintenanceWindow.weekdays",
 		"lindm.resource.v1.RepositorySnapshot.signer_sha256",
 		"lindm.resource.v1.RepositorySnapshots.repositories",
-		"lindm.resource.v1.OSUpdateDesired.exclusions",
 		"lindm.resource.v1.TrustCADesired.purposes",
 		"lindm.resource.v1.CertificateEnrollmentDesired.eku",
 		"lindm.resource.v1.CertificateEnrollmentDesired.sans",

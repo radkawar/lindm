@@ -44,7 +44,7 @@ message NativeResourceTransactionRequest {
   option (buf.validate.message).cel = {
     id: "native_resource_transaction.kind"
     message: "native resource helper only accepts closed local configuration plans"
-    expression: "this.plan.ref.kind in [2, 3, 8, 17, 21, 22, 23]"
+    expression: "this.plan.ref.kind in [2, 3, 8, 15, 17, 21, 22, 23]"
   };
 }
 

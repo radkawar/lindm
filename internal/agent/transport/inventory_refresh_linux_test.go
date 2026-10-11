@@ -53,6 +53,10 @@ type refreshTransportFixture struct {
 	readiness                           *agentv1.RecoveryReadinessObservation
 	readinessErr                        error
 	readinessCalls                      int
+	patchStatus                         *agentv1.PatchStatusObservation
+	patchStatusResponse                 *agentv1.GetPatchStatusResponse
+	patchStatusErr                      error
+	patchStatusCalls                    int
 	publishedHost                       *inventoryv1.HostObservation
 }
 

@@ -2334,8 +2334,11 @@ type NativeDetails struct {
 	// Absent on direct unprivileged inspection and historical host evidence.
 	// Published inventory attaches a fresh protected executor observation.
 	RecoveryReadiness *v1.RecoveryReadinessObservation `protobuf:"bytes,17,opt,name=recovery_readiness,json=recoveryReadiness,proto3" json:"recovery_readiness,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Absent on direct unprivileged inspection and historical host evidence.
+	// Published inventory attaches the protected executor patch status.
+	PatchStatus   *v1.PatchStatusObservation `protobuf:"bytes,18,opt,name=patch_status,json=patchStatus,proto3" json:"patch_status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NativeDetails) Reset() {
@@ -2483,6 +2486,13 @@ func (x *NativeDetails) GetPlatform() *PlatformDetails {
 func (x *NativeDetails) GetRecoveryReadiness() *v1.RecoveryReadinessObservation {
 	if x != nil {
 		return x.RecoveryReadiness
+	}
+	return nil
+}
+
+func (x *NativeDetails) GetPatchStatus() *v1.PatchStatusObservation {
+	if x != nil {
+		return x.PatchStatus
 	}
 	return nil
 }
@@ -2809,7 +2819,7 @@ var File_lindm_inventory_v1_observation_proto protoreflect.FileDescriptor
 
 const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/inventory/v1/observation.proto\x12\x12lindm.inventory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/recovery_readiness.proto\"\xc6\x03\n" +
+	"$lindm/inventory/v1/observation.proto\x12\x12lindm.inventory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1elindm/agent/v1/os_update.proto\x1a'lindm/agent/v1/recovery_readiness.proto\"\xc6\x03\n" +
 	"\aPackage\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x04name\x12$\n" +
@@ -3033,7 +3043,8 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12N\n" +
 	"\fapplications\x18\x02 \x03(\v2\x1f.lindm.inventory.v1.ApplicationB\t\xbaH\x06\x92\x01\x03\x10\x80\x10R\fapplications:w\xbaHt\x1ar\n" +
-	"\x14applications.failure\x12'failed collections have no partial rows\x1a1this.status == 1 || this.applications.size() == 0\"\xef\t\n" +
+	"\x14applications.failure\x12'failed collections have no partial rows\x1a1this.status == 1 || this.applications.size() == 0\"\xba\n" +
+	"\n" +
 	"\rNativeDetails\x128\n" +
 	"\x03cpu\x18\x01 \x01(\v2\x1e.lindm.inventory.v1.CpuDetailsB\x06\xbaH\x03\xc8\x01\x01R\x03cpu\x12A\n" +
 	"\x06memory\x18\x02 \x01(\v2!.lindm.inventory.v1.MemoryDetailsB\x06\xbaH\x03\xc8\x01\x01R\x06memory\x12D\n" +
@@ -3053,7 +3064,8 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\aflatpak\x18\x0e \x01(\v2&.lindm.inventory.v1.ApplicationDetailsB\x06\xbaH\x03\xc8\x01\x01R\aflatpak\x12B\n" +
 	"\x04snap\x18\x0f \x01(\v2&.lindm.inventory.v1.ApplicationDetailsB\x06\xbaH\x03\xc8\x01\x01R\x04snap\x12?\n" +
 	"\bplatform\x18\x10 \x01(\v2#.lindm.inventory.v1.PlatformDetailsR\bplatform\x12[\n" +
-	"\x12recovery_readiness\x18\x11 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationR\x11recoveryReadiness\"\xb9\x05\n" +
+	"\x12recovery_readiness\x18\x11 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationR\x11recoveryReadiness\x12I\n" +
+	"\fpatch_status\x18\x12 \x01(\v2&.lindm.agent.v1.PatchStatusObservationR\vpatchStatus\"\xb9\x05\n" +
 	"\x11ModuleObservation\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\x18\n" +
@@ -3162,6 +3174,7 @@ var file_lindm_inventory_v1_observation_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),           // 38: google.protobuf.Timestamp
 	(*v1.NVMeSanitizeScope)(nil),            // 39: lindm.agent.v1.NVMeSanitizeScope
 	(*v1.RecoveryReadinessObservation)(nil), // 40: lindm.agent.v1.RecoveryReadinessObservation
+	(*v1.PatchStatusObservation)(nil),       // 41: lindm.agent.v1.PatchStatusObservation
 }
 var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
 	34,  // 0: lindm.inventory.v1.Package.module:type_name -> lindm.inventory.v1.ModuleObservation
@@ -3290,18 +3303,19 @@ var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
 	32,  // 123: lindm.inventory.v1.NativeDetails.snap:type_name -> lindm.inventory.v1.ApplicationDetails
 	37,  // 124: lindm.inventory.v1.NativeDetails.platform:type_name -> lindm.inventory.v1.PlatformDetails
 	40,  // 125: lindm.inventory.v1.NativeDetails.recovery_readiness:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	0,   // 126: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 127: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	35,  // 128: lindm.inventory.v1.RepositoryObservation.configurations:type_name -> lindm.inventory.v1.RepositoryConfiguration
-	3,   // 129: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 130: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
-	36,  // 131: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
-	3,   // 132: lindm.inventory.v1.PlatformDetails.releasever:type_name -> lindm.inventory.v1.ObservedString
-	133, // [133:133] is the sub-list for method output_type
-	133, // [133:133] is the sub-list for method input_type
-	133, // [133:133] is the sub-list for extension type_name
-	133, // [133:133] is the sub-list for extension extendee
-	0,   // [0:133] is the sub-list for field type_name
+	41,  // 126: lindm.inventory.v1.NativeDetails.patch_status:type_name -> lindm.agent.v1.PatchStatusObservation
+	0,   // 127: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 128: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	35,  // 129: lindm.inventory.v1.RepositoryObservation.configurations:type_name -> lindm.inventory.v1.RepositoryConfiguration
+	3,   // 130: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 131: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
+	36,  // 132: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
+	3,   // 133: lindm.inventory.v1.PlatformDetails.releasever:type_name -> lindm.inventory.v1.ObservedString
+	134, // [134:134] is the sub-list for method output_type
+	134, // [134:134] is the sub-list for method input_type
+	134, // [134:134] is the sub-list for extension type_name
+	134, // [134:134] is the sub-list for extension extendee
+	0,   // [0:134] is the sub-list for field type_name
 }
 
 func init() { file_lindm_inventory_v1_observation_proto_init() }

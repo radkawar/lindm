@@ -35,6 +35,9 @@ type resourceDispatch struct {
 	// reboot performs a real guest reboot and reopens the control-plane
 	// forwards; it is nil outside the connected resource lane.
 	reboot func(context.Context) error
+	// awaitReboot waits for a guest-initiated reboot away from the previous
+	// boot ID within timeout and reopens the forwards; nil like reboot.
+	awaitReboot func(ctx context.Context, previousBoot string, timeout time.Duration) error
 }
 
 func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.ResourceDesiredState, ownership *resourcev1.OwnershipPolicy) error {
@@ -300,13 +303,13 @@ func fileOracle(ctx context.Context, vm *guestVM, name, content string, exists b
 	return resourceOracle(ctx, vm, "native-file-content-mode-uid-gid-xattrs-selinux", command)
 }
 
-func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane, reboot func(context.Context) error) error {
+func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane, reboot func(context.Context) error, awaitReboot func(context.Context, string, time.Duration) error) error {
 	vm := packages.vm
 	if result.Resources == nil {
 		result.Resources = newVMResourceEvidence()
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
-	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot}
+	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot, awaitReboot: awaitReboot}
 	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	kinds := result.Resources.Kinds
 	if selected["packages"] {
@@ -337,6 +340,12 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 	}
 	if selected["password"] {
 		if err := exerciseResourcePassword(ctx, packages, r, &kinds[8]); err != nil {
+			return err
+		}
+	}
+	if selected["os-update"] {
+		r.fresh()
+		if err := exerciseResourceOSUpdate(ctx, r, rpm, &kinds[10]); err != nil {
 			return err
 		}
 	}

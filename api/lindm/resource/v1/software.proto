@@ -3,7 +3,6 @@ syntax = "proto3";
 package lindm.resource.v1;
 
 import "buf/validate/validate.proto";
-import "google/protobuf/timestamp.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/identity.proto";
 
@@ -359,6 +358,9 @@ message FlatpakAppDesired {
     expression: "this.remote.kind == 13 && this.remote.canonical_key.startsWith('flatpak/')"
   };
 }
+// SECURITY installs only updates the native backend classifies as security
+// fixes: APT security pockets (unattended-upgrades origins) or RPM advisories
+// of type security (dnf --security). ALL also installs other updates.
 enum UpdateSelection {
   UPDATE_SELECTION_UNSPECIFIED = 0;
   UPDATE_SELECTION_SECURITY = 1;
@@ -374,16 +376,18 @@ enum Weekday {
   WEEKDAY_SATURDAY = 6;
   WEEKDAY_SUNDAY = 7;
 }
-enum DSTBehavior {
-  DST_BEHAVIOR_UNSPECIFIED = 0;
-  DST_BEHAVIOR_SKIP_GAP_FIRST_FOLD = 1;
-  DST_BEHAVIOR_NEXT_VALID_FIRST_FOLD = 2;
-}
+// A window opens on each listed weekday at the local start minute of the IANA
+// zone and lasts duration_minutes; it may cross midnight. Native runs start
+// only inside an open window; a transaction already running is never killed
+// at the window end. systemd skips a calendar start that does not exist on a
+// DST spring-forward day, so that day's window does not open; avoid starts
+// inside the zone's transition hour. "Local" is not an IANA zone for systemd.
 message MaintenanceWindow {
   string time_zone = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 128
     pattern: "^[a-zA-Z0-9_+-]+(/[a-zA-Z0-9_+-]+)*$"
+    not_in: ["Local"]
   }];
   repeated Weekday weekdays = 2 [(buf.validate.field).repeated = {
     min_items: 1
@@ -398,61 +402,40 @@ message MaintenanceWindow {
   }];
   uint32 local_start_minute = 3 [(buf.validate.field).uint32.lte = 1439];
   uint32 duration_minutes = 4 [(buf.validate.field).uint32 = {
-    gte: 1
+    gte: 15
     lte: 1440
   }];
-  DSTBehavior dst = 5 [(buf.validate.field).enum = {
+  reserved 5;
+  reserved "dst";
+}
+enum OSUpdateRebootMode {
+  OS_UPDATE_REBOOT_MODE_UNSPECIFIED = 0;
+  // Report reboot-required only; lindm never schedules a reboot.
+  OS_UPDATE_REBOOT_MODE_NEVER = 1;
+  // When the native reboot-required oracle is set after a run, schedule a
+  // logind reboot at most max_delay_minutes later and notify logged-in users.
+  OS_UPDATE_REBOOT_MODE_SCHEDULED = 2;
+}
+// Reboots use logind ScheduleShutdown as root. Block inhibitors present when
+// the reboot would be scheduled defer it to the next run; an existing logind
+// schedule owned by anyone else is never replaced. A user may reboot earlier.
+message OSUpdateRebootPolicy {
+  OSUpdateRebootMode mode = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
-}
-enum InhibitorPolicy {
-  INHIBITOR_POLICY_UNSPECIFIED = 0;
-  INHIBITOR_POLICY_RESPECT = 1;
-  INHIBITOR_POLICY_APPROVED_OVERRIDE = 2;
-}
-enum ServerDrainPolicy {
-  SERVER_DRAIN_POLICY_UNSPECIFIED = 0;
-  SERVER_DRAIN_POLICY_NOT_REQUIRED = 1;
-  SERVER_DRAIN_POLICY_REQUIRE_RECEIPT = 2;
-}
-message RebootPolicy {
-  bool allowed = 1;
-  google.protobuf.Timestamp deadline = 2;
-  uint32 max_deferrals = 3 [(buf.validate.field).uint32.lte = 100];
-  InhibitorPolicy inhibitors = 4 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: 0
-  }];
-  ServerDrainPolicy server_drain = 5 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: 0
+  // Maximum reboot delay after the completed update, 5 minutes to 7 days.
+  uint32 max_delay_minutes = 2 [(buf.validate.field).uint32.lte = 10080];
+  // Optional notice shown to terminal (logind wall) and graphical
+  // (desktop notification) sessions together with the scheduled time.
+  string notice = 3 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[^\\x00-\\x1f\\x7f]*$"
   }];
   option (buf.validate.message).cel = {
-    id: "reboot_policy.deadline"
-    message: "automatic reboot requires a deadline"
-    expression: "!this.allowed || has(this.deadline)"
-  };
-}
-message RolloutBudget {
-  uint32 max_unavailable = 1 [(buf.validate.field).uint32 = {
-    gte: 1
-    lte: 1000000
-  }];
-  uint32 max_failure_percent = 2 [(buf.validate.field).uint32.lte = 100];
-  uint32 health_window_seconds = 3 [(buf.validate.field).uint32 = {
-    gte: 30
-    lte: 604800
-  }];
-}
-message ReleaseUpgradeTarget {
-  PlatformProduct source = 1 [(buf.validate.field).required = true];
-  PlatformProduct target = 2 [(buf.validate.field).required = true];
-  string approval_id = 3 [(buf.validate.field).string.uuid = true];
-  option (buf.validate.message).cel = {
-    id: "release_upgrade.change"
-    message: "release upgrade must identify a different target version of the same product and architecture"
-    expression: "this.source.os_id == this.target.os_id && this.source.product == this.target.product && this.source.architecture == this.target.architecture && this.source.version != this.target.version"
+    id: "os_update_reboot.delay"
+    message: "scheduled reboots need a 5..10080 minute delay; never-reboot policies carry no delay or notice"
+    expression: "this.mode == 2 ? this.max_delay_minutes >= 5u : (this.max_delay_minutes == 0u && this.notice == '')"
   };
 }
 message RepositorySnapshot {
@@ -499,17 +482,23 @@ message SourceSnapshot {
     NixSnapshot nix = 3;
   }
 }
+// Native automatic updates driven by a lindm-owned systemd timer: APT
+// unattended-upgrades plus needrestart, DNF5 `dnf5 automatic` or DNF4
+// `dnf-automatic`. The system's own configured and signed repositories are the
+// update source; lindm adds no repository and disables no signature check.
 message OSUpdateDesired {
   UpdateSelection selection = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
   MaintenanceWindow maintenance = 2 [(buf.validate.field).required = true];
-  RebootPolicy reboot = 3 [(buf.validate.field).required = true];
-  repeated PackageIdentity exclusions = 4 [(buf.validate.field).repeated.max_items = 256];
-  RolloutBudget budget = 5 [(buf.validate.field).required = true];
-  ReleaseUpgradeTarget release_upgrade = 6;
-  SourceSnapshot source = 7 [(buf.validate.field).required = true];
+  reserved 3 to 7;
+  reserved "reboot", "exclusions", "budget", "release_upgrade", "source";
+  OSUpdateRebootPolicy reboot_policy = 8 [(buf.validate.field).required = true];
+  // A package's update is installed only after the device first observed an
+  // update pending for that package (name and architecture) at least this many
+  // days earlier. Zero installs every eligible update in the next window.
+  uint32 deferral_days = 9 [(buf.validate.field).uint32.lte = 90];
 }
 enum SnapConfinement {
   SNAP_CONFINEMENT_UNSPECIFIED = 0;

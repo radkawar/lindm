@@ -9,6 +9,7 @@ import {
   type DeviceActionVerification,
   type StorageTarget,
 } from "../../../gen/lindm/agent/v1/device_actions_pb";
+import { OSUpdateRebootMode, UpdateSelection } from "../../../gen/lindm/resource/v1/software_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Fact } from "./observations";
@@ -27,6 +28,7 @@ export const actionLabels: Record<DeviceActionKind, string> = {
   shutdown: "Shut down device",
   refreshInventory: "Refresh inventory",
   localAdminPasswordRotate: "Rotate managed local-admin password",
+  patchNow: "Patch now",
 };
 export const actionPermissions: Record<DeviceActionKind, string> = {
   escrowRotate: "encryption.manage",
@@ -41,6 +43,7 @@ export const actionPermissions: Record<DeviceActionKind, string> = {
   shutdown: "remote_execution.run",
   refreshInventory: "inventory.manage",
   localAdminPasswordRotate: "secrets.manage",
+  patchNow: "remote_execution.run",
 };
 export const actionStateLabels: Record<DeviceActionState, string> = {
   [DeviceActionState.UNSPECIFIED]: "No result yet",
@@ -154,6 +157,31 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
       ) : null}
       {action.case === "refreshInventory" ? (
         <p>Collect a fresh inventory from this device.</p>
+      ) : null}
+      {action.case === "patchNow" ? (
+        <dl className="grid gap-2 text-sm">
+          <Fact label="Updates">
+            {action.value.selection === UpdateSelection.ALL
+              ? "All updates"
+              : action.value.selection === UpdateSelection.SECURITY
+                ? "Security updates"
+                : "Unsupported / unspecified"}
+          </Fact>
+          <Fact label="Reboot">
+            {action.value.rebootPolicy?.mode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
+              ? `Scheduled within ${action.value.rebootPolicy.maxDelayMinutes} minutes when required`
+              : action.value.rebootPolicy?.mode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER
+                ? "Never: report reboot-required only"
+                : "Unsupported / unspecified"}
+          </Fact>
+          {action.value.rebootPolicy?.notice ? (
+            <Fact label="User notice">{action.value.rebootPolicy.notice}</Fact>
+          ) : null}
+          <Fact label="Completion evidence">
+            The action confirms only that the native update run started. Installed updates and the
+            run result appear in Patch status.
+          </Fact>
+        </dl>
       ) : null}
       {action.case === "localAdminPasswordRotate" ? (
         <>

@@ -27,6 +27,7 @@ import (
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/resourceprovider"
@@ -72,6 +73,7 @@ func init() {
 		resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:         {open: openFirewallResource},
 		resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {open: openEncryptionResource},
 		resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:       {open: openPasswordResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY:      {open: openOSUpdateResource},
 	})
 }
 
@@ -182,6 +184,16 @@ func openPasswordResource(ctx context.Context, o resourceOpen) (nativeResource, 
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
 		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Password, ExecuteNative: s.resourceNativeTransaction,
+	})
+}
+
+func openOSUpdateResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return osupdateprovider.Open(ctx, osupdateprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.OSUpdate, StateDirectory: s.directory,
+		ExecuteNative: s.resourceNativeTransaction,
 	})
 }
 

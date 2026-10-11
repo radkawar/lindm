@@ -55,6 +55,9 @@ func (s *Store) validateOwnershipSnapshot(snapshot *agentv1.ResourceOwnershipSna
 	if rules := ownershipRules(ref.GetKind()); rules.valid != nil && !rules.valid(snapshot) {
 		return ErrResourceOwnershipConflict
 	}
+	if ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY && !osUpdateOwnershipSnapshotValid(snapshot) {
+		return ErrResourceOwnershipConflict
+	}
 	if file := observation.GetManagedFile(); file != nil {
 		if file.GetExists() != (snapshot.ManagedFileContent != nil) {
 			return ErrResourceOwnershipConflict
@@ -233,11 +236,11 @@ func validOwnershipDimensions(kind resourcev1.ResourceKind, dimensions []agentv1
 				return false
 			}
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT:
-			if kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE || kind == resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE || kind == resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE || kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL || kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION || kind == resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY || kind == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE {
+			if kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE || kind == resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE || kind == resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE || kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL || kind == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION || kind == resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY || kind == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE || kind == resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY {
 				return false
 			}
 		default:
-			if !extendedDimensionKind(kind, dimension) && !sysctlOwnershipDimensionKind(kind, dimension) && !definitionOwnershipDimensionKind(kind, dimension) && !passwordOwnershipDimensionKind(kind, dimension) && !firewallOwnershipDimensionKind(kind, dimension) {
+			if !extendedDimensionKind(kind, dimension) && !sysctlOwnershipDimensionKind(kind, dimension) && !definitionOwnershipDimensionKind(kind, dimension) && !passwordOwnershipDimensionKind(kind, dimension) && !firewallOwnershipDimensionKind(kind, dimension) && !osUpdateOwnershipDimensionKind(kind, dimension) {
 				return false
 			}
 		}
@@ -269,6 +272,9 @@ func ownershipDimensionsAllowed(action *agentv1.ResourceExecutionRecord, dimensi
 			return false
 		}
 		if kind == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE && !firewallOwnershipDimensionAllowed(action, dimension) {
+			return false
+		}
+		if kind == resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY && !osUpdateOwnershipDimensionAllowed(action, dimension) {
 			return false
 		}
 		switch dimension {
@@ -340,6 +346,12 @@ func ownershipDimensionsMatch(last, current *agentv1.ResourceOwnershipSnapshot, 
 		}
 		if kind == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE {
 			if !firewallOwnershipDimensionMatches(last, current, dimension) {
+				return false
+			}
+			continue
+		}
+		if kind == resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY {
+			if !osUpdateOwnershipDimensionMatches(last, current, dimension) {
 				return false
 			}
 			continue

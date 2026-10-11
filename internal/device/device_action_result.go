@@ -135,6 +135,9 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	if err := validatePowerActionResult(intent.GetSpec(), admittedChallenge, status); err != nil {
 		return nil, err
 	}
+	if err := validatePatchNowResult(intent.GetSpec(), status); err != nil {
+		return nil, err
+	}
 	if intent.GetSpec().GetRefreshInventory() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		sequence := status.GetVerification().GetInventorySequence()
 		if sequence == 0 || !status.GetVerification().GetVerified() || !status.GetVerification().GetAfter().GetSupported() || admittedChallenge.GetIssuedAt() == nil {
@@ -284,6 +287,25 @@ func validatePowerActionResult(spec *agentv1.DeviceActionSpec, challenge *agentv
 		if challenge.GetBootId() == "" || boot == "" || boot == challenge.GetBootId() || boot != verification.GetAfter().GetBootId() || !verification.GetVerified() || !verification.GetAfter().GetSupported() {
 			return rpcreason.Error(connect.CodePermissionDenied, "device_action_restart_unverified")
 		}
+	}
+	return nil
+}
+
+// Patch now succeeds when the native run unit was started; installation
+// outcome is reported separately through patch status, never by this action.
+func validatePatchNowResult(spec *agentv1.DeviceActionSpec, status *agentv1.DeviceActionStatus) error {
+	verification := status.GetVerification()
+	if spec.GetPatchNow() == nil {
+		if verification.GetPatchRunStarted() {
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_patch_run_unexpected")
+		}
+		return nil
+	}
+	if verification.GetPowerRequestAccepted() {
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_patch_now_power_claimed")
+	}
+	if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED && (!verification.GetVerified() || !verification.GetPatchRunStarted() || verification.GetEvidence() != "native_patch_run_started") {
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_patch_now_unverified")
 	}
 	return nil
 }

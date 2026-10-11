@@ -180,6 +180,25 @@ type DeviceSearchCursor struct {
 	ExpiresAt       pgtype.Timestamptz
 }
 
+type HostPatchStatus struct {
+	GenerationID           uuid.UUID
+	ObservedAt             pgtype.Timestamptz
+	ReceivedAt             pgtype.Timestamptz
+	Available              bool
+	Reason                 string
+	Backend                int16
+	PendingSecurityUpdates int32
+	PendingUpdates         int32
+	DeferredUpdates        int32
+	RebootRequired         bool
+	MetadataRefreshedAt    pgtype.Timestamptz
+	LastSuccessfulUpdate   pgtype.Timestamptz
+	LastRunFinishedAt      pgtype.Timestamptz
+	LastRunResult          int16
+	RebootScheduledFor     pgtype.Timestamptz
+	PolicyInstalled        bool
+}
+
 type InventoryAttributeDefinition struct {
 	Key        string
 	Definition []byte

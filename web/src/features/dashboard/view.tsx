@@ -73,6 +73,7 @@ export function DashboardView() {
   const compliance = data?.resourceCompliance;
   const findings = data?.findings;
   const approvals = data?.approvals;
+  const patch = data?.patchCompliance;
   const observed = formatTimestamp(data?.observedAt);
 
   const osRows = operatingSystems
@@ -90,6 +91,16 @@ export function DashboardView() {
         ["Needs attention", compliance.attentionResources],
         ["Not checked recently", compliance.staleResources],
         ["Unknown", compliance.unknownResources],
+      ]
+    : [];
+  const patchStaleHours = patch ? patch.staleAfterSeconds / 3600 : 0;
+  const patchRows: [string, bigint][] = patch
+    ? [
+        ["Patched", patch.patchedDevices],
+        ["Security pending", patch.securityPendingDevices],
+        ["Reboot required", patch.rebootRequiredDevices],
+        [`Stale (over ${patchStaleHours} hours)`, patch.staleDevices],
+        ["Unknown", patch.unknownDevices],
       ]
     : [];
   const findingRows: [string, bigint][] = findings
@@ -194,14 +205,19 @@ export function DashboardView() {
             </Link>
           </div>
 
-          <div className="grid items-stretch gap-4 xl:grid-cols-3">
+          <div className="grid items-stretch gap-4 lg:grid-cols-2 2xl:grid-cols-4">
             <Panel
               title="Operating systems"
               description="Devices by operating system and version."
               help="From each device's latest report. The twenty largest groups are shown; Other contains the rest."
             >
               {operatingSystems ? (
-                <DistributionChart kind="donut" rows={osRows} label="Devices" />
+                <DistributionChart
+                  kind="donut"
+                  rows={osRows}
+                  label="Devices"
+                  ariaLabel="Devices by operating system and version"
+                />
               ) : (
                 <Unavailable section="Operating system" />
               )}
@@ -219,7 +235,12 @@ export function DashboardView() {
                     </span>
                     <span className="text-xs text-muted-foreground">profile items</span>
                   </div>
-                  <DistributionChart kind="stacked" rows={complianceRows} label="Resources" />
+                  <DistributionChart
+                    kind="stacked"
+                    rows={complianceRows}
+                    label="Resources"
+                    ariaLabel="Service resource compliance distribution"
+                  />
                   <p className="mt-auto text-xs text-muted-foreground">
                     {compliance.unassignedDevices.toString()} devices without a profile.
                   </p>
@@ -229,13 +250,40 @@ export function DashboardView() {
               )}
             </Panel>
             <Panel
+              title="Patch compliance"
+              description="Active devices by latest OS patch status."
+              help={`Each active device's latest patch status, computed offline on the device from its native package cache (unattended-upgrades or DNF automatic) and published with host inventory. Categories are disjoint: security pending means one or more pending security updates; reboot required means none pending but the native reboot oracle is set; stale means computed over ${patchStaleHours} hours before the summary; unknown means no status or the device reported it unavailable. Pending security updates and failed runs count fresh statuses only. Device-reported telemetry, not native installation proof.`}
+            >
+              {patch ? (
+                <>
+                  <DistributionChart
+                    kind="donut"
+                    rows={patchRows}
+                    label="Devices"
+                    ariaLabel="Active devices by patch compliance"
+                  />
+                  <p className="mt-auto text-xs text-muted-foreground">
+                    {patch.pendingSecurityUpdates.toString()} pending security updates ·{" "}
+                    {patch.failedRunDevices.toString()} devices whose last update run failed
+                  </p>
+                </>
+              ) : (
+                <Unavailable section="Patch compliance" />
+              )}
+            </Panel>
+            <Panel
               title="Open security findings"
               description="Findings by severity."
               help="Counts findings, not devices. Accepted findings are not included. Missing advisory data can hide findings, so zero does not guarantee no exposure."
             >
               {findings ? (
                 <>
-                  <DistributionChart kind="severity" rows={findingRows} label="Findings" />
+                  <DistributionChart
+                    kind="severity"
+                    rows={findingRows}
+                    label="Findings"
+                    ariaLabel="Open findings by severity"
+                  />
                   <p className="text-xs text-muted-foreground">
                     Devices checked: {findings.evaluatedDevices.toString()} · not checked:{" "}
                     {findings.unknownDevices.toString()}
@@ -438,10 +486,12 @@ function DistributionChart({
   rows,
   kind,
   label,
+  ariaLabel,
 }: {
   rows: [string, bigint][];
   kind: "donut" | "stacked" | "severity";
   label: string;
+  ariaLabel: string;
 }) {
   const points = rows.map(([name, count], index) => ({
     name,
@@ -483,11 +533,7 @@ function DistributionChart({
         <EmptyState title={`No ${label.toLowerCase()} in this summary`} />
       ) : kind === "donut" ? (
         <div className="relative">
-          <ChartContainer
-            config={config}
-            className="mx-auto h-44 w-full"
-            aria-label={`${label} by operating system and version`}
-          >
+          <ChartContainer config={config} className="mx-auto h-44 w-full" aria-label={ariaLabel}>
             <PieChart>
               <ChartTooltip content={tooltip} />
               <Pie
@@ -510,11 +556,7 @@ function DistributionChart({
           </div>
         </div>
       ) : kind === "stacked" ? (
-        <ChartContainer
-          config={config}
-          className="h-20 w-full"
-          aria-label="Service resource compliance distribution"
-        >
+        <ChartContainer config={config} className="h-20 w-full" aria-label={ariaLabel}>
           <BarChart
             accessibilityLayer
             layout="vertical"
@@ -537,11 +579,7 @@ function DistributionChart({
           </BarChart>
         </ChartContainer>
       ) : (
-        <ChartContainer
-          config={config}
-          className="h-44 w-full"
-          aria-label="Open findings by severity"
-        >
+        <ChartContainer config={config} className="h-44 w-full" aria-label={ariaLabel}>
           <BarChart
             accessibilityLayer
             data={points}

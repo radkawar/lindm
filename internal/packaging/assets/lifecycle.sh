@@ -121,6 +121,11 @@ configure() {
 	fi
 }
 
+# The static lindm-os-update{,-now,-status}.service units are never enabled,
+# started or stopped here. A window or patch-now run may itself be the
+# package transaction upgrading lindm-agent, and stopping it from prerm would
+# interrupt dpkg/rpm mid-transaction. Their parent directories come from
+# tmpfiles.conf, which configure applies.
 stop_units() {
 	if systemd_running; then
 		systemctl stop "$AGENT_UNIT" "$EXECUTOR_UNIT" "$FIREWALL_RESTORE_UNIT" "$CONNECTIVITY_GUARD_UNIT" || fail "systemctl stop failed"

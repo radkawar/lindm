@@ -1,0 +1,23 @@
+# Static: started only by the root executor for an authorized patch-now
+# action after it writes /run/lindm/os-update/patch-now.binpb. The runner
+# consumes the request and records REJECTED for an invalid or expired one,
+# so there is no ConditionPathExists. Like lindm-os-update.service, the native
+# package manager needs full system write access and the network, so there is
+# no ProtectSystem sandbox. Background priority, default KillMode; the runner
+# bounds itself at 5h30m (SIGTERM only), leaving 30 min of the 6 h timeout.
+[Unit]
+Description=Lindm OS update patch-now run
+Wants=network-online.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lindm/lindm-agent os-update run-now
+User=root
+Group=root
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=6h
+LimitCORE=0

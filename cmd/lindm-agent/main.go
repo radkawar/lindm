@@ -44,6 +44,7 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent action-credential -action UUID
        lindm-agent action-sandbox [-install]
        lindm-agent recovery-run -config FILE
+       lindm-agent os-update run|run-now|status
        lindm-agent version
        lindm-agent help
 
@@ -71,6 +72,9 @@ is root-only and reads an owner unlock credential from a protected stdin pipe,
 never argv or a plaintext file. Bytes are exact; do not append a newline.
 recovery-run is the signed recovery image's root-only entrypoint. It cannot enroll,
 serve general device/admin operations, or start without fresh online authority.
+os-update is the root entrypoint of the packaged lindm-os-update{,-now,-status}
+units: a maintenance-window native update run, a patch-now run consuming the
+executor's request, and the offline patch-status recompute. It takes no paths.
 session is the unprivileged per-user remote-assistance helper (systemd user unit
 lindm-session.service). It refuses root, verifies the session socket peer is root,
 and uses only the caller's session bus, desktop portal and notifications.
@@ -137,6 +141,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return liveRootPoweroff(ctx, args[1:])
 	case "recovery-run":
 		return recoveryRun(ctx, args[1:])
+	case "os-update":
+		return osUpdateCommand(ctx, args[1:])
 	case "update-apply":
 		return updateApplyCommand(ctx, args[1:])
 	case "update-status":

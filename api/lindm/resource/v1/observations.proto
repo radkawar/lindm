@@ -439,27 +439,85 @@ message DeploymentIdentity {
   bool booted = 3;
   bool pending = 4;
 }
-message InhibitorEvidence {
-  string native_id = 1 [(buf.validate.field).string = {
+enum OSUpdateBackend {
+  OS_UPDATE_BACKEND_UNSPECIFIED = 0;
+  // unattended-upgrade(8) with needrestart(1) service restarts.
+  OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES = 1;
+  // dnf5-plugin-automatic `dnf5 automatic`.
+  OS_UPDATE_BACKEND_DNF5_AUTOMATIC = 2;
+  // dnf-automatic(8) on DNF4.
+  OS_UPDATE_BACKEND_DNF4_AUTOMATIC = 3;
+}
+// Closed set of lindm-owned native objects. Paths are fixed by the provider.
+enum OSUpdateNativeFile {
+  OS_UPDATE_NATIVE_FILE_UNSPECIFIED = 0;
+  // /etc/lindm/os-update/policy.binpb, the runner's validated policy.
+  OS_UPDATE_NATIVE_FILE_POLICY = 1;
+  // /etc/systemd/system/lindm-os-update.timer, the maintenance window calendar.
+  OS_UPDATE_NATIVE_FILE_TIMER = 2;
+  // /etc/systemd/system/timers.target.d/lindm-os-update.conf (Wants= the timer).
+  OS_UPDATE_NATIVE_FILE_TIMER_WANTS = 3;
+  // /etc/apt/apt.conf.d/99lindm-os-update: disables APT::Periodic unattended
+  // upgrades so installation happens only inside the lindm window.
+  OS_UPDATE_NATIVE_FILE_APT_PERIODIC = 4;
+  // /etc/dnf/automatic.conf on DNF5 (Fedora), a %ghost file dnf5 automatic
+  // reads last; it fixes upgrade_type, reboot=never and stdio emission.
+  OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC = 5;
+}
+message OSUpdateFileObservation {
+  OSUpdateNativeFile kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ManagedFileObservation state = 2 [(buf.validate.field).required = true];
+  bytes content_sha256 = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  option (buf.validate.message).cel = {
+    id: "os_update_file.content"
+    message: "existing owned files carry a content digest"
+    expression: "this.state.exists == (this.content_sha256.size() == 32)"
+  };
+}
+// Configuration state only. Volatile patch facts (pending updates, reboot
+// required, last run) are inventory (lindm.agent.v1.PatchStatusObservation).
+message OSUpdateObservation {
+  reserved 1 to 8;
+  reserved "source", "deployments", "kernel_release", "boot_id", "inhibitors", "drain_receipt", "reboot_required", "native_database_revision";
+  OSUpdateBackend backend = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Native automatic-update package version, e.g. "unattended-upgrades 2.9.1".
+  string native_version = 10 [(buf.validate.field).string = {
     min_len: 1
     max_len: 128
+    pattern: "^[^\\x00-\\x1f\\x7f]*$"
   }];
-  uint32 uid = 2;
-  string reason = 3 [(buf.validate.field).string.max_len = 512];
-  bool blocks_reboot = 4;
-}
-message OSUpdateObservation {
-  SourceSnapshot source = 1 [(buf.validate.field).required = true];
-  repeated DeploymentIdentity deployments = 2 [(buf.validate.field).repeated.max_items = 32];
-  string kernel_release = 3 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 256
+  // Decoded lindm-owned policy file; absent when missing or invalid.
+  OSUpdateDesired effective = 11;
+  repeated OSUpdateFileObservation files = 12 [(buf.validate.field).repeated.max_items = 4];
+  // lindm-os-update.timer is loaded from the owned file and active (waiting).
+  bool timer_active = 13;
+  // systemd's loaded TimersCalendar specification(s), joined by "; ".
+  string timer_calendar = 14 [(buf.validate.field).string.max_len = 2048];
+  // Native automatic-update schedulers that are enabled or active and would
+  // install outside the window (for example dnf5-automatic.timer).
+  repeated string conflicting_units = 15 [(buf.validate.field).repeated = {
+    max_items: 8
+    unique: true
+    items: {
+      string: {pattern: "^[a-zA-Z0-9@_.-]{1,128}[.](timer|service)$"}
+    }
   }];
-  string boot_id = 4 [(buf.validate.field).string.uuid = true];
-  repeated InhibitorEvidence inhibitors = 5 [(buf.validate.field).repeated.max_items = 64];
-  ProbeReceipt drain_receipt = 6;
-  bool reboot_required = 7;
-  bytes native_database_revision = 8 [(buf.validate.field).bytes.len = 32];
+  // needrestart (APT) or dnf needs-restarting (RPM) is installed.
+  bool reboot_oracle_available = 16;
+  option (buf.validate.message).cel = {
+    id: "os_update_observation.files"
+    message: "owned file kinds are unique"
+    expression: "this.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)"
+  };
 }
 message NativeModuleVersion {
   string name = 1 [(buf.validate.field).string = {

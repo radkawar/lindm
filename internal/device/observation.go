@@ -107,6 +107,9 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 			if err := q.UpsertHostObservation(ctx, fields); err != nil {
 				return err
 			}
+			if err := recordPatchStatus(ctx, q, principal.GenerationID, observation.GetDetails().GetPatchStatus(), authority.now); err != nil {
+				return err
+			}
 			state, err := activateIfPending(ctx, q, authority.device)
 			if err != nil {
 				return err

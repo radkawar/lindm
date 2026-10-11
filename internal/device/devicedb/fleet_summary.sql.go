@@ -252,6 +252,67 @@ func (q *Queries) FleetSummaryOS(ctx context.Context, arg FleetSummaryOSParams) 
 	return items, nil
 }
 
+const fleetSummaryPatch = `-- name: FleetSummaryPatch :one
+WITH patch AS (
+ SELECT CASE
+   WHEN p.generation_id IS NULL OR NOT p.available THEN 'unknown'
+   WHEN LEAST(p.observed_at, p.received_at) < CURRENT_TIMESTAMP - make_interval(secs => $1::integer) THEN 'stale'
+   WHEN p.pending_security_updates > 0 THEN 'security_pending'
+   WHEN p.reboot_required THEN 'reboot_required'
+   ELSE 'patched'
+ END AS bucket,
+ COALESCE(p.pending_security_updates, 0)::bigint AS pending_security_updates,
+ COALESCE(p.last_run_result, 0)::smallint AS last_run_result
+ FROM devices d
+ LEFT JOIN host_patch_status p ON p.generation_id = d.current_generation_id
+ WHERE d.state = 'active'
+  AND device_scope_matches(d.id, $2::boolean, $3::jsonb)
+)
+SELECT count(*) FILTER (WHERE bucket = 'patched')::bigint AS patched_devices,
+ count(*) FILTER (WHERE bucket = 'security_pending')::bigint AS security_pending_devices,
+ count(*) FILTER (WHERE bucket = 'reboot_required')::bigint AS reboot_required_devices,
+ count(*) FILTER (WHERE bucket = 'stale')::bigint AS stale_devices,
+ count(*) FILTER (WHERE bucket = 'unknown')::bigint AS unknown_devices,
+ COALESCE(sum(pending_security_updates) FILTER (WHERE bucket IN ('patched', 'security_pending', 'reboot_required')), 0)::bigint AS pending_security_updates,
+ count(*) FILTER (WHERE bucket IN ('patched', 'security_pending', 'reboot_required') AND last_run_result = 2)::bigint AS failed_run_devices
+FROM patch
+`
+
+type FleetSummaryPatchParams struct {
+	StaleAfterSeconds int32
+	ScopeUnrestricted bool
+	Scopes            []byte
+}
+
+type FleetSummaryPatchRow struct {
+	PatchedDevices         int64
+	SecurityPendingDevices int64
+	RebootRequiredDevices  int64
+	StaleDevices           int64
+	UnknownDevices         int64
+	PendingSecurityUpdates int64
+	FailedRunDevices       int64
+}
+
+// Active devices only, keyed by their current generation's latest published
+// patch status. Buckets are disjoint; freshness never trusts a device clock
+// beyond the server receipt of the observation that carried the status.
+// last_run_result 2 is lindm.agent.v1.PatchRunResult FAILED.
+func (q *Queries) FleetSummaryPatch(ctx context.Context, arg FleetSummaryPatchParams) (FleetSummaryPatchRow, error) {
+	row := q.db.QueryRow(ctx, fleetSummaryPatch, arg.StaleAfterSeconds, arg.ScopeUnrestricted, arg.Scopes)
+	var i FleetSummaryPatchRow
+	err := row.Scan(
+		&i.PatchedDevices,
+		&i.SecurityPendingDevices,
+		&i.RebootRequiredDevices,
+		&i.StaleDevices,
+		&i.UnknownDevices,
+		&i.PendingSecurityUpdates,
+		&i.FailedRunDevices,
+	)
+	return i, err
+}
+
 const fleetSummaryRecentActions = `-- name: FleetSummaryRecentActions :many
 WITH recent_device AS (
  SELECT a.id, a.device_id, a.capability, a.issued_at, a.expires_at,

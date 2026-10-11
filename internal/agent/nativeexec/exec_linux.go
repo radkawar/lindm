@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -55,6 +56,10 @@ var allowedEnv = map[string]bool{
 	"SYSTEMD_PAGER":        true,
 	"SYSTEMD_UNIT_PATH":    true, // private staged unit verification
 	"SOURCE_DATE_EPOCH":    true, // reproducible recovery image builds
+	"NEEDRESTART_MODE":     true, // needrestart's dpkg hook restarts services without prompting
+	// The caller's own user session bus, validated by sessionBusAddress: only
+	// unix:path=/run/user/<uid>/bus, and with Credential set only that UID's.
+	"DBUS_SESSION_BUS_ADDRESS": true,
 }
 
 var (
@@ -91,6 +96,10 @@ type Command struct {
 	// package database: SIGKILL could leave dpkg/rpm half-configured. The
 	// caller's service unit timeout bounds such a run instead.
 	TerminateOnly bool
+	// Credential runs the child as another user (UID, primary GID and exactly
+	// the listed supplementary groups) for a root caller acting on a user's
+	// behalf, such as a desktop notification on that user's session bus.
+	Credential *syscall.Credential
 }
 
 // Result is the structured outcome of a completed run.
@@ -160,6 +169,24 @@ func Executable(path string) (string, error) {
 	return resolved, nil
 }
 
+// sessionBusAddress accepts only a user's runtime-directory session bus, in
+// canonical decimal form, owned by the credential's UID when one is set.
+func sessionBusAddress(value string, credential *syscall.Credential) bool {
+	uid, ok := strings.CutPrefix(value, "unix:path=/run/user/")
+	if !ok {
+		return false
+	}
+	uid, ok = strings.CutSuffix(uid, "/bus")
+	if !ok {
+		return false
+	}
+	n, err := strconv.ParseUint(uid, 10, 32)
+	if err != nil || strconv.FormatUint(n, 10) != uid {
+		return false
+	}
+	return credential == nil || credential.Uid == uint32(n)
+}
+
 func (c *Command) prepare() (*exec.Cmd, error) {
 	if c.Timeout <= 0 || c.Timeout > MaxTimeout || c.StderrLimit <= 0 || c.StderrLimit > MaxOutputLimit {
 		return nil, ErrInvalidCommand
@@ -169,6 +196,9 @@ func (c *Command) prepare() (*exec.Cmd, error) {
 		key, value, ok := strings.Cut(entry, "=")
 		if !ok || !allowedEnv[key] || strings.ContainsRune(value, 0) {
 			return nil, fmt.Errorf("%w: environment key %q", ErrInvalidCommand, key)
+		}
+		if key == "DBUS_SESSION_BUS_ADDRESS" && !sessionBusAddress(value, c.Credential) {
+			return nil, fmt.Errorf("%w: session bus address", ErrInvalidCommand)
 		}
 		env = append(env, entry)
 	}
@@ -194,6 +224,11 @@ func (c *Command) prepare() (*exec.Cmd, error) {
 		cmd.Stdin = bytes.NewReader(c.Stdin)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if c.Credential != nil {
+		credential := *c.Credential
+		credential.Groups = append([]uint32{}, c.Credential.Groups...)
+		cmd.SysProcAttr.Credential = &credential
+	}
 	cmd.WaitDelay = waitDelay
 	return cmd, nil
 }

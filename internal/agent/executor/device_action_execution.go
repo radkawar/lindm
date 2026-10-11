@@ -157,6 +157,11 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 			result, sealed, operationErr = s.actionProvider.StageLocalAdminPassword(work, record.GetNativePlan(), gate)
 		case record.GetIntent().GetSpec().GetRefreshInventory() != nil:
 			result, operationErr = s.beginInventoryRefresh(work, record, gate)
+		case record.GetIntent().GetSpec().GetPatchNow() != nil:
+			// The runner request may not outlive the signed action.
+			bounded, stop := context.WithDeadline(work, record.GetIntent().GetExpiresAt().AsTime())
+			result, operationErr = s.actionProvider.Apply(bounded, record.GetNativePlan(), credential, gate)
+			stop()
 		default:
 			result, operationErr = s.actionProvider.Apply(work, record.GetNativePlan(), credential, gate)
 		}
@@ -360,7 +365,8 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 		if spec.GetLocalAdminPasswordRotate() != nil {
 			next.LocalAdminPassword = sealed
 		}
-	} else if operationErr == nil && result.GetVerified() && (confirm || !escrowed) {
+	} else if operationErr == nil && result.GetVerified() && (confirm || !escrowed) && (spec.GetPatchNow() == nil || result.GetPatchRunStarted() && result.GetEvidence() == "native_patch_run_started" && !result.GetPowerRequestAccepted()) {
+		// Patch now succeeds on a started native run; installation is patch status.
 		next.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED
 	} else {
 		next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_OBSERVATION

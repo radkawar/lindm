@@ -145,49 +145,52 @@ func (PasswordNativeFeature) EnumDescriptor() ([]byte, []int) {
 type ResourceOwnedDimension int32
 
 const (
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_UNSPECIFIED             ResourceOwnedDimension = 0
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME         ResourceOwnedDimension = 1
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSTEMD_ENABLEMENT      ResourceOwnedDimension = 2
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE ResourceOwnedDimension = 3
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION  ResourceOwnedDimension = 4
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN      ResourceOwnedDimension = 5
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT                  ResourceOwnedDimension = 6
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_PRESENCE   ResourceOwnedDimension = 7
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT    ResourceOwnedDimension = 8
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE       ResourceOwnedDimension = 9
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID        ResourceOwnedDimension = 10
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID        ResourceOwnedDimension = 11
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_GROUP_GID               ResourceOwnedDimension = 12
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_GROUP_MEMBERS           ResourceOwnedDimension = 13
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_UID                ResourceOwnedDimension = 14
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_PRIMARY_GROUP      ResourceOwnedDimension = 15
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_GROUPS             ResourceOwnedDimension = 16
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_HOME               ResourceOwnedDimension = 17
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_SHELL              ResourceOwnedDimension = 18
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_PASSWORD_LOCK      ResourceOwnedDimension = 19
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_MIN          ResourceOwnedDimension = 20
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_MAX          ResourceOwnedDimension = 21
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_WARN         ResourceOwnedDimension = 22
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_INACTIVE     ResourceOwnedDimension = 23
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_EXPIRY       ResourceOwnedDimension = 24
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_ACCOUNT_LOCK       ResourceOwnedDimension = 25
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE            ResourceOwnedDimension = 26
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE      ResourceOwnedDimension = 27
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_FILE         ResourceOwnedDimension = 30
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_ENABLEMENT   ResourceOwnedDimension = 31
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_RUNTIME      ResourceOwnedDimension = 32
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_LENGTH         ResourceOwnedDimension = 40
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_CLASSES        ResourceOwnedDimension = 41
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_HISTORY        ResourceOwnedDimension = 42
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MAX_AGE        ResourceOwnedDimension = 43
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MIN_AGE        ResourceOwnedDimension = 44
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_WARN           ResourceOwnedDimension = 45
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_FAILURE_LIMIT  ResourceOwnedDimension = 46
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_UNLOCK_AFTER   ResourceOwnedDimension = 47
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT   ResourceOwnedDimension = 48
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER        ResourceOwnedDimension = 49
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET        ResourceOwnedDimension = 50
-	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE    ResourceOwnedDimension = 51
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_UNSPECIFIED                    ResourceOwnedDimension = 0
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME                ResourceOwnedDimension = 1
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSTEMD_ENABLEMENT             ResourceOwnedDimension = 2
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE        ResourceOwnedDimension = 3
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION         ResourceOwnedDimension = 4
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN             ResourceOwnedDimension = 5
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT                         ResourceOwnedDimension = 6
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_PRESENCE          ResourceOwnedDimension = 7
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT           ResourceOwnedDimension = 8
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE              ResourceOwnedDimension = 9
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID               ResourceOwnedDimension = 10
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID               ResourceOwnedDimension = 11
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_GROUP_GID                      ResourceOwnedDimension = 12
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_GROUP_MEMBERS                  ResourceOwnedDimension = 13
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_UID                       ResourceOwnedDimension = 14
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_PRIMARY_GROUP             ResourceOwnedDimension = 15
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_GROUPS                    ResourceOwnedDimension = 16
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_HOME                      ResourceOwnedDimension = 17
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_SHELL                     ResourceOwnedDimension = 18
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_PASSWORD_LOCK             ResourceOwnedDimension = 19
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_MIN                 ResourceOwnedDimension = 20
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_MAX                 ResourceOwnedDimension = 21
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_WARN                ResourceOwnedDimension = 22
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_INACTIVE            ResourceOwnedDimension = 23
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_AGING_EXPIRY              ResourceOwnedDimension = 24
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_ACCOUNT_LOCK              ResourceOwnedDimension = 25
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE                   ResourceOwnedDimension = 26
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE             ResourceOwnedDimension = 27
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_FILE                ResourceOwnedDimension = 30
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_ENABLEMENT          ResourceOwnedDimension = 31
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_DEFINITION_RUNTIME             ResourceOwnedDimension = 32
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_LENGTH                ResourceOwnedDimension = 40
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_CLASSES               ResourceOwnedDimension = 41
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_HISTORY               ResourceOwnedDimension = 42
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MAX_AGE               ResourceOwnedDimension = 43
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MIN_AGE               ResourceOwnedDimension = 44
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_WARN                  ResourceOwnedDimension = 45
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_FAILURE_LIMIT         ResourceOwnedDimension = 46
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_UNLOCK_AFTER          ResourceOwnedDimension = 47
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT          ResourceOwnedDimension = 48
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER               ResourceOwnedDimension = 49
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET               ResourceOwnedDimension = 50
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE           ResourceOwnedDimension = 51
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY               ResourceOwnedDimension = 60
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE             ResourceOwnedDimension = 61
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION ResourceOwnedDimension = 62
 )
 
 // Enum value maps for ResourceOwnedDimension.
@@ -236,51 +239,57 @@ var (
 		49: "RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER",
 		50: "RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET",
 		51: "RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE",
+		60: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY",
+		61: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE",
+		62: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION",
 	}
 	ResourceOwnedDimension_value = map[string]int32{
-		"RESOURCE_OWNED_DIMENSION_UNSPECIFIED":             0,
-		"RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME":         1,
-		"RESOURCE_OWNED_DIMENSION_SYSTEMD_ENABLEMENT":      2,
-		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE": 3,
-		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION":  4,
-		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN":      5,
-		"RESOURCE_OWNED_DIMENSION_OBJECT":                  6,
-		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_PRESENCE":   7,
-		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT":    8,
-		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE":       9,
-		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID":        10,
-		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID":        11,
-		"RESOURCE_OWNED_DIMENSION_GROUP_GID":               12,
-		"RESOURCE_OWNED_DIMENSION_GROUP_MEMBERS":           13,
-		"RESOURCE_OWNED_DIMENSION_USER_UID":                14,
-		"RESOURCE_OWNED_DIMENSION_USER_PRIMARY_GROUP":      15,
-		"RESOURCE_OWNED_DIMENSION_USER_GROUPS":             16,
-		"RESOURCE_OWNED_DIMENSION_USER_HOME":               17,
-		"RESOURCE_OWNED_DIMENSION_USER_SHELL":              18,
-		"RESOURCE_OWNED_DIMENSION_USER_PASSWORD_LOCK":      19,
-		"RESOURCE_OWNED_DIMENSION_USER_AGING_MIN":          20,
-		"RESOURCE_OWNED_DIMENSION_USER_AGING_MAX":          21,
-		"RESOURCE_OWNED_DIMENSION_USER_AGING_WARN":         22,
-		"RESOURCE_OWNED_DIMENSION_USER_AGING_INACTIVE":     23,
-		"RESOURCE_OWNED_DIMENSION_USER_AGING_EXPIRY":       24,
-		"RESOURCE_OWNED_DIMENSION_USER_ACCOUNT_LOCK":       25,
-		"RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE":            26,
-		"RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE":      27,
-		"RESOURCE_OWNED_DIMENSION_DEFINITION_FILE":         30,
-		"RESOURCE_OWNED_DIMENSION_DEFINITION_ENABLEMENT":   31,
-		"RESOURCE_OWNED_DIMENSION_DEFINITION_RUNTIME":      32,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_LENGTH":         40,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_CLASSES":        41,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_HISTORY":        42,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_MAX_AGE":        43,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_MIN_AGE":        44,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_WARN":           45,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_FAILURE_LIMIT":  46,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_UNLOCK_AFTER":   47,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT":   48,
-		"RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER":        49,
-		"RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET":        50,
-		"RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE":    51,
+		"RESOURCE_OWNED_DIMENSION_UNSPECIFIED":                    0,
+		"RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME":                1,
+		"RESOURCE_OWNED_DIMENSION_SYSTEMD_ENABLEMENT":             2,
+		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE":        3,
+		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION":         4,
+		"RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN":             5,
+		"RESOURCE_OWNED_DIMENSION_OBJECT":                         6,
+		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_PRESENCE":          7,
+		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT":           8,
+		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE":              9,
+		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID":               10,
+		"RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID":               11,
+		"RESOURCE_OWNED_DIMENSION_GROUP_GID":                      12,
+		"RESOURCE_OWNED_DIMENSION_GROUP_MEMBERS":                  13,
+		"RESOURCE_OWNED_DIMENSION_USER_UID":                       14,
+		"RESOURCE_OWNED_DIMENSION_USER_PRIMARY_GROUP":             15,
+		"RESOURCE_OWNED_DIMENSION_USER_GROUPS":                    16,
+		"RESOURCE_OWNED_DIMENSION_USER_HOME":                      17,
+		"RESOURCE_OWNED_DIMENSION_USER_SHELL":                     18,
+		"RESOURCE_OWNED_DIMENSION_USER_PASSWORD_LOCK":             19,
+		"RESOURCE_OWNED_DIMENSION_USER_AGING_MIN":                 20,
+		"RESOURCE_OWNED_DIMENSION_USER_AGING_MAX":                 21,
+		"RESOURCE_OWNED_DIMENSION_USER_AGING_WARN":                22,
+		"RESOURCE_OWNED_DIMENSION_USER_AGING_INACTIVE":            23,
+		"RESOURCE_OWNED_DIMENSION_USER_AGING_EXPIRY":              24,
+		"RESOURCE_OWNED_DIMENSION_USER_ACCOUNT_LOCK":              25,
+		"RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE":                   26,
+		"RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE":             27,
+		"RESOURCE_OWNED_DIMENSION_DEFINITION_FILE":                30,
+		"RESOURCE_OWNED_DIMENSION_DEFINITION_ENABLEMENT":          31,
+		"RESOURCE_OWNED_DIMENSION_DEFINITION_RUNTIME":             32,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_LENGTH":                40,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_CLASSES":               41,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_HISTORY":               42,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_MAX_AGE":               43,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_MIN_AGE":               44,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_WARN":                  45,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_FAILURE_LIMIT":         46,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_UNLOCK_AFTER":          47,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT":          48,
+		"RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER":               49,
+		"RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET":               50,
+		"RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE":           51,
+		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY":               60,
+		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE":             61,
+		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION": 62,
 	}
 )
 
@@ -385,6 +394,7 @@ type ResourceOwnershipSnapshot struct {
 	PasswordPolicy     *PasswordPolicyOwnership   `protobuf:"bytes,9,opt,name=password_policy,json=passwordPolicy,proto3" json:"password_policy,omitempty"`
 	Firewall           *FirewallNativeSnapshot    `protobuf:"bytes,10,opt,name=firewall,proto3" json:"firewall,omitempty"`
 	AccountNssReceipt  *v1.ProbeReceipt           `protobuf:"bytes,11,opt,name=account_nss_receipt,json=accountNssReceipt,proto3" json:"account_nss_receipt,omitempty"`
+	OsUpdate           *OSUpdateOwnership         `protobuf:"bytes,12,opt,name=os_update,json=osUpdate,proto3" json:"os_update,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -492,6 +502,13 @@ func (x *ResourceOwnershipSnapshot) GetFirewall() *FirewallNativeSnapshot {
 func (x *ResourceOwnershipSnapshot) GetAccountNssReceipt() *v1.ProbeReceipt {
 	if x != nil {
 		return x.AccountNssReceipt
+	}
+	return nil
+}
+
+func (x *ResourceOwnershipSnapshot) GetOsUpdate() *OSUpdateOwnership {
+	if x != nil {
+		return x.OsUpdate
 	}
 	return nil
 }
@@ -950,6 +967,128 @@ func (x *PasswordPolicyOwnership) GetQualityDropinsSha256() []byte {
 	return nil
 }
 
+type OSUpdateNativeFileSnapshot struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Kind          v1.OSUpdateNativeFile      `protobuf:"varint,1,opt,name=kind,proto3,enum=lindm.resource.v1.OSUpdateNativeFile" json:"kind,omitempty"`
+	State         *v1.ManagedFileObservation `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	Content       []byte                     `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
+	Xattrs        []*NativeFileXattr         `protobuf:"bytes,4,rep,name=xattrs,proto3" json:"xattrs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OSUpdateNativeFileSnapshot) Reset() {
+	*x = OSUpdateNativeFileSnapshot{}
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateNativeFileSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateNativeFileSnapshot) ProtoMessage() {}
+
+func (x *OSUpdateNativeFileSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateNativeFileSnapshot.ProtoReflect.Descriptor instead.
+func (*OSUpdateNativeFileSnapshot) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *OSUpdateNativeFileSnapshot) GetKind() v1.OSUpdateNativeFile {
+	if x != nil {
+		return x.Kind
+	}
+	return v1.OSUpdateNativeFile(0)
+}
+
+func (x *OSUpdateNativeFileSnapshot) GetState() *v1.ManagedFileObservation {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+func (x *OSUpdateNativeFileSnapshot) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *OSUpdateNativeFileSnapshot) GetXattrs() []*NativeFileXattr {
+	if x != nil {
+		return x.Xattrs
+	}
+	return nil
+}
+
+// Root-only baseline and last-applied evidence. Every owned path must be absent
+// in the baseline: the provider never adopts or rewrites an unowned file.
+type OSUpdateOwnership struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Files         []*OSUpdateNativeFileSnapshot `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	TimerActive   bool                          `protobuf:"varint,2,opt,name=timer_active,json=timerActive,proto3" json:"timer_active,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OSUpdateOwnership) Reset() {
+	*x = OSUpdateOwnership{}
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateOwnership) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateOwnership) ProtoMessage() {}
+
+func (x *OSUpdateOwnership) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateOwnership.ProtoReflect.Descriptor instead.
+func (*OSUpdateOwnership) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *OSUpdateOwnership) GetFiles() []*OSUpdateNativeFileSnapshot {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *OSUpdateOwnership) GetTimerActive() bool {
+	if x != nil {
+		return x.TimerActive
+	}
+	return false
+}
+
 type NativeFileXattr struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -960,7 +1099,7 @@ type NativeFileXattr struct {
 
 func (x *NativeFileXattr) Reset() {
 	*x = NativeFileXattr{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +1111,7 @@ func (x *NativeFileXattr) String() string {
 func (*NativeFileXattr) ProtoMessage() {}
 
 func (x *NativeFileXattr) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +1124,7 @@ func (x *NativeFileXattr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NativeFileXattr.ProtoReflect.Descriptor instead.
 func (*NativeFileXattr) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *NativeFileXattr) GetName() string {
@@ -1017,7 +1156,7 @@ type ResourceAccountPrivate struct {
 
 func (x *ResourceAccountPrivate) Reset() {
 	*x = ResourceAccountPrivate{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1029,7 +1168,7 @@ func (x *ResourceAccountPrivate) String() string {
 func (*ResourceAccountPrivate) ProtoMessage() {}
 
 func (x *ResourceAccountPrivate) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1042,7 +1181,7 @@ func (x *ResourceAccountPrivate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceAccountPrivate.ProtoReflect.Descriptor instead.
 func (*ResourceAccountPrivate) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ResourceAccountPrivate) GetPasswordToken() string {
@@ -1092,7 +1231,7 @@ type ResourceOwnedMemberEdge struct {
 
 func (x *ResourceOwnedMemberEdge) Reset() {
 	*x = ResourceOwnedMemberEdge{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1104,7 +1243,7 @@ func (x *ResourceOwnedMemberEdge) String() string {
 func (*ResourceOwnedMemberEdge) ProtoMessage() {}
 
 func (x *ResourceOwnedMemberEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1117,7 +1256,7 @@ func (x *ResourceOwnedMemberEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnedMemberEdge.ProtoReflect.Descriptor instead.
 func (*ResourceOwnedMemberEdge) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ResourceOwnedMemberEdge) GetUser() string {
@@ -1174,7 +1313,7 @@ type ResourceOwnershipLedger struct {
 
 func (x *ResourceOwnershipLedger) Reset() {
 	*x = ResourceOwnershipLedger{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1186,7 +1325,7 @@ func (x *ResourceOwnershipLedger) String() string {
 func (*ResourceOwnershipLedger) ProtoMessage() {}
 
 func (x *ResourceOwnershipLedger) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1199,7 +1338,7 @@ func (x *ResourceOwnershipLedger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnershipLedger.ProtoReflect.Descriptor instead.
 func (*ResourceOwnershipLedger) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ResourceOwnershipLedger) GetFormatVersion() uint32 {
@@ -1325,7 +1464,7 @@ var File_lindm_agent_v1_resource_ownership_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\x9f\x13\n" +
+	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xfa\x14\n" +
 	"\x19ResourceOwnershipSnapshot\x12P\n" +
 	"\vobservation\x18\x01 \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x12@\n" +
 	"\x14managed_file_content\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x12managedFileContent\x88\x01\x01\x12G\n" +
@@ -1338,14 +1477,16 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x0fpassword_policy\x18\t \x01(\v2'.lindm.agent.v1.PasswordPolicyOwnershipR\x0epasswordPolicy\x12B\n" +
 	"\bfirewall\x18\n" +
 	" \x01(\v2&.lindm.agent.v1.FirewallNativeSnapshotR\bfirewall\x12O\n" +
-	"\x13account_nss_receipt\x18\v \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x11accountNssReceipt:\xeb\v\xbaH\xe7\v\x1a\xa1\x01\n" +
+	"\x13account_nss_receipt\x18\v \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x11accountNssReceipt\x12>\n" +
+	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate:\x86\r\xbaH\x82\r\x1a\xa1\x01\n" +
 	"\x1aownership_snapshot.content\x12<private content is only valid for a managed file observation\x1aE!has(this.managed_file_content) || has(this.observation.managed_file)\x1a\x80\x03\n" +
 	"\x1fownership_snapshot.private_kind\x121private state must match its native resource kind\x1a\xa9\x02(this.managed_file_xattrs.size() == 0 || has(this.observation.managed_file)) && (!has(this.account_private) || has(this.observation.local_user) || has(this.observation.local_group)) && (this.account_member_edges.size() == 0 || has(this.observation.local_user) || has(this.observation.local_group))\x1a\xbe\x02\n" +
 	"#ownership_snapshot.account_planning\x12<native account planning evidence must match its account kind\x1a\xd8\x01(!has(this.account_nss_receipt) || has(this.observation.local_user) || has(this.observation.local_group)) && (!has(this.account_private) || !has(this.account_private.desired_home) || has(this.observation.local_user))\x1a\x9d\x01\n" +
 	"\x19ownership_snapshot.sysctl\x12Asysctl private file evidence belongs only to a sysctl observation\x1a=!has(this.sysctl_persistence) || has(this.observation.sysctl)\x1a\xa8\x01\n" +
 	"\x1downership_snapshot.definition\x12@definition private evidence belongs only to a systemd definition\x1aEhas(this.definition_file) == has(this.observation.systemd_definition)\x1a\x9c\x01\n" +
 	"\x1bownership_snapshot.password\x129password private evidence belongs only to password policy\x1aBhas(this.password_policy) == has(this.observation.password_policy)\x1a\x92\x01\n" +
-	"\x1bownership_snapshot.firewall\x128firewall private evidence belongs only to firewall zones\x1a9has(this.firewall) == has(this.observation.firewall_zone)B\x17\n" +
+	"\x1bownership_snapshot.firewall\x128firewall private evidence belongs only to firewall zones\x1a9has(this.firewall) == has(this.observation.firewall_zone)\x1a\x98\x01\n" +
+	"\x1cownership_snapshot.os_update\x12@update policy private evidence belongs only to the update policy\x1a6has(this.os_update) == has(this.observation.os_update)B\x17\n" +
 	"\x15_managed_file_content\"\xdc\a\n" +
 	"\x16FirewallNativeSnapshot\x123\n" +
 	"\x05table\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x182\x16^lindm_z_[a-f0-9]{32}$R\x05table\x12$\n" +
@@ -1403,7 +1544,21 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x11acquired_features\x18\x06 \x03(\x0e2%.lindm.agent.v1.PasswordNativeFeatureB\x13\xbaH\x10\x92\x01\r\x10\x03\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x10acquiredFeatures\x12=\n" +
 	"\x16quality_dropins_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\x14qualityDropinsSha256:\xbc\x02\xbaH\xb8\x02\x1a\x9d\x01\n" +
 	"\x1fpassword_ownership.unique_files\x123password native files have unique closed identities\x1aEthis.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)\x1a\x95\x01\n" +
-	"$password_ownership.acquired_features\x122acquired manager features must be observed enabled\x1a9this.acquired_features.all(f, f in this.enabled_features)\"R\n" +
+	"$password_ownership.acquired_features\x122acquired manager features must be observed enabled\x1a9this.acquired_features.all(f, f in this.enabled_features)\"\xb2\x03\n" +
+	"\x1aOSUpdateNativeFileSnapshot\x12E\n" +
+	"\x04kind\x18\x01 \x01(\x0e2%.lindm.resource.v1.OSUpdateNativeFileB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12G\n" +
+	"\x05state\x18\x02 \x01(\v2).lindm.resource.v1.ManagedFileObservationB\x06\xbaH\x03\xc8\x01\x01R\x05state\x12(\n" +
+	"\acontent\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\acontent\x88\x01\x01\x12A\n" +
+	"\x06xattrs\x18\x04 \x03(\v2\x1f.lindm.agent.v1.NativeFileXattrB\b\xbaH\x05\x92\x01\x02\x10@R\x06xattrs:\x8a\x01\xbaH\x86\x01\x1a\x83\x01\n" +
+	"\x1eos_update_file.private_content\x129existing update policy files require private native bytes\x1a&this.state.exists == has(this.content)B\n" +
+	"\n" +
+	"\b_content\"\xaa\x02\n" +
+	"\x11OSUpdateOwnership\x12L\n" +
+	"\x05files\x18\x01 \x03(\v2*.lindm.agent.v1.OSUpdateNativeFileSnapshotB\n" +
+	"\xbaH\a\x92\x01\x04\b\x03\x10\x04R\x05files\x12!\n" +
+	"\ftimer_active\x18\x02 \x01(\bR\vtimerActive:\xa3\x01\xbaH\x9f\x01\x1a\x9c\x01\n" +
+	" os_update_ownership.unique_files\x121update policy files have unique closed identities\x1aEthis.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)\"R\n" +
 	"\x0fNativeFileXattr\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xff\x01R\x04name\x12\x1f\n" +
@@ -1457,7 +1612,7 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"#PASSWORD_NATIVE_FEATURE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fPASSWORD_NATIVE_FEATURE_QUALITY\x10\x01\x12#\n" +
 	"\x1fPASSWORD_NATIVE_FEATURE_HISTORY\x10\x02\x12$\n" +
-	" PASSWORD_NATIVE_FEATURE_FAILLOCK\x10\x03*\xfc\x0f\n" +
+	" PASSWORD_NATIVE_FEATURE_FAILLOCK\x10\x03*\x99\x11\n" +
 	"\x16ResourceOwnedDimension\x12(\n" +
 	"$RESOURCE_OWNED_DIMENSION_UNSPECIFIED\x10\x00\x12,\n" +
 	"(RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME\x10\x01\x12/\n" +
@@ -1502,7 +1657,10 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	".RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT\x100\x12-\n" +
 	")RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER\x101\x12-\n" +
 	")RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET\x102\x121\n" +
-	"-RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE\x103*\xdb\x01\n" +
+	"-RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE\x103\x12-\n" +
+	")RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY\x10<\x12/\n" +
+	"+RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE\x10=\x12;\n" +
+	"7RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION\x10>*\xdb\x01\n" +
 	"\x16ResourceOwnershipState\x12(\n" +
 	"$RESOURCE_OWNERSHIP_STATE_UNSPECIFIED\x10\x00\x12$\n" +
 	" RESOURCE_OWNERSHIP_STATE_CLAIMED\x10\x01\x12$\n" +
@@ -1523,7 +1681,7 @@ func file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_resource_ownership_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_lindm_agent_v1_resource_ownership_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_lindm_agent_v1_resource_ownership_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_lindm_agent_v1_resource_ownership_proto_goTypes = []any{
 	(PasswordNativeFile)(0),            // 0: lindm.agent.v1.PasswordNativeFile
 	(PasswordNativeFeature)(0),         // 1: lindm.agent.v1.PasswordNativeFeature
@@ -1535,65 +1693,73 @@ var file_lindm_agent_v1_resource_ownership_proto_goTypes = []any{
 	(*DefinitionFileSnapshot)(nil),     // 7: lindm.agent.v1.DefinitionFileSnapshot
 	(*PasswordNativeFileSnapshot)(nil), // 8: lindm.agent.v1.PasswordNativeFileSnapshot
 	(*PasswordPolicyOwnership)(nil),    // 9: lindm.agent.v1.PasswordPolicyOwnership
-	(*NativeFileXattr)(nil),            // 10: lindm.agent.v1.NativeFileXattr
-	(*ResourceAccountPrivate)(nil),     // 11: lindm.agent.v1.ResourceAccountPrivate
-	(*ResourceOwnedMemberEdge)(nil),    // 12: lindm.agent.v1.ResourceOwnedMemberEdge
-	(*ResourceOwnershipLedger)(nil),    // 13: lindm.agent.v1.ResourceOwnershipLedger
-	(*v1.ResourceObservation)(nil),     // 14: lindm.resource.v1.ResourceObservation
-	(*v1.ArtifactRef)(nil),             // 15: lindm.resource.v1.ArtifactRef
-	(*v1.MemberEdgeChange)(nil),        // 16: lindm.resource.v1.MemberEdgeChange
-	(*v1.ProbeReceipt)(nil),            // 17: lindm.resource.v1.ProbeReceipt
-	(*FirewallNativeChain)(nil),        // 18: lindm.agent.v1.FirewallNativeChain
-	(*FirewallNativeRule)(nil),         // 19: lindm.agent.v1.FirewallNativeRule
-	(*FirewallPersistentState)(nil),    // 20: lindm.agent.v1.FirewallPersistentState
-	(*v1.ManagedFileObservation)(nil),  // 21: lindm.resource.v1.ManagedFileObservation
-	(*v1.HomeMetadata)(nil),            // 22: lindm.resource.v1.HomeMetadata
-	(*PrivateCustodyEnvelope)(nil),     // 23: lindm.agent.v1.PrivateCustodyEnvelope
-	(*v1.ResourceRef)(nil),             // 24: lindm.resource.v1.ResourceRef
-	(*ResourceOwnershipBinding)(nil),   // 25: lindm.agent.v1.ResourceOwnershipBinding
+	(*OSUpdateNativeFileSnapshot)(nil), // 10: lindm.agent.v1.OSUpdateNativeFileSnapshot
+	(*OSUpdateOwnership)(nil),          // 11: lindm.agent.v1.OSUpdateOwnership
+	(*NativeFileXattr)(nil),            // 12: lindm.agent.v1.NativeFileXattr
+	(*ResourceAccountPrivate)(nil),     // 13: lindm.agent.v1.ResourceAccountPrivate
+	(*ResourceOwnedMemberEdge)(nil),    // 14: lindm.agent.v1.ResourceOwnedMemberEdge
+	(*ResourceOwnershipLedger)(nil),    // 15: lindm.agent.v1.ResourceOwnershipLedger
+	(*v1.ResourceObservation)(nil),     // 16: lindm.resource.v1.ResourceObservation
+	(*v1.ArtifactRef)(nil),             // 17: lindm.resource.v1.ArtifactRef
+	(*v1.MemberEdgeChange)(nil),        // 18: lindm.resource.v1.MemberEdgeChange
+	(*v1.ProbeReceipt)(nil),            // 19: lindm.resource.v1.ProbeReceipt
+	(*FirewallNativeChain)(nil),        // 20: lindm.agent.v1.FirewallNativeChain
+	(*FirewallNativeRule)(nil),         // 21: lindm.agent.v1.FirewallNativeRule
+	(*FirewallPersistentState)(nil),    // 22: lindm.agent.v1.FirewallPersistentState
+	(*v1.ManagedFileObservation)(nil),  // 23: lindm.resource.v1.ManagedFileObservation
+	(v1.OSUpdateNativeFile)(0),         // 24: lindm.resource.v1.OSUpdateNativeFile
+	(*v1.HomeMetadata)(nil),            // 25: lindm.resource.v1.HomeMetadata
+	(*PrivateCustodyEnvelope)(nil),     // 26: lindm.agent.v1.PrivateCustodyEnvelope
+	(*v1.ResourceRef)(nil),             // 27: lindm.resource.v1.ResourceRef
+	(*ResourceOwnershipBinding)(nil),   // 28: lindm.agent.v1.ResourceOwnershipBinding
 }
 var file_lindm_agent_v1_resource_ownership_proto_depIdxs = []int32{
-	14, // 0: lindm.agent.v1.ResourceOwnershipSnapshot.observation:type_name -> lindm.resource.v1.ResourceObservation
-	15, // 1: lindm.agent.v1.ResourceOwnershipSnapshot.artifacts:type_name -> lindm.resource.v1.ArtifactRef
-	10, // 2: lindm.agent.v1.ResourceOwnershipSnapshot.managed_file_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	11, // 3: lindm.agent.v1.ResourceOwnershipSnapshot.account_private:type_name -> lindm.agent.v1.ResourceAccountPrivate
-	16, // 4: lindm.agent.v1.ResourceOwnershipSnapshot.account_member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
+	16, // 0: lindm.agent.v1.ResourceOwnershipSnapshot.observation:type_name -> lindm.resource.v1.ResourceObservation
+	17, // 1: lindm.agent.v1.ResourceOwnershipSnapshot.artifacts:type_name -> lindm.resource.v1.ArtifactRef
+	12, // 2: lindm.agent.v1.ResourceOwnershipSnapshot.managed_file_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	13, // 3: lindm.agent.v1.ResourceOwnershipSnapshot.account_private:type_name -> lindm.agent.v1.ResourceAccountPrivate
+	18, // 4: lindm.agent.v1.ResourceOwnershipSnapshot.account_member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
 	6,  // 5: lindm.agent.v1.ResourceOwnershipSnapshot.sysctl_persistence:type_name -> lindm.agent.v1.SysctlPersistenceSnapshot
 	7,  // 6: lindm.agent.v1.ResourceOwnershipSnapshot.definition_file:type_name -> lindm.agent.v1.DefinitionFileSnapshot
 	9,  // 7: lindm.agent.v1.ResourceOwnershipSnapshot.password_policy:type_name -> lindm.agent.v1.PasswordPolicyOwnership
 	5,  // 8: lindm.agent.v1.ResourceOwnershipSnapshot.firewall:type_name -> lindm.agent.v1.FirewallNativeSnapshot
-	17, // 9: lindm.agent.v1.ResourceOwnershipSnapshot.account_nss_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	18, // 10: lindm.agent.v1.FirewallNativeSnapshot.chains:type_name -> lindm.agent.v1.FirewallNativeChain
-	19, // 11: lindm.agent.v1.FirewallNativeSnapshot.rules:type_name -> lindm.agent.v1.FirewallNativeRule
-	20, // 12: lindm.agent.v1.FirewallNativeSnapshot.persistent:type_name -> lindm.agent.v1.FirewallPersistentState
-	21, // 13: lindm.agent.v1.FirewallNativeSnapshot.persistence_file:type_name -> lindm.resource.v1.ManagedFileObservation
-	10, // 14: lindm.agent.v1.FirewallNativeSnapshot.persistence_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	10, // 15: lindm.agent.v1.FirewallNativeSnapshot.creation_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	21, // 16: lindm.agent.v1.SysctlPersistenceSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	10, // 17: lindm.agent.v1.SysctlPersistenceSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	21, // 18: lindm.agent.v1.DefinitionFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	10, // 19: lindm.agent.v1.DefinitionFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	0,  // 20: lindm.agent.v1.PasswordNativeFileSnapshot.kind:type_name -> lindm.agent.v1.PasswordNativeFile
-	21, // 21: lindm.agent.v1.PasswordNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	10, // 22: lindm.agent.v1.PasswordNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	8,  // 23: lindm.agent.v1.PasswordPolicyOwnership.files:type_name -> lindm.agent.v1.PasswordNativeFileSnapshot
-	1,  // 24: lindm.agent.v1.PasswordPolicyOwnership.enabled_features:type_name -> lindm.agent.v1.PasswordNativeFeature
-	1,  // 25: lindm.agent.v1.PasswordPolicyOwnership.acquired_features:type_name -> lindm.agent.v1.PasswordNativeFeature
-	22, // 26: lindm.agent.v1.ResourceAccountPrivate.desired_home:type_name -> lindm.resource.v1.HomeMetadata
-	23, // 27: lindm.agent.v1.ResourceAccountPrivate.encrypted_password_token:type_name -> lindm.agent.v1.PrivateCustodyEnvelope
-	24, // 28: lindm.agent.v1.ResourceOwnershipLedger.ref:type_name -> lindm.resource.v1.ResourceRef
-	25, // 29: lindm.agent.v1.ResourceOwnershipLedger.owner:type_name -> lindm.agent.v1.ResourceOwnershipBinding
-	3,  // 30: lindm.agent.v1.ResourceOwnershipLedger.state:type_name -> lindm.agent.v1.ResourceOwnershipState
-	4,  // 31: lindm.agent.v1.ResourceOwnershipLedger.baseline:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	4,  // 32: lindm.agent.v1.ResourceOwnershipLedger.last_applied:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	4,  // 33: lindm.agent.v1.ResourceOwnershipLedger.before_effect:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	2,  // 34: lindm.agent.v1.ResourceOwnershipLedger.owned_dimensions:type_name -> lindm.agent.v1.ResourceOwnedDimension
-	12, // 35: lindm.agent.v1.ResourceOwnershipLedger.owned_member_edges:type_name -> lindm.agent.v1.ResourceOwnedMemberEdge
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	19, // 9: lindm.agent.v1.ResourceOwnershipSnapshot.account_nss_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	11, // 10: lindm.agent.v1.ResourceOwnershipSnapshot.os_update:type_name -> lindm.agent.v1.OSUpdateOwnership
+	20, // 11: lindm.agent.v1.FirewallNativeSnapshot.chains:type_name -> lindm.agent.v1.FirewallNativeChain
+	21, // 12: lindm.agent.v1.FirewallNativeSnapshot.rules:type_name -> lindm.agent.v1.FirewallNativeRule
+	22, // 13: lindm.agent.v1.FirewallNativeSnapshot.persistent:type_name -> lindm.agent.v1.FirewallPersistentState
+	23, // 14: lindm.agent.v1.FirewallNativeSnapshot.persistence_file:type_name -> lindm.resource.v1.ManagedFileObservation
+	12, // 15: lindm.agent.v1.FirewallNativeSnapshot.persistence_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	12, // 16: lindm.agent.v1.FirewallNativeSnapshot.creation_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	23, // 17: lindm.agent.v1.SysctlPersistenceSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	12, // 18: lindm.agent.v1.SysctlPersistenceSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	23, // 19: lindm.agent.v1.DefinitionFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	12, // 20: lindm.agent.v1.DefinitionFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	0,  // 21: lindm.agent.v1.PasswordNativeFileSnapshot.kind:type_name -> lindm.agent.v1.PasswordNativeFile
+	23, // 22: lindm.agent.v1.PasswordNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	12, // 23: lindm.agent.v1.PasswordNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	8,  // 24: lindm.agent.v1.PasswordPolicyOwnership.files:type_name -> lindm.agent.v1.PasswordNativeFileSnapshot
+	1,  // 25: lindm.agent.v1.PasswordPolicyOwnership.enabled_features:type_name -> lindm.agent.v1.PasswordNativeFeature
+	1,  // 26: lindm.agent.v1.PasswordPolicyOwnership.acquired_features:type_name -> lindm.agent.v1.PasswordNativeFeature
+	24, // 27: lindm.agent.v1.OSUpdateNativeFileSnapshot.kind:type_name -> lindm.resource.v1.OSUpdateNativeFile
+	23, // 28: lindm.agent.v1.OSUpdateNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	12, // 29: lindm.agent.v1.OSUpdateNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	10, // 30: lindm.agent.v1.OSUpdateOwnership.files:type_name -> lindm.agent.v1.OSUpdateNativeFileSnapshot
+	25, // 31: lindm.agent.v1.ResourceAccountPrivate.desired_home:type_name -> lindm.resource.v1.HomeMetadata
+	26, // 32: lindm.agent.v1.ResourceAccountPrivate.encrypted_password_token:type_name -> lindm.agent.v1.PrivateCustodyEnvelope
+	27, // 33: lindm.agent.v1.ResourceOwnershipLedger.ref:type_name -> lindm.resource.v1.ResourceRef
+	28, // 34: lindm.agent.v1.ResourceOwnershipLedger.owner:type_name -> lindm.agent.v1.ResourceOwnershipBinding
+	3,  // 35: lindm.agent.v1.ResourceOwnershipLedger.state:type_name -> lindm.agent.v1.ResourceOwnershipState
+	4,  // 36: lindm.agent.v1.ResourceOwnershipLedger.baseline:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	4,  // 37: lindm.agent.v1.ResourceOwnershipLedger.last_applied:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	4,  // 38: lindm.agent.v1.ResourceOwnershipLedger.before_effect:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	2,  // 39: lindm.agent.v1.ResourceOwnershipLedger.owned_dimensions:type_name -> lindm.agent.v1.ResourceOwnedDimension
+	14, // 40: lindm.agent.v1.ResourceOwnershipLedger.owned_member_edges:type_name -> lindm.agent.v1.ResourceOwnedMemberEdge
+	41, // [41:41] is the sub-list for method output_type
+	41, // [41:41] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_resource_ownership_proto_init() }
@@ -1609,15 +1775,16 @@ func file_lindm_agent_v1_resource_ownership_proto_init() {
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[2].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[3].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[4].OneofWrappers = []any{}
-	file_lindm_agent_v1_resource_ownership_proto_msgTypes[7].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[6].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[9].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_resource_ownership_proto_rawDesc), len(file_lindm_agent_v1_resource_ownership_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

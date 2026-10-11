@@ -10,6 +10,7 @@ import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/inventory_refresh.proto";
 import "lindm/agent/v1/offline_enrollment.proto";
+import "lindm/agent/v1/os_update.proto";
 import "lindm/agent/v1/recovery_readiness.proto";
 import "lindm/agent/v1/resource_execution.proto";
 import "lindm/agent/v1/update.proto";
@@ -77,6 +78,9 @@ service ExecutorService {
   rpc GetExecutionTrust(GetExecutionTrustRequest) returns (GetExecutionTrustResponse);
   // Reads native recovery capability and ESP capacity without changing boot state.
   rpc GetRecoveryReadiness(GetRecoveryReadinessRequest) returns (GetRecoveryReadinessResponse);
+  // Reads the last offline patch status; a stale status starts the static
+  // lindm-os-update-status.service refresh without waiting for it.
+  rpc GetPatchStatus(GetPatchStatusRequest) returns (GetPatchStatusResponse);
   // Verifies and journals intent before native preparation. Package staging is
   // asynchronous; exact retries poll without extending its signed deadline.
   rpc PrepareResourceExecution(PrepareResourceExecutionRequest) returns (PrepareResourceExecutionResponse);

@@ -410,7 +410,7 @@ func TestOwnerDelegationRetainsExplicitSupportedCapabilities(t *testing.T) {
 		"device.lock-sessions.v1", "device.release-lock.v1",
 		"device.quarantine.v1", "device.release-quarantine.v1",
 		"device.crypto-erase.v1", "device.sanitize.v1",
-		"device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1",
+		"device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1", "device.patch-now.v1",
 	}
 	for _, delegate := range f.declaration.Delegates {
 		delegate.Capabilities = capabilities

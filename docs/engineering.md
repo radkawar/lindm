@@ -1142,7 +1142,7 @@ Local identity tests use a real PostgreSQL schema and a software P-256 WebAuthn
 authenticator, not a verifier mock. The `TestLocal*` and `TestBreakGlass*` integration
 tests exercise password lockout, one-use enrollment and challenges, replay/expiry,
 immediate disable, worker fences and emergency audit. Run these with the same
-`LINDM_TEST_DATABASE_URL` used by the integration lane. Browser qualification must
+`LINDM_TEST_DATABASE_URL_FILE` used by the integration lane. Browser qualification must
 add a Chromium CDP virtual authenticator with user verification enabled and complete
 `/enroll`, sign-in, account reset and the persistent emergency banner.
 
@@ -1793,7 +1793,7 @@ overall `refresh_timeout_seconds` ceiling (default 7,200) applies regardless.
 The staging lease is renewed by a one-minute heartbeat throughout parsing.
 
 Real-source RHEL qualification is explicitly opt-in:
-`LINDM_TEST_DATABASE_URL=... go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=2h10m`.
+`LINDM_TEST_DATABASE_URL_FILE=.cache/dev/migration-database-url go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=2h10m`.
 It acquires both real signed archives and publishes through the production service
 inside an owned disposable test schema. It requires network access and a test role
 with schema-creation privileges, never the demo database or an owner's session.

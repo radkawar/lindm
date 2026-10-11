@@ -1,0 +1,25 @@
+# Static: started by the root executor when the published patch status is
+# stale. It reads only the native cache (apt-get -s, dnf --cacheonly) and
+# never fetches, hence PrivateNetwork. AF_UNIX stays reachable for logind.
+# /var stays writable: apt may rebuild its package cache and dnf writes its
+# logs and solver caches even for cache-only queries.
+[Unit]
+Description=Lindm offline OS patch status
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lindm/lindm-agent os-update status
+User=root
+Group=root
+UMask=0077
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=yes
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=5min
+LimitCORE=0

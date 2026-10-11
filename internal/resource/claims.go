@@ -226,18 +226,13 @@ func Claims(desired *resourcev1.ResourceDesiredState) ([]*resourcev1.ResourceCla
 			requireRef(state.FlatpakApp.GetRemote())
 		}
 	case *resourcev1.ResourceDesiredState_OsUpdate:
-		// Exact package pins must be excluded from an unplanned system update.
-		// A native solver manifest may refine the complete member claims later.
-		members := make([]string, 0, len(state.OsUpdate.GetExclusions()))
-		for _, pkg := range state.OsUpdate.GetExclusions() {
-			members = append(members, packageKey(pkg))
+		// One native update scheduler per device; owned fixed paths exclude any
+		// managed file or systemd definition resource from the same objects.
+		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE, "system", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
+		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "timer/"+OSUpdateTimerUnit, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
+		for _, kind := range OSUpdateNativeFiles() {
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, OSUpdateNativePath(kind), resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update:"+kind.String())
 		}
-		slices.Sort(members)
-		claims = append(claims, &resourcev1.ResourceClaim{Domain: resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, Key: "*", Mode: resourcev1.ClaimMode_CLAIM_MODE_EXACT_SET, Members: members})
-		for _, snapshot := range state.OsUpdate.GetSource().GetRepositories().GetRepositories() {
-			requireRef(snapshot.GetRepository())
-		}
-		requireRef(state.OsUpdate.GetSource().GetOstree().GetRemote())
 	case *resourcev1.ResourceDesiredState_PasswordPolicy:
 		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PAM_OWNER, "system/local-auth", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "password-policy")
 	case *resourcev1.ResourceDesiredState_CertificateEnrollment:
@@ -355,12 +350,6 @@ func Conflicts(left, right []*resourcev1.ResourceClaim) bool {
 			if a.GetDomain() != b.GetDomain() {
 				continue
 			}
-			if a.GetDomain() == resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE && (a.GetKey() == "*" || b.GetKey() == "*") {
-				if updatePinConflict(a, b) || updatePinConflict(b, a) {
-					return true
-				}
-				continue
-			}
 			keysOverlap := a.GetKey() == b.GetKey() || a.GetKey() == "*" || b.GetKey() == "*"
 			if a.GetDomain() == resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT {
 				keysOverlap = portClaimsOverlap(a.GetKey(), b.GetKey())
@@ -405,10 +394,6 @@ func allMembers(left, right []string) bool {
 		}
 	}
 	return true
-}
-
-func updatePinConflict(update, pin *resourcev1.ResourceClaim) bool {
-	return update.GetKey() == "*" && update.GetMode() == resourcev1.ClaimMode_CLAIM_MODE_EXACT_SET && pin.GetMode() == resourcev1.ClaimMode_CLAIM_MODE_VALUE && !slices.Contains(update.GetMembers(), pin.GetKey())
 }
 
 func portClaimsOverlap(left, right string) bool {

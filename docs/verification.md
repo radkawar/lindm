@@ -1553,6 +1553,27 @@ opens `history.sqlite` read-write, so read-only staging resolves against a priva
 snapshot; DNF4 refuses package downloads under `cacheonly`; and the fixture
 toolchain oracle assumed `dnf5`.
 
+##### Shared native runner, custody walk and provider registry
+
+After every agent provider moved onto `nativeexec`, `custody.OpenRoot`/`ReadRoot`
+and the per-kind `resourceprovider` registries, the all-kinds connected lane
+(`lab vm resources -phase connected -kinds
+packages,files,accounts,sysctl,definitions,password,firewall`) passed all 72
+scenarios on each of Ubuntu 24.04 (`ubuntu-noble-arm64`, `dgx20`) and Fedora 44
+(`fedora-cloud-44-1.7-aarch64`, `dgx21`), aarch64 KVM, from one snapshot of the
+shared tree (`c44a02b` plus 78 uncommitted landed files including the exit-status
+fix; source tar SHA-256 `060a334d…2b687`, lab `3ff63d0a…278eecfa`, lindmd
+`be7d457c…7fca2c48`). The first run of the same lanes caught that fix: account
+NSS absence and the LUKS wipe proof still
+matched `os/exec` exit errors, so every account action timed out. Per-kind
+scope limits are unchanged from the records above. Records are under
+`$HOME/.cache/lindm-providerlayer-20261011/`:
+
+| Record                         | SHA-256                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `ubuntu2404-arm64-res-s2.json` | `d7445376e31e944ea010d4dda936448395d9d2ee0f4a0414d1690feb019fa5a8` |
+| `fedora44-arm64-res-s2.json`   | `50457a88ec627a8f9e48524e9c0deccee4712cf15d9bfd32a2882714a0844b71` |
+
 ##### Host resource providers on EL 9
 
 The connected host lanes (`lab vm resources -phase connected -kinds
@@ -1733,6 +1754,91 @@ unit names, killed neither, and the transaction succeeded instead of ending
 `OUTCOME_UNKNOWN`. The repository is now `lindm-lab-resource-repository.service`,
 and the watcher kills exactly one UUID-named effect helper or records why not.
 
+##### OS update policy, patch now and patch status
+
+`lab vm resources -phase connected -kinds os-update -allow-network -accelerator kvm
+-local-authority` (RHEL adds `-redhat-token-file`) qualifies `os.update.v1`, the
+`device.patch-now.v1` action, patch-status inventory and fleet patch
+compliance. Every policy change goes through the real server assignment, signed
+intent/challenge/start grant, protected executor and transient native helper.
+Each guest uses the distribution's own signed repositories. The policy zone is
+`Europe/Berlin` while guest clocks are UTC, so the timer calendar crosses a real
+IANA conversion. Each record runs eleven scenarios, all passed:
+
+| Scenario                             | Native proof                                                                                                                                                                                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `competing-native-scheduler-refused` | APT: a later part sets `APT::Periodic::Unattended-Upgrade "1"`; RPM: an enabled `dnf-automatic.timer`/`dnf5-automatic.timer`. Signed failure before any effect; owned paths, loaded timer and native scheduler state byte-identical before, after refusal and after clear                |
+| `policy-installs-window-timer`       | Owned files with mode/owner/digest, systemd's loaded `TimersCalendar` in the policy zone, `FragmentPath`, `ActiveState=active`, effective APT periodic `0`                                                                                                                               |
+| `start-outside-window-skipped`       | Manual start before the window opens: package database digest unchanged; published patch status `last_run` `SKIPPED_OUTSIDE_WINDOW`                                                                                                                                                      |
+| `window-deferral-holds-updates`      | The owned timer itself fires at the window start (`LastTriggerUSec`); with 7 deferral days the run is `DEFERRED` with deferred packages, the package database is unchanged                                                                                                               |
+| `policy-reconciles-without-deferral` | Reconcile to deferral 0 and a new window                                                                                                                                                                                                                                                 |
+| `window-installs-security-update`    | Timer-opened run installs the real pending security updates (package database changed); native reboot oracle set; logind `ScheduledShutdown` is `reboot` at completion + 5 min (±1 min) and equals the reported time; the policy notice reached a logged-in pty as a logind wall message |
+| `scheduled-reboot-executes`          | A new boot ID after the scheduled time, native oracle cleared, fresh post-reboot patch status                                                                                                                                                                                            |
+| `repeat-after-reboot`                | Same policy converges with no start grant                                                                                                                                                                                                                                                |
+| `patch-now-all-updates`              | Signed patch-now (`ALL`, reboot `NEVER`) is `SUCCEEDED` with `patch_run_started`; patch status `last_run` carries the action ID, `SUCCEEDED`, no logind schedule (`policy_never` when a reboot is required); updated count agrees with the database diff                                 |
+| `fleet-patch-compliance`             | `GetFleetSummary.patch_compliance` buckets sum to the active devices and place the device in the bucket its fresh status implies                                                                                                                                                         |
+| `release-removes-policy`             | Signed release; owned objects, timer and native scheduler state byte-identical to the pre-lane baseline                                                                                                                                                                                  |
+
+The server records come from signed `refresh_inventory` actions, which are part
+of each scenario's evidence. All records are from source snapshot `s11`:
+the feature rebased on `c44a02b` with native tools through `nativeexec`
+(SIGTERM-only package transactions, credentialed notify child), commit
+`656d4d5`, tree SHA-256 `3c2ddbba…1377`, lab `a80fb128…9889`, lindmd
+`141c684d…beb4`. Records are under `$HOME/.cache/lindm-ospatch-20261011/`
+(aarch64 on the Sparks with KVM and AAVMF):
+
+| Record                                   | Image / SELinux                                | Facts                                                                                                                                     | SHA-256                                                            |
+| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu24-arm64-dgx20-osupdate-s11.json` | `ubuntu-noble-20260926-arm64`, AppArmor        | 29 pending security; 23 deferred; window installed 29 packages; reboot at +5 min executed; patch-now updated 3; fleet bucket `patched`    | `31fc2734ac310f230d143a324fd5b92d38d1c037984ee0375462024558ed55bd` |
+| `fedora44-arm64-dgx20-osupdate-s11.json` | `fedora-cloud-44-1.7-aarch64`, Enforcing       | 71 pending security; 71 deferred; window installed 78; reboot executed; patch-now updated 120 (`policy_never`); fleet `reboot_required`   | `7b11840048a08037589a400bad54b0eb7b55ef12d858e8cae148b27899c65db5` |
+| `rhel98-arm64-dgx21-osupdate-s11.json`   | `rhel-9.8-kvm-aarch64`, Enforcing, registered  | 105 pending security; 119 deferred; window installed 105; reboot executed; patch-now updated 24 (`policy_never`); fleet `reboot_required` | `819225c0ec2c1ce9ec9d0e5a0772857072a959819a4ef8311634f7f4b665772e` |
+| `rhel102-arm64-dgx21-osupdate-s11.json`  | `rhel-10.2-kvm-aarch64`, Enforcing, registered | 117 pending security; 127 deferred; window installed 117; reboot executed; patch-now updated 53 (`policy_never`); fleet `reboot_required` | `fb3e576c856bee4910637689f3fcb886cff675a82bb4c6a59164f3c7282305b1` |
+
+Red Hat receipts (registration, identity, entitled metadata refresh,
+unregistration and activation-key deletion all true): RHEL 9.8 run
+`lindm-lab-e13412e8d9165d718b63d1aeea5bb517`, consumer
+`eb6add44-1caf-4e27-b1ae-c49dc2c63377`; RHEL 10.2 run
+`lindm-lab-c1a2b9f74687cd9ee931ba5c8677dfbc`, consumer
+`5a7ddb0a-a925-49bc-bac9-e55f9a190fce`. A read-only `lab images redhat
+inventory` after the runs returned an empty list. The runner's deferred count is per
+`name.arch` from `repoquery`, and the oracle counts `check-update` lines, so
+the two counts need not be equal. Earlier passing `s8` records (pre-rebase)
+for Ubuntu and both RHEL releases are superseded by these.
+
+Native findings, each fixed with a regression before these records:
+
+- The helper's `NativeResourceTransactionRequest` kind allowlist lacked kind 15,
+  so it refused the plan after the ownership effect began
+  (`TestHelperAdmitsCreationAndReleaseRequests`).
+- `/etc/os-release` is a symlink on all three distributions. The runner's
+  `O_NOFOLLOW` read failed, so it now reads `/usr/lib/os-release`
+  (`TestDetectReadsUsrLibOSReleaseBeforeTheEtcSymlink`).
+- `dnf5 --cacheonly needs-restarting` loads filelists and failed cache-only. The
+  oracle now disables repositories (`TestDNFRebootOracleDisablesEveryRepository`).
+- Fedora's btrfs root assigns subvolume `st_dev` per boot. The owned-file
+  identity digests changed across the policy reboot and blocked release, so
+  release now compares boot-stable identity: bytes, mode/owner, label and inode
+  (`TestOSUpdateDimensionsIgnoreBootDeviceNumbers`). The `s8` Fedora records end
+  in `release_conflict` for this reason and are diagnostic only.
+- Deferral is anchored to the window start in zone calendar days
+  (`TestDeferralIsAnchoredToWindowStarts`, injected clock, DST weeks). The
+  rendered timer passes the host's `systemd-analyze verify`, and its calendar
+  elapses equal the runner gate's window starts
+  (`TestRenderedUnitsPassSystemdVerify`, `TestTimerElapsesAreTheRunnerWindowStarts`).
+
+Not proven by these records:
+
+- Graphical desktop notification: the guests are headless. The notify helper is
+  covered only by a real private `dbus-daemon` session test.
+- A window ending during a running transaction, and DST on a real clock (unit
+  tests only).
+- Block-inhibitor deferral of the scheduled reboot.
+- Physical hardware.
+- Debian, AlmaLinux, Rocky and derivatives, which the registry gates.
+- L07/P09 beyond one host's policy: package exclusions, advisory rings and canary
+  pause, server availability budgets and release upgrades are not implemented by
+  `os.update.v1`; the policy has no fields for them.
+
 ### Capability matrix dimensions
 
 The executable manifest must express distro/vendor/minor, architecture/CPU baseline,
@@ -1869,7 +1975,7 @@ records the precise sanitized setup stage and complete owned cleanup.
 Earlier browser sandbox and MFA blockers remain separate failed records, not passes.
 
 `go test -race -tags=integration ./internal/identity -run SCIM` requires
-`LINDM_TEST_DATABASE_URL` and isolated real Postgres schemas. It qualifies connector
+`LINDM_TEST_DATABASE_URL_FILE` and isolated real Postgres schemas. It qualifies connector
 correlation/isolation, one-time bearer issuance and rotation, tombstones, conditional
 ETags, concurrent mutations and lifecycle fences. It cannot certify a live sender
 configuration. Require rename/recycled-email and old-claim resurrection denial;
@@ -2099,7 +2205,7 @@ is claimed by this lane.
 ### Integration delivery and archive regression lane
 
 `go test -race -tags=integration ./internal/integrations ./internal/reports`
-uses real PostgreSQL isolated schemas through `LINDM_TEST_DATABASE_URL`, never the
+uses real PostgreSQL isolated schemas through `LINDM_TEST_DATABASE_URL_FILE`, never the
 public application schema. Local HTTPS and TLS-syslog receivers bind dynamic
 loopback ports and independently validate HMAC and octet-counted RFC 5424 frames.
 The lane exercises outbox rollback/redaction, two-worker `SKIP LOCKED` claims,
@@ -2127,7 +2233,7 @@ changes and artifact/manifest downloads under allowed and denied identities.
 upstream comparison vectors plus genuine pinned vendor data. Source URLs, digests,
 licenses and extraction provenance accompany `internal/advisory/feed/testdata`.
 The PostgreSQL lane is `go test -race -tags=integration ./internal/advisory/...`,
-using isolated `testdb` schemas and `LINDM_TEST_DATABASE_URL`. It exercises
+using isolated `testdb` schemas and `LINDM_TEST_DATABASE_URL_FILE`. It exercises
 Ubuntu/Fedora/Debian/Rocky/Alma/SLES/Leap/Arch backports and genuine Red Hat
 mainstream, EUS/module and E4S fixes. Controlled installed versions and enabled
 repository fixtures are boundary regressions, not claims of historical VM installs.

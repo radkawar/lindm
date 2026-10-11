@@ -43,11 +43,6 @@ func TestNestedRefsAreCanonicalAndEcosystemBound(t *testing.T) {
 			t.Errorf("invalid reference release accepted: %v", ref)
 		}
 	}
-	update := desiredJSON(t, updateJSON(""))
-	update.GetOsUpdate().GetSource().GetRepositories().Repositories[0].Repository.CanonicalKey = "apt/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
-	if err := ValidateDesired(update); err == nil {
-		t.Fatal("deeply nested update source alias accepted")
-	}
 }
 
 func TestManagedEmptyDNSServersAndUnmanagedServers(t *testing.T) {
@@ -80,31 +75,48 @@ func TestUndefinedServiceMaskingRejectedAndDisabledNotStopped(t *testing.T) {
 	}
 }
 
-func TestUpdateRequiresEverySourceRepository(t *testing.T) {
-	update := desiredJSON(t, updateJSON(""))
-	claims, err := Claims(update)
-	if err != nil {
-		t.Fatal(err)
+func TestUpdatePolicyClaimsFixedNativeObjects(t *testing.T) {
+	claims := claimsJSON(t, updateJSON())
+	for _, other := range []string{
+		`{"managedFile":{"path":"/etc/dnf/automatic.conf","presence":2}}`,
+		`{"managedFile":{"path":"/etc/systemd/system/lindm-os-update.timer","presence":2}}`,
+	} {
+		if !Conflicts(claims, claimsJSON(t, other)) {
+			t.Fatalf("update policy did not exclude another resource on its owned path: %s", other)
+		}
 	}
-	release, err := ReleaseClaims(update.GetOsUpdate().GetSource().GetRepositories().Repositories[0].GetRepository())
-	if err != nil {
-		t.Fatal(err)
+	want := map[string]resourcev1.ClaimDomain{"system": resourcev1.ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE, "timer/" + OSUpdateTimerUnit: resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION}
+	for _, kind := range OSUpdateNativeFiles() {
+		want[OSUpdateNativePath(kind)] = resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE
 	}
-	if !Conflicts(claims, release) {
-		t.Fatal("update did not retain its repository snapshot source")
+	if len(claims) != len(want) {
+		t.Fatalf("update policy claims = %d, want %d", len(claims), len(want))
 	}
-	remote := &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: "ostree/" + fixtureID}
-	update.GetOsUpdate().Source = &resourcev1.SourceSnapshot{Source: &resourcev1.SourceSnapshot_Ostree{Ostree: &resourcev1.OstreeSnapshot{Remote: remote, CommitSha256: make([]byte, 32)}}}
-	claims, err = Claims(update)
-	if err != nil {
-		t.Fatal(err)
+	for _, claim := range claims {
+		if want[claim.GetKey()] != claim.GetDomain() || claim.GetMode() != resourcev1.ClaimMode_CLAIM_MODE_VALUE {
+			t.Fatalf("unexpected update policy claim %v", claim)
+		}
 	}
-	release, err = ReleaseClaims(remote)
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestUpdatePolicyPlanEffectOnlyForNativeChange(t *testing.T) {
+	plan := &resourcev1.ResourcePlan{Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{}}}
+	if PlanRequiresEffect(plan) {
+		t.Fatal("converged update policy requested a native effect")
 	}
-	if !Conflicts(claims, release) {
-		t.Fatal("update did not retain its OSTree source")
+	plan.GetOsUpdate().TimerChange = true
+	if !PlanRequiresEffect(plan) {
+		t.Fatal("stopped maintenance timer bypassed the start grant")
+	}
+	plan.GetOsUpdate().TimerChange = false
+	plan.GetOsUpdate().ChangedFiles = []resourcev1.OSUpdateNativeFile{resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_POLICY}
+	if !PlanRequiresEffect(plan) {
+		t.Fatal("changed owned file bypassed the start grant")
+	}
+	plan.GetOsUpdate().ChangedFiles = nil
+	plan.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+	if !PlanRequiresEffect(plan) {
+		t.Fatal("release bypassed the start grant")
 	}
 }
 
@@ -127,10 +139,6 @@ func TestVPNRoutesContributeConflictClaims(t *testing.T) {
 
 func TestEveryObservationArmBindsIdentity(t *testing.T) {
 	_, serviceObservation, _ := serviceEvidence(t)
-	sourceBytes, err := protojson.Marshal(desiredJSON(t, updateJSON("")).GetOsUpdate().GetSource())
-	if err != nil {
-		t.Fatal(err)
-	}
 	digest := `"` + fixtureDigest + `"`
 	cases := []struct {
 		kind     resourcev1.ResourceKind
@@ -151,7 +159,7 @@ func TestEveryObservationArmBindsIdentity(t *testing.T) {
 		{12, "deb/example/amd64", `"nativePackage":{"package":{"ecosystem":1,"nativeName":"example","architecture":"amd64"},"databaseRevisionSha256":` + digest + `}`, "deb/other/amd64"},
 		{13, "apt/" + fixtureID, `"repository":{"repositoryId":"` + fixtureID + `","ecosystem":1,"metadataRevisionSha256":` + digest + `,"nativeNamespaceSha256":` + digest + `}`, "apt/" + fixtureGeneration},
 		{14, "system/" + fixtureID + "/" + fixtureGeneration + "/app/org.example.App/x86_64/stable", `"flatpakApp":{"installation":{"system":` + fixtureDevice + `},"appId":"org.example.App","architecture":"x86_64","branch":"stable","installationRevisionSha256":` + digest + `}`, "system/" + fixtureID + "/" + fixtureGeneration + "/app/org.example.Other/x86_64/stable"},
-		{15, "system", `"osUpdate":{"source":` + string(sourceBytes) + `,"kernelRelease":"6.1","bootId":"` + fixtureID + `","nativeDatabaseRevision":` + digest + `}`, "other"},
+		{15, "system", `"osUpdate":{"backend":1,"nativeVersion":"unattended-upgrades 2.9.1+nmu4ubuntu1","files":[{"kind":1,"state":{"path":"/etc/lindm/os-update/policy.binpb","ancestrySha256":` + digest + `}}]}`, "other"},
 		{16, "system/login", `"sessionPolicy":{"scope":{"systemLogin":` + fixtureDevice + `},"sessionManager":"logind","effective":{"scope":{"systemLogin":` + fixtureDevice + `},"lockOnSuspend":true},"configurationSha256":` + digest + `}`, "person/" + fixtureID + "/gnome"},
 		{17, "system/local-auth", `"passwordPolicy":{"pamOwner":"pam-auth-update","effective":{"minLength":14},"configurationSha256":` + digest + `}`, "other"},
 		{18, "system/example/", `"snapApp":{"name":"example","confinement":1,"stateRevisionSha256":` + digest + `}`, "system/other/"},

@@ -27,6 +27,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/custody"
+	"lindm/internal/resource"
 )
 
 var (
@@ -63,6 +64,8 @@ type Provider struct {
 	run             nativeRunner
 	sessionNative   func(context.Context, string) ([]graphicalSession, error)
 	openPower       func(context.Context) (powerBus, func() error, error)
+	openSystemd     func(context.Context) (systemdBus, func() error, error)
+	patchNowDir     string
 	bootID          func() (string, error)
 	accounts        *accountLocker
 	resolve         func(context.Context, *agentv1.DeviceActionSpec, bool) (*targetHandle, error)
@@ -122,6 +125,8 @@ func New(options Options) (*Provider, error) {
 	p := &Provider{config: proto.CloneOf(config), validate: validator, seal: options.SealRecovery, recoveryCustody: options.TrustedRecoveryCustody, run: runNative, gate: make(chan struct{}, 1), clock: time.Now}
 	p.sessionNative = logindSessions
 	p.openPower = openLogindPower
+	p.openSystemd = openSystemd
+	p.patchNowDir = resource.OSUpdatePatchNowDir
 	p.bootID = powerBootID
 	p.accounts, err = newAccountLocker(options.AccountJournal, config)
 	if err != nil {
@@ -197,6 +202,9 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 	}
 	if _, ok := powerAction(spec); ok {
 		return p.observePower(ctx, spec)
+	}
+	if spec.GetPatchNow() != nil {
+		return p.observePatchNow(ctx)
 	}
 	if LiveRootHeaderErase(spec) {
 		return p.observeLiveRoot(ctx, spec)
@@ -419,6 +427,9 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.DeviceActionPlan, cr
 	if _, ok := powerAction(plan.GetSpec()); ok {
 		return p.applyPower(ctx, plan, gate)
 	}
+	if plan.GetSpec().GetPatchNow() != nil {
+		return p.applyPatchNow(ctx, plan, gate)
+	}
 	if plan.GetSpec().GetRefreshInventory() != nil {
 		// Collection and durable transport publication belong to the executor.
 		return nil, ErrUnsupported
@@ -511,6 +522,10 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 	}
 	if _, ok := powerAction(plan.GetSpec()); ok {
 		// Only the executor's later boot observation can confirm a restart.
+		return nil, ErrNotVerified
+	}
+	if plan.GetSpec().GetPatchNow() != nil {
+		// Only Apply observes the started unit; installation is patch status.
 		return nil, ErrNotVerified
 	}
 	if plan.GetSpec().GetRefreshInventory() != nil {

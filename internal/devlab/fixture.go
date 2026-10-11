@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -104,15 +103,9 @@ func initialize(root, authentication string) (err error) {
 		secrets[name] = base64.RawURLEncoding.EncodeToString(bytes[:])
 		files[name] = []byte(secrets[name])
 	}
-	dsn := func(role, password string) []byte {
-		u := url.URL{Scheme: "postgresql", User: url.UserPassword(role, password), Host: "localhost:15432", Path: "/lindm"}
-		q := url.Values{"sslmode": {"verify-full"}, "sslrootcert": {filepath.Join(dir, "transport-ca.crt")}}
-		u.RawQuery = q.Encode()
-		return []byte(u.String())
+	for name, data := range rotatedFixtureFiles(dir, secrets) {
+		files[name] = data
 	}
-	files["database-url"] = dsn("lindm_runtime", secrets["runtime-password"])
-	files["migration-database-url"] = dsn("lindm_migrator", secrets["migrator-password"])
-	files["database-init.sql"] = []byte(databaseRoleSQL(secrets["migrator-password"], secrets["runtime-password"]) + applicationDatabaseSQL)
 	if authentication == "keycloak" {
 		files["realm.json"], err = realmFile(secrets)
 		if err != nil {

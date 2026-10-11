@@ -166,7 +166,13 @@ func rebootLifecycleGuest(ctx context.Context, vm *guestVM, previousBoot string)
 	if err := lifecycleCommand(ctx, vm, "schedule real guest reboot", "systemd-run --quiet --on-active=2s --unit=lindm-lab-reboot /usr/bin/systemctl reboot"); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
+	return awaitLifecycleGuestBoot(ctx, vm, previous, 6*time.Minute)
+}
+
+// awaitLifecycleGuestBoot waits, without issuing any reboot, for a fresh pinned
+// connection to report a boot ID other than previous, then for cloud-init.
+func awaitLifecycleGuestBoot(ctx context.Context, vm *guestVM, previous uuid.UUID, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := waitGuestBootChange(ctx, previous, func(probe context.Context) (string, error) {
 		// QEMU/slirp can retain the old host TCP connection after the guest
@@ -183,7 +189,7 @@ func rebootLifecycleGuest(ctx context.Context, vm *guestVM, previousBoot string)
 	}); err != nil {
 		return err
 	}
-	_, err = vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute)
+	_, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute)
 	return err
 }
 

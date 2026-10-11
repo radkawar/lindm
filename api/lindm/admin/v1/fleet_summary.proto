@@ -80,6 +80,27 @@ message FleetApprovalSummary {
   uint64 pending_approvals = 1;
 }
 
+// Patch compliance of active devices from their latest published patch-status
+// inventory. Buckets are disjoint and sum to the active device count. A status
+// counts only when available and computed within stale_after_seconds.
+message FleetPatchSummary {
+  // Zero pending security updates and no reboot required.
+  uint64 patched_devices = 1;
+  // One or more pending security updates.
+  uint64 security_pending_devices = 2;
+  // No pending security update, but the native reboot oracle is set.
+  uint64 reboot_required_devices = 3;
+  // Latest status older than stale_after_seconds.
+  uint64 stale_devices = 4;
+  // No status, or the device reported its patch status unavailable.
+  uint64 unknown_devices = 5;
+  // Sum of pending security updates across fresh statuses.
+  uint64 pending_security_updates = 6;
+  // Fresh statuses whose last lindm-driven native run failed (any bucket).
+  uint64 failed_run_devices = 7;
+  uint32 stale_after_seconds = 8;
+}
+
 message FleetRecentAction {
   string action_id = 1;
   string device_id = 2;
@@ -114,4 +135,6 @@ message GetFleetSummaryResponse {
   // devices and generations. Server records are not native execution proof;
   // no action payload or recovery secret is included.
   repeated FleetRecentAction recent_actions = 8;
+  // Same transaction as observed_at; active devices only.
+  FleetPatchSummary patch_compliance = 9;
 }

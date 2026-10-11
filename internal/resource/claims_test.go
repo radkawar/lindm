@@ -38,8 +38,7 @@ func TestCrossKindClaimConflicts(t *testing.T) {
 		{"static route and quarantine", connection, `{"firewallZone":{"zoneId":"` + fixtureID + `","presence":1,"defaultIngress":2,"defaultEgress":2}}`, true},
 		{"administration port denied", `{"sshServer":{"port":22}}`, `{"firewallZone":{"zoneId":"` + fixtureID + `","presence":1,"defaultIngress":1,"defaultEgress":1,"rules":[{"ruleId":"` + fixtureID + `","direction":1,"family":1,"protocol":1,"destinationPorts":[{"first":1,"last":1024}],"verdict":2}]}}`, true},
 		{"unrelated firewall port", `{"sshServer":{"port":22}}`, `{"firewallZone":{"zoneId":"` + fixtureID + `","presence":1,"defaultIngress":1,"defaultEgress":1,"rules":[{"ruleId":"` + fixtureID + `","direction":1,"family":1,"protocol":1,"destinationPorts":[{"first":80,"last":80}],"verdict":2}]}}`, false},
-		{"update encompasses pinned package", pinnedPackage, updateJSON(""), true},
-		{"update excludes pinned package", pinnedPackage, updateJSON(packageIdentity), false},
+		{"update policy leaves pinned package alone", pinnedPackage, updateJSON(), false},
 		{"remove configured daemon package", `{"nativePackage":{"package":` + packageIdentity + `,"presence":2,"any":{},"repository":` + fixtureRepository + `,"removal":1}}`, `{"timeSync":{"backend":2,"sources":[{"host":{"dns":"time.example.com"},"mode":1,"port":123}],"maxOffsetMilliseconds":100,"convergenceTimeoutSeconds":60}}`, true},
 		{"dns retains deleted connection", `{"dns":{"connection":{"connectionUuid":"` + fixtureID + `"},"ignoreAutoDns":true}}`, `{"networkConnection":{"connectionUuid":"` + fixtureID + `","displayName":"Managed","presence":2,"device":{"permanentMac":"02:00:00:00:00:01"},"activation":1,"ethernet":{}}}`, true},
 	}

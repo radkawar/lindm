@@ -128,6 +128,8 @@ var qualifiedResourceKinds = map[resourcev1.ResourceKind]resourceQualification{
 	resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:       {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 	resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:         {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 	resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	// The update policy only creates lindm-owned objects; it never adopts.
+	resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY: {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 }
 
 // The generic wire is not native qualification. Keep unqualified kinds and

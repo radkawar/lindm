@@ -59,6 +59,11 @@ export const resourceKinds = [
     help: "Set local password rules.",
   },
   {
+    arm: "osUpdate",
+    label: "OS update policy",
+    help: "Install security or all updates from the device's own signed repositories inside a weekly maintenance window, with optional deferral and a scheduled reboot. A window starting inside a daylight-saving transition hour, often between 01:00 and 03:00, does not open that day. Native automatic-update tools must already be installed.",
+  },
+  {
     arm: "sessionPolicy",
     label: "Login and session policy",
     help: "Set screen lock and login limits.",
@@ -121,9 +126,33 @@ export function initialState(arm: string): JsonObject {
       };
     case "encryptionCompliance":
       return { requireLuksRoot: true };
+    case "osUpdate":
+      return {
+        selection: "UPDATE_SELECTION_SECURITY",
+        maintenance: {
+          timeZone: browserTimeZone(),
+          weekdays: ["WEEKDAY_SUNDAY"],
+          // 04:00 local stays clear of daylight-saving transition hours.
+          localStartMinute: 240,
+          durationMinutes: 120,
+        },
+        rebootPolicy: {
+          mode: "OS_UPDATE_REBOOT_MODE_SCHEDULED",
+          maxDelayMinutes: 60,
+          notice: "Updates were installed. This device restarts at the scheduled time.",
+        },
+        deferralDays: 0,
+      };
     default:
       return {};
   }
+}
+
+// The browser's IANA zone is only a starting value; the device evaluates the
+// window in whichever zone the published policy names.
+function browserTimeZone(): string {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return zone && /^[a-zA-Z0-9_+-]+(\/[a-zA-Z0-9_+-]+)*$/.test(zone) ? zone : "UTC";
 }
 
 // These are the display-side derivations of the canonical identities. The server
@@ -177,6 +206,9 @@ export function withDerivedRef(document: JsonObject): JsonObject {
     }
     case "passwordPolicy":
       key = "system/local-auth";
+      break;
+    case "osUpdate":
+      key = "system";
       break;
     case "encryptionCompliance":
       key = "system/root";

@@ -1,0 +1,26 @@
+# Static: started only by the os.update.v1 provider's lindm-os-update.timer
+# (/etc/systemd/system), never enabled by the package. The native package
+# manager installs files anywhere, runs maintainer scripts and restarts
+# services, so this unit deliberately has no ProtectSystem/ReadWritePaths
+# sandbox and needs the network. It runs at background CPU and I/O priority.
+# A transaction already running is never stopped at the window end. The
+# runner bounds itself at 5h30m and only ever sends SIGTERM to a native tool;
+# TimeoutStartSec leaves 30 min for that tool to finish its transaction
+# before systemd's own stop. KillMode stays at the default.
+[Unit]
+Description=Lindm OS update maintenance window run
+ConditionPathExists=/etc/lindm/os-update/policy.binpb
+Wants=network-online.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lindm/lindm-agent os-update run
+User=root
+Group=root
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=6h
+LimitCORE=0

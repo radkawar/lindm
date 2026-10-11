@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -198,5 +199,55 @@ func awaitGone(t *testing.T, stdout []byte) {
 			t.Fatalf("descendant %d survived", pid)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestRunValidatesSessionBusAddress(t *testing.T) {
+	bus := func(env string, credential *syscall.Credential) error {
+		_, err := Run(t.Context(), Command{Path: "/usr/bin/env", Env: []string{env}, Credential: credential, Timeout: 5 * time.Second, StdoutLimit: 4096, StderrLimit: 4096})
+		return err
+	}
+	self := uint32(os.Getuid())
+	own := "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/" + strconv.FormatUint(uint64(self), 10) + "/bus"
+	if err := bus(own, nil); err != nil {
+		t.Fatalf("own session bus refused: %v", err)
+	}
+	for _, env := range []string{
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/bus",
+		"DBUS_SESSION_BUS_ADDRESS=unix:abstract=/run/user/1000/bus",
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/01000/bus",
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus,guid=x",
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/../0/bus",
+		"DBUS_SESSION_BUS_ADDRESS=tcp:host=localhost,port=1",
+	} {
+		if err := bus(env, nil); !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("%s accepted: %v", env, err)
+		}
+	}
+	// With a credential the bus must be that user's.
+	if err := bus(own, &syscall.Credential{Uid: self + 1, Gid: uint32(os.Getgid())}); !errors.Is(err, ErrInvalidCommand) {
+		t.Fatalf("another user's bus accepted: %v", err)
+	}
+	if _, err := Run(t.Context(), Command{Path: "/usr/bin/env", Env: []string{"NEEDRESTART_MODE=a"}, Timeout: 5 * time.Second, StdoutLimit: 4096, StderrLimit: 4096}); err != nil {
+		t.Fatalf("NEEDRESTART_MODE refused: %v", err)
+	}
+}
+
+func TestRunWithCredentialDropsToThatUser(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("changing credentials requires root")
+	}
+	const uid, gid = 65534, 65534
+	result, err := Run(t.Context(), Command{
+		Path: shell, Args: []string{"-c", "id -u; id -g; id -G"},
+		Env:        []string{"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/65534/bus"},
+		Credential: &syscall.Credential{Uid: uid, Gid: gid, Groups: []uint32{}},
+		Timeout:    5 * time.Second, StdoutLimit: 4096, StderrLimit: 4096,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(result.Stdout); got != "65534\n65534\n65534\n" {
+		t.Fatalf("child identity %q", got)
 	}
 }

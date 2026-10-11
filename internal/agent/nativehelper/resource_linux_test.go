@@ -87,6 +87,37 @@ func TestManagedFileHelperOnlyReceivesSelectedParent(t *testing.T) {
 	}
 }
 
+func TestOSUpdateHelperOnlyReceivesOwnedConfigurationParents(t *testing.T) {
+	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
+	for _, test := range []struct {
+		os, version string
+		backend     resourcev1.OSUpdateBackend
+		paths       []string
+	}{
+		{"ubuntu", "24.04", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system", "/etc/apt/apt.conf.d"}},
+		{"fedora", "44", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system", "/etc/dnf"}},
+		{"rhel", "9.8", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
+		{"rhel", "10.2", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
+	} {
+		plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: test.os, Version: test.version}}, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{Desired: &resourcev1.OSUpdateDesired{}, Backend: test.backend}}}
+		values := unitValues(t, directory, plan, nil, nil)
+		if !slices.Equal(unitValue[[]string](t, values, "ReadWritePaths"), test.paths) || values["PrivateNetwork"] != true {
+			t.Fatalf("%s update policy helper widened native write or network scope", test.os)
+		}
+		if unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_SYS_ADMIN|uint64(1)<<unix.CAP_NET_ADMIN) != 0 {
+			t.Fatal("update policy helper inherited package privileges")
+		}
+	}
+	plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: "arch"}}, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{Desired: &resourcev1.OSUpdateDesired{}}}}
+	kind, err := effectKind(plan.GetRef().GetKind())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resourceProperties(kind, directory, &agentv1.NativeResourceTransactionRequest{ActionId: nativeTestAction, Plan: plan}); err == nil {
+		t.Fatal("unsupported product received native update policy write scope")
+	}
+}
+
 func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
 	root := filepath.Join(directory, accountprovider.NativeRootDirectory)

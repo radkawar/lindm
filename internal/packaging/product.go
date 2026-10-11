@@ -29,7 +29,7 @@ func agentProduct() product {
 		name: PackageName, binary: BinaryPath, lifecycle: lifecyclePath, lifecycleAsset: "lifecycle.sh",
 		summary:     "Lindm protected agent",
 		description: "Versioned agent binary with a root executor and an unprivileged network service.\nRemove and purge retain identity and spool state. This package does not grant a root shell.",
-		units:       []string{executorUnit, agentUnit, poweroffUnit, firewallRestoreUnit, connectivityGuardUnit, connectivityProbeUnit},
+		units:       []string{executorUnit, agentUnit, poweroffUnit, firewallRestoreUnit, connectivityGuardUnit, connectivityProbeUnit, osUpdateUnit, osUpdateNowUnit, osUpdateStatusUnit},
 		userUnits:   []string{sessionUnit},
 		dirs:        []string{"usr/libexec/lindm", "etc/lindm", "usr/share/doc/lindm-agent"},
 		// Remote assistance captures through the PipeWire GStreamer source and
@@ -91,6 +91,9 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 		{rel: "usr/lib/systemd/system/" + firewallRestoreUnit, mode: 0o644, name: firewallRestoreUnit},
 		{rel: "usr/lib/systemd/system/" + connectivityGuardUnit, mode: 0o644, name: connectivityGuardUnit},
 		{rel: "usr/lib/systemd/system/" + connectivityProbeUnit, mode: 0o644, name: connectivityProbeUnit},
+		{rel: "usr/lib/systemd/system/" + osUpdateUnit, mode: 0o644, name: osUpdateUnit},
+		{rel: "usr/lib/systemd/system/" + osUpdateNowUnit, mode: 0o644, name: osUpdateNowUnit},
+		{rel: "usr/lib/systemd/system/" + osUpdateStatusUnit, mode: 0o644, name: osUpdateStatusUnit},
 		{rel: "usr/lib/systemd/user/" + sessionUnit, mode: 0o644, name: sessionUnit},
 		{rel: "usr/lib/tmpfiles.d/lindm.conf", mode: 0o644, name: "tmpfiles.conf"},
 		{rel: "usr/lib/sysusers.d/lindm.conf", mode: 0o644, name: "sysusers.conf"},

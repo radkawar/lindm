@@ -120,3 +120,32 @@ WITH recent_device AS (
  SELECT * FROM recent_service
 )
 SELECT * FROM recent ORDER BY issued_at DESC, id DESC, kind DESC LIMIT sqlc.arg('row_limit');
+
+-- name: FleetSummaryPatch :one
+-- Active devices only, keyed by their current generation's latest published
+-- patch status. Buckets are disjoint; freshness never trusts a device clock
+-- beyond the server receipt of the observation that carried the status.
+-- last_run_result 2 is lindm.agent.v1.PatchRunResult FAILED.
+WITH patch AS (
+ SELECT CASE
+   WHEN p.generation_id IS NULL OR NOT p.available THEN 'unknown'
+   WHEN LEAST(p.observed_at, p.received_at) < CURRENT_TIMESTAMP - make_interval(secs => sqlc.arg('stale_after_seconds')::integer) THEN 'stale'
+   WHEN p.pending_security_updates > 0 THEN 'security_pending'
+   WHEN p.reboot_required THEN 'reboot_required'
+   ELSE 'patched'
+ END AS bucket,
+ COALESCE(p.pending_security_updates, 0)::bigint AS pending_security_updates,
+ COALESCE(p.last_run_result, 0)::smallint AS last_run_result
+ FROM devices d
+ LEFT JOIN host_patch_status p ON p.generation_id = d.current_generation_id
+ WHERE d.state = 'active'
+  AND device_scope_matches(d.id, sqlc.arg('scope_unrestricted')::boolean, sqlc.arg('scopes')::jsonb)
+)
+SELECT count(*) FILTER (WHERE bucket = 'patched')::bigint AS patched_devices,
+ count(*) FILTER (WHERE bucket = 'security_pending')::bigint AS security_pending_devices,
+ count(*) FILTER (WHERE bucket = 'reboot_required')::bigint AS reboot_required_devices,
+ count(*) FILTER (WHERE bucket = 'stale')::bigint AS stale_devices,
+ count(*) FILTER (WHERE bucket = 'unknown')::bigint AS unknown_devices,
+ COALESCE(sum(pending_security_updates) FILTER (WHERE bucket IN ('patched', 'security_pending', 'reboot_required')), 0)::bigint AS pending_security_updates,
+ count(*) FILTER (WHERE bucket IN ('patched', 'security_pending', 'reboot_required') AND last_run_result = 2)::bigint AS failed_run_devices
+FROM patch;

@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/private_custody.proto";
 import "lindm/agent/v1/secret_delivery.proto";
 import "lindm/agent/v1/trust.proto";
+import "lindm/resource/v1/software.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
@@ -333,6 +334,17 @@ message LocalAdminAccountObservation {
   // Shadow last-change field in days since the epoch; 0 when absent.
   uint32 password_changed_day = 4 [(buf.validate.field).uint32.lte = 1000000];
 }
+// Starts one native update run now, outside the maintenance window and without
+// deferral, using the system's configured repositories (native unattended-
+// upgrades or dnf automatic). Completion is reported by patch-status
+// inventory under this action ID; acceptance alone is not installation.
+message PatchNowAction {
+  lindm.resource.v1.UpdateSelection selection = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.OSUpdateRebootPolicy reboot_policy = 2 [(buf.validate.field).required = true];
+}
 
 // Closed immutable action specification. No executable, command, script, path,
 // arbitrary native arguments, or generic extension map exists in this contract.
@@ -351,6 +363,7 @@ message DeviceActionSpec {
     ShutdownAction shutdown = 10;
     RefreshInventoryAction refresh_inventory = 11;
     LocalAdminPasswordRotateAction local_admin_password_rotate = 12;
+    PatchNowAction patch_now = 13;
   }
 }
 // Public token inventory only: no native token blobs, sealed secrets or keys.
@@ -467,6 +480,8 @@ message DeviceActionVerification {
   uint64 inventory_sequence = 8 [(buf.validate.field).uint64.lte = 9223372036854775807];
   // Native acceptance is not proof that power-off or reboot completed.
   bool power_request_accepted = 9;
+  // The native patch run unit was started for this action; not installation.
+  bool patch_run_started = 10;
   option (buf.validate.message).cel = {
     id: "device_action_verification.nvme"
     message: "verified native sanitize requires completed command and exact sampling evidence"

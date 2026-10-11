@@ -141,6 +141,7 @@ type Service struct {
 	updateHold            bool
 	assistanceEnabled     bool
 	assistance            *assistanceBroker
+	patchStatus           *patchStatusReader
 }
 
 var _ agentv1connect.ExecutorServiceHandler = (*Service)(nil)
@@ -222,6 +223,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareEncryptionKeyRequest{}, &agentv1.AcknowledgeEncryptionKeyRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
 		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
+		&agentv1.GetPatchStatusRequest{}, &agentv1.GetPatchStatusResponse{}, &agentv1.PatchStatusObservation{},
 		&agentv1.PrepareResourceExecutionRequest{}, &agentv1.StartResourceExecutionRequest{},
 		&agentv1.GetResourceExecutionRequest{}, &agentv1.ResourceExecutionRecord{},
 		&agentv1.ResourceExecutionIntent{}, &agentv1.ResourceExecutionChallenge{},
@@ -270,6 +272,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 	for _, opt := range opts {
 		opt(svc)
 	}
+	svc.patchStatus = newPatchStatusReader(svc)
 	svc.assistance, err = newAssistanceBroker(svc.assistanceEnabled, svc.now, actionprovider.ReadLogindSessions)
 	if err != nil {
 		_ = svc.Close()

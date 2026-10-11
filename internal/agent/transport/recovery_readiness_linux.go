@@ -19,10 +19,11 @@ import (
 
 // collectNativeObservation attaches root-only public evidence before ownership
 // passes to the immutable spool. Direct inventory.Collect retains caller
-// privileges and never claims recovery readiness. Both publication paths use
-// this boundary; invalid root projections are discarded in their entirety.
-// A failed root observation is recorded only as the readiness reason: other
-// categories keep their independent unprivileged collection status.
+// privileges and never claims recovery readiness or patch status. Both
+// publication paths use this boundary; invalid root projections are discarded
+// in their entirety. A failed root observation is recorded only as the
+// readiness reason: other categories keep their independent unprivileged
+// collection status. Patch status is attached independently of readiness.
 func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	collect := r.collectInventory
 	if collect == nil {
@@ -62,6 +63,7 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 		}
 	}
 	defer func() { host.FinishedAt = timestamppb.Now() }()
+	r.attachPatchStatus(ctx, host)
 	response, err := rpc(ctx, r.executor.GetRecoveryReadiness, &agentv1.GetRecoveryReadinessRequest{})
 	if err != nil {
 		failed("recovery_readiness_executor_unavailable")

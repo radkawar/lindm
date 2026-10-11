@@ -12,27 +12,27 @@ it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Omarchy 4.0.4                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                               |
-| lifecycle         | implemented                                                                               |
-| dispatch          | implemented                                                                               |
-| packages          | gated: not implemented for Omarchy 4.0.4                                                  |
-| accounts          | gated: not implemented for Omarchy 4.0.4                                                  |
-| sysctl            | gated: not implemented for Omarchy 4.0.4                                                  |
-| definitions       | gated: not implemented for Omarchy 4.0.4                                                  |
-| password          | gated: not implemented for Omarchy 4.0.4                                                  |
-| firewall          | gated: not implemented for Omarchy 4.0.4                                                  |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| self-update       | implemented                                                                               |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| advisories        | gated: no vendor advisory feed; the Arch feed does not cover Omarchy packages             |
-| os-update         | gated: OS patch policy provider not landed                                                |
-| release-upgrade   | gated: release upgrade is not implemented                                                 |
+| Capability        | Omarchy 4.0.4                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                             |
+| lifecycle         | implemented                                                                                             |
+| dispatch          | implemented                                                                                             |
+| packages          | gated: not implemented for Omarchy 4.0.4                                                                |
+| accounts          | gated: not implemented for Omarchy 4.0.4                                                                |
+| sysctl            | gated: not implemented for Omarchy 4.0.4                                                                |
+| definitions       | gated: not implemented for Omarchy 4.0.4                                                                |
+| password          | gated: not implemented for Omarchy 4.0.4                                                                |
+| firewall          | gated: not implemented for Omarchy 4.0.4                                                                |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| self-update       | implemented                                                                                             |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| advisories        | gated: no vendor advisory feed; the Arch feed does not cover Omarchy packages                           |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
+| release-upgrade   | gated: release upgrade is not implemented                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 

@@ -21,6 +21,7 @@ import { deviceQueryOptions } from "./queries";
 import { CollectionStatusBadge, Fact, ObservedTime, ObservedValue } from "./observations";
 import { DeviceMetadataCard } from "./metadata";
 import { DeviceNativeDetails, NumberValue } from "./native-details";
+import { DevicePatchStatus } from "./patch-status";
 import { DeviceEncryptionPanel } from "./encryption";
 import { DeviceLocalAdminPanel } from "./local-admin";
 import { DeviceActionsPanel, DeviceLockRestriction } from "./actions";
@@ -483,6 +484,7 @@ export function DeviceDetailView({
                   </CardContent>
                 </Card>
                 <DeviceNativeDetails details={host?.details} osId={host?.osId} />
+                <DevicePatchStatus status={host?.details?.patchStatus} />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Card>
                     <CardHeader>

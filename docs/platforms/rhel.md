@@ -26,7 +26,7 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | self-update       | gated: not implemented for RHEL 8                                                                                               | implemented                                                                               | implemented                                                                               |
 | assistance        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
 | advisories        | implemented                                                                                                                     | implemented                                                                               | implemented                                                                               |
-| os-update         | gated: OS patch policy provider not landed                                                                                      | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed                                                |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                                                               | implemented                                                                               |
 | release-upgrade   | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented                                                 |
 
 <!-- END GENERATED platform-capabilities -->
@@ -298,6 +298,29 @@ checked on the RHEL 10.2 KVM and AlmaLinux 10.2 GenericCloud aarch64 guests
 
 Evidence and the unproven remainder are in
 [verification](../verification.md#host-resource-providers-on-el-10).
+
+## OS update policy (EL 9 and EL 10)
+
+RHEL 9 and 10 use DNF4 `dnf-automatic` (4.14 on EL 9, 4.20 on EL 10) under the
+same lindm window timer, runner and release model as
+[Ubuntu](ubuntu.md#os-update-policy-osupdatev1). AlmaLinux and Rocky are refused
+as unsupported until their own records exist. Prerequisites are `dnf-automatic` and
+`dnf-plugins-core` (for `dnf needs-restarting`). Updates come from the
+registered system's entitled repositories, and the security classification is
+the CDN updateinfo errata type. An unregistered host has no security metadata to
+classify. The policy owns the policy file, the timer and its `timers.target`
+drop-in; it does not touch the package's `%config` `/etc/dnf/automatic.conf`.
+An enabled or active `dnf-automatic*.timer` is refused before any effect. Each run
+writes `/run/lindm-os-update/automatic.conf` (`upgrade_type`, `random_sleep = 0`,
+download and apply `yes`, `emit_via = stdio`, and `[base] excludepkgs` for
+deferred `name.arch`, appended to `dnf.conf` excludes). It then runs
+`dnf-automatic <conf> --installupdates`. The conf also sets `reboot = never`
+(4.14 ignores the key); the reboot is always the lindm logind schedule. Listing uses
+`dnf --cacheonly repoquery --upgrades --latest-limit 1 [--security]`. The reboot
+oracle is `dnf -q --disablerepo=* needs-restarting -r`, which looks only at
+installed core packages, as on [Fedora](fedora.md#os-update-policy-osupdatev1).
+Records, the registration and consumer-UUID receipts, and SELinux state are in
+[verification](../verification.md#os-update-policy-patch-now-and-patch-status).
 
 ## Encryption and recovery
 

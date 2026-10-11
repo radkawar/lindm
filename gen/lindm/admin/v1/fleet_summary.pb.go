@@ -570,6 +570,116 @@ func (x *FleetApprovalSummary) GetPendingApprovals() uint64 {
 	return 0
 }
 
+// Patch compliance of active devices from their latest published patch-status
+// inventory. Buckets are disjoint and sum to the active device count. A status
+// counts only when available and computed within stale_after_seconds.
+type FleetPatchSummary struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Zero pending security updates and no reboot required.
+	PatchedDevices uint64 `protobuf:"varint,1,opt,name=patched_devices,json=patchedDevices,proto3" json:"patched_devices,omitempty"`
+	// One or more pending security updates.
+	SecurityPendingDevices uint64 `protobuf:"varint,2,opt,name=security_pending_devices,json=securityPendingDevices,proto3" json:"security_pending_devices,omitempty"`
+	// No pending security update, but the native reboot oracle is set.
+	RebootRequiredDevices uint64 `protobuf:"varint,3,opt,name=reboot_required_devices,json=rebootRequiredDevices,proto3" json:"reboot_required_devices,omitempty"`
+	// Latest status older than stale_after_seconds.
+	StaleDevices uint64 `protobuf:"varint,4,opt,name=stale_devices,json=staleDevices,proto3" json:"stale_devices,omitempty"`
+	// No status, or the device reported its patch status unavailable.
+	UnknownDevices uint64 `protobuf:"varint,5,opt,name=unknown_devices,json=unknownDevices,proto3" json:"unknown_devices,omitempty"`
+	// Sum of pending security updates across fresh statuses.
+	PendingSecurityUpdates uint64 `protobuf:"varint,6,opt,name=pending_security_updates,json=pendingSecurityUpdates,proto3" json:"pending_security_updates,omitempty"`
+	// Fresh statuses whose last lindm-driven native run failed (any bucket).
+	FailedRunDevices  uint64 `protobuf:"varint,7,opt,name=failed_run_devices,json=failedRunDevices,proto3" json:"failed_run_devices,omitempty"`
+	StaleAfterSeconds uint32 `protobuf:"varint,8,opt,name=stale_after_seconds,json=staleAfterSeconds,proto3" json:"stale_after_seconds,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *FleetPatchSummary) Reset() {
+	*x = FleetPatchSummary{}
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FleetPatchSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FleetPatchSummary) ProtoMessage() {}
+
+func (x *FleetPatchSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FleetPatchSummary.ProtoReflect.Descriptor instead.
+func (*FleetPatchSummary) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *FleetPatchSummary) GetPatchedDevices() uint64 {
+	if x != nil {
+		return x.PatchedDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetSecurityPendingDevices() uint64 {
+	if x != nil {
+		return x.SecurityPendingDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetRebootRequiredDevices() uint64 {
+	if x != nil {
+		return x.RebootRequiredDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetStaleDevices() uint64 {
+	if x != nil {
+		return x.StaleDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetUnknownDevices() uint64 {
+	if x != nil {
+		return x.UnknownDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetPendingSecurityUpdates() uint64 {
+	if x != nil {
+		return x.PendingSecurityUpdates
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetFailedRunDevices() uint64 {
+	if x != nil {
+		return x.FailedRunDevices
+	}
+	return 0
+}
+
+func (x *FleetPatchSummary) GetStaleAfterSeconds() uint32 {
+	if x != nil {
+		return x.StaleAfterSeconds
+	}
+	return 0
+}
+
 type FleetRecentAction struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ActionId string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
@@ -593,7 +703,7 @@ type FleetRecentAction struct {
 
 func (x *FleetRecentAction) Reset() {
 	*x = FleetRecentAction{}
-	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -605,7 +715,7 @@ func (x *FleetRecentAction) String() string {
 func (*FleetRecentAction) ProtoMessage() {}
 
 func (x *FleetRecentAction) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -618,7 +728,7 @@ func (x *FleetRecentAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FleetRecentAction.ProtoReflect.Descriptor instead.
 func (*FleetRecentAction) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{8}
+	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FleetRecentAction) GetActionId() string {
@@ -722,13 +832,15 @@ type GetFleetSummaryResponse struct {
 	// devices and generations. Server records are not native execution proof;
 	// no action payload or recovery secret is included.
 	RecentActions []*FleetRecentAction `protobuf:"bytes,8,rep,name=recent_actions,json=recentActions,proto3" json:"recent_actions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Same transaction as observed_at; active devices only.
+	PatchCompliance *FleetPatchSummary `protobuf:"bytes,9,opt,name=patch_compliance,json=patchCompliance,proto3" json:"patch_compliance,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetFleetSummaryResponse) Reset() {
 	*x = GetFleetSummaryResponse{}
-	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -740,7 +852,7 @@ func (x *GetFleetSummaryResponse) String() string {
 func (*GetFleetSummaryResponse) ProtoMessage() {}
 
 func (x *GetFleetSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +865,7 @@ func (x *GetFleetSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFleetSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetFleetSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{9}
+	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetFleetSummaryResponse) GetObservedAt() *timestamppb.Timestamp {
@@ -812,6 +924,13 @@ func (x *GetFleetSummaryResponse) GetRecentActions() []*FleetRecentAction {
 	return nil
 }
 
+func (x *GetFleetSummaryResponse) GetPatchCompliance() *FleetPatchSummary {
+	if x != nil {
+		return x.PatchCompliance
+	}
+	return nil
+}
+
 var File_lindm_admin_v1_fleet_summary_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
@@ -855,7 +974,16 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\x11evaluated_devices\x18\x06 \x01(\x04R\x10evaluatedDevices\x12'\n" +
 	"\x0funknown_devices\x18\a \x01(\x04R\x0eunknownDevices\"C\n" +
 	"\x14FleetApprovalSummary\x12+\n" +
-	"\x11pending_approvals\x18\x01 \x01(\x04R\x10pendingApprovals\"\xff\x03\n" +
+	"\x11pending_approvals\x18\x01 \x01(\x04R\x10pendingApprovals\"\x94\x03\n" +
+	"\x11FleetPatchSummary\x12'\n" +
+	"\x0fpatched_devices\x18\x01 \x01(\x04R\x0epatchedDevices\x128\n" +
+	"\x18security_pending_devices\x18\x02 \x01(\x04R\x16securityPendingDevices\x126\n" +
+	"\x17reboot_required_devices\x18\x03 \x01(\x04R\x15rebootRequiredDevices\x12#\n" +
+	"\rstale_devices\x18\x04 \x01(\x04R\fstaleDevices\x12'\n" +
+	"\x0funknown_devices\x18\x05 \x01(\x04R\x0eunknownDevices\x128\n" +
+	"\x18pending_security_updates\x18\x06 \x01(\x04R\x16pendingSecurityUpdates\x12,\n" +
+	"\x12failed_run_devices\x18\a \x01(\x04R\x10failedRunDevices\x12.\n" +
+	"\x13stale_after_seconds\x18\b \x01(\rR\x11staleAfterSeconds\"\xff\x03\n" +
 	"\x11FleetRecentAction\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1e\n" +
@@ -874,7 +1002,7 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	" \x01(\tR\x04kind\x12\x1f\n" +
 	"\vresource_id\x18\v \x01(\tR\n" +
 	"resourceId\x12\x12\n" +
-	"\x04unit\x18\f \x01(\tR\x04unit\"\xd7\x04\n" +
+	"\x04unit\x18\f \x01(\tR\x04unit\"\xa5\x05\n" +
 	"\x17GetFleetSummaryResponse\x12;\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"observedAt\x12C\n" +
@@ -884,7 +1012,8 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\x13resource_compliance\x18\x05 \x01(\v2..lindm.admin.v1.FleetResourceComplianceSummaryR\x12resourceCompliance\x12?\n" +
 	"\bfindings\x18\x06 \x01(\v2#.lindm.admin.v1.FleetFindingSummaryR\bfindings\x12B\n" +
 	"\tapprovals\x18\a \x01(\v2$.lindm.admin.v1.FleetApprovalSummaryR\tapprovals\x12H\n" +
-	"\x0erecent_actions\x18\b \x03(\v2!.lindm.admin.v1.FleetRecentActionR\rrecentActionsB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x0erecent_actions\x18\b \x03(\v2!.lindm.admin.v1.FleetRecentActionR\rrecentActions\x12L\n" +
+	"\x10patch_compliance\x18\t \x01(\v2!.lindm.admin.v1.FleetPatchSummaryR\x0fpatchComplianceB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_fleet_summary_proto_rawDescOnce sync.Once
@@ -898,7 +1027,7 @@ func file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_fleet_summary_proto_rawDescData
 }
 
-var file_lindm_admin_v1_fleet_summary_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_lindm_admin_v1_fleet_summary_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_lindm_admin_v1_fleet_summary_proto_goTypes = []any{
 	(*GetFleetSummaryRequest)(nil),         // 0: lindm.admin.v1.GetFleetSummaryRequest
 	(*FleetLifecycleSummary)(nil),          // 1: lindm.admin.v1.FleetLifecycleSummary
@@ -908,29 +1037,31 @@ var file_lindm_admin_v1_fleet_summary_proto_goTypes = []any{
 	(*FleetResourceComplianceSummary)(nil), // 5: lindm.admin.v1.FleetResourceComplianceSummary
 	(*FleetFindingSummary)(nil),            // 6: lindm.admin.v1.FleetFindingSummary
 	(*FleetApprovalSummary)(nil),           // 7: lindm.admin.v1.FleetApprovalSummary
-	(*FleetRecentAction)(nil),              // 8: lindm.admin.v1.FleetRecentAction
-	(*GetFleetSummaryResponse)(nil),        // 9: lindm.admin.v1.GetFleetSummaryResponse
-	(*timestamppb.Timestamp)(nil),          // 10: google.protobuf.Timestamp
+	(*FleetPatchSummary)(nil),              // 8: lindm.admin.v1.FleetPatchSummary
+	(*FleetRecentAction)(nil),              // 9: lindm.admin.v1.FleetRecentAction
+	(*GetFleetSummaryResponse)(nil),        // 10: lindm.admin.v1.GetFleetSummaryResponse
+	(*timestamppb.Timestamp)(nil),          // 11: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_fleet_summary_proto_depIdxs = []int32{
 	3,  // 0: lindm.admin.v1.FleetOSSummary.groups:type_name -> lindm.admin.v1.FleetOSCount
-	10, // 1: lindm.admin.v1.FleetRecentAction.created_at:type_name -> google.protobuf.Timestamp
-	10, // 2: lindm.admin.v1.FleetRecentAction.expires_at:type_name -> google.protobuf.Timestamp
-	10, // 3: lindm.admin.v1.FleetRecentAction.start_authorized_at:type_name -> google.protobuf.Timestamp
-	10, // 4: lindm.admin.v1.FleetRecentAction.closed_at:type_name -> google.protobuf.Timestamp
-	10, // 5: lindm.admin.v1.GetFleetSummaryResponse.observed_at:type_name -> google.protobuf.Timestamp
+	11, // 1: lindm.admin.v1.FleetRecentAction.created_at:type_name -> google.protobuf.Timestamp
+	11, // 2: lindm.admin.v1.FleetRecentAction.expires_at:type_name -> google.protobuf.Timestamp
+	11, // 3: lindm.admin.v1.FleetRecentAction.start_authorized_at:type_name -> google.protobuf.Timestamp
+	11, // 4: lindm.admin.v1.FleetRecentAction.closed_at:type_name -> google.protobuf.Timestamp
+	11, // 5: lindm.admin.v1.GetFleetSummaryResponse.observed_at:type_name -> google.protobuf.Timestamp
 	1,  // 6: lindm.admin.v1.GetFleetSummaryResponse.lifecycle:type_name -> lindm.admin.v1.FleetLifecycleSummary
 	2,  // 7: lindm.admin.v1.GetFleetSummaryResponse.contact:type_name -> lindm.admin.v1.FleetContactSummary
 	4,  // 8: lindm.admin.v1.GetFleetSummaryResponse.operating_systems:type_name -> lindm.admin.v1.FleetOSSummary
 	5,  // 9: lindm.admin.v1.GetFleetSummaryResponse.resource_compliance:type_name -> lindm.admin.v1.FleetResourceComplianceSummary
 	6,  // 10: lindm.admin.v1.GetFleetSummaryResponse.findings:type_name -> lindm.admin.v1.FleetFindingSummary
 	7,  // 11: lindm.admin.v1.GetFleetSummaryResponse.approvals:type_name -> lindm.admin.v1.FleetApprovalSummary
-	8,  // 12: lindm.admin.v1.GetFleetSummaryResponse.recent_actions:type_name -> lindm.admin.v1.FleetRecentAction
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	9,  // 12: lindm.admin.v1.GetFleetSummaryResponse.recent_actions:type_name -> lindm.admin.v1.FleetRecentAction
+	8,  // 13: lindm.admin.v1.GetFleetSummaryResponse.patch_compliance:type_name -> lindm.admin.v1.FleetPatchSummary
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_fleet_summary_proto_init() }
@@ -944,7 +1075,7 @@ func file_lindm_admin_v1_fleet_summary_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_fleet_summary_proto_rawDesc), len(file_lindm_admin_v1_fleet_summary_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

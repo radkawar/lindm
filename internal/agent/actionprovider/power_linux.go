@@ -48,15 +48,25 @@ func powerAction(spec *agentv1.DeviceActionSpec) (powerRequest, bool) {
 
 // openLogindPower uses neither environment-selected buses nor autoactivation.
 // A bounded socket and root peer/owner checks match the session provider boundary.
-func openLogindPower(ctx context.Context) (_ powerBus, _ func() error, err error) {
-	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
+func openLogindPower(ctx context.Context) (powerBus, func() error, error) {
+	conn, owner, closeConnection, err := openRootSystemBus(ctx, logindName)
 	if err != nil {
 		return nil, nil, err
+	}
+	return conn.Object(owner, logindPath), closeConnection, nil
+}
+
+// openRootSystemBus dials the fixed system bus socket, requires a root bus peer
+// and a root-owned connection for the well-known name, and returns that owner.
+func openRootSystemBus(ctx context.Context, name string) (_ *dbus.Conn, _ string, _ func() error, err error) {
+	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
+	if err != nil {
+		return nil, "", nil, err
 	}
 	socket, ok := raw.(*net.UnixConn)
 	if !ok {
 		_ = raw.Close()
-		return nil, nil, ErrUnsupported
+		return nil, "", nil, ErrUnsupported
 	}
 	defer func() {
 		if err != nil {
@@ -65,22 +75,22 @@ func openLogindPower(ctx context.Context) (_ powerBus, _ func() error, err error
 	}()
 	deadline, ok := ctx.Deadline()
 	if !ok {
-		return nil, nil, ErrUnsupported
+		return nil, "", nil, ErrUnsupported
 	}
 	if err := socket.SetDeadline(deadline); err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	fd, err := socket.SyscallConn()
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	var peer *unix.Ucred
 	var peerErr error
 	if err := fd.Control(func(fd uintptr) { peer, peerErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED) }); err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	if peerErr != nil || peer == nil || peer.Uid != 0 {
-		return nil, nil, fmt.Errorf("%w: untrusted_system_bus", ErrUnsupported)
+		return nil, "", nil, fmt.Errorf("%w: untrusted_system_bus", ErrUnsupported)
 	}
 	closed := make(chan struct{})
 	stop := context.AfterFunc(ctx, func() { _ = socket.Close(); close(closed) })
@@ -92,7 +102,7 @@ func openLogindPower(ctx context.Context) (_ powerBus, _ func() error, err error
 	conn, err := dbus.ConnectUnix(socket, dbus.WithAuth(dbus.AuthExternal(strconv.Itoa(os.Geteuid()))))
 	if err != nil {
 		stopCancellation()
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	closeConnection := func() error {
 		stopCancellation()
@@ -104,17 +114,17 @@ func openLogindPower(ctx context.Context) (_ powerBus, _ func() error, err error
 		}
 	}()
 	var owner string
-	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", dbus.FlagNoAutoStart, logindName).Store(&owner); err != nil {
-		return nil, nil, err
+	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", dbus.FlagNoAutoStart, name).Store(&owner); err != nil {
+		return nil, "", nil, err
 	}
 	var uid uint32
 	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetConnectionUnixUser", dbus.FlagNoAutoStart, owner).Store(&uid); err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	if uid != 0 {
-		return nil, nil, fmt.Errorf("%w: untrusted_logind", ErrUnsupported)
+		return nil, "", nil, fmt.Errorf("%w: untrusted_bus_name_owner", ErrUnsupported)
 	}
-	return conn.Object(owner, logindPath), closeConnection, nil
+	return conn, owner, closeConnection, nil
 }
 
 func powerBootID() (string, error) {

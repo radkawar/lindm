@@ -75,6 +75,9 @@ const (
 	// ExecutorServiceGetRecoveryReadinessProcedure is the fully-qualified name of the ExecutorService's
 	// GetRecoveryReadiness RPC.
 	ExecutorServiceGetRecoveryReadinessProcedure = "/lindm.agent.v1.ExecutorService/GetRecoveryReadiness"
+	// ExecutorServiceGetPatchStatusProcedure is the fully-qualified name of the ExecutorService's
+	// GetPatchStatus RPC.
+	ExecutorServiceGetPatchStatusProcedure = "/lindm.agent.v1.ExecutorService/GetPatchStatus"
 	// ExecutorServicePrepareResourceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's PrepareResourceExecution RPC.
 	ExecutorServicePrepareResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareResourceExecution"
@@ -180,6 +183,9 @@ type ExecutorServiceClient interface {
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Reads native recovery capability and ESP capacity without changing boot state.
 	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
+	// Reads the last offline patch status; a stale status starts the static
+	// lindm-os-update-status.service refresh without waiting for it.
+	GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error)
 	// Verifies and journals intent before native preparation. Package staging is
 	// asynchronous; exact retries poll without extending its signed deadline.
 	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
@@ -310,6 +316,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
 			connect.WithClientOptions(opts...),
 		),
+		getPatchStatus: connect.NewClient[v1.GetPatchStatusRequest, v1.GetPatchStatusResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetPatchStatusProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetPatchStatus")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareResourceExecution: connect.NewClient[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareResourceExecutionProcedure,
@@ -437,6 +449,7 @@ type executorServiceClient struct {
 	updateExecutionTrust         *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
 	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	getRecoveryReadiness         *connect.Client[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse]
+	getPatchStatus               *connect.Client[v1.GetPatchStatusRequest, v1.GetPatchStatusResponse]
 	prepareResourceExecution     *connect.Client[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse]
 	startResourceExecution       *connect.Client[v1.StartResourceExecutionRequest, v1.StartResourceExecutionResponse]
 	getResourceExecution         *connect.Client[v1.GetResourceExecutionRequest, v1.GetResourceExecutionResponse]
@@ -525,6 +538,11 @@ func (c *executorServiceClient) GetExecutionTrust(ctx context.Context, req *conn
 // GetRecoveryReadiness calls lindm.agent.v1.ExecutorService.GetRecoveryReadiness.
 func (c *executorServiceClient) GetRecoveryReadiness(ctx context.Context, req *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error) {
 	return c.getRecoveryReadiness.CallUnary(ctx, req)
+}
+
+// GetPatchStatus calls lindm.agent.v1.ExecutorService.GetPatchStatus.
+func (c *executorServiceClient) GetPatchStatus(ctx context.Context, req *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error) {
+	return c.getPatchStatus.CallUnary(ctx, req)
 }
 
 // PrepareResourceExecution calls lindm.agent.v1.ExecutorService.PrepareResourceExecution.
@@ -667,6 +685,9 @@ type ExecutorServiceHandler interface {
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Reads native recovery capability and ESP capacity without changing boot state.
 	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
+	// Reads the last offline patch status; a stale status starts the static
+	// lindm-os-update-status.service refresh without waiting for it.
+	GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error)
 	// Verifies and journals intent before native preparation. Package staging is
 	// asynchronous; exact retries poll without extending its signed deadline.
 	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
@@ -791,6 +812,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		ExecutorServiceGetRecoveryReadinessProcedure,
 		svc.GetRecoveryReadiness,
 		connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetPatchStatusHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetPatchStatusProcedure,
+		svc.GetPatchStatus,
+		connect.WithSchema(executorServiceMethods.ByName("GetPatchStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServicePrepareResourceExecutionHandler := connect.NewUnaryHandler(
@@ -931,6 +958,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceGetExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetRecoveryReadinessProcedure:
 			executorServiceGetRecoveryReadinessHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetPatchStatusProcedure:
+			executorServiceGetPatchStatusHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareResourceExecutionProcedure:
 			executorServicePrepareResourceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartResourceExecutionProcedure:
@@ -1030,6 +1059,10 @@ func (UnimplementedExecutorServiceHandler) GetExecutionTrust(context.Context, *c
 
 func (UnimplementedExecutorServiceHandler) GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetRecoveryReadiness is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetPatchStatus is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error) {

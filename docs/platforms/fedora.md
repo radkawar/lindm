@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Fedora 43                                                                                 | Fedora 44                                  |
-| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ |
-| inventory         | implemented                                                                               | implemented                                |
-| lifecycle         | implemented                                                                               | implemented                                |
-| dispatch          | implemented                                                                               | implemented                                |
-| packages          | implemented                                                                               | implemented                                |
-| accounts          | implemented                                                                               | implemented                                |
-| sysctl            | implemented                                                                               | implemented                                |
-| definitions       | implemented                                                                               | implemented                                |
-| password          | gated: libpwquality/PAM/manager versions not measured on this release                     | implemented                                |
-| firewall          | implemented                                                                               | implemented                                |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| self-update       | implemented                                                                               | implemented                                |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
-| advisories        | implemented                                                                               | implemented                                |
-| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed |
-| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  |
+| Capability        | Fedora 43                                                                                               | Fedora 44                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| inventory         | implemented                                                                                             | implemented                               |
+| lifecycle         | implemented                                                                                             | implemented                               |
+| dispatch          | implemented                                                                                             | implemented                               |
+| packages          | implemented                                                                                             | implemented                               |
+| accounts          | implemented                                                                                             | implemented                               |
+| sysctl            | implemented                                                                                             | implemented                               |
+| definitions       | implemented                                                                                             | implemented                               |
+| password          | gated: libpwquality/PAM/manager versions not measured on this release                                   | implemented                               |
+| firewall          | implemented                                                                                             | implemented                               |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| self-update       | implemented                                                                                             | implemented                               |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
+| advisories        | implemented                                                                                             | implemented                               |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               |
+| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -258,7 +258,8 @@ a kind only when its per-kind qualification table lists it with native Ubuntu
 24.04 and Fedora 44 records (see
 [verification](../verification.md#generic-resource-executor-cutover-phase-2)):
 systemd services, native packages, managed files, local groups and users,
-sysctl, systemd timers and drop-ins, password policy, encryption compliance and firewall zones are
+sysctl, systemd timers and drop-ins, password policy, encryption compliance, firewall zones and the
+OS update policy are
 dispatched; other kinds show
 `resource_executor_not_available`. The Fedora 44 records are aarch64 cloud-image
 guests with SELinux enforcing; new files get their label from `matchpathcon`,
@@ -322,6 +323,40 @@ probe units needed no policy change. The 6.19 kernel needed the same two fixes
 as Ubuntu (ptrace-gated `/proc/1/ns/net`, explicit boolean bitwise operation on
 read-back).
 
+### OS update policy (`os.update.v1`)
+
+Fedora 44 uses `dnf5 automatic` under the same lindm window timer, runner and
+release model as [Ubuntu](ubuntu.md#os-update-policy-osupdatev1). Prerequisites
+are `dnf5-plugin-automatic` and `dnf5-plugins` (for `dnf5 needs-restarting`).
+`dnf5 automatic` accepts no configuration path. It reads
+`/usr/share/dnf5/dnf5-plugins/automatic.conf`, then
+`/etc/dnf/dnf5-plugins/automatic.conf`, then `/etc/dnf/automatic.conf`, and later
+files win per key. The policy therefore owns the `%ghost`
+`/etc/dnf/automatic.conf` in place of the APT override. Its content is
+`upgrade_type = security|default`, `random_sleep = 0`, download and apply `yes`,
+`reboot = never` and `emit_via = stdio`. An existing unowned file, or an enabled
+or active `dnf5-automatic*.timer`/`dnf-automatic*.timer`, is refused before any
+effect; the provider never disables native units it does not own.
+
+A window run calls `dnf5 -q makecache --refresh`. It lists pending updates with
+`dnf5 --cacheonly repoquery --upgrades --latest-limit=1 [--security]`; security
+means the repository's updateinfo advisory type. It then folds the three
+automatic configuration files in dnf5's order and refuses a mismatch as `FAILED`
+`dnf5_automatic_config_mismatch`. Finally it runs
+`dnf5 [--exclude=name.arch …] automatic --installupdates`. Global `--exclude`
+appends to `excludepkgs` and reaches automatic's upgrade goal. Patch now cannot
+pass its own selection to `dnf5 automatic`, so it uses the same native solver
+directly: `dnf5 --assumeyes upgrade [--security]`. The reboot oracle is
+`dnf5 -q --disable-repo=* needs-restarting -r`. With repositories enabled,
+`needs-restarting` also loads filelists and updateinfo, and fails cache-only
+when filelists were never downloaded. Disabling them keeps the verdict on
+installed core packages (kernel, glibc, systemd, dbus, linux-firmware and
+configured extras). Reboot hints that only repository advisories carry are not
+consulted. Missing cached metadata in the offline status reports
+`native_metadata_unavailable`.
+[Verification](../verification.md#os-update-policy-patch-now-and-patch-status)
+records the native runs with SELinux enforcing.
+
 ## Device actions
 
 Encryption success does not imply power, desktop lock, account lock, quarantine
@@ -341,6 +376,9 @@ relaxing policy. Failed record
 `14b3f2416533882ef77632d5cdf8fd4bf5ba2948dc6ebbdfe4ac3c0aa3c5a78e`,
 is not erase proof. Later action records, not this historical failure or encryption
 result, determine the current capability status.
+
+Patch now behaves as on [Ubuntu](ubuntu.md#device-actions), except that the
+Fedora run calls `dnf5 upgrade` instead of `dnf5 automatic` (see above).
 
 ## Desktop session helper and remote assistance
 

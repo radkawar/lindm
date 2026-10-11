@@ -299,6 +299,10 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	if hasInventoryReceipt && (i.GetSpec().GetRefreshInventory() == nil || record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED || record.GetVerification().GetInventorySequence() == 0) {
 		return ErrDeviceActionRejected
 	}
+	// Only patch now may claim a started native run, and it never claims power.
+	if v := record.GetVerification(); v.GetPatchRunStarted() && (i.GetSpec().GetPatchNow() == nil || !started) || i.GetSpec().GetPatchNow() != nil && v.GetPowerRequestAccepted() {
+		return ErrDeviceActionRejected
+	}
 	switch record.GetState() {
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED:
 		if started || record.GetVerification() != nil {
@@ -328,6 +332,9 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 			if v.GetBootId() == "" || v.GetBootId() == c.GetBootId() || v.GetAfter().GetBootId() != v.GetBootId() {
 				return ErrDeviceActionRejected
 			}
+		}
+		if i.GetSpec().GetPatchNow() != nil && (!record.GetVerification().GetPatchRunStarted() || record.GetVerification().GetEvidence() != "native_patch_run_started") {
+			return ErrDeviceActionRejected
 		}
 		if !started || !record.GetVerification().GetVerified() || escrowed && len(record.GetEscrowReceiptEnvelope()) == 0 {
 			return ErrDeviceActionRejected

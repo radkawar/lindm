@@ -42,6 +42,8 @@ func DeviceActionCapability(spec *agentv1.DeviceActionSpec) (string, error) {
 		return "device.refresh-inventory.v1", nil
 	case *agentv1.DeviceActionSpec_LocalAdminPasswordRotate:
 		return "device.local-admin-rotate.v1", nil
+	case *agentv1.DeviceActionSpec_PatchNow:
+		return "device.patch-now.v1", nil
 	default:
 		return "", errors.New("unsupported device action capability")
 	}

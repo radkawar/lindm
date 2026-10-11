@@ -447,10 +447,27 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
 			return err
 		}
+		// The update policy's own logind reboot is awaited, never triggered.
+		awaitReboot := func(ctx context.Context, previousBoot string, timeout time.Duration) error {
+			previous, err := uuid.Parse(previousBoot)
+			if err != nil || previous == uuid.Nil {
+				return errors.New("previous guest boot ID is invalid")
+			}
+			err = closeLifecycleForwards(forwards)
+			forwards = nil
+			if err != nil {
+				return err
+			}
+			if err := awaitLifecycleGuestBoot(ctx, vm, previous, timeout); err != nil {
+				return err
+			}
+			forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
+			return err
+		}
 		if firewall != nil {
 			firewall.rebootDevice = reboot
 		}
-		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, reboot)
+		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, reboot, awaitReboot)
 		return result, err
 	}
 	if options.PowerActions {

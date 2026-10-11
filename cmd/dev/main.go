@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|pre-push|land|gate-commit|generate-docs> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|worktree|signoff|pre-push|land|gate-commit|generate-docs> [options]
 
   generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
          fails instead when any block is stale (make generate / make lint).
@@ -36,6 +36,9 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
          -confirm-delete. Stop the separately supervised lindmd first.
   recreate-database  DESTROY only lindm, terminate its connections, reprovision,
          migrate and bootstrap. Requires -confirm-delete; preserves other databases.
+  rotate-credentials  Replace the postgres, lindm_migrator and lindm_runtime
+         passwords in the running cluster and rewrite their fixture files and
+         manifest; keeps data. Restart a running lindmd afterwards.
   worktree add|list|prune  Private worktrees in <main>.worktrees; see worktree help.
   signoff  Gate a clean worktree of the pushed HEAD and post gh-signoff
          statuses for that SHA; see signoff -h.
@@ -61,6 +64,7 @@ Database URLs: .cache/dev/{database-url,migration-database-url}
 All secret files are 0600 in a 0700 fixture directory. Never commit/copy them.
 Certificates last five years; changed/expired fixtures fail rather than rotate
 credentials beneath persisted data. Restore originals or explicitly reset.
+Database role passwords rotate only through rotate-credentials.
 Compose project names are checkout-specific; fixed ports permit one running lab.
 `
 
@@ -89,7 +93,7 @@ func run() error {
 	case "gate-commit":
 		return runGateCommit(os.Args[2:])
 	}
-	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" {
+	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" && verb != "rotate-credentials" {
 		return fmt.Errorf("unknown command %q; use help", verb)
 	}
 	flags := flag.NewFlagSet(verb, flag.ContinueOnError)
@@ -165,6 +169,7 @@ func run() error {
 		"recreate-database": func(ctx context.Context, root string) error {
 			return devlab.RecreateDatabase(ctx, root, confirm)
 		},
+		"rotate-credentials": devlab.RotateCredentials,
 	}
 	fmt.Printf("Compose project: %s\nFixture: %s\n", devlab.ProjectName(absolute), devlab.FixturePath(absolute))
 	if err := operations[verb](ctx, absolute); err != nil {

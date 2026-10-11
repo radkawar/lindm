@@ -477,11 +477,22 @@ enum UpdateCheckpoint {
   UPDATE_CHECKPOINT_REBOOT = 5;
   UPDATE_CHECKPOINT_NEW_BOOT_HEALTH = 6;
 }
+// Configuration plan only: the native update transaction happens later in the
+// window, executed by the native tool under the lindm runner, never here.
 message OSUpdatePlan {
-  OSUpdateDesired desired = 1 [(buf.validate.field).required = true];
-  ArtifactRef transaction_manifest = 2 [(buf.validate.field).required = true];
-  repeated UpdateCheckpoint checkpoints = 3 [(buf.validate.field).repeated = {
-    max_items: 6
+  reserved 1 to 6;
+  reserved "transaction_manifest", "checkpoints", "target_deployment", "maintenance_lease_sha256", "previous_boot_id";
+  OwnershipInverseBinding inverse = 7;
+  OSUpdateDesired desired = 8 [(buf.validate.field).required = true];
+  OSUpdateBackend backend = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Digest of the complete owned target image (all files and timer state).
+  bytes candidate_sha256 = 10 [(buf.validate.field).bytes.len = 32];
+  // Empty for an already converged reconcile; no effect is then requested.
+  repeated OSUpdateNativeFile changed_files = 11 [(buf.validate.field).repeated = {
+    max_items: 4
     unique: true
     items: {
       enum: {
@@ -490,10 +501,10 @@ message OSUpdatePlan {
       }
     }
   }];
-  DeploymentIdentity target_deployment = 4;
-  bytes maintenance_lease_sha256 = 5 [(buf.validate.field).bytes.len = 32];
-  string previous_boot_id = 6 [(buf.validate.field).string.uuid = true];
-  OwnershipInverseBinding inverse = 7;
+  // Rendered OnCalendar specifications of the target timer, joined by "; ".
+  string timer_calendar = 12 [(buf.validate.field).string.max_len = 2048];
+  // The loaded timer must be (re)started or stopped even if no file changes.
+  bool timer_change = 13;
 }
 enum SessionField {
   SESSION_FIELD_UNSPECIFIED = 0;

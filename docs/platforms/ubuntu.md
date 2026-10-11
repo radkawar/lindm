@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Ubuntu 22.04 LTS                                                                          | Ubuntu 24.04 LTS                           | Ubuntu 26.04 LTS                                                      |
-| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------- |
-| inventory         | implemented                                                                               | implemented                                | implemented                                                           |
-| lifecycle         | implemented                                                                               | implemented                                | implemented                                                           |
-| dispatch          | implemented                                                                               | implemented                                | implemented                                                           |
-| packages          | implemented                                                                               | implemented                                | implemented                                                           |
-| accounts          | implemented                                                                               | implemented                                | implemented                                                           |
-| sysctl            | implemented                                                                               | implemented                                | implemented                                                           |
-| definitions       | gated: systemd 249 is below the definition provider floor 255                             | implemented                                | implemented                                                           |
-| password          | implemented                                                                               | implemented                                | implemented                                                           |
-| firewall          | implemented                                                                               | implemented                                | implemented                                                           |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: owned-boot recovery fixture not maintained for the 26.04 media |
-| self-update       | implemented                                                                               | implemented                                | implemented                                                           |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
-| advisories        | implemented                                                                               | implemented                                | implemented                                                           |
-| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed | gated: OS patch policy provider not landed                            |
-| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  | gated: release upgrade is not implemented                             |
+| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS                          | Ubuntu 26.04 LTS                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| lifecycle         | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| dispatch          | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| packages          | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| accounts          | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| sysctl            | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented                               | implemented                                                                                             |
+| password          | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| firewall          | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | gated: owned-boot recovery fixture not maintained for the 26.04 media                                   |
+| self-update       | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
+| advisories        | implemented                                                                                             | implemented                               | implemented                                                                                             |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
+| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented | gated: release upgrade is not implemented                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -252,7 +252,8 @@ a kind only when its per-kind qualification table lists it with native Ubuntu
 24.04 and Fedora 44 records (see
 [verification](../verification.md#generic-resource-executor-cutover-phase-2)):
 systemd services, native packages, managed files, local groups and users,
-sysctl, systemd timers and drop-ins, password policy, encryption compliance and firewall zones are
+sysctl, systemd timers and drop-ins, password policy, encryption compliance, firewall zones and the
+OS update policy are
 dispatched; other kinds show
 `resource_executor_not_available`. The 24.04 records are aarch64 cloud-image
 guests.
@@ -359,6 +360,70 @@ check compares per-namespace `/proc/<pid>/net/dev` entries; the 6.8 kernel reads
 back boolean bitwise expressions with an explicit `NFTA_BITWISE_OP=0`, which the
 expression digest normalizes.
 
+### OS update policy (`os.update.v1`)
+
+The provider configures native automatic updates; it never installs anything
+itself. It needs the root-local opt-in `os_update_provider: {"enabled": true}` in
+`executor.json` and the native `unattended-upgrades`, `needrestart` and
+`update-notifier-common` packages (a missing one is a precondition failure
+naming it). A signed policy owns exactly four objects:
+`/etc/lindm/os-update/policy.binpb` (0600, the runner's validated policy),
+`/etc/systemd/system/lindm-os-update.timer` (one `OnCalendar=` per weekday in the
+policy's IANA zone, `Persistent=true`),
+`/etc/systemd/system/timers.target.d/lindm-os-update.conf` (`Wants=` the timer)
+and `/etc/apt/apt.conf.d/99lindm-os-update`
+(`APT::Periodic::Unattended-Upgrade "0";`). The last one stops the native
+`apt-daily-upgrade` run from installing outside the window; `apt-daily`'s
+metadata refresh keeps running. Any of these paths present but unowned refuses
+the policy, which never adopts files. Release stops the timer, removes exactly
+these files and reloads systemd, which restores the distribution's periodic
+behaviour. The package's tmpfiles entries create the parent directories. The
+plan predicts the effective `APT::Periodic::Unattended-Upgrade` with the
+candidate override in place. It uses a private copy of `apt.conf.d` named by
+`Dir::Etc::parts` in a temporary `APT_CONFIG`. A later part or
+`/etc/apt/apt.conf` that keeps the value non-zero is refused before any effect
+([provider](../../internal/agent/osupdateprovider/apt_candidate_linux.go)).
+
+The static `lindm-os-update.service` runs `lindm-agent os-update run` as root
+without a sandbox, because the package manager writes the whole system
+([runner](../../internal/agent/osupdate/backend_linux.go)). A start outside an
+open window, such as a `Persistent=` catch-up, records `SKIPPED_OUTSIDE_WINDOW`.
+Inside it the runner calls `apt-get update` and lists pending updates from
+`apt-get -s dist-upgrade` `Inst` lines; a candidate counts as security when one
+of its origin archives ends in `-security`. It then applies the deferral and runs
+`unattended-upgrade -v` with a per-run `APT_CONFIG`. That file points
+`Dir::Etc::main` at a per-run file, which APT reads after every part. The file
+`#clear`s and sets `Unattended-Upgrade::Allowed-Origins`. SECURITY means
+`${distro_id}:${distro_codename}-security` and the ESM apps/infra security
+origins; ALL adds `-updates` and the release pocket. Deferred names go to
+`Package-Blacklist`, and `Automatic-Reboot` is forced to `false`.
+`NEEDRESTART_MODE=a` and `needrestart -r a -l` restart affected services. Reboot
+required means `/run/reboot-required` or a needrestart kernel status
+(`NEEDRESTART-KSTA`) of 2 or 3. Native unattended-upgrades defaults stay in
+force: on battery, on a metered connection or for phased updates a run can
+succeed with nothing installed.
+
+Deferral is per package name and architecture. It counts calendar days in the
+window's zone from the window start at which the update was first seen pending.
+Patch now (below) ignores both window and deferral. systemd skips a window start
+that does not exist on a daylight-saving spring-forward day, so that day's
+window does not open. With reboot mode `SCHEDULED`, a required reboot becomes
+logind `SetWallMessage` plus `ScheduleShutdown("reboot", completion + max delay)`
+over the root-checked system bus. An existing schedule is never replaced, and a
+block inhibitor defers to the next run. Graphical users also get a desktop
+notification from a child running with their logind UID/GID against
+`/run/user/<uid>/bus`.
+
+`lindm-os-update-status.service` (`PrivateNetwork=yes`) computes the patch
+status offline from the cache: pending security/total/deferred counts, the
+reboot oracle, metadata time, the last run and success, and a pending logind
+reboot. The executor publishes it as inventory `patch_status` and starts the
+unit when the status is stale. Empty `/var/lib/apt/lists` reports
+`native_metadata_unavailable`, never zero updates. The metadata time is the
+newest `*Release` modification time, which APT sets to the server's
+`Last-Modified`, not the local refresh time. Evidence and limits are in
+[verification](../verification.md#os-update-policy-patch-now-and-patch-status).
+
 ## Device actions
 
 Logind is the session/power boundary, not a shell wrapper. Lock requests require
@@ -379,6 +444,14 @@ Use the exact Ubuntu24 power/refresh and device-action evidence in
 [verification](../verification.md); service dispatch alone does not qualify account
 lock, desktop lock, encryption, recovery or wipe. Destructive targets require fresh
 inventory, exact signed identity and separately authorized provisioning.
+
+Patch now (`device.patch-now.v1`, local opt-in `allow_patch_now`) writes a
+deterministic request to `/run/lindm/os-update/patch-now.binpb` (root 0700
+directory) after the signed gate. It then starts the static
+`lindm-os-update-now.service` without waiting, and the action proves only that
+the native run started. The installation outcome is the patch status `last_run`
+carrying the action ID. A running window or patch-now run refuses a second one
+as `patch_run_in_progress`.
 
 ## Desktop session helper and remote assistance
 

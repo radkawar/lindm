@@ -70,6 +70,7 @@ func newVMResourceEvidence() *VMResourceEvidence {
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE, Unproven: []string{"approved disposable encrypted machine required; no owner demo access authorized"}},
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY, Unproven: []string{"real weak-password rejection and lockout/login preservation not exercised"}},
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, Unproven: []string{"SecretRef password hash delivery and SSH password login not exercised"}},
+		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, Unproven: []string{"real pending update inside a timer-opened window, policy reboot and patch-now not exercised"}},
 	}}
 }
 

@@ -5,6 +5,7 @@ package lindm.inventory.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/os_update.proto";
 import "lindm/agent/v1/recovery_readiness.proto";
 
 option go_package = "lindm/gen/lindm/inventory/v1;inventoryv1";
@@ -462,6 +463,9 @@ message NativeDetails {
   // Absent on direct unprivileged inspection and historical host evidence.
   // Published inventory attaches a fresh protected executor observation.
   lindm.agent.v1.RecoveryReadinessObservation recovery_readiness = 17;
+  // Absent on direct unprivileged inspection and historical host evidence.
+  // Published inventory attaches the protected executor patch status.
+  lindm.agent.v1.PatchStatusObservation patch_status = 18;
 }
 
 // Module identity is native RPM MODULARITYLABEL evidence, not a guessed stream.

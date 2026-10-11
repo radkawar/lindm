@@ -445,6 +445,9 @@ func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapsh
 	if rules := ownershipRules(observation.GetRef().GetKind()); rules.acquisition != nil {
 		return rules.acquisition(intent, snapshot)
 	}
+	if observation.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY {
+		return osUpdateOwnershipAcquisitionAllowed(snapshot)
+	}
 	if group := observation.GetLocalGroup(); group != nil && group.GetOrigin() != resourcev1.NSSOrigin_NSS_ORIGIN_LOCAL_FILES {
 		return false
 	}

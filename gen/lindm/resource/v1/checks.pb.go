@@ -1145,17 +1145,21 @@ func (x *FlatpakAppChecks) GetConverged() bool {
 	return false
 }
 
+// Policy configuration compliance. Patch compliance (pending security updates,
+// reboot required) is inventory and is never folded into this convergence.
 type OSUpdateChecks struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	InstallationMatches      bool                   `protobuf:"varint,1,opt,name=installation_matches,json=installationMatches,proto3" json:"installation_matches,omitempty"`
-	DeploymentMatches        bool                   `protobuf:"varint,2,opt,name=deployment_matches,json=deploymentMatches,proto3" json:"deployment_matches,omitempty"`
-	RebootRequired           bool                   `protobuf:"varint,3,opt,name=reboot_required,json=rebootRequired,proto3" json:"reboot_required,omitempty"`
-	NewBootObserved          bool                   `protobuf:"varint,4,opt,name=new_boot_observed,json=newBootObserved,proto3" json:"new_boot_observed,omitempty"`
-	NewBootHealth            *ProbeReceipt          `protobuf:"bytes,5,opt,name=new_boot_health,json=newBootHealth,proto3" json:"new_boot_health,omitempty"`
-	MaintenancePolicyMatches bool                   `protobuf:"varint,6,opt,name=maintenance_policy_matches,json=maintenancePolicyMatches,proto3" json:"maintenance_policy_matches,omitempty"`
-	Converged                bool                   `protobuf:"varint,7,opt,name=converged,proto3" json:"converged,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Converged bool                   `protobuf:"varint,7,opt,name=converged,proto3" json:"converged,omitempty"`
+	// The owned runner policy decodes to exactly the desired policy.
+	PolicyMatches bool `protobuf:"varint,8,opt,name=policy_matches,json=policyMatches,proto3" json:"policy_matches,omitempty"`
+	// systemd loaded the owned timer with the rendered calendar and it is active.
+	ScheduleActive bool `protobuf:"varint,9,opt,name=schedule_active,json=scheduleActive,proto3" json:"schedule_active,omitempty"`
+	// Owned native configuration (APT periodic override) has the target bytes.
+	NativeConfigurationMatches bool `protobuf:"varint,10,opt,name=native_configuration_matches,json=nativeConfigurationMatches,proto3" json:"native_configuration_matches,omitempty"`
+	// No enabled or active native automatic-update scheduler bypasses the window.
+	NoConflictingScheduler bool `protobuf:"varint,11,opt,name=no_conflicting_scheduler,json=noConflictingScheduler,proto3" json:"no_conflicting_scheduler,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *OSUpdateChecks) Reset() {
@@ -1188,51 +1192,37 @@ func (*OSUpdateChecks) Descriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_checks_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *OSUpdateChecks) GetInstallationMatches() bool {
-	if x != nil {
-		return x.InstallationMatches
-	}
-	return false
-}
-
-func (x *OSUpdateChecks) GetDeploymentMatches() bool {
-	if x != nil {
-		return x.DeploymentMatches
-	}
-	return false
-}
-
-func (x *OSUpdateChecks) GetRebootRequired() bool {
-	if x != nil {
-		return x.RebootRequired
-	}
-	return false
-}
-
-func (x *OSUpdateChecks) GetNewBootObserved() bool {
-	if x != nil {
-		return x.NewBootObserved
-	}
-	return false
-}
-
-func (x *OSUpdateChecks) GetNewBootHealth() *ProbeReceipt {
-	if x != nil {
-		return x.NewBootHealth
-	}
-	return nil
-}
-
-func (x *OSUpdateChecks) GetMaintenancePolicyMatches() bool {
-	if x != nil {
-		return x.MaintenancePolicyMatches
-	}
-	return false
-}
-
 func (x *OSUpdateChecks) GetConverged() bool {
 	if x != nil {
 		return x.Converged
+	}
+	return false
+}
+
+func (x *OSUpdateChecks) GetPolicyMatches() bool {
+	if x != nil {
+		return x.PolicyMatches
+	}
+	return false
+}
+
+func (x *OSUpdateChecks) GetScheduleActive() bool {
+	if x != nil {
+		return x.ScheduleActive
+	}
+	return false
+}
+
+func (x *OSUpdateChecks) GetNativeConfigurationMatches() bool {
+	if x != nil {
+		return x.NativeConfigurationMatches
+	}
+	return false
+}
+
+func (x *OSUpdateChecks) GetNoConflictingScheduler() bool {
+	if x != nil {
+		return x.NoConflictingScheduler
 	}
 	return false
 }
@@ -2077,16 +2067,15 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x06launch\x18\x03 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x06launch\x128\n" +
 	"\x18unrelated_data_preserved\x18\x04 \x01(\bR\x16unrelatedDataPreserved\x12\x1c\n" +
 	"\tconverged\x18\x05 \x01(\bR\tconverged:\x80\x02\xbaH\xfc\x01\x1a\xf9\x01\n" +
-	"\x1aflatpak_checks.convergence\x12WFlatpak convergence requires native identity, permissions, launch and data preservation\x1a\x81\x01!this.converged || (this.scope_ref_commit_match && this.permissions_match && this.launch.passed && this.unrelated_data_preserved)\"\x9a\x05\n" +
-	"\x0eOSUpdateChecks\x121\n" +
-	"\x14installation_matches\x18\x01 \x01(\bR\x13installationMatches\x12-\n" +
-	"\x12deployment_matches\x18\x02 \x01(\bR\x11deploymentMatches\x12'\n" +
-	"\x0freboot_required\x18\x03 \x01(\bR\x0erebootRequired\x12*\n" +
-	"\x11new_boot_observed\x18\x04 \x01(\bR\x0fnewBootObserved\x12G\n" +
-	"\x0fnew_boot_health\x18\x05 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\rnewBootHealth\x12<\n" +
-	"\x1amaintenance_policy_matches\x18\x06 \x01(\bR\x18maintenancePolicyMatches\x12\x1c\n" +
-	"\tconverged\x18\a \x01(\bR\tconverged:\xab\x02\xbaH\xa7\x02\x1a\xa4\x02\n" +
-	"\x19update_checks.convergence\x12%installation is not reboot compliance\x1a\xdf\x01!this.converged || (this.installation_matches && this.deployment_matches && this.maintenance_policy_matches && (!this.reboot_required || (this.new_boot_observed && has(this.new_boot_health) && this.new_boot_health.passed)))\"\xe0\x03\n" +
+	"\x1aflatpak_checks.convergence\x12WFlatpak convergence requires native identity, permissions, launch and data preservation\x1a\x81\x01!this.converged || (this.scope_ref_commit_match && this.permissions_match && this.launch.passed && this.unrelated_data_preserved)\"\x8f\x05\n" +
+	"\x0eOSUpdateChecks\x12\x1c\n" +
+	"\tconverged\x18\a \x01(\bR\tconverged\x12%\n" +
+	"\x0epolicy_matches\x18\b \x01(\bR\rpolicyMatches\x12'\n" +
+	"\x0fschedule_active\x18\t \x01(\bR\x0escheduleActive\x12@\n" +
+	"\x1cnative_configuration_matches\x18\n" +
+	" \x01(\bR\x1anativeConfigurationMatches\x128\n" +
+	"\x18no_conflicting_scheduler\x18\v \x01(\bR\x16noConflictingScheduler:\x91\x02\xbaH\x8d\x02\x1a\x8a\x02\n" +
+	"\x19update_checks.convergence\x12dupdate policy convergence requires policy, schedule, native configuration and no competing scheduler\x1a\x86\x01!this.converged || (this.policy_matches && this.schedule_active && this.native_configuration_matches && this.no_conflicting_scheduler)J\x04\b\x01\x10\aR\x14installation_matchesR\x12deployment_matchesR\x0freboot_requiredR\x11new_boot_observedR\x0fnew_boot_healthR\x1amaintenance_policy_matches\"\xe0\x03\n" +
 	"\x13SessionPolicyChecks\x128\n" +
 	"\x18effective_settings_match\x18\x01 \x01(\bR\x16effectiveSettingsMatch\x12a\n" +
 	"\x18visible_session_behavior\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x16visibleSessionBehavior\x120\n" +
@@ -2218,18 +2207,17 @@ var file_lindm_resource_v1_checks_proto_depIdxs = []int32{
 	25, // 17: lindm.resource.v1.NativePackageChecks.native_configuration_readiness:type_name -> lindm.resource.v1.ProbeReceipt
 	25, // 18: lindm.resource.v1.RepositoryChecks.metadata_signature:type_name -> lindm.resource.v1.ProbeReceipt
 	25, // 19: lindm.resource.v1.FlatpakAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 20: lindm.resource.v1.OSUpdateChecks.new_boot_health:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 21: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 22: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 23: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 24: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 25: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 26: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	25, // 20: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 21: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 22: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 23: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 24: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 25: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
+	26, // [26:26] is the sub-list for method output_type
+	26, // [26:26] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_checks_proto_init() }

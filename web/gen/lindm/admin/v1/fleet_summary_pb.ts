@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/fleet_summary.proto.
  */
 export const file_lindm_admin_v1_fleet_summary: GenFile = /*@__PURE__*/
-  fileDesc("CiJsaW5kbS9hZG1pbi92MS9mbGVldF9zdW1tYXJ5LnByb3RvEg5saW5kbS5hZG1pbi52MSI+ChZHZXRGbGVldFN1bW1hcnlSZXF1ZXN0EiQKE3JlY2VudF9hY3Rpb25fbGltaXQYASABKA1CB7pIBCoCGBQilwEKFUZsZWV0TGlmZWN5Y2xlU3VtbWFyeRIVCg10b3RhbF9kZXZpY2VzGAEgASgEEhcKD3BlbmRpbmdfZGV2aWNlcxgCIAEoBBIWCg5hY3RpdmVfZGV2aWNlcxgDIAEoBBIXCg9yZXZva2VkX2RldmljZXMYBCABKAQSHQoVcmVjb3ZlcnlfaG9sZF9kZXZpY2VzGAUgASgEInoKE0ZsZWV0Q29udGFjdFN1bW1hcnkSFgoOcmVjZW50X2RldmljZXMYASABKAQSFQoNc3RhbGVfZGV2aWNlcxgCIAEoBBIXCg91bmtub3duX2RldmljZXMYAyABKAQSGwoTc3RhbGVfYWZ0ZXJfc2Vjb25kcxgEIAEoDSJCCgxGbGVldE9TQ291bnQSDQoFb3NfaWQYASABKAkSEgoKb3NfdmVyc2lvbhgCIAEoCRIPCgdkZXZpY2VzGAMgASgEIlUKDkZsZWV0T1NTdW1tYXJ5EiwKBmdyb3VwcxgBIAMoCzIcLmxpbmRtLmFkbWluLnYxLkZsZWV0T1NDb3VudBIVCg1vdGhlcl9kZXZpY2VzGAIgASgEIucBCh5GbGVldFJlc291cmNlQ29tcGxpYW5jZVN1bW1hcnkSFwoPdG90YWxfcmVzb3VyY2VzGAEgASgEEhsKE2NvbXBsaWFudF9yZXNvdXJjZXMYAiABKAQSIgoaZHJpZnRfcmVtZWRpYXRlZF9yZXNvdXJjZXMYAyABKAQSGwoTYXR0ZW50aW9uX3Jlc291cmNlcxgEIAEoBBIXCg9zdGFsZV9yZXNvdXJjZXMYBSABKAQSGQoRdW5rbm93bl9yZXNvdXJjZXMYBiABKAQSGgoSdW5hc3NpZ25lZF9kZXZpY2VzGAcgASgEIsIBChNGbGVldEZpbmRpbmdTdW1tYXJ5EhkKEWNyaXRpY2FsX2ZpbmRpbmdzGAEgASgEEhUKDWhpZ2hfZmluZGluZ3MYAiABKAQSFwoPbWVkaXVtX2ZpbmRpbmdzGAMgASgEEhQKDGxvd19maW5kaW5ncxgEIAEoBBIWCg5vdGhlcl9maW5kaW5ncxgFIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgGIAEoBBIXCg91bmtub3duX2RldmljZXMYByABKAQiMQoURmxlZXRBcHByb3ZhbFN1bW1hcnkSGQoRcGVuZGluZ19hcHByb3ZhbHMYASABKAQi9gIKEUZsZWV0UmVjZW50QWN0aW9uEhEKCWFjdGlvbl9pZBgBIAEoCRIRCglkZXZpY2VfaWQYAiABKAkSEgoKY2FwYWJpbGl0eRgDIAEoCRIuCgpjcmVhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI3ChNzdGFydF9hdXRob3JpemVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCgljbG9zZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWNsb3NlZF9yZWFzb24YCCABKAkSFwoPb3V0Y29tZV91bmtub3duGAkgASgIEgwKBGtpbmQYCiABKAkSEwoLcmVzb3VyY2VfaWQYCyABKAkSDAoEdW5pdBgMIAEoCSLtAwoXR2V0RmxlZXRTdW1tYXJ5UmVzcG9uc2USLwoLb2JzZXJ2ZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjgKCWxpZmVjeWNsZRgCIAEoCzIlLmxpbmRtLmFkbWluLnYxLkZsZWV0TGlmZWN5Y2xlU3VtbWFyeRI0Cgdjb250YWN0GAMgASgLMiMubGluZG0uYWRtaW4udjEuRmxlZXRDb250YWN0U3VtbWFyeRI5ChFvcGVyYXRpbmdfc3lzdGVtcxgEIAEoCzIeLmxpbmRtLmFkbWluLnYxLkZsZWV0T1NTdW1tYXJ5EksKE3Jlc291cmNlX2NvbXBsaWFuY2UYBSABKAsyLi5saW5kbS5hZG1pbi52MS5GbGVldFJlc291cmNlQ29tcGxpYW5jZVN1bW1hcnkSNQoIZmluZGluZ3MYBiABKAsyIy5saW5kbS5hZG1pbi52MS5GbGVldEZpbmRpbmdTdW1tYXJ5EjcKCWFwcHJvdmFscxgHIAEoCzIkLmxpbmRtLmFkbWluLnYxLkZsZWV0QXBwcm92YWxTdW1tYXJ5EjkKDnJlY2VudF9hY3Rpb25zGAggAygLMiEubGluZG0uYWRtaW4udjEuRmxlZXRSZWNlbnRBY3Rpb25CIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiJsaW5kbS9hZG1pbi92MS9mbGVldF9zdW1tYXJ5LnByb3RvEg5saW5kbS5hZG1pbi52MSI+ChZHZXRGbGVldFN1bW1hcnlSZXF1ZXN0EiQKE3JlY2VudF9hY3Rpb25fbGltaXQYASABKA1CB7pIBCoCGBQilwEKFUZsZWV0TGlmZWN5Y2xlU3VtbWFyeRIVCg10b3RhbF9kZXZpY2VzGAEgASgEEhcKD3BlbmRpbmdfZGV2aWNlcxgCIAEoBBIWCg5hY3RpdmVfZGV2aWNlcxgDIAEoBBIXCg9yZXZva2VkX2RldmljZXMYBCABKAQSHQoVcmVjb3ZlcnlfaG9sZF9kZXZpY2VzGAUgASgEInoKE0ZsZWV0Q29udGFjdFN1bW1hcnkSFgoOcmVjZW50X2RldmljZXMYASABKAQSFQoNc3RhbGVfZGV2aWNlcxgCIAEoBBIXCg91bmtub3duX2RldmljZXMYAyABKAQSGwoTc3RhbGVfYWZ0ZXJfc2Vjb25kcxgEIAEoDSJCCgxGbGVldE9TQ291bnQSDQoFb3NfaWQYASABKAkSEgoKb3NfdmVyc2lvbhgCIAEoCRIPCgdkZXZpY2VzGAMgASgEIlUKDkZsZWV0T1NTdW1tYXJ5EiwKBmdyb3VwcxgBIAMoCzIcLmxpbmRtLmFkbWluLnYxLkZsZWV0T1NDb3VudBIVCg1vdGhlcl9kZXZpY2VzGAIgASgEIucBCh5GbGVldFJlc291cmNlQ29tcGxpYW5jZVN1bW1hcnkSFwoPdG90YWxfcmVzb3VyY2VzGAEgASgEEhsKE2NvbXBsaWFudF9yZXNvdXJjZXMYAiABKAQSIgoaZHJpZnRfcmVtZWRpYXRlZF9yZXNvdXJjZXMYAyABKAQSGwoTYXR0ZW50aW9uX3Jlc291cmNlcxgEIAEoBBIXCg9zdGFsZV9yZXNvdXJjZXMYBSABKAQSGQoRdW5rbm93bl9yZXNvdXJjZXMYBiABKAQSGgoSdW5hc3NpZ25lZF9kZXZpY2VzGAcgASgEIsIBChNGbGVldEZpbmRpbmdTdW1tYXJ5EhkKEWNyaXRpY2FsX2ZpbmRpbmdzGAEgASgEEhUKDWhpZ2hfZmluZGluZ3MYAiABKAQSFwoPbWVkaXVtX2ZpbmRpbmdzGAMgASgEEhQKDGxvd19maW5kaW5ncxgEIAEoBBIWCg5vdGhlcl9maW5kaW5ncxgFIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgGIAEoBBIXCg91bmtub3duX2RldmljZXMYByABKAQiMQoURmxlZXRBcHByb3ZhbFN1bW1hcnkSGQoRcGVuZGluZ19hcHByb3ZhbHMYASABKAQi+gEKEUZsZWV0UGF0Y2hTdW1tYXJ5EhcKD3BhdGNoZWRfZGV2aWNlcxgBIAEoBBIgChhzZWN1cml0eV9wZW5kaW5nX2RldmljZXMYAiABKAQSHwoXcmVib290X3JlcXVpcmVkX2RldmljZXMYAyABKAQSFQoNc3RhbGVfZGV2aWNlcxgEIAEoBBIXCg91bmtub3duX2RldmljZXMYBSABKAQSIAoYcGVuZGluZ19zZWN1cml0eV91cGRhdGVzGAYgASgEEhoKEmZhaWxlZF9ydW5fZGV2aWNlcxgHIAEoBBIbChNzdGFsZV9hZnRlcl9zZWNvbmRzGAggASgNIvYCChFGbGVldFJlY2VudEFjdGlvbhIRCglhY3Rpb25faWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhIKCmNhcGFiaWxpdHkYAyABKAkSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNwoTc3RhcnRfYXV0aG9yaXplZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJY2xvc2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIVCg1jbG9zZWRfcmVhc29uGAggASgJEhcKD291dGNvbWVfdW5rbm93bhgJIAEoCBIMCgRraW5kGAogASgJEhMKC3Jlc291cmNlX2lkGAsgASgJEgwKBHVuaXQYDCABKAkiqgQKF0dldEZsZWV0U3VtbWFyeVJlc3BvbnNlEi8KC29ic2VydmVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI4CglsaWZlY3ljbGUYAiABKAsyJS5saW5kbS5hZG1pbi52MS5GbGVldExpZmVjeWNsZVN1bW1hcnkSNAoHY29udGFjdBgDIAEoCzIjLmxpbmRtLmFkbWluLnYxLkZsZWV0Q29udGFjdFN1bW1hcnkSOQoRb3BlcmF0aW5nX3N5c3RlbXMYBCABKAsyHi5saW5kbS5hZG1pbi52MS5GbGVldE9TU3VtbWFyeRJLChNyZXNvdXJjZV9jb21wbGlhbmNlGAUgASgLMi4ubGluZG0uYWRtaW4udjEuRmxlZXRSZXNvdXJjZUNvbXBsaWFuY2VTdW1tYXJ5EjUKCGZpbmRpbmdzGAYgASgLMiMubGluZG0uYWRtaW4udjEuRmxlZXRGaW5kaW5nU3VtbWFyeRI3CglhcHByb3ZhbHMYByABKAsyJC5saW5kbS5hZG1pbi52MS5GbGVldEFwcHJvdmFsU3VtbWFyeRI5Cg5yZWNlbnRfYWN0aW9ucxgIIAMoCzIhLmxpbmRtLmFkbWluLnYxLkZsZWV0UmVjZW50QWN0aW9uEjsKEHBhdGNoX2NvbXBsaWFuY2UYCSABKAsyIS5saW5kbS5hZG1pbi52MS5GbGVldFBhdGNoU3VtbWFyeUIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message lindm.admin.v1.GetFleetSummaryRequest
@@ -292,6 +292,76 @@ export const FleetApprovalSummarySchema: GenMessage<FleetApprovalSummary> = /*@_
   messageDesc(file_lindm_admin_v1_fleet_summary, 7);
 
 /**
+ * Patch compliance of active devices from their latest published patch-status
+ * inventory. Buckets are disjoint and sum to the active device count. A status
+ * counts only when available and computed within stale_after_seconds.
+ *
+ * @generated from message lindm.admin.v1.FleetPatchSummary
+ */
+export type FleetPatchSummary = Message<"lindm.admin.v1.FleetPatchSummary"> & {
+  /**
+   * Zero pending security updates and no reboot required.
+   *
+   * @generated from field: uint64 patched_devices = 1;
+   */
+  patchedDevices: bigint;
+
+  /**
+   * One or more pending security updates.
+   *
+   * @generated from field: uint64 security_pending_devices = 2;
+   */
+  securityPendingDevices: bigint;
+
+  /**
+   * No pending security update, but the native reboot oracle is set.
+   *
+   * @generated from field: uint64 reboot_required_devices = 3;
+   */
+  rebootRequiredDevices: bigint;
+
+  /**
+   * Latest status older than stale_after_seconds.
+   *
+   * @generated from field: uint64 stale_devices = 4;
+   */
+  staleDevices: bigint;
+
+  /**
+   * No status, or the device reported its patch status unavailable.
+   *
+   * @generated from field: uint64 unknown_devices = 5;
+   */
+  unknownDevices: bigint;
+
+  /**
+   * Sum of pending security updates across fresh statuses.
+   *
+   * @generated from field: uint64 pending_security_updates = 6;
+   */
+  pendingSecurityUpdates: bigint;
+
+  /**
+   * Fresh statuses whose last lindm-driven native run failed (any bucket).
+   *
+   * @generated from field: uint64 failed_run_devices = 7;
+   */
+  failedRunDevices: bigint;
+
+  /**
+   * @generated from field: uint32 stale_after_seconds = 8;
+   */
+  staleAfterSeconds: number;
+};
+
+/**
+ * Describes the message lindm.admin.v1.FleetPatchSummary.
+ * Use `create(FleetPatchSummarySchema)` to create a new message.
+ */
+export const FleetPatchSummarySchema: GenMessage<FleetPatchSummary> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_fleet_summary, 8);
+
+/**
  * @generated from message lindm.admin.v1.FleetRecentAction
  */
 export type FleetRecentAction = Message<"lindm.admin.v1.FleetRecentAction"> & {
@@ -367,7 +437,7 @@ export type FleetRecentAction = Message<"lindm.admin.v1.FleetRecentAction"> & {
  * Use `create(FleetRecentActionSchema)` to create a new message.
  */
 export const FleetRecentActionSchema: GenMessage<FleetRecentAction> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_fleet_summary, 8);
+  messageDesc(file_lindm_admin_v1_fleet_summary, 9);
 
 /**
  * @generated from message lindm.admin.v1.GetFleetSummaryResponse
@@ -423,6 +493,13 @@ export type GetFleetSummaryResponse = Message<"lindm.admin.v1.GetFleetSummaryRes
    * @generated from field: repeated lindm.admin.v1.FleetRecentAction recent_actions = 8;
    */
   recentActions: FleetRecentAction[];
+
+  /**
+   * Same transaction as observed_at; active devices only.
+   *
+   * @generated from field: lindm.admin.v1.FleetPatchSummary patch_compliance = 9;
+   */
+  patchCompliance?: FleetPatchSummary | undefined;
 };
 
 /**
@@ -430,5 +507,5 @@ export type GetFleetSummaryResponse = Message<"lindm.admin.v1.GetFleetSummaryRes
  * Use `create(GetFleetSummaryResponseSchema)` to create a new message.
  */
 export const GetFleetSummaryResponseSchema: GenMessage<GetFleetSummaryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_fleet_summary, 9);
+  messageDesc(file_lindm_admin_v1_fleet_summary, 10);
 

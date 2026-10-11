@@ -55,6 +55,16 @@ const labels: Record<string, string> = {
   defaultEgress: "Default outgoing traffic",
   content: "File contents (nonsecret)",
   persistent: "Persist across reboots",
+  selection: "Updates to install",
+  maintenance: "Maintenance window",
+  timeZone: "Time zone (IANA)",
+  weekdays: "Window days",
+  localStartMinute: "Window start (minutes after local midnight)",
+  durationMinutes: "Window length (minutes)",
+  rebootPolicy: "Reboot after updates",
+  maxDelayMinutes: "Maximum reboot delay (minutes)",
+  notice: "Reboot notice",
+  deferralDays: "Defer each update (days)",
 };
 
 export function fieldLabel(name: string): string {

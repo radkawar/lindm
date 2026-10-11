@@ -323,6 +323,7 @@ func TestDeviceActionCapabilityIsClosedAndActionSpecific(t *testing.T) {
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}}, "device.shutdown.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}, "device.refresh-inventory.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{}}}, "device.local-admin-rotate.v1"},
+		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_PatchNow{PatchNow: &agentv1.PatchNowAction{}}}, "device.patch-now.v1"},
 	} {
 		got, err := DeviceActionCapability(tc.spec)
 		if err != nil || got != tc.want {

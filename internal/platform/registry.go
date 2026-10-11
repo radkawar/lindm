@@ -18,7 +18,7 @@ var (
 const (
 	reasonNoActionRecipe = "no maintained encrypted installer, native action prerequisites or graphical golden"
 	reasonNoPasswordPins = "libpwquality/PAM/manager versions not measured on this release"
-	reasonOSPatch        = "OS patch policy provider not landed"
+	reasonOSPatch        = "OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release"
 	reasonReleaseUpgrade = "release upgrade is not implemented"
 	reasonDesignOnly     = "design-only: the declarative/image-based management model is not specified"
 	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
@@ -32,6 +32,14 @@ func gates(pairs ...string) map[Capability]string {
 	m := map[Capability]string{OSUpdate: reasonOSPatch, ReleaseUpgrade: reasonReleaseUpgrade}
 	for i := 0; i+1 < len(pairs); i += 2 {
 		m[Capability(pairs[i])] = pairs[i+1]
+	}
+	return m
+}
+
+// without drops the default gate of capabilities a row supports.
+func without(m map[Capability]string, supported ...Capability) map[Capability]string {
+	for _, c := range supported {
+		delete(m, c)
 	}
 	return m
 }
@@ -132,8 +140,8 @@ var registry = []*Release{
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
 			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
+		Gates:    without(gates(), OSUpdate),
 	},
 	{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
@@ -200,8 +208,8 @@ var registry = []*Release{
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
+		Gates:    without(gates(), OSUpdate),
 	},
 	{
 		Key: "fedora-atomic", Name: "Fedora Atomic Silverblue/Kinoite", Distribution: "Fedora Atomic", ID: "fedora", Version: Any(),
@@ -223,8 +231,8 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks9, el9Pins),
 		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}),
+		Gates:    without(actionGates(), OSUpdate),
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
@@ -233,8 +241,8 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks10, el10Pins),
 		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}),
+		Gates:    without(actionGates(), OSUpdate),
 	},
 	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
 	{

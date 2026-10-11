@@ -16,6 +16,7 @@ type NativeResourceProviders struct {
 	Sysctl         *agentv1.NativeSysctlProviderConfig
 	Firewall       *agentv1.NativeFirewallProviderConfig
 	Password       *agentv1.NativePasswordProviderConfig
+	OSUpdate       *agentv1.NativeOSUpdateProviderConfig
 	ProtectedPaths []string
 }
 
@@ -23,7 +24,8 @@ func WithNativeResourceProviders(local NativeResourceProviders) Option {
 	return func(s *Service) {
 		s.nativeResources = NativeResourceProviders{
 			Files: proto.CloneOf(local.Files), Accounts: proto.CloneOf(local.Accounts), Sysctl: proto.CloneOf(local.Sysctl),
-			Firewall: proto.CloneOf(local.Firewall), Password: proto.CloneOf(local.Password), ProtectedPaths: append([]string(nil), local.ProtectedPaths...),
+			Firewall: proto.CloneOf(local.Firewall), Password: proto.CloneOf(local.Password), OSUpdate: proto.CloneOf(local.OSUpdate),
+			ProtectedPaths: append([]string(nil), local.ProtectedPaths...),
 		}
 	}
 }

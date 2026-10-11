@@ -141,7 +141,7 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
 - Integration tests:
   - Files are named `*_integration_test.go` and tagged `//go:build integration`.
   - Each test gets a fresh schema via `pool, conn := testdb.Open(t)`.
-  - Without `LINDM_TEST_DATABASE_URL` they fail rather than skip. Run them with `make test-integration`.
+  - Without `LINDM_TEST_DATABASE_URL_FILE` (an owner-only DSN file; never put the DSN in argv or the environment) they fail rather than skip. Run them with `make test-integration`.
 - Root, namespace or capability tests in `internal/agent` call `t.Skip` when not running as root or on EPERM. Some re-exec the test binary, gated by env vars (e.g. `LINDM_SNAPSHOT_REEXEC`).
 - The web code has no unit tests. It is gated by eslint (`--max-warnings=0`), `tsc` and prettier.
 - There is no coverage percentage target. Rules:

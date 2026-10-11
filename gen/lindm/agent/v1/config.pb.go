@@ -67,6 +67,8 @@ type AgentConfig struct {
 	ConnectivityProbe *ConnectivityProbeServerConfig `protobuf:"bytes,16,opt,name=connectivity_probe,json=connectivityProbe,proto3" json:"connectivity_probe,omitempty"`
 	// Absent or disabled: invitations end with DISABLED; no session socket.
 	RemoteAssistance *RemoteAssistanceConfig `protobuf:"bytes,17,opt,name=remote_assistance,json=remoteAssistance,proto3" json:"remote_assistance,omitempty"`
+	// Absent: os.update.v1 resources are refused as unsupported.
+	OsUpdateProvider *NativeOSUpdateProviderConfig `protobuf:"bytes,18,opt,name=os_update_provider,json=osUpdateProvider,proto3" json:"os_update_provider,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -220,6 +222,13 @@ func (x *AgentConfig) GetRemoteAssistance() *RemoteAssistanceConfig {
 	return nil
 }
 
+func (x *AgentConfig) GetOsUpdateProvider() *NativeOSUpdateProviderConfig {
+	if x != nil {
+		return x.OsUpdateProvider
+	}
+	return nil
+}
+
 type NativePackageProviderConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Sources       []*NativePackageSource `protobuf:"bytes,1,rep,name=sources,proto3" json:"sources,omitempty"`
@@ -358,8 +367,11 @@ type DeviceActionProviderConfig struct {
 	// Root-owned allowlist of existing non-root local accounts whose password the
 	// signed local-admin rotation may replace. Empty disables the action.
 	LocalAdminAccounts []string `protobuf:"bytes,14,rep,name=local_admin_accounts,json=localAdminAccounts,proto3" json:"local_admin_accounts,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Explicit opt-in for the patch-now action, which starts the static root
+	// lindm-os-update-now.service outside the maintenance window.
+	AllowPatchNow bool `protobuf:"varint,15,opt,name=allow_patch_now,json=allowPatchNow,proto3" json:"allow_patch_now,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeviceActionProviderConfig) Reset() {
@@ -488,6 +500,13 @@ func (x *DeviceActionProviderConfig) GetLocalAdminAccounts() []string {
 		return x.LocalAdminAccounts
 	}
 	return nil
+}
+
+func (x *DeviceActionProviderConfig) GetAllowPatchNow() bool {
+	if x != nil {
+		return x.AllowPatchNow
+	}
+	return false
 }
 
 type QualifiedActionTarget struct {
@@ -834,8 +853,7 @@ var File_lindm_agent_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a.lindm/agent/v1/connectivity_probe_config.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/native_password.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/resource/v1/software.proto\x1a&lindm/validation/v1/string_rules.proto\"\xaa\n" +
-	"\n" +
+	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a.lindm/agent/v1/connectivity_probe_config.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/native_password.proto\x1a\x1elindm/agent/v1/os_update.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/resource/v1/software.proto\x1a&lindm/validation/v1/string_rules.proto\"\x86\v\n" +
 	"\vAgentConfig\x122\n" +
 	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x126\n" +
 	"\x11runtime_directory\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10runtimeDirectory\x12=\n" +
@@ -855,7 +873,8 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x11password_provider\x18\x0e \x01(\v2,.lindm.agent.v1.NativePasswordProviderConfigR\x10passwordProvider\x12V\n" +
 	"\x12connectivity_guard\x18\x0f \x01(\v2'.lindm.agent.v1.ConnectivityGuardConfigR\x11connectivityGuard\x12\\\n" +
 	"\x12connectivity_probe\x18\x10 \x01(\v2-.lindm.agent.v1.ConnectivityProbeServerConfigR\x11connectivityProbe\x12S\n" +
-	"\x11remote_assistance\x18\x11 \x01(\v2&.lindm.agent.v1.RemoteAssistanceConfigR\x10remoteAssistance\"\xce\x02\n" +
+	"\x11remote_assistance\x18\x11 \x01(\v2&.lindm.agent.v1.RemoteAssistanceConfigR\x10remoteAssistance\x12Z\n" +
+	"\x12os_update_provider\x18\x12 \x01(\v2,.lindm.agent.v1.NativeOSUpdateProviderConfigR\x10osUpdateProvider\"\xce\x02\n" +
 	"\x1bNativePackageProviderConfig\x12I\n" +
 	"\asources\x18\x01 \x03(\v2#.lindm.agent.v1.NativePackageSourceB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10 R\asources:\xe3\x01\xbaH\xdf\x01\x1a\xdc\x01\n" +
@@ -868,7 +887,7 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x12signing_key_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x10signingKeySha256\x12d\n" +
 	"\x1brpm_signing_key_fingerprint\x18\x04 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x18rpmSigningKeyFingerprint:\xa2\x05\xbaH\x9e\x05\x1a\xea\x01\n" +
 	"\x1enative_package_source.approved\x12Gnative package sources must be present approved APT or RPM repositories\x1a\x7fthis.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm))\x1a\xae\x03\n" +
-	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\xfa\x06\n" +
+	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\xa2\a\n" +
 	"\x1aDeviceActionProviderConfig\x12I\n" +
 	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
 	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +
@@ -885,7 +904,8 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x12allow_account_lock\x18\v \x01(\bR\x10allowAccountLock\x12_\n" +
 	"\x12protected_accounts\x18\f \x03(\tB0\xbaH-\x92\x01*\x10\x80\x01\x18\x01\"#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\x11protectedAccounts\x12.\n" +
 	"\x13allow_power_actions\x18\r \x01(\bR\x11allowPowerActions\x12g\n" +
-	"\x14local_admin_accounts\x18\x0e \x03(\tB5\xbaH2\x92\x01/\x10\b\x18\x01\")r'2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$Z\x04rootR\x12localAdminAccounts\"\x9f\x04\n" +
+	"\x14local_admin_accounts\x18\x0e \x03(\tB5\xbaH2\x92\x01/\x10\b\x18\x01\")r'2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$Z\x04rootR\x12localAdminAccounts\x12&\n" +
+	"\x0fallow_patch_now\x18\x0f \x01(\bR\rallowPatchNow\"\x9f\x04\n" +
 	"\x15QualifiedActionTarget\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
 	"\x16owner_recovery_keyslot\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\x14ownerRecoveryKeyslot\x126\n" +
@@ -958,11 +978,12 @@ var file_lindm_agent_v1_config_proto_goTypes = []any{
 	(*ConnectivityGuardConfig)(nil),       // 13: lindm.agent.v1.ConnectivityGuardConfig
 	(*ConnectivityProbeServerConfig)(nil), // 14: lindm.agent.v1.ConnectivityProbeServerConfig
 	(*RemoteAssistanceConfig)(nil),        // 15: lindm.agent.v1.RemoteAssistanceConfig
-	(*v1.RepositoryDesired)(nil),          // 16: lindm.resource.v1.RepositoryDesired
-	(*StorageTarget)(nil),                 // 17: lindm.agent.v1.StorageTarget
-	(SanitizeMethod)(0),                   // 18: lindm.agent.v1.SanitizeMethod
-	(RecoveryCustody)(0),                  // 19: lindm.agent.v1.RecoveryCustody
-	(*timestamppb.Timestamp)(nil),         // 20: google.protobuf.Timestamp
+	(*NativeOSUpdateProviderConfig)(nil),  // 16: lindm.agent.v1.NativeOSUpdateProviderConfig
+	(*v1.RepositoryDesired)(nil),          // 17: lindm.resource.v1.RepositoryDesired
+	(*StorageTarget)(nil),                 // 18: lindm.agent.v1.StorageTarget
+	(SanitizeMethod)(0),                   // 19: lindm.agent.v1.SanitizeMethod
+	(RecoveryCustody)(0),                  // 20: lindm.agent.v1.RecoveryCustody
+	(*timestamppb.Timestamp)(nil),         // 21: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	3,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
@@ -977,20 +998,21 @@ var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	13, // 9: lindm.agent.v1.AgentConfig.connectivity_guard:type_name -> lindm.agent.v1.ConnectivityGuardConfig
 	14, // 10: lindm.agent.v1.AgentConfig.connectivity_probe:type_name -> lindm.agent.v1.ConnectivityProbeServerConfig
 	15, // 11: lindm.agent.v1.AgentConfig.remote_assistance:type_name -> lindm.agent.v1.RemoteAssistanceConfig
-	2,  // 12: lindm.agent.v1.NativePackageProviderConfig.sources:type_name -> lindm.agent.v1.NativePackageSource
-	16, // 13: lindm.agent.v1.NativePackageSource.repository:type_name -> lindm.resource.v1.RepositoryDesired
-	4,  // 14: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
-	17, // 15: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
-	18, // 16: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
-	3,  // 17: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
-	19, // 18: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	20, // 19: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	19, // 20: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	16, // 12: lindm.agent.v1.AgentConfig.os_update_provider:type_name -> lindm.agent.v1.NativeOSUpdateProviderConfig
+	2,  // 13: lindm.agent.v1.NativePackageProviderConfig.sources:type_name -> lindm.agent.v1.NativePackageSource
+	17, // 14: lindm.agent.v1.NativePackageSource.repository:type_name -> lindm.resource.v1.RepositoryDesired
+	4,  // 15: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
+	18, // 16: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	19, // 17: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
+	3,  // 18: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	20, // 19: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	21, // 20: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	20, // 21: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_config_proto_init() }
@@ -1005,6 +1027,7 @@ func file_lindm_agent_v1_config_proto_init() {
 	file_lindm_agent_v1_device_actions_proto_init()
 	file_lindm_agent_v1_native_firewall_proto_init()
 	file_lindm_agent_v1_native_password_proto_init()
+	file_lindm_agent_v1_os_update_proto_init()
 	file_lindm_agent_v1_resource_native_proto_init()
 	file_lindm_agent_v1_update_proto_init()
 	type x struct{}

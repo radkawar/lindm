@@ -95,5 +95,8 @@ func PlanRequiresEffect(plan *resourcev1.ResourcePlan) bool {
 	if packages := plan.GetNativePackage(); packages != nil {
 		return packages.GetChangePackages() || packages.GetChangePin()
 	}
+	if update := plan.GetOsUpdate(); update != nil {
+		return len(update.GetChangedFiles()) != 0 || update.GetTimerChange()
+	}
 	return true
 }

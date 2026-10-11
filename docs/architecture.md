@@ -497,8 +497,12 @@ One policy applies to every call:
   verified target runs with the requested name as `argv[0]`;
 - a clean environment: `PATH=/usr/sbin:/usr/bin`, `LANG=C`, `LC_ALL=C` plus only
   allowlisted keys (`HOME`, `TZ`, `DEBIAN_FRONTEND`, `APT_CONFIG`,
-  `DPKG_FRONTEND_LOCKED`, `SYSTEMD_*` display/unit-path knobs,
-  `SOURCE_DATE_EPOCH`); the working directory defaults to `/`;
+  `DPKG_FRONTEND_LOCKED`, `NEEDRESTART_MODE`, `SYSTEMD_*` display/unit-path
+  knobs, `SOURCE_DATE_EPOCH`, and `DBUS_SESSION_BUS_ADDRESS` only as
+  `unix:path=/run/user/<uid>/bus`); the working directory defaults to `/`;
+- an optional `Credential` (UID, primary GID, explicit supplementary groups)
+  for a root caller acting for a user, such as the OS update reboot
+  notification; with it, a session bus address must name that UID's bus;
 - an explicit deadline and separate stdout/stderr limits on every call. Output
   beyond a limit is drained, not SIGPIPEd, and the call fails with
   `output_limit`;

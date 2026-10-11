@@ -258,6 +258,127 @@ func (RepositoryEcosystem) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{3}
 }
 
+type OSUpdateBackend int32
+
+const (
+	OSUpdateBackend_OS_UPDATE_BACKEND_UNSPECIFIED OSUpdateBackend = 0
+	// unattended-upgrade(8) with needrestart(1) service restarts.
+	OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES OSUpdateBackend = 1
+	// dnf5-plugin-automatic `dnf5 automatic`.
+	OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC OSUpdateBackend = 2
+	// dnf-automatic(8) on DNF4.
+	OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC OSUpdateBackend = 3
+)
+
+// Enum value maps for OSUpdateBackend.
+var (
+	OSUpdateBackend_name = map[int32]string{
+		0: "OS_UPDATE_BACKEND_UNSPECIFIED",
+		1: "OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES",
+		2: "OS_UPDATE_BACKEND_DNF5_AUTOMATIC",
+		3: "OS_UPDATE_BACKEND_DNF4_AUTOMATIC",
+	}
+	OSUpdateBackend_value = map[string]int32{
+		"OS_UPDATE_BACKEND_UNSPECIFIED":             0,
+		"OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES": 1,
+		"OS_UPDATE_BACKEND_DNF5_AUTOMATIC":          2,
+		"OS_UPDATE_BACKEND_DNF4_AUTOMATIC":          3,
+	}
+)
+
+func (x OSUpdateBackend) Enum() *OSUpdateBackend {
+	p := new(OSUpdateBackend)
+	*p = x
+	return p
+}
+
+func (x OSUpdateBackend) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OSUpdateBackend) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_resource_v1_observations_proto_enumTypes[4].Descriptor()
+}
+
+func (OSUpdateBackend) Type() protoreflect.EnumType {
+	return &file_lindm_resource_v1_observations_proto_enumTypes[4]
+}
+
+func (x OSUpdateBackend) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OSUpdateBackend.Descriptor instead.
+func (OSUpdateBackend) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{4}
+}
+
+// Closed set of lindm-owned native objects. Paths are fixed by the provider.
+type OSUpdateNativeFile int32
+
+const (
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_UNSPECIFIED OSUpdateNativeFile = 0
+	// /etc/lindm/os-update/policy.binpb, the runner's validated policy.
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_POLICY OSUpdateNativeFile = 1
+	// /etc/systemd/system/lindm-os-update.timer, the maintenance window calendar.
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_TIMER OSUpdateNativeFile = 2
+	// /etc/systemd/system/timers.target.d/lindm-os-update.conf (Wants= the timer).
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_TIMER_WANTS OSUpdateNativeFile = 3
+	// /etc/apt/apt.conf.d/99lindm-os-update: disables APT::Periodic unattended
+	// upgrades so installation happens only inside the lindm window.
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_APT_PERIODIC OSUpdateNativeFile = 4
+	// /etc/dnf/automatic.conf on DNF5 (Fedora), a %ghost file dnf5 automatic
+	// reads last; it fixes upgrade_type, reboot=never and stdio emission.
+	OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC OSUpdateNativeFile = 5
+)
+
+// Enum value maps for OSUpdateNativeFile.
+var (
+	OSUpdateNativeFile_name = map[int32]string{
+		0: "OS_UPDATE_NATIVE_FILE_UNSPECIFIED",
+		1: "OS_UPDATE_NATIVE_FILE_POLICY",
+		2: "OS_UPDATE_NATIVE_FILE_TIMER",
+		3: "OS_UPDATE_NATIVE_FILE_TIMER_WANTS",
+		4: "OS_UPDATE_NATIVE_FILE_APT_PERIODIC",
+		5: "OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC",
+	}
+	OSUpdateNativeFile_value = map[string]int32{
+		"OS_UPDATE_NATIVE_FILE_UNSPECIFIED":    0,
+		"OS_UPDATE_NATIVE_FILE_POLICY":         1,
+		"OS_UPDATE_NATIVE_FILE_TIMER":          2,
+		"OS_UPDATE_NATIVE_FILE_TIMER_WANTS":    3,
+		"OS_UPDATE_NATIVE_FILE_APT_PERIODIC":   4,
+		"OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC": 5,
+	}
+)
+
+func (x OSUpdateNativeFile) Enum() *OSUpdateNativeFile {
+	p := new(OSUpdateNativeFile)
+	*p = x
+	return p
+}
+
+func (x OSUpdateNativeFile) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OSUpdateNativeFile) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_resource_v1_observations_proto_enumTypes[5].Descriptor()
+}
+
+func (OSUpdateNativeFile) Type() protoreflect.EnumType {
+	return &file_lindm_resource_v1_observations_proto_enumTypes[5]
+}
+
+func (x OSUpdateNativeFile) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OSUpdateNativeFile.Descriptor instead.
+func (OSUpdateNativeFile) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{5}
+}
+
 // Public projection of the existing imperative storage identity basis. This
 // observation grants no storage authority; adapters map each basis explicitly.
 type RootStorageIdentityBasis int32
@@ -293,11 +414,11 @@ func (x RootStorageIdentityBasis) String() string {
 }
 
 func (RootStorageIdentityBasis) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_observations_proto_enumTypes[4].Descriptor()
+	return file_lindm_resource_v1_observations_proto_enumTypes[6].Descriptor()
 }
 
 func (RootStorageIdentityBasis) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_observations_proto_enumTypes[4]
+	return &file_lindm_resource_v1_observations_proto_enumTypes[6]
 }
 
 func (x RootStorageIdentityBasis) Number() protoreflect.EnumNumber {
@@ -306,7 +427,7 @@ func (x RootStorageIdentityBasis) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RootStorageIdentityBasis.Descriptor instead.
 func (RootStorageIdentityBasis) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{4}
+	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{6}
 }
 
 type ObservationMetadata struct {
@@ -2856,30 +2977,29 @@ func (x *DeploymentIdentity) GetPending() bool {
 	return false
 }
 
-type InhibitorEvidence struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NativeId      string                 `protobuf:"bytes,1,opt,name=native_id,json=nativeId,proto3" json:"native_id,omitempty"`
-	Uid           uint32                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	BlocksReboot  bool                   `protobuf:"varint,4,opt,name=blocks_reboot,json=blocksReboot,proto3" json:"blocks_reboot,omitempty"`
+type OSUpdateFileObservation struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Kind          OSUpdateNativeFile      `protobuf:"varint,1,opt,name=kind,proto3,enum=lindm.resource.v1.OSUpdateNativeFile" json:"kind,omitempty"`
+	State         *ManagedFileObservation `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	ContentSha256 []byte                  `protobuf:"bytes,3,opt,name=content_sha256,json=contentSha256,proto3" json:"content_sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *InhibitorEvidence) Reset() {
-	*x = InhibitorEvidence{}
+func (x *OSUpdateFileObservation) Reset() {
+	*x = OSUpdateFileObservation{}
 	mi := &file_lindm_resource_v1_observations_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *InhibitorEvidence) String() string {
+func (x *OSUpdateFileObservation) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*InhibitorEvidence) ProtoMessage() {}
+func (*OSUpdateFileObservation) ProtoMessage() {}
 
-func (x *InhibitorEvidence) ProtoReflect() protoreflect.Message {
+func (x *OSUpdateFileObservation) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_resource_v1_observations_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2891,51 +3011,53 @@ func (x *InhibitorEvidence) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use InhibitorEvidence.ProtoReflect.Descriptor instead.
-func (*InhibitorEvidence) Descriptor() ([]byte, []int) {
+// Deprecated: Use OSUpdateFileObservation.ProtoReflect.Descriptor instead.
+func (*OSUpdateFileObservation) Descriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *InhibitorEvidence) GetNativeId() string {
+func (x *OSUpdateFileObservation) GetKind() OSUpdateNativeFile {
 	if x != nil {
-		return x.NativeId
+		return x.Kind
 	}
-	return ""
+	return OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_UNSPECIFIED
 }
 
-func (x *InhibitorEvidence) GetUid() uint32 {
+func (x *OSUpdateFileObservation) GetState() *ManagedFileObservation {
 	if x != nil {
-		return x.Uid
+		return x.State
 	}
-	return 0
+	return nil
 }
 
-func (x *InhibitorEvidence) GetReason() string {
+func (x *OSUpdateFileObservation) GetContentSha256() []byte {
 	if x != nil {
-		return x.Reason
+		return x.ContentSha256
 	}
-	return ""
+	return nil
 }
 
-func (x *InhibitorEvidence) GetBlocksReboot() bool {
-	if x != nil {
-		return x.BlocksReboot
-	}
-	return false
-}
-
+// Configuration state only. Volatile patch facts (pending updates, reboot
+// required, last run) are inventory (lindm.agent.v1.PatchStatusObservation).
 type OSUpdateObservation struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Source                 *SourceSnapshot        `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
-	Deployments            []*DeploymentIdentity  `protobuf:"bytes,2,rep,name=deployments,proto3" json:"deployments,omitempty"`
-	KernelRelease          string                 `protobuf:"bytes,3,opt,name=kernel_release,json=kernelRelease,proto3" json:"kernel_release,omitempty"`
-	BootId                 string                 `protobuf:"bytes,4,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
-	Inhibitors             []*InhibitorEvidence   `protobuf:"bytes,5,rep,name=inhibitors,proto3" json:"inhibitors,omitempty"`
-	DrainReceipt           *ProbeReceipt          `protobuf:"bytes,6,opt,name=drain_receipt,json=drainReceipt,proto3" json:"drain_receipt,omitempty"`
-	RebootRequired         bool                   `protobuf:"varint,7,opt,name=reboot_required,json=rebootRequired,proto3" json:"reboot_required,omitempty"`
-	NativeDatabaseRevision []byte                 `protobuf:"bytes,8,opt,name=native_database_revision,json=nativeDatabaseRevision,proto3" json:"native_database_revision,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Backend OSUpdateBackend        `protobuf:"varint,9,opt,name=backend,proto3,enum=lindm.resource.v1.OSUpdateBackend" json:"backend,omitempty"`
+	// Native automatic-update package version, e.g. "unattended-upgrades 2.9.1".
+	NativeVersion string `protobuf:"bytes,10,opt,name=native_version,json=nativeVersion,proto3" json:"native_version,omitempty"`
+	// Decoded lindm-owned policy file; absent when missing or invalid.
+	Effective *OSUpdateDesired           `protobuf:"bytes,11,opt,name=effective,proto3" json:"effective,omitempty"`
+	Files     []*OSUpdateFileObservation `protobuf:"bytes,12,rep,name=files,proto3" json:"files,omitempty"`
+	// lindm-os-update.timer is loaded from the owned file and active (waiting).
+	TimerActive bool `protobuf:"varint,13,opt,name=timer_active,json=timerActive,proto3" json:"timer_active,omitempty"`
+	// systemd's loaded TimersCalendar specification(s), joined by "; ".
+	TimerCalendar string `protobuf:"bytes,14,opt,name=timer_calendar,json=timerCalendar,proto3" json:"timer_calendar,omitempty"`
+	// Native automatic-update schedulers that are enabled or active and would
+	// install outside the window (for example dnf5-automatic.timer).
+	ConflictingUnits []string `protobuf:"bytes,15,rep,name=conflicting_units,json=conflictingUnits,proto3" json:"conflicting_units,omitempty"`
+	// needrestart (APT) or dnf needs-restarting (RPM) is installed.
+	RebootOracleAvailable bool `protobuf:"varint,16,opt,name=reboot_oracle_available,json=rebootOracleAvailable,proto3" json:"reboot_oracle_available,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *OSUpdateObservation) Reset() {
@@ -2968,60 +3090,60 @@ func (*OSUpdateObservation) Descriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_observations_proto_rawDescGZIP(), []int{28}
 }
 
-func (x *OSUpdateObservation) GetSource() *SourceSnapshot {
+func (x *OSUpdateObservation) GetBackend() OSUpdateBackend {
 	if x != nil {
-		return x.Source
+		return x.Backend
 	}
-	return nil
+	return OSUpdateBackend_OS_UPDATE_BACKEND_UNSPECIFIED
 }
 
-func (x *OSUpdateObservation) GetDeployments() []*DeploymentIdentity {
+func (x *OSUpdateObservation) GetNativeVersion() string {
 	if x != nil {
-		return x.Deployments
-	}
-	return nil
-}
-
-func (x *OSUpdateObservation) GetKernelRelease() string {
-	if x != nil {
-		return x.KernelRelease
+		return x.NativeVersion
 	}
 	return ""
 }
 
-func (x *OSUpdateObservation) GetBootId() string {
+func (x *OSUpdateObservation) GetEffective() *OSUpdateDesired {
 	if x != nil {
-		return x.BootId
-	}
-	return ""
-}
-
-func (x *OSUpdateObservation) GetInhibitors() []*InhibitorEvidence {
-	if x != nil {
-		return x.Inhibitors
+		return x.Effective
 	}
 	return nil
 }
 
-func (x *OSUpdateObservation) GetDrainReceipt() *ProbeReceipt {
+func (x *OSUpdateObservation) GetFiles() []*OSUpdateFileObservation {
 	if x != nil {
-		return x.DrainReceipt
+		return x.Files
 	}
 	return nil
 }
 
-func (x *OSUpdateObservation) GetRebootRequired() bool {
+func (x *OSUpdateObservation) GetTimerActive() bool {
 	if x != nil {
-		return x.RebootRequired
+		return x.TimerActive
 	}
 	return false
 }
 
-func (x *OSUpdateObservation) GetNativeDatabaseRevision() []byte {
+func (x *OSUpdateObservation) GetTimerCalendar() string {
 	if x != nil {
-		return x.NativeDatabaseRevision
+		return x.TimerCalendar
+	}
+	return ""
+}
+
+func (x *OSUpdateObservation) GetConflictingUnits() []string {
+	if x != nil {
+		return x.ConflictingUnits
 	}
 	return nil
+}
+
+func (x *OSUpdateObservation) GetRebootOracleAvailable() bool {
+	if x != nil {
+		return x.RebootOracleAvailable
+	}
+	return false
 }
 
 type NativeModuleVersion struct {
@@ -4550,25 +4672,27 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\bnativeId\x12.\n" +
 	"\x0econtent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\rcontentSha256\x12\x16\n" +
 	"\x06booted\x18\x03 \x01(\bR\x06booted\x12\x18\n" +
-	"\apending\x18\x04 \x01(\bR\apending\"\x95\x01\n" +
-	"\x11InhibitorEvidence\x12'\n" +
-	"\tnative_id\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\bnativeId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\rR\x03uid\x12 \n" +
-	"\x06reason\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x06reason\x12#\n" +
-	"\rblocks_reboot\x18\x04 \x01(\bR\fblocksReboot\"\x83\x04\n" +
-	"\x13OSUpdateObservation\x12A\n" +
-	"\x06source\x18\x01 \x01(\v2!.lindm.resource.v1.SourceSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06source\x12Q\n" +
-	"\vdeployments\x18\x02 \x03(\v2%.lindm.resource.v1.DeploymentIdentityB\b\xbaH\x05\x92\x01\x02\x10 R\vdeployments\x121\n" +
-	"\x0ekernel_release\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\rkernelRelease\x12!\n" +
-	"\aboot_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12N\n" +
-	"\n" +
-	"inhibitors\x18\x05 \x03(\v2$.lindm.resource.v1.InhibitorEvidenceB\b\xbaH\x05\x92\x01\x02\x10@R\n" +
-	"inhibitors\x12D\n" +
-	"\rdrain_receipt\x18\x06 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\fdrainReceipt\x12'\n" +
-	"\x0freboot_required\x18\a \x01(\bR\x0erebootRequired\x12A\n" +
-	"\x18native_database_revision\x18\b \x01(\fB\a\xbaH\x04z\x02h R\x16nativeDatabaseRevision\"[\n" +
+	"\apending\x18\x04 \x01(\bR\apending\"\xe3\x02\n" +
+	"\x17OSUpdateFileObservation\x12E\n" +
+	"\x04kind\x18\x01 \x01(\x0e2%.lindm.resource.v1.OSUpdateNativeFileB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12G\n" +
+	"\x05state\x18\x02 \x01(\v2).lindm.resource.v1.ManagedFileObservationB\x06\xbaH\x03\xc8\x01\x01R\x05state\x121\n" +
+	"\x0econtent_sha256\x18\x03 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\rcontentSha256:\x84\x01\xbaH\x80\x01\x1a~\n" +
+	"\x16os_update_file.content\x12+existing owned files carry a content digest\x1a7this.state.exists == (this.content_sha256.size() == 32)\"\xaf\x06\n" +
+	"\x13OSUpdateObservation\x12H\n" +
+	"\abackend\x18\t \x01(\x0e2\".lindm.resource.v1.OSUpdateBackendB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\abackend\x12F\n" +
+	"\x0enative_version\x18\n" +
+	" \x01(\tB\x1f\xbaH\x1cr\x1a\x10\x01\x18\x80\x012\x13^[^\\x00-\\x1f\\x7f]*$R\rnativeVersion\x12@\n" +
+	"\teffective\x18\v \x01(\v2\".lindm.resource.v1.OSUpdateDesiredR\teffective\x12J\n" +
+	"\x05files\x18\f \x03(\v2*.lindm.resource.v1.OSUpdateFileObservationB\b\xbaH\x05\x92\x01\x02\x10\x04R\x05files\x12!\n" +
+	"\ftimer_active\x18\r \x01(\bR\vtimerActive\x12/\n" +
+	"\x0etimer_calendar\x18\x0e \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\rtimerCalendar\x12g\n" +
+	"\x11conflicting_units\x18\x0f \x03(\tB:\xbaH7\x92\x014\x10\b\x18\x01\".r,2*^[a-zA-Z0-9@_.-]{1,128}[.](timer|service)$R\x10conflictingUnits\x126\n" +
+	"\x17reboot_oracle_available\x18\x10 \x01(\bR\x15rebootOracleAvailable:\x88\x01\xbaH\x84\x01\x1a\x81\x01\n" +
+	"\x1bos_update_observation.files\x12\x1bowned file kinds are unique\x1aEthis.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)J\x04\b\x01\x10\tR\x06sourceR\vdeploymentsR\x0ekernel_releaseR\aboot_idR\n" +
+	"inhibitorsR\rdrain_receiptR\x0freboot_requiredR\x18native_database_revision\"[\n" +
 	"\x13NativeModuleVersion\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\x04name\x12$\n" +
@@ -4751,7 +4875,19 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\x19REPOSITORY_ECOSYSTEM_ALPM\x10\x03\x12 \n" +
 	"\x1cREPOSITORY_ECOSYSTEM_FLATPAK\x10\x04\x12\x1c\n" +
 	"\x18REPOSITORY_ECOSYSTEM_NIX\x10\x05\x12\x1f\n" +
-	"\x1bREPOSITORY_ECOSYSTEM_OSTREE\x10\x06*\xa4\x01\n" +
+	"\x1bREPOSITORY_ECOSYSTEM_OSTREE\x10\x06*\xaf\x01\n" +
+	"\x0fOSUpdateBackend\x12!\n" +
+	"\x1dOS_UPDATE_BACKEND_UNSPECIFIED\x10\x00\x12-\n" +
+	")OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES\x10\x01\x12$\n" +
+	" OS_UPDATE_BACKEND_DNF5_AUTOMATIC\x10\x02\x12$\n" +
+	" OS_UPDATE_BACKEND_DNF4_AUTOMATIC\x10\x03*\xf7\x01\n" +
+	"\x12OSUpdateNativeFile\x12%\n" +
+	"!OS_UPDATE_NATIVE_FILE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cOS_UPDATE_NATIVE_FILE_POLICY\x10\x01\x12\x1f\n" +
+	"\x1bOS_UPDATE_NATIVE_FILE_TIMER\x10\x02\x12%\n" +
+	"!OS_UPDATE_NATIVE_FILE_TIMER_WANTS\x10\x03\x12&\n" +
+	"\"OS_UPDATE_NATIVE_FILE_APT_PERIODIC\x10\x04\x12(\n" +
+	"$OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC\x10\x05*\xa4\x01\n" +
 	"\x18RootStorageIdentityBasis\x12+\n" +
 	"'ROOT_STORAGE_IDENTITY_BASIS_UNSPECIFIED\x10\x00\x12*\n" +
 	"&ROOT_STORAGE_IDENTITY_BASIS_WWN_SERIAL\x10\x01\x12/\n" +
@@ -4769,190 +4905,193 @@ func file_lindm_resource_v1_observations_proto_rawDescGZIP() []byte {
 	return file_lindm_resource_v1_observations_proto_rawDescData
 }
 
-var file_lindm_resource_v1_observations_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_lindm_resource_v1_observations_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_lindm_resource_v1_observations_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_lindm_resource_v1_observations_proto_goTypes = []any{
 	(ObservationStatus)(0),                   // 0: lindm.resource.v1.ObservationStatus
 	(NSSOrigin)(0),                           // 1: lindm.resource.v1.NSSOrigin
 	(ConnectionMedium)(0),                    // 2: lindm.resource.v1.ConnectionMedium
 	(RepositoryEcosystem)(0),                 // 3: lindm.resource.v1.RepositoryEcosystem
-	(RootStorageIdentityBasis)(0),            // 4: lindm.resource.v1.RootStorageIdentityBasis
-	(*ObservationMetadata)(nil),              // 5: lindm.resource.v1.ObservationMetadata
-	(*FileIdentity)(nil),                     // 6: lindm.resource.v1.FileIdentity
-	(*InstallLink)(nil),                      // 7: lindm.resource.v1.InstallLink
-	(*SystemdServiceObservation)(nil),        // 8: lindm.resource.v1.SystemdServiceObservation
-	(*LocalGroupObservation)(nil),            // 9: lindm.resource.v1.LocalGroupObservation
-	(*HomeMetadata)(nil),                     // 10: lindm.resource.v1.HomeMetadata
-	(*LocalUserObservation)(nil),             // 11: lindm.resource.v1.LocalUserObservation
-	(*SudoPermissionEvidence)(nil),           // 12: lindm.resource.v1.SudoPermissionEvidence
-	(*SudoRuleObservation)(nil),              // 13: lindm.resource.v1.SudoRuleObservation
-	(*SSHIncludeEdge)(nil),                   // 14: lindm.resource.v1.SSHIncludeEdge
-	(*SSHMatchEvidence)(nil),                 // 15: lindm.resource.v1.SSHMatchEvidence
-	(*SSHServerObservation)(nil),             // 16: lindm.resource.v1.SSHServerObservation
-	(*TimeSourceEvidence)(nil),               // 17: lindm.resource.v1.TimeSourceEvidence
-	(*TimeSyncObservation)(nil),              // 18: lindm.resource.v1.TimeSyncObservation
-	(*TrustPurposeEvidence)(nil),             // 19: lindm.resource.v1.TrustPurposeEvidence
-	(*TrustCAObservation)(nil),               // 20: lindm.resource.v1.TrustCAObservation
-	(*FirewallZoneObservation)(nil),          // 21: lindm.resource.v1.FirewallZoneObservation
-	(*NetworkConnectionObservation)(nil),     // 22: lindm.resource.v1.NetworkConnectionObservation
-	(*DNSLookupEvidence)(nil),                // 23: lindm.resource.v1.DNSLookupEvidence
-	(*DNSObservation)(nil),                   // 24: lindm.resource.v1.DNSObservation
-	(*ProxyRequestEvidence)(nil),             // 25: lindm.resource.v1.ProxyRequestEvidence
-	(*ProxyObservation)(nil),                 // 26: lindm.resource.v1.ProxyObservation
-	(*NativePackageRecord)(nil),              // 27: lindm.resource.v1.NativePackageRecord
-	(*NativePackageObservation)(nil),         // 28: lindm.resource.v1.NativePackageObservation
-	(*RepositoryObservation)(nil),            // 29: lindm.resource.v1.RepositoryObservation
-	(*FlatpakAppObservation)(nil),            // 30: lindm.resource.v1.FlatpakAppObservation
-	(*DeploymentIdentity)(nil),               // 31: lindm.resource.v1.DeploymentIdentity
-	(*InhibitorEvidence)(nil),                // 32: lindm.resource.v1.InhibitorEvidence
-	(*OSUpdateObservation)(nil),              // 33: lindm.resource.v1.OSUpdateObservation
-	(*NativeModuleVersion)(nil),              // 34: lindm.resource.v1.NativeModuleVersion
-	(*SessionPolicyObservation)(nil),         // 35: lindm.resource.v1.SessionPolicyObservation
-	(*PasswordPolicyObservation)(nil),        // 36: lindm.resource.v1.PasswordPolicyObservation
-	(*SnapAppObservation)(nil),               // 37: lindm.resource.v1.SnapAppObservation
-	(*PublicCertificate)(nil),                // 38: lindm.resource.v1.PublicCertificate
-	(*CertificateEnrollmentObservation)(nil), // 39: lindm.resource.v1.CertificateEnrollmentObservation
-	(*DirectoryAccountMapping)(nil),          // 40: lindm.resource.v1.DirectoryAccountMapping
-	(*DirectoryClientObservation)(nil),       // 41: lindm.resource.v1.DirectoryClientObservation
-	(*ManagedFileObservation)(nil),           // 42: lindm.resource.v1.ManagedFileObservation
-	(*SysctlObservation)(nil),                // 43: lindm.resource.v1.SysctlObservation
-	(*SystemdDefinitionObservation)(nil),     // 44: lindm.resource.v1.SystemdDefinitionObservation
-	(*SystemdEffectiveOptions)(nil),          // 45: lindm.resource.v1.SystemdEffectiveOptions
-	(*EncryptionComplianceObservation)(nil),  // 46: lindm.resource.v1.EncryptionComplianceObservation
-	(*timestamppb.Timestamp)(nil),            // 47: google.protobuf.Timestamp
-	(*BackendSelection)(nil),                 // 48: lindm.resource.v1.BackendSelection
-	(PasswordHashAlgorithm)(0),               // 49: lindm.resource.v1.PasswordHashAlgorithm
-	(*PasswordAging)(nil),                    // 50: lindm.resource.v1.PasswordAging
-	(*SudoPrincipal)(nil),                    // 51: lindm.resource.v1.SudoPrincipal
-	(*SudoCommand)(nil),                      // 52: lindm.resource.v1.SudoCommand
-	(*SSHMatchSelector)(nil),                 // 53: lindm.resource.v1.SSHMatchSelector
-	(*SSHMatch)(nil),                         // 54: lindm.resource.v1.SSHMatch
-	(*SSHServerDesired)(nil),                 // 55: lindm.resource.v1.SSHServerDesired
-	(*Endpoint)(nil),                         // 56: lindm.resource.v1.Endpoint
-	(*TimeSource)(nil),                       // 57: lindm.resource.v1.TimeSource
-	(CertificatePurpose)(0),                  // 58: lindm.resource.v1.CertificatePurpose
-	(*ProbeReceipt)(nil),                     // 59: lindm.resource.v1.ProbeReceipt
-	(TrustStoreScope)(0),                     // 60: lindm.resource.v1.TrustStoreScope
-	(*FirewallRule)(nil),                     // 61: lindm.resource.v1.FirewallRule
-	(*InterfaceSelector)(nil),                // 62: lindm.resource.v1.InterfaceSelector
-	(FirewallVerdict)(0),                     // 63: lindm.resource.v1.FirewallVerdict
-	(*IPAddress)(nil),                        // 64: lindm.resource.v1.IPAddress
-	(*IPRoute)(nil),                          // 65: lindm.resource.v1.IPRoute
-	(*DNSServer)(nil),                        // 66: lindm.resource.v1.DNSServer
-	(*DNSDesired)(nil),                       // 67: lindm.resource.v1.DNSDesired
-	(*ProxyConsumer)(nil),                    // 68: lindm.resource.v1.ProxyConsumer
-	(*PackageIdentity)(nil),                  // 69: lindm.resource.v1.PackageIdentity
-	(*NativeVersion)(nil),                    // 70: lindm.resource.v1.NativeVersion
-	(*ResourceRef)(nil),                      // 71: lindm.resource.v1.ResourceRef
-	(*InstallationBinding)(nil),              // 72: lindm.resource.v1.InstallationBinding
-	(*FlatpakPermissionPolicy)(nil),          // 73: lindm.resource.v1.FlatpakPermissionPolicy
-	(*SourceSnapshot)(nil),                   // 74: lindm.resource.v1.SourceSnapshot
-	(*SessionScope)(nil),                     // 75: lindm.resource.v1.SessionScope
-	(*SessionPolicyDesired)(nil),             // 76: lindm.resource.v1.SessionPolicyDesired
-	(*PasswordPolicyDesired)(nil),            // 77: lindm.resource.v1.PasswordPolicyDesired
-	(SnapConfinement)(0),                     // 78: lindm.resource.v1.SnapConfinement
-	(*SnapInterfaceGrant)(nil),               // 79: lindm.resource.v1.SnapInterfaceGrant
-	(*SubjectAlternativeName)(nil),           // 80: lindm.resource.v1.SubjectAlternativeName
-	(*CredentialConsumer)(nil),               // 81: lindm.resource.v1.CredentialConsumer
-	(*CredentialSubjectBinding)(nil),         // 82: lindm.resource.v1.CredentialSubjectBinding
-	(*NativeAccountBinding)(nil),             // 83: lindm.resource.v1.NativeAccountBinding
-	(DirectoryBackend)(0),                    // 84: lindm.resource.v1.DirectoryBackend
-	(*DirectoryLoginPolicy)(nil),             // 85: lindm.resource.v1.DirectoryLoginPolicy
-	(*SystemdDefinitionDesired)(nil),         // 86: lindm.resource.v1.SystemdDefinitionDesired
+	(OSUpdateBackend)(0),                     // 4: lindm.resource.v1.OSUpdateBackend
+	(OSUpdateNativeFile)(0),                  // 5: lindm.resource.v1.OSUpdateNativeFile
+	(RootStorageIdentityBasis)(0),            // 6: lindm.resource.v1.RootStorageIdentityBasis
+	(*ObservationMetadata)(nil),              // 7: lindm.resource.v1.ObservationMetadata
+	(*FileIdentity)(nil),                     // 8: lindm.resource.v1.FileIdentity
+	(*InstallLink)(nil),                      // 9: lindm.resource.v1.InstallLink
+	(*SystemdServiceObservation)(nil),        // 10: lindm.resource.v1.SystemdServiceObservation
+	(*LocalGroupObservation)(nil),            // 11: lindm.resource.v1.LocalGroupObservation
+	(*HomeMetadata)(nil),                     // 12: lindm.resource.v1.HomeMetadata
+	(*LocalUserObservation)(nil),             // 13: lindm.resource.v1.LocalUserObservation
+	(*SudoPermissionEvidence)(nil),           // 14: lindm.resource.v1.SudoPermissionEvidence
+	(*SudoRuleObservation)(nil),              // 15: lindm.resource.v1.SudoRuleObservation
+	(*SSHIncludeEdge)(nil),                   // 16: lindm.resource.v1.SSHIncludeEdge
+	(*SSHMatchEvidence)(nil),                 // 17: lindm.resource.v1.SSHMatchEvidence
+	(*SSHServerObservation)(nil),             // 18: lindm.resource.v1.SSHServerObservation
+	(*TimeSourceEvidence)(nil),               // 19: lindm.resource.v1.TimeSourceEvidence
+	(*TimeSyncObservation)(nil),              // 20: lindm.resource.v1.TimeSyncObservation
+	(*TrustPurposeEvidence)(nil),             // 21: lindm.resource.v1.TrustPurposeEvidence
+	(*TrustCAObservation)(nil),               // 22: lindm.resource.v1.TrustCAObservation
+	(*FirewallZoneObservation)(nil),          // 23: lindm.resource.v1.FirewallZoneObservation
+	(*NetworkConnectionObservation)(nil),     // 24: lindm.resource.v1.NetworkConnectionObservation
+	(*DNSLookupEvidence)(nil),                // 25: lindm.resource.v1.DNSLookupEvidence
+	(*DNSObservation)(nil),                   // 26: lindm.resource.v1.DNSObservation
+	(*ProxyRequestEvidence)(nil),             // 27: lindm.resource.v1.ProxyRequestEvidence
+	(*ProxyObservation)(nil),                 // 28: lindm.resource.v1.ProxyObservation
+	(*NativePackageRecord)(nil),              // 29: lindm.resource.v1.NativePackageRecord
+	(*NativePackageObservation)(nil),         // 30: lindm.resource.v1.NativePackageObservation
+	(*RepositoryObservation)(nil),            // 31: lindm.resource.v1.RepositoryObservation
+	(*FlatpakAppObservation)(nil),            // 32: lindm.resource.v1.FlatpakAppObservation
+	(*DeploymentIdentity)(nil),               // 33: lindm.resource.v1.DeploymentIdentity
+	(*OSUpdateFileObservation)(nil),          // 34: lindm.resource.v1.OSUpdateFileObservation
+	(*OSUpdateObservation)(nil),              // 35: lindm.resource.v1.OSUpdateObservation
+	(*NativeModuleVersion)(nil),              // 36: lindm.resource.v1.NativeModuleVersion
+	(*SessionPolicyObservation)(nil),         // 37: lindm.resource.v1.SessionPolicyObservation
+	(*PasswordPolicyObservation)(nil),        // 38: lindm.resource.v1.PasswordPolicyObservation
+	(*SnapAppObservation)(nil),               // 39: lindm.resource.v1.SnapAppObservation
+	(*PublicCertificate)(nil),                // 40: lindm.resource.v1.PublicCertificate
+	(*CertificateEnrollmentObservation)(nil), // 41: lindm.resource.v1.CertificateEnrollmentObservation
+	(*DirectoryAccountMapping)(nil),          // 42: lindm.resource.v1.DirectoryAccountMapping
+	(*DirectoryClientObservation)(nil),       // 43: lindm.resource.v1.DirectoryClientObservation
+	(*ManagedFileObservation)(nil),           // 44: lindm.resource.v1.ManagedFileObservation
+	(*SysctlObservation)(nil),                // 45: lindm.resource.v1.SysctlObservation
+	(*SystemdDefinitionObservation)(nil),     // 46: lindm.resource.v1.SystemdDefinitionObservation
+	(*SystemdEffectiveOptions)(nil),          // 47: lindm.resource.v1.SystemdEffectiveOptions
+	(*EncryptionComplianceObservation)(nil),  // 48: lindm.resource.v1.EncryptionComplianceObservation
+	(*timestamppb.Timestamp)(nil),            // 49: google.protobuf.Timestamp
+	(*BackendSelection)(nil),                 // 50: lindm.resource.v1.BackendSelection
+	(PasswordHashAlgorithm)(0),               // 51: lindm.resource.v1.PasswordHashAlgorithm
+	(*PasswordAging)(nil),                    // 52: lindm.resource.v1.PasswordAging
+	(*SudoPrincipal)(nil),                    // 53: lindm.resource.v1.SudoPrincipal
+	(*SudoCommand)(nil),                      // 54: lindm.resource.v1.SudoCommand
+	(*SSHMatchSelector)(nil),                 // 55: lindm.resource.v1.SSHMatchSelector
+	(*SSHMatch)(nil),                         // 56: lindm.resource.v1.SSHMatch
+	(*SSHServerDesired)(nil),                 // 57: lindm.resource.v1.SSHServerDesired
+	(*Endpoint)(nil),                         // 58: lindm.resource.v1.Endpoint
+	(*TimeSource)(nil),                       // 59: lindm.resource.v1.TimeSource
+	(CertificatePurpose)(0),                  // 60: lindm.resource.v1.CertificatePurpose
+	(*ProbeReceipt)(nil),                     // 61: lindm.resource.v1.ProbeReceipt
+	(TrustStoreScope)(0),                     // 62: lindm.resource.v1.TrustStoreScope
+	(*FirewallRule)(nil),                     // 63: lindm.resource.v1.FirewallRule
+	(*InterfaceSelector)(nil),                // 64: lindm.resource.v1.InterfaceSelector
+	(FirewallVerdict)(0),                     // 65: lindm.resource.v1.FirewallVerdict
+	(*IPAddress)(nil),                        // 66: lindm.resource.v1.IPAddress
+	(*IPRoute)(nil),                          // 67: lindm.resource.v1.IPRoute
+	(*DNSServer)(nil),                        // 68: lindm.resource.v1.DNSServer
+	(*DNSDesired)(nil),                       // 69: lindm.resource.v1.DNSDesired
+	(*ProxyConsumer)(nil),                    // 70: lindm.resource.v1.ProxyConsumer
+	(*PackageIdentity)(nil),                  // 71: lindm.resource.v1.PackageIdentity
+	(*NativeVersion)(nil),                    // 72: lindm.resource.v1.NativeVersion
+	(*ResourceRef)(nil),                      // 73: lindm.resource.v1.ResourceRef
+	(*InstallationBinding)(nil),              // 74: lindm.resource.v1.InstallationBinding
+	(*FlatpakPermissionPolicy)(nil),          // 75: lindm.resource.v1.FlatpakPermissionPolicy
+	(*OSUpdateDesired)(nil),                  // 76: lindm.resource.v1.OSUpdateDesired
+	(*SessionScope)(nil),                     // 77: lindm.resource.v1.SessionScope
+	(*SessionPolicyDesired)(nil),             // 78: lindm.resource.v1.SessionPolicyDesired
+	(*PasswordPolicyDesired)(nil),            // 79: lindm.resource.v1.PasswordPolicyDesired
+	(SnapConfinement)(0),                     // 80: lindm.resource.v1.SnapConfinement
+	(*SnapInterfaceGrant)(nil),               // 81: lindm.resource.v1.SnapInterfaceGrant
+	(*SubjectAlternativeName)(nil),           // 82: lindm.resource.v1.SubjectAlternativeName
+	(*CredentialConsumer)(nil),               // 83: lindm.resource.v1.CredentialConsumer
+	(*CredentialSubjectBinding)(nil),         // 84: lindm.resource.v1.CredentialSubjectBinding
+	(*NativeAccountBinding)(nil),             // 85: lindm.resource.v1.NativeAccountBinding
+	(DirectoryBackend)(0),                    // 86: lindm.resource.v1.DirectoryBackend
+	(*DirectoryLoginPolicy)(nil),             // 87: lindm.resource.v1.DirectoryLoginPolicy
+	(*SystemdDefinitionDesired)(nil),         // 88: lindm.resource.v1.SystemdDefinitionDesired
 }
 var file_lindm_resource_v1_observations_proto_depIdxs = []int32{
-	47, // 0: lindm.resource.v1.ObservationMetadata.observed_at:type_name -> google.protobuf.Timestamp
-	48, // 1: lindm.resource.v1.ObservationMetadata.backend:type_name -> lindm.resource.v1.BackendSelection
+	49, // 0: lindm.resource.v1.ObservationMetadata.observed_at:type_name -> google.protobuf.Timestamp
+	50, // 1: lindm.resource.v1.ObservationMetadata.backend:type_name -> lindm.resource.v1.BackendSelection
 	0,  // 2: lindm.resource.v1.ObservationMetadata.observation_status:type_name -> lindm.resource.v1.ObservationStatus
-	47, // 3: lindm.resource.v1.SystemdServiceObservation.observed_at:type_name -> google.protobuf.Timestamp
-	7,  // 4: lindm.resource.v1.SystemdServiceObservation.install_links:type_name -> lindm.resource.v1.InstallLink
+	49, // 3: lindm.resource.v1.SystemdServiceObservation.observed_at:type_name -> google.protobuf.Timestamp
+	9,  // 4: lindm.resource.v1.SystemdServiceObservation.install_links:type_name -> lindm.resource.v1.InstallLink
 	1,  // 5: lindm.resource.v1.LocalGroupObservation.origin:type_name -> lindm.resource.v1.NSSOrigin
 	1,  // 6: lindm.resource.v1.LocalUserObservation.origin:type_name -> lindm.resource.v1.NSSOrigin
-	10, // 7: lindm.resource.v1.LocalUserObservation.home:type_name -> lindm.resource.v1.HomeMetadata
-	49, // 8: lindm.resource.v1.LocalUserObservation.password_algorithm:type_name -> lindm.resource.v1.PasswordHashAlgorithm
-	50, // 9: lindm.resource.v1.LocalUserObservation.aging:type_name -> lindm.resource.v1.PasswordAging
-	51, // 10: lindm.resource.v1.SudoPermissionEvidence.subject:type_name -> lindm.resource.v1.SudoPrincipal
-	51, // 11: lindm.resource.v1.SudoPermissionEvidence.run_as:type_name -> lindm.resource.v1.SudoPrincipal
-	52, // 12: lindm.resource.v1.SudoPermissionEvidence.command:type_name -> lindm.resource.v1.SudoCommand
-	6,  // 13: lindm.resource.v1.SudoRuleObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
-	12, // 14: lindm.resource.v1.SudoRuleObservation.permissions:type_name -> lindm.resource.v1.SudoPermissionEvidence
-	53, // 15: lindm.resource.v1.SSHMatchEvidence.context:type_name -> lindm.resource.v1.SSHMatchSelector
-	54, // 16: lindm.resource.v1.SSHMatchEvidence.effective:type_name -> lindm.resource.v1.SSHMatch
-	14, // 17: lindm.resource.v1.SSHServerObservation.includes:type_name -> lindm.resource.v1.SSHIncludeEdge
-	55, // 18: lindm.resource.v1.SSHServerObservation.effective:type_name -> lindm.resource.v1.SSHServerDesired
-	56, // 19: lindm.resource.v1.SSHServerObservation.listeners:type_name -> lindm.resource.v1.Endpoint
-	15, // 20: lindm.resource.v1.SSHServerObservation.matches:type_name -> lindm.resource.v1.SSHMatchEvidence
-	57, // 21: lindm.resource.v1.TimeSourceEvidence.source:type_name -> lindm.resource.v1.TimeSource
-	17, // 22: lindm.resource.v1.TimeSyncObservation.sources:type_name -> lindm.resource.v1.TimeSourceEvidence
-	58, // 23: lindm.resource.v1.TrustPurposeEvidence.purpose:type_name -> lindm.resource.v1.CertificatePurpose
-	59, // 24: lindm.resource.v1.TrustPurposeEvidence.chain_probe:type_name -> lindm.resource.v1.ProbeReceipt
-	6,  // 25: lindm.resource.v1.TrustCAObservation.sources:type_name -> lindm.resource.v1.FileIdentity
-	60, // 26: lindm.resource.v1.TrustCAObservation.scope:type_name -> lindm.resource.v1.TrustStoreScope
-	19, // 27: lindm.resource.v1.TrustCAObservation.purposes:type_name -> lindm.resource.v1.TrustPurposeEvidence
-	61, // 28: lindm.resource.v1.FirewallZoneObservation.persistent_rules:type_name -> lindm.resource.v1.FirewallRule
-	61, // 29: lindm.resource.v1.FirewallZoneObservation.active_rules:type_name -> lindm.resource.v1.FirewallRule
-	62, // 30: lindm.resource.v1.FirewallZoneObservation.bound_interfaces:type_name -> lindm.resource.v1.InterfaceSelector
-	63, // 31: lindm.resource.v1.FirewallZoneObservation.default_ingress:type_name -> lindm.resource.v1.FirewallVerdict
-	63, // 32: lindm.resource.v1.FirewallZoneObservation.default_egress:type_name -> lindm.resource.v1.FirewallVerdict
+	12, // 7: lindm.resource.v1.LocalUserObservation.home:type_name -> lindm.resource.v1.HomeMetadata
+	51, // 8: lindm.resource.v1.LocalUserObservation.password_algorithm:type_name -> lindm.resource.v1.PasswordHashAlgorithm
+	52, // 9: lindm.resource.v1.LocalUserObservation.aging:type_name -> lindm.resource.v1.PasswordAging
+	53, // 10: lindm.resource.v1.SudoPermissionEvidence.subject:type_name -> lindm.resource.v1.SudoPrincipal
+	53, // 11: lindm.resource.v1.SudoPermissionEvidence.run_as:type_name -> lindm.resource.v1.SudoPrincipal
+	54, // 12: lindm.resource.v1.SudoPermissionEvidence.command:type_name -> lindm.resource.v1.SudoCommand
+	8,  // 13: lindm.resource.v1.SudoRuleObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
+	14, // 14: lindm.resource.v1.SudoRuleObservation.permissions:type_name -> lindm.resource.v1.SudoPermissionEvidence
+	55, // 15: lindm.resource.v1.SSHMatchEvidence.context:type_name -> lindm.resource.v1.SSHMatchSelector
+	56, // 16: lindm.resource.v1.SSHMatchEvidence.effective:type_name -> lindm.resource.v1.SSHMatch
+	16, // 17: lindm.resource.v1.SSHServerObservation.includes:type_name -> lindm.resource.v1.SSHIncludeEdge
+	57, // 18: lindm.resource.v1.SSHServerObservation.effective:type_name -> lindm.resource.v1.SSHServerDesired
+	58, // 19: lindm.resource.v1.SSHServerObservation.listeners:type_name -> lindm.resource.v1.Endpoint
+	17, // 20: lindm.resource.v1.SSHServerObservation.matches:type_name -> lindm.resource.v1.SSHMatchEvidence
+	59, // 21: lindm.resource.v1.TimeSourceEvidence.source:type_name -> lindm.resource.v1.TimeSource
+	19, // 22: lindm.resource.v1.TimeSyncObservation.sources:type_name -> lindm.resource.v1.TimeSourceEvidence
+	60, // 23: lindm.resource.v1.TrustPurposeEvidence.purpose:type_name -> lindm.resource.v1.CertificatePurpose
+	61, // 24: lindm.resource.v1.TrustPurposeEvidence.chain_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	8,  // 25: lindm.resource.v1.TrustCAObservation.sources:type_name -> lindm.resource.v1.FileIdentity
+	62, // 26: lindm.resource.v1.TrustCAObservation.scope:type_name -> lindm.resource.v1.TrustStoreScope
+	21, // 27: lindm.resource.v1.TrustCAObservation.purposes:type_name -> lindm.resource.v1.TrustPurposeEvidence
+	63, // 28: lindm.resource.v1.FirewallZoneObservation.persistent_rules:type_name -> lindm.resource.v1.FirewallRule
+	63, // 29: lindm.resource.v1.FirewallZoneObservation.active_rules:type_name -> lindm.resource.v1.FirewallRule
+	64, // 30: lindm.resource.v1.FirewallZoneObservation.bound_interfaces:type_name -> lindm.resource.v1.InterfaceSelector
+	65, // 31: lindm.resource.v1.FirewallZoneObservation.default_ingress:type_name -> lindm.resource.v1.FirewallVerdict
+	65, // 32: lindm.resource.v1.FirewallZoneObservation.default_egress:type_name -> lindm.resource.v1.FirewallVerdict
 	2,  // 33: lindm.resource.v1.NetworkConnectionObservation.medium:type_name -> lindm.resource.v1.ConnectionMedium
-	62, // 34: lindm.resource.v1.NetworkConnectionObservation.active_device:type_name -> lindm.resource.v1.InterfaceSelector
-	64, // 35: lindm.resource.v1.NetworkConnectionObservation.addresses:type_name -> lindm.resource.v1.IPAddress
-	65, // 36: lindm.resource.v1.NetworkConnectionObservation.routes:type_name -> lindm.resource.v1.IPRoute
-	66, // 37: lindm.resource.v1.DNSLookupEvidence.server:type_name -> lindm.resource.v1.DNSServer
-	59, // 38: lindm.resource.v1.DNSLookupEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	67, // 39: lindm.resource.v1.DNSObservation.effective:type_name -> lindm.resource.v1.DNSDesired
-	23, // 40: lindm.resource.v1.DNSObservation.lookups:type_name -> lindm.resource.v1.DNSLookupEvidence
-	56, // 41: lindm.resource.v1.ProxyRequestEvidence.destination:type_name -> lindm.resource.v1.Endpoint
-	59, // 42: lindm.resource.v1.ProxyRequestEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	68, // 43: lindm.resource.v1.ProxyObservation.consumer:type_name -> lindm.resource.v1.ProxyConsumer
-	25, // 44: lindm.resource.v1.ProxyObservation.requests:type_name -> lindm.resource.v1.ProxyRequestEvidence
-	69, // 45: lindm.resource.v1.NativePackageRecord.package:type_name -> lindm.resource.v1.PackageIdentity
-	70, // 46: lindm.resource.v1.NativePackageRecord.version:type_name -> lindm.resource.v1.NativeVersion
-	71, // 47: lindm.resource.v1.NativePackageRecord.source:type_name -> lindm.resource.v1.ResourceRef
-	69, // 48: lindm.resource.v1.NativePackageObservation.package:type_name -> lindm.resource.v1.PackageIdentity
-	27, // 49: lindm.resource.v1.NativePackageObservation.record:type_name -> lindm.resource.v1.NativePackageRecord
-	6,  // 50: lindm.resource.v1.NativePackageObservation.pin_file:type_name -> lindm.resource.v1.FileIdentity
-	6,  // 51: lindm.resource.v1.RepositoryObservation.stanzas:type_name -> lindm.resource.v1.FileIdentity
-	6,  // 52: lindm.resource.v1.RepositoryObservation.key_objects:type_name -> lindm.resource.v1.FileIdentity
+	64, // 34: lindm.resource.v1.NetworkConnectionObservation.active_device:type_name -> lindm.resource.v1.InterfaceSelector
+	66, // 35: lindm.resource.v1.NetworkConnectionObservation.addresses:type_name -> lindm.resource.v1.IPAddress
+	67, // 36: lindm.resource.v1.NetworkConnectionObservation.routes:type_name -> lindm.resource.v1.IPRoute
+	68, // 37: lindm.resource.v1.DNSLookupEvidence.server:type_name -> lindm.resource.v1.DNSServer
+	61, // 38: lindm.resource.v1.DNSLookupEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	69, // 39: lindm.resource.v1.DNSObservation.effective:type_name -> lindm.resource.v1.DNSDesired
+	25, // 40: lindm.resource.v1.DNSObservation.lookups:type_name -> lindm.resource.v1.DNSLookupEvidence
+	58, // 41: lindm.resource.v1.ProxyRequestEvidence.destination:type_name -> lindm.resource.v1.Endpoint
+	61, // 42: lindm.resource.v1.ProxyRequestEvidence.receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	70, // 43: lindm.resource.v1.ProxyObservation.consumer:type_name -> lindm.resource.v1.ProxyConsumer
+	27, // 44: lindm.resource.v1.ProxyObservation.requests:type_name -> lindm.resource.v1.ProxyRequestEvidence
+	71, // 45: lindm.resource.v1.NativePackageRecord.package:type_name -> lindm.resource.v1.PackageIdentity
+	72, // 46: lindm.resource.v1.NativePackageRecord.version:type_name -> lindm.resource.v1.NativeVersion
+	73, // 47: lindm.resource.v1.NativePackageRecord.source:type_name -> lindm.resource.v1.ResourceRef
+	71, // 48: lindm.resource.v1.NativePackageObservation.package:type_name -> lindm.resource.v1.PackageIdentity
+	29, // 49: lindm.resource.v1.NativePackageObservation.record:type_name -> lindm.resource.v1.NativePackageRecord
+	8,  // 50: lindm.resource.v1.NativePackageObservation.pin_file:type_name -> lindm.resource.v1.FileIdentity
+	8,  // 51: lindm.resource.v1.RepositoryObservation.stanzas:type_name -> lindm.resource.v1.FileIdentity
+	8,  // 52: lindm.resource.v1.RepositoryObservation.key_objects:type_name -> lindm.resource.v1.FileIdentity
 	3,  // 53: lindm.resource.v1.RepositoryObservation.ecosystem:type_name -> lindm.resource.v1.RepositoryEcosystem
-	72, // 54: lindm.resource.v1.FlatpakAppObservation.installation:type_name -> lindm.resource.v1.InstallationBinding
-	73, // 55: lindm.resource.v1.FlatpakAppObservation.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
-	74, // 56: lindm.resource.v1.OSUpdateObservation.source:type_name -> lindm.resource.v1.SourceSnapshot
-	31, // 57: lindm.resource.v1.OSUpdateObservation.deployments:type_name -> lindm.resource.v1.DeploymentIdentity
-	32, // 58: lindm.resource.v1.OSUpdateObservation.inhibitors:type_name -> lindm.resource.v1.InhibitorEvidence
-	59, // 59: lindm.resource.v1.OSUpdateObservation.drain_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	75, // 60: lindm.resource.v1.SessionPolicyObservation.scope:type_name -> lindm.resource.v1.SessionScope
-	76, // 61: lindm.resource.v1.SessionPolicyObservation.effective:type_name -> lindm.resource.v1.SessionPolicyDesired
-	34, // 62: lindm.resource.v1.SessionPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
-	77, // 63: lindm.resource.v1.PasswordPolicyObservation.effective:type_name -> lindm.resource.v1.PasswordPolicyDesired
-	34, // 64: lindm.resource.v1.PasswordPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
-	78, // 65: lindm.resource.v1.SnapAppObservation.confinement:type_name -> lindm.resource.v1.SnapConfinement
-	79, // 66: lindm.resource.v1.SnapAppObservation.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
-	58, // 67: lindm.resource.v1.PublicCertificate.eku:type_name -> lindm.resource.v1.CertificatePurpose
-	80, // 68: lindm.resource.v1.PublicCertificate.sans:type_name -> lindm.resource.v1.SubjectAlternativeName
-	47, // 69: lindm.resource.v1.PublicCertificate.not_before:type_name -> google.protobuf.Timestamp
-	47, // 70: lindm.resource.v1.PublicCertificate.not_after:type_name -> google.protobuf.Timestamp
-	38, // 71: lindm.resource.v1.CertificateEnrollmentObservation.chain:type_name -> lindm.resource.v1.PublicCertificate
-	81, // 72: lindm.resource.v1.CertificateEnrollmentObservation.active_consumers:type_name -> lindm.resource.v1.CredentialConsumer
-	82, // 73: lindm.resource.v1.CertificateEnrollmentObservation.subject:type_name -> lindm.resource.v1.CredentialSubjectBinding
-	83, // 74: lindm.resource.v1.DirectoryAccountMapping.account:type_name -> lindm.resource.v1.NativeAccountBinding
-	84, // 75: lindm.resource.v1.DirectoryClientObservation.backend:type_name -> lindm.resource.v1.DirectoryBackend
-	40, // 76: lindm.resource.v1.DirectoryClientObservation.mappings:type_name -> lindm.resource.v1.DirectoryAccountMapping
-	85, // 77: lindm.resource.v1.DirectoryClientObservation.effective_login:type_name -> lindm.resource.v1.DirectoryLoginPolicy
-	6,  // 78: lindm.resource.v1.ManagedFileObservation.file:type_name -> lindm.resource.v1.FileIdentity
-	6,  // 79: lindm.resource.v1.SysctlObservation.owned_persistence_file:type_name -> lindm.resource.v1.FileIdentity
-	42, // 80: lindm.resource.v1.SysctlObservation.persistence_file_state:type_name -> lindm.resource.v1.ManagedFileObservation
-	86, // 81: lindm.resource.v1.SystemdDefinitionObservation.effective:type_name -> lindm.resource.v1.SystemdDefinitionDesired
-	6,  // 82: lindm.resource.v1.SystemdDefinitionObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
-	42, // 83: lindm.resource.v1.SystemdDefinitionObservation.file_state:type_name -> lindm.resource.v1.ManagedFileObservation
-	45, // 84: lindm.resource.v1.SystemdDefinitionObservation.effective_options:type_name -> lindm.resource.v1.SystemdEffectiveOptions
-	7,  // 85: lindm.resource.v1.SystemdDefinitionObservation.timer_install_links:type_name -> lindm.resource.v1.InstallLink
-	4,  // 86: lindm.resource.v1.EncryptionComplianceObservation.root_identity_basis:type_name -> lindm.resource.v1.RootStorageIdentityBasis
-	87, // [87:87] is the sub-list for method output_type
-	87, // [87:87] is the sub-list for method input_type
-	87, // [87:87] is the sub-list for extension type_name
-	87, // [87:87] is the sub-list for extension extendee
-	0,  // [0:87] is the sub-list for field type_name
+	74, // 54: lindm.resource.v1.FlatpakAppObservation.installation:type_name -> lindm.resource.v1.InstallationBinding
+	75, // 55: lindm.resource.v1.FlatpakAppObservation.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
+	5,  // 56: lindm.resource.v1.OSUpdateFileObservation.kind:type_name -> lindm.resource.v1.OSUpdateNativeFile
+	44, // 57: lindm.resource.v1.OSUpdateFileObservation.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	4,  // 58: lindm.resource.v1.OSUpdateObservation.backend:type_name -> lindm.resource.v1.OSUpdateBackend
+	76, // 59: lindm.resource.v1.OSUpdateObservation.effective:type_name -> lindm.resource.v1.OSUpdateDesired
+	34, // 60: lindm.resource.v1.OSUpdateObservation.files:type_name -> lindm.resource.v1.OSUpdateFileObservation
+	77, // 61: lindm.resource.v1.SessionPolicyObservation.scope:type_name -> lindm.resource.v1.SessionScope
+	78, // 62: lindm.resource.v1.SessionPolicyObservation.effective:type_name -> lindm.resource.v1.SessionPolicyDesired
+	36, // 63: lindm.resource.v1.SessionPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
+	79, // 64: lindm.resource.v1.PasswordPolicyObservation.effective:type_name -> lindm.resource.v1.PasswordPolicyDesired
+	36, // 65: lindm.resource.v1.PasswordPolicyObservation.modules:type_name -> lindm.resource.v1.NativeModuleVersion
+	80, // 66: lindm.resource.v1.SnapAppObservation.confinement:type_name -> lindm.resource.v1.SnapConfinement
+	81, // 67: lindm.resource.v1.SnapAppObservation.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
+	60, // 68: lindm.resource.v1.PublicCertificate.eku:type_name -> lindm.resource.v1.CertificatePurpose
+	82, // 69: lindm.resource.v1.PublicCertificate.sans:type_name -> lindm.resource.v1.SubjectAlternativeName
+	49, // 70: lindm.resource.v1.PublicCertificate.not_before:type_name -> google.protobuf.Timestamp
+	49, // 71: lindm.resource.v1.PublicCertificate.not_after:type_name -> google.protobuf.Timestamp
+	40, // 72: lindm.resource.v1.CertificateEnrollmentObservation.chain:type_name -> lindm.resource.v1.PublicCertificate
+	83, // 73: lindm.resource.v1.CertificateEnrollmentObservation.active_consumers:type_name -> lindm.resource.v1.CredentialConsumer
+	84, // 74: lindm.resource.v1.CertificateEnrollmentObservation.subject:type_name -> lindm.resource.v1.CredentialSubjectBinding
+	85, // 75: lindm.resource.v1.DirectoryAccountMapping.account:type_name -> lindm.resource.v1.NativeAccountBinding
+	86, // 76: lindm.resource.v1.DirectoryClientObservation.backend:type_name -> lindm.resource.v1.DirectoryBackend
+	42, // 77: lindm.resource.v1.DirectoryClientObservation.mappings:type_name -> lindm.resource.v1.DirectoryAccountMapping
+	87, // 78: lindm.resource.v1.DirectoryClientObservation.effective_login:type_name -> lindm.resource.v1.DirectoryLoginPolicy
+	8,  // 79: lindm.resource.v1.ManagedFileObservation.file:type_name -> lindm.resource.v1.FileIdentity
+	8,  // 80: lindm.resource.v1.SysctlObservation.owned_persistence_file:type_name -> lindm.resource.v1.FileIdentity
+	44, // 81: lindm.resource.v1.SysctlObservation.persistence_file_state:type_name -> lindm.resource.v1.ManagedFileObservation
+	88, // 82: lindm.resource.v1.SystemdDefinitionObservation.effective:type_name -> lindm.resource.v1.SystemdDefinitionDesired
+	8,  // 83: lindm.resource.v1.SystemdDefinitionObservation.owned_file:type_name -> lindm.resource.v1.FileIdentity
+	44, // 84: lindm.resource.v1.SystemdDefinitionObservation.file_state:type_name -> lindm.resource.v1.ManagedFileObservation
+	47, // 85: lindm.resource.v1.SystemdDefinitionObservation.effective_options:type_name -> lindm.resource.v1.SystemdEffectiveOptions
+	9,  // 86: lindm.resource.v1.SystemdDefinitionObservation.timer_install_links:type_name -> lindm.resource.v1.InstallLink
+	6,  // 87: lindm.resource.v1.EncryptionComplianceObservation.root_identity_basis:type_name -> lindm.resource.v1.RootStorageIdentityBasis
+	88, // [88:88] is the sub-list for method output_type
+	88, // [88:88] is the sub-list for method input_type
+	88, // [88:88] is the sub-list for extension type_name
+	88, // [88:88] is the sub-list for extension extendee
+	0,  // [0:88] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_observations_proto_init() }
@@ -4981,7 +5120,7 @@ func file_lindm_resource_v1_observations_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_observations_proto_rawDesc), len(file_lindm_resource_v1_observations_proto_rawDesc)),
-			NumEnums:      5,
+			NumEnums:      7,
 			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   0,

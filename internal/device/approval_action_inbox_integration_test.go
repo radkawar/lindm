@@ -13,6 +13,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 	"lindm/internal/identity/identitydb"
 )
@@ -29,6 +30,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 	specs["release_quarantine"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{QuarantineActionId: uuid.NewString()}}}
 	specs["restart"], specs["shutdown"], specs["refresh_inventory"] = restartActionSpec(), shutdownActionSpec(), refreshActionSpec()
 	specs["local_admin_password_rotate"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: "lapsadmin", EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}}
+	specs["patch_now"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_PatchNow{PatchNow: &agentv1.PatchNowAction{Selection: resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY, RebootPolicy: &resourcev1.OSUpdateRebootPolicy{Mode: resourcev1.OSUpdateRebootMode_OS_UPDATE_REBOOT_MODE_NEVER}}}}
 	fields := new(agentv1.DeviceActionSpec).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
 	if len(specs) != fields.Len() {
 		t.Fatal("closed action schema needs an inbox fixture")

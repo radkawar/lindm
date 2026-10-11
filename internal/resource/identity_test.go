@@ -63,7 +63,7 @@ func TestKindRegistryAndCanonicalIdentity(t *testing.T) {
 		{12, "package.native.v1", `{"nativePackage":{"package":{"ecosystem":1,"nativeName":"Example","architecture":"amd64"},"presence":1,"any":{},"repository":` + fixtureRepository + `,"removal":1}}`, "deb/Example/amd64"},
 		{13, "package.repository.v1", `{"repository":{"repositoryId":"` + fixtureID + `","presence":1,"apt":{"uri":"https://packages.example.com/repo","suite":"stable","components":["main"],"architectures":["amd64"],"signingKey":` + fixtureArtifact + `}}}`, "apt/" + fixtureID},
 		{14, "flatpak.app.v1", `{"flatpakApp":{"installation":{"system":` + fixtureDevice + `},"appId":"org.example.App","architecture":"x86_64","branch":"stable","presence":1,"remote":{"kind":13,"canonicalKey":"flatpak/` + fixtureID + `"}}}`, "system/" + fixtureID + "/" + fixtureGeneration + "/app/org.example.App/x86_64/stable"},
-		{15, "os.update.v1", updateJSON(""), "system"},
+		{15, "os.update.v1", updateJSON(), "system"},
 		{16, "session.policy.v1", `{"sessionPolicy":{"scope":{"systemLogin":` + fixtureDevice + `},"lockOnSuspend":true}}`, "system/login"},
 		{17, "password.policy.v1", `{"passwordPolicy":{"minLength":14}}`, "system/local-auth"},
 		{18, "snap.app.v1", `{"snapApp":{"name":"example-app","instanceKey":"","presence":1,"channel":"stable","confinement":1}}`, "system/example-app/"},
@@ -129,8 +129,8 @@ func fixtureCertificate(t *testing.T) []byte {
 	return der
 }
 
-func updateJSON(exclusions string) string {
-	return `{"osUpdate":{"selection":2,"maintenance":{"timeZone":"UTC","weekdays":[1],"localStartMinute":60,"durationMinutes":120,"dst":1},"reboot":{"allowed":false,"inhibitors":1,"serverDrain":1},"exclusions":[` + exclusions + `],"budget":{"maxUnavailable":1,"maxFailurePercent":10,"healthWindowSeconds":60},"source":{"repositories":{"repositories":[{"repository":` + fixtureRepository + `,"metadataSha256":"` + fixtureDigest + `","signerSha256":["` + fixtureDigest + `"]}]}}}}`
+func updateJSON() string {
+	return `{"osUpdate":{"selection":1,"maintenance":{"timeZone":"Europe/Berlin","weekdays":[7,3],"localStartMinute":120,"durationMinutes":120},"rebootPolicy":{"mode":2,"maxDelayMinutes":60,"notice":"Updates were installed."},"deferralDays":3}}`
 }
 
 func TestCanonicalRefRejectsMismatchesAndUnknownFields(t *testing.T) {

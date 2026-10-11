@@ -247,6 +247,13 @@ export function DeviceActionResult({
               {status.verification?.inventorySequence.toString() || "Not reported"}
             </Fact>
           ) : null}
+          {action.spec?.action.case === "patchNow" ? (
+            <Fact label="Native update run">
+              {status.verification?.patchRunStarted
+                ? "Started. See Patch status for the run result."
+                : "Not confirmed"}
+            </Fact>
+          ) : null}
           {action.spec?.action.case === "lockSessions" ||
           action.spec?.action.case === "releaseLock" ? (
             <>

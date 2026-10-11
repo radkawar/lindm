@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/observations.proto";
+import "lindm/resource/v1/software.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Root-local opt-in for the os.update.v1 resource; never part of a remote
+// policy. Absent configuration refuses the kind without native effects.
+message NativeOSUpdateProviderConfig {
+  bool enabled = 1 [(buf.validate.field).bool.const = true];
+}
+
+// Content of the lindm-owned /etc/lindm/os-update/policy.binpb read by the
+// root `lindm-agent os-update run` service. Deterministic protobuf encoding.
+message OSUpdateRunPolicy {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  lindm.resource.v1.OSUpdateDesired desired = 2 [(buf.validate.field).required = true];
+}
+
+// Written by the root executor to /run/lindm/os-update/patch-now.binpb before it
+// starts lindm-os-update-now.service. The runner consumes and removes it.
+message OSUpdatePatchNowRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.UpdateSelection selection = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.OSUpdateRebootPolicy reboot_policy = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp requested_at = 4 [(buf.validate.field).required = true];
+  // The request is ignored after this instant (bounded by the signed action).
+  google.protobuf.Timestamp not_after = 5 [(buf.validate.field).required = true];
+}
+
+enum PatchRunTrigger {
+  PATCH_RUN_TRIGGER_UNSPECIFIED = 0;
+  PATCH_RUN_TRIGGER_MAINTENANCE_WINDOW = 1;
+  PATCH_RUN_TRIGGER_PATCH_NOW = 2;
+}
+
+enum PatchRunResult {
+  PATCH_RUN_RESULT_UNSPECIFIED = 0;
+  // The native tool completed successfully (possibly installing nothing).
+  PATCH_RUN_RESULT_SUCCEEDED = 1;
+  PATCH_RUN_RESULT_FAILED = 2;
+  // Triggered (for example Persistent= catch-up) outside an open window.
+  PATCH_RUN_RESULT_SKIPPED_OUTSIDE_WINDOW = 3;
+  // Every pending update was still inside its deferral period.
+  PATCH_RUN_RESULT_DEFERRED = 4;
+  // A patch-now request was absent, invalid or expired.
+  PATCH_RUN_RESULT_REJECTED = 5;
+}
+
+enum PatchRunTool {
+  PATCH_RUN_TOOL_UNSPECIFIED = 0;
+  PATCH_RUN_TOOL_APT_GET = 1;
+  PATCH_RUN_TOOL_UNATTENDED_UPGRADE = 2;
+  PATCH_RUN_TOOL_NEEDRESTART = 3;
+  PATCH_RUN_TOOL_DNF5 = 4;
+  PATCH_RUN_TOOL_DNF = 5;
+  PATCH_RUN_TOOL_DNF_AUTOMATIC = 6;
+  PATCH_RUN_TOOL_LOGIND = 7;
+  PATCH_RUN_TOOL_LINDM_AGENT = 8;
+}
+
+enum PatchRunPhase {
+  PATCH_RUN_PHASE_UNSPECIFIED = 0;
+  PATCH_RUN_PHASE_VALIDATION = 1;
+  PATCH_RUN_PHASE_REFRESH = 2;
+  PATCH_RUN_PHASE_LIST = 3;
+  PATCH_RUN_PHASE_INSTALL = 4;
+  PATCH_RUN_PHASE_RESTART_SERVICES = 5;
+  PATCH_RUN_PHASE_REBOOT_CHECK = 6;
+  PATCH_RUN_PHASE_REBOOT_SCHEDULE = 7;
+}
+
+// Sanitized native failure: no URLs, credentials, environment or arguments.
+message PatchRunDiagnostic {
+  PatchRunTool tool = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  PatchRunPhase phase = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // -1 when no exit status exists.
+  int32 exit_code = 3 [(buf.validate.field).int32 = {
+    gte: -1
+    lte: 255
+  }];
+  repeated string error_lines = 4 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      string: {
+        max_len: 512
+        pattern: "^[^\\x00-\\x1f\\x7f]*$"
+      }
+    }
+  }];
+  bool truncated = 5;
+}
+
+message PatchRunSummary {
+  PatchRunTrigger trigger = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string action_id = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  google.protobuf.Timestamp started_at = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 4 [(buf.validate.field).required = true];
+  PatchRunResult result = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.UpdateSelection selection = 6 [(buf.validate.field).enum.defined_only = true];
+  // Native package changes observed between the before and after package lists.
+  uint32 updated_packages = 7 [(buf.validate.field).uint32.lte = 100000];
+  uint32 deferred_packages = 8 [(buf.validate.field).uint32.lte = 100000];
+  bool reboot_required = 9;
+  // Accepted logind schedule; absent when none was requested or accepted.
+  google.protobuf.Timestamp reboot_scheduled_for = 10;
+  // Why no reboot was scheduled although required, e.g. "policy_never",
+  // "native_power_inhibited", "native_power_already_pending".
+  string reboot_reason = 11 [(buf.validate.field).string = {
+    max_len: 128
+    pattern: "^[a-z0-9_]*$"
+  }];
+  PatchRunDiagnostic diagnostic = 12;
+  // Graphical sessions that accepted a desktop notification.
+  uint32 notified_sessions = 13 [(buf.validate.field).uint32.lte = 1024];
+  option (buf.validate.message).cel = {
+    id: "patch_run_summary.trigger"
+    message: "patch-now runs carry their action identity; window runs do not"
+    expression: "(this.trigger == 2) == (this.action_id != '')"
+  };
+  option (buf.validate.message).cel = {
+    id: "patch_run_summary.failure"
+    message: "failed runs carry a native diagnostic"
+    expression: "(this.result == 2) == has(this.diagnostic)"
+  };
+}
+
+message OSUpdateDeferralEntry {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[A-Za-z0-9][A-Za-z0-9+._~-]*$"
+  }];
+  string architecture = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9_-]+$"
+  }];
+  google.protobuf.Timestamp first_seen = 3 [(buf.validate.field).required = true];
+}
+
+// Root-only runner state at /var/lib/lindm/os-update/run.binpb.
+message OSUpdateRunState {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  PatchRunSummary last_run = 2;
+  google.protobuf.Timestamp last_success = 3;
+  // Packages with a pending update, first observation time; pruned when no
+  // update is pending for the package any more.
+  repeated OSUpdateDeferralEntry pending_since = 4 [(buf.validate.field).repeated.max_items = 16384];
+}
+
+// Public patch-status inventory, computed offline from the native cache by
+// lindm-os-update-status.service or the runner and published unmodified.
+message PatchStatusObservation {
+  google.protobuf.Timestamp observed_at = 1 [(buf.validate.field).required = true];
+  string boot_id = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  bool available = 3;
+  string reason = 4 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[a-z0-9_:.-]*$"
+  }];
+  lindm.resource.v1.OSUpdateBackend backend = 5 [(buf.validate.field).enum.defined_only = true];
+  uint32 pending_security_updates = 6 [(buf.validate.field).uint32.lte = 100000];
+  uint32 pending_updates = 7 [(buf.validate.field).uint32.lte = 100000];
+  // Native oracle: /run/reboot-required or needrestart kernel status on APT,
+  // `needs-restarting -r` on RPM.
+  bool reboot_required = 8;
+  // Newest native repository metadata in the cache used for the counts.
+  google.protobuf.Timestamp metadata_refreshed_at = 9;
+  // Finish time of the last successful lindm-driven native update run.
+  google.protobuf.Timestamp last_successful_update = 10;
+  PatchRunSummary last_run = 11;
+  // The lindm-owned policy file is installed (an os.update.v1 resource).
+  bool policy_installed = 12;
+  // Pending updates still inside the policy deferral period.
+  uint32 deferred_updates = 13 [(buf.validate.field).uint32.lte = 100000];
+  // An accepted logind reboot schedule currently pending.
+  google.protobuf.Timestamp reboot_scheduled_for = 14;
+  option (buf.validate.message).cel = {
+    id: "patch_status.availability"
+    message: "available observations carry a backend, metadata time and boot; failures carry a reason"
+    expression: "this.available ? (this.reason == '' && this.backend != 0 && has(this.metadata_refreshed_at) && this.boot_id != '' && this.pending_security_updates <= this.pending_updates && this.deferred_updates <= this.pending_updates) : this.reason != ''"
+  };
+}
+
+message GetPatchStatusRequest {}
+
+message GetPatchStatusResponse {
+  PatchStatusObservation observation = 1 [(buf.validate.field).required = true];
+}

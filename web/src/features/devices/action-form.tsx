@@ -14,6 +14,7 @@ import {
   LockSessionsActionSchema,
   NVMeSanitizeScopeSchema,
   QuarantineActionSchema,
+  PatchNowActionSchema,
   RecoveryBootMode,
   RecoveryBootSpecSchema,
   RefreshInventoryActionSchema,
@@ -26,6 +27,11 @@ import {
   StorageTargetSchema,
   TPM2BindActionSchema,
 } from "../../../gen/lindm/agent/v1/device_actions_pb";
+import {
+  OSUpdateRebootMode,
+  OSUpdateRebootPolicySchema,
+  UpdateSelection,
+} from "../../../gen/lindm/resource/v1/software_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +98,7 @@ const imperativeKinds: DeviceActionKind[] = [
   "restart",
   "shutdown",
   "refreshInventory",
+  "patchNow",
 ];
 const approvalLabels: Record<ApprovalState, string> = {
   [ApprovalState.UNSPECIFIED]: "Unknown",
@@ -115,6 +122,7 @@ const actionSummaries: Record<DeviceActionKind, string> = {
   shutdown: "Shut down the device.",
   refreshInventory: "Collect a fresh inventory from this device.",
   localAdminPasswordRotate: "Set a new password for the managed local admin account.",
+  patchNow: "Install OS updates now. Results appear in Patch status.",
 };
 
 export function DeviceActionForm({
@@ -161,6 +169,12 @@ export function DeviceActionForm({
   const [usernames, setUsernames] = useState("");
   const [powerDelay, setPowerDelay] = useState("");
   const [powerMessage, setPowerMessage] = useState("");
+  const [patchSelection, setPatchSelection] = useState(UpdateSelection.SECURITY);
+  const [patchRebootMode, setPatchRebootMode] = useState(
+    OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
+  );
+  const [patchRebootDelay, setPatchRebootDelay] = useState("60");
+  const [patchRebootNotice, setPatchRebootNotice] = useState("");
   const [method, setMethod] = useState(SanitizeMethod.OVERWRITE);
   const [nvmeControllerWide, setNvmeControllerWide] = useState(false);
   const [eraseMode, setEraseMode] = useState(CryptoEraseMode.OFFLINE);
@@ -440,6 +454,24 @@ export function DeviceActionForm({
         case "refreshInventory":
           spec.action = { case: kind, value: create(RefreshInventoryActionSchema) };
           break;
+        case "patchNow": {
+          const scheduled = patchRebootMode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED;
+          const delay = Number(patchRebootDelay.trim());
+          if (scheduled && (!Number.isInteger(delay) || delay < 5 || delay > 10080))
+            throw new Error("Enter a reboot delay between 5 and 10080 minutes.");
+          spec.action = {
+            case: kind,
+            value: create(PatchNowActionSchema, {
+              selection: patchSelection,
+              rebootPolicy: create(OSUpdateRebootPolicySchema, {
+                mode: patchRebootMode,
+                maxDelayMinutes: scheduled ? delay : 0,
+                notice: scheduled ? patchRebootNotice.trim() : "",
+              }),
+            }),
+          };
+          break;
+        }
       }
       const payload = create(CreateDeviceActionRequestSchema, {
         requestId: newRequestId(),
@@ -637,6 +669,74 @@ export function DeviceActionForm({
                 value={powerMessage}
                 onChange={(event) => setPowerMessage(event.target.value)}
               />
+            </>
+          ) : null}
+          {kind === "patchNow" ? (
+            <>
+              <Label htmlFor={`${prefix}-patch-selection`}>Updates to install</Label>
+              <SelectField
+                id={`${prefix}-patch-selection`}
+                value={patchSelection}
+                disabled={busy}
+                onValueChange={(value) =>
+                  setPatchSelection(
+                    Number(value) === UpdateSelection.ALL
+                      ? UpdateSelection.ALL
+                      : UpdateSelection.SECURITY,
+                  )
+                }
+                options={[
+                  { value: UpdateSelection.SECURITY, label: "Security updates" },
+                  { value: UpdateSelection.ALL, label: "All updates" },
+                ]}
+              />
+              <Label htmlFor={`${prefix}-patch-reboot`}>Reboot after updates</Label>
+              <SelectField
+                id={`${prefix}-patch-reboot`}
+                value={patchRebootMode}
+                disabled={busy}
+                onValueChange={(value) =>
+                  setPatchRebootMode(
+                    Number(value) === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
+                      ? OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
+                      : OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
+                  )
+                }
+                options={[
+                  {
+                    value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
+                    label: "Never: only report that a reboot is required",
+                  },
+                  {
+                    value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED,
+                    label: "Schedule a reboot when one is required",
+                  },
+                ]}
+              />
+              {patchRebootMode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED ? (
+                <>
+                  <Label htmlFor={`${prefix}-patch-delay`}>
+                    Reboot delay in minutes, 5 to 10080
+                  </Label>
+                  <Input
+                    id={`${prefix}-patch-delay`}
+                    inputMode="numeric"
+                    value={patchRebootDelay}
+                    onChange={(event) => setPatchRebootDelay(event.target.value)}
+                  />
+                  <Label htmlFor={`${prefix}-patch-notice`}>User notice (optional)</Label>
+                  <Input
+                    id={`${prefix}-patch-notice`}
+                    maxLength={256}
+                    value={patchRebootNotice}
+                    onChange={(event) => setPatchRebootNotice(event.target.value)}
+                  />
+                </>
+              ) : null}
+              <p className="text-sm text-muted-foreground">
+                This action only starts the device&apos;s native update run. Its result, installed
+                updates and any pending reboot appear in Patch status on this device.
+              </p>
             </>
           ) : null}
           {storage && storageTargets.isPending ? (
@@ -1110,7 +1210,9 @@ export function DeviceActionForm({
                       : attempt.payload.spec?.action.case === "restart" ||
                           attempt.payload.spec?.action.case === "shutdown"
                         ? "Users can lose unsaved work."
-                        : "Check the details above before sending."}
+                        : attempt.payload.spec?.action.case === "patchNow"
+                          ? "Updates can restart services and, with a reboot policy, the device."
+                          : "Check the details above before sending."}
               </AlertDescription>
             </Alert>
           ) : null}

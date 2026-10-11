@@ -22,10 +22,12 @@ import (
 	"lindm/internal/agent/definitionprovider"
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/firewallprovider"
+	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/sysctlprovider"
 	"lindm/internal/platform"
+	"lindm/internal/resource"
 )
 
 // nativeKind is the root helper's closed contract for one resource kind. Every
@@ -176,6 +178,28 @@ var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativ
 			return nil
 		},
 		apply: applyOnly(passwordprovider.ApplyNative),
+	},
+	resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY: {
+		effect: func(s *effectSandbox, _ string, request *agentv1.NativeResourceTransactionRequest, _ *resourcev1.ResourceDesiredState) error {
+			// Owned files only; the package creates every parent directory. The
+			// systemd unit root covers the timer and timers.target.d drop-in.
+			s.paths = append(s.paths, filepath.Dir(resource.OSUpdatePolicyPath), filepath.Dir(resource.OSUpdateTimerPath))
+			s.fileCaps()
+			if platform.Of(request.GetPlan().GetBackend().GetProduct()).Gate(platform.OSUpdate) != nil {
+				return errors.New("native_os_update_platform_not_supported")
+			}
+			switch request.GetPlan().GetOsUpdate().GetBackend() {
+			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES:
+				s.paths = append(s.paths, filepath.Dir(resource.OSUpdateAPTPeriodPath))
+			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC:
+				s.paths = append(s.paths, filepath.Dir(resource.OSUpdateDNF5AutomaticPath))
+			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
+			default:
+				return errors.New("native_os_update_platform_not_supported")
+			}
+			return nil
+		},
+		apply: applyOnly(osupdateprovider.ApplyNative),
 	},
 	resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE: {
 		effect: func(s *effectSandbox, _ string, _ *agentv1.NativeResourceTransactionRequest, _ *resourcev1.ResourceDesiredState) error {

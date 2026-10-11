@@ -45,6 +45,11 @@ const (
 	firewallRestoreUnit   = "lindm-firewall-restore.service"
 	connectivityGuardUnit = "lindm-connectivity-guard.service"
 	connectivityProbeUnit = "lindm-connectivity-probe.service"
+	// Static OS update units: started by the provider-owned timer or the
+	// executor, never enabled by the package.
+	osUpdateUnit       = "lindm-os-update.service"
+	osUpdateNowUnit    = "lindm-os-update-now.service"
+	osUpdateStatusUnit = "lindm-os-update-status.service"
 	// sessionUnit is the per-user remote-assistance helper (systemd user unit).
 	sessionUnit   = "lindm-session.service"
 	sysusersPath  = "/usr/lib/sysusers.d/lindm.conf"

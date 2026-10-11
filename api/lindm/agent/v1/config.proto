@@ -11,6 +11,7 @@ import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/native_firewall.proto";
 import "lindm/agent/v1/native_password.proto";
+import "lindm/agent/v1/os_update.proto";
 import "lindm/agent/v1/resource_native.proto";
 import "lindm/agent/v1/update.proto";
 import "lindm/resource/v1/software.proto";
@@ -68,6 +69,8 @@ message AgentConfig {
   ConnectivityProbeServerConfig connectivity_probe = 16;
   // Absent or disabled: invitations end with DISABLED; no session socket.
   RemoteAssistanceConfig remote_assistance = 17;
+  // Absent: os.update.v1 resources are refused as unsupported.
+  NativeOSUpdateProviderConfig os_update_provider = 18;
 }
 
 message NativePackageProviderConfig {
@@ -149,6 +152,9 @@ message DeviceActionProviderConfig {
       }
     }
   }];
+  // Explicit opt-in for the patch-now action, which starts the static root
+  // lindm-os-update-now.service outside the maintenance window.
+  bool allow_patch_now = 15;
 }
 
 message QualifiedActionTarget {

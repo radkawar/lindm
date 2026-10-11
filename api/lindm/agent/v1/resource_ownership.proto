@@ -30,6 +30,7 @@ message ResourceOwnershipSnapshot {
   PasswordPolicyOwnership password_policy = 9;
   FirewallNativeSnapshot firewall = 10;
   lindm.resource.v1.ProbeReceipt account_nss_receipt = 11;
+  OSUpdateOwnership os_update = 12;
   option (buf.validate.message).cel = {
     id: "ownership_snapshot.content"
     message: "private content is only valid for a managed file observation"
@@ -64,6 +65,11 @@ message ResourceOwnershipSnapshot {
     id: "ownership_snapshot.firewall"
     message: "firewall private evidence belongs only to firewall zones"
     expression: "has(this.firewall) == has(this.observation.firewall_zone)"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.os_update"
+    message: "update policy private evidence belongs only to the update policy"
+    expression: "has(this.os_update) == has(this.observation.os_update)"
   };
 }
 message FirewallNativeSnapshot {
@@ -197,6 +203,35 @@ message PasswordPolicyOwnership {
   };
 }
 
+message OSUpdateNativeFileSnapshot {
+  lindm.resource.v1.OSUpdateNativeFile kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.ManagedFileObservation state = 2 [(buf.validate.field).required = true];
+  optional bytes content = 3 [(buf.validate.field).bytes.max_len = 32768];
+  repeated NativeFileXattr xattrs = 4 [(buf.validate.field).repeated.max_items = 64];
+  option (buf.validate.message).cel = {
+    id: "os_update_file.private_content"
+    message: "existing update policy files require private native bytes"
+    expression: "this.state.exists == has(this.content)"
+  };
+}
+// Root-only baseline and last-applied evidence. Every owned path must be absent
+// in the baseline: the provider never adopts or rewrites an unowned file.
+message OSUpdateOwnership {
+  repeated OSUpdateNativeFileSnapshot files = 1 [(buf.validate.field).repeated = {
+    min_items: 3
+    max_items: 4
+  }];
+  bool timer_active = 2;
+  option (buf.validate.message).cel = {
+    id: "os_update_ownership.unique_files"
+    message: "update policy files have unique closed identities"
+    expression: "this.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)"
+  };
+}
+
 message NativeFileXattr {
   string name = 1 [(buf.validate.field).string = {
     min_len: 1
@@ -277,6 +312,9 @@ enum ResourceOwnedDimension {
   RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER = 49;
   RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET = 50;
   RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE = 51;
+  RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY = 60;
+  RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE = 61;
+  RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION = 62;
 }
 
 enum ResourceOwnershipState {

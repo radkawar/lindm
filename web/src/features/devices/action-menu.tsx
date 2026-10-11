@@ -26,6 +26,7 @@ const simpleKinds: DeviceActionKind[] = [
   "restart",
   "shutdown",
   "refreshInventory",
+  "patchNow",
   "lockSessions",
   "releaseLock",
   "quarantine",

@@ -51,6 +51,10 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, mapErr(err)
 	}
+	patch, err := q.FleetSummaryPatch(ctx, devicedb.FleetSummaryPatchParams{StaleAfterSeconds: patchStaleAfterSeconds, ScopeUnrestricted: unrestricted, Scopes: scopes})
+	if err != nil {
+		return nil, mapErr(err)
+	}
 	response := &adminv1.GetFleetSummaryResponse{
 		ObservedAt: protoTime(counts.ObservedAt),
 		Lifecycle: &adminv1.FleetLifecycleSummary{
@@ -71,6 +75,7 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 			StaleResources: uint64(compliance.StaleResources), UnknownResources: uint64(compliance.UnknownResources),
 			UnassignedDevices: uint64(counts.UnassignedDevices),
 		},
+		PatchCompliance: fleetPatchSummary(patch),
 	}
 	for _, row := range operatingSystems {
 		response.OperatingSystems.Groups = append(response.OperatingSystems.Groups, &adminv1.FleetOSCount{

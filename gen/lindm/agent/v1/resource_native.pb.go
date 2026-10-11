@@ -989,15 +989,15 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"$lindm/agent/v1/resource_native.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/resource_ownership.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/resource.proto\"\xa3\x02\n" +
 	"\x18NativeFileProviderConfig\x12_\n" +
 	"\rallowed_roots\x18\x01 \x03(\tB:\xbaH7\x92\x014\b\x01\x10 \x18\x01\",r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\fallowedRoots:\xa5\x01\xbaH\xa1\x01\x1a\x9e\x01\n" +
-	"$native_file_provider.canonical_roots\x12=approved file roots must not contain dot or parent components\x1a7this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))\"\xad\x04\n" +
+	"$native_file_provider.canonical_roots\x12=approved file roots must not contain dot or parent components\x1a7this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))\"\xb1\x04\n" +
 	" NativeResourceTransactionRequest\x12;\n" +
 	"\x04plan\x18\x01 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanB\x06\xbaH\x03\xc8\x01\x01R\x04plan\x12I\n" +
 	"\x06before\x18\x02 \x01(\v2).lindm.agent.v1.ResourceOwnershipSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12I\n" +
 	"\x06target\x18\x03 \x01(\v2).lindm.agent.v1.ResourceOwnershipSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12M\n" +
 	"\townership\x18\x04 \x01(\v2'.lindm.agent.v1.ResourceOwnershipLedgerB\x06\xbaH\x03\xc8\x01\x01R\townership\x12%\n" +
 	"\taction_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12\x1d\n" +
-	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce:\xa0\x01\xbaH\x9c\x01\x1a\x99\x01\n" +
-	" native_resource_transaction.kind\x12Dnative resource helper only accepts closed local configuration plans\x1a/this.plan.ref.kind in [2, 3, 8, 17, 21, 22, 23]\"w\n" +
+	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce:\xa4\x01\xbaH\xa0\x01\x1a\x9d\x01\n" +
+	" native_resource_transaction.kind\x12Dnative resource helper only accepts closed local configuration plans\x1a3this.plan.ref.kind in [2, 3, 8, 15, 17, 21, 22, 23]\"w\n" +
 	"\x1aNativeSysctlProviderConfig\x12Y\n" +
 	"\fallowed_keys\x18\x01 \x03(\tB6\xbaH3\x92\x010\b\x01\x10\x80\x01\x18\x01\"'r%(\x80\x022 ^[a-z0-9_]+([.][a-zA-Z0-9_-]+)+$R\vallowedKeys\"\x9c\x02\n" +
 	"\x16NativeApprovedHomeRoot\x12!\n" +

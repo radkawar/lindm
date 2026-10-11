@@ -186,18 +186,24 @@ message FlatpakAppChecks {
     expression: "!this.converged || (this.scope_ref_commit_match && this.permissions_match && this.launch.passed && this.unrelated_data_preserved)"
   };
 }
+// Policy configuration compliance. Patch compliance (pending security updates,
+// reboot required) is inventory and is never folded into this convergence.
 message OSUpdateChecks {
-  bool installation_matches = 1;
-  bool deployment_matches = 2;
-  bool reboot_required = 3;
-  bool new_boot_observed = 4;
-  ProbeReceipt new_boot_health = 5;
-  bool maintenance_policy_matches = 6;
+  reserved 1 to 6;
+  reserved "installation_matches", "deployment_matches", "reboot_required", "new_boot_observed", "new_boot_health", "maintenance_policy_matches";
   bool converged = 7;
+  // The owned runner policy decodes to exactly the desired policy.
+  bool policy_matches = 8;
+  // systemd loaded the owned timer with the rendered calendar and it is active.
+  bool schedule_active = 9;
+  // Owned native configuration (APT periodic override) has the target bytes.
+  bool native_configuration_matches = 10;
+  // No enabled or active native automatic-update scheduler bypasses the window.
+  bool no_conflicting_scheduler = 11;
   option (buf.validate.message).cel = {
     id: "update_checks.convergence"
-    message: "installation is not reboot compliance"
-    expression: "!this.converged || (this.installation_matches && this.deployment_matches && this.maintenance_policy_matches && (!this.reboot_required || (this.new_boot_observed && has(this.new_boot_health) && this.new_boot_health.passed)))"
+    message: "update policy convergence requires policy, schedule, native configuration and no competing scheduler"
+    expression: "!this.converged || (this.policy_matches && this.schedule_active && this.native_configuration_matches && this.no_conflicting_scheduler)"
   };
 }
 message SessionPolicyChecks {
