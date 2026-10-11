@@ -228,8 +228,8 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	result.DeviceID, result.EnrollmentGeneration = issued.GetDeviceId(), issued.GetEnrollmentGeneration()
-	channel, target := updateChannel(built.second, 1, true, 100)
-	if err := publisher.Publish(ctx, channel, map[string]string{target: built.second.Path}); err != nil {
+	channel, targets, target := updateChannel(built.second, 1, true, 100)
+	if err := publisher.Publish(ctx, channel, targets); err != nil {
 		return result, err
 	}
 	initial, err := fixture.CaptureReleaseMetadata(ctx)
@@ -444,8 +444,8 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, errors.New("updated agent did not acquire an authenticated successor session")
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "native unpack interrupted by owned QEMU reset; boot helper completes exact update", Status: status})
-	down, downTarget := updateChannel(built.first, channel.GetGeneration()+1, false, 100)
-	if err := publisher.Publish(ctx, down, map[string]string{downTarget: built.first.Path}); err != nil {
+	down, downTargets, _ := updateChannel(built.first, channel.GetGeneration()+1, false, 100)
+	if err := publisher.Publish(ctx, down, downTargets); err != nil {
 		return result, err
 	}
 	status, err = waitUpdateObservation(ctx, vm, status, "no_update")
@@ -459,18 +459,25 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	return result, nil
 }
 
-func updateChannel(artifact packaging.Artifact, generation uint64, paused bool, percentage uint32) (*updatev1.AgentUpdateChannel, string) {
+// updateChannel returns the signed channel and the TUF targets it names: the
+// package and, for formats with a detached native signature (pacman), its
+// adjacent .sig.
+func updateChannel(artifact packaging.Artifact, generation uint64, paused bool, percentage uint32) (*updatev1.AgentUpdateChannel, map[string]string, string) {
 	name := "packages/lindm-agent/" + artifact.Architecture.GOARCH + "/" + filepath.Base(artifact.Path)
 	native := artifact.Version
+	targets := map[string]string{name: artifact.Path}
+	signature := ""
 	switch artifact.Format {
 	case packaging.FormatRPM:
 		native += "-" + packaging.RPMRelease
 	case packaging.FormatArch:
 		// pacman reports pkgver-pkgrel; lindm packages use pkgrel 1.
 		native += "-1"
+		signature = name + ".sig"
+		targets[signature] = artifact.SignaturePath
 	}
 	now := time.Now().UTC()
-	return &updatev1.AgentUpdateChannel{Ring: "canary", Paused: paused, EligiblePercentage: percentage, Generation: generation, IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(time.Hour)), Artifacts: []*updatev1.AgentUpdateArtifact{{Version: artifact.Version, Architecture: artifact.Architecture.GOARCH, PackageFormat: string(artifact.Format), TargetPath: name, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1, NativeVersion: native}}}, name
+	return &updatev1.AgentUpdateChannel{Ring: "canary", Paused: paused, EligiblePercentage: percentage, Generation: generation, IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(time.Hour)), Artifacts: []*updatev1.AgentUpdateArtifact{{Version: artifact.Version, Architecture: artifact.Architecture.GOARCH, PackageFormat: string(artifact.Format), TargetPath: name, SignatureTargetPath: signature, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1, NativeVersion: native}}}, targets, name
 }
 
 // updateHardwareSupported resolves the selected guest machine exactly as the

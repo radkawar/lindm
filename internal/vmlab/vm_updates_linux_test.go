@@ -76,7 +76,7 @@ func TestUpdateChannelUsesNativePackageVersion(t *testing.T) {
 		{packaging.FormatArch, "0.2.0-1"},
 	} {
 		t.Run(string(test.format), func(t *testing.T) {
-			channel, _ := updateChannel(packaging.Artifact{Version: "0.2.0", Format: test.format}, 1, false, 100)
+			channel, _, _ := updateChannel(packaging.Artifact{Version: "0.2.0", Format: test.format}, 1, false, 100)
 			if got := channel.GetArtifacts()[0].GetNativeVersion(); got != test.want {
 				t.Fatalf("native version = %q, want %q", got, test.want)
 			}

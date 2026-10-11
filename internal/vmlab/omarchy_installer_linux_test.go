@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/packaging"
 )
 
 type omarchyTestConfiguration struct {
@@ -339,5 +341,23 @@ func TestUnlockEncryptedSerialWaitsOutPromptFlush(t *testing.T) {
 	cancel()
 	if err := <-result; err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Observed on the Omarchy update lane: an Arch channel without its adjacent
+// detached signature target fails catalog validation before any publication.
+func TestUpdateChannelPublishesArchSignatureTarget(t *testing.T) {
+	artifact := packaging.Artifact{Format: packaging.FormatArch, Path: "/work/lindm-agent-0.2.0-1-x86_64.pkg.tar.zst", SignaturePath: "/work/lindm-agent-0.2.0-1-x86_64.pkg.tar.zst.sig", Version: "0.2.0", Architecture: packaging.Architecture{GOARCH: "amd64"}}
+	channel, targets, name := updateChannel(artifact, 1, true, 100)
+	if err := protovalidate.Validate(channel); err != nil {
+		t.Fatal(err)
+	}
+	got := channel.GetArtifacts()[0]
+	if got.GetSignatureTargetPath() != name+".sig" || targets[name] != artifact.Path || targets[name+".sig"] != artifact.SignaturePath || len(targets) != 2 || got.GetNativeVersion() != "0.2.0-1" {
+		t.Fatalf("Arch update targets do not bind the detached signature: %+v %v", got, targets)
+	}
+	artifact.Format, artifact.SignaturePath = packaging.FormatDEB, ""
+	if _, targets, _ := updateChannel(artifact, 1, true, 100); len(targets) != 1 {
+		t.Fatalf("DEB update published extra targets: %v", targets)
 	}
 }
