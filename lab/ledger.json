@@ -1132,6 +1132,54 @@
       "revision": "06fbc3cf41954c5bf846b98f3f8675edf7d46830-dirty",
       "source": "MATRIX_SOURCE_IMPORT",
       "verified": true
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "dispatch",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-20260926-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/run-20261011-ubuntu2404-final/ubuntu-24.04/dispatch-aarch64.json",
+      "sha256": "9e1a84a851549b4b2f0e70ed4c2a4fa4ee4d04dec1342bc11c747a755c002a31",
+      "recorded": "2026-10-11T12:26:28.684046213Z",
+      "revision": "b983b5386d77228766b0afcb0b7c97607e7ad437",
+      "source": "MATRIX_SOURCE_RUN"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "lifecycle",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-20260926-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/run-20261011-ubuntu2404-final/ubuntu-24.04/lifecycle-aarch64.json",
+      "sha256": "af2ff4fa2ae7d5d03cbf84954167c7e40e653424b32bb3f774676037b1dcd45f",
+      "recorded": "2026-10-11T13:04:44.862962458Z",
+      "revision": "b983b5386d77228766b0afcb0b7c97607e7ad437",
+      "source": "MATRIX_SOURCE_RUN"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "dispatch",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/run-20261011-ubuntu2404-final/ubuntu-24.04/dispatch-x86_64.json",
+      "sha256": "8dd4512afdf5785e07ad2d6ea685ea6caec51e6fdb69cd57ddddc69c58698100",
+      "recorded": "2026-10-11T13:43:50.238326970Z",
+      "revision": "b983b5386d77228766b0afcb0b7c97607e7ad437",
+      "source": "MATRIX_SOURCE_RUN"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "lifecycle",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/run-20261011-ubuntu2404-final/ubuntu-24.04/lifecycle-x86_64.json",
+      "sha256": "538c72469c73940e09f5484e6f1033d337bd58996bc866a519be0d1e295c7ff0",
+      "recorded": "2026-10-11T13:45:13.194280891Z",
+      "revision": "b983b5386d77228766b0afcb0b7c97607e7ad437",
+      "source": "MATRIX_SOURCE_RUN"
     }
   ]
 }
