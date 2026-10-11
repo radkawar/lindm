@@ -163,10 +163,11 @@ func closeGNOMEOverview(ctx context.Context, vm *EncryptedVM, desktop *labDeskto
 	return nil
 }
 
-// waitAssistanceSessionUnit observes the packaged user unit in the autologin
-// user's manager. It reports whether the unit came up on its own through
-// graphical-session.target; only if it did not is it started explicitly, and
-// that fact is recorded, never hidden.
+// waitAssistanceSessionUnit requires the packaged user unit to come up on its
+// own in the autologin user's manager, through graphical-session.target or,
+// where the desktop never activates that target, the packaged XDG autostart
+// entry. The lab never starts it: a helper that does not start is a product
+// failure, because nothing on the desktop would even refuse visibly.
 func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, desktop *labDesktop, evidence *assistanceGuestEvidence) error {
 	state := func() (string, string, error) {
 		out, err := vm.runResult(ctx, desktop.rootScript(`as systemctl --user is-active lindm-session.service graphical-session.target || true`), nil, 4096, 15*time.Second)
@@ -188,10 +189,14 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, desktop *labDes
 		evidence.SessionUnitState, evidence.GraphicalSessionTarget = unit, target
 		if unit == "active" {
 			evidence.SessionUnitAutoStarted = true
+			evidence.SessionUnitActivation = "graphical-session.target"
+			if target != "active" {
+				evidence.SessionUnitActivation = "xdg-autostart"
+			}
 			return nil
 		}
 		if time.Now().After(deadline) {
-			break
+			return fmt.Errorf("lindm-session.service did not start on its own (unit %s, graphical-session.target %s)", unit, target)
 		}
 		select {
 		case <-ctx.Done():
@@ -199,14 +204,6 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, desktop *labDes
 		case <-time.After(2 * time.Second):
 		}
 	}
-	if _, err := vm.run(ctx, desktop.rootScript(`as systemctl --user start lindm-session.service`), nil, 4096, time.Minute); err != nil {
-		return fmt.Errorf("start lindm-session.service in the user manager: %w", err)
-	}
-	if err := pollGuest(ctx, vm, 30*time.Second, "lindm-session.service", desktop.rootScript(`as systemctl --user is-active --quiet lindm-session.service`)); err != nil {
-		return err
-	}
-	evidence.SessionUnitState = "active"
-	return nil
 }
 
 // openAssistanceTerminal starts a terminal in the lab user's session whose

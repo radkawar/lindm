@@ -297,6 +297,7 @@ func (r *assistanceRun) unavailable(ctx context.Context, spec assistanceScenario
 	if err := waitAssistanceCaptureStopped(ctx, r.vm.guest); err != nil {
 		return err
 	}
+	scenario.CaptureStopped = true
 	return r.browser.call(ctx, "leave", map[string]any{"deviceId": r.deviceID}, nil, time.Minute)
 }
 

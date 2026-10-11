@@ -95,6 +95,7 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 		{rel: "usr/lib/systemd/system/" + osUpdateNowUnit, mode: 0o644, name: osUpdateNowUnit},
 		{rel: "usr/lib/systemd/system/" + osUpdateStatusUnit, mode: 0o644, name: osUpdateStatusUnit},
 		{rel: "usr/lib/systemd/user/" + sessionUnit, mode: 0o644, name: sessionUnit},
+		{rel: sessionAutostartPath[1:], mode: 0o644, conf: true, name: "lindm-session-autostart.desktop"},
 		{rel: "usr/lib/tmpfiles.d/lindm.conf", mode: 0o644, name: "tmpfiles.conf"},
 		{rel: "usr/lib/sysusers.d/lindm.conf", mode: 0o644, name: "sysusers.conf"},
 		{rel: p.lifecycle[1:], mode: 0o755, name: p.lifecycleAsset},

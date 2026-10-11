@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Lindm remote assistance helper
+Comment=Starts the per-user lindm-session.service where the desktop session does not activate graphical-session.target
+# Session managers that run XDG autostart themselves (cinnamon-session,
+# cosmic-session) start the globally enabled user unit through this entry;
+# starting an already running unit is a no-op. systemd-managed sessions (GNOME,
+# KDE, uwsm) reach the unit through graphical-session.target, so systemd's
+# xdg-autostart generator skips this entry. An administrator's global disable
+# of the unit is honoured.
+Exec=sh -c "systemctl --user --quiet is-enabled lindm-session.service && exec systemctl --user start --no-block lindm-session.service"
+NoDisplay=true
+Terminal=false
+X-systemd-skip=true
+X-GNOME-Autostart-enabled=true

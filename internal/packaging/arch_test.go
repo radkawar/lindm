@@ -180,7 +180,7 @@ func assertArchArchive(t *testing.T, artifact Artifact, staged []stagedFile) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info["pkgver"][0] != "0.1.0-1" || info["arch"][0] != "x86_64" || strings.Join(info["backup"], ",") != "etc/lindm/executor.json,etc/lindm/agent.json" {
+	if info["pkgver"][0] != "0.1.0-1" || info["arch"][0] != "x86_64" || strings.Join(info["backup"], ",") != "etc/xdg/autostart/lindm-session.desktop,etc/lindm/executor.json,etc/lindm/agent.json" {
 		t.Fatalf("incorrect package identity/config preservation: %+v", info)
 	}
 	if strings.Join(info["license"], ",") != "UNLICENSED" || len(info["url"]) != 0 {

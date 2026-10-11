@@ -43,7 +43,9 @@ func stagePayload(work string, binary *os.File, epoch int64, p product) (string,
 	}
 	dirs := append([]string{"usr/bin", "usr/lib/systemd/system", "usr/lib/tmpfiles.d", "usr/lib/sysusers.d"}, p.dirs...)
 	if len(p.userUnits) != 0 {
-		dirs = append(dirs, "usr/lib/systemd/user")
+		// Shared system directories: staged for the user unit and its XDG
+		// autostart entry, never listed as owned by the package.
+		dirs = append(dirs, "usr/lib/systemd/user", "etc/xdg/autostart")
 	}
 	for _, dir := range dirs {
 		if err := mkdir(filepath.Join(root, dir), epoch); err != nil {

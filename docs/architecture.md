@@ -2038,7 +2038,14 @@ Each side sends its complete current state, never a stream of events:
      that session receives it from then on. A target username, when set, must
      match.
 4. `lindm-agent session` runs as the user through the user unit
-   `lindm-session.service` (`WantedBy=graphical-session.target`). It shows a
+   `lindm-session.service` (`WantedBy=graphical-session.target`). Session
+   managers that never activate that target (Cinnamon 6.6) start the globally
+   enabled unit through the packaged XDG autostart entry
+   `/etc/xdg/autostart/lindm-session.desktop`; systemd-managed sessions skip it
+   (`X-systemd-skip=true`), and a global disable of the unit is honoured. Only a
+   graphical session manager runs it, so SSH and other non-graphical logins never
+   start the helper, and the executor still binds a helper only to its UID's
+   single active local graphical logind session. It shows a
    critical, non-expiring desktop notification with explicit **Allow** and
    **Decline** actions. Only the `allow` action consents.
    - Before showing the prompt it requires notification actions, the portal

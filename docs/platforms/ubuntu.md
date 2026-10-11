@@ -505,7 +505,10 @@ The package installs the user unit `/usr/lib/systemd/user/lindm-session.service`
 Configure runs `systemctl --global enable`, so the unit starts with
 `graphical-session.target` at the next graphical login. The user manager reaches
 that target in the GDM GNOME/Wayland session (observed active in the 24.04
-autologin session).
+autologin session). The package also installs the conffile
+`/etc/xdg/autostart/lindm-session.desktop` for session managers that never
+activate that target; GNOME's systemd-managed session skips it
+(`X-systemd-skip=true`).
 
 The executor serves `/run/lindm-session/session.sock` only when
 `/etc/lindm/executor.json` sets `remote_assistance.enabled`. The packaged default

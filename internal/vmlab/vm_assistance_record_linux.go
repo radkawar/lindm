@@ -73,9 +73,12 @@ type assistanceGuestEvidence struct {
 	ExecutorSocket         string                 `json:"executor_session_socket"`
 	SessionUnitState       string                 `json:"session_unit_state"`
 	SessionUnitAutoStarted bool                   `json:"session_unit_auto_started"`
-	GraphicalSessionTarget string                 `json:"graphical_session_target"`
-	Packages               []string               `json:"packages"`
-	Terminal               string                 `json:"terminal"`
+	// SessionUnitActivation is graphical-session.target when that target was
+	// active, otherwise the packaged XDG autostart entry.
+	SessionUnitActivation  string   `json:"session_unit_activation"`
+	GraphicalSessionTarget string   `json:"graphical_session_target"`
+	Packages               []string `json:"packages"`
+	Terminal               string   `json:"terminal"`
 	// Capabilities is the native capability probe of the lab session: what
 	// the session helper's environment, portal frontend and notification
 	// server expose, observed before any scenario.

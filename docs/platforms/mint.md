@@ -139,11 +139,23 @@ regression `TestNativeFlatpakTruthUsesAgentPrivilegeAndEnvironment`.
 
 ## Desktop, lock and assistance
 
-Cinnamon (X11) under LightDM/slick-greeter. Assistance is gated:
-`portal_screencast_unavailable` (the ISO's `xdg-desktop-portal-xapp` and
-`-gtk` provide no ScreenCast/RemoteDesktop portal and lindm has no X11 capture
-path). Lock behavior (`cinnamon-screensaver`, logind `LockedHint`) is owned by
-the desktop-session lane and recorded there.
+Cinnamon 6.6.4+zena (X11, `XDG_CURRENT_DESKTOP=X-Cinnamon`) under LightDM
+1.30.0-0ubuntu14 with slick-greeter. The lab autologin session reports logind
+`Service=lightdm-autologin`, `Type=x11`, `Desktop=cinnamon` (observed by the
+desktop-session lane).
+
+- **Lock.** logind `LockSessions` engages `cinnamon-screensaver` 6.6.1+zena
+  (`org.cinnamon.ScreenSaver.GetActive` returns true), but Cinnamon never sets
+  logind `LockedHint`, which stays `no`. The product therefore reports the lock
+  as `OUTCOME_UNKNOWN` with `session_lock_state_unreported` evidence rather than
+  claiming a verified lock. Release succeeds and leaves the screensaver locked;
+  account lock/restore and quarantine pass.
+- **Assistance.** Gated `portal_screencast_unavailable`: xdg-desktop-portal
+  1.20.0+ds-2ubuntu1 with `-xapp` 1.1.3+zena and `-gtk` 1.15.1-1build2 exposes no
+  ScreenCast or RemoteDesktop portal, and lindm has no X11 capture path. VIEW and
+  CONTROL end `UNAVAILABLE` before any consent prompt. Cinnamon 6.6.4 also leaves
+  `graphical-session.target` inactive, so the packaged `lindm-session.service`
+  user unit would not start from that target.
 
 ## Lab records
 

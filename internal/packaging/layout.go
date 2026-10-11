@@ -51,11 +51,14 @@ const (
 	osUpdateNowUnit    = "lindm-os-update-now.service"
 	osUpdateStatusUnit = "lindm-os-update-status.service"
 	// sessionUnit is the per-user remote-assistance helper (systemd user unit).
-	sessionUnit   = "lindm-session.service"
-	sysusersPath  = "/usr/lib/sysusers.d/lindm.conf"
-	tmpfilesPath  = "/usr/lib/tmpfiles.d/lindm.conf"
-	copyrightPath = "/usr/share/doc/lindm-agent/copyright"
-	purposeText   = "development-package-signing\n"
+	sessionUnit = "lindm-session.service"
+	// sessionAutostartPath starts sessionUnit from XDG autostart on desktops
+	// whose session manager never activates graphical-session.target.
+	sessionAutostartPath = "/etc/xdg/autostart/lindm-session.desktop"
+	sysusersPath         = "/usr/lib/sysusers.d/lindm.conf"
+	tmpfilesPath         = "/usr/lib/tmpfiles.d/lindm.conf"
+	copyrightPath        = "/usr/share/doc/lindm-agent/copyright"
+	purposeText          = "development-package-signing\n"
 )
 
 //go:embed assets/*
