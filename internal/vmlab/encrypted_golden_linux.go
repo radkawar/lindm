@@ -58,9 +58,9 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err = validateManifest(m); err != nil {
 		return nil, err
 	}
-	supported := (m.Distribution == "ubuntu" && m.Version == "24.04") || (m.Distribution == "fedora" && m.Version == "44")
+	supported := (m.Distribution == "ubuntu" && (m.Version == "24.04" || m.Version == "26.04")) || (m.Distribution == "fedora" && m.Version == "44")
 	if !strings.HasSuffix(m.ImageFilename, ".iso") || !supported {
-		return nil, errors.New("encrypted lab requires Ubuntu 24.04 or Fedora 44 official installer ISO manifest")
+		return nil, errors.New("encrypted lab requires Ubuntu 24.04/26.04 or Fedora 44 official installer ISO manifest")
 	}
 	hardware, err := encryptedMachineHardware(m, opts)
 	if err != nil {

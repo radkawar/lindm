@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | RHEL 8                                                                 | RHEL 9                                                                                    | RHEL 10                                                                                   |
+| ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                            | implemented                                                                               | implemented                                                                               |
+| lifecycle         | gated: not implemented for RHEL 8                                      | implemented                                                                               | implemented                                                                               |
+| dispatch          | gated: not implemented for RHEL 8                                      | implemented                                                                               | implemented                                                                               |
+| packages          | implemented                                                            | implemented                                                                               | implemented                                                                               |
+| accounts          | gated: EL host providers are qualified only on RHEL and AlmaLinux 9/10 | implemented                                                                               | implemented                                                                               |
+| sysctl            | gated: EL host providers are qualified only on RHEL and AlmaLinux 9/10 | implemented                                                                               | implemented                                                                               |
+| definitions       | gated: systemd 239 is below the definition provider floor 252          | implemented                                                                               | implemented                                                                               |
+| password          | gated: not implemented for RHEL 8                                      | implemented                                                                               | implemented                                                                               |
+| firewall          | gated: EL host providers are qualified only on RHEL and AlmaLinux 9/10 | implemented                                                                               | implemented                                                                               |
+| encryption        | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| wipe              | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| report-loss       | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| lock              | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| recovery-sanitize | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| self-update       | gated: not implemented for RHEL 8                                      | implemented                                                                               | implemented                                                                               |
+| assistance        | gated: not implemented for RHEL 8                                      | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| advisories        | implemented                                                            | implemented                                                                               | implemented                                                                               |
+| os-update         | gated: OS patch policy provider not landed                             | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed                                                |
+| release-upgrade   | gated: release upgrade is not implemented                              | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented                                                 |
+
+<!-- END GENERATED platform-capabilities -->
+
 RHEL 9 and 10 on a supported minor are launch qualification targets; RHEL 8 is a
 separate legacy row. x86_64 and vendor-image aarch64 server results must remain
 independent. [Verification](../verification.md#1-launch-platform-qualification)

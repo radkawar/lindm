@@ -15,7 +15,10 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|generate-docs> [options]
+
+  generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
+         fails instead when any block is stale (make generate / make lint).
 
   init   Atomically generate .cache/dev; validate, never overwrite, on reuse.
   up     Start pinned PostgreSQL and optional Keycloak, await TLS readiness,
@@ -23,12 +26,17 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
          the fixed owner; local mode prints the explicit one-shot bootstrap command.
   check  Check PostgreSQL runtime TLS login and, in Keycloak mode, directory access.
   test-integration  Run real PostgreSQL regressions in isolated disposable schemas.
+         The fixture comes from -root; -code <checkout> (default -root) selects
+         the code under test, so a clean worktree runs against the shared fixture.
   trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires
          -confirm-delete. Stop the separately supervised lindmd first.
   recreate-database  DESTROY only lindm, terminate its connections, reprovision,
          migrate and bootstrap. Requires -confirm-delete; preserves other databases.
+  worktree add|list|prune  Private worktrees in <main>.worktrees; see worktree help.
+  signoff  Gate a clean worktree of the pushed HEAD and post gh-signoff
+         statuses for that SHA; see signoff -h.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
 40m for test-integration).
@@ -59,6 +67,15 @@ func run() error {
 		fmt.Print(usage)
 		return nil
 	}
+	if verb == "generate-docs" {
+		return generateDocs(os.Args[2:])
+	}
+	switch verb {
+	case "worktree":
+		return runWorktree(os.Args[2:])
+	case "signoff":
+		return runSignoff(os.Args[2:])
+	}
 	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" {
 		return fmt.Errorf("unknown command %q; use help", verb)
 	}
@@ -79,6 +96,10 @@ func run() error {
 	}
 	if verb == "reset" || verb == "recreate-database" {
 		flags.BoolVar(&confirm, "confirm-delete", false, "confirm destructive deletion for the selected operation")
+	}
+	var code string
+	if verb == "test-integration" {
+		flags.StringVar(&code, "code", "", "checkout whose code is built and tested (default -root)")
 	}
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), usage) }
@@ -117,8 +138,17 @@ func run() error {
 		"up":    func(ctx context.Context, root string) error { return devlab.Up(ctx, root, authentication) },
 		"check": devlab.Check,
 		"down":  devlab.Down, "reset": devlab.Reset,
-		"test-integration": devlab.TestIntegration,
-		"trust":            devlab.Trust,
+		"test-integration": func(ctx context.Context, root string) error {
+			if code == "" {
+				return devlab.TestIntegration(ctx, root, root)
+			}
+			codeRoot, err := filepath.Abs(code)
+			if err != nil {
+				return err
+			}
+			return devlab.TestIntegration(ctx, root, codeRoot)
+		},
+		"trust": devlab.Trust,
 		"recreate-database": func(ctx context.Context, root string) error {
 			return devlab.RecreateDatabase(ctx, root, confirm)
 		},

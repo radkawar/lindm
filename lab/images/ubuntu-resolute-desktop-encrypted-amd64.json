@@ -1,0 +1,19 @@
+{
+  "id": "ubuntu-resolute-desktop-encrypted-26.04.1-amd64",
+  "distribution": "ubuntu",
+  "version": "26.04",
+  "architecture": "amd64",
+  "edition": "desktop-encrypted-lab",
+  "release": "26.04.1",
+  "imageFilename": "ubuntu-26.04.1-desktop-amd64.iso",
+  "imageUrl": "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-desktop-amd64.iso",
+  "checksumUrl": "https://releases.ubuntu.com/26.04.1/SHA256SUMS",
+  "signatureUrl": "https://releases.ubuntu.com/26.04.1/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "sha256": "601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f",
+  "signerFingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "imageSizeBytes": "6482409472",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://ubuntu.com/tutorials/how-to-verify-ubuntu",
+  "releaseProvenanceUrl": "https://releases.ubuntu.com/26.04.1/"
+}

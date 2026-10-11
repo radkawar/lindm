@@ -45,8 +45,13 @@ type VMLifecycleOptions struct {
 	ServiceExecution bool
 	// Uses a private real server/database and automatic network trust relay.
 	ControlPlaneTrust bool
-	LindmdBinary      string
-	LocalAuthority    bool
+	// LindmdBinary runs that private server. It is required with
+	// ControlPlaneTrust and LocalAuthority, and otherwise absent.
+	LindmdBinary string
+	// LocalAuthority selects private password/WebAuthn authority instead of
+	// Keycloak; without ControlPlaneTrust it replaces the shared development
+	// console, so manual trust/service variants also run on remote hosts.
+	LocalAuthority bool
 	// Optional bounded observation time after the first two publications lets
 	// a human inspect the actual console without changing product timers.
 	ObserveFor time.Duration
@@ -67,6 +72,7 @@ type VMLifecycleResult struct {
 	FirstArtifactSHA256      string                         `json:"first_artifact_sha256"`
 	SecondArtifactSHA256     string                         `json:"second_artifact_sha256"`
 	SignerFingerprint        string                         `json:"signer_fingerprint"`
+	ControlPlane             string                         `json:"control_plane"`
 	DeviceID                 string                         `json:"device_id"`
 	Generation               string                         `json:"generation"`
 	InstallationID           string                         `json:"installation_id"`
@@ -105,11 +111,9 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if options.ObserveFor < 0 || options.ObserveFor > 10*time.Minute {
 		return nil, errors.New("observation interval must be between zero and ten minutes")
 	}
-	if options.ControlPlaneTrust && (options.ExecutionTrust || options.ServiceExecution) {
-		return nil, errors.New("control-plane trust is exclusive with manual trust/service execution")
-	}
-	if options.ControlPlaneTrust != (options.LindmdBinary != "") {
-		return nil, errors.New("control-plane trust requires a prebuilt lindmd binary exclusively")
+	controlPlane, err := lifecycleControlPlane(options)
+	if err != nil {
+		return nil, err
 	}
 	if err := packaging.UpgradeOrdered(options.First.Version, options.Second.Version); err != nil {
 		return nil, err
@@ -152,7 +156,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
-	result := &VMLifecycleResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), ImageSHA256: verified.SHA256, FirstArtifactSHA256: options.First.SHA256, SecondArtifactSHA256: options.Second.SHA256, SignerFingerprint: options.SignerFingerprint}
+	result := &VMLifecycleResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), ImageSHA256: verified.SHA256, FirstArtifactSHA256: options.First.SHA256, SecondArtifactSHA256: options.Second.SHA256, SignerFingerprint: options.SignerFingerprint, ControlPlane: controlPlane}
 	result.Runtime = runtimeEvidence
 	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
 	if packages.family == familyDNF {
@@ -184,7 +188,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	var isolated *devlab.AuthorityFixture
 	destinations := [2]string{"127.0.0.1:18444", "127.0.0.1:18445"}
-	if options.ControlPlaneTrust {
+	if controlPlane != lifecycleSharedControlPlane {
 		if options.LocalAuthority {
 			isolated, err = devlab.OpenLocalAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
 		} else {
@@ -488,6 +492,36 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		}
 	}
 	return result, nil
+}
+
+// Lifecycle control planes recorded in VMLifecycleResult.ControlPlane.
+const (
+	lifecycleSharedControlPlane     = "shared-development"
+	lifecycleIsolatedKeycloak       = "isolated-keycloak"
+	lifecycleIsolatedLocalAuthority = "isolated-local-authority"
+)
+
+// lifecycleControlPlane selects the real server a lifecycle lane enrolls
+// against. Control-plane trust always owns a private lindmd and database; local
+// authority does too, which lets manual trust/service variants run where the
+// shared development console is unreachable. The private server receives the
+// same public execution root as the fixture whose offline keys sign the manual
+// trust and service intents.
+func lifecycleControlPlane(options VMLifecycleOptions) (string, error) {
+	if options.ControlPlaneTrust && (options.ExecutionTrust || options.ServiceExecution) {
+		return "", errors.New("control-plane trust is exclusive with manual trust/service execution")
+	}
+	if (options.ControlPlaneTrust || options.LocalAuthority) != (options.LindmdBinary != "") {
+		return "", errors.New("control-plane trust or local authority requires a prebuilt lindmd binary exclusively")
+	}
+	switch {
+	case options.LocalAuthority:
+		return lifecycleIsolatedLocalAuthority, nil
+	case options.ControlPlaneTrust:
+		return lifecycleIsolatedKeycloak, nil
+	default:
+		return lifecycleSharedControlPlane, nil
+	}
 }
 
 func lifecycleRejections(cases []packaging.RejectionCase, format packaging.Format) ([]packaging.RejectionCase, error) {

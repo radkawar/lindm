@@ -35,7 +35,7 @@ mkdir -m 0755 /var/lib/lindm-resource-lab /etc/lindm-resource-lab
 cd /var/lib/lindm-resource-lab
 . /etc/os-release
 case "$ID:$VERSION_ID" in
- ubuntu:24.04) apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y dpkg-dev apt-utils gnupg openssl python3 attr curl ;;
+ ubuntu:24.04|ubuntu:26.04) apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y dpkg-dev apt-utils gnupg openssl python3 attr curl ;;
  fedora:44) dnf5 install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 python3-libdnf5 attr curl
   # The provider requires the maintained DNF5 (>= 5.4.6.0) release update.
   dnf5 upgrade -y dnf5 libdnf5 libdnf5-cli python3-libdnf5 ;;
@@ -46,7 +46,7 @@ case "$ID:$VERSION_ID" in
  almalinux:8.*|rocky:8.*)
   # EL8 DNF4 runs on platform-python 3.6; the fixture server needs Python 3.7+.
   dnf install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python39 attr curl acl python3-dnf-plugin-versionlock ;;
- *) echo 'resource lane requires Ubuntu 24.04, Fedora 44 or an EL 8/9/10 DNF4 platform' >&2; exit 1 ;;
+ *) echo 'resource lane requires Ubuntu 24.04/26.04, Fedora 44 or an EL 8/9/10 DNF4 platform' >&2; exit 1 ;;
 esac
 case "$ID" in
  ubuntu) DEB_ARCH=$(dpkg --print-architecture) ;;

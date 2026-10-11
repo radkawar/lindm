@@ -72,8 +72,8 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if (manifest.GetDistribution() != "ubuntu" || manifest.GetVersion() != "24.04" || manifest.GetArchitecture() != "amd64") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44" || manifest.GetArchitecture() != "x86_64") {
-		return nil, errors.New("vm updates requires Ubuntu 24.04 amd64 or Fedora 44 x86_64")
+	if (manifest.GetDistribution() != "ubuntu" || (manifest.GetVersion() != "24.04" && manifest.GetVersion() != "26.04") || manifest.GetArchitecture() != "amd64") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44" || manifest.GetArchitecture() != "x86_64") {
+		return nil, errors.New("vm updates requires Ubuntu 24.04/26.04 amd64 or Fedora 44 x86_64")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Minute)
 	defer cancel()

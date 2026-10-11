@@ -54,7 +54,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	}
 	distribution := manifest.GetDistribution()
 	if distribution != "ubuntu" && distribution != "fedora" {
-		return nil, errors.New("assistance lane requires the Ubuntu 24.04 or Fedora 44 encrypted GNOME installer")
+		return nil, errors.New("assistance lane requires the Ubuntu 24.04/26.04 or Fedora 44 encrypted GNOME installer")
 	}
 	if options.Encrypted.Desktop != "gnome" || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("assistance lane requires the installer GNOME desktop, a lab display and signed-package egress")

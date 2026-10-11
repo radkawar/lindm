@@ -630,9 +630,12 @@ IdP. The server and dedicated pinned PostgreSQL container run beside the VM, wit
 dynamic loopback listeners and a fresh owned database; no local `:18444` binding or
 shared development secrets are forwarded. This avoids WAN latency in the guest's
 control-plane path and keeps fixture ownership/cleanup together. Remote lifecycle
-requires `-control-plane-trust=true`; manual shared-console lifecycle variants stay
-local. Successful and partial lane records are copied to the requested new local
-`-record` file before exact run-directory cleanup. The record includes host/runtime,
+always uses that private local authority (`-local-authority`, staged `lindmd`): with
+`-control-plane-trust`, and also for manual `-execution-trust`/`-service-execution`,
+whose offline-signed trust and intents use the same staged fixture execution root;
+the record's `control_plane` names the server used. Successful and partial lane
+records are copied to the requested new local `-record` file before exact
+run-directory cleanup. The record includes host/runtime,
 elapsed time, source revision and binary-diff SHA-256. Persistent image/golden caches
 and slot identities are retained. A lost transport or failed evidence copy reports
 the exact retained run path instead of deleting evidence or guessing at live state.
@@ -1191,10 +1194,45 @@ real-PostgreSQL integration tests. It requires already-running development
 dependencies and does not start or migrate the public application schema.
 Unlike `make test-integration`, it does not invoke `dev-up`; use the direct command
 when an independent native lane must retain its running control-plane environment.
+`-root` names the checkout owning the running `.cache/dev` fixture (its lock,
+credentials and `LINDM_NATIVE_REPOSITORY`); `-code DIR` (default `-root`) names
+the checkout whose `lindmd` is built and whose packages are tested, so a clean
+worktree is qualified against the shared fixture without copying fixture secrets.
 `internal/testdb.New` owns reusable isolated-schema creation/cleanup; integration
 tests retain the `testdb.Open(t)` wrapper. This is schema isolation, not a separate
 PostgreSQL database. The fresh-authorization proof does not qualify job dispatch,
 device execution or finer commercial authorization scopes.
+
+Private worktrees live in `<main>.worktrees/NAME` (here
+`~/dev/minor/lindm.worktrees`), never in the research-clone directory. `go run
+./cmd/dev worktree add NAME [-base REV]` creates one detached at `REV` (default
+`HEAD`) and links the main checkout's `node_modules` only when `package.json` and
+`package-lock.json` are byte-identical; otherwise it runs `npm ci --ignore-scripts`
+in the worktree, because a shared install from another lockfile would test the
+wrong packages. `.tools` is not shared: each checkout's Makefile installs its own
+pinned tools. `worktree list` shows HEAD, ahead/behind `main`, dirty state, newest
+mtime outside `node_modules` and allocated size. `worktree prune [-older-than D]
+[-dry-run] [-archive-dirty] [PATH...]` (default: every worktree under
+`<main>.worktrees`) removes clean worktrees whose HEAD is an ancestor of `main`.
+A dirty or diverged worktree is kept unless `-archive-dirty`, which first writes
+`git diff --binary HEAD`, a tar of untracked non-ignored files, the HEAD SHA and a
+bundle of commits `main` lacks to `~/.cache/lindm-worktree-archive/<name>-<ts>/`,
+then removes it. Prune never touches a worktree used by a live process (any
+`/proc/*/cwd`, root, executable or open file beneath it, rechecked immediately
+before removal) or whose development Compose project is running, and ends with
+`git worktree prune`.
+
+`make signoff` (`go run ./cmd/dev signoff` after `dev-up`) is local CI for the
+pushed HEAD, never the shared dirty tree. It refuses a HEAD that no
+remote-tracking branch contains, creates a temporary clean worktree at that SHA,
+runs `make check` there, runs `test-integration` with that worktree as `-code`
+against the main checkout's fixture, and only then posts `gh signoff create
+--commit SHA unit integration` from the main checkout and prints `gh signoff
+status`. `make signoff-acceptance` runs `make acceptance` in the clean worktree
+with `lab acceptance -fixture <main>` and the main checkout's image and golden
+caches, writes evidence to `<main>/artifacts/acceptance-<ts>`, and posts the
+`acceptance` context. The temporary worktree is removed afterwards, also on
+failure or interrupt.
 
 The control-plane trust VM lane uses a separate disposable PostgreSQL **database**,
 not `testdb`'s schema. It invokes the real `lindmd` executable, whose protected
@@ -2442,5 +2480,6 @@ must inspect behavior and failure boundaries, not merely confirm formatting.
 The initial specification and automation are committed without selecting a public
 software license on the owner's behalf. Before external distribution, choose product
 licensing and review all source/content redistribution. Clones used for research live
-outside this repo under `~/dev/minor/clones`; no vendored commercial Fleet code or
+outside this repo under `~/dev/minor/clones` (third-party sources only; lindm
+worktrees use `cmd/dev worktree`); no vendored commercial Fleet code or
 unattributed documentation copying.

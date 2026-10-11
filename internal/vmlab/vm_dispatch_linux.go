@@ -115,7 +115,7 @@ func resourceLanePlatform(manifest *labv1.ImageManifest) bool {
 	version := manifest.GetVersion()
 	switch manifest.GetDistribution() {
 	case "ubuntu":
-		return version == "24.04"
+		return version == "24.04" || version == "26.04"
 	case "fedora":
 		return version == "44"
 	case "almalinux", "rocky":
@@ -141,7 +141,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return nil, errors.New("direct resource execution requires the resource lane")
 	}
 	if options.Resources && (options.PowerActions || options.Hold != 0 || !resourceLanePlatform(manifest)) {
-		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9 or 10, without power actions or console hold")
+		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04/26.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9 or 10, without power actions or console hold")
 	}
 	if (options.ResourceKinds["secret-password"] || options.ResourceKinds["local-admin"]) && (!options.Resources || options.ResourceExecutionOnly) {
 		return nil, errors.New("secret delivery and managed local-admin kinds require the connected resource phase")

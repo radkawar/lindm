@@ -7,6 +7,35 @@ Ubuntu, but **no Ubuntu evidence carries over** to it.
 
 ## Supported versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Pop!\_OS 24.04 LTS                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                  |
+| lifecycle         | implemented                                                                                  |
+| dispatch          | implemented                                                                                  |
+| packages          | implemented                                                                                  |
+| accounts          | implemented                                                                                  |
+| sysctl            | implemented                                                                                  |
+| definitions       | implemented                                                                                  |
+| password          | implemented                                                                                  |
+| firewall          | implemented                                                                                  |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| self-update       | implemented                                                                                  |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden    |
+| advisories        | gated: no vendor advisory feed; the Ubuntu feed covers only verified Ubuntu-archive packages |
+| os-update         | gated: OS patch policy provider not landed                                                   |
+| release-upgrade   | gated: release upgrade is not implemented                                                    |
+
+<!-- END GENERATED platform-capabilities -->
+
 Current LTS on x86_64. System76 arm64 images are not part of this row. Nothing is
 recorded yet; see the
 [tier capability matrix](../verification.md#tier-capability-matrix).

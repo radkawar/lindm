@@ -83,7 +83,7 @@ type acceptanceRecord struct {
 }
 
 type acceptanceOptions struct {
-	repository, binary, labBinary, evidence, cache, work, host           string
+	repository, fixture, binary, labBinary, evidence, cache, work, host  string
 	webOnly                                                              bool
 	skipFeeds                                                            bool
 	feedBytes                                                            int64
@@ -95,7 +95,8 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	flags := flag.NewFlagSet("acceptance", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options acceptanceOptions
-	flags.StringVar(&options.repository, "repo", ".", "checkout with protected dev trust and live PostgreSQL")
+	flags.StringVar(&options.repository, "repo", ".", "checkout under test: browser journeys and native package sources")
+	flags.StringVar(&options.fixture, "fixture", "", "checkout with protected dev trust and live PostgreSQL (default -repo)")
 	flags.StringVar(&options.binary, "lindmd", "artifacts/bin/lindmd", "release-stamped real server with embedded console")
 	flags.StringVar(&options.labBinary, "lab-binary", "artifacts/bin/lab", "matching native guest probe")
 	flags.StringVar(&options.evidence, "evidence", "", "new private directory for report and cross-browser screenshots")
@@ -122,6 +123,13 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	}
 	var err error
 	options.repository, err = filepath.Abs(options.repository)
+	if err != nil {
+		return err
+	}
+	if options.fixture == "" {
+		options.fixture = options.repository
+	}
+	options.fixture, err = filepath.Abs(options.fixture)
 	if err != nil {
 		return err
 	}
@@ -165,7 +173,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(private)) }()
-	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, options.repository, options.binary)
+	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, options.fixture, options.binary)
 	if err != nil {
 		return err
 	}
@@ -212,7 +220,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	// Run feeds even when a browser failed: independent failures must remain
 	// visible instead of masking the vendor-size path behind the first UI error.
 	if !options.skipFeeds {
-		record.Feeds, err = fixture.RefreshAcceptanceFeeds(ctx, filepath.Join(options.repository, ".cache/lab/acceptance-feeds"), options.feedBytes, options.feedDuration)
+		record.Feeds, err = fixture.RefreshAcceptanceFeeds(ctx, filepath.Join(options.fixture, ".cache/lab/acceptance-feeds"), options.feedBytes, options.feedDuration)
 		resultErr = errors.Join(resultErr, err)
 	}
 	if !chromium.Passed || chromium.Grant.Secret == "" || chromium.Token.Secret == "" {

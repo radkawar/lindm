@@ -1,0 +1,410 @@
+// Package platform is the single declarative registry of the Linux releases
+// lindm recognizes. Each row records the os-release identity it matches, its
+// support tier, native tooling facts, provider quirks and explicit capability
+// gates. Agent providers, server capability gating and the lab ask this package
+// for capabilities and native facts; they never compare distribution IDs.
+//
+// Identification is exact: ID plus a VERSION_ID rule (and VARIANT_ID where a
+// product has mutable and image-based variants). ID_LIKE, names and resemblance
+// are never selectors. A derivative row names its base row explicitly; native
+// tooling facts come from the base, while gates and evidence stay the
+// derivative's own. An unlisted ID or version resolves to a release whose every
+// capability is gated with a reason, never to a guessed neighbour.
+//
+// The registry does not certify anything: a capability that is not gated is
+// implemented for that release, and qualification remains per-cell evidence
+// recorded by the lab matrix ledger.
+package platform
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+// Tier is the owner-set support tier of a release.
+type Tier uint8
+
+const (
+	// TierOutside marks a release lindm recognizes but the owner has not placed
+	// in a support tier (legacy server branches, enterprise SUSE, Leap).
+	TierOutside Tier = iota
+	Tier1
+	Tier2
+	// TierFuture is design-only: no mutable provider ever qualifies it.
+	TierFuture
+)
+
+func (t Tier) String() string {
+	switch t {
+	case Tier1:
+		return "1"
+	case Tier2:
+		return "2"
+	case TierFuture:
+		return "Future"
+	default:
+		return "Outside"
+	}
+}
+
+// Family is the native packaging lineage of a release.
+type Family string
+
+const (
+	FamilyDebian Family = "debian"
+	FamilyRedHat Family = "redhat"
+	FamilyArch   Family = "arch"
+	FamilySUSE   Family = "suse"
+	FamilyNix    Family = "nix"
+)
+
+// Backend is the native package backend a release's providers drive.
+type Backend string
+
+const (
+	BackendNone   Backend = ""
+	BackendAPT    Backend = "apt"
+	BackendDNF4   Backend = "dnf4"
+	BackendDNF5   Backend = "dnf5"
+	BackendPacman Backend = "pacman"
+	BackendZypper Backend = "zypper"
+)
+
+// PackageDB is the native installed-package database behind a backend.
+type PackageDB string
+
+const (
+	PackageDBNone   PackageDB = ""
+	PackageDBDpkg   PackageDB = "dpkg"
+	PackageDBRPM    PackageDB = "rpm"
+	PackageDBPacman PackageDB = "pacman"
+)
+
+// PackageDB returns the installed-package database the backend maintains.
+func (b Backend) PackageDB() PackageDB {
+	switch b {
+	case BackendAPT:
+		return PackageDBDpkg
+	case BackendDNF4, BackendDNF5, BackendZypper:
+		return PackageDBRPM
+	case BackendPacman:
+		return PackageDBPacman
+	default:
+		return PackageDBNone
+	}
+}
+
+// PackageFormat is the native package file format lindm publishes for a backend:
+// "deb", "rpm" or "arch" (pacman .pkg.tar.zst), empty when none.
+func (b Backend) PackageFormat() string {
+	switch b.PackageDB() {
+	case PackageDBDpkg:
+		return "deb"
+	case PackageDBRPM:
+		return "rpm"
+	case PackageDBPacman:
+		return "arch"
+	default:
+		return ""
+	}
+}
+
+// PackageTooling describes the native package tooling.
+type PackageTooling struct {
+	Backend Backend
+	// Minimum is the oldest backend version the providers accept.
+	Minimum string
+}
+
+// PAMManager owns a release's PAM stack.
+type PAMManager string
+
+const (
+	PAMManagerNone          PAMManager = ""
+	PAMManagerPamAuthUpdate PAMManager = "pam-auth-update"
+	PAMManagerAuthselect    PAMManager = "authselect"
+)
+
+// PasswordPins are the exact upstream releases the password provider qualified
+// for one VERSION_ID: libpwquality, the PAM modules package and the PAM manager.
+type PasswordPins struct {
+	Version string // exact VERSION_ID the pins were measured on
+	Quality string
+	PAM     string
+	Manager string
+}
+
+// Quirks are native behaviours providers must honour for a release.
+type Quirks struct {
+	// AccountChroot: shadow tools must chroot (--root) into the account root
+	// because --prefix takes the SELinux label of the prefixed path (EL 9
+	// shadow-utils 4.9, EL 10 4.15) and EL 9's chage has no --prefix.
+	AccountChroot bool
+	// SystemdFloor is the oldest systemd whose unit-file/timer D-Bus interface
+	// and systemd-analyze verify options the definition provider uses.
+	SystemdFloor int
+	PAMManager   PAMManager
+	Password     []PasswordPins
+}
+
+// Desktop is the qualified graphical edition of a release.
+type Desktop struct {
+	Name           string // edition, e.g. "GNOME"
+	Version        string // qualified desktop version, e.g. "46"
+	DisplayManager string // e.g. "gdm3"
+	Lock           string // screen lock backend, e.g. "gnome-shell (logind Lock)"
+}
+
+// Advisory names the vendor advisory source the server applies to a release.
+type Advisory struct {
+	Feed      string // "osv", "redhat-csaf", "rpm-updateinfo", "debian-tracker", "suse-csaf", "arch-asa"
+	Ecosystem string // vendor ecosystem/product string, e.g. "Ubuntu:24.04:LTS"
+	// PURLNamespace and PURLDistro are the package-URL namespace and distro
+	// qualifier the vendor feed uses for this release.
+	PURLNamespace string
+	PURLDistro    string
+}
+
+// Release is one registry row.
+type Release struct {
+	Key  string // stable key, e.g. "ubuntu-24.04"; lab matrix and docs key
+	Name string // display name, e.g. "Ubuntu 24.04 LTS"
+	// Distribution groups releases in documentation, e.g. "Ubuntu".
+	Distribution string
+	ID           string // os-release ID
+	Version      Version
+	Codename     string   // os-release VERSION_CODENAME
+	IDLike       []string // documented ID_LIKE; informational, never a selector
+	// Variants are the accepted VARIANT_ID values; nil accepts any.
+	Variants []string
+	// Base is the Key of the release whose native tooling a derivative ships.
+	Base string
+	Tier Tier
+	// Page is the docs/platforms page describing the release.
+	Page          string
+	Family        Family
+	Architectures []string
+	Packages      PackageTooling
+	Systemd       int
+	FDE           string
+	Desktop       Desktop
+	Firewall      string
+	Advisory      Advisory
+	Quirks        Quirks
+	// Supports lists the implemented capabilities; every other capability is
+	// gated, with the reason in Gates or a default reason.
+	Supports []Capability
+	Gates    map[Capability]string
+
+	base *Release
+}
+
+// Native returns the release whose native tooling and quirks apply: the base
+// for a derivative, the release itself otherwise.
+func (r *Release) Native() *Release {
+	if r.base != nil {
+		return r.base
+	}
+	return r
+}
+
+// Known reports whether the release is a registry row.
+func (r *Release) Known() bool { return r.Key != "" }
+
+// Supported reports whether the capability is implemented for the release.
+func (r *Release) Supported(c Capability) bool { return slices.Contains(r.Supports, c) }
+
+// Gate returns nil when the capability is implemented for the release, and
+// otherwise a *GateError carrying the explicit reason.
+func (r *Release) Gate(c Capability) error {
+	if reason := r.GateReason(c); reason != "" {
+		return &GateError{Release: r.Name, Capability: c, Reason: reason}
+	}
+	return nil
+}
+
+// GateReason returns the explicit reason a capability is gated, or "" when
+// it is implemented.
+func (r *Release) GateReason(c Capability) string {
+	if r.Supported(c) {
+		return ""
+	}
+	if reason := r.Gates[c]; reason != "" {
+		return reason
+	}
+	return "not implemented for " + r.Name
+}
+
+// PasswordPins returns the password-provider pins measured on the observed
+// VERSION_ID of this release (or of its base for a derivative).
+func (r *Release) PasswordPins(versionID string) (PasswordPins, bool) {
+	if r.base != nil {
+		versionID = r.base.Version.Value
+	}
+	for _, pins := range r.Native().Quirks.Password {
+		if pins.Version == versionID {
+			return pins, true
+		}
+	}
+	return PasswordPins{}, false
+}
+
+// GateError reports a gated capability.
+type GateError struct {
+	Release    string
+	Capability Capability
+	Reason     string
+}
+
+func (e *GateError) Error() string {
+	return fmt.Sprintf("platform: %s gated on %s: %s", e.Capability, e.Release, e.Reason)
+}
+
+// VersionRule says how a row matches os-release VERSION_ID.
+type VersionRule uint8
+
+const (
+	// VersionExact requires VERSION_ID to equal Value.
+	VersionExact VersionRule = iota
+	// VersionMajor accepts Value or any Value.N minor.
+	VersionMajor
+	// VersionAbsent requires VERSION_ID to be absent (Arch's rolling model).
+	VersionAbsent
+	// VersionSnapshot requires a YYYYMMDD snapshot VERSION_ID (Tumbleweed).
+	VersionSnapshot
+	// VersionAny accepts any VERSION_ID, including none.
+	VersionAny
+)
+
+// Version is a VERSION_ID rule. Value is also the lab manifest version for
+// rolling rows ("rolling" for Arch, empty for snapshots, which use the
+// manifest's snapshot date).
+type Version struct {
+	Rule  VersionRule
+	Value string
+}
+
+// Exact, Major, Absent, Snapshot and Any build version rules.
+func Exact(v string) Version { return Version{Rule: VersionExact, Value: v} }
+func Major(v string) Version { return Version{Rule: VersionMajor, Value: v} }
+func Absent() Version        { return Version{Rule: VersionAbsent, Value: "rolling"} }
+func Snapshot() Version      { return Version{Rule: VersionSnapshot} }
+func Any() Version           { return Version{Rule: VersionAny} }
+
+func (v Version) matches(versionID string) bool {
+	switch v.Rule {
+	case VersionExact:
+		return versionID == v.Value
+	case VersionMajor:
+		return versionID == v.Value || strings.HasPrefix(versionID, v.Value+".") && !strings.Contains(versionID[len(v.Value)+1:], ".")
+	case VersionAbsent:
+		return versionID == ""
+	case VersionSnapshot:
+		return snapshot(versionID)
+	default:
+		return true
+	}
+}
+
+// String renders the rule for documentation.
+func (v Version) String() string {
+	switch v.Rule {
+	case VersionExact:
+		return v.Value
+	case VersionMajor:
+		return v.Value + ".x"
+	case VersionAbsent:
+		return "absent (rolling)"
+	case VersionSnapshot:
+		return "YYYYMMDD snapshot"
+	default:
+		return "any"
+	}
+}
+
+func snapshot(s string) bool {
+	if len(s) != 8 {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// OSRelease is the subset of os-release(5) that identifies a release.
+type OSRelease struct {
+	ID        string
+	VersionID string
+	VariantID string
+}
+
+// Identify returns the registry row matching the observed os-release identity,
+// or an unknown release whose every capability is gated.
+func Identify(o OSRelease) *Release {
+	for _, r := range registry {
+		if r.ID == o.ID && r.Version.matches(o.VersionID) && (r.Variants == nil || slices.Contains(r.Variants, o.VariantID)) {
+			return r
+		}
+	}
+	return unknown(o.ID, o.VersionID)
+}
+
+// Product is the native identity carried in resource evidence; it has no
+// VARIANT_ID, so callers that must exclude image-based variants re-read
+// os-release and use Identify.
+type Product interface {
+	GetOsId() string
+	GetVersion() string
+}
+
+// Of identifies an observed resource platform product.
+func Of(p Product) *Release {
+	return Identify(OSRelease{ID: p.GetOsId(), VersionID: p.GetVersion()})
+}
+
+// ForManifest identifies a lab image manifest's distribution and version.
+// Rolling rows use their manifest convention ("rolling" for Arch, the
+// snapshot date for Tumbleweed).
+func ForManifest(distribution, version string) *Release {
+	for _, r := range registry {
+		if r.ID != distribution || r.Variants != nil && !slices.Contains(r.Variants, "") {
+			continue
+		}
+		if r.Version.Rule == VersionAbsent && version == r.Version.Value || r.Version.Rule != VersionAbsent && r.Version.matches(version) {
+			return r
+		}
+	}
+	return unknown(distribution, version)
+}
+
+// Lookup returns the row with the given key.
+func Lookup(key string) (*Release, bool) {
+	for _, r := range registry {
+		if r.Key == key {
+			return r, true
+		}
+	}
+	return nil, false
+}
+
+// Releases returns every registry row in registry order. Callers must not
+// modify the rows.
+func Releases() []*Release { return slices.Clone(registry) }
+
+// KnownID reports whether s is an os-release ID of any registry row.
+func KnownID(s string) bool {
+	return slices.ContainsFunc(registry, func(r *Release) bool { return r.ID == s })
+}
+
+func unknown(id, version string) *Release {
+	name := fmt.Sprintf("unregistered release ID=%q VERSION_ID=%q", id, version)
+	gates := make(map[Capability]string, len(Capabilities))
+	for _, c := range Capabilities {
+		gates[c] = "release is not in the platform registry"
+	}
+	return &Release{Name: name, ID: id, Version: Exact(version), Gates: gates}
+}

@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Ubuntu 22.04 LTS                                                                          | Ubuntu 24.04 LTS                           | Ubuntu 26.04 LTS                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                               | implemented                                | implemented                                                                               |
+| lifecycle         | implemented                                                                               | implemented                                | implemented                                                                               |
+| dispatch          | implemented                                                                               | implemented                                | implemented                                                                               |
+| packages          | implemented                                                                               | implemented                                | implemented                                                                               |
+| accounts          | implemented                                                                               | implemented                                | implemented                                                                               |
+| sysctl            | implemented                                                                               | implemented                                | implemented                                                                               |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                             | implemented                                | implemented                                                                               |
+| password          | gated: libpwquality/PAM/manager versions not measured on this release                     | implemented                                | implemented                                                                               |
+| firewall          | implemented                                                                               | implemented                                | implemented                                                                               |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| self-update       | implemented                                                                               | implemented                                | implemented                                                                               |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| advisories        | implemented                                                                               | implemented                                | implemented                                                                               |
+| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed | gated: OS patch policy provider not landed                                                |
+| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  | gated: release upgrade is not implemented                                                 |
+
+<!-- END GENERATED platform-capabilities -->
+
 [Verification](../verification.md#1-launch-platform-qualification) is authoritative for
 qualification, including later evidence and failures. This page describes implementation
 and narrowly identified observations, not general production readiness or all-resource support.
@@ -9,12 +38,22 @@ Ubuntu 24.04 and 26.04 LTS are required launch branches: official GNOME Desktop 
 Server/minimal, x86_64 desktop/server and aarch64 server; Kubuntu/KDE needs separate
 qualification. Ubuntu 22.04 is a separate legacy row. Ubuntu Core is not this platform.
 
-Pinned cloud inputs are [Noble 20260926](../../lab/images/ubuntu-noble-amd64.json#L1)
-and [Resolute release-20260927](../../lab/images/ubuntu-resolute-amd64.json#L1).
-The latter is generic amd64, not amd64v3. Image manifests bind exact vendor URL,
+Pinned cloud inputs are Noble 20260926 ([amd64](../../lab/images/ubuntu-noble-amd64.json#L1),
+[arm64](../../lab/images/ubuntu-noble-arm64.json#L1)) and Resolute release-20260927
+([amd64](../../lab/images/ubuntu-resolute-amd64.json#L1),
+[arm64](../../lab/images/ubuntu-resolute-arm64.json#L1)). Release-20260927 is the
+current Resolute cloud build after the 26.04.1 point release (2026-08-27); the amd64
+image is generic amd64, not amd64v3. Image manifests bind exact vendor URL,
 architecture, size, SHA-256 and the Ubuntu cloud-image signing fingerprint
-`D2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81`. A verified image is an input, not a
-successful installation, desktop, encryption or agent lifecycle result.
+`D2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81`. The 26.04.1 encrypted-installer input is
+the official GNOME desktop ISO
+([`ubuntu-26.04.1-desktop-amd64.iso`](../../lab/images/ubuntu-resolute-desktop-encrypted-amd64.json#L1),
+SHA-256 `601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f`,
+6,482,409,472 bytes), bound to the signed `releases.ubuntu.com/26.04.1/SHA256SUMS`
+and the Ubuntu CD image key `843938DF228D22F7B3742BC0D94AA3F0EFE21092`, as the
+Noble live-server manifests are. All three passed `lab images fetch` on 2026-10-11.
+A verified image is an input, not a successful installation, desktop, encryption or
+agent lifecycle result.
 
 Observed Ubuntu 26.04 x86_64 cloud lanes, under
 `$HOME/.cache/lindm-platformlanes-20261009/`:

@@ -67,16 +67,33 @@ behavior unbuilt.
 
 ### Supported OS tiers
 
-The owner set these tiers on 2026-10-11. The live per-capability matrix is in
+The owner set these tiers on 2026-10-11. **Tier 1** is desktop-first with full parity
+with Ubuntu 24.04. **Tier 2** meets the same contract through a rolling model.
+**Future** rows (NixOS, Fedora Atomic Silverblue/Kinoite) are a design-only management
+model: their declarative and image-based models stay unadvertised and unbuilt beyond
+design until a separate model is specified. The table is generated from the platform
+registry (`internal/platform`, `make generate`); the live per-capability matrix is in
 [verification](verification.md#platform-support-tiers).
 
-- **Tier 1, desktop-first, full parity with Ubuntu 24.04:** Ubuntu 22.04/24.04/26.04
-  LTS, Debian 12/13, Fedora (current two releases), RHEL 9/10, Rocky Linux and
-  AlmaLinux 9/10, Linux Mint (current, Cinnamon) and Pop!\_OS (current LTS, COSMIC).
-- **Tier 2:** Arch Linux, openSUSE Tumbleweed and Omarchy (Arch-based, Hyprland).
-- **Future management model, design-only:** NixOS and Fedora Atomic
-  (Silverblue/Kinoite). Their declarative and image-based models stay unadvertised
-  and unbuilt beyond design until a separate model is specified.
+<!-- BEGIN GENERATED platform-tiers -->
+
+| Tier   | Distribution        | Releases                        | Desktop edition                | Architectures   | Platform page                             |
+| ------ | ------------------- | ------------------------------- | ------------------------------ | --------------- | ----------------------------------------- |
+| 1      | Ubuntu              | 22.04 LTS, 24.04 LTS, 26.04 LTS | GNOME                          | x86_64, aarch64 | [ubuntu](platforms/ubuntu.md)             |
+| 1      | Debian              | 12, 13                          | GNOME/KDE                      | x86_64, aarch64 | [debian](platforms/debian.md)             |
+| 1      | Fedora              | 43, 44                          | Workstation GNOME; KDE edition | x86_64, aarch64 | [fedora](platforms/fedora.md)             |
+| 1      | RHEL                | 9, 10                           | GNOME                          | x86_64, aarch64 | [rhel](platforms/rhel.md)                 |
+| 1      | Rocky Linux         | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | AlmaLinux           | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | Linux Mint          | 22.3                            | Cinnamon                       | x86_64          | [mint](platforms/mint.md)                 |
+| 1      | Pop!\_OS            | 24.04 LTS                       | COSMIC                         | x86_64          | [popos](platforms/popos.md)               |
+| 2      | Arch Linux          | rolling                         | owner-chosen per record        | x86_64          | [arch](platforms/arch.md)                 |
+| 2      | Omarchy             | 4.0.4                           | Hyprland                       | x86_64          | [omarchy](platforms/omarchy.md)           |
+| 2      | openSUSE Tumbleweed | pinned snapshot                 | KDE Plasma/GNOME               | x86_64, aarch64 | [opensuse](platforms/opensuse.md)         |
+| Future | Fedora Atomic       | Silverblue/Kinoite              | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+| Future | NixOS               | any                             | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+
+<!-- END GENERATED platform-tiers -->
 
 Full parity means the agent lifecycle works: signed install, enrollment, upgrade,
 reboot, purge/reinstall and revocation. It also needs connected dispatch, strict

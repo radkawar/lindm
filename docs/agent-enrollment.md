@@ -846,7 +846,12 @@ authenticated release-management API to register the server's reported identity
 and the two actual signed package versions under test; no version is inferred from
 an image name. This also applies to the shared server used for signed service lanes.
 
-This mode is exclusive with `-execution-trust` and `-service-execution`. The lab
+This mode is exclusive with `-execution-trust` and `-service-execution`. Those manual
+variants normally enroll against the shared development console; add
+`-local-authority -lindmd /absolute/path/to/lindmd` to run them against the same kind
+of private server and local password/WebAuthn owners instead (remote hosts always do
+this). The private server receives the fixture's public execution root, so the
+offline-signed trust updates and service intents are unchanged.
 creates a unique disposable PostgreSQL database and starts the real server on
 private host ports. Only lab code uses the protected development PostgreSQL admin
 credential to create/drop that database; the server receives its non-superuser

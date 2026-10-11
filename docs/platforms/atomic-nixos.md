@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Fedora Atomic Silverblue/Kinoite                                                  | NixOS                                                                             |
+| ----------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| inventory         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| lifecycle         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| dispatch          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| packages          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| accounts          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| sysctl            | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| definitions       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| password          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| firewall          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| encryption        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| wipe              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| report-loss       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| lock              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| recovery-sanitize | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| self-update       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| assistance        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| advisories        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| os-update         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| release-upgrade   | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+
+<!-- END GENERATED platform-capabilities -->
+
 **Fedora Silverblue/Kinoite and NixOS are separate native management products, not
 mutable RPM/DEB aliases.** Under the
 [supported OS tiers](../product-specification.md#supported-os-tiers) they are a

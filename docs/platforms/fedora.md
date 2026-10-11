@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Fedora 43                                                                                 | Fedora 44                                  |
+| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ |
+| inventory         | implemented                                                                               | implemented                                |
+| lifecycle         | implemented                                                                               | implemented                                |
+| dispatch          | implemented                                                                               | implemented                                |
+| packages          | implemented                                                                               | implemented                                |
+| accounts          | implemented                                                                               | implemented                                |
+| sysctl            | implemented                                                                               | implemented                                |
+| definitions       | implemented                                                                               | implemented                                |
+| password          | gated: libpwquality/PAM/manager versions not measured on this release                     | implemented                                |
+| firewall          | implemented                                                                               | implemented                                |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| self-update       | implemented                                                                               | implemented                                |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                |
+| advisories        | implemented                                                                               | implemented                                |
+| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed |
+| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  |
+
+<!-- END GENERATED platform-capabilities -->
+
 This page covers mutable Fedora, not Silverblue or Kinoite. Fedora 43 and 44,
 x86_64 desktop/server and aarch64 server are qualification targets, not blanket
 support claims. [Verification](../verification.md#1-launch-platform-qualification)

@@ -19,13 +19,17 @@ const integrationServerRelease = "0.1.0"
 // initialized fixture. Credentials are passed only in-process or in the child
 // environment, never command arguments.
 //
+// fixtureRoot is the checkout owning the running .cache/dev fixture; codeRoot
+// is the checkout whose lindmd is built and whose packages are tested. They
+// differ when a clean worktree is qualified against the shared fixture.
+//
 // The fixture lock covers only the preflight. Native-server fixtures acquire it
 // themselves while they mutate shared trust material, so holding it across the
 // test run would deadlock them.
-func TestIntegration(ctx context.Context, repoRoot string) (resultErr error) {
+func TestIntegration(ctx context.Context, fixtureRoot, codeRoot string) (resultErr error) {
 	var root string
 	var dsn []byte
-	if err := locked(ctx, repoRoot, func(lockedRoot string) error {
+	if err := locked(ctx, fixtureRoot, func(lockedRoot string) error {
 		root = lockedRoot
 		dir := FixturePath(root)
 		if err := validateFixture(dir); err != nil {
@@ -54,7 +58,7 @@ func TestIntegration(ctx context.Context, repoRoot string) (resultErr error) {
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(work)) }()
 	server := filepath.Join(work, "lindmd")
-	if err := command(ctx, root, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease, "-o", server, "./cmd/lindmd"); err != nil {
+	if err := command(ctx, codeRoot, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease, "-o", server, "./cmd/lindmd"); err != nil {
 		return fmt.Errorf("build native integration server: %w", err)
 	}
 	env := make([]string, 0, len(os.Environ())+3)
@@ -67,5 +71,5 @@ func TestIntegration(ctx context.Context, repoRoot string) (resultErr error) {
 	// The device suite runs six to fifteen minutes under -race against real
 	// PostgreSQL, depending on concurrent package and host load; a per-binary
 	// deadline near that reports false timeouts. The command deadline is 40m.
-	return command(ctx, root, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=30m", "./internal/...")
+	return command(ctx, codeRoot, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=30m", "./internal/...")
 }

@@ -90,21 +90,29 @@ full parity with Ubuntu 24.04. **Tier 2** gets the same capability contract
 through its own rolling model. Every cell still needs its own native evidence. The
 older family/branch allocation [below](#branch-allocation) still sets
 architectures and editions. Server-only legacy branches (RHEL/Rocky/Alma 8, SUSE
-enterprise, Leap) are outside these tiers until the owner places them.
+enterprise, Leap) are outside these tiers until the owner places them. The table is
+generated from the platform registry (`internal/platform`); aarch64 rows are server
+editions, and desktop editions qualify on x86_64.
 
-| Tier   | Distribution / branch                     | Desktop edition to qualify          | Architecture used in the lab                  | Platform page                             |
-| ------ | ----------------------------------------- | ----------------------------------- | --------------------------------------------- | ----------------------------------------- |
-| 1      | Ubuntu 22.04, 24.04, 26.04 LTS            | GNOME (official desktop)            | x86_64 desktop/server; aarch64 server         | [ubuntu](platforms/ubuntu.md)             |
-| 1      | Debian 12, 13                             | GNOME/KDE                           | x86_64 desktop/server; aarch64 server         | [debian](platforms/debian.md)             |
-| 1      | Fedora, current two releases (43, 44)     | Workstation GNOME; KDE edition      | x86_64 desktop/server; aarch64 server         | [fedora](platforms/fedora.md)             |
-| 1      | RHEL 9, 10 (supported minor)              | Vendor GNOME installation           | x86_64; aarch64 server on vendor images       | [rhel](platforms/rhel.md)                 |
-| 1      | Rocky Linux 9, 10; AlmaLinux 9, 10        | GNOME, one row per distribution     | x86_64; aarch64 server                        | [alma-rocky](platforms/alma-rocky.md)     |
-| 1      | Linux Mint, current release               | Cinnamon                            | x86_64 only (no arm64 build), local KVM       | [mint](platforms/mint.md)                 |
-| 1      | Pop!\_OS, current LTS                     | COSMIC                              | x86_64 local KVM (arm64 builds not qualified) | [popos](platforms/popos.md)               |
-| 2      | Arch Linux, pinned snapshot               | Owner-chosen desktop per record     | x86_64 local KVM                              | [arch](platforms/arch.md)                 |
-| 2      | openSUSE Tumbleweed, pinned snapshot      | KDE Plasma/GNOME per record         | x86_64; aarch64 records stay separate         | [opensuse](platforms/opensuse.md)         |
-| 2      | Omarchy, current release on pinned Arch   | Hyprland                            | x86_64 local KVM                              | [omarchy](platforms/omarchy.md)           |
-| Future | NixOS; Fedora Atomic (Silverblue/Kinoite) | Not qualified until a model is spec | None; design only                             | [atomic-nixos](platforms/atomic-nixos.md) |
+<!-- BEGIN GENERATED platform-tiers -->
+
+| Tier   | Distribution        | Releases                        | Desktop edition                | Architectures   | Platform page                             |
+| ------ | ------------------- | ------------------------------- | ------------------------------ | --------------- | ----------------------------------------- |
+| 1      | Ubuntu              | 22.04 LTS, 24.04 LTS, 26.04 LTS | GNOME                          | x86_64, aarch64 | [ubuntu](platforms/ubuntu.md)             |
+| 1      | Debian              | 12, 13                          | GNOME/KDE                      | x86_64, aarch64 | [debian](platforms/debian.md)             |
+| 1      | Fedora              | 43, 44                          | Workstation GNOME; KDE edition | x86_64, aarch64 | [fedora](platforms/fedora.md)             |
+| 1      | RHEL                | 9, 10                           | GNOME                          | x86_64, aarch64 | [rhel](platforms/rhel.md)                 |
+| 1      | Rocky Linux         | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | AlmaLinux           | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | Linux Mint          | 22.3                            | Cinnamon                       | x86_64          | [mint](platforms/mint.md)                 |
+| 1      | Pop!\_OS            | 24.04 LTS                       | COSMIC                         | x86_64          | [popos](platforms/popos.md)               |
+| 2      | Arch Linux          | rolling                         | owner-chosen per record        | x86_64          | [arch](platforms/arch.md)                 |
+| 2      | Omarchy             | 4.0.4                           | Hyprland                       | x86_64          | [omarchy](platforms/omarchy.md)           |
+| 2      | openSUSE Tumbleweed | pinned snapshot                 | KDE Plasma/GNOME               | x86_64, aarch64 | [opensuse](platforms/opensuse.md)         |
+| Future | Fedora Atomic       | Silverblue/Kinoite              | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+| Future | NixOS               | any                             | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+
+<!-- END GENERATED platform-tiers -->
 
 NixOS and Fedora Atomic manage the system declaratively or as images. They stay
 **design-only** until a separate management model is specified; see the
@@ -1105,36 +1113,37 @@ dispatch); Leap's cell also has the same x86_64 lanes, and Arch's
 `N` now includes the same x86_64 lanes. The generic-executor resource cells (files,
 accounts, sysctl, timers/drop-ins, password policy, packages) are aarch64 records
 listed under [the executor cutover](#generic-resource-executor-cutover-phase-2).
-`N98a` marks registered RHEL 9.8 aarch64 connected records
-([EL 9 host providers](#host-resource-providers-on-el-9)).
+`N98a` and `N102a` mark registered RHEL 9.8 and 10.2 aarch64 connected records
+([EL 9](#host-resource-providers-on-el-9) and
+[EL 10](#host-resource-providers-on-el-10) host providers).
 Rocky/AlmaLinux ARM records are derivative rows, not RHEL evidence, and nothing
 here covers desktop workflows.
 Exact builds and observed limits are in the
 [evidence ledger](implementation-plan.md#2-evidence-ledger).
 
-| Resource kind                                     | Code | Ubuntu LTS | Fedora   | RHEL | Debian/SUSE  | Arch/Tumbleweed | Atomic product | NixOS product |
-| ------------------------------------------------- | ---- | ---------- | -------- | ---- | ------------ | --------------- | -------------- | ------------- |
-| Host and native package inventory                 | I    | N24, N26   | N43, N44 | S    | Na Deb, Leap | N Arch; Na TW   | S              | S             |
-| Systemd service state                             | I    | N24        | N44      | S    | Na Deb, Leap | N Arch; Na TW   | S*             | S*            |
-| Device local accounts/groups                      | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
-| Sudo policy                                       | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| SSH configuration                                 | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Session/password settings                         | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
-| Managed files                                     | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
-| Kernel sysctl                                     | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
-| Systemd timers and drop-ins                       | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
-| Firewall                                          | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Time synchronization                              | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Trust stores                                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Wi-Fi/Ethernet                                    | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| VPN                                               | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| DNS/proxy                                         | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Native repositories/packages                      | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
-| OS/security-update lifecycle                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Device/user certificates and directory client     | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Recovery escrow, lock/quarantine and sanitization | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Atomic OS deployment/boot/rollback                | S    | —          | —        | —    | —            | —               | S              | —             |
-| Declarative system generation/activation          | S    | —          | —        | —    | —            | —               | —              | S             |
+| Resource kind                                     | Code | Ubuntu LTS | Fedora   | RHEL        | Debian/SUSE  | Arch/Tumbleweed | Atomic product | NixOS product |
+| ------------------------------------------------- | ---- | ---------- | -------- | ----------- | ------------ | --------------- | -------------- | ------------- |
+| Host and native package inventory                 | I    | N24, N26   | N43, N44 | S           | Na Deb, Leap | N Arch; Na TW   | S              | S             |
+| Systemd service state                             | I    | N24        | N44      | S           | Na Deb, Leap | N Arch; Na TW   | S*             | S*            |
+| Device local accounts/groups                      | I    | N24        | N44      | N98a, N102a | S            | S               | S*             | S*            |
+| Sudo policy                                       | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| SSH configuration                                 | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Session/password settings                         | I    | N24        | N44      | N98a, N102a | S            | S               | S*             | S*            |
+| Managed files                                     | I    | N24        | N44      | N98a, N102a | S            | S               | S*             | S*            |
+| Kernel sysctl                                     | I    | N24        | N44      | N98a, N102a | S            | S               | S*             | S*            |
+| Systemd timers and drop-ins                       | I    | N24        | N44      | N98a, N102a | S            | S               | S*             | S*            |
+| Firewall                                          | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Time synchronization                              | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Trust stores                                      | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Wi-Fi/Ethernet                                    | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| VPN                                               | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| DNS/proxy                                         | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Native repositories/packages                      | I    | N24        | N44      | S           | S            | S               | S*             | S*            |
+| OS/security-update lifecycle                      | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Device/user certificates and directory client     | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Recovery escrow, lock/quarantine and sanitization | S    | S          | S        | S           | S            | S               | S*             | S*            |
+| Atomic OS deployment/boot/rollback                | S    | —          | —        | —           | —            | —               | S              | —             |
+| Declarative system generation/activation          | S    | —          | —        | —           | —            | —               | —              | S             |
 
 Every applicable resource/platform cell is launch-required; inventory and service
 state are build-order priorities, and `S` records missing implementation or evidence,
@@ -1638,6 +1647,42 @@ outcomes true (host: run `lindm-lab-f57bd294ba353b74e1cfaa97fef40a02`, consumer
 `4bda96e1d1c6506e3e72ea10123114f8a88f1842605dab19a5e91f973d90510e`) passed files,
 accounts and the first three sysctl scenarios, then lost the SSH transport while
 probing the boot ID after the guest reboot; the rerun passed.
+
+After landing, both platforms passed every kind together in one connected lane
+(`-kinds packages,files,accounts,sysctl,definitions,password,firewall`, eight
+resource kinds, 72/72 scenarios, SELinux Enforcing), each run from an immutable
+snapshot of the shared tree (revision `5231542c`), under
+`$HOME/.cache/lindm-resourcecoverage-20261011/`:
+
+| Platform                                | Record                                    | Snapshot (diff SHA-256, lindmd) | SHA-256                                                            |
+| --------------------------------------- | ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| RHEL 10.2 aarch64, registered (`dgx21`) | `rhel102-arm64-dgx21-allkinds-el10.json`  | `304635fb…`, `09b405e7…`        | `27ec51eec1fc302e51a84460661e1ba7c23168f626bf4f1f198d3e3dc6d76e31` |
+| AlmaLinux 10.2 aarch64 (`dgx20`)        | `alma102-arm64-dgx20-allkinds-el10b.json` | `95d893ed…`, `87936177…`        | `30d7dc4375d145a1fdb59ad68da6454293cbaad7d25193abf60a9fb4ca6eeee1` |
+
+The RHEL record's `redhat` block reports all five outcomes true (run
+`lindm-lab-d22b4e7cdcec997192ca036fad27b658`, consumer
+`8f1f9be4-aecf-450a-b8ce-ddbd699e2995`). The AlmaLinux record comes from the
+later snapshot that also contains the reboot-probe retry below; its first
+all-kinds run (`alma102-arm64-dgx20-allkinds-el10.json`,
+`80a68642b25543bde0652476b32e1b19dc082df66a27d1cdf0881c8998a73893`) passed
+everything except firewall `reboot-restore`, where the lab's boot-ID probe
+reached the old boot's `sshd` as shutdown stopped it and the session ended
+without an exit status (`ssh.ExitMissingError`, seen twice on EL 10). The lab
+now retries that like any other transport loss of the old boot
+([`waitGuestBootChange`](../internal/vmlab/vm_lifecycle_helpers_linux.go)).
+A RHEL rerun from that snapshot lost the controller's SSH link to `dgx21`;
+its remote lane left consumer `1e213dc5-a28c-4e09-9617-39e4175f50f7`
+registered (`rhel102-arm64-dgx21-allkinds-el10b-aborted.json`,
+`cfee5a320dd8f1964f9de49b71788fb720d1a869dc68687cdd6c651f225ceb12`, unregistered
+false). After stopping only that run's guests, the maintained
+`lab images redhat cleanup` deleted it and a second lab system
+(`3e964495-3828-4dc3-973d-f50948133b48`) plus the one remaining lab activation key;
+inventory before (`rhel102-el10b-orphan-inventory-before.json`,
+`932ca819aae0b913ad2a1a962d209628271b10f4d28c5cc7767583d9bff7c6c9`), cleanup
+(`rhel102-el10b-orphan-cleanup.json`,
+`b8ccc97e07527301df6346159215b4f258a4a8a5f2fa17ce3fca48366ea1d01b`) and inventory
+after, `[]` (`rhel102-el10b-orphan-inventory-after.json`,
+`37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570`).
 
 No product defect beyond the gates surfaced on EL 10; the decisive native fact
 is that shadow-utils 4.15 `--prefix` still writes the account databases with the

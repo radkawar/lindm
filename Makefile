@@ -43,6 +43,7 @@ bootstrap: tools
 generate: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
 	$(BUF) generate
 	$(SQLC) generate
+	go run ./cmd/dev generate-docs
 
 web-assets:
 	npm run build:web
@@ -53,6 +54,7 @@ lint: web-assets $(BUF) $(GOLANGCI)
 	$(BUF) format --diff --exit-code
 	$(GOLANGCI) run $(GO_PACKAGES)
 	@diff="$$($(GOLANGCI) fmt --diff $(GO_DIRS))" && { test -z "$$diff" || { printf '%s\n' "$$diff"; exit 1; }; }
+	go run ./cmd/dev generate-docs -check
 
 fmt: $(BUF) $(GOLANGCI)
 	npm run format
@@ -108,14 +110,15 @@ check-web: acceptance-build
 acceptance: acceptance-build
 	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
 
-# Local CI (basecamp/gh-signoff): run the gates on this machine, then post
-# green commit statuses for the pushed HEAD. gh-signoff refuses a dirty tree or
-# an unpushed commit, so a signoff always attests to exactly what is on GitHub.
-# Contexts: unit (make check) and integration (real PostgreSQL). `create`
-# keeps context names from colliding with gh-signoff command words.
+# Local CI (basecamp/gh-signoff): cmd/dev signoff refuses an unpushed HEAD,
+# runs the gates in a temporary clean worktree of that SHA (integration and
+# acceptance against this checkout's dev fixture), then posts green statuses
+# with gh signoff create --commit SHA, so a signoff attests to exactly what is
+# on GitHub even while this tree is dirty. Contexts: unit (make check),
+# integration (real PostgreSQL) and acceptance.
 .PHONY: signoff signoff-acceptance
-signoff: check test-integration
-	gh signoff create unit integration
+signoff: dev-up
+	go run ./cmd/dev signoff
 
-signoff-acceptance: acceptance
-	gh signoff create acceptance
+signoff-acceptance:
+	go run ./cmd/dev signoff -acceptance -acceptance-flags "$(ACCEPTANCE_FLAGS)"

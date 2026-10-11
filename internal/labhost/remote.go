@@ -91,22 +91,6 @@ func SetFlag(args []string, name, value string) []string {
 	return append(args, "-"+name+"="+value)
 }
 
-func boolFlag(args []string, name string) bool {
-	value := false
-	for _, arg := range args {
-		if arg == "-"+name || arg == "--"+name {
-			value = true
-		}
-		if text, ok := strings.CutPrefix(arg, "-"+name+"="); ok {
-			value = text == "true"
-		}
-		if text, ok := strings.CutPrefix(arg, "--"+name+"="); ok {
-			value = text == "true"
-		}
-	}
-	return value
-}
-
 func (r RemoteRun) Run(ctx context.Context) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
 	defer cancel()
@@ -259,9 +243,9 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		args = append(args, "-local-authority=true")
 	}
 	if args[1] == "lifecycle" {
-		if !boolFlag(args, "control-plane-trust") {
-			return errors.New("remote lifecycle requires -control-plane-trust=true; manual shared-console lanes remain local")
-		}
+		// The shared development console is local-only. Every remote lifecycle
+		// variant, including manual trust/service execution, uses a private
+		// lindmd with isolated local authority beside the guest.
 		args = append(args, "-local-authority=true")
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}

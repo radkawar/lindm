@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Arch Linux                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                               |
+| lifecycle         | implemented                                                                               |
+| dispatch          | implemented                                                                               |
+| packages          | gated: not implemented for Arch Linux                                                     |
+| accounts          | gated: not implemented for Arch Linux                                                     |
+| sysctl            | gated: not implemented for Arch Linux                                                     |
+| definitions       | gated: not implemented for Arch Linux                                                     |
+| password          | gated: not implemented for Arch Linux                                                     |
+| firewall          | gated: not implemented for Arch Linux                                                     |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| self-update       | implemented                                                                               |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| advisories        | implemented                                                                               |
+| os-update         | gated: OS patch policy provider not landed                                                |
+| release-upgrade   | gated: release upgrade is not implemented                                                 |
+
+<!-- END GENERATED platform-capabilities -->
+
 Arch is a **snapshot-qualified rolling platform**, not a moving `latest` support
 claim. The launch target is x86_64. The recorded input is official arch-boxes
 `20261001.604814`, paired with Arch Linux Archive repository date `2026-10-02`.

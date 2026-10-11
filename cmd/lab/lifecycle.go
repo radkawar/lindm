@@ -35,8 +35,8 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	executionTrust := flags.Bool("execution-trust", false, "exercise signed execution trust rotation, revocation and retained rollback fences after upgrade")
 	serviceExecution := flags.Bool("service-execution", false, "exercise packaged signed service execution and retained journal evidence; implies execution-trust")
 	controlPlaneTrust := flags.Bool("control-plane-trust", false, "exercise isolated real control-plane authority and automatic installed agent trust synchronization")
-	lindmd := flags.String("lindmd", "", "prebuilt current lindmd binary (required with -control-plane-trust)")
-	localAuthority := flags.Bool("local-authority", false, "use isolated local authority with -control-plane-trust instead of Keycloak")
+	lindmd := flags.String("lindmd", "", "prebuilt current lindmd binary for the private control plane (required with -control-plane-trust or -local-authority)")
+	localAuthority := flags.Bool("local-authority", false, "use a private lindmd with isolated local password/WebAuthn authority instead of Keycloak or the shared development console")
 	record := flags.String("record", "", "write successful lifecycle evidence to a new private file")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
@@ -48,8 +48,8 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	if *controlPlaneTrust && (*executionTrust || *serviceExecution) {
 		return errors.New("-control-plane-trust is exclusive with -execution-trust and -service-execution")
 	}
-	if *controlPlaneTrust != (*lindmd != "") {
-		return errors.New("-control-plane-trust requires -lindmd; -lindmd is only valid with -control-plane-trust")
+	if (*controlPlaneTrust || *localAuthority) != (*lindmd != "") {
+		return errors.New("-control-plane-trust and -local-authority require -lindmd; -lindmd is only valid with either")
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {

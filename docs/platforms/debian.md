@@ -2,6 +2,35 @@
 
 ## Versions, architectures and qualification
 
+<!-- BEGIN GENERATED platform-capabilities -->
+
+Generated from `internal/platform`; “implemented” is not qualification (see the
+[verification ledger](../verification.md#tier-capability-matrix)).
+
+| Capability        | Debian 11                                                                                 | Debian 12                                                                                 | Debian 13                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| lifecycle         | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| dispatch          | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| packages          | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| accounts          | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| sysctl            | gated: not implemented for Debian 11                                                      | gated: not implemented for Debian 12                                                      | gated: not implemented for Debian 13                                                      |
+| definitions       | gated: systemd 247 is below the definition provider floor 255                             | gated: systemd 252 is below the definition provider floor 255                             | implemented                                                                               |
+| password          | gated: not implemented for Debian 11                                                      | gated: libpwquality/PAM/manager versions not measured on this release                     | gated: libpwquality/PAM/manager versions not measured on this release                     |
+| firewall          | gated: not implemented for Debian 11                                                      | gated: not implemented for Debian 12                                                      | gated: not implemented for Debian 13                                                      |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| self-update       | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
+| advisories        | implemented                                                                               | implemented                                                                               | implemented                                                                               |
+| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed                                                |
+| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented                                                 |
+
+<!-- END GENERATED platform-capabilities -->
+
 [Verification](../verification.md#1-launch-platform-qualification) is the authoritative
 qualification ledger; the [shared platform contract](README.md) separates implementation,
 recorded operation and complete release certification. Debian 13 is a required launch
