@@ -29,6 +29,7 @@ import (
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -43,9 +44,9 @@ var (
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("fileprovider: not_converged"))
 )
 
-// NativeConfig is trusted local context, never accepted from an action payload.
+// nativeConfig is trusted local context, never accepted from an action payload.
 // Native comes only from the protected executor configuration.
-type NativeConfig struct {
+type nativeConfig struct {
 	Native              *agentv1.NativeFileProviderConfig
 	Platform            *resourcev1.PlatformProduct
 	ExecutorIncarnation string
@@ -82,6 +83,8 @@ type Provider struct {
 	closed  bool
 }
 
+var _ resourceprovider.Provider = (*Provider)(nil)
+
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
 func validateMessage(message proto.Message) error {
@@ -107,7 +110,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	if err := validateMessage(config.Ownership); err != nil {
 		return nil, err
 	}
-	backend, boot, err := nativeContext(ctx, NativeConfig{Native: config.Native, Platform: config.Platform, ExecutorIncarnation: config.ExecutorIncarnation, ProtectedPaths: config.ProtectedPaths})
+	backend, boot, err := nativeContext(ctx, nativeConfig{Native: config.Native, Platform: config.Platform, ExecutorIncarnation: config.ExecutorIncarnation, ProtectedPaths: config.ProtectedPaths})
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +120,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	config.ProtectedPaths = slices.Clone(config.ProtectedPaths)
 	return &Provider{config: config, journal: config.Journal, backend: backend, boot: boot}, nil
 }
-func nativeContext(ctx context.Context, config NativeConfig) (*resourcev1.BackendSelection, string, error) {
+func nativeContext(ctx context.Context, config nativeConfig) (*resourcev1.BackendSelection, string, error) {
 	if os.Geteuid() != 0 {
 		return nil, "", ErrUnsupported
 	}

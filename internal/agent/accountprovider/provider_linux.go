@@ -24,6 +24,8 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
@@ -61,6 +63,8 @@ type Provider struct {
 	closed  bool
 }
 
+var _ resourceprovider.Provider = (*Provider)(nil)
+
 func Open(ctx context.Context, c Config) (*Provider, error) {
 	if ctx == nil || c.Journal == nil || c.Ownership == nil || c.Platform == nil || c.Native == nil || c.NativeTransaction == nil || c.NativeObserve == nil || c.NativeDigest == nil || c.Secrets == nil || os.Geteuid() != 0 {
 		return nil, ErrUnsupported
@@ -70,7 +74,7 @@ func Open(ctx context.Context, c Config) (*Provider, error) {
 			return nil, ErrUnsafe
 		}
 	}
-	p, err := nativeProvider(ctx, NativeConfig{Native: c.Native, Platform: c.Platform, ExecutorIncarnation: c.ExecutorIncarnation, NativeDigest: c.NativeDigest})
+	p, err := nativeProvider(ctx, nativeConfig{Native: c.Native, Platform: c.Platform, ExecutorIncarnation: c.ExecutorIncarnation, NativeDigest: c.NativeDigest})
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +152,7 @@ func (p *Provider) validateDesired(d *resourcev1.ResourceDesiredState) error {
 		return ErrUnsafe
 	}
 	if u.GetShell() != nil {
-		shells, e := protectedRead("/etc/shells")
+		shells, e := rootRead("/etc/shells")
 		if e != nil {
 			return e
 		}
@@ -165,7 +169,7 @@ func (p *Provider) validateDesired(d *resourcev1.ResourceDesiredState) error {
 		if e != nil {
 			return e
 		}
-		if e = protectedAncestry(filepath.Dir(resolved)); e != nil {
+		if e = rootDirectory(filepath.Dir(resolved)); e != nil {
 			return e
 		}
 		info, e := os.Stat(resolved)
@@ -178,6 +182,29 @@ func (p *Provider) validateDesired(d *resourcev1.ResourceDesiredState) error {
 	}
 	return nil
 }
+
+// Observe reads the account without effects. The ownership ledger only scopes
+// which owned dimensions the observation reports.
+func (p *Provider) Observe(ctx context.Context, d *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return nil, ErrUnsupported
+	}
+	if err := p.validateDesired(d); err != nil {
+		return nil, err
+	}
+	l, err := p.ledger(ctx, d.GetRef())
+	if err != nil {
+		return nil, err
+	}
+	before, _, _, err := p.observe(ctx, d, l)
+	if err != nil {
+		return nil, err
+	}
+	return before.GetObservation(), nil
+}
+
 func (p *Provider) Plan(ctx context.Context, d *resourcev1.ResourceDesiredState, op resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -270,7 +297,7 @@ func (p *Provider) plan(ctx context.Context, d *resourcev1.ResourceDesiredState,
 	if err != nil {
 		return nil, err
 	}
-	if _, err = nativeToolOptions(ctx, p.run, commands, ChrootAccountRoot(p.config.Platform)); err != nil {
+	if _, err = nativeToolOptions(ctx, p.run, commands, platform.Of(p.config.Platform).Native().Quirks.AccountChroot); err != nil {
 		return nil, err
 	}
 	return plan, nil

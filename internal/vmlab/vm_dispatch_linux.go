@@ -26,6 +26,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 const dispatchUnit = "labdispatch.service"
@@ -108,28 +109,6 @@ type VMDispatchResult struct {
 	Architecture           string                          `json:"architecture,omitempty"`
 }
 
-// resourceLanePlatform lists the images whose native fixture builder and
-// oracles exist: APT, DNF5 and the EL DNF4 generation (RHEL 9/10, AlmaLinux and
-// Rocky 8/9/10).
-func resourceLanePlatform(manifest *labv1.ImageManifest) bool {
-	version := manifest.GetVersion()
-	switch manifest.GetDistribution() {
-	case "ubuntu":
-		return version == "24.04" || version == "26.04"
-	case "fedora":
-		return version == "44"
-	case "almalinux", "rocky":
-		if strings.HasPrefix(version, "8.") {
-			return true
-		}
-		fallthrough
-	case "rhel":
-		return strings.HasPrefix(version, "9.") || strings.HasPrefix(version, "10.")
-	default:
-		return false
-	}
-}
-
 // DispatchVM uses the same native builders, authenticated package installers,
 // isolated server/database and enrollment helpers as the lifecycle lane. All
 // execution authority after trust admission comes from the real server/relay.
@@ -140,8 +119,14 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.ResourceExecutionOnly && !options.Resources {
 		return nil, errors.New("direct resource execution requires the resource lane")
 	}
-	if options.Resources && (options.PowerActions || options.Hold != 0 || !resourceLanePlatform(manifest)) {
-		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04/26.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9 or 10, without power actions or console hold")
+	release := manifestRelease(manifest)
+	if options.Resources {
+		if err := release.LabLane(platform.LaneResources); err != nil {
+			return nil, err
+		}
+		if options.PowerActions || options.Hold != 0 {
+			return nil, errors.New("native resource lane runs without power actions or console hold")
+		}
 	}
 	if (options.ResourceKinds["secret-password"] || options.ResourceKinds["local-admin"]) && (!options.Resources || options.ResourceExecutionOnly) {
 		return nil, errors.New("secret delivery and managed local-admin kinds require the connected resource phase")
@@ -150,11 +135,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.ResourceKinds["local-admin"] && !options.LocalAuthority {
 		return nil, errors.New("the local-admin kind requires -local-authority for reveal step-up and approval")
 	}
-	format, err := NativePackageFormat(manifest.GetDistribution())
+	format, err := NativePackageFormat(release)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateVMRedHatToken(manifest.GetDistribution(), options.RedHatTokenFile); err != nil {
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
 		return nil, err
 	}
 	if options.Hold < 0 || options.Hold > time.Hour || (options.Hold > 0 && options.Progress == nil) {
@@ -276,11 +261,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err := pinArchRepositories(ctx, vm, manifest); err != nil {
 		return result, err
 	}
-	family, err := nativeDistributionFamily(manifest.GetDistribution())
+	backend, err := nativeBackend(release)
 	if err != nil {
 		return result, err
 	}
-	if family == familyDNF {
+	if backend.DNF() {
 		mode, err := vm.run(ctx, "getenforce", nil, 128, 10*time.Second)
 		if err != nil {
 			return result, err

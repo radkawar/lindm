@@ -15,6 +15,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // ListDeviceStorageTargets projects the current generation's published host
@@ -245,9 +246,11 @@ func requireObservedStorageTargets(details *inventoryv1.NativeDetails, spec *age
 	}
 	candidates, reason := observedStorageTargets(details, kind)
 	if reason != "" {
-		return rpcError(connect.CodeFailedPrecondition, reason)
+		return rpcreason.Error(connect.CodeFailedPrecondition, reason)
 	}
-	mismatch := func() error { return rpcError(connect.CodeFailedPrecondition, "device_action_storage_target_mismatch") }
+	mismatch := func() error {
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_storage_target_mismatch")
+	}
 	for i, target := range requested {
 		for _, previous := range requested[:i] {
 			if proto.Equal(target, previous) {
@@ -301,11 +304,11 @@ func requireObservedStorageTargets(details *inventoryv1.NativeDetails, spec *age
 				current = byName[storageString(current.GetParent())]
 			}
 			if !covered {
-				return rpcError(connect.CodeFailedPrecondition, "device_action_storage_target_set_mismatch")
+				return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_storage_target_set_mismatch")
 			}
 		}
 		if len(requested) != len(candidates) || len(requested) != containers {
-			return rpcError(connect.CodeFailedPrecondition, "device_action_storage_target_set_mismatch")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_storage_target_set_mismatch")
 		}
 	}
 	return nil

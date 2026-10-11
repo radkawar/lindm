@@ -3,19 +3,16 @@
 package nativefile
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 // CreationMetadata derives the label of the final pathname from native SELinux
@@ -61,43 +58,14 @@ func CreationXattrs(ctx context.Context, path string) ([]*agentv1.NativeFileXatt
 	}
 	// Fixed native policy lookup, not a configurable command or interpreter.
 	// A helper with SELinux enabled but no lookup tool refuses new files.
-	program := "/usr/sbin/matchpathcon"
-	info, err := os.Stat(program)
-	if err != nil {
-		return nil, fmt.Errorf("%w: SELinux label lookup unavailable: %w", ErrUnsupported, err)
-	}
-	var native unix.Stat_t
-	if err := unix.Stat(program, &native); err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() || native.Uid != 0 || native.Mode&0022 != 0 {
-		return nil, ErrUnsafePath
-	}
-	lookup, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 	// matchpathcon -m takes a file class name, not a numeric mode.
-	command := exec.CommandContext(lookup, program, "-n", "-m", "file", "--", path)
-	command.Env = []string{"LANG=C", "LC_ALL=C", "PATH=/usr/sbin:/usr/bin"}
-	command.Dir = "/"
-	command.WaitDelay = time.Second
-	var stdout, stderr boundedOutput
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
+	result, err := nativeexec.Run(ctx, nativeexec.Command{Path: "/usr/sbin/matchpathcon", Args: []string{"-n", "-m", "file", "--", path}, Timeout: 5 * time.Second, StdoutLimit: 4096, StderrLimit: 4096})
+	if err != nil {
 		return nil, fmt.Errorf("%w: SELinux label lookup: %w", ErrUnsupported, err)
 	}
-	label := strings.TrimSuffix(stdout.String(), "\n")
-	if stderr.Len() != 0 || label == "" || label == "<<none>>" || strings.ContainsAny(label, "\x00\r\n\t ") || strings.Count(label, ":") < 2 {
+	label := strings.TrimSuffix(string(result.Stdout), "\n")
+	if len(result.Stderr) != 0 || label == "" || label == "<<none>>" || strings.ContainsAny(label, "\x00\r\n\t ") || strings.Count(label, ":") < 2 {
 		return nil, ErrUnsupported
 	}
 	return []*agentv1.NativeFileXattr{{Name: "security.selinux", Value: append([]byte(label), 0)}}, nil
-}
-
-type boundedOutput struct{ bytes.Buffer }
-
-func (w *boundedOutput) Write(data []byte) (int, error) {
-	if len(data) > 4096-w.Len() {
-		return 0, ErrUnsupported
-	}
-	return w.Buffer.Write(data)
 }

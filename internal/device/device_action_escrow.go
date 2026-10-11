@@ -18,6 +18,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/escrow"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // deviceActionReceipt observes committed escrow in a fresh transaction before
@@ -32,7 +33,7 @@ func (s *Service) deviceActionReceipt(ctx context.Context, principal devicePrinc
 		return nil, mapErr(err)
 	}
 	if s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -56,7 +57,7 @@ func (s *Service) deviceActionReceipt(ctx context.Context, principal devicePrinc
 		return nil, mapErr(err)
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_binding_rejected")
 	}
 	if len(action.EscrowReceiptEnvelope) > 0 {
 		if err := tx.Commit(ctx); err != nil {
@@ -78,7 +79,7 @@ func (s *Service) deviceActionReceipt(ctx context.Context, principal devicePrinc
 		return nil, mapErr(err)
 	}
 	if snapshot.Delegation == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	receipt := &agentv1.DeviceActionEscrowReceipt{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), IntentSha256: intentDigest[:], EscrowSha256: escrowDigest, RecoveryKeySha256: stored.SecretSha256, NewKeyslot: recovery.GetNewKeyslot(), LuksUuid: recovery.GetLuksUuid(), EscrowKeyId: recovery.GetEscrowKeyId(), StoredAt: timestamppb.New(stored.CommittedAt.Time), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), LocalAdmin: recovery.GetLocalAdmin()}
 	envelope, err := s.authority.Sign(ctx, receipt, s.signing.StartKey)
@@ -187,10 +188,10 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 		return nil, invalid("invalid_recovery_key_reveal")
 	}
 	if s.identity == nil || s.escrow == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "escrow_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_unconfigured")
 	}
 	if err := s.identity.RequireRecentStepUp(ctx, 5*time.Minute); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recent_step_up_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recent_step_up_required")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -244,7 +245,7 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 	}
 	secret, err := s.escrow.Reveal(stored.BindingDocument, &escrow.Record{KeyID: stored.KeyID, WrappedKey: stored.WrappedKey, Ciphertext: stored.Ciphertext, SecretSHA256: stored.SecretSha256})
 	if err != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "escrow_custody_rejected")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_custody_rejected")
 	}
 	return noStore(&adminv1.RevealRecoveryKeyResponse{RecoveryKey: secret}), nil
 }

@@ -19,6 +19,7 @@ import (
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 // VMUnattendedOptions selects only owned, disposable native resources.
@@ -80,8 +81,8 @@ func EnrollUnattendedVM(ctx context.Context, manifest *labv1.ImageManifest, opti
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if (manifest.GetDistribution() != "ubuntu" || manifest.GetVersion() != "24.04") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44") {
-		return nil, errors.New("unattended lane requires Ubuntu 24.04 or Fedora 44 cloud manifest")
+	if err := manifestRelease(manifest).LabLane(platform.LaneUnattended); err != nil {
+		return nil, err
 	}
 	if options.LindmdBinary == "" || options.LabBinary == "" {
 		return nil, errors.New("provide prebuilt -lindmd and matching -lab-binary; protected dev trust and live PostgreSQL are required")
@@ -266,7 +267,7 @@ func runUnattendedGuest(ctx context.Context, manifest *labv1.ImageManifest, opti
 		return nil, "", errors.New("native privilege evidence changed enrolled identity")
 	}
 	control := &vmControlPlane{session: owner, fixture: public}
-	result.Inventory, err = waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, nil)
+	result.Inventory, err = waitLifecycleInventory(ctx, vm, control, manifestRelease(manifest), result.DeviceID, nil)
 	if err != nil {
 		return nil, "", err
 	}

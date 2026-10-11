@@ -13,7 +13,7 @@ import (
 func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm device-actions", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04 or Fedora 44 encrypted installer manifest")
+	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04/26.04 or Fedora 44 encrypted installer manifest")
 	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud recovery image manifest")
 	var options vmlab.VMDeviceActionsOptions
 	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")

@@ -23,6 +23,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/policy"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Request[adminv1.SetResourceAssignmentRequest]) (*connect.Response[adminv1.SetResourceAssignmentResponse], error) {
@@ -40,7 +41,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		return nil, invalid("invalid_service_assignment")
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "service_authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_authorization_unavailable")
 	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionAssignResources)
 	if err != nil {
@@ -104,14 +105,14 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		return nil, mapErr(err)
 	}
 	if (err == nil && head.ID.String() != req.Msg.GetExpectedAssignmentId()) || (errors.Is(err, pgx.ErrNoRows) && req.Msg.ExpectedAssignmentId != nil) {
-		return nil, rpcError(connect.CodeAborted, "service_assignment_conflict")
+		return nil, rpcreason.Error(connect.CodeAborted, "service_assignment_conflict")
 	}
 	capacity, err := q.ServiceDispatchCapacity(ctx, generationID)
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if capacity.Assignments >= 65536 {
-		return nil, rpcError(connect.CodeResourceExhausted, "service_assignment_capacity")
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "service_assignment_capacity")
 	}
 	now, err := dispatchClock(ctx, q)
 	if err != nil {
@@ -138,7 +139,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		}
 		for _, item := range resolved {
 			if item.State != policy.ResolutionReady {
-				return nil, rpcError(connect.CodeFailedPrecondition, "resource_resolution_conflict")
+				return nil, rpcreason.Error(connect.CodeFailedPrecondition, "resource_resolution_conflict")
 			}
 		}
 		assignment.ProfileId, assignment.RevisionId, assignment.RevisionNumber, assignment.ProfileName = retained.GetProfileId(), retained.GetRevisionId(), retained.GetRevisionNumber(), retained.GetSpec().GetName()
@@ -327,7 +328,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 		return nil, mapErr(err)
 	}
 	if len(encoded) > maxMessageBytes || proto.Size(response) > maxMessageBytes {
-		return nil, rpcError(connect.CodeResourceExhausted, "service_state_response_capacity")
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "service_state_response_capacity")
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)

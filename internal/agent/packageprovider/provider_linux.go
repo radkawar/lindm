@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"lindm/internal/custody"
+
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
@@ -33,7 +35,9 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/dnf"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/statefs"
+	"lindm/internal/platform"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -87,6 +91,8 @@ type Provider struct {
 	closed bool
 }
 
+var _ resourceprovider.Provider = (*Provider)(nil)
+
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
 func validateMessage(message proto.Message) error {
@@ -126,16 +132,18 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	p := &Provider{config: config, state: filepath.Join(config.StateDirectory, "packageprovider"), run: runNative}
 	var tool string
 	var backend resourcev1.Backend
-	switch config.Platform.GetOsId() {
-	case "ubuntu", "debian":
+	if err := platform.Of(config.Platform).Gate(platform.Packages); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
+	}
+	switch platform.Of(config.Platform).Native().Packages.Backend.PackageDB() {
+	case platform.PackageDBDpkg:
 		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB
 		tool = "/usr/bin/apt-get"
 		backend = resourcev1.Backend_BACKEND_APT
-	default:
-		if _, ok := dnfGeneration(config.Platform.GetOsId()); !ok {
-			return nil, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
-		}
+	case platform.PackageDBRPM:
 		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
+	default:
+		return nil, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
 	}
 	if err := p.checkPlatform(); err != nil {
 		return nil, err
@@ -206,12 +214,9 @@ func (p *Provider) checkPlatform() error {
 	if fields["ID"] != p.config.Platform.GetOsId() || fields["VERSION_ID"] != p.config.Platform.GetVersion() {
 		return fmt.Errorf("%w: actual native platform mismatch", ErrUnsupported)
 	}
-	if fields["ID"] == "fedora" {
-		switch fields["VARIANT_ID"] {
-		case "", "workstation", "server", "cloud", "container":
-		default:
-			return fmt.Errorf("%w: immutable Fedora product", ErrUnsupported)
-		}
+	// VARIANT_ID separates mutable products from their image-based variants.
+	if err := platform.Identify(platform.OSRelease{ID: fields["ID"], VersionID: fields["VERSION_ID"], VariantID: fields["VARIANT_ID"]}).Gate(platform.Packages); err != nil {
+		return fmt.Errorf("%w: %v", ErrUnsupported, err)
 	}
 	return nil
 }
@@ -227,7 +232,7 @@ func checkSource(source *agentv1.NativePackageSource) error {
 	if err := unix.Close(parent); err != nil {
 		return err
 	}
-	key, err := protectedFile(path, 4<<20)
+	key, err := custody.ReadRoot(path, 4<<20, false)
 	if err != nil {
 		return err
 	}

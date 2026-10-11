@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 // The native parser and kernel must accept the timeout set's fixed-width key;
@@ -36,8 +38,8 @@ func TestQuarantineRulesNativeCheckInPrivateNetwork(t *testing.T) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Cloneflags: unix.CLONE_NEWNET}
 	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin", "LANG=C", "LC_ALL=C"}
 	cmd.Stdin = bytes.NewReader(rules)
-	var output boundedOutput
-	cmd.Stdout, cmd.Stderr = &output, &output
+	output := nativeexec.NewBuffer(outputLimit)
+	cmd.Stdout, cmd.Stderr = output, output
 	if err := cmd.Run(); err != nil {
 		if errors.Is(err, unix.EPERM) {
 			t.Skip("private network namespace capability unavailable")

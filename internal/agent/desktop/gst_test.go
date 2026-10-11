@@ -57,18 +57,3 @@ func TestGstArguments(t *testing.T) {
 		}
 	}
 }
-
-func TestTailBufferKeepsLastBytes(t *testing.T) {
-	buffer := &tailBuffer{limit: 8}
-	for _, chunk := range []string{"abc", "defgh", "ijk", "0123456789xyz"} {
-		if n, err := buffer.Write([]byte(chunk)); err != nil || n != len(chunk) {
-			t.Fatalf("Write = %d, %v", n, err)
-		}
-	}
-	if got := buffer.String(); got != "56789xyz" {
-		t.Fatalf("tail = %q, want 56789xyz", got)
-	}
-	if n, err := buffer.Write([]byte("AB")); err != nil || n != 2 || buffer.String() != "789xyzAB" {
-		t.Fatalf("tail after small write = %q", buffer.String())
-	}
-}

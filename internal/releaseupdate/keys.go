@@ -133,7 +133,7 @@ func LoadOnlineSigners(directory string) (RoleSigners, error) {
 }
 
 func loadRoleSigners(directory string, roles []string, online bool) (result RoleSigners, err error) {
-	if err = protectedDirectory(directory); err != nil {
+	if err = ownedDirectory(directory); err != nil {
 		return result, err
 	}
 	root, err := os.OpenRoot(directory)
@@ -205,7 +205,7 @@ func loadRoleSigners(directory string, roles []string, online bool) (result Role
 // GenerateDevelopmentKeys creates conspicuously opt-in local test custody only.
 // Existing keys are never replaced. Production custody must be provisioned separately.
 func GenerateDevelopmentKeys(directory string) (err error) {
-	if err = protectedDirectory(directory); err != nil {
+	if err = ownedDirectory(directory); err != nil {
 		return err
 	}
 	for _, role := range []string{"root", "targets", rolloutRole, "snapshot", "timestamp"} {

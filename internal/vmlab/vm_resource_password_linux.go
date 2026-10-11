@@ -31,8 +31,24 @@ type rootRecoverySession struct {
 
 var logindSessionID = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 
+// rootRecoveryLoginScript authorizes the lab's own key for a disposable root
+// login. Installer-built goldens (Debian) ship the lab's sshd drop-in with
+// "PermitRootLogin no"; it becomes key-only "prohibit-password", the cloud
+// images' default, and sshd reloads. Password authentication stays disabled.
+const rootRecoveryLoginScript = `install -d -o root -g root -m 0700 /root/.ssh
+install -o root -g root -m 0600 /home/` + labUser + `/.ssh/authorized_keys /root/.ssh/authorized_keys
+if command -v restorecon >/dev/null 2>&1; then restorecon -RF /root/.ssh; fi
+conf=/etc/ssh/sshd_config.d/00-lindm-lab.conf
+if test -f "$conf" && grep -qx 'PermitRootLogin no' "$conf"; then
+ sed -i 's/^PermitRootLogin no$/PermitRootLogin prohibit-password/' "$conf"
+ grep -qx 'PermitRootLogin prohibit-password' "$conf"
+ grep -qx 'PasswordAuthentication no' "$conf"
+ systemctl reload ssh.service 2>/dev/null || systemctl reload sshd.service
+fi
+`
+
 func openRootRecoverySession(ctx context.Context, vm *guestVM) (_ *rootRecoverySession, resultErr error) {
-	if err := lifecycleCommand(ctx, vm, "authorize disposable root recovery login", "install -d -o root -g root -m 0700 /root/.ssh; install -o root -g root -m 0600 /home/"+labUser+"/.ssh/authorized_keys /root/.ssh/authorized_keys; if command -v restorecon >/dev/null 2>&1; then restorecon -RF /root/.ssh; fi"); err != nil {
+	if err := lifecycleCommand(ctx, vm, "authorize disposable root recovery login", rootRecoveryLoginScript); err != nil {
 		return nil, err
 	}
 	config := *vm.config
@@ -100,8 +116,8 @@ func enablePasswordProvider(ctx context.Context, packages *nativeGuestPackages, 
 const passwordFixtureScript = `set -eu
 . /etc/os-release
 case "$ID" in
- ubuntu) DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality libpwquality-tools ;;
- fedora|rhel|almalinux) rpm -q libpwquality pam authselect ;;
+ ubuntu|debian) DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality libpwquality-tools ;;
+ fedora|rhel|almalinux|rocky) rpm -q libpwquality pam authselect ;;
 esac
 command -v pwscore
 `
@@ -112,7 +128,7 @@ command -v pwscore
 // has, before qualifying the managed path.
 const passwordUnmanagedProbe = `. /etc/os-release
 case "$ID" in
- rhel|almalinux) if authselect current --raw >/dev/null 2>&1; then echo managed; else echo unmanaged; fi ;;
+ rhel|almalinux|rocky) if authselect current --raw >/dev/null 2>&1; then echo managed; else echo unmanaged; fi ;;
  *) echo managed ;;
 esac
 `
@@ -144,7 +160,7 @@ const (
 // native configuration, and the distribution's PAM password stack.
 func passwordOracle(minLength uint32) func(context.Context, *guestVM) (VMResourceNativeRecord, error) {
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
-		stack := ". /etc/os-release; case \"$ID\" in ubuntu) stack=/etc/pam.d/common-password ;; fedora|rhel|almalinux) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
+		stack := ". /etc/os-release; case \"$ID\" in ubuntu|debian) stack=/etc/pam.d/common-password ;; fedora|rhel|almalinux|rocky) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
 		command := stack + "printf '%s\\n' " + passwordLongCandidate + " | pwscore; "
 		if minLength > 12 {
 			command += "if printf '%s\\n' " + passwordShortCandidate + " | pwscore; then exit 1; fi; printf 'short-rejected\\n'; "

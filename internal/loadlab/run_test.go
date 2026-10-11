@@ -25,16 +25,3 @@ func TestJitterPreservesCadenceAndSeed(t *testing.T) {
 		t.Fatalf("jitter changes offered heartbeat rate: mean %s", mean)
 	}
 }
-
-func TestHardwareOutputBound(t *testing.T) {
-	var output boundedOutput
-	if _, err := output.Write(make([]byte, 65536)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := output.Write([]byte{1}); err == nil {
-		t.Fatal("hardware subprocess can grow evidence without bound")
-	}
-	if output.buffer.Len() != 65536 {
-		t.Fatal("failed write exceeded evidence bound")
-	}
-}

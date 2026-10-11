@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -191,7 +193,7 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 	return syncTree(directory)
 }
 func readPreparedManifest(directory string) (*resourcev1.PackageTransactionManifest, error) {
-	data, err := protectedFile(filepath.Join(directory, "native-manifest.pb"), 256<<10)
+	data, err := custody.ReadRoot(filepath.Join(directory, "native-manifest.pb"), 256<<10, false)
 	if err != nil {
 		return nil, err
 	}
@@ -360,14 +362,14 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if len(manifest.GetEntries()) != 0 {
 		if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 			for _, args := range dpkgArgs {
-				if _, err = p.run(ctx, "/usr/bin/dpkg", args, "/", []string{"DPKG_FRONTEND_LOCKED=true"}); err != nil {
+				if _, err = commitNative(ctx, "/usr/bin/dpkg", args, "/", []string{"DPKG_FRONTEND_LOCKED=true"}); err != nil {
 					break
 				}
 			}
 		} else if p.manager == dnf.DNF4 {
 			_, err = p.dnf4(ctx, "apply", directory, p.versionlock)
 		} else {
-			_, err = p.dnf(ctx, directory, []string{"--cacheonly", "replay", filepath.Join(directory, "transaction")})
+			_, err = commitNative(ctx, p.managerPath, p.dnfArgs(directory, []string{"--cacheonly", "replay", filepath.Join(directory, "transaction")}), "/", nil)
 		}
 		if err != nil {
 			return errors.Join(ErrOutcomeUnknown, err)
@@ -438,7 +440,7 @@ func validateEffectiveTarget(request *agentv1.NativePackageTransactionRequest) e
 }
 func (p *Provider) checkStagedArtifacts(ctx context.Context, directory string, request *agentv1.NativePackageTransactionRequest, manifest *resourcev1.PackageTransactionManifest, before *database) error {
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		data, err := protectedFile(p.nativeTransactionPath(directory), 4<<20)
+		data, err := custody.ReadRoot(p.nativeTransactionPath(directory), 4<<20, false)
 		if err != nil {
 			return err
 		}

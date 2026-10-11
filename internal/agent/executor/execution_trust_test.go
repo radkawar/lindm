@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -334,7 +335,7 @@ func rejectAuthority(t *testing.T, svc *Service, req *agentv1.UpdateExecutionTru
 	t.Helper()
 	_, err := svc.UpdateExecutionTrust(t.Context(), connect.NewRequest(req))
 	var connectErr *connect.Error
-	if !errors.As(err, &connectErr) || connectErr.Code() != connect.CodePermissionDenied || connectErr.Meta().Get("Lindm-Reason") != "execution_trust_rejected" {
+	if !errors.As(err, &connectErr) || connectErr.Code() != connect.CodePermissionDenied || rpcreason.Get(connectErr) != "execution_trust_rejected" {
 		t.Fatalf("cryptographic update was not an authority denial: %v", err)
 	}
 }

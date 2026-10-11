@@ -11,6 +11,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/protodata"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -24,7 +25,7 @@ func (s *Service) GetRecoveryTime(ctx context.Context, req *connect.Request[reco
 		return nil, invalid("invalid_recovery_time")
 	}
 	if s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -58,7 +59,7 @@ func (s *Service) GetRecoveryTime(ctx context.Context, req *connect.Request[reco
 		}
 	}
 	if !expires.After(now) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "recovery_time_window_empty")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_time_window_empty")
 	}
 	digest, err := trust.DeviceActionDigest(req.Msg)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // AcceptanceGuestOptions boots one vendor image under a caller-held host lease.
@@ -82,11 +83,12 @@ func RunAcceptanceGuest(ctx context.Context, options AcceptanceGuestOptions, vis
 	if err := validateManifest(m); err != nil {
 		return evidence, err
 	}
-	if (m.Distribution != "ubuntu" || m.Version != "24.04") && (m.Distribution != "fedora" || m.Version != "44") {
-		return evidence, errors.New("acceptance requires stock Ubuntu 24.04 or Fedora 44")
+	lane := platform.LaneAcceptance
+	if options.Encrypted != nil {
+		lane = platform.LaneEncryptedAcceptance
 	}
-	if options.Encrypted != nil && m.Distribution != "ubuntu" {
-		return evidence, errors.New("encrypted acceptance requires the Ubuntu 24.04 vendor installer")
+	if err := platform.ForManifest(m.Distribution, m.Version).LabLane(lane); err != nil {
+		return evidence, err
 	}
 	evidence.ImageID, evidence.ImageSHA256 = m.Id, m.Sha256
 	evidence.Distribution, evidence.Version = m.Distribution, m.Version

@@ -79,13 +79,3 @@ func TestFailedStopDoesNotDisableTimer(t *testing.T) {
 		t.Fatalf("disable after failed stop = %v", manager.calls)
 	}
 }
-func TestBoundedNativeVerifierOutput(t *testing.T) {
-	var output boundedOutput
-	data := make([]byte, 32769)
-	if n, err := output.Write(data); err != nil || n != len(data) {
-		t.Fatalf("write = %d, %v", n, err)
-	}
-	if !output.overflow || output.Len() != 32768 {
-		t.Fatalf("unbounded verify output: len=%d overflow=%v", output.Len(), output.overflow)
-	}
-}

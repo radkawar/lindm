@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -21,6 +20,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const (
@@ -122,25 +124,6 @@ func entraUUID(value string) bool {
 	return err == nil && id != uuid.Nil && id.String() == value
 }
 
-// Retain a bounded prefix, but consume all writes so a noisy child cannot cause
-// an unbounded allocation or a blocked pipe. Overflow is always an error.
-type entraCapture struct {
-	data     []byte
-	limit    int
-	overflow bool
-}
-
-func (b *entraCapture) Write(p []byte) (int, error) {
-	n := len(p)
-	remaining := b.limit - len(b.data)
-	if len(p) > remaining {
-		b.overflow = true
-		p = p[:remaining]
-	}
-	b.data = append(b.data, p...)
-	return n, nil
-}
-
 // Never echo Graph messages, CLI stderr, subprocess arguments or response bodies:
 // Graph and az can include passwords, client secrets, bearer tokens and PII.
 // Only known Graph codes and numeric AADSTS codes cross the diagnostic boundary.
@@ -206,25 +189,22 @@ func entraMissing(err error) bool {
 func entraAZ(ctx context.Context, operation, permission string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "az", append(args, "--only-show-errors", "--output", "json")...)
-	cmd.WaitDelay = time.Second
-	stdout := entraCapture{limit: entraOutputLimit}
-	stderr := entraCapture{limit: 64 << 10}
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	// Bounded prefixes that drain everything; overflow is always an error.
+	stdout, stderr := nativeexec.NewBuffer(entraOutputLimit), nativeexec.NewBuffer(64<<10)
+	if err := labexec.Run(ctx, labexec.Command{Path: "az", Args: append(args, "--only-show-errors", "--output", "json"), Stdout: stdout, Stderr: stderr}); err != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("entra: %s: %w", operation, ctx.Err())
 		}
-		code := entraErrorCode(stderr.data)
+		code := entraErrorCode(stderr.Bytes())
 		if code == "unavailable" {
-			code = entraErrorCode(stdout.data)
+			code = entraErrorCode(stdout.Bytes())
 		}
 		return nil, &entraGraphError{operation, code, permission}
 	}
-	if stdout.overflow || stderr.overflow {
+	if stdout.Truncated() || stderr.Truncated() {
 		return nil, fmt.Errorf("entra: %s: captured output exceeded safety limit", operation)
 	}
-	return stdout.data, nil
+	return stdout.Bytes(), nil
 }
 
 func entraAccount(ctx context.Context, runDir string) (entraGraph, string, error) {

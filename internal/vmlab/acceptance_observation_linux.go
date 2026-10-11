@@ -50,7 +50,7 @@ func (g *AcceptanceGuest) Observe(ctx context.Context, owner *devlab.OwnerSessio
 	if g.closed || g.vm == nil || !g.enrolled || owner == nil {
 		return nil, errors.New("acceptance observation requires an enrolled live guest and authenticated owner")
 	}
-	before, err := collectVMTruth(ctx, g.vm, g.manifest.Distribution)
+	before, err := collectVMTruth(ctx, g.vm, manifestRelease(g.manifest))
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (g *AcceptanceGuest) Observe(ctx context.Context, owner *devlab.OwnerSessio
 		DeviceID: g.evidence.DeviceID, Host: observation.Host, Packages: observation.Packages,
 		NativeBefore: before.details,
 	}
-	after, err := collectVMTruth(ctx, g.vm, g.manifest.Distribution)
+	after, err := collectVMTruth(ctx, g.vm, manifestRelease(g.manifest))
 	if err != nil {
 		return result, err
 	}
@@ -86,7 +86,7 @@ func (g *AcceptanceGuest) Observe(ctx context.Context, owner *devlab.OwnerSessio
 	}
 	comparisonErr := errors.Join(
 		compareVMObservation(before, observation),
-		compareVMDetails(before.host[0], before.host[2], before.details, after.details, observation.GetHost().GetDetails()),
+		compareVMDetails(before.release(), before.host[2], before.details, after.details, observation.GetHost().GetDetails()),
 	)
 	control := &vmControlPlane{session: owner}
 	publication, err := control.WaitSnapshot(ctx, g.evidence.DeviceID, after, nil, 10*time.Minute)

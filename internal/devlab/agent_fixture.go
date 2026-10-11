@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"lindm/internal/config"
+	"lindm/internal/custody"
 	"lindm/internal/trust"
 )
 
@@ -52,21 +53,14 @@ func readAgentFixture(ctx context.Context, repoRoot string, checkServer bool) (*
 			if err := verifyDevelopmentTrust(ctx, authority, dir); err != nil {
 				return err
 			}
-		} else {
-			if err := protected(dir, true); err != nil {
-				return err
-			}
-			for _, name := range []string{"execution-root.json", "bootstrap.dsse.json"} {
-				if err := protected(filepath.Join(dir, name), false); err != nil {
-					return err
-				}
-			}
+		} else if _, err := custody.Owned(dir, true); err != nil {
+			return err
 		}
-		execution, err := os.ReadFile(filepath.Join(dir, "execution-root.json"))
+		execution, err := readOwned(filepath.Join(dir, "execution-root.json"))
 		if err != nil {
 			return err
 		}
-		bundle, err := os.ReadFile(filepath.Join(dir, "bootstrap.dsse.json"))
+		bundle, err := readOwned(filepath.Join(dir, "bootstrap.dsse.json"))
 		if err != nil {
 			return err
 		}

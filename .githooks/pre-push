@@ -1,3 +1,5 @@
 #!/bin/sh
 set -eu
-exec make check
+# Gate the commits being pushed, not this working tree; git's ref lines
+# arrive on stdin.
+exec make --no-print-directory pre-push

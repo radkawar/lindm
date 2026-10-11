@@ -74,6 +74,7 @@ is on port 18445. Development ports are loopback-only.
 | `make dev-trust`          | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                                         |
 | `make dev-down`           | Stop this checkout's lab services while preserving credentials and volumes                                                                                                |
 | `make fmt`                | Apply repository formatting                                                                                                                                               |
+| `lab vm assistance -hold` | Hands-on remote-assistance demo: one enrolled GNOME VM, local console and guest display until Ctrl-C (`docs/engineering.md`)                                              |
 
 The lab uses `.cache/dev` with mode 0700 and secret files with mode 0600. Never commit
 or copy these credentials. Development-only certificates last five years. Moved,
@@ -658,7 +659,8 @@ exercises typed systemd D-Bus reconciliation in fresh Ubuntu/Fedora guests, with
 independent native state checks. This is provider qualification, not remote policy
 execution or complete G3.
 
-Pre-commit checks the staged snapshot; pre-push runs `make check`. CI additionally
+Pre-commit checks the staged snapshot; pre-push runs `make check` in a clean worktree of each pushed
+commit (skipped when it already has a green `signoff/unit`). CI additionally
 checks generated-contract drift and real database regressions. Hooks are not a
 substitute for protected-branch CI. Dependency audit requires registry/advisory access;
 `make lint` and `make test` are separate checks for already provisioned offline work.

@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -249,7 +251,7 @@ func (p *Provider) loadManifest(ref *resourcev1.ArtifactRef) (*resourcev1.Packag
 	if err := checkArtifact(filepath.Join(directory, "manifest.pb"), ref); err != nil {
 		return nil, "", err
 	}
-	data, err := protectedFile(filepath.Join(directory, "manifest.pb"), 256<<10)
+	data, err := custody.ReadRoot(filepath.Join(directory, "manifest.pb"), 256<<10, false)
 	if err != nil {
 		return nil, "", err
 	}

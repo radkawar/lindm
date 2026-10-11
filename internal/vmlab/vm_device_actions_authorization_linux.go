@@ -14,6 +14,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/rpcreason"
 )
 
 type actionDenialEvidence struct {
@@ -25,15 +26,15 @@ type actionDenialEvidence struct {
 
 func actionDenial(name string, err error, expected connect.Code) (actionDenialEvidence, error) {
 	var rpc *connect.Error
-	if !errors.As(err, &rpc) || rpc.Code() != expected || rpc.Meta().Get("Lindm-Reason") == "" {
+	if !errors.As(err, &rpc) || rpc.Code() != expected || rpcreason.Get(rpc) == "" {
 		return actionDenialEvidence{}, fmt.Errorf("%s did not receive expected %s denial (observed %s, reason %q)", name, expected, connect.CodeOf(err), func() string {
 			if rpc != nil {
-				return rpc.Meta().Get("Lindm-Reason")
+				return rpcreason.Get(rpc)
 			}
 			return ""
 		}())
 	}
-	return actionDenialEvidence{Scenario: name, Code: rpc.Code().String(), Reason: rpc.Meta().Get("Lindm-Reason"), ObservedAt: time.Now().UTC()}, nil
+	return actionDenialEvidence{Scenario: name, Code: rpc.Code().String(), Reason: rpcreason.Get(rpc), ObservedAt: time.Now().UTC()}, nil
 }
 
 func nativeApprovalNegatives(ctx context.Context, fixture *devlab.AuthorityFixture, owner *devlab.OwnerSession, approver **devlab.OwnerSession, deviceID, actionID string) ([]actionDenialEvidence, error) {

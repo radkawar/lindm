@@ -52,16 +52,7 @@ func (s *Store) validateOwnershipSnapshot(snapshot *agentv1.ResourceOwnershipSna
 	if !privateOwnershipSnapshotValid(snapshot) {
 		return ErrResourceOwnershipConflict
 	}
-	if ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL && !sysctlOwnershipSnapshotValid(snapshot) {
-		return ErrResourceOwnershipConflict
-	}
-	if ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION && !definitionOwnershipSnapshotValid(snapshot) {
-		return ErrResourceOwnershipConflict
-	}
-	if ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY && !passwordOwnershipSnapshotValid(snapshot) {
-		return ErrResourceOwnershipConflict
-	}
-	if ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE && !firewallOwnershipSnapshotValid(snapshot) {
+	if rules := ownershipRules(ref.GetKind()); rules.valid != nil && !rules.valid(snapshot) {
 		return ErrResourceOwnershipConflict
 	}
 	if file := observation.GetManagedFile(); file != nil {

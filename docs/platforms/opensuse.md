@@ -177,6 +177,11 @@ SLES service packs, SLED and extensions do not inherit one another's fixes.
 GA-media notices are rejected because a shipped package's accumulated fixes are
 not a first-fixed EVR boundary
 ([`suse.go`](../../internal/advisory/feed/suse.go):17-19,78-125).
+A feed source resolves to its platform registry release
+([`registry.go`](../../internal/platform/registry.go)), which supplies the product
+CPE: SLES 15 with an explicit service pack (`15.N`), Leap 16.0, or Tumbleweed as
+`rolling`. Leap 15.x, SLES 16 and Tumbleweed snapshot-dated sources are rejected
+rather than mapped to a guessed CPE.
 Feed authentication requires the vendor exact-filename checksum and detached
 signature with pinned keys. SUSE coverage remains partial: no finding is not a
 clean bill of health, and offline byte-pinned imports do not become fresh complete

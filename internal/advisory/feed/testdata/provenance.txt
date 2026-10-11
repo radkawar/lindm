@@ -188,3 +188,18 @@ Complete export SHA256 c45c2791452b55990d08ae1ba4962a712081d6e0134bc5c5c6707d09a
 Census of all 70180 entries found maximum 1416, shared by USN-8728-1/-2/-3.
 This fixture preserves the original vendor bytes, including all release scopes.
 It is vendor advisory metadata, not an assertion that every CVE affects a host.
+
+ubuntu-USN-8861-1.json and ubuntu-UBUNTU-CVE-2026-43916.json: exact entries
+USN-8861-1.json and UBUNTU-CVE-2026-43916.json from the canonical
+https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip
+(fetched 2026-10-11, last-modified 2026-10-10T23:18:01Z, 777941722 bytes,
+complete export SHA256 c45c2791452b55990d08ae1ba4962a712081d6e0134bc5c5c6707d09adf50aba).
+USN-8861-1 entry SHA256 c8a3c9704e2a6567172f2ae4790fc9d5a2a41b27d6abe2a84aac79df54865dc1
+(2187 bytes): resolute-only (Ubuntu:26.04:LTS, purl distro=resolute) openssl
+source and binary maps fixed in 3.5.5-1ubuntu3.7; CVE-2026-42772, CVE-2026-54873.
+Advisory https://ubuntu.com/security/notices/USN-8861-1
+UBUNTU-CVE-2026-43916 entry SHA256 8d191d0d10b90bfabd25d1ec7ac24f69a7696fa8b5191e1a04618314d8ca6f80
+(7456 bytes): withdrawn 2026-05-20, one of 15 withdrawn resolute records still
+labelled with the development-series ecosystem "Ubuntu:26.04" (no ":LTS").
+Copyright Canonical Ltd and contributors. CC-BY-SA-4.0:
+https://github.com/canonical/ubuntu-security-notices/blob/main/LICENSE

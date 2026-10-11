@@ -11,12 +11,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
 
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -35,36 +36,38 @@ const (
 type nativeResult struct{ stdout, stderr []byte }
 type nativeRunner func(context.Context, string, []string, string, []string) (nativeResult, error)
 
-type boundedBuffer struct {
-	bytes.Buffer
-	limit int
-}
-
-func (b *boundedBuffer) Write(data []byte) (int, error) {
-	if len(data) > b.limit-b.Len() {
-		return 0, errors.New("packageprovider: native output limit")
-	}
-	return b.Buffer.Write(data)
-}
-
-// runNative does not inherit user PATH, native configuration overrides or a shell.
-// Each invocation is bounded even when the caller supplied no deadline. Stderr is
-// retained separately: a database warning must never look like authoritative absence.
+// runNative runs a native package tool through nativeexec: no shell, no
+// inherited PATH or configuration overrides, its own process group and a
+// bounded deadline even when the caller supplied none. Stderr is retained
+// separately: a database warning must never look like authoritative absence.
+// Errors carry only the sanitized first stderr line, never raw output.
 func runNative(ctx context.Context, executable string, args []string, directory string, extraEnv []string) (nativeResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, executable, args...)
-	cmd.Dir = directory
-	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/", "LANG=C", "LC_ALL=C", "TZ=UTC", "DEBIAN_FRONTEND=noninteractive"}, extraEnv...)
-	cmd.WaitDelay = time.Second
-	out, diagnostic := &boundedBuffer{limit: maxOutput}, &boundedBuffer{limit: maxDiagnostic}
-	cmd.Stdout, cmd.Stderr = out, diagnostic
-	err := cmd.Run()
-	result := nativeResult{stdout: out.Bytes(), stderr: diagnostic.Bytes()}
+	return execNative(ctx, false, executable, args, directory, extraEnv)
+}
+
+// commitNative runs a step that mutates the system package database. Such a
+// step is never SIGKILLed: on deadline or cancellation its group receives
+// SIGTERM and the run waits, so dpkg/rpm are not left half-configured.
+func commitNative(ctx context.Context, executable string, args []string, directory string, extraEnv []string) (nativeResult, error) {
+	return execNative(ctx, true, executable, args, directory, extraEnv)
+}
+
+func execNative(ctx context.Context, terminateOnly bool, executable string, args []string, directory string, extraEnv []string) (nativeResult, error) {
+	result, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path:          executable,
+		Args:          args,
+		Env:           append([]string{"HOME=/", "TZ=UTC", "DEBIAN_FRONTEND=noninteractive"}, extraEnv...),
+		Dir:           directory,
+		Timeout:       10 * time.Minute,
+		StdoutLimit:   maxOutput,
+		StderrLimit:   maxDiagnostic,
+		TerminateOnly: terminateOnly,
+	})
+	native := nativeResult{stdout: result.Stdout, stderr: result.Stderr}
 	if err != nil {
-		return result, fmt.Errorf("packageprovider: %s: %w: %s", filepath.Base(executable), err, strings.TrimSpace(string(result.stderr)))
+		return native, fmt.Errorf("packageprovider: %s: %w: %s", filepath.Base(executable), err, result.Diagnostic())
 	}
-	return result, nil
+	return native, nil
 }
 
 type database struct {
@@ -276,27 +279,6 @@ func firstLine(data []byte) string {
 		line = line[:256]
 	}
 	return line
-}
-
-func protectedFile(path string, maximum int64) (data []byte, err error) {
-	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-	if err != nil {
-		return nil, err
-	}
-	f := os.NewFile(uintptr(fd), path)
-	defer func() { err = errors.Join(err, f.Close()) }()
-	var stat unix.Stat_t
-	if err = unix.Fstat(fd, &stat); err != nil {
-		return nil, err
-	}
-	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Uid != 0 || stat.Mode&0022 != 0 || stat.Nlink != 1 || stat.Size > maximum {
-		return nil, errors.New("packageprovider: unsafe native file")
-	}
-	data, err = io.ReadAll(io.LimitReader(f, maximum+1))
-	if err == nil && int64(len(data)) > maximum {
-		err = errors.New("packageprovider: native file size limit")
-	}
-	return data, err
 }
 
 func checkNoDowngrade(before, after *resourcev1.NativeVersion) error {

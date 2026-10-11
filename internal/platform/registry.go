@@ -8,7 +8,7 @@ import "slices"
 
 var (
 	agentCore = []Capability{Inventory, Lifecycle, Dispatch, SelfUpdate}
-	// hostResources are the EL 9/10, Ubuntu and Fedora host providers.
+	// hostResources are the EL 9/10, Debian 12/13, Ubuntu and Fedora host providers.
 	hostResources = []Capability{Packages, Accounts, Sysctl, Definitions, Firewall}
 	// actionLanes have a maintained encrypted-installer recipe, native action
 	// prerequisites and a graphical golden.
@@ -21,7 +21,9 @@ const (
 	reasonOSPatch        = "OS patch policy provider not landed"
 	reasonReleaseUpgrade = "release upgrade is not implemented"
 	reasonDesignOnly     = "design-only: the declarative/image-based management model is not specified"
-	reasonELHost         = "EL host providers are qualified only on RHEL and AlmaLinux 9/10"
+	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
+	reasonEL8Packages    = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
+	reasonRockyOSV       = "Rocky's OSV export uses source-like package mappings without a complete binary universe"
 )
 
 func caps(groups ...[]Capability) []Capability { return slices.Concat(groups...) }
@@ -58,19 +60,52 @@ var (
 	debianLike = []string{"debian"}
 	fedoraVar  = []string{"", "workstation", "server", "cloud", "container"}
 	apt        = PackageTooling{Backend: BackendAPT}
-	dnf5       = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
-	dnf4       = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
-	pacman     = PackageTooling{Backend: BackendPacman}
-	zypper     = PackageTooling{Backend: BackendZypper}
-	gnomeGDM3  = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
-	gnomeGDM   = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
-	ufw        = "nftables + ufw (inactive)"
-	firewalld  = "nftables + firewalld"
-	nftables   = "nftables"
-	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect}
-	elQuirks10 = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect}
-	el9Pins    = []PasswordPins{{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}}
-	el10Pins   = []PasswordPins{{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}}
+	// DNF 5.4.6.0 is the first release that stores a transaction without
+	// privileges; older releases refuse the staging sandbox's read-only /usr.
+	dnf5 = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
+	// DNF 4.7.0 is EL 8.10's; older DNF4 lacks the plugin selection, strict
+	// remote-RPM and query APIs the DNF4 adapter relies on.
+	dnf4        = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
+	pacman      = PackageTooling{Backend: BackendPacman}
+	zypper      = PackageTooling{Backend: BackendZypper}
+	gnomeGDM3   = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
+	gnomeGDM    = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
+	ufw         = "nftables + ufw (inactive)"
+	firewalld   = "nftables + firewalld"
+	nftables    = "nftables"
+	elQuirks9   = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect}
+	elQuirks10  = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect}
+	el9Pins     = []PasswordPins{{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}}
+	el10Pins    = []PasswordPins{{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}}
+	osvFeed     = []Feed{FeedOSV}
+	debianFeeds = []Feed{FeedOSV, FeedDebianTracker}
+	redHatFeed  = []Feed{FeedRedHatCSAF}
+	suseFeed    = []Feed{FeedSUSECSAF}
+	// Encrypted-installer and device-action lab recipes.
+	dracutTPM      = []string{"systemd", "crypt", "tpm2-tss", "lvm"}
+	dracutSplitTPM = []string{"systemd", "crypt", "tpm2-tss", "lvm", "systemd-cryptsetup"}
+	ubuntuSession  = LabSession{
+		Desktops:  map[string][]string{"gnome": {"ubuntu-desktop-minimal"}, "kde": {"kubuntu-desktop"}},
+		GDMConfig: "/etc/gdm3/custom.conf", Name: "ubuntu", Terminal: []string{"gnome-terminal", "--"},
+		UpgradePrompt: "/etc/update-manager/release-upgrades",
+		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell"},
+	}
+	ubuntuGuest = LabGuest{
+		Initrd:    "/boot/initrd.img-%s",
+		Actions:   []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
+		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "sbsigntool", "busybox-static", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+	}
+	fedoraGraphical = []string{"base-graphical", "desktop-accessibility", "fonts", "guest-desktop-agents", "hardware-support", "input-methods", "networkmanager-submodules"}
+	fedoraSession   = LabSession{
+		Desktops:  map[string][]string{"gnome": slices.Concat(fedoraGraphical, []string{"gnome-desktop"}), "kde": slices.Concat(fedoraGraphical, []string{"kde-desktop"})},
+		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"ptyxis", "--new-window", "--"},
+		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell"},
+	}
+	fedoraGuest = LabGuest{
+		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
+		Actions:   []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl"},
+		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "sbsigntools", "busybox", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+	}
 )
 
 var registry = []*Release{
@@ -78,18 +113,25 @@ var registry = []*Release{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249,
 		Desktop: gnomeGDM3, Firewall: ufw,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy"},
-		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Advisories}),
-		Gates:    actionGates(string(Definitions), "systemd 249 is below the definition provider floor 255", string(Password), reasonNoPasswordPins),
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy"},
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
+			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}},
+		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}},
+		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories}),
+		// 249's verify has no --recursive-errors (systemd 250) and exits 0 on
+		// a candidate setting it ignores as invalid.
+		Gates: actionGates(string(Definitions), "systemd 249 is below the definition provider floor 255"),
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 255,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Ubuntu:24.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "noble"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:24.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "noble", CodenameRelease: true},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
+			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest,
+			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(),
 	},
@@ -97,16 +139,19 @@ var registry = []*Release{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 259,
 		Desktop: gnomeGDM3, Firewall: ufw,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		// The 26.04 desktop ISO carries dracut 110 and the TSS2 stack itself.
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
+			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), "owned-boot recovery fixture not maintained for the 26.04 media"),
 	},
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",
 		Tier: TierOutside, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 247,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Debian:11", PURLNamespace: "debian", PURLDistro: "debian-11"},
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:11", PURLNamespace: "debian", PURLDistro: "debian-11"},
 		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
 		Supports: caps(agentCore, []Capability{Packages, Accounts, Advisories}),
 		Gates:    actionGates(string(Definitions), "systemd 247 is below the definition provider floor 255"),
@@ -115,26 +160,32 @@ var registry = []*Release{
 		Key: "debian-12", Name: "Debian 12", Distribution: "Debian", ID: "debian", Version: Exact("12"), Codename: "bookworm",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252,
 		Desktop: Desktop{Name: "GNOME/KDE"}, Firewall: nftables,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "debian-12"},
-		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Advisories}),
-		Gates:    actionGates(string(Definitions), "systemd 252 is below the definition provider floor 255", string(Password), reasonNoPasswordPins),
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "debian-12"},
+		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
+		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
+			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}},
+		Lab:      Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
+		Gates:    actionGates(),
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257,
 		Desktop: Desktop{Name: "GNOME/KDE"}, Firewall: nftables,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "debian-13"},
-		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Definitions, Advisories}),
-		Gates:    actionGates(string(Password), reasonNoPasswordPins),
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "debian-13"},
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
+			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}},
+		Lab:      Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
+		Gates:    actionGates(),
 	},
 	{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,
 		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5,
 		Desktop: Desktop{Name: "Workstation GNOME; KDE edition", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
-		Advisory: Advisory{Feed: "rpm-updateinfo", Ecosystem: "Fedora 43 updates"},
+		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43"},
 		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect},
+		Lab:      Lab{Lanes: []LabLane{LaneServices}},
 		Supports: caps(agentCore, hostResources, []Capability{Advisories}),
 		Gates:    actionGates(string(Password), reasonNoPasswordPins),
 	},
@@ -142,9 +193,13 @@ var registry = []*Release{
 		Key: "fedora-44", Name: "Fedora 44", Distribution: "Fedora", ID: "fedora", Version: Exact("44"), Variants: fedoraVar,
 		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Systemd: 259,
 		FDE: "LUKS2 (anaconda LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "Workstation GNOME; KDE edition", Version: "GNOME 50", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
-		Advisory: Advisory{Feed: "rpm-updateinfo", Ecosystem: "Fedora 44 updates"},
+		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 44"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect,
 			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAcceptance},
+			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
+			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(),
 	},
@@ -156,16 +211,18 @@ var registry = []*Release{
 	{
 		Key: "rhel-8", Name: "RHEL 8", Distribution: "RHEL", ID: "rhel", Version: Major("8"),
 		Tier: TierOutside, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 239,
-		Advisory: Advisory{Feed: "redhat-csaf", Ecosystem: "cpe:/o:redhat:enterprise_linux:8", PURLNamespace: "redhat"},
-		Supports: []Capability{Inventory, Packages, Advisories},
-		Gates:    gates(string(Accounts), reasonELHost, string(Sysctl), reasonELHost, string(Firewall), reasonELHost, string(Definitions), "systemd 239 is below the definition provider floor 252"),
+		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:8", PURLNamespace: "redhat", PlatformStreams: true},
+		Lab:      Lab{Lanes: []LabLane{LaneServices}, Entitlement: true},
+		Supports: []Capability{Inventory, Advisories},
+		Gates:    gates(string(Packages), reasonEL8Packages, string(Accounts), reasonELHost, string(Sysctl), reasonELHost, string(Firewall), reasonELHost, string(Definitions), "systemd 239 is below the definition provider floor 252"),
 	},
 	{
 		Key: "rhel-9", Name: "RHEL 9", Distribution: "RHEL", ID: "rhel", Version: Major("9"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feed: "redhat-csaf", Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat"},
+		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks9, el9Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
 		Gates:    actionGates(),
 	},
@@ -173,21 +230,41 @@ var registry = []*Release{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feed: "redhat-csaf", Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat"},
+		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks10, el10Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
 		Gates:    actionGates(),
 	},
-	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux"),
-	elRebuild("rocky-9", "Rocky Linux 9", "Rocky Linux", "rocky", "9", Tier1, 0, "Rocky Linux:9", "rocky-linux"),
-	elRebuild("rocky-10", "Rocky Linux 10", "Rocky Linux", "rocky", "10", Tier1, 0, "Rocky Linux:10", "rocky-linux"),
-	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux"),
+	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
+	{
+		Key: "rocky-9", Name: "Rocky Linux 9", Distribution: "Rocky Linux", ID: "rocky", Version: Major("9"),
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
+		Desktop: gnomeGDM, Firewall: firewalld,
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV},
+		Quirks:   withPins(elQuirks9, el9Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
+		Gates:    actionGates(),
+	},
+	{
+		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
+		Desktop: gnomeGDM, Firewall: firewalld,
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV},
+		Quirks:   withPins(elQuirks10, el10Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
+		Gates:    actionGates(),
+	},
+	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux", ""),
 	{
 		Key: "almalinux-9", Name: "AlmaLinux 9", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9"},
 		Quirks:   withPins(elQuirks9, el9Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
 		Gates:    actionGates(),
 	},
@@ -195,8 +272,9 @@ var registry = []*Release{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feed: "osv", Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10"},
 		Quirks:   withPins(elQuirks10, el10Pins),
+		Lab:      Lab{Lanes: []LabLane{LaneResources}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
 		Gates:    actionGates(),
 	},
@@ -230,7 +308,7 @@ var registry = []*Release{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),
 		Tier: Tier2, Page: "arch.md", Family: FamilyArch, Architectures: x86, Packages: pacman,
 		Desktop:  Desktop{Name: "owner-chosen per record"},
-		Advisory: Advisory{Feed: "arch-asa", Ecosystem: "Arch Linux rolling"},
+		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling"},
 		Supports: caps(agentCore, []Capability{Advisories}),
 		Gates:    actionGates(),
 	},
@@ -246,21 +324,22 @@ var registry = []*Release{
 		Key: "opensuse-tumbleweed", Name: "openSUSE Tumbleweed", Distribution: "openSUSE Tumbleweed", ID: "opensuse-tumbleweed", Version: Snapshot(),
 		Tier: Tier2, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
 		Desktop:  Desktop{Name: "KDE Plasma/GNOME"},
-		Advisory: Advisory{Feed: "suse-csaf", Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse"},
+		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse"},
+		Lab:      Lab{Installer: AutoYaST},
 		Supports: caps(agentCore, []Capability{Advisories}),
 		Gates:    actionGates(),
 	},
 	{
 		Key: "opensuse-leap-16.0", Name: "openSUSE Leap 16.0", Distribution: "openSUSE Leap", ID: "opensuse-leap", Version: Exact("16.0"),
 		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
-		Advisory: Advisory{Feed: "suse-csaf", Ecosystem: "cpe:/o:opensuse:leap:16.0", PURLNamespace: "suse"},
+		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:opensuse:leap:16.0", PURLNamespace: "suse"},
 		Supports: caps(agentCore, []Capability{Advisories}),
 		Gates:    gates(),
 	},
 	{
 		Key: "sles-15", Name: "SLES 15", Distribution: "SLES", ID: "sles", Version: Major("15"),
 		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
-		Advisory: Advisory{Feed: "suse-csaf", Ecosystem: "cpe:/o:suse:sles:15:spN", PURLNamespace: "suse"},
+		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:suse:sles:15:spN", PURLNamespace: "suse"},
 		Supports: []Capability{Inventory, Advisories}, Gates: gates(),
 	},
 	{
@@ -280,14 +359,15 @@ func withPins(q Quirks, pins []PasswordPins) Quirks {
 	return q
 }
 
-func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl string) *Release {
+func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {
 	return &Release{
 		Key: key, Name: name, Distribution: distribution, ID: id, Version: Major(major),
 		Tier: tier, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: systemd,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feed: "osv", Ecosystem: ecosystem, PURLNamespace: purl, PURLDistro: purl + "-" + major},
-		Supports: caps(agentCore, []Capability{Packages, Advisories}),
-		Gates: actionGates(string(Accounts), reasonELHost, string(Sysctl), reasonELHost, string(Firewall), reasonELHost,
+		Lab:      Lab{Lanes: []LabLane{LaneResources}},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: ecosystem, PURLNamespace: purl, PURLDistro: purl + "-" + major, Partial: partial},
+		Supports: caps(agentCore, []Capability{Advisories}),
+		Gates: actionGates(string(Packages), reasonEL8Packages, string(Accounts), reasonELHost, string(Sysctl), reasonELHost, string(Firewall), reasonELHost,
 			string(Definitions), reasonELHost, string(Password), reasonELHost),
 	}
 }

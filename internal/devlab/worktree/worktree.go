@@ -21,7 +21,9 @@ import (
 	"syscall"
 	"time"
 
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/devlab"
+	"lindm/internal/labexec"
 )
 
 // Trunk is the branch that merged work must be reachable from.
@@ -57,7 +59,8 @@ func Open(ctx context.Context, dir string) (*Repository, error) {
 	return &Repository{Main: main, Root: main + ".worktrees", Archive: filepath.Join(cache, "lindm-worktree-archive")}, nil
 }
 
-// Add creates Root/name detached at rev and shares or installs node_modules.
+// Add creates Root/name detached at rev, shares or installs node_modules and
+// installs the pinned .tools.
 // It returns the new path. Progress from npm goes to log.
 func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (string, error) {
 	if !namePattern.MatchString(name) {
@@ -77,6 +80,13 @@ func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (
 	}
 	if err := r.shareNodeModules(ctx, path, log); err != nil {
 		return path, fmt.Errorf("node_modules for %s: %w", path, err)
+	}
+	// Commit hooks and gates use the checkout's own pinned .tools; a shared
+	// tool directory would be reinstalled by every newer Makefile.
+	tools := exec.CommandContext(ctx, "make", "--no-print-directory", "tools")
+	tools.Dir, tools.Stdout, tools.Stderr = path, log, log
+	if err := tools.Run(); err != nil {
+		return path, fmt.Errorf("make tools in %s: %w", path, err)
 	}
 	return path, nil
 }
@@ -105,9 +115,7 @@ func (r *Repository) shareNodeModules(ctx context.Context, path string, log io.W
 	if _, err := fmt.Fprintln(log, "node_modules: package manifests differ from the main checkout; installing privately"); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "npm", "ci", "--ignore-scripts")
-	cmd.Dir, cmd.Stdout, cmd.Stderr = path, log, log
-	if err := cmd.Run(); err != nil {
+	if err := labexec.Run(ctx, labexec.Command{Path: "npm", Args: []string{"ci", "--ignore-scripts"}, Dir: path, Stdout: log, Stderr: log}); err != nil {
 		return fmt.Errorf("npm ci: %w", err)
 	}
 	return nil
@@ -361,11 +369,9 @@ func (r *Repository) archive(ctx context.Context, status Status, now time.Time) 
 	if info, err := os.Stat(list); err != nil {
 		return dir, err
 	} else if info.Size() != 0 {
-		var output capped
-		output.limit = 64 << 10
-		tar := exec.CommandContext(ctx, "tar", "-C", status.Path, "--null", "--no-recursion", "-T", list, "-cf", filepath.Join(dir, "untracked.tar"))
-		tar.Stdout, tar.Stderr = &output, &output
-		if err := tar.Run(); err != nil {
+		output := nativeexec.NewBuffer(64 << 10)
+		args := []string{"-C", status.Path, "--null", "--no-recursion", "-T", list, "-cf", filepath.Join(dir, "untracked.tar")}
+		if err := labexec.Run(ctx, labexec.Command{Path: "tar", Args: args, Stdout: output, Stderr: output}); err != nil {
 			return dir, fmt.Errorf("tar untracked files: %w: %s", err, bytes.TrimSpace(output.Bytes()))
 		}
 	}
@@ -414,11 +420,8 @@ func composeUser(ctx context.Context, root string) (string, error) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return "", nil
 	}
-	var stdout, stderr capped
-	stdout.limit, stderr.limit = 1<<20, 64<<10
-	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", `{{.Label "com.docker.compose.project"}}`)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	stdout, stderr := nativeexec.NewBuffer(1<<20), nativeexec.NewBuffer(64<<10)
+	if err := labexec.Run(ctx, labexec.Command{Path: "docker", Args: []string{"ps", "--format", `{{.Label "com.docker.compose.project"}}`}, Stdout: stdout, Stderr: stderr}); err != nil {
 		return "", fmt.Errorf("list running containers: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
 	}
 	project := devlab.ProjectName(root)
@@ -449,14 +452,11 @@ func canonical(path string) string {
 
 // git runs git in dir and returns bounded stdout.
 func git(ctx context.Context, dir string, args ...string) (string, error) {
-	var stdout, stderr capped
-	stdout.limit, stderr.limit = maxGitOutput, 64<<10
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = dir, &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	stdout, stderr := nativeexec.NewBuffer(maxGitOutput), nativeexec.NewBuffer(64<<10)
+	if err := labexec.Run(ctx, labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: stdout, Stderr: stderr}); err != nil {
 		return "", fmt.Errorf("git %s in %s: %w: %s", strings.Join(args, " "), dir, err, bytes.TrimSpace(stderr.Bytes()))
 	}
-	if stdout.overflow {
+	if stdout.Truncated() {
 		return "", fmt.Errorf("git %s in %s: output exceeds %d bytes", strings.Join(args, " "), dir, maxGitOutput)
 	}
 	return stdout.String(), nil
@@ -469,28 +469,9 @@ func gitToFile(ctx context.Context, dir, path string, args ...string) (err error
 		return err
 	}
 	defer func() { err = errors.Join(err, file.Close()) }()
-	var stderr capped
-	stderr.limit = 64 << 10
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = dir, file, &stderr
-	if err := cmd.Run(); err != nil {
+	stderr := nativeexec.NewBuffer(64 << 10)
+	if err := labexec.Run(ctx, labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: file, Stderr: stderr}); err != nil {
 		return fmt.Errorf("git %s in %s: %w: %s", strings.Join(args, " "), dir, err, bytes.TrimSpace(stderr.Bytes()))
 	}
 	return nil
-}
-
-// capped keeps at most limit bytes and records whether more arrived.
-type capped struct {
-	bytes.Buffer
-	limit    int
-	overflow bool
-}
-
-func (c *capped) Write(p []byte) (int, error) {
-	if room := c.limit - c.Len(); len(p) > room {
-		c.overflow = true
-		c.Buffer.Write(p[:max(room, 0)])
-		return len(p), nil
-	}
-	return c.Buffer.Write(p)
 }

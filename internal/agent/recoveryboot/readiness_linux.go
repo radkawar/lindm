@@ -33,7 +33,7 @@ func ObserveReadiness(ctx context.Context, espPath string) (Readiness, error) {
 	if os.Geteuid() != 0 {
 		return result, errors.New("recovery_readiness_root_required")
 	}
-	if err := protectedPath(espPath, false); err != nil {
+	if err := rootDirectory(espPath); err != nil {
 		return result, errors.New("recovery_readiness_esp_unreadable")
 	}
 	var filesystem unix.Statfs_t
@@ -110,7 +110,7 @@ func readinessSecureBoot(read func(string) ([]byte, error)) (bool, error) {
 // number without granting block access or relaxing the device sandbox.
 func readinessESPIdentity(device uint64) (_ string, _ string, err error) {
 	const directory = "/run/udev/data"
-	if err := protectedPath(directory, false); err != nil {
+	if err := rootDirectory(directory); err != nil {
 		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
 	}
 	name := fmt.Sprintf("%s/b%d:%d", directory, unix.Major(device), unix.Minor(device))

@@ -38,7 +38,7 @@ func publisherConfig(cfg PublisherConfig) (*Publisher, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	if err := protectedDirectory(cfg.Directory); err != nil {
+	if err := ownedDirectory(cfg.Directory); err != nil {
 		return nil, err
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(&updatev1.AgentUpdateChannel{}, &updatev1.AgentUpdateArtifact{}), protovalidate.WithDisableLazy())

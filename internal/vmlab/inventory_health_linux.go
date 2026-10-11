@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 // CheckInventoryHealth rejects collection failures, including failures that match
@@ -20,25 +21,25 @@ func CheckInventoryHealth(host *inventoryv1.HostObservation, packages *inventory
 	if host == nil || host.GetOsId().GetStatus() != truthSuccess || host.GetOsId().GetValue() == "" {
 		return errors.New("inventory health requires a successful OS identity")
 	}
-	context := inventoryHealthContext{distro: host.OsId.Value, host: host, details: host.Details}
+	context := inventoryHealthContext{release: platform.Identify(platform.OSRelease{ID: host.GetOsId().GetValue(), VersionID: host.GetOsVersion().GetValue()}), host: host, details: host.Details}
 	if err := checkInventoryMessage(host.ProtoReflect(), "host", context, true); err != nil {
 		return err
 	}
-	return CheckInventoryPackageHealth(context.distro, packages)
+	return CheckInventoryPackageHealth(context.release, packages)
 }
 
 // CheckInventoryPackageHealth checks the package collection and every package's
 // native module status. Non-RPM module absence is allowed only for the distro's
 // native package manager; package collection itself must always succeed.
-func CheckInventoryPackageHealth(distro string, packages *inventoryv1.PackageObservation) error {
+func CheckInventoryPackageHealth(release *platform.Release, packages *inventoryv1.PackageObservation) error {
 	if packages == nil {
 		return errors.New("inventory health missing packages")
 	}
-	return checkInventoryMessage(packages.ProtoReflect(), "packages", inventoryHealthContext{distro: distro}, true)
+	return checkInventoryMessage(packages.ProtoReflect(), "packages", inventoryHealthContext{release: release}, true)
 }
 
 type inventoryHealthContext struct {
-	distro  string
+	release *platform.Release
 	host    *inventoryv1.HostObservation
 	details *inventoryv1.NativeDetails
 	block   *inventoryv1.BlockDevice

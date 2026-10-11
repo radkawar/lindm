@@ -15,6 +15,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 // VMDeviceActionsOptions configures a maintained native lane, never production
@@ -126,23 +127,23 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if !machine.boot.PromptSeen {
 		return nil, errors.New("initial unbound encrypted clone did not request owner credential")
 	}
-	// Fedora's initramfs keeps cryptsetup authentication errors in the journal,
-	// and does not necessarily repeat its serial prompt on rejection. Route only
+	// Some initramfs keep cryptsetup authentication errors in the journal and
+	// do not necessarily repeat their serial prompt on rejection. Route only
 	// this service's normal diagnostics to the lab console so a wrong-key test
 	// observes an explicit authentication failure, never infers one from timeout.
 	// Modify the disposable clone, not the immutable golden or product package.
-	if manifest.GetDistribution() == "fedora" {
+	if platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Lab.Guest.CryptsetupConsole {
 		const consoleSetup = `mkdir -p /etc/systemd/system/systemd-cryptsetup@.service.d
 printf '[Service]\nStandardOutput=journal+console\nStandardError=journal+console\nEnvironment=SYSTEMD_LOG_TARGET=console\n' > /etc/systemd/system/systemd-cryptsetup@.service.d/lab-console.conf
 dracut --force --include /etc/systemd/system/systemd-cryptsetup@.service.d /etc/systemd/system/systemd-cryptsetup@.service.d`
 		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(consoleSetup), nil); err != nil {
-			return nil, fmt.Errorf("enable Fedora cryptsetup rejection oracle: %w", err)
+			return nil, fmt.Errorf("enable cryptsetup rejection oracle: %w", err)
 		}
 	}
 	if _, err := observeEncryptedGuest(ctx, vm, options.Encrypted.Firmware.SecureBoot); err != nil {
 		return nil, err
 	}
-	if err := installActionPrerequisites(ctx, vm.guest, manifest.GetDistribution()); err != nil {
+	if err := installActionPrerequisites(ctx, vm.guest, manifest); err != nil {
 		return nil, err
 	}
 	targets, err := observeActionTargets(ctx, vm)
@@ -238,6 +239,12 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	}
 	if manifest.GetDistribution() != options.RecoveryManifest.GetDistribution() {
 		return nil, errors.New("recovery image and native package distribution must match")
+	}
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	for _, c := range deviceActionCapabilities(options.Scenario, options.WipePhase) {
+		if err := release.Gate(c); err != nil {
+			return nil, err
+		}
 	}
 	if options.Encrypted.Desktop != "gnome" || !options.Encrypted.TPMBoot || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("device actions require installer GNOME, unbound TPM-capable boot stack, explicit topology and signed-package egress")
@@ -552,6 +559,29 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		}
 	}
 	return result, nil
+}
+
+// deviceActionCapabilities are the registry capabilities one device-action
+// run exercises.
+func deviceActionCapabilities(scenario, wipePhase string) []platform.Capability {
+	switch {
+	case scenario == "all":
+		return []platform.Capability{platform.Encryption, platform.Wipe, platform.ReportLoss, platform.Lock, platform.RecoverySanitize}
+	case scenario != "wipe": // encryption and its compliance
+		return []platform.Capability{platform.Encryption}
+	}
+	switch wipePhase {
+	case "lock-quarantine":
+		return []platform.Capability{platform.Lock}
+	case "live-erase":
+		return []platform.Capability{platform.Wipe}
+	case "live-report-loss":
+		return []platform.Capability{platform.ReportLoss}
+	case "recovery-nvme", "recovery-sata":
+		return []platform.Capability{platform.RecoverySanitize}
+	default:
+		return []platform.Capability{platform.Wipe, platform.ReportLoss, platform.Lock, platform.RecoverySanitize}
+	}
 }
 
 func nativeQuarantineScenarios(ctx context.Context, machine *actionMachine, control *vmControlPlane, result *VMDeviceActionsResult) (err error) {

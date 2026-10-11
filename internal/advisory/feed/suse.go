@@ -12,6 +12,7 @@ import (
 	"buf.build/go/protovalidate"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 // These external CSAF 2.0 wire types are shared by the SUSE and Red Hat parsers;
@@ -191,27 +192,21 @@ func susePlatform(config *advisoryv1.FeedSource) (string, error) {
 	default:
 		return "", errors.New("feed: unsupported or missing SUSE architecture")
 	}
-	release := config.GetRelease()
-	switch config.GetDistro() {
-	case "sles":
-		major, sp, ok := strings.Cut(release, ".")
-		if !ok || !suseDigits(major) || !suseDigits(sp) {
-			return "", errors.New("feed: SLES requires explicit major.service-pack release")
-		}
-		// Only base SLES, not SAP, Desktop, LTSS, modules, or extensions.
-		return "cpe:/o:suse:sles:" + major + ":sp" + sp, nil
-	case "opensuse-leap":
-		major, minor, ok := strings.Cut(release, ".")
-		if !ok || !suseDigits(major) || !suseDigits(minor) {
-			return "", errors.New("feed: openSUSE Leap requires explicit major.minor release")
-		}
-		return "cpe:/o:opensuse:leap:" + release, nil
-	case "opensuse-tumbleweed":
-		if release == "rolling" {
-			return "cpe:/o:opensuse:tumbleweed", nil
-		}
+	product, err := vendorProduct(config, platform.FeedSUSECSAF)
+	if err != nil {
+		return "", err
 	}
-	return "", errors.New("feed: unsupported SUSE product or release stream")
+	// Only the base product CPE, not SAP, Desktop, LTSS, modules or extensions.
+	// SLES names its service pack explicitly in the configured major.SP release.
+	cpe, servicePack := strings.CutSuffix(product.Advisory.Ecosystem, "spN")
+	if !servicePack {
+		return cpe, nil
+	}
+	_, sp, ok := strings.Cut(config.GetRelease(), ".")
+	if !ok || !suseDigits(sp) {
+		return "", errors.New("feed: SLES requires explicit major.service-pack release")
+	}
+	return cpe + "sp" + sp, nil
 }
 
 func suseDigits(value string) bool {
@@ -279,11 +274,11 @@ func suseRPM(product suseProduct, arch string) (string, string, error) {
 	identity, query, ok := strings.Cut(purl, "?")
 	name, version, versionOK := strings.Cut(identity, "@")
 	qualifiers, err := url.ParseQuery(query)
-	if !ok || !versionOK || err != nil || name == "" || strings.ContainsAny(name, "%/@") || qualifiers.Get("arch") != arch {
+	if !ok || !versionOK || err != nil || name == "" || strings.ContainsAny(name, "%/@") || qualifiers.Get(purlArch) != arch {
 		return "", "", errors.New("feed: invalid SUSE RPM package identity")
 	}
 	for key, values := range qualifiers {
-		if len(values) != 1 || (key != "arch" && key != "upstream" && key != "epoch") {
+		if len(values) != 1 || (key != purlArch && key != "upstream" && key != "epoch") {
 			return "", "", errors.New("feed: unsupported SUSE RPM qualifier")
 		}
 	}

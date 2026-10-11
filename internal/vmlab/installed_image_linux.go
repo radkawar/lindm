@@ -16,6 +16,7 @@ import (
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // installerImage describes a vendor installer whose authenticated media produce
@@ -25,8 +26,8 @@ import (
 type installerImage struct {
 	// label prefixes diagnostics, for example "debian".
 	label string
-	// media selects the vendor boot-configuration and recipe layout.
-	media string
+	// installer selects the vendor boot-configuration and recipe layout.
+	installer platform.Installer
 	// cache is the private subdirectory of the image cache.
 	cache string
 	// version binds the recipe and machine layout into the cache identity.
@@ -46,12 +47,13 @@ type installerImage struct {
 type installedProbe struct{ label, script string }
 
 // installerImageFor returns nil for manifests that already name a bootable
-// cloud disk. Installer manifests are validated before any acquisition.
+// cloud disk. Installer editions are validated before any acquisition against
+// the registry installer of the manifest's release.
 func installerImageFor(m *labv1.ImageManifest) (*installerImage, error) {
-	switch {
-	case m.GetDistribution() == "debian" && m.GetEdition() == "netinst":
+	switch m.GetEdition() {
+	case "netinst":
 		return debianInstallerImage(m)
-	case m.GetDistribution() == "opensuse-tumbleweed" && m.GetEdition() == tumbleweedInstallerEdition:
+	case tumbleweedInstallerEdition:
 		return tumbleweedInstallerImage(m)
 	default:
 		return nil, nil
@@ -141,7 +143,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	if actual.SHA256 != source.SHA256 || actual.Size != source.Size {
 		return nil, fmt.Errorf("verified %s installer changed before remastering", spec.label)
 	}
-	installer, err := prepareInstallerFileForMachine(ctx, dir, iso, spec.media, recipe, hardware.Architecture)
+	installer, err := prepareInstallerFileForMachine(ctx, dir, iso, spec.installer, recipe, hardware.Architecture)
 	if err != nil {
 		return nil, err
 	}

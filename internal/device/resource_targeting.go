@@ -18,6 +18,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/policy"
 	"lindm/internal/resource"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candidates []*policyv1.TargetCandidate) (*policyv1.TargetResolution, error) {
@@ -40,7 +41,7 @@ func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candid
 			}
 			retainedBytes += proto.Size(revision.GetSpec())
 			if retainedBytes > maxMessageBytes {
-				return nil, rpcError(connect.CodeResourceExhausted, "target_resolution_capacity")
+				return nil, rpcreason.Error(connect.CodeResourceExhausted, "target_resolution_capacity")
 			}
 			revisions[id] = revision
 		}
@@ -98,12 +99,12 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	resources := make([]*policyv1.ProfileResource, 0, len(preview.GetResolution().GetResources()))
 	for _, item := range preview.GetResolution().GetResources() {
 		if item.GetDisposition() != policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_READY || item.GetResource() == nil {
-			return rpcError(connect.CodeFailedPrecondition, "resource_resolution_conflict")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "resource_resolution_conflict")
 		}
 		resources = append(resources, proto.CloneOf(item.GetResource()))
 	}
 	if resourceAdoptionRequired(resources) && adoptionApprovalID == "" {
-		return rpcError(connect.CodePermissionDenied, "approval_required")
+		return rpcreason.Error(connect.CodePermissionDenied, "approval_required")
 	}
 	ordered, err := orderedResources(resources)
 	if err != nil {
@@ -147,7 +148,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if resourceAdoptionRequired(resources) {
 		approvalID, err := uuid.Parse(adoptionApprovalID)
 		if err != nil {
-			return rpcError(connect.CodePermissionDenied, "approval_invalid")
+			return rpcreason.Error(connect.CodePermissionDenied, "approval_invalid")
 		}
 		if err := q.SetResourceAssignmentAdoptionApproval(ctx, devicedb.SetResourceAssignmentAdoptionApprovalParams{ID: id, AdoptionApprovalID: &approvalID}); err != nil {
 			return err

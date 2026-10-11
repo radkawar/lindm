@@ -18,18 +18,19 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 // assistanceRun carries one lane's live resources across scenarios.
 type assistanceRun struct {
-	vm           *EncryptedVM
-	screen       *assistanceScreen
-	browser      *assistanceBrowser
-	owner        *devlab.OwnerSession
-	evidence     *assistanceEvidence
-	result       *VMAssistanceResult
-	distribution string
-	deviceID     string
+	vm       *EncryptedVM
+	screen   *assistanceScreen
+	browser  *assistanceBrowser
+	owner    *devlab.OwnerSession
+	evidence *assistanceEvidence
+	result   *VMAssistanceResult
+	release  *platform.Release
+	deviceID string
 }
 
 // browserMedia mirrors the runner's camelCase observation.
@@ -146,6 +147,9 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		return err
 	}
 	if err := r.guestScreenshot(scenario, "consent-prompt", prompt); err != nil {
+		return err
+	}
+	if err := r.browserScreenshot(ctx, scenario, "awaiting-consent"); err != nil {
 		return err
 	}
 	// The prompt's actions are declared allow, decline.
@@ -287,7 +291,7 @@ func (r *assistanceRun) typeNonce(ctx context.Context, scenario *assistanceScena
 		return err
 	}
 	scenario.Nonce = hex.EncodeToString(nonce[:])
-	terminal, err := openAssistanceTerminal(ctx, r.vm.guest, r.distribution, assistanceNoncePath)
+	terminal, err := openAssistanceTerminal(ctx, r.vm.guest, r.release, assistanceNoncePath)
 	if err != nil {
 		return err
 	}

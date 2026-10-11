@@ -182,16 +182,11 @@ func newOwnershipDimensionMatches(ledger *agentv1.ResourceOwnershipLedger, curre
 // their original baseline value and the same protected native incarnation.
 func baselineOwnershipDimensionMatches(ledger *agentv1.ResourceOwnershipLedger, current *agentv1.ResourceOwnershipSnapshot, dimension agentv1.ResourceOwnedDimension) bool {
 	baseline := ledger.GetBaseline()
-	if baseline.GetObservation().GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY {
-		return PasswordBaselineDimensionMatches(ledger, current, dimension)
+	rules := ownershipRules(baseline.GetObservation().GetRef().GetKind())
+	if rules.baseline != nil {
+		return rules.baseline(ledger, current, dimension)
 	}
-	numericDimension := agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_UNSPECIFIED
-	switch baseline.GetObservation().GetRef().GetKind() {
-	case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:
-		numericDimension = agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_UID
-	case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP:
-		numericDimension = agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_GROUP_GID
-	}
+	numericDimension := rules.numeric
 	if numericDimension == agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_UNSPECIFIED ||
 		!slices.Contains(ledger.GetOwnedDimensions(), numericDimension) ||
 		dimension == agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT ||

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -19,27 +18,13 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
 func sha256Bytes(data []byte) []byte { digest := sha256.Sum256(data); return digest[:] }
-
-type boundedOutput struct {
-	bytes.Buffer
-	overflow bool
-}
-
-func (b *boundedOutput) Write(data []byte) (int, error) {
-	n := len(data)
-	remaining := 32768 - b.Len()
-	if len(data) > remaining {
-		b.overflow = true
-		data = data[:max(remaining, 0)]
-	}
-	_, _ = b.Buffer.Write(data)
-	return n, nil
-}
 
 // verifyCandidate stages only bounded public definition bytes in the helper's
 // root-private per-action directory. It never writes a live unit or executes
@@ -100,33 +85,28 @@ func verifyCandidate(ctx context.Context, scratch string, desired *resourcev1.Re
 			return err
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
 	argument := name
 	if d.GetTimer() != nil {
 		argument = candidate
 	}
-	command := exec.CommandContext(ctx, "/usr/bin/systemd-analyze", "verify", "--man=no", "--recursive-errors=no", "--", argument)
-	command.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C", "SYSTEMD_UNIT_PATH=" + stage + ":"}
-	command.Dir = "/"
-	command.WaitDelay = 2 * time.Second
-	var output boundedOutput
-	command.Stdout = &output
-	command.Stderr = &output
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("%w: systemd-analyze verify: %w: %s", ErrUnsupported, err, output.String())
-	}
-	if output.overflow {
-		return ErrUnsupported
+	// Diagnostics describe only public definition bytes; surface the
+	// sanitized first line. Truncated output is never a verified candidate.
+	result, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path: "/usr/bin/systemd-analyze", Args: []string{"verify", "--man=no", "--recursive-errors=no", "--", argument},
+		Env: []string{"SYSTEMD_UNIT_PATH=" + stage + ":"}, Timeout: 20 * time.Second, StdoutLimit: 32768, StderrLimit: 32768,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: systemd-analyze verify: %w: %s", ErrUnsupported, err, result.Diagnostic())
 	}
 	return nil
 }
 
-// ExecuteNative is called only by the fixed transient native helper. It has no
+// ApplyNative is called only by the fixed transient native helper. It has no
 // SQLite handle and recomputes its private target from the protected plan and
 // ledger. beforeEffect is invoked once after candidate/native preconditions and
 // descriptor custody, immediately before the first live filesystem or bus effect.
-func ExecuteNative(ctx context.Context, config NativeConfig, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (_ *agentv1.ResourceOwnershipSnapshot, err error) {
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (_ *agentv1.ResourceOwnershipSnapshot, err error) {
+	config := nativeConfig{Platform: env.Platform, ExecutorIncarnation: env.ExecutorIncarnation, ScratchDirectory: env.Directory}
 	if ctx == nil || beforeEffect == nil || config.ScratchDirectory == "" {
 		return nil, ErrUnsupported
 	}

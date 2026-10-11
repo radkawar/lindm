@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -168,12 +169,13 @@ func TestGeneratorDefaultDoesNotInspectOrLaunch(t *testing.T) {
 }
 
 func TestAffinityCommandAllowsOwnedFixtureCleanup(t *testing.T) {
-	cmd := newAffinityCommand(context.Background(), "/test/taskset", nil, nil, io.Discard, io.Discard)
+	// labexec's tests cover the TERM, grace and group-kill mechanics.
+	cmd := affinityCommand("/test/taskset", nil, nil, io.Discard, io.Discard)
 	const ownedCleanupDeadline = 3*time.Minute + 3*time.Minute + 15*time.Second + 20*time.Second
-	if cmd.WaitDelay < ownedCleanupDeadline || cmd.WaitDelay != 7*time.Minute {
-		t.Fatalf("affinity cancellation grace %v does not preserve bounded owned cleanup %v", cmd.WaitDelay, ownedCleanupDeadline)
+	if cmd.Grace < ownedCleanupDeadline || cmd.Grace != 7*time.Minute {
+		t.Fatalf("affinity cancellation grace %v does not preserve bounded owned cleanup %v", cmd.Grace, ownedCleanupDeadline)
 	}
-	if cmd.Cancel == nil || cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setpgid {
-		t.Fatal("affinity command lost process-group cancellation")
+	if cmd.Interrupt != syscall.SIGTERM {
+		t.Fatal("affinity command lost graceful process-group cancellation")
 	}
 }

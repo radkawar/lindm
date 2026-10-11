@@ -64,6 +64,10 @@ func (n *readOnlyNative) Plan(_ context.Context, desired *resourcev1.ResourceDes
 		Plan:   &resourcev1.ResourcePlan_EncryptionCompliance{EncryptionCompliance: &resourcev1.EncryptionCompliancePlan{Desired: proto.CloneOf(desired.GetEncryptionCompliance()), Before: native, Change: resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_OBSERVE}},
 	}, nil
 }
+func (n *readOnlyNative) Observe(context.Context, *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	return nil, errors.New("fixture does not observe")
+}
+
 func (n *readOnlyNative) Verify(_ context.Context, plan *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	if n.missing {
 		return nil, n.verificationErr

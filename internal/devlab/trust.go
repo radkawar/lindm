@@ -23,6 +23,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/config"
+	"lindm/internal/custody"
 	"lindm/internal/trust"
 )
 
@@ -136,16 +137,12 @@ func Trust(ctx context.Context, repoRoot string) error {
 }
 
 func verifyDevelopmentTrust(ctx context.Context, authority *trust.Authority, dir string) error {
-	if err := protected(dir, true); err != nil {
+	if _, err := custody.Owned(dir, true); err != nil {
 		return err
 	}
 	files := make(map[string][]byte)
 	for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "release-root.json", "release-key.pem", "execution-key-0.pem", "execution-key-1.pem", "execution-key-2.pem"} {
-		path := filepath.Join(dir, name)
-		if err := protected(path, false); err != nil {
-			return err
-		}
-		content, err := os.ReadFile(path)
+		content, err := readOwned(filepath.Join(dir, name))
 		if err != nil {
 			return err
 		}

@@ -17,6 +17,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -45,7 +46,7 @@ func (f *deviceActionFixture) observeRecoveryReadiness(t *testing.T, observation
 func recoveryAdmissionReason(t *testing.T, err error, reason string) {
 	t.Helper()
 	var failure *connect.Error
-	if !errors.As(err, &failure) || failure.Code() != connect.CodeFailedPrecondition || failure.Meta().Get("Lindm-Reason") != reason {
+	if !errors.As(err, &failure) || failure.Code() != connect.CodeFailedPrecondition || rpcreason.Get(failure) != reason {
 		t.Fatalf("wanted readiness failure %s, got %v", reason, err)
 	}
 }

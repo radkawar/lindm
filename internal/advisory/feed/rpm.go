@@ -17,6 +17,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 type rpmUpdate struct {
@@ -49,8 +50,9 @@ type rpmUpdate struct {
 }
 
 func parseUpdateinfo(config *advisoryv1.FeedSource, raw []byte, validator protovalidate.Validator) (doc *advisoryv1.FeedDocument, err error) {
-	if config.GetDistro() != "fedora" {
-		return nil, errors.New("feed: updateinfo adapter supports Fedora; other products require their own vendor mapping")
+	product, err := vendorProduct(config, platform.FeedRPMUpdateinfo)
+	if err != nil {
+		return nil, err
 	}
 	arch := canonicalArch(config.GetArchitecture())
 	switch arch {
@@ -91,7 +93,7 @@ func parseUpdateinfo(config *advisoryv1.FeedSource, raw []byte, validator protov
 		if err := decoder.DecodeElement(&update, &root); err != nil {
 			return nil, fmt.Errorf("feed: decode advisory: %w", err)
 		}
-		if err := appendUpdate(doc, config, &update, validator); err != nil {
+		if err := appendUpdate(doc, config, product.Advisory.Ecosystem, &update, validator); err != nil {
 			return nil, err
 		}
 	case "updates":
@@ -121,11 +123,11 @@ func parseUpdateinfo(config *advisoryv1.FeedSource, raw []byte, validator protov
 				// Repository metadata can contain explicitly labelled entries
 				// for another Fedora release (e.g. shared shim builds). Never
 				// apply those records to the configured release.
-				if update.Release != "Fedora "+config.GetRelease() && otherFedoraRelease(update.Release) {
+				if update.Release != product.Advisory.Ecosystem && otherFedoraRelease(update.Release) {
 					continue
 				}
 				matchedProduct = true
-				if err := appendUpdate(doc, config, &update, validator); err != nil {
+				if err := appendUpdate(doc, config, product.Advisory.Ecosystem, &update, validator); err != nil {
 					return nil, err
 				}
 			case xml.CharData:
@@ -151,8 +153,9 @@ func parseUpdateinfo(config *advisoryv1.FeedSource, raw []byte, validator protov
 	return doc, nil
 }
 
-func appendUpdate(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, update *rpmUpdate, validator protovalidate.Validator) error {
-	if update.ID == "" || update.Type == "" || update.Release != "Fedora "+config.GetRelease() {
+// appendUpdate accepts only the configured vendor product name, e.g. "Fedora 44".
+func appendUpdate(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, product string, update *rpmUpdate, validator protovalidate.Validator) error {
+	if update.ID == "" || update.Type == "" || update.Release != product {
 		return errors.New("feed: unknown or mismatched updateinfo product")
 	}
 	if update.Type != "security" {
@@ -183,7 +186,7 @@ func appendUpdate(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, u
 	cves = disclosedCVEs(update.Description, cves)
 	slices.Sort(cves)
 	for _, collection := range update.Collections {
-		if collection.Short != "F"+config.GetRelease() || collection.Name != "Fedora "+config.GetRelease() || len(collection.Modules) != 0 || len(collection.Packages) == 0 {
+		if collection.Short != "F"+config.GetRelease() || collection.Name != product || len(collection.Modules) != 0 || len(collection.Packages) == 0 {
 			return errors.New("feed: unsupported collection, release or module stream")
 		}
 		for _, pkg := range collection.Packages {

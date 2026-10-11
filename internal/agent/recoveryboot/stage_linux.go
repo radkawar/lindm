@@ -14,6 +14,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	"lindm/internal/custody"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -67,7 +69,7 @@ func Reboot(ctx context.Context) error {
 // is rounded to filesystem allocation units; available excludes reserved blocks.
 // It neither reserves space nor replaces Preflight's artifact and custody checks.
 func CheckESPCapacity(espPath string, imageSize int64) (needed, available uint64, err error) {
-	if err := protectedPath(espPath, false); err != nil {
+	if err := rootDirectory(espPath); err != nil {
 		return 0, 0, err
 	}
 	var esp unix.Statfs_t
@@ -131,7 +133,7 @@ func preflight(ctx context.Context, request StageRequest, capacity func(string, 
 		return err
 	}
 	if request.TrustedTPMCustody != nil {
-		if err := protectedPath(request.StateDirectory, true); err != nil {
+		if err := custody.PrivateDirectory(request.StateDirectory); err != nil {
 			return err
 		}
 		if err := request.TrustedTPMCustody(ctx); err != nil {
@@ -173,7 +175,7 @@ func preflight(ctx context.Context, request StageRequest, capacity func(string, 
 	if err := fixedDefault(request.ESPPath); err != nil {
 		return err
 	}
-	if err := protectedPath(filepath.Join(request.ESPPath, "EFI", "Linux"), false); err != nil {
+	if err := rootDirectory(filepath.Join(request.ESPPath, "EFI", "Linux")); err != nil {
 		return err
 	}
 	_, err = bootSnapshot(request.ESPPath)
@@ -205,7 +207,7 @@ func Stage(ctx context.Context, request StageRequest) (*Staged, error) {
 		return nil, err
 	}
 	directory := filepath.Join(request.ESPPath, "EFI", "Linux")
-	if err := protectedPath(directory, false); err != nil {
+	if err := rootDirectory(directory); err != nil {
 		return nil, err
 	}
 	entry := "lindm-recovery-" + request.ActionID + ".efi"
@@ -353,7 +355,7 @@ func VerifyBoot(ctx context.Context, stateDirectory, actionID, sourceBootID stri
 	if !uuidText(actionID) || !uuidText(sourceBootID) {
 		return "", errors.New("recoveryboot: invalid_boot_binding")
 	}
-	if err := protectedPath(stateDirectory, true); err != nil {
+	if err := custody.PrivateDirectory(stateDirectory); err != nil {
 		return "", err
 	}
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
@@ -480,7 +482,7 @@ func certificateInDB(data, certificate []byte) bool {
 func bootSnapshot(esp string) ([]byte, error) {
 	hash := sha256.New()
 	root := filepath.Join(esp, "loader")
-	if err := protectedPath(root, false); err != nil {
+	if err := rootDirectory(root); err != nil {
 		return nil, err
 	}
 	err := filepath.WalkDir(root, func(name string, entry fs.DirEntry, err error) error {

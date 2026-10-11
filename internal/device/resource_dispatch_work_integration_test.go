@@ -20,6 +20,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func TestServiceFreshDelegationIntentWindow(t *testing.T) {
@@ -323,7 +324,7 @@ func dispatchError(t *testing.T, err error, code connect.Code, reason string) {
 		t.Fatalf("got %v want %v (%s)", err, code, reason)
 	}
 	rpc, ok := err.(*connect.Error)
-	if !ok || rpc.Meta().Get("Lindm-Reason") != reason {
+	if !ok || rpcreason.Get(rpc) != reason {
 		t.Fatalf("got %v want reason %s", err, reason)
 	}
 }

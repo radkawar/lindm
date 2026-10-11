@@ -13,6 +13,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
+	"lindm/internal/rpcreason"
 )
 
 // Executor sync contract.
@@ -168,7 +169,7 @@ func (h *Helper) syncFailed(now time.Time, err error) {
 		reason := "session_refused"
 		var connectErr *connect.Error
 		if errors.As(err, &connectErr) {
-			if value := connectErr.Meta().Get("Lindm-Reason"); value != "" {
+			if value := rpcreason.Get(connectErr); value != "" {
 				reason = value
 			}
 		}

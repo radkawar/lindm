@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 	"lindm/internal/redhatimages"
 )
 
@@ -39,9 +40,9 @@ type vmRedHatRegistration struct {
 	evidence *VMRedHatEvidence
 }
 
-func validateVMRedHatToken(distribution, tokenFile string) error {
-	if tokenFile != "" && distribution != "rhel" {
-		return errors.New("-redhat-token-file is only valid for RHEL guests")
+func validateVMRedHatToken(release *platform.Release, tokenFile string) error {
+	if tokenFile != "" && !release.Lab.Entitlement {
+		return errors.New("-redhat-token-file is only valid for subscription-entitled (RHEL) guests")
 	}
 	return nil
 }

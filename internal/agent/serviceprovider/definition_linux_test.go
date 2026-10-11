@@ -12,11 +12,13 @@ import (
 	"testing"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 func TestDefinitionRejectsUnsafePathsAndCounts(t *testing.T) {
 	for _, path := range []string{"", "relative.service", "/nul\x00.service", "/" + string(bytes.Repeat([]byte{'x'}, maxDefinitionPath))} {
-		if file, _, _, err := openProtectedFile(path, maxDefinitionBytes); err == nil {
+		if file, _, _, err := custody.OpenResolved(path, maxDefinitionBytes, maxDefinitionPath, maxSymlinks); err == nil {
 			_ = file.Close()
 			t.Fatalf("unsafe path accepted: %q", path)
 		}
@@ -33,7 +35,7 @@ func TestDefinitionRejectsUnsafePathsAndCounts(t *testing.T) {
 	if err := os.WriteFile(path, []byte("[Service]\nType=simple\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if file, _, _, err := openProtectedFile(path, maxDefinitionBytes); err == nil {
+	if file, _, _, err := custody.OpenResolved(path, maxDefinitionBytes, maxDefinitionPath, maxSymlinks); err == nil {
 		_ = file.Close()
 		t.Fatal("untrusted/writable definition ancestry accepted")
 	}
@@ -64,7 +66,7 @@ func TestDefinitionReadDetectsMetadataChange(t *testing.T) {
 func TestDefinitionRejectsUnreportedBytes(t *testing.T) {
 	// procfs exposes regular, root-owned files with bytes beyond st_size.
 	// Metadata stability alone must not authorize an empty hash of those bytes.
-	file, _, stat, err := openProtectedFile("/proc/version", maxDefinitionBytes)
+	file, _, stat, err := custody.OpenResolved("/proc/version", maxDefinitionBytes, maxDefinitionPath, maxSymlinks)
 	if errors.Is(err, os.ErrNotExist) {
 		t.Skip("procfs is not mounted")
 	}
@@ -201,7 +203,7 @@ func TestTrustedDefinitionHashAndVendorSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	alias := filepath.Join(directory, "lib", "unit.service")
-	file, canonical, _, err := openProtectedFile(alias, maxDefinitionBytes)
+	file, canonical, _, err := custody.OpenResolved(alias, maxDefinitionBytes, maxDefinitionPath, maxSymlinks)
 	if err != nil {
 		t.Fatal(err)
 	}

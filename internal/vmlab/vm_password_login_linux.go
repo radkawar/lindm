@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 // Password-login proofs dial the guest's pinned loopback SSH forward as the
@@ -110,7 +112,7 @@ func passwordSession(ctx context.Context, vm *guestVM, user string, password []b
 		return nil, err
 	}
 	defer func() { _ = session.Close() }()
-	stdout := &limitedOutput{limit: 16 << 10}
+	stdout := nativeexec.NewBuffer(16 << 10)
 	session.Stdout = stdout
 	if err := session.Run(command); err != nil {
 		return nil, err
@@ -118,7 +120,10 @@ func passwordSession(ctx context.Context, vm *guestVM, user string, password []b
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	return stdout.data, nil
+	if stdout.Truncated() {
+		return nil, errors.New("password session output exceeds capacity")
+	}
+	return stdout.Bytes(), nil
 }
 
 func guestEpoch(ctx context.Context, vm *guestVM) (int64, error) {

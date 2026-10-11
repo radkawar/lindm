@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -20,12 +19,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"connectrpc.com/connect"
 
 	"lindm/gen/lindm/admin/v1/adminv1connect"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/custody"
+	"lindm/internal/labexec"
 )
 
 // entraFixtureURL is also enforced at the HTTP transport boundary, not just on
@@ -115,16 +116,13 @@ func openEntraBrowser(ctx context.Context, root, runDir, origin, username, passw
 	if username == "" || password == "" {
 		return nil, errors.New("entra: browser credentials are missing")
 	}
-	if err := protected(runDir, true); err != nil {
+	if _, err := custody.Owned(runDir, true); err != nil {
 		return nil, errors.New("entra: browser run directory is not private and owned")
 	}
 	shared := FixturePath(root)
-	if err := protected(filepath.Join(shared, "server.crt"), false); err != nil {
-		return nil, errors.New("entra: browser fixture certificate is not private and owned")
-	}
-	certificatePEM, err := os.ReadFile(filepath.Join(shared, "server.crt"))
+	certificatePEM, err := readOwned(filepath.Join(shared, "server.crt"))
 	if err != nil {
-		return nil, errors.New("read Entra browser fixture certificate failed")
+		return nil, errors.New("entra: browser fixture certificate is not private, owned and readable")
 	}
 	block, _ := pem.Decode(certificatePEM)
 	if block == nil || block.Type != "CERTIFICATE" {
@@ -266,29 +264,19 @@ func startEntraChromium(ctx context.Context, runDir, pin, origin string, unsandb
 	// Umask belongs to this child, never the multithreaded Go process. The fixed
 	// launcher execs Chromium without interpolation or credential arguments and
 	// keeps inherited CDP pipes. Any browser-created secret file is mode 0600.
-	command := exec.CommandContext(ctx, "sh", "-c", `umask 077; exec "$@"`, "lindm-entra-chromium",
-		binary, "--headless=new", "--incognito", "--remote-debugging-pipe", "--user-data-dir="+profile,
-		"--ignore-certificate-errors-spki-list="+pin, "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
-		"--disable-component-update", "--disable-sync", "--disable-extensions", "--disable-breakpad", "--disable-crash-reporter", "--lang=en-US", "about:blank")
+	args := []string{"-c", `umask 077; exec "$@"`, "lindm-entra-chromium",
+		binary, "--headless=new", "--incognito", "--remote-debugging-pipe", "--user-data-dir=" + profile,
+		"--ignore-certificate-errors-spki-list=" + pin, "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
+		"--disable-component-update", "--disable-sync", "--disable-extensions", "--disable-breakpad", "--disable-crash-reporter", "--lang=en-US", "about:blank"}
 	if unsandboxed {
 		// Explicit operator consent only; never an automatic sandbox fallback.
-		command.Args = append(command.Args, "--no-sandbox")
+		args = append(args, "--no-sandbox")
 	}
+	diagnostic := nativeexec.NewBuffer(64 << 10)
 	// Explicit environment: caller-provided Entra secrets must not be inherited.
-	command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + profile, "TMPDIR=" + profile, "LANG=C.UTF-8"}
-	command.ExtraFiles = []*os.File{childInput, childOutput}
-	diagnostic := &entraCapture{limit: 64 << 10}
-	command.Stdout, command.Stderr = io.Discard, diagnostic
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.WaitDelay = 3 * time.Second
-	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	if err := command.Start(); err != nil {
+	env := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + profile, "TMPDIR=" + profile, "LANG=C.UTF-8"}
+	browser, err := labexec.Start(ctx, labexec.Command{Path: "sh", Args: args, Env: env, Files: []*os.File{childInput, childOutput}, Stderr: diagnostic})
+	if err != nil {
 		return nil, nil, errors.New("start isolated Entra Chromium failed")
 	}
 	closeErr := errors.Join(childInput.Close(), childOutput.Close())
@@ -306,28 +294,20 @@ func startEntraChromium(ctx context.Context, runDir, pin, origin string, unsandb
 	})
 	cdp := &entraCDP{input: input, output: output, scanner: scanner, origin: origin}
 	cleanup := func() error {
-		// Kill the owned process group before reaping its leader, preventing PID
-		// reuse from redirecting cleanup. This does not depend on caller context.
-		defer func() { clear(diagnostic.data) }()
-		killErr := command.Cancel()
-		if errors.Is(killErr, os.ErrProcessDone) {
-			killErr = nil
-		}
-		pipeErr := errors.Join(input.Close(), output.Close())
-		waitErr := command.Wait()
+		// Close kills the owned process group before reaping its leader, so PID
+		// reuse cannot redirect cleanup. This does not depend on caller context.
+		defer func() { clear(diagnostic.Bytes()) }()
+		waitErr := browser.Close()
 		var exitErr *exec.ExitError
-		if errors.As(waitErr, &exitErr) {
-			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signal() == syscall.SIGKILL {
-				waitErr = nil
-			}
-		}
+		errors.As(waitErr, &exitErr)
+		pipeErr := errors.Join(input.Close(), output.Close())
 		removeErr := os.RemoveAll(profile)
-		if errors.Join(closeErr, killErr, pipeErr, waitErr, removeErr) != nil {
+		if errors.Join(closeErr, waitErr, pipeErr, removeErr) != nil {
 			detail := "unknown"
 			switch {
-			case bytes.Contains(diagnostic.data, []byte("No usable sandbox")) || bytes.Contains(diagnostic.data, []byte("Failed to move to new namespace")) || bytes.Contains(diagnostic.data, []byte("SUID sandbox helper binary")):
+			case bytes.Contains(diagnostic.Bytes(), []byte("No usable sandbox")) || bytes.Contains(diagnostic.Bytes(), []byte("Failed to move to new namespace")) || bytes.Contains(diagnostic.Bytes(), []byte("SUID sandbox helper binary")):
 				detail = "sandbox_unavailable (install an administrator-supported sandboxed Chromium; no sandbox bypass is enabled)"
-			case bytes.Contains(diagnostic.data, []byte("error while loading shared libraries")):
+			case bytes.Contains(diagnostic.Bytes(), []byte("error while loading shared libraries")):
 				detail = "missing_shared_library"
 			}
 			if exitErr != nil {

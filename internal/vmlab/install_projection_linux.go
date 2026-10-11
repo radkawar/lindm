@@ -15,7 +15,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/statefs"
+	"lindm/internal/labexec"
 )
 
 // InstallProjectionEvidence describes an isolated fixture, not host service
@@ -274,17 +276,16 @@ func observeProjectionLinks(units string) ([]InstallProjectionLink, error) {
 }
 
 func projectionCommand(ctx context.Context, binary string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	output := &limitedOutput{limit: 64 << 10}
-	command := exec.CommandContext(ctx, binary, args...)
-	command.Env = []string{"LC_ALL=C", "SYSTEMCTL_SKIP_SYSV=1", "SYSTEMD_LOG_TARGET=console", "SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat"}
-	command.Stdout, command.Stderr = output, output
-	command.WaitDelay = time.Second
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("native projection fixture command %s: %w: %s", filepath.Base(binary), err, output.data)
+	output := nativeexec.NewBuffer(64 << 10)
+	env := []string{"LC_ALL=C", "SYSTEMCTL_SKIP_SYSV=1", "SYSTEMD_LOG_TARGET=console", "SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat"}
+	err := labexec.Run(ctx, labexec.Command{Path: binary, Args: args, Env: env, Stdout: output, Stderr: output, Timeout: 10 * time.Second})
+	if err == nil && output.Truncated() {
+		err = errors.New("output exceeds limit")
 	}
-	return output.data, nil
+	if err != nil {
+		return nil, fmt.Errorf("native projection fixture command %s: %w: %s", filepath.Base(binary), err, output.Bytes())
+	}
+	return output.Bytes(), nil
 }
 
 func projectionIdentity(path string) (unix.Stat_t, error) {

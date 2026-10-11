@@ -24,6 +24,28 @@ const resourceRepositoryID = "d06a3d03-3118-4779-a00f-a5544ff095ad"
 const resourcePackageName = "lindm-resource-proof"
 const resourceDependencyName = "lindm-resource-dependency"
 
+// resourceRepositoryServer serves the signed fixture repository over HTTPS.
+// http.server answers HTTP/1.0 and closes each connection; an ssl socket's
+// close never sends the TLS close_notify alert, which OpenSSL 3 clients that
+// read to EOF report as "unexpected eof while reading" (APT 3.0 on Debian 13
+// then refuses the Release file). Each connection is unwrapped, sending
+// close_notify, before it is closed; a peer that never answers bounds the wait.
+const resourceRepositoryServer = `import functools, http.server, ssl
+class Server(http.server.ThreadingHTTPServer):
+    def shutdown_request(self, request):
+        try:
+            request.settimeout(10)
+            request.unwrap()
+        except (OSError, ValueError):
+            pass
+        super().shutdown_request(request)
+server = Server(('127.0.0.1', 18449), functools.partial(http.server.SimpleHTTPRequestHandler, directory='/var/lib/lindm-resource-lab/repo'))
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain('/var/lib/lindm-resource-lab/https.crt', '/var/lib/lindm-resource-lab/https.key')
+server.socket = context.wrap_socket(server.socket, server_side=True)
+server.serve_forever()
+`
+
 // This is laboratory fixture construction, not a provider or policy program.
 // It runs only inside DispatchVM's fresh disposable guest. Both repository
 // metadata and RPM payloads are signed; HTTPS uses a guest-local disposable CA.
@@ -35,7 +57,12 @@ mkdir -m 0755 /var/lib/lindm-resource-lab /etc/lindm-resource-lab
 cd /var/lib/lindm-resource-lab
 . /etc/os-release
 case "$ID:$VERSION_ID" in
- ubuntu:24.04|ubuntu:26.04) apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y dpkg-dev apt-utils gnupg openssl python3 attr curl ;;
+ ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debian:13)
+  # The image's own OpenPGP verifiers before the lab's build tools (gnupg
+  # depends on gpgv) are installed; APT 3.0 itself verifies with sqv.
+  dpkg-query -W -f='${Package} ${Version} ${db:Status-Status}\n' gpgv sqv > image-verifiers.txt 2>&1 || true
+  # Debian installer images omit acl; the file lane's ACL refusal needs setfacl.
+  apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y dpkg-dev apt-utils gnupg openssl python3 attr acl curl ;;
  fedora:44) dnf5 install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 python3-libdnf5 attr curl
   # The provider requires the maintained DNF5 (>= 5.4.6.0) release update.
   dnf5 upgrade -y dnf5 libdnf5 libdnf5-cli python3-libdnf5 ;;
@@ -46,10 +73,10 @@ case "$ID:$VERSION_ID" in
  almalinux:8.*|rocky:8.*)
   # EL8 DNF4 runs on platform-python 3.6; the fixture server needs Python 3.7+.
   dnf install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python39 attr curl acl python3-dnf-plugin-versionlock ;;
- *) echo 'resource lane requires Ubuntu 24.04/26.04, Fedora 44 or an EL 8/9/10 DNF4 platform' >&2; exit 1 ;;
+ *) echo 'resource lane requires Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 44 or an EL 8/9/10 DNF4 platform' >&2; exit 1 ;;
 esac
 case "$ID" in
- ubuntu) DEB_ARCH=$(dpkg --print-architecture) ;;
+ ubuntu|debian) DEB_ARCH=$(dpkg --print-architecture) ;;
  *) RPM_ARCH=$(rpm --eval '%{_arch}') ;;
 esac
 mkdir -m 0700 gnupg
@@ -59,7 +86,7 @@ gpg --batch --armor --export > repository.asc
 gpg --batch --export > repository.gpg
 # Root provisions the approved signer into system RPM trust; the provider
 # refuses RPM sources whose key is absent there.
-if [ "$ID" != ubuntu ]; then rpmkeys --import repository.asc; fi
+if [ -z "${DEB_ARCH:-}" ]; then rpmkeys --import repository.asc; fi
 gpg --batch --with-colons --list-keys > keys.colons
 mkdir -m 0700 wrong-gnupg
 gpg --homedir "$PWD/wrong-gnupg" --batch --pinentry-mode loopback --passphrase '' --quick-generate-key 'Wrong disposable signer <wrong@invalid>' rsa3072 sign 1d
@@ -69,7 +96,7 @@ gpg --homedir "$PWD/wrong-gnupg" --batch --with-colons --list-keys > wrong-keys.
 openssl req -x509 -newkey rsa:3072 -nodes -keyout https.key -out https.crt -days 1 -subj /CN=localhost -addext 'subjectAltName=IP:127.0.0.1,DNS:localhost' -addext 'basicConstraints=critical,CA:TRUE'
 chmod 0600 https.key
 case "$ID" in
- ubuntu) install -m 0644 https.crt /usr/local/share/ca-certificates/lindm-resource-lab.crt; update-ca-certificates ;;
+ ubuntu|debian) install -m 0644 https.crt /usr/local/share/ca-certificates/lindm-resource-lab.crt; update-ca-certificates ;;
  *) install -m 0644 https.crt /etc/pki/ca-trust/source/anchors/lindm-resource-lab.crt; update-ca-trust ;;
 esac
 mkdir repo
@@ -88,7 +115,7 @@ cat /usr/share/$name/version
 APP
    chmod 0755 "build/$name-$version/usr/bin/$name"
   fi
-  if [ "$ID" = ubuntu ]; then
+  if [ -n "${DEB_ARCH:-}" ]; then
    mkdir "build/$name-$version/DEBIAN"
    cat > "build/$name-$version/DEBIAN/control" <<EOF
 Package: $name
@@ -149,7 +176,7 @@ EOF
   fi
  done
 done
-if [ "$ID" = ubuntu ]; then
+if [ -n "${DEB_ARCH:-}" ]; then
  mkdir -p "repo/dists/stable/main/binary-$DEB_ARCH"
  (cd repo; dpkg-scanpackages --multiversion . /dev/null > "dists/stable/main/binary-$DEB_ARCH/Packages")
  gzip -k "repo/dists/stable/main/binary-$DEB_ARCH/Packages"
@@ -162,16 +189,10 @@ else
  gpg --batch --yes --armor --detach-sign repo/repodata/repomd.xml
 fi
 cat > serve.py <<'PY'
-import functools, http.server, ssl
-server = http.server.ThreadingHTTPServer(('127.0.0.1', 18449), functools.partial(http.server.SimpleHTTPRequestHandler, directory='/var/lib/lindm-resource-lab/repo'))
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain('/var/lib/lindm-resource-lab/https.crt', '/var/lib/lindm-resource-lab/https.key')
-server.socket = context.wrap_socket(server.socket, server_side=True)
-server.serve_forever()
-PY
+` + resourceRepositoryServer + `PY
 if command -v restorecon >/dev/null 2>&1; then restorecon -RF /var/lib/lindm-resource-lab /etc/lindm-resource-lab; test "$(getenforce)" = Enforcing; fi
 SERVE_PYTHON=/usr/bin/python3
-if [ -x /usr/bin/python3.9 ] && [ "$ID" != fedora ] && [ "$ID" != ubuntu ]; then SERVE_PYTHON=/usr/bin/python3.9; fi
+if [ -x /usr/bin/python3.9 ] && [ "$ID" != fedora ] && [ -z "${DEB_ARCH:-}" ]; then SERVE_PYTHON=/usr/bin/python3.9; fi
 # An installed, enabled unit (not a transient one) keeps the signed repository
 # available after the sysctl and firewall lanes' real guest reboots, which run
 # before the package interruption scenario. Lab units stay in lindm-lab-*: the
@@ -189,6 +210,17 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now lindm-lab-resource-repository.service
 curl --fail --retry 10 --retry-connrefused --retry-delay 1 https://127.0.0.1:18449/ -o /dev/null
+if [ -n "${DEB_ARCH:-}" ]; then
+ # The repository is signed; the lab's gnupg pulled gpgv, which the image may
+ # lack (Debian 13's APT verifies with sqv). Restoring the image's own verifier
+ # set keeps the provider from depending on a lab-installed tool.
+ if ! awk '$1=="gpgv" && $NF=="installed" {found=1} END {exit !found}' image-verifiers.txt; then
+  test "$(apt-get -s purge gnupg gpgv | awk '$1=="Purg"{print $2}' | sort | tr '\n' ' ')" = 'gnupg gpgv '
+  DEBIAN_FRONTEND=noninteractive apt-get purge -y gnupg gpgv > purged-verifiers.txt 2>&1
+  test ! -e /usr/bin/gpgv
+ fi
+ dpkg-query -W -f='${Package} ${Version} ${db:Status-Status}\n' gpgv gnupg sqv > fixture-verifiers.txt 2>&1 || true
+fi
 `
 
 func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages, architecture string, selected map[string]bool) error {
@@ -209,7 +241,7 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 		return err
 	}
 	keyPath := resourceFixtureRoot + "/repository.gpg"
-	if packages.family == familyDNF {
+	if packages.backend.DNF() {
 		keyPath = resourceFixtureRoot + "/repository.asc"
 	}
 	key, err := packages.vm.run(ctx, "sudo -n cat "+nativeQuote(keyPath), nil, 1<<20, 15*time.Second)
@@ -220,7 +252,7 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 	artifact := &resourcev1.ArtifactRef{ArtifactId: "66db4aa6-9bcc-45f5-b725-4ed529533879", Sha256: digest[:], SizeBytes: uint64(len(key))}
 	repository := &resourcev1.RepositoryDesired{RepositoryId: resourceRepositoryID, Presence: resourcev1.Presence_PRESENCE_PRESENT}
 	source := &agentv1.NativePackageSource{Repository: repository, SigningKeyFile: keyPath, SigningKeySha256: digest[:]}
-	if packages.family == familyDNF {
+	if packages.backend.DNF() {
 		listed, err := packages.vm.run(ctx, "sudo -n cat "+resourceFixtureRoot+"/keys.colons", nil, 16384, 15*time.Second)
 		if err != nil {
 			return err

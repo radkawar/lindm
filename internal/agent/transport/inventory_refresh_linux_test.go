@@ -23,6 +23,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/config"
 	"lindm/internal/agent/spool"
+	"lindm/internal/rpcreason"
 )
 
 // These boundaries exercise actual collection scheduling, SQLite spool promotion,
@@ -131,7 +132,7 @@ func (f *refreshTransportFixture) reopen() {
 
 func refreshNotPublished() error {
 	err := connect.NewError(connect.CodeFailedPrecondition, errors.New("refresh inventory is not published"))
-	err.Meta().Set("Lindm-Reason", "inventory_refresh_not_published")
+	rpcreason.Set(err, "inventory_refresh_not_published")
 	return err
 }
 
@@ -629,7 +630,7 @@ func TestInventoryRefreshTerminalSnapshotIsNotPublication(t *testing.T) {
 		t.Run(state.String(), func(t *testing.T) {
 			f := newRefreshTransportFixture(t)
 			f.snapshotState = state
-			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcReason(err) != "inventory_refresh_not_published" {
+			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcreason.Get(err) != "inventory_refresh_not_published" {
 				t.Fatalf("terminal nonpublication accepted or lost its error: %v", err)
 			}
 			if f.batches != 0 || f.committed || f.confirmations != 0 {
@@ -720,7 +721,7 @@ func TestInventoryRefreshPackageWithoutBoundHostNeverConfirms(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.queue(refreshObservation(f.status.GetStartedAt().AsTime().Add(-time.Second)))
-	if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcReason(err) != "inventory_refresh_not_published" {
+	if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcreason.Get(err) != "inventory_refresh_not_published" {
 		t.Fatalf("package-only tuple was accepted without the bound host: %v", err)
 	}
 	if f.collections != 0 || f.hostCalls != 0 || f.staleUploads != 0 || !f.committed || f.confirmations != 0 {
@@ -793,7 +794,7 @@ func TestInventoryRefreshMissingQueuedCounterpartDoesNotFlushOldPending(t *testi
 			// A stale queued replacement is not evidence for discarding the
 			// old pending domain, even when the other fresh half can upload.
 			f.queue(old)
-			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcReason(err) != "inventory_refresh_not_published" {
+			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); rpcreason.Get(err) != "inventory_refresh_not_published" {
 				t.Fatalf("missing fresh counterpart satisfied refresh: %v", err)
 			}
 			if f.collections != 0 || f.staleUploads != 0 || f.confirmations != 0 {

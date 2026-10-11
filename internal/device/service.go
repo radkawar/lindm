@@ -37,6 +37,7 @@ import (
 	"lindm/internal/policy"
 	"lindm/internal/releaseupdate"
 	"lindm/internal/resource"
+	"lindm/internal/rpcreason"
 	"lindm/internal/targeting"
 	"lindm/internal/trust"
 )
@@ -367,10 +368,10 @@ func (s *Service) handlerOptions() []connect.HandlerOption {
 func (s *Service) require(ctx context.Context, perm identity.Permission) (identity.Principal, error) {
 	principal, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return identity.Principal{}, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return identity.Principal{}, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if !identity.Authorize(principal, perm) {
-		return identity.Principal{}, rpcError(connect.CodePermissionDenied, "permission_denied")
+		return identity.Principal{}, rpcreason.Error(connect.CodePermissionDenied, "permission_denied")
 	}
 	return principal, nil
 }
@@ -385,7 +386,7 @@ func (s *Service) acquire(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		return rpcError(connect.CodeResourceExhausted, "admission_rejected")
+		return rpcreason.Error(connect.CodeResourceExhausted, "admission_rejected")
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"lindm/internal/assistrelay"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // assistanceTx runs fn in a read-committed transaction. Deadline enforcement
@@ -59,10 +60,10 @@ func (s *Service) authorizeAssistance(ctx context.Context) (identity.Principal, 
 		return identity.Principal{}, nil, nil, err
 	}
 	if s.assistance == nil {
-		return identity.Principal{}, nil, nil, rpcError(connect.CodeFailedPrecondition, "assistance_unconfigured")
+		return identity.Principal{}, nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "assistance_unconfigured")
 	}
 	if s.identity == nil {
-		return identity.Principal{}, nil, nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return identity.Principal{}, nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return identity.Principal{}, nil, nil, mapErr(err)
@@ -131,13 +132,13 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 			return err
 		}
 		if device.State != stateActive || device.CurrentGenerationID == nil || !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > assistanceOnlineWindow {
-			return rpcError(connect.CodeFailedPrecondition, "device_offline")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_offline")
 		}
 		if err := enforceOpenAssistance(ctx, q, deviceID, now, revoked); err != nil {
 			return err
 		}
 		if _, err := q.LockOpenAssistanceSession(ctx, deviceID); err == nil {
-			return rpcError(connect.CodeFailedPrecondition, "assistance_busy")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_busy")
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
@@ -149,7 +150,7 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 			return err
 		}
 		if live >= int64(s.assistance.MaxSessions()) {
-			return rpcError(connect.CodeFailedPrecondition, "assistance_capacity")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_capacity")
 		}
 		id := uuid.New()
 		if err := q.InsertAssistanceSession(ctx, devicedb.InsertAssistanceSessionParams{
@@ -284,15 +285,15 @@ func (s *Service) lockAssistanceInScope(ctx context.Context, q *devicedb.Queries
 // creatorOffered admits only the creating operator while the session is OFFERED.
 func creatorOffered(row devicedb.AssistanceSession, actor identity.Principal) error {
 	if row.OperatorID != actor.ID {
-		return rpcError(connect.CodePermissionDenied, "assistance_not_creator")
+		return rpcreason.Error(connect.CodePermissionDenied, "assistance_not_creator")
 	}
 	switch row.State {
 	case assistanceOffered:
 		return nil
 	case assistanceEnded:
-		return rpcError(connect.CodeFailedPrecondition, "assistance_ended")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_ended")
 	default:
-		return rpcError(connect.CodeFailedPrecondition, "assistance_state")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_state")
 	}
 }
 
@@ -355,7 +356,7 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 	defer release()
 	fingerprint, err := assistanceSDP(req.Msg.GetAnswerSdp(), s.assistance.RelayAddress())
 	if errors.Is(err, errAssistanceNonRelay) {
-		return nil, rpcError(connect.CodeFailedPrecondition, err.Error())
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return nil, invalid(err.Error())

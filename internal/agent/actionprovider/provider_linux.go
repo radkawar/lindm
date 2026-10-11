@@ -93,7 +93,7 @@ func New(options Options) (*Provider, error) {
 		return nil, fmt.Errorf("%w: bounded_quarantine_required", ErrUnsupported)
 	}
 	if config.GetProtectedStateDirectory() != "" {
-		if err := protectedDirectory(config.GetProtectedStateDirectory()); err != nil {
+		if err := privateStateDirectory(config.GetProtectedStateDirectory()); err != nil {
 			return nil, err
 		}
 	}
@@ -135,24 +135,16 @@ func New(options Options) (*Provider, error) {
 	return p, nil
 }
 
-func protectedDirectory(path string) error {
+// privateStateDirectory requires a strict root-owned ancestry and a private leaf.
+func privateStateDirectory(path string) error {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" {
 		return ErrUnsupported
 	}
-	for current := path; ; current = filepath.Dir(current) {
-		var st unix.Stat_t
-		if err := unix.Lstat(current, &st); err != nil {
-			return err
-		}
-		if !custody.TrustedDirectory(&st) {
+	if err := custody.PrivateDirectory(path); err != nil {
+		if errors.Is(err, custody.ErrUnsafe) {
 			return fmt.Errorf("%w: unprotected_state_directory", ErrUnsupported)
 		}
-		if current == path && st.Mode&0077 != 0 {
-			return fmt.Errorf("%w: state_directory_must_be_private", ErrUnsupported)
-		}
-		if current == "/" {
-			break
-		}
+		return err
 	}
 	return nil
 }

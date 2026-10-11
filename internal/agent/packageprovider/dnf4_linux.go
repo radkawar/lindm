@@ -13,9 +13,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"lindm/internal/custody"
+
 	"golang.org/x/sys/unix"
 
 	"lindm/internal/agent/dnf"
+	"lindm/internal/platform"
 )
 
 // dnf4Adapter is the fixed DNF4 Python API transaction adapter. It is executed
@@ -24,37 +27,21 @@ import (
 //go:embed dnf4_transaction.py
 var dnf4Adapter string
 
-// minimumDNF4 is EL8.10's DNF; older DNF4 lacks the plugin selection, strict
-// remote-RPM and query APIs the adapter relies on.
-const minimumDNF4 = "4.7.0"
-
-// dnfGeneration is the only native DNF generation each platform qualifies.
-// The installed manager must still identify itself as that generation.
-func dnfGeneration(osID string) (dnf.Kind, bool) {
-	switch osID {
-	case "fedora":
-		return dnf.DNF5, true
-	case "rhel", "almalinux", "rocky":
-		return dnf.DNF4, true
-	default:
-		return "", false
-	}
-}
-
 type dnf4Probe struct {
 	Version     string `json:"version"`
 	Versionlock string `json:"versionlock"`
 }
 
-// selectDNF identifies the installed native manager; the platform only selects
-// which generation is acceptable. DNF5 identifies itself by executing its CLI.
-// The DNF4 CLI cannot run under the executor's or staging unit's read-only
-// /var (it opens /var/log/hawkey.log before applying --setopt=logdir and exits
-// 1), so DNF4 is identified through the dnf module imported by the interpreter
-// that the native entrypoint itself names, which also yields the native
-// versionlock plugin state.
+// selectDNF identifies the installed native manager; the platform registry
+// only selects which generation and minimum are acceptable. DNF5 identifies
+// itself by executing its CLI. The DNF4 CLI cannot run under the executor's or
+// staging unit's read-only /var (it opens /var/log/hawkey.log before applying
+// --setopt=logdir and exits 1), so DNF4 is identified through the dnf module
+// imported by the interpreter that the native entrypoint itself names, which
+// also yields the native versionlock plugin state.
 func (p *Provider) selectDNF(ctx context.Context, logDirectory string) (dnf.Manager, error) {
-	want, ok := dnfGeneration(p.config.Platform.GetOsId())
+	tooling := platform.Of(p.config.Platform).Native().Packages
+	want, ok := map[platform.Backend]dnf.Kind{platform.BackendDNF4: dnf.DNF4, platform.BackendDNF5: dnf.DNF5}[tooling.Backend]
 	if !ok {
 		return dnf.Manager{}, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
 	}
@@ -63,9 +50,8 @@ func (p *Provider) selectDNF(ctx context.Context, logDirectory string) (dnf.Mana
 		return dnf.Manager{}, err
 	}
 	var manager dnf.Manager
-	minimum := minimumDNF5
+	minimum := tooling.Minimum
 	if want == dnf.DNF4 {
-		minimum = minimumDNF4
 		if manager, err = p.probeDNF4(ctx, selected); err != nil {
 			return dnf.Manager{}, err
 		}
@@ -142,6 +128,10 @@ func (p *Provider) dnf4(ctx context.Context, phase, directory string, versionloc
 		flag = "1"
 	}
 	command := append([]string{"-I", "-c", dnf4Adapter, phase, directory}, args...)
+	if phase == "apply" {
+		// Applying mutates the system RPM database; never SIGKILL it.
+		return commitNative(ctx, p.interpreter, append(command, flag), "/", nil)
+	}
 	return p.run(ctx, p.interpreter, append(command, flag), "/", nil)
 }
 
@@ -163,5 +153,5 @@ func nativeEntrypoint(path string) ([]byte, error) {
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Uid != 0 || stat.Mode&0022 != 0 {
 		return nil, errors.New("packageprovider: unsafe native DNF4 entrypoint")
 	}
-	return protectedFile(resolved, 64<<10)
+	return custody.ReadRoot(resolved, 64<<10, false)
 }

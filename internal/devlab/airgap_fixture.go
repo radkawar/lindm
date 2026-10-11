@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 // AirgapAuthorityOptions configures an isolated site server for offline-bundle
@@ -94,14 +95,13 @@ func (f *AuthorityFixture) configureAirgap(ctx context.Context, cfg *configv1.Se
 // this fixture's private configuration, inside the same network namespace.
 // A failure carries lindmd's own structured error text, never configuration.
 func (f *AuthorityFixture) runServerCommand(ctx context.Context, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
-	defer cancel()
-	command := exec.CommandContext(ctx, f.binary, append(append([]string{}, args...), "-config", f.configPath())...)
-	var stdout bytes.Buffer
-	stderr := &tailBuffer{limit: 64 << 10}
-	command.Stdout, command.Stderr, command.WaitDelay = &boundedBuffer{buffer: &stdout, limit: 1 << 20}, io.MultiWriter(f.log, stderr), 5*time.Second
-	if err := command.Run(); err != nil {
-		return stdout.Bytes(), fmt.Errorf("lindmd %s failed: %s: %w", args[0], commandFailure(stderr.data), err)
+	stdout, stderr := nativeexec.NewBuffer(1<<20), nativeexec.NewTailBuffer(64<<10)
+	err := labexec.Run(ctx, labexec.Command{Path: f.binary, Args: append(append([]string{}, args...), "-config", f.configPath()), Stdout: stdout, Stderr: io.MultiWriter(f.log, stderr), Timeout: 2 * time.Hour})
+	if err == nil && stdout.Truncated() {
+		err = errors.New("command output exceeded bound")
+	}
+	if err != nil {
+		return stdout.Bytes(), fmt.Errorf("lindmd %s failed: %s: %w", args[0], commandFailure(stderr.Bytes()), err)
 	}
 	return stdout.Bytes(), nil
 }
@@ -121,35 +121,10 @@ func commandFailure(log []byte) string {
 	return "no structured failure reported"
 }
 
-type tailBuffer struct {
-	data  []byte
-	limit int
-}
-
-func (b *tailBuffer) Write(p []byte) (int, error) {
-	b.data = append(b.data, p...)
-	if len(b.data) > b.limit {
-		b.data = append([]byte(nil), b.data[len(b.data)-b.limit:]...)
-	}
-	return len(p), nil
-}
-
 // RunServerCommand is the post-start counterpart of the BeforeStart runner.
 func (f *AuthorityFixture) RunServerCommand(ctx context.Context, args ...string) ([]byte, error) {
 	if f.closed {
 		return nil, errors.New("isolated authority fixture is closed")
 	}
 	return f.runServerCommand(ctx, args...)
-}
-
-type boundedBuffer struct {
-	buffer *bytes.Buffer
-	limit  int
-}
-
-func (b *boundedBuffer) Write(p []byte) (int, error) {
-	if b.buffer.Len()+len(p) > b.limit {
-		return 0, errors.New("command output exceeded bound")
-	}
-	return b.buffer.Write(p)
 }

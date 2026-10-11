@@ -32,7 +32,7 @@ func TestSUSEBackportedOpenSSH(t *testing.T) {
 		t.Fatal("SUSE vendor fixture bytes changed")
 	}
 	validator := suseValidator(t)
-	for _, distro := range []string{"sles", "opensuse-leap"} {
+	for _, distro := range []string{"sles"} {
 		for _, arch := range []string{"x86_64", "aarch64", "ppc64le", "s390x"} {
 			t.Run(distro+"/"+arch, func(t *testing.T) {
 				doc, err := parseSUSE(suseSource(distro, "15.6", arch), raw, validator)
@@ -88,6 +88,8 @@ func TestSUSERejectsWrongScope(t *testing.T) {
 		{"sles-sap", "15.6", "x86_64"},
 		{"sled", "15.6", "x86_64"},
 		{"opensuse-leap", "15.5", "x86_64"},
+		// Leap 15.6 is listed in the notice but is not a registry release.
+		{"opensuse-leap", "15.6", "x86_64"},
 		{"opensuse-leap", "15.6", "i586"},
 		{"opensuse-tumbleweed", "rolling", "x86_64"},
 		{"opensuse-tumbleweed", "20240615", "x86_64"},

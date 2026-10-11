@@ -12,7 +12,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -27,113 +26,35 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/custody"
 )
 
 type commandRunner func(context.Context, string, ...string) ([]byte, error)
-type boundedOutput struct{ bytes.Buffer }
 
-func (b *boundedOutput) Write(p []byte) (int, error) {
-	if len(p) > 65536-b.Len() {
-		return 0, ErrUnsupported
-	}
-	return b.Buffer.Write(p)
-}
 func runNative(ctx context.Context, path string, args ...string) ([]byte, error) {
-	// Executables are package-installed under root-only native directories.
-	resolved, err := filepath.EvalSymlinks(path)
+	result, err := nativeexec.Run(ctx, nativeexec.Command{Path: path, Args: args, Env: []string{"DEBIAN_FRONTEND=noninteractive"}, Timeout: 30 * time.Second, StdoutLimit: 65536, StderrLimit: 65536})
 	if err != nil {
-		return nil, err
-	}
-	if !strings.HasPrefix(resolved, "/usr/") {
-		return nil, ErrUnsupported
-	}
-	file, err := protectedOpen(resolved)
-	if err != nil {
-		return nil, err
-	}
-	if err := file.Close(); err != nil {
-		return nil, err
-	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin", "LANG=C", "LC_ALL=C", "DEBIAN_FRONTEND=noninteractive"}
-	cmd.WaitDelay = time.Second
-	var out, stderr boundedOutput
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("password native %s: %w", filepath.Base(path), err)
 	}
-	return out.Bytes(), nil
+	return result.Stdout, nil
 }
-func protectedOpen(path string) (*os.File, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-		return nil, ErrUnsupported
+
+// unsupported maps a custody refusal onto the provider's ErrUnsupported.
+func unsupported(err error) error {
+	if errors.Is(err, custody.ErrUnsafe) {
+		return errors.Join(ErrUnsupported, err)
 	}
-	parent, err := unix.Open("/", unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
-	if err != nil {
-		return nil, err
-	}
-	rest := strings.TrimPrefix(path, "/")
-	for {
-		var st unix.Stat_t
-		if err := unix.Fstat(parent, &st); err != nil {
-			return nil, errors.Join(err, unix.Close(parent))
-		}
-		if st.Uid != 0 || st.Mode&0022 != 0 {
-			return nil, errors.Join(fmt.Errorf("%w: replaceable ancestry of %s", ErrUnsupported, path), unix.Close(parent))
-		}
-		name, next, more := strings.Cut(rest, "/")
-		if !more {
-			break
-		}
-		fd, openErr := unix.Openat(parent, name, unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-		closeErr := unix.Close(parent)
-		if openErr != nil {
-			return nil, errors.Join(openErr, closeErr)
-		}
-		if closeErr != nil {
-			return nil, errors.Join(closeErr, unix.Close(fd))
-		}
-		parent = fd
-		rest = next
-	}
-	fd, openErr := unix.Openat(parent, rest, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-	closeErr := unix.Close(parent)
-	if openErr != nil {
-		return nil, errors.Join(openErr, closeErr)
-	}
-	f := os.NewFile(uintptr(fd), path)
-	if closeErr != nil {
-		return nil, errors.Join(closeErr, f.Close())
-	}
-	var st unix.Stat_t
-	if err := unix.Fstat(fd, &st); err != nil {
-		return nil, errors.Join(err, f.Close())
-	}
-	// Distribution builds hardlink identical vendor files (Fedora's authselect
-	// profiles); a root-owned, non-writable regular file is safe at any count.
-	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != 0 || st.Mode&0022 != 0 {
-		return nil, errors.Join(fmt.Errorf("%w: unprotected native file %s", ErrUnsupported, path), f.Close())
-	}
-	return f, nil
+	return err
 }
-func readNative(path string, limit int64) (data []byte, err error) {
-	f, err := protectedOpen(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = errors.Join(err, f.Close()) }()
-	data, err = io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > limit {
-		return nil, ErrUnsupported
-	}
-	return data, nil
+
+// readNative reads a root-protected native file. Distribution builds hardlink
+// identical vendor files (Fedora's authselect profiles); a root-owned,
+// non-writable regular file is safe at any link count.
+func readNative(path string, limit int64) ([]byte, error) {
+	data, err := custody.ReadRoot(path, limit, true)
+	return data, unsupported(err)
 }
 func digestMessage(m proto.Message) ([]byte, error) {
 	b, err := (proto.MarshalOptions{Deterministic: true}).Marshal(m)
@@ -586,9 +507,12 @@ func observeModules(ctx context.Context, platform *resourcev1.PlatformProduct, f
 	return modules, hash.Sum(nil), nil
 }
 func moduleDigest(path string) (digest []byte, err error) {
-	file, err := protectedOpen(path)
+	file, stat, err := custody.OpenRoot(path, unix.O_RDONLY)
 	if err != nil {
-		return nil, err
+		return nil, unsupported(err)
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
+		return nil, errors.Join(ErrUnsupported, file.Close())
 	}
 	defer func() { err = errors.Join(err, file.Close()) }()
 	var magic [4]byte
@@ -793,7 +717,7 @@ func (p *Provider) snapshot(ctx context.Context, d *resourcev1.PasswordPolicyDes
 	observed := &resourcev1.ResourceObservation{Ref: passwordRef(), Metadata: &resourcev1.ObservationMetadata{BootId: strings.TrimSpace(string(boot)), ExecutorIncarnation: p.config.ExecutorIncarnation, ObservedAt: timestamppb.Now(), Backend: proto.CloneOf(p.backend), NativeRevision: make([]byte, 32), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK}}
 	result := &agentv1.ResourceOwnershipSnapshot{Observation: observed, PasswordPolicy: &agentv1.PasswordPolicyOwnership{ManagerProfile: manager.profile, ManagerGenerationSha256: manager.generation, ManagerProfileSha256: manager.profileDigest, EnabledFeatures: manager.features}}
 	last := agentv1.PasswordNativeFile(4)
-	if p.config.Platform.GetOsId() == "ubuntu" {
+	if !authselectProduct(p.config.Platform) {
 		last = 8
 	}
 	for kind := agentv1.PasswordNativeFile(1); kind <= last; kind++ {

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 const (
@@ -265,39 +267,42 @@ func boundedRead(r io.Reader, bound int64) ([]byte, error) {
 }
 
 // Applies binds inventories to configured products. It deliberately does not
-// equate a RHEL minor/EUS release with its major stream or another vendor's build.
+// equate a Red Hat minor/EUS release with its major stream or another vendor's build.
 func Applies(source *advisoryv1.FeedSource, distro, release, architecture string) bool {
 	if source == nil || source.GetDistro() != distro {
 		return false
 	}
-	configured := source.GetRelease()
-	if distro == "ubuntu" {
-		if configured == "noble" {
-			configured = "24.04"
-		}
-		if release == "noble" {
-			release = "24.04"
-		}
+	product := platform.ForFeed(distro, source.GetRelease())
+	if !product.Supported(platform.Advisories) {
+		return false
 	}
-	if configured == "rolling" {
-		switch distro {
-		case "arch":
-			if release == "" {
-				release = "rolling"
-			}
-		case "opensuse-tumbleweed":
-			if _, err := time.Parse("20060102", release); err == nil {
-				release = "rolling"
-			}
-		}
-	}
-	if distro == "rhel" && source.GetPlatformStream() == "standard" && !strings.Contains(configured, ".") {
+	configured, release := product.FeedRelease(source.GetRelease()), product.FeedRelease(release)
+	if product.Advisory.PlatformStreams && source.GetPlatformStream() == "standard" && !strings.Contains(configured, ".") {
 		release, _, _ = strings.Cut(release, ".")
 	}
 	if configured != release {
 		return false
 	}
 	return source.GetArchitecture() == "" || canonicalArch(source.GetArchitecture()) == canonicalArch(architecture)
+}
+
+// vendorProduct resolves a feed source to its registry release, which must
+// support advisories through the given vendor adapter. No cross-vendor
+// inference: a compatible rebuild never borrows another vendor's feed.
+func vendorProduct(config *advisoryv1.FeedSource, adapter platform.Feed) (*platform.Release, error) {
+	product := platform.ForFeed(config.GetDistro(), config.GetRelease())
+	if err := product.Gate(platform.Advisories); err != nil {
+		return nil, fmt.Errorf("feed: %w", err)
+	}
+	if !slices.Contains(product.Advisory.Feeds, adapter) {
+		return nil, fmt.Errorf("feed: %s advisories do not cover %s", adapter, product.Name)
+	}
+	return product, nil
+}
+
+// manager is the native version-comparison scheme of the product's packages.
+func manager(product *platform.Release) string {
+	return string(product.Native().Packages.Backend.PackageDB())
 }
 
 func canonicalArch(arch string) string {
@@ -308,16 +313,6 @@ func canonicalArch(arch string) string {
 		return "aarch64"
 	}
 	return arch
-}
-
-func managerFor(distro string) string {
-	if distro == "arch" {
-		return "pacman"
-	}
-	if distro == "ubuntu" || distro == "debian" {
-		return "dpkg"
-	}
-	return "rpm"
 }
 
 func addRecord(doc *advisoryv1.FeedDocument, record *advisoryv1.Advisory, manager string, validator protovalidate.Validator) error {

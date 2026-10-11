@@ -16,6 +16,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 const (
@@ -174,34 +176,18 @@ func mkdirDurable(directory string, mode os.FileMode) error {
 	return syncDir(parent)
 }
 
-func protectedDirectory(directory string) error {
+// ownedDirectory durably creates directory, then requires custody.Owned: a
+// private leaf owned by the effective user. Publishers, mirrors and tests run
+// unprivileged, so the ancestry is the operator's, not root's.
+func ownedDirectory(directory string) error {
 	if !filepath.IsAbs(directory) {
 		return errors.New("releaseupdate: state directory must be absolute")
 	}
 	if err := mkdirDurable(directory, 0700); err != nil {
 		return err
 	}
-	st, err := os.Lstat(directory)
-	if err != nil {
-		return err
-	}
-	if !st.IsDir() || st.Mode().Perm()&0077 != 0 {
-		return errors.New("releaseupdate: private owned directory required")
-	}
-	f, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	var s unix.Stat_t
-	err = unix.Fstat(int(f.Fd()), &s)
-	closeErr := f.Close()
-	if err != nil || closeErr != nil {
-		return errors.Join(err, closeErr)
-	}
-	if s.Uid != uint32(os.Geteuid()) {
-		return errors.New("releaseupdate: wrong directory owner")
-	}
-	return nil
+	_, err := custody.Owned(directory, true)
+	return err
 }
 
 func acquireLock(directory string) (*os.File, error) {

@@ -84,7 +84,7 @@ func buildArchRejectionFixtures(ctx context.Context, req RejectionRequest) (resu
 	if err != nil {
 		return nil, err
 	}
-	if info["pkgver"][0] != artifact.Version+"-"+archRelease || info["arch"][0] != artifact.Architecture.Arch {
+	if info["pkgver"][0] != artifact.Version+"-"+archRelease || info[pkgInfoArch][0] != artifact.Architecture.Arch {
 		return nil, fmt.Errorf("%w: positive Arch metadata differs", ErrArtifact)
 	}
 	wrong, wrongGuard, err := generateDevelopmentSigner(ctx, work)
@@ -103,7 +103,7 @@ func buildArchRejectionFixtures(ctx context.Context, req RejectionRequest) (resu
 	staged := filepath.Join(work, "fixtures")
 	result = &RejectionFixtures{WrongSignerFingerprint: wrong.Fingerprint}
 	for _, kind := range []string{"unsigned", "tampered", "wrong-signer"} {
-		dir := filepath.Join(staged, kind, "arch")
+		dir := filepath.Join(staged, kind, string(FormatArch))
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}

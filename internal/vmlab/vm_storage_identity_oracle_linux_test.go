@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 func TestStorageIdentityOracleSeparatesLUKSAndFilesystemUUID(t *testing.T) {
@@ -30,16 +31,16 @@ func TestStorageIdentityOracleSeparatesLUKSAndFilesystemUUID(t *testing.T) {
 	before.Storage = storage
 	after := proto.CloneOf(before)
 	actual := proto.CloneOf(before)
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.Storage.Devices[0].Identity.LuksUuid.Value = "11111111-1111-1111-1111-111111111111"
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("oracle ignored changed LUKS identity")
 	}
 	actual = proto.CloneOf(before)
 	actual.Storage.Devices[0].Identity = nil
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("oracle ignored missing storage identity")
 	}
 }

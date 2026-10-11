@@ -154,10 +154,11 @@ func supportTable() (string, error) {
 			if n.Systemd > 0 {
 				systemd = strconv.Itoa(n.Systemd)
 			}
-			advisory := r.Advisory.Feed
-			if r.Advisory.Ecosystem != "" {
-				advisory += " " + r.Advisory.Ecosystem
+			feeds := make([]string, 0, len(r.Advisory.Feeds)+1)
+			for _, f := range r.Advisory.Feeds {
+				feeds = append(feeds, string(f))
 			}
+			advisory := strings.TrimSpace(strings.Join(feeds, ", ") + " " + r.Advisory.Ecosystem)
 			rows = append(rows, []string{
 				tier.String(), gendoc.Escape(r.Name), gendoc.Escape(match(r)), dash(strings.Join(r.Architectures, ", ")),
 				dash(packages), dash(systemd), dash(n.Firewall), dash(r.FDE), dash(desktop(r.Desktop)), dash(advisory),

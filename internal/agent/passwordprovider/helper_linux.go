@@ -15,14 +15,16 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
-// ExecuteNative is called only by the fixed separately confined root helper.
+// ApplyNative is called only by the fixed separately confined root helper.
 // No paths, profile snippets or argv come from the remote desired policy. The
 // target is recomputed from signed policy and protected baseline. All native
 // files are prepared without writes; the final gate precedes the first effect.
-func ExecuteNative(ctx context.Context, config *agentv1.NativePasswordProviderConfig, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+	config := env.Config.GetPasswordProvider()
 	if beforeEffect == nil {
 		return nil, ErrUnsupported
 	}

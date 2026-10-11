@@ -14,6 +14,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 )
 
 // ConfirmRefreshInventoryPublication attests the exact collections bound during
@@ -23,13 +24,13 @@ func (s *Service) ConfirmRefreshInventoryPublication(ctx context.Context, req *c
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_inventory_publication")
 	}
 	if s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -54,14 +55,14 @@ func (s *Service) ConfirmRefreshInventoryPublication(ctx context.Context, req *c
 		return nil, mapErr(notFoundIfMissing(err))
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_binding_rejected")
 	}
 	intent, err := actionIntent(action)
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if intent.GetSpec().GetRefreshInventory() == nil || !action.StartAuthorizedAt.Valid || len(action.StartGrantEnvelope) == 0 {
-		return nil, rpcError(connect.CodeFailedPrecondition, "inventory_refresh_not_started")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "inventory_refresh_not_started")
 	}
 	if len(action.InventoryReceiptEnvelope) != 0 {
 		if err := tx.Commit(ctx); err != nil {
@@ -70,17 +71,17 @@ func (s *Service) ConfirmRefreshInventoryPublication(ctx context.Context, req *c
 		return noStore(&devicev1.ConfirmRefreshInventoryPublicationResponse{ReceiptEnvelope: action.InventoryReceiptEnvelope}), nil
 	}
 	if action.ClosedAt.Valid {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_closed")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_closed")
 	}
 	published, err := q.GetDeviceActionInventoryPublication(ctx, action.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "inventory_refresh_not_published")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "inventory_refresh_not_published")
 	}
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if authority.Delegation == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	if !deviceActionSignerDelegated(authority.Delegation, s.signing.StartKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, "device.refresh-inventory.v1") {
 		return nil, deviceActionCapabilityError("device.refresh-inventory.v1", "start")

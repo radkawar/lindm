@@ -1,7 +1,6 @@
 package loadlab
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
@@ -12,7 +11,6 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,7 +29,9 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/devlab"
+	"lindm/internal/labexec"
 	"lindm/internal/trust"
 )
 
@@ -731,17 +731,15 @@ func minTime(a, b, c time.Time) time.Time {
 func hardware(ctx context.Context) (map[string]string, error) {
 	result := map[string]string{}
 	for name, args := range map[string][]string{"cpu": {"lscpu"}, "disk": {"lsblk", "-o", "NAME,MODEL,SIZE,ROTA,TYPE,FSTYPE,MOUNTPOINTS"}, "kernel": {"uname", "-srvmo"}, "clock_ticks": {"getconf", "CLK_TCK"}} {
-		call, cancel := context.WithTimeout(ctx, 5*time.Second)
-		var output boundedOutput
-		command := exec.CommandContext(call, args[0], args[1:]...)
-		command.Stdout = &output
-		command.Stderr = io.Discard
-		err := command.Run()
-		cancel()
+		output := nativeexec.NewBuffer(65536)
+		err := labexec.Run(ctx, labexec.Command{Path: args[0], Args: args[1:], Stdout: output, Timeout: 5 * time.Second})
+		if err == nil && output.Truncated() {
+			err = errors.New("hardware evidence exceeds bound")
+		}
 		if err != nil {
 			return nil, fmt.Errorf("record %s: %w", name, err)
 		}
-		result[name] = output.buffer.String()
+		result[name] = output.String()
 	}
 	memory, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
@@ -756,15 +754,6 @@ func hardware(ctx context.Context) (map[string]string, error) {
 		result[name] = string(data)
 	}
 	return result, nil
-}
-
-type boundedOutput struct{ buffer bytes.Buffer }
-
-func (b *boundedOutput) Write(p []byte) (int, error) {
-	if len(p) > 65536-b.buffer.Len() {
-		return 0, errors.New("hardware evidence exceeds bound")
-	}
-	return b.buffer.Write(p)
 }
 
 func binaryDigest(path string) (string, error) {

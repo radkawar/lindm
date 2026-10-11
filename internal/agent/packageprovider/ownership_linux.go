@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
 
@@ -58,7 +60,7 @@ func (p *Provider) installedIdentity(ctx context.Context, record *resourcev1.Nat
 	}
 	for _, suffix := range []string{".list", ".md5sums", ".conffiles"} {
 		path := base + suffix
-		data, err := protectedFile(path, maxOutput)
+		data, err := custody.ReadRoot(path, maxOutput, false)
 		if errors.Is(err, os.ErrNotExist) && suffix != ".list" {
 			continue
 		}

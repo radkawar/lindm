@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 func TestNativeTruthStatusDistinguishesMissingFromZero(t *testing.T) {
@@ -239,7 +240,7 @@ func TestNativeDetailsComparisonChecksValuesAndStatuses(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			before, after, actual := nativeDetailsFixture(), nativeDetailsFixture(), nativeDetailsFixture()
 			test.mutate(actual)
-			err := compareVMDetails("ubuntu", "x86_64", before, after, actual)
+			err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual)
 			if err == nil {
 				t.Fatal("accepted mismatched native detail")
 			}
@@ -257,16 +258,16 @@ func TestNativeDetailsComparisonAllowsOnlyBoundedChanges(t *testing.T) {
 	actual.Memory.AvailableBytes.Value += 64 << 20
 	actual.LocalUsers.Users[0], actual.LocalUsers.Users[1] = actual.LocalUsers.Users[1], actual.LocalUsers.Users[0]
 	actual.Network.Interfaces[0].Addresses.Values[0], actual.Network.Interfaces[0].Addresses.Values[1] = actual.Network.Interfaces[0].Addresses.Values[1], actual.Network.Interfaces[0].Addresses.Values[0]
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.UptimeSeconds.Value = 83
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("accepted out-of-window uptime")
 	}
 	actual.UptimeSeconds.Value = 70
 	after.KernelModuleCount.Value++
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil || !strings.Contains(err.Error(), "no collector verdict") {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil || !strings.Contains(err.Error(), "no collector verdict") {
 		t.Fatalf("unstable truth = %v", err)
 	}
 	if truthWithin(math.MaxUint64, 0, 1, 2) || truthWithin(0, math.MaxUint64-1, math.MaxUint64, 2) {
@@ -315,11 +316,11 @@ func TestNativeApplicationsCompareArchitectureAndVersion(t *testing.T) {
 		}}
 	}
 	actual.Flatpak.Applications[0], actual.Flatpak.Applications[1] = actual.Flatpak.Applications[1], actual.Flatpak.Applications[0]
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.Flatpak.Applications[0].Version.Value = "wrong"
-	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("accepted wrong application version")
 	}
 }
@@ -329,7 +330,7 @@ func TestNativeStatusMismatchIdentifiesEnumsWithoutGuestValues(t *testing.T) {
 	before.Snap.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_NATIVE_COMMAND_FAILURE
 	after.Snap.Status = before.Snap.Status
 	actual.Snap.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT
-	err := compareVMDetails("ubuntu", "x86_64", before, after, actual)
+	err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual)
 	if err == nil || !strings.Contains(err.Error(), "COLLECTION_STATUS_NATIVE_COMMAND_FAILURE") || !strings.Contains(err.Error(), "COLLECTION_STATUS_INVALID_OUTPUT") {
 		t.Fatalf("status mismatch omitted enum evidence: %v", err)
 	}

@@ -17,6 +17,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
+	"lindm/internal/rpcreason"
 )
 
 const (
@@ -251,8 +252,7 @@ func peerCredential(conn net.Conn) (uint32, error) {
 }
 
 func writeDenied(w http.ResponseWriter, r *http.Request, code connect.Code, reason string) {
-	err := connect.NewError(code, errors.New(reason))
-	err.Meta().Set("Lindm-Reason", reason)
+	err := rpcreason.Error(code, reason)
 	if connect.NewErrorWriter().IsSupported(r) {
 		_ = connect.NewErrorWriter().Write(w, r, err)
 		return

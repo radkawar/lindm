@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	configv1 "lindm/gen/lindm/config/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 // VMAssistanceOptions configures the maintained remote-assistance lane. Only
@@ -35,6 +37,12 @@ type VMAssistanceOptions struct {
 	// relayed media on the lab host.
 	RelayAddress string
 	Encrypted    EncryptedVMOptions
+	// Scenarios selects lane scenarios by name, in lane order; nil runs all.
+	Scenarios []string
+	// Hold, when set, receives the owner's access once the selected scenarios
+	// passed; lindmd and the VM then keep running until ctx ends. Any held run
+	// is a hands-on demo, never a qualification record.
+	Hold func(*AssistanceHold) error
 }
 
 // assistanceRelayPorts is the relay allocation range size; four allocations
@@ -52,9 +60,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	distribution := manifest.GetDistribution()
-	if distribution != "ubuntu" && distribution != "fedora" {
-		return nil, errors.New("assistance lane requires the Ubuntu 24.04/26.04 or Fedora 44 encrypted GNOME installer")
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	if err := release.Gate(platform.Assistance); err != nil {
+		return nil, err
 	}
 	if options.Encrypted.Desktop != "gnome" || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("assistance lane requires the installer GNOME desktop, a lab display and signed-package egress")
@@ -63,7 +71,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err != nil {
 		return nil, err
 	}
-	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: distribution, Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
+	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: manifest.GetDistribution(), Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
 		"One disposable QEMU guest (virtio-gpu, usb-tablet, PS/2 keyboard); local-user consent and stop clicks are QMP absolute-pointer input located from QMP screendumps, not a human at a physical display.",
 		"Relayed media stays on the lab host: guest UDP reaches the embedded TURN listener through QEMU user networking (10.0.2.2 to host loopback); NAT traversal, public relays and multi-host paths are not qualified.",
 		"The operator browser is headless Playwright Chromium on the lab host with a virtual WebAuthn authenticator; other browsers are not qualified by this lane.",
@@ -80,8 +88,16 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 			result.Failure = err.Error()
 		}
 	}()
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
-	defer cancel()
+	// Setup and scenarios are bounded; a held demo then outlives the bound,
+	// so the deadline cancels a context the owned processes keep using.
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	deadline := time.AfterFunc(2*time.Hour, func() { cancel(errors.New("assistance lane exceeded its 2h bound")) })
+	defer deadline.Stop()
+	scenarios, err := selectAssistanceScenarios(options.Scenarios)
+	if err != nil {
+		return result, err
+	}
 	if result.LabSHA256, err = dispatchFileDigest(options.LabBinary); err != nil {
 		return result, err
 	}
@@ -171,37 +187,23 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := waitNativeActionPresence(ctx, control.session, result.DeviceID); err != nil {
 		return result, err
 	}
-	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, distribution); err != nil {
+	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, release); err != nil {
 		return result, err
 	}
 	if err := waitAssistanceSessionUnit(ctx, vm.guest, result.Guest); err != nil {
 		return result, err
 	}
-	if result.Guest.Packages, err = observeAssistancePackages(ctx, vm.guest, distribution); err != nil {
+	if result.Guest.Packages, err = observeAssistancePackages(ctx, vm.guest, release); err != nil {
 		return result, err
 	}
 	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
 	if _, err := screen.captureReference(ctx); err != nil {
 		return result, err
 	}
-	private, err := os.MkdirTemp("", "lindm-assistance-secrets-")
-	if err != nil {
-		return result, err
-	}
-	defer func() { err = errors.Join(err, os.RemoveAll(private)) }()
-	browser, err := openAssistanceOperator(ctx, fixture, options, private)
-	if err != nil {
-		return result, err
-	}
-	defer func() { err = errors.Join(err, browser.Close()) }()
-	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Version: browser.version, Username: assistanceOperator}
-	run := &assistanceRun{vm: vm, screen: screen, browser: browser, owner: control.session, evidence: evidence, result: result, distribution: distribution, deviceID: result.DeviceID}
+	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Username: assistanceOperator}
 	var scenarioErr error
-	for _, scenario := range assistanceScenarios {
-		if scenarioErr = run.scenario(ctx, scenario); scenarioErr != nil {
-			scenarioErr = fmt.Errorf("assistance scenario %s: %w", scenario.name, scenarioErr)
-			break
-		}
+	if len(scenarios) != 0 {
+		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, deviceID: result.DeviceID}, fixture, options, scenarios)
 	}
 	// Device journals are recorded for failures too: they are the product
 	// slices' diagnostic for a wrong end cause.
@@ -209,8 +211,51 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if scenarioErr != nil || err != nil {
 		return result, errors.Join(scenarioErr, err)
 	}
-	result.Audit, err = collectAssistanceAudit(ctx, control.session, result.Scenarios)
-	return result, err
+	if result.Audit, err = collectAssistanceAudit(ctx, control.session, result.Scenarios); err != nil || options.Hold == nil {
+		return result, err
+	}
+	if !deadline.Stop() {
+		return result, context.Cause(ctx)
+	}
+	return result, holdAssistance(ctx, vm, fixture, result, options.Hold)
+}
+
+// runAssistanceScenarios signs the operator browser in and runs each scenario
+// in order; the browser is gone before the lane collects journals or holds.
+func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, scenarios []assistanceScenarioSpec) (err error) {
+	private, err := os.MkdirTemp("", "lindm-assistance-secrets-")
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(private)) }()
+	if run.browser, err = openAssistanceOperator(ctx, fixture, options, private); err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, run.browser.Close()) }()
+	run.result.Browser.Version = run.browser.version
+	for _, scenario := range scenarios {
+		if err := run.scenario(ctx, scenario); err != nil {
+			return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
+		}
+	}
+	return nil
+}
+
+// selectAssistanceScenarios keeps lane order and rejects unknown names.
+func selectAssistanceScenarios(names []string) ([]assistanceScenarioSpec, error) {
+	if names == nil {
+		return assistanceScenarios, nil
+	}
+	selected := make([]assistanceScenarioSpec, 0, len(names))
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(names, spec.name) {
+			selected = append(selected, spec)
+		}
+	}
+	if len(selected) != len(names) {
+		return nil, errors.New("assistance scenarios must be distinct names from control, view, decline, portal-cancel, lock")
+	}
+	return selected, nil
 }
 
 // openAssistanceOperator issues a distinct owner account through the real

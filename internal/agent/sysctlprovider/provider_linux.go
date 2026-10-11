@@ -27,6 +27,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -68,6 +69,8 @@ type Provider struct {
 	gate    sync.Mutex
 	closed  bool
 }
+
+var _ resourceprovider.Provider = (*Provider)(nil)
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
@@ -185,6 +188,20 @@ func messageDigest(message proto.Message) ([]byte, error) {
 }
 func sameSnapshot(a, b *agentv1.ResourceOwnershipSnapshot) bool {
 	return proto.Equal(a.GetObservation().GetSysctl(), b.GetObservation().GetSysctl()) && proto.Equal(a.GetSysctlPersistence(), b.GetSysctlPersistence())
+}
+
+// Observe reads the runtime and persistent value without effects.
+func (p *Provider) Observe(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	p.gate.Lock()
+	defer p.gate.Unlock()
+	if err := p.validateDesired(desired); err != nil {
+		return nil, err
+	}
+	before, err := p.observe(ctx, desired.GetSysctl())
+	if err != nil {
+		return nil, err
+	}
+	return before.GetObservation(), nil
 }
 
 func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {

@@ -1,0 +1,149 @@
+package platform
+
+import (
+	"fmt"
+	"slices"
+)
+
+// Lab records the virtual-machine lab recipes maintained for a release. A lane
+// absent from Lanes has no maintained fixture builder or oracle there.
+type Lab struct {
+	Lanes []LabLane
+	// Entitlement: the guest's vendor repositories need a subscription token.
+	Entitlement bool
+	// Installer is the vendor installer the lab's encrypted and installed-image
+	// recipes remaster; InstallerNone when the lab installs from cloud images.
+	Installer Installer
+	// Kickstart is the Anaconda kickstart syntax version, e.g. "F44".
+	// Repository and RepositoryKey are the immutable signed release tree and
+	// its key file that the installed root adds packages from; %s is the
+	// architecture.
+	Kickstart, Repository, RepositoryKey string
+	// TPM is the encrypted installer's TPM2-unlocking initramfs recipe.
+	TPM LabTPM
+	// Session is the encrypted golden's graphical lab session.
+	Session LabSession
+	// Guest names the native guest facts of the device-action lanes.
+	Guest LabGuest
+}
+
+// LabLane is a vmlab qualification lane with per-release recipes.
+type LabLane string
+
+const (
+	LaneResources  LabLane = "resources"
+	LaneUpdates    LabLane = "updates"
+	LaneAirgap     LabLane = "airgap"
+	LaneUnattended LabLane = "unattended"
+	LaneServices   LabLane = "services"
+	LaneServer     LabLane = "server"
+	// LaneAcceptance is the stock-image console acceptance lane and
+	// LaneEncryptedAcceptance its vendor-installer encrypted variant.
+	LaneAcceptance          LabLane = "acceptance"
+	LaneEncryptedAcceptance LabLane = "encrypted-acceptance"
+)
+
+// LabLane returns nil when the release has a maintained recipe for the lane.
+func (r *Release) LabLane(l LabLane) error {
+	if slices.Contains(r.Lab.Lanes, l) {
+		return nil
+	}
+	return fmt.Errorf("platform: no maintained vm %s lane for %s", l, r.Name)
+}
+
+// DNF reports whether the backend is a DNF generation.
+func (b Backend) DNF() bool { return b == BackendDNF4 || b == BackendDNF5 }
+
+// Installer is a vendor installer whose unattended recipe the lab remasters
+// into the authenticated vendor ISO.
+type Installer string
+
+const (
+	InstallerNone   Installer = ""
+	Subiquity       Installer = "subiquity"        // autoinstall user-data over NoCloud
+	Anaconda        Installer = "anaconda"         // kickstart
+	DebianInstaller Installer = "debian-installer" // preseed
+	AutoYaST        Installer = "autoyast"         // AutoYaST profile through linuxrc
+)
+
+// InstallerMedia is the vendor ISO layout an installer recipe is remastered
+// into. The recipe lives in the ISO's /lindm-seed directory.
+type InstallerMedia struct {
+	// GRUB is the vendor grub.cfg on the ISO. EFIImage: the El Torito EFI FAT
+	// image carries the same file, which must be patched too.
+	GRUB     string
+	EFIImage bool
+	// Seed is the recipe file name and Args the kernel arguments that make the
+	// installer read it.
+	Seed, Args string
+	// Entry is the GRUB default entry: the vendor's text installer.
+	Entry string
+	// Separator appends "---" so the installer arguments stay off the
+	// installed kernel command line.
+	Separator bool
+	// RedeclareEFI: xorriso cannot replay the vendor boot catalog, so the
+	// unchanged EFI image is re-declared as the only UEFI El Torito entry.
+	RedeclareEFI bool
+}
+
+var installerMedia = map[Installer]InstallerMedia{
+	Subiquity: {GRUB: "/boot/grub/grub.cfg", Seed: "user-data", Args: `autoinstall noprompt ds=nocloud\;s=/cdrom/lindm-seed/`, Entry: "0", Separator: true},
+	Anaconda:  {GRUB: "/EFI/BOOT/grub.cfg", EFIImage: true, Seed: "ks.cfg", Args: "inst.ks=cdrom:/lindm-seed/ks.cfg inst.text", Entry: "0"},
+	// The first Debian entry boots the graphical initrd; the vendor's text
+	// installer is selected by title.
+	DebianInstaller: {GRUB: "/boot/grub/grub.cfg", Seed: "preseed.cfg", Args: "auto=true priority=critical preseed/file=/cdrom/lindm-seed/preseed.cfg DEBIAN_FRONTEND=text net.ifnames=0 biosdevname=0", Entry: "'Install'", Separator: true},
+	// linuxrc reads the profile from the DVD itself and configures DHCP for
+	// the snapshot-bound online repository; the installer self-update would
+	// fetch content outside both pins. openSUSE's ARM DVD catalogs its EFI
+	// image with platform 0 behind a hybrid MBR xorriso cannot replay.
+	AutoYaST: {GRUB: "/EFI/BOOT/grub.cfg", EFIImage: true, Seed: "autoinst.xml", Args: "autoyast=cd:/lindm-seed/autoinst.xml textmode=1 self_update=0 net.ifnames=0 ifcfg=eth0=dhcp", Entry: "'Installation'", RedeclareEFI: true},
+}
+
+// Media returns the installer's remastering layout; ok is false for
+// InstallerNone and unknown installers.
+func (i Installer) Media() (InstallerMedia, bool) {
+	m, ok := installerMedia[i]
+	return m, ok
+}
+
+// LabTPM is the dracut recipe that lets the installed initramfs unlock LUKS
+// with a TPM2 token.
+type LabTPM struct {
+	// Modules are the dracut modules; dracut 108 and later split
+	// systemd-cryptsetup out of crypt.
+	Modules []string
+	// Packages are what the installed root adds for them; a trailing "-"
+	// removes a package (apt).
+	Packages []string
+}
+
+// LabSession is the autologin GNOME or KDE session of the encrypted golden.
+type LabSession struct {
+	// Desktops maps a lab desktop ("gnome", "kde") to the packages that install
+	// it (DNF groups under Anaconda).
+	Desktops map[string][]string
+	// GDMConfig is the GDM daemon file that enables autologin, and Name the
+	// lab user's AccountsService session. The GDM service is the release's
+	// Desktop.DisplayManager.
+	GDMConfig, Name string
+	// Terminal is the argv prefix that opens a terminal running a command.
+	Terminal []string
+	// UpgradePrompt is the update-manager file whose release-upgrade Prompt the
+	// lab sets to never, so its dialog cannot cover the session.
+	UpgradePrompt string
+	// Capture are the assistance capture-stack packages recorded as evidence.
+	Capture []string
+}
+
+// LabGuest are the native guest facts of the device-action lanes.
+type LabGuest struct {
+	// Initrd is the installed initramfs path; %s is the kernel release.
+	Initrd string
+	// CryptsetupConsole: the initramfs reports a rejected passphrase only in
+	// the journal, so the lab routes systemd-cryptsetup diagnostics to the
+	// console to observe it.
+	CryptsetupConsole bool
+	// Actions are the device-action prerequisites and OwnedBoot those of the
+	// owned systemd-boot recovery fixture.
+	Actions, OwnedBoot []string
+}

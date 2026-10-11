@@ -12,6 +12,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/identity"
 	"lindm/internal/policy"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) PublishProfileRevision(ctx context.Context, req *connect.Request[adminv1.PublishProfileRevisionRequest]) (*connect.Response[adminv1.PublishProfileRevisionResponse], error) {
@@ -37,7 +38,7 @@ func (s *Service) PublishProfileRevision(ctx context.Context, req *connect.Reque
 		}
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "profile_authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "profile_authorization_unavailable")
 	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionManageProfiles)
 	if err != nil {
@@ -181,13 +182,13 @@ func profileError(err error) error {
 	case errors.Is(err, policy.ErrProfileRejected):
 		return invalid("invalid_profile_request")
 	case errors.Is(err, policy.ErrProfileConflict):
-		return rpcError(connect.CodeAborted, "profile_revision_conflict")
+		return rpcreason.Error(connect.CodeAborted, "profile_revision_conflict")
 	case errors.Is(err, policy.ErrProfileNotFound):
-		return rpcError(connect.CodeNotFound, "profile_revision_not_found")
+		return rpcreason.Error(connect.CodeNotFound, "profile_revision_not_found")
 	case errors.Is(err, policy.ErrProfileCorrupt):
-		return rpcError(connect.CodeFailedPrecondition, "profile_recovery_hold")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "profile_recovery_hold")
 	case errors.Is(err, policy.ErrProfileCapacity):
-		return rpcError(connect.CodeResourceExhausted, "profile_revision_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "profile_revision_capacity")
 	default:
 		return mapErr(err)
 	}

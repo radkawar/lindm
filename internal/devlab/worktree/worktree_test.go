@@ -39,10 +39,13 @@ func fixtureRepository(t *testing.T) *Repository {
 	if err := os.Mkdir(filepath.Join(main, "node_modules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(main, ".git", "info", "exclude"), []byte("/node_modules\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(main, "Makefile"), []byte("tools:\n\tmkdir -p .tools && touch .tools/installed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gitT(t, main, "add", "package.json", "package-lock.json", "README")
+	if err := os.WriteFile(filepath.Join(main, ".git", "info", "exclude"), []byte("/node_modules\n/.tools\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitT(t, main, "add", "package.json", "package-lock.json", "README", "Makefile")
 	gitT(t, main, "commit", "--quiet", "-m", "initial")
 	repo, err := Open(context.Background(), main)
 	if err != nil {
@@ -63,6 +66,9 @@ func TestAddSharesMatchingInstall(t *testing.T) {
 	}
 	if target, err := os.Readlink(filepath.Join(path, "node_modules")); err != nil || target != filepath.Join(repo.Main, "node_modules") {
 		t.Fatalf("node_modules link %q: %v", target, err)
+	}
+	if _, err := os.Stat(filepath.Join(path, ".tools", "installed")); err != nil {
+		t.Fatalf("pinned tools not installed in the worktree: %v", err)
 	}
 	if status := gitT(t, path, "status", "--porcelain"); status != "" {
 		t.Fatalf("shared install made the tree dirty: %q", status)

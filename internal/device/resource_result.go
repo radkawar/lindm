@@ -23,6 +23,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/resource"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -31,7 +32,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_service_result_request")
@@ -71,7 +72,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		return nil, mapErr(err)
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "service_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_action_binding_rejected")
 	}
 	if cancellation := req.Msg.GetNeverPrepared(); cancellation != nil {
 		return s.reportNeverPreparedResource(ctx, tx, q, action, cancellation, now)
@@ -106,7 +107,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		}
 		accepted := new(agentv1.ResourceExecutionAttestation)
 		if err := s.authority.Verify(ctx, action.AttestationEnvelope, accepted, 1, public); err != nil || accepted.GetSessionEpoch() != req.Msg.GetSessionEpoch() {
-			return nil, rpcError(connect.CodePermissionDenied, "service_result_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_rejected")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -114,16 +115,16 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		return noStore(&devicev1.ReportResourceResultResponse{Closed: action.ClosedAt.Valid}), nil
 	}
 	if len(action.ResultNonce) != 32 || !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcError(connect.CodePermissionDenied, "service_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_nonce_rejected")
 	}
 	binding := &trust.ResourceAttestationBinding{DeploymentID: s.deploymentID, DeviceID: principal.DeviceID, EnrollmentGeneration: principal.GenerationID, SessionEpoch: req.Msg.GetSessionEpoch(), ActionID: id, IntentSHA256: sha256.Sum256(action.IntentEnvelope)}
 	copy(binding.Nonce[:], action.ResultNonce)
 	attestation, err := s.authority.VerifyResourceAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), s.ca, binding, now, trust.MaxDeviceClockSkew)
 	if errors.Is(err, trust.ErrDeviceClockSkew) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_clock_skew")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
 	}
 	if err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "service_result_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_rejected")
 	}
 	previous, err := resourceActionRevision(action)
 	if err != nil {
@@ -142,14 +143,14 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	// history or refreshed native proof. All other states remain increasing.
 	if attestation.GetActionRevision() < previous ||
 		(attestation.GetActionRevision() == previous && (priorPreparation == nil || !proto.Equal(priorPreparation, status))) {
-		return nil, rpcError(connect.CodeAlreadyExists, "service_result_conflict")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
 	}
 	intent := new(agentv1.ResourceExecutionIntent)
 	if err := proto.Unmarshal(action.IntentDocument, intent); err != nil {
 		return nil, mapErr(errInternalState)
 	}
 	if err := resourceResultBinding(intent, status); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "resource_result_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 	}
 	if _, err := resourceActionHead(action, intent); err != nil {
 		return nil, mapErr(err)
@@ -160,23 +161,23 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			return nil, mapErr(err)
 		}
 		if err := validateReleaseAction(release, action, intent); err != nil {
-			return nil, rpcError(connect.CodePermissionDenied, "resource_release_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_release_binding_rejected")
 		}
 	}
 	if (status.GetReadOnly() || status.GetAdmissionRefusal() != nil) && len(action.StartGrantEnvelope) != 0 {
-		return nil, rpcError(connect.CodePermissionDenied, "resource_result_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 	}
 	terminal := resourceExecutionTerminal(status.GetState())
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING || status.GetPreparationOutcome() != nil {
 		if len(action.StartGrantEnvelope) != 0 {
-			return nil, rpcError(connect.CodePermissionDenied, "resource_result_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 		}
 		if priorPreparation != nil && priorPreparation.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
-			return nil, rpcError(connect.CodeAlreadyExists, "service_result_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
 		}
 	}
 	if action.ClosedAt.Valid && !terminal {
-		return nil, rpcError(connect.CodeAlreadyExists, "service_result_conflict")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
 	}
 	encoded, err := proto.Marshal(status)
 	if err != nil {
@@ -361,21 +362,21 @@ func resourceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
 func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, action devicedb.ResourceAction, cancellation *devicev1.ResourcePreparationCancellation, now time.Time) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
 	digest := sha256.Sum256(action.IntentEnvelope)
 	if len(action.StartGrantEnvelope) != 0 || !bytes.Equal(cancellation.GetIntentSha256(), digest[:]) || !bytes.Equal(cancellation.GetResultNonce(), action.ResultNonce) {
-		return nil, rpcError(connect.CodePermissionDenied, "resource_cancellation_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_cancellation_binding_rejected")
 	}
 	intent := new(agentv1.ResourceExecutionIntent)
 	if err := proto.Unmarshal(action.IntentDocument, intent); err != nil {
 		return nil, mapErr(errInternalState)
 	}
 	if intent.GetPreparation() == nil || intent.GetDesired().GetNativePackage() == nil {
-		return nil, rpcError(connect.CodePermissionDenied, "resource_cancellation_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_cancellation_binding_rejected")
 	}
 	if _, err := resourceActionHead(action, intent); err != nil {
 		return nil, mapErr(err)
 	}
 	if action.ClosedAt.Valid {
 		if !strings.HasSuffix(action.ClosedReason, "_never_prepared") {
-			return nil, rpcError(connect.CodeAlreadyExists, "service_result_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -383,10 +384,10 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 		return noStore(&devicev1.ReportResourceResultResponse{Closed: true}), nil
 	}
 	if action.ClosedReason == "" || len(action.StatusDocument) != 0 {
-		return nil, rpcError(connect.CodePermissionDenied, "resource_cancellation_not_requested")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_cancellation_not_requested")
 	}
 	if !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcError(connect.CodePermissionDenied, "service_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_nonce_rejected")
 	}
 	if err := q.CloseServiceAction(ctx, devicedb.CloseServiceActionParams{ID: action.ID, ClosedAt: timestamptz(now), ClosedReason: action.ClosedReason + "_never_prepared"}); err != nil {
 		return nil, mapErr(err)
@@ -397,7 +398,7 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 			return nil, mapErr(err)
 		}
 		if err := validateReleaseAction(release, action, intent); err != nil {
-			return nil, rpcError(connect.CodePermissionDenied, "resource_release_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_release_binding_rejected")
 		}
 		if err := q.SetResourceReleaseState(ctx, devicedb.SetResourceReleaseStateParams{ID: release.ID, State: "release_conflict", Reason: "cancelled_no_effect"}); err != nil {
 			return nil, mapErr(err)

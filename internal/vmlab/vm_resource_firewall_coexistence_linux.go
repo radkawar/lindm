@@ -19,6 +19,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 // The firewall zone's coexistence scenarios: the distribution's active native
@@ -27,17 +28,19 @@ import (
 // oracle reads the guest with the distribution's own tools, never the agent.
 
 // firewallNativeManagerScript activates the native manager before any zone
-// exists. UFW (iptables-nft) admits SSH and the oracle ports; firewalld is
+// exists. UFW (iptables-nft) admits SSH and the oracle ports; Debian installs
+// its own archive's ufw, which no installer task selects. firewalld is
 // installed and enabled with its default zone, whose ports provisioning opens.
 const firewallNativeManagerScript = `. /etc/os-release
 case "$ID" in
-ubuntu)
+ubuntu|debian)
+ command -v ufw >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y ufw >/dev/null
  ufw allow 22/tcp >/dev/null
  for port in 8080 8081 8083; do ufw allow "$port/tcp" >/dev/null; done
  ufw --force enable >/dev/null
  ufw status | grep -qx 'Status: active'
  ;;
-fedora|rhel|almalinux)
+fedora|rhel|almalinux|rocky)
  rpm -q firewalld >/dev/null 2>&1 || dnf -y -q install firewalld >/dev/null
  systemctl enable --now firewalld.service >/dev/null 2>&1
  firewall-cmd --state >/dev/null
@@ -63,13 +66,13 @@ for o in tables:
 // nativeManager names the active native manager's own tables and the commands
 // that show its status and reload it.
 func (f *firewallLane) nativeManager() (tables []string, status, reload string, err error) {
-	switch f.distro {
-	case "ubuntu":
+	switch f.release.Native().Packages.Backend.PackageDB() {
+	case platform.PackageDBDpkg:
 		return []string{"ip filter", "ip6 filter"}, "ufw status verbose", "ufw reload >/dev/null && ufw status | grep -qx 'Status: active'", nil
-	case "fedora", "rhel", "almalinux":
+	case platform.PackageDBRPM:
 		return []string{"inet firewalld"}, "firewall-cmd --get-default-zone; firewall-cmd --list-all", "firewall-cmd --reload >/dev/null && firewall-cmd --state", nil
 	}
-	return nil, "", "", fmt.Errorf("no qualified native firewall manager for %q", f.distro)
+	return nil, "", "", fmt.Errorf("no qualified native firewall manager for %s", f.release.Name)
 }
 
 // nativeTables reads every foreign table digest and requires the active
@@ -500,7 +503,7 @@ echo "$units" >> "$log"
 unit=$(printf '%s\n' "$units" | awk '$3=="active"{print $1}' | grep -E '^lindm-resource-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.service$')
 test -n "$unit" || { echo "no active effect helper" >> "$log"; exit 1; }
 test "$(printf '%s\n' "$unit" | wc -l)" -eq 1 || { echo "ambiguous active effect helpers" >> "$log"; exit 1; }
-systemctl kill --kill-whom=all --signal=SIGKILL "$unit"
+systemctl kill ` + systemctlKillWhom + `=all --signal=SIGKILL "$unit"
 echo "killed $unit $(date +%s.%N)" >> "$log"
 `
 

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 // These structs describe upstream OSV, not a second lindm serialization contract.
@@ -65,7 +66,7 @@ type osvAffected struct {
 }
 
 func parseOSV(config *advisoryv1.FeedSource, raw []byte, validator protovalidate.Validator) (*advisoryv1.FeedDocument, error) {
-	ecosystem, err := osvEcosystem(config)
+	product, err := vendorProduct(config, platform.FeedOSV)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func parseOSV(config *advisoryv1.FeedSource, raw []byte, validator protovalidate
 		if err := json.Unmarshal(data, &record); err != nil {
 			return fmt.Errorf("feed: decode OSV: %w", err)
 		}
-		ok, err := appendOSV(doc, config, ecosystem, &record, validator)
+		ok, err := appendOSV(doc, config, product, &record, validator)
 		matched = matched || ok
 		return err
 	}
@@ -97,50 +98,7 @@ func parseOSV(config *advisoryv1.FeedSource, raw []byte, validator protovalidate
 	return doc, nil
 }
 
-func osvEcosystem(config *advisoryv1.FeedSource) (string, error) {
-	release := config.GetRelease()
-	switch config.GetDistro() {
-	case "ubuntu":
-		version, _, err := ubuntuRelease(release)
-		if err != nil {
-			return "", err
-		}
-		return "Ubuntu:" + version + ":LTS", nil
-	case "debian":
-		if release != "11" && release != "12" && release != "13" {
-			return "", errors.New("feed: unsupported Debian release")
-		}
-		return "Debian:" + release, nil
-	case "rocky", "almalinux":
-		// These vendors publish major-release repositories, not RHEL EUS
-		// streams. A configured minor still remains exact in Applies.
-		major, _, _ := strings.Cut(release, ".")
-		if major != "8" && major != "9" && major != "10" {
-			return "", errors.New("feed: unsupported RPM product release")
-		}
-		if config.GetDistro() == "rocky" {
-			return "Rocky Linux:" + major, nil
-		}
-		return "AlmaLinux:" + major, nil
-	default:
-		return "", errors.New("feed: unsupported OSV distro/product; no cross-vendor inference")
-	}
-}
-
-func ubuntuRelease(release string) (version, codename string, err error) {
-	switch release {
-	case "22.04":
-		return "22.04", "jammy", nil
-	case "noble", "24.04":
-		return "24.04", "noble", nil
-	case "26.04":
-		return "26.04", "resolute", nil
-	default:
-		return "", "", errors.New("feed: unsupported Ubuntu release")
-	}
-}
-
-func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecosystem string, record *osvRecord, validator protovalidate.Validator) (bool, error) {
+func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, product *platform.Release, record *osvRecord, validator protovalidate.Validator) (bool, error) {
 	if record.ID == "" || !strings.HasPrefix(record.SchemaVersion, "1.") {
 		return false, errors.New("feed: unsupported OSV document shape")
 	}
@@ -184,17 +142,17 @@ func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecos
 		if normalizedBytes > maxBytes {
 			return errors.New("feed: OSV entry normalized byte limit exceeded")
 		}
-		return addRecord(doc, advisory, managerFor(config.GetDistro()), validator)
+		return addRecord(doc, advisory, manager(product), validator)
 	}
 	for _, affected := range record.Affected {
 		if affected.Package.Ecosystem == "" {
 			return false, errors.New("feed: OSV missing ecosystem")
 		}
-		if affected.Package.Ecosystem != ecosystem {
+		if affected.Package.Ecosystem != product.Advisory.Ecosystem {
 			continue
 		}
 		matched = true
-		arch, source, err := osvIdentity(config, &affected)
+		arch, source, err := osvIdentity(product, &affected)
 		if err != nil {
 			return false, err
 		}
@@ -287,16 +245,13 @@ func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecos
 	return matched, nil
 }
 
-func osvIdentity(config *advisoryv1.FeedSource, affected *osvAffected) (string, bool, error) {
+// purlArch is the package-URL architecture qualifier key, not a distribution.
+const purlArch = "arch"
+
+func osvIdentity(product *platform.Release, affected *osvAffected) (string, bool, error) {
 	purl, query, _ := strings.Cut(affected.Package.PURL, "?")
-	prefix := "pkg:deb/" + config.GetDistro() + "/"
-	if managerFor(config.GetDistro()) == "rpm" {
-		distro := config.GetDistro()
-		if distro == "rocky" {
-			distro = "rocky-linux"
-		}
-		prefix = "pkg:rpm/" + distro + "/"
-	}
+	db := product.Native().Packages.Backend
+	prefix := "pkg:" + db.PackageFormat() + "/" + product.Advisory.PURLNamespace + "/"
 	if !strings.HasPrefix(purl, prefix) {
 		return "", false, errors.New("feed: OSV package URL does not identify configured vendor")
 	}
@@ -314,40 +269,22 @@ func osvIdentity(config *advisoryv1.FeedSource, affected *osvAffected) (string, 
 			return "", false, errors.New("feed: ambiguous OSV package qualifiers")
 		}
 		switch key {
-		case "arch", "distro", "epoch":
+		case purlArch, "distro", "epoch":
 		default:
 			return "", false, errors.New("feed: unsupported OSV package qualifier")
 		}
 	}
-	if distro := qualifiers.Get("distro"); distro != "" {
-		want := config.GetDistro() + "-" + config.GetRelease()
-		switch config.GetDistro() {
-		case "ubuntu":
-			_, codename, err := ubuntuRelease(config.GetRelease())
-			if err != nil {
-				return "", false, err
-			}
-			want = codename
-		case "rocky", "almalinux":
-			major, _, _ := strings.Cut(config.GetRelease(), ".")
-			vendor := config.GetDistro()
-			if vendor == "rocky" {
-				vendor = "rocky-linux"
-			}
-			want = vendor + "-" + major
-		}
-		if distro != want {
-			return "", false, errors.New("feed: conflicting OSV product qualifier")
-		}
+	if distro := qualifiers.Get("distro"); distro != "" && distro != product.Advisory.PURLDistro {
+		return "", false, errors.New("feed: conflicting OSV product qualifier")
 	}
-	arch := qualifiers.Get("arch")
+	arch := qualifiers.Get(purlArch)
 	switch arch {
 	case "", "source", "src", "nosrc", "all", "noarch", "amd64", "x86_64", "i386", "i686", "arm64", "aarch64", "armhf", "ppc64el", "ppc64le", "s390x", "riscv64":
 	default:
 		return "", false, errors.New("feed: unsupported OSV architecture")
 	}
 	source := arch == "source" || arch == "src" || arch == "nosrc"
-	if managerFor(config.GetDistro()) == "dpkg" && !source {
+	if db.PackageDB() == platform.PackageDBDpkg && !source {
 		return "", false, errors.New("feed: dpkg OSV source mapping unavailable")
 	}
 	if source {

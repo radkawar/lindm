@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"lindm/internal/custody"
+
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -22,7 +24,7 @@ func bindPreparationBaseline(directory string, observation *resourcev1.ResourceO
 		return err
 	}
 	path := filepath.Join(directory, "preparation-before.pb")
-	data, err := protectedFile(path, 128<<10)
+	data, err := custody.ReadRoot(path, 128<<10, false)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := reserveSpace(directory, 2<<20); err != nil {
 			return err
@@ -56,7 +58,7 @@ func bindPreparationBaseline(directory string, observation *resourcev1.ResourceO
 	if snapshot.GetObservation().GetMetadata().GetBootId() != observation.GetMetadata().GetBootId() || !proto.Equal(snapshot.GetObservation().GetMetadata().GetBackend(), observation.GetMetadata().GetBackend()) {
 		return errors.New("packageprovider: boot or native backend changed during preparation")
 	}
-	digest, err := protectedFile(filepath.Join(directory, "preparation-ownership.sha256"), 32)
+	digest, err := custody.ReadRoot(filepath.Join(directory, "preparation-ownership.sha256"), 32, false)
 	if err != nil {
 		return err
 	}

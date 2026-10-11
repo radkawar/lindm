@@ -9,6 +9,8 @@ GOLANGCI := $(TOOLS)/golangci-lint
 GOVULNCHECK := $(TOOLS)/govulncheck
 GO_DIRS := cmd db gen internal web
 GO_PACKAGES := $(addsuffix /...,$(addprefix ./,$(GO_DIRS)))
+# Clean-worktree gates pass --allow-parallel-runners with their own cache.
+GOLANGCI_RUN_FLAGS ?=
 
 tools: $(BUF) $(SQLC) $(GOLANGCI) $(GOVULNCHECK) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
 
@@ -52,7 +54,7 @@ lint: web-assets $(BUF) $(GOLANGCI)
 	npm run check
 	$(BUF) lint
 	$(BUF) format --diff --exit-code
-	$(GOLANGCI) run $(GO_PACKAGES)
+	$(GOLANGCI) run $(GOLANGCI_RUN_FLAGS) $(GO_PACKAGES)
 	@diff="$$($(GOLANGCI) fmt --diff $(GO_DIRS))" && { test -z "$$diff" || { printf '%s\n' "$$diff"; exit 1; }; }
 	go run ./cmd/dev generate-docs -check
 
@@ -116,9 +118,14 @@ acceptance: acceptance-build
 # with gh signoff create --commit SHA, so a signoff attests to exactly what is
 # on GitHub even while this tree is dirty. Contexts: unit (make check),
 # integration (real PostgreSQL) and acceptance.
-.PHONY: signoff signoff-acceptance
+.PHONY: signoff signoff-acceptance pre-push
 signoff: dev-up
 	go run ./cmd/dev signoff
 
 signoff-acceptance:
 	go run ./cmd/dev signoff -acceptance -acceptance-flags "$(ACCEPTANCE_FLAGS)"
+
+# Git pre-push hook body: make check at each pushed SHA in a clean worktree,
+# skipped when that SHA already carries a green signoff/unit.
+pre-push:
+	go run ./cmd/dev pre-push

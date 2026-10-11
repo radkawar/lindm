@@ -19,6 +19,7 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // VMLifecycleOptions selects real artifacts and an already running development
@@ -98,14 +99,15 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	format, err := NativePackageFormat(manifest.GetDistribution())
+	release := manifestRelease(manifest)
+	format, err := NativePackageFormat(release)
 	if err != nil {
 		return nil, err
 	}
 	if _, _, err := inspectArchitecture(manifest.GetArchitecture()); err != nil {
 		return nil, err
 	}
-	if err := validateVMRedHatToken(manifest.GetDistribution(), options.RedHatTokenFile); err != nil {
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
 		return nil, err
 	}
 	if options.ObserveFor < 0 || options.ObserveFor > 10*time.Minute {
@@ -159,7 +161,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	result := &VMLifecycleResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), ImageSHA256: verified.SHA256, FirstArtifactSHA256: options.First.SHA256, SecondArtifactSHA256: options.Second.SHA256, SignerFingerprint: options.SignerFingerprint, ControlPlane: controlPlane}
 	result.Runtime = runtimeEvidence
 	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
-	if packages.family == familyDNF {
+	if packages.backend.DNF() {
 		result.SELinuxBefore, err = serviceGuestEnforcing(ctx, vm)
 		if err != nil {
 			return nil, err
@@ -276,7 +278,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := lifecycleCommand(ctx, vm, "start enrolled network process", "systemctl restart lindm-agent.service"); err != nil {
 		return nil, err
 	}
-	first, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, nil)
+	first, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +297,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	// Observation can span another scheduled publication. Choose a current,
 	// fully compared baseline and a fresh cursor before changing the package.
-	baseline, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, nil)
+	baseline, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +309,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
 	}
-	upgraded, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, baseline)
+	upgraded, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, baseline)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +380,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := lifecycleCommand(ctx, vm, "synchronize after reboot", "systemctl restart lindm-agent.service"); err != nil {
 		return nil, err
 	}
-	rebooted, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, upgraded)
+	rebooted, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, upgraded)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +425,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		}
 		result.ControlPlaneTrust.ReinstallRetained = true
 	}
-	reinstalled, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, rebooted)
+	reinstalled, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, rebooted)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +441,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := lifecycleCommand(ctx, vm, "corrupt stopped unprivileged spool", "systemctl stop lindm-agent.service; test -f /var/lib/lindm/agent/spool.sqlite; printf 'deliberately damaged SQLite header' > /var/lib/lindm/agent/spool.sqlite; systemctl start lindm-agent.service"); err != nil {
 		return nil, err
 	}
-	recovered, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, reinstalled)
+	recovered, err := waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, reinstalled)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +487,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		return nil, err
 	}
 	result.MissingJournalHeld = true
-	if packages.family == familyDNF {
+	if packages.backend.DNF() {
 		result.SELinuxAfter, err = serviceGuestEnforcing(ctx, vm)
 		if err != nil {
 			return nil, err
@@ -565,8 +567,8 @@ func lifecycleProgress(ctx context.Context, options VMLifecycleOptions, phase st
 	}
 }
 
-func waitLifecycleInventory(ctx context.Context, vm *guestVM, control *vmControlPlane, distribution, deviceID string, previous *vmInventoryEvidence) (*vmInventoryEvidence, error) {
-	before, err := collectVMTruth(ctx, vm, distribution)
+func waitLifecycleInventory(ctx context.Context, vm *guestVM, control *vmControlPlane, release *platform.Release, deviceID string, previous *vmInventoryEvidence) (*vmInventoryEvidence, error) {
+	before, err := collectVMTruth(ctx, vm, release)
 	if err != nil {
 		return nil, err
 	}
@@ -577,7 +579,7 @@ func waitLifecycleInventory(ctx context.Context, vm *guestVM, control *vmControl
 	if err != nil {
 		return nil, err
 	}
-	actual, err := collectVMTruth(ctx, vm, distribution)
+	actual, err := collectVMTruth(ctx, vm, release)
 	if err != nil {
 		return nil, err
 	}

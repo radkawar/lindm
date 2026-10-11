@@ -5,6 +5,7 @@ package sysctlprovider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -12,21 +13,15 @@ import (
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/inventory"
+	"lindm/internal/platform"
 )
 
-func nativeBackend(ctx context.Context, platform *resourcev1.PlatformProduct) (*resourcev1.BackendSelection, error) {
-	if err := validateMessage(platform); err != nil {
+func nativeBackend(ctx context.Context, product *resourcev1.PlatformProduct) (*resourcev1.BackendSelection, error) {
+	if err := validateMessage(product); err != nil {
 		return nil, err
 	}
-	switch platform.GetOsId() {
-	case "ubuntu", "fedora":
-	case "rhel", "almalinux":
-		// Of Enterprise Linux only EL 9 and EL 10 are qualified.
-		if major, _, _ := strings.Cut(platform.GetVersion(), "."); major != "9" && major != "10" {
-			return nil, ErrUnsupported
-		}
-	default:
-		return nil, ErrUnsupported
+	if err := platform.Of(product).Gate(platform.Sysctl); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
 	}
 	for _, marker := range []string{"/run/ostree-booted", "/etc/NIXOS", "/etc/transactional-update.conf"} {
 		if _, err := os.Stat(marker); err == nil {
@@ -39,12 +34,12 @@ func nativeBackend(ctx context.Context, platform *resourcev1.PlatformProduct) (*
 	if err != nil {
 		return nil, err
 	}
-	if !proto.Equal(actual, platform) {
+	if !proto.Equal(actual, product) {
 		return nil, ErrConflict
 	}
-	version, err := protectedRead("/proc/sys/kernel/osrelease", 128)
+	version, err := rootRead("/proc/sys/kernel/osrelease", 128)
 	if err != nil {
 		return nil, err
 	}
-	return &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_PROC_SYSCTL, NativeVersion: strings.TrimSpace(string(version)), ProviderVersion: "1", Product: proto.CloneOf(platform)}, nil
+	return &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_PROC_SYSCTL, NativeVersion: strings.TrimSpace(string(version)), ProviderVersion: "1", Product: proto.CloneOf(product)}, nil
 }

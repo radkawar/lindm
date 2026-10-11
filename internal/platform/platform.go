@@ -97,8 +97,12 @@ func (b Backend) PackageDB() PackageDB {
 
 // PackageFormat is the native package file format lindm publishes for a backend:
 // "deb", "rpm" or "arch" (pacman .pkg.tar.zst), empty when none.
-func (b Backend) PackageFormat() string {
-	switch b.PackageDB() {
+func (b Backend) PackageFormat() string { return b.PackageDB().PackageFormat() }
+
+// PackageFormat is the native package file format lindm publishes for a
+// package database: "deb", "rpm" or "arch" (pacman .pkg.tar.zst), empty when none.
+func (d PackageDB) PackageFormat() string {
+	switch d {
 	case PackageDBDpkg:
 		return "deb"
 	case PackageDBRPM:
@@ -156,14 +160,40 @@ type Desktop struct {
 	Lock           string // screen lock backend, e.g. "gnome-shell (logind Lock)"
 }
 
-// Advisory names the vendor advisory source the server applies to a release.
+// Feed is a vendor advisory source adapter.
+type Feed string
+
+const (
+	FeedOSV           Feed = "osv"
+	FeedDebianTracker Feed = "debian-tracker"
+	FeedRPMUpdateinfo Feed = "rpm-updateinfo"
+	FeedRedHatCSAF    Feed = "redhat-csaf"
+	FeedSUSECSAF      Feed = "suse-csaf"
+	FeedArchASA       Feed = "arch-asa"
+)
+
+// Advisory names the vendor advisory sources the server applies to a release.
 type Advisory struct {
-	Feed      string // "osv", "redhat-csaf", "rpm-updateinfo", "debian-tracker", "suse-csaf", "arch-asa"
-	Ecosystem string // vendor ecosystem/product string, e.g. "Ubuntu:24.04:LTS"
+	// Feeds are the accepted vendor sources, the primary one first.
+	Feeds []Feed
+	// Ecosystem is the vendor's product identity: the OSV ecosystem, the
+	// updateinfo product name or the CSAF product CPE, in which a trailing
+	// "spN" stands for the configured SLES service pack.
+	Ecosystem string
 	// PURLNamespace and PURLDistro are the package-URL namespace and distro
 	// qualifier the vendor feed uses for this release.
 	PURLNamespace string
 	PURLDistro    string
+	// CodenameRelease accepts the codename as the feed release (legacy
+	// "noble" sources).
+	CodenameRelease bool
+	// PlatformStreams: the vendor feed is per servicing stream (Red Hat
+	// standard/EUS/E4S). A standard major feed covers every minor; hosts need
+	// corroborated stream evidence and native module identity.
+	PlatformStreams bool
+	// Partial says why even a complete vendor export cannot establish a clean
+	// result; empty when a complete export is authoritative.
+	Partial string
 }
 
 // Release is one registry row.
@@ -192,6 +222,7 @@ type Release struct {
 	Firewall      string
 	Advisory      Advisory
 	Quirks        Quirks
+	Lab           Lab
 	// Supports lists the implemented capabilities; every other capability is
 	// gated, with the reason in Gates or a default reason.
 	Supports []Capability
@@ -307,6 +338,9 @@ func (v Version) matches(versionID string) bool {
 	}
 }
 
+// rolling reports a rule without fixed releases (absent or snapshot VERSION_ID).
+func (v Version) rolling() bool { return v.Rule == VersionAbsent || v.Rule == VersionSnapshot }
+
 // String renders the rule for documentation.
 func (v Version) String() string {
 	switch v.Rule {
@@ -379,6 +413,38 @@ func ForManifest(distribution, version string) *Release {
 		}
 	}
 	return unknown(distribution, version)
+}
+
+// ForFeed identifies an advisory feed source's distro and release. Feeds name
+// rolling rows "rolling" and may name a CodenameRelease row by its codename;
+// otherwise the row's VERSION_ID rule applies (a major row also accepts one
+// exact minor, which the source keeps as its scope).
+func ForFeed(distro, release string) *Release {
+	for _, r := range registry {
+		if r.ID != distro || r.Variants != nil && !slices.Contains(r.Variants, "") {
+			continue
+		}
+		if rolling := r.Version.rolling(); rolling && release == feedRolling || !rolling && r.Version.matches(r.FeedRelease(release)) {
+			return r
+		}
+	}
+	return unknown(distro, release)
+}
+
+const feedRolling = "rolling"
+
+// FeedRelease returns the feed spelling of a VERSION_ID observed on or
+// configured for this release: "rolling" for a rolling row's absent or
+// snapshot VERSION_ID, the version for an accepted codename, otherwise the
+// VERSION_ID unchanged.
+func (r *Release) FeedRelease(versionID string) string {
+	switch {
+	case r.Version.rolling() && r.Version.matches(versionID):
+		return feedRolling
+	case r.Advisory.CodenameRelease && versionID == r.Codename:
+		return r.Version.Value
+	}
+	return versionID
 }
 
 // Lookup returns the row with the given key.

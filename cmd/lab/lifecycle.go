@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 	"lindm/internal/vmlab"
 )
 
@@ -55,7 +56,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
-	format, err := vmlab.NativePackageFormat(manifest.GetDistribution())
+	format, err := vmlab.NativePackageFormat(platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()))
 	if err != nil {
 		return err
 	}

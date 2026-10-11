@@ -19,17 +19,18 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/escrow"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/secretseal"
 )
 
 var (
-	errSecretUnavailable     = rpcError(connect.CodeFailedPrecondition, "secret_unavailable")
-	errSecretBindingMismatch = rpcError(connect.CodeFailedPrecondition, "secret_binding_mismatch")
+	errSecretUnavailable     = rpcreason.Error(connect.CodeFailedPrecondition, "secret_unavailable")
+	errSecretBindingMismatch = rpcreason.Error(connect.CodeFailedPrecondition, "secret_binding_mismatch")
 	errSecretPurposeMismatch = invalid("secret_purpose_mismatch")
-	errSecretVersionConflict = rpcError(connect.CodeFailedPrecondition, "secret_version_conflict")
-	errSecretRequestReused   = rpcError(connect.CodeAlreadyExists, "request_id_reused")
-	errEscrowUnconfigured    = rpcError(connect.CodeFailedPrecondition, "escrow_unconfigured")
-	errEscrowCustodyRejected = rpcError(connect.CodeFailedPrecondition, "escrow_custody_rejected")
+	errSecretVersionConflict = rpcreason.Error(connect.CodeFailedPrecondition, "secret_version_conflict")
+	errSecretRequestReused   = rpcreason.Error(connect.CodeAlreadyExists, "request_id_reused")
+	errEscrowUnconfigured    = rpcreason.Error(connect.CodeFailedPrecondition, "escrow_unconfigured")
+	errEscrowCustodyRejected = rpcreason.Error(connect.CodeFailedPrecondition, "escrow_custody_rejected")
 )
 
 const secretVersionPage = 100
@@ -357,7 +358,7 @@ func (s *Service) RevealSecret(ctx context.Context, req *connect.Request[adminv1
 		return nil, errEscrowUnconfigured
 	}
 	if err := s.identity.RequireRecentStepUp(ctx, 5*time.Minute); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recent_step_up_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recent_step_up_required")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)

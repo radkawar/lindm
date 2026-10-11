@@ -9,6 +9,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // GetEnrollmentInstructions returns deployment-owned installation metadata, not
@@ -30,7 +31,7 @@ func (s *Service) GetEnrollmentInstructions(ctx context.Context, req *connect.Re
 	var response *adminv1.GetEnrollmentInstructionsResponse
 	err = s.withinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageEnrollment, func(context.Context, *devicedb.Queries) error {
 		if s.enrollmentInstructions == nil {
-			return rpcError(connect.CodeFailedPrecondition, "enrollment_instructions_unavailable")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "enrollment_instructions_unavailable")
 		}
 		response = proto.CloneOf(s.enrollmentInstructions)
 		return nil

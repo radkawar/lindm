@@ -17,6 +17,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -25,7 +26,7 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_service_start_request")
@@ -36,28 +37,28 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 		return nil, mapErr(err)
 	}
 	if captured.DeviceID != principal.DeviceID || captured.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "service_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_action_binding_rejected")
 	}
 	intent := new(agentv1.ResourceExecutionIntent)
 	if err := proto.Unmarshal(captured.IntentDocument, intent); err != nil {
 		return nil, mapErr(errInternalState)
 	}
 	if intent.GetDesired().GetEncryptionCompliance() != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "resource_read_only")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "resource_read_only")
 	}
 	challenge := new(agentv1.ResourceExecutionChallenge)
 	if err := s.authority.Verify(ctx, req.Msg.GetChallengeProof(), challenge, 1, principal.PublicKey); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "service_challenge_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_challenge_rejected")
 	}
 	digest := sha256.Sum256(captured.IntentEnvelope)
 	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() || !proto.Equal(challenge.GetRef(), intent.GetDesired().GetRef()) || challenge.GetOperation() != intent.GetOperation() || !bytes.Equal(challenge.GetIntentSha256(), digest[:]) {
-		return nil, rpcError(connect.CodePermissionDenied, "service_challenge_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_challenge_binding_rejected")
 	}
 	var approval *identity.Authorization
 	var authorizationErr error
 	if len(captured.StartGrantEnvelope) == 0 {
 		if s.signing == nil {
-			return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 		}
 		actor, err := uuid.Parse(intent.GetActorId())
 		if err != nil {
@@ -137,7 +138,7 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 			return nil, mapErr(err)
 		}
 		if err := validateReleaseAction(release, action, intent); err != nil {
-			return nil, rpcError(connect.CodePermissionDenied, "resource_release_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_release_binding_rejected")
 		}
 	}
 	now, err := dispatchClock(ctx, q)
@@ -152,7 +153,7 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 	}
 	if len(action.StartGrantEnvelope) != 0 {
 		if !bytes.Equal(action.ChallengeProof, req.Msg.GetChallengeProof()) {
-			return nil, rpcError(connect.CodeAlreadyExists, "service_start_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_start_conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -166,10 +167,10 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 		return nil, mapErr(err)
 	}
 	if action.ClosedAt.Valid {
-		return nil, rpcError(connect.CodeFailedPrecondition, "service_action_closed")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_action_closed")
 	}
 	if action.ClosedReason != "" {
-		return nil, rpcError(connect.CodePermissionDenied, action.ClosedReason)
+		return nil, rpcreason.Error(connect.CodePermissionDenied, action.ClosedReason)
 	}
 	targetEligible, err := s.targeting.CheckExecution(ctx, tx, principal.DeviceID, principal.GenerationID, actionHead)
 	if err != nil {
@@ -198,19 +199,19 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
 		}
-		return nil, rpcError(connect.CodePermissionDenied, rejectReason)
+		return nil, rpcreason.Error(connect.CodePermissionDenied, rejectReason)
 	}
 	if snapshot == nil || snapshot.Delegation == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	issued := challenge.GetIssuedAt().AsTime()
 	if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(challenge.GetExpiresAt().AsTime()) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_clock_skew")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
 	}
 	// The current authority and lease must be valid on server time, independently
 	// of the bounded device-clock interval used for the challenge and grant.
 	if _, err := verifier.VerifyResourceIntent(ctx, snapshot.Root, snapshot.Delegation, action.IntentEnvelope, now); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "service_start_authority_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_start_authority_rejected")
 	}
 	expires := challenge.GetExpiresAt().AsTime()
 	if limit := issued.Add(approval.ExpiresAt().Sub(now)); limit.Before(expires) {
@@ -220,15 +221,15 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 		expires = limit
 	}
 	if !expires.After(issued) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "service_start_window_empty")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_start_window_empty")
 	}
 	grant := &agentv1.ResourceExecutionStartGrant{Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: approval.Version(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: challenge.GetIssuedAt(), ExpiresAt: timestamppb.New(expires)}
 	envelope, err := s.authority.Sign(ctx, grant, s.signing.StartKey)
 	if err != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_rejected")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_rejected")
 	}
 	if _, err := verifier.VerifyResourceStart(ctx, snapshot.Root, snapshot.Delegation, envelope, intent, challenge, issued); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "service_start_authority_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_start_authority_rejected")
 	}
 	if err := q.SetServiceGrant(ctx, devicedb.SetServiceGrantParams{ID: id, ChallengeProof: req.Msg.GetChallengeProof(), StartGrantEnvelope: envelope, StartAuthorizedAt: timestamptz(now)}); err != nil {
 		return nil, mapErr(err)

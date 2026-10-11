@@ -25,6 +25,7 @@ import (
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/localrpc"
 	"lindm/internal/agent/spool"
+	"lindm/internal/rpcreason"
 )
 
 const heartbeatInterval = time.Minute
@@ -262,7 +263,7 @@ func outcome(err error) agentv1.TransportOutcome {
 	if errors.Is(err, spool.ErrNeedsSync) || errors.Is(err, spool.ErrUnsafe) || errors.Is(err, spool.ErrUnrecognized) {
 		return agentv1.TransportOutcome_TRANSPORT_OUTCOME_LOCAL_RECOVERY_REQUIRED
 	}
-	switch rpcReason(err) {
+	switch rpcreason.Get(err) {
 	case "unprovisioned", "pending_enrollment":
 		return agentv1.TransportOutcome_TRANSPORT_OUTCOME_WAITING_FOR_ENROLLMENT
 	case "recovery_hold", "device_revoked", "generation_mismatch", "session_fenced", "authority_rejected", "authority_receipt_capacity":

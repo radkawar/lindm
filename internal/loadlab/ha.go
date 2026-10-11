@@ -8,7 +8,6 @@ import (
 	"maps"
 	"math/rand/v2"
 	"os"
-	"os/exec"
 	"runtime"
 	"slices"
 	"strings"
@@ -23,7 +22,10 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/devlab"
+	"lindm/internal/labexec"
+	"lindm/internal/rpcreason"
 )
 
 // HAOptions selects a bounded replicated-topology qualification run. There is
@@ -453,8 +455,8 @@ func (h *haRun) mutate(ctx context.Context, name string, call func(context.Conte
 		if !ambiguous(err) || time.Now().After(deadline) {
 			reason := name + ":" + connect.CodeOf(err).String()
 			var failure *connect.Error
-			if errors.As(err, &failure) && failure.Meta().Get("Lindm-Reason") != "" {
-				reason += "/" + failure.Meta().Get("Lindm-Reason")
+			if errors.As(err, &failure) && rpcreason.Get(failure) != "" {
+				reason += "/" + rpcreason.Get(failure)
 			}
 			h.adminMu.Lock()
 			if h.admin.Rejections == nil {
@@ -639,13 +641,15 @@ func (h *haRun) replicaErrors() []string {
 }
 
 func binaryVersion(ctx context.Context, binary string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	output, err := exec.CommandContext(ctx, binary, "version").Output()
+	output := nativeexec.NewBuffer(4 << 10)
+	err := labexec.Run(ctx, labexec.Command{Path: binary, Args: []string{"version"}, Stdout: output, Timeout: 10 * time.Second})
+	if err == nil && output.Truncated() {
+		err = errors.New("output exceeds limit")
+	}
 	if err != nil {
 		return "", fmt.Errorf("read %s version: %w", binary, err)
 	}
-	return strings.TrimSpace(string(output)), nil
+	return strings.TrimSpace(output.String()), nil
 }
 
 // phase runs the workload for one interval and records its metrics.

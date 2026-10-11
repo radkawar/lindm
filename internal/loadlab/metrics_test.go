@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+
+	"lindm/internal/rpcreason"
 )
 
 func TestMeasurementsPreserveErrorsAndBoundLatency(t *testing.T) {
@@ -61,7 +63,7 @@ func TestSnapshotCompletionBoundary(t *testing.T) {
 func TestFailureReasonsSurviveStageSnapshot(t *testing.T) {
 	m := &measurements{}
 	failure := connect.NewError(connect.CodeFailedPrecondition, errors.New("not persisted"))
-	failure.Meta().Set("Lindm-Reason", "execution_signing_rejected")
+	rpcreason.Set(failure, "execution_signing_rejected")
 	m.observe("/device/GetResourceWork", time.Millisecond, failure)
 	first := m.snapshot(false)
 	m.observe("/device/GetResourceWork", time.Millisecond, failure)

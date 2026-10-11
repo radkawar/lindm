@@ -71,3 +71,36 @@ rhel98-packages.json and rhel98-platform.json
   VM. Controlled standard/EUS/E4S database fixtures are separately labeled tests.
   This x86_64 KVM guest is emulated/virtual inventory evidence, not physical
   qualification, entitlement verification, or a graphical-session claim.
+
+ubuntu-resolute-arm64-packages.json
+  Retained PackageBatch SHA256: 49bbea1b10885fa9ab17faec97cf5867805804a18ce66ce1de7df4fd72150080
+  Maintained lane: lab vm inspect -host dgx20 -accelerator kvm with -inventory-record
+  Manifest: lab/images/ubuntu-resolute-arm64.json
+  Run record: ~/.cache/lindm-ubuntu2604-20261011/advisories/ubuntu2604-arm64-dgx20-inspect-01.json
+  Run record SHA256: 711509471c3946c757d46238eccbbe509194f1ae87b0521b5c17314d554b27ca
+  Image ID: ubuntu-resolute-20260927-arm64
+  Image SHA256: 63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7
+  Agent SHA256: bbc7e69ac228cbcd851b6e9af99434d7463fb940745da2b0d4cc68484acd56d9
+  Full observation SHA256: 5d395948b3a6790e6db69302ccb73b46381d8624ac63066ff20fef8b570e2971
+  Package collection: 2026-10-11T07:52:06.358584960Z through 2026-10-11T07:52:06.362627744Z
+  Native oracle independently matched all 675 dpkg package records. Retained
+  libssl3t64, openssl and openssl-provider-legacy are 3.5.5-1ubuntu3.5 (source
+  openssl). USN-8861-1 fixes resolute in 3.5.5-1ubuntu3.7, so all three actual
+  binaries are affected. VM: aarch64 KVM on dgx20, QEMU 8.2.2, AAVMF
+  qemu-efi-aarch64 2024.02-2ubuntu0.10 (Secure Boot off), virtio-blk, TPM absent.
+
+ubuntu-resolute-amd64-packages.json
+  Retained PackageBatch SHA256: 5b6f29a9104b39e7d5874e1197a99d17512bc545f0e0f34ba633059ebe2ff67a
+  Maintained lane: lab vm inspect -host local with -inventory-record
+  Manifest: lab/images/ubuntu-resolute-amd64.json
+  Run record: ~/.cache/lindm-ubuntu2604-20261011/advisories/ubuntu2604-amd64-local-inspect-01.json
+  Run record SHA256: 678ef76e9a6b6e459e97260e9b6c97d547688044eab8c8786e907bf834031080
+  Image ID: ubuntu-resolute-20260927-amd64
+  Image SHA256: 8800651811af9a85465ad1d552add729947bb16488dddb4a9b5305a3d97332b2
+  Agent SHA256: 4042ffe3c81f535486d2dff58844664ced3b5a9e1350e2da592f0303a4746ca4
+  Full observation SHA256: db81b44ea3ce91d9bf4a3645f65f5d764acc1f16510f5d5e97aab540accfc1cb
+  Package collection: 2026-10-11T08:16:22.190469860Z through 2026-10-11T08:16:22.194417501Z
+  Native oracle independently matched all 678 dpkg package records. Retained
+  libssl3t64, openssl and openssl-provider-legacy are 3.5.5-1ubuntu3.5 (source
+  openssl), affected until USN-8861-1's resolute 3.5.5-1ubuntu3.7. VM: x86_64
+  KVM, QEMU 8.2.2, SeaBIOS 1.16.3, virtio-blk, TPM absent.

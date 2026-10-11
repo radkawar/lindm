@@ -38,3 +38,23 @@ func TestVMRequiresKVMNeverFallsBackToForeignTCGForCapacity(t *testing.T) {
 		}
 	}
 }
+
+// Only an assistance run with -hold escapes the lane deadline and remote hosts;
+// the last occurrence wins, as in the flag package.
+func TestVMHoldsOnlyHeldAssistance(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"vm", "assistance", "-manifest", "m", "-hold"}, true},
+		{[]string{"vm", "assistance", "--hold=true"}, true},
+		{[]string{"vm", "assistance", "-hold", "-hold=false"}, false},
+		{[]string{"vm", "assistance", "-hold=maybe"}, false},
+		{[]string{"vm", "assistance", "-evidence", "dir"}, false},
+		{[]string{"vm", "device-actions", "-hold"}, false},
+	} {
+		if got := vmHolds(tc.args); got != tc.want {
+			t.Errorf("vmHolds(%q) = %v, want %v", tc.args, got, tc.want)
+		}
+	}
+}

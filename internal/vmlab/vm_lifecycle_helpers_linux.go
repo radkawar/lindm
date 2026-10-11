@@ -93,6 +93,12 @@ func probeGuestPrivileges(ctx context.Context, vm *guestVM) (*labv1.NetworkBound
 	return evidence, nil
 }
 
+// systemctlKillWhom expands, in a guest shell, to systemctl's process-selection
+// option: systemd 252 renamed --kill-who= to --kill-whom= (still accepting the
+// old name), while Ubuntu 22.04's systemd 249 knows only --kill-who=. Append
+// "=main" or "=all".
+const systemctlKillWhom = `$(systemctl --kill-whom=main --version >/dev/null 2>&1 && echo --kill-whom || echo --kill-who)`
+
 func lifecycleCommand(ctx context.Context, vm *guestVM, phase, command string) error {
 	result, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(command), nil, 1<<20, time.Minute)
 	if err != nil {

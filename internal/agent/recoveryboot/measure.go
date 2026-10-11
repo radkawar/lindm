@@ -1,7 +1,6 @@
 package recoveryboot
 
 import (
-	"bytes"
 	"context"
 	"debug/pe"
 	"encoding/hex"
@@ -10,10 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 // PredictPCR11 extracts the exact final UKI sections, including ukify-generated
@@ -52,13 +52,11 @@ func PredictPCR11(ctx context.Context, image, outputDirectory string) (_ []byte,
 	if !linux {
 		return nil, errors.New("recoveryboot: missing_uki_kernel_section")
 	}
-	cmd := exec.CommandContext(ctx, "/usr/lib/systemd/systemd-measure", args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
-	var output limitedOutput
-	cmd.Stdout = &output
-	cmd.Stderr = io.Discard
-	cmd.WaitDelay = time.Second
-	if err := cmd.Run(); err != nil {
+	output, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path: "/usr/lib/systemd/systemd-measure", Args: args,
+		Timeout: 90 * time.Second, StdoutLimit: 64 << 10, StderrLimit: 64 << 10,
+	})
+	if err != nil {
 		return nil, fmt.Errorf("recoveryboot: measure UKI: %w", err)
 	}
 	var result map[string][]struct {
@@ -66,7 +64,7 @@ func PredictPCR11(ctx context.Context, image, outputDirectory string) (_ []byte,
 		PCR   int    `json:"pcr"`
 		Hash  string `json:"hash"`
 	}
-	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+	if err := json.Unmarshal(output.Stdout, &result); err != nil {
 		return nil, err
 	}
 	values := result["sha256"]
@@ -77,7 +75,7 @@ func PredictPCR11(ctx context.Context, image, outputDirectory string) (_ []byte,
 	if err != nil || len(digest) != 32 {
 		return nil, errors.New("recoveryboot: invalid_pcr11_digest")
 	}
-	if err := writeExclusive(filepath.Join(outputDirectory, "pcr11.json"), output.Bytes(), 0600); err != nil {
+	if err := writeExclusive(filepath.Join(outputDirectory, "pcr11.json"), output.Stdout, 0600); err != nil {
 		return nil, err
 	}
 	return digest, nil
@@ -96,13 +94,4 @@ func extractSection(section *pe.Section, name string) (err error) {
 		return err
 	}
 	return out.Sync()
-}
-
-type limitedOutput struct{ bytes.Buffer }
-
-func (b *limitedOutput) Write(data []byte) (int, error) {
-	if len(data) > 65536-b.Len() {
-		return 0, errors.New("recoveryboot: tool_output_limit")
-	}
-	return b.Buffer.Write(data)
 }

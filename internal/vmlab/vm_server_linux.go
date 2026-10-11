@@ -18,6 +18,7 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/deploylab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // VMServerOptions selects only an owned guest and source checkout. The lane never
@@ -47,8 +48,11 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if manifest.Distribution != "ubuntu" || manifest.Version != "24.04" || manifest.Architecture != "amd64" {
-		return nil, errors.New("vm server requires Ubuntu 24.04 amd64")
+	if err := manifestRelease(manifest).LabLane(platform.LaneServer); err != nil {
+		return nil, err
+	}
+	if manifest.Architecture != "amd64" {
+		return nil, errors.New("vm server requires an amd64 manifest")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()

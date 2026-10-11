@@ -29,6 +29,7 @@ import (
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/passwordprovider"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/sysctlprovider"
 	"lindm/internal/resource"
@@ -37,98 +38,151 @@ import (
 
 // nativeResource is a process-local seam, never caller-supplied execution data.
 // Production selects a native provider by the signed, canonical resource kind.
-type nativeResource interface {
-	Plan(context.Context, *resourcev1.ResourceDesiredState, resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error)
-	Verify(context.Context, *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error)
-	Apply(context.Context, *resourcev1.ResourcePlan, func(context.Context) error) (*resourcev1.ResourceVerification, error)
-	Close() error
+type nativeResource = resourceprovider.Provider
+
+// resourceOpen is everything an opener may use; kinds take what they need.
+type resourceOpen struct {
+	service  *Service
+	intent   *agentv1.ResourceExecutionIntent
+	platform *resourcev1.PlatformProduct
+	secrets  secretAccessor
+}
+
+// resourceKind is the executor's per-kind entry: the provider opener and any
+// kind-specific plan/verification shape rules beyond the generic ones.
+type resourceKind struct {
+	open         func(context.Context, resourceOpen) (nativeResource, error)
+	plan         func(*resourcev1.ResourcePlan) error
+	verification func(*resourcev1.ResourcePlan, *resourcev1.ResourceVerification) error
+}
+
+// resourceKinds is the executor's only resource-kind dispatch. It is filled
+// once by init because openers transitively reach the plan validators.
+var resourceKinds resourceprovider.Registry[resourceKind]
+
+func init() {
+	resourceKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]resourceKind{
+		resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE:        {open: openPackageResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE:       {open: openServiceResource, plan: serviceprovider.ValidatePlan, verification: serviceprovider.ValidateVerification},
+		resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:          {open: openFileResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP:           {open: openAccountResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:            {open: openAccountResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:                {open: openSysctlResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:    {open: openDefinitionResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:         {open: openFirewallResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {open: openEncryptionResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:       {open: openPasswordResource},
+	})
 }
 
 func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
 	if err := resource.ValidateDesired(intent.GetDesired()); err != nil {
 		return nil, err
 	}
+	kind, err := resourceKinds.Lookup(intent.GetDesired().GetRef().GetKind())
+	if err != nil {
+		return nil, errors.Join(serviceprovider.ErrUnsupported, err)
+	}
 	platform, err := inventory.HostPlatform(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if intent.GetDesired().GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE {
-		record, _, err := s.store.LoadResourceAction(ctx, intent.GetActionId())
-		if err != nil {
-			return nil, err
-		}
-		if !proto.Equal(record.GetIntent(), intent) || !bytes.Equal(digestBytes(record.GetIntentEnvelope()), record.GetIntentSha256()) {
-			return nil, errRecoveryHold
-		}
-		return packageprovider.Open(ctx, packageprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), StateDirectory: s.directory, Native: s.packageProvider,
-			Preparation: intent.GetPreparation(), IntentDigest: record.GetIntentSha256(),
-			NativeStage: s.packageNativeStage, NativeStageCancel: s.packageNativeCancel, NativeTransaction: s.packageNativeTransaction,
-		})
+	return kind.open(ctx, resourceOpen{service: s, intent: intent, platform: platform, secrets: secrets})
+}
+
+// Native package transactions keep their staged helper protocol (stage,
+// cancel, transaction) but expose the same Provider contract here.
+func openPackageResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	record, _, err := s.store.LoadResourceAction(ctx, intent.GetActionId())
+	if err != nil {
+		return nil, err
 	}
-	switch intent.GetDesired().GetRef().GetKind() {
-	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE:
-		return serviceprovider.Open(ctx, serviceprovider.Config{
-			ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
-		return fileprovider.Open(ctx, fileprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Files,
-			ProtectedPaths: s.nativeResources.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:
-		return accountprovider.Open(ctx, accountprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Accounts,
-			NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest, Secrets: secrets,
-			NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
-				result, err := s.observeNativeResource(ctx, desired, platform, nil)
-				if err != nil {
-					return nil, err
-				}
-				return result.GetAfter(), nil
-			},
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
-		return sysctlprovider.Open(ctx, sysctlprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Sysctl, NativeApply: s.resourceNativeApply,
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
-		return definitionprovider.Open(ctx, definitionprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), ExecuteNative: s.resourceNativeTransaction,
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:
-		return s.openFirewallResource(ctx, intent, platform)
-	case resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE:
-		return encryptionprovider.Open(ctx, encryptionprovider.Config{
-			ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			AuthenticatedEscrow: s.authenticatedResourceEscrow,
-			Observe: func(ctx context.Context) (*actionprovider.RootEncryptionEvidence, error) {
-				result, err := s.observeNativeResource(ctx, intent.GetDesired(), platform, nil)
-				if err != nil {
-					return nil, err
-				}
-				return rootEncryptionEvidence(result)
-			},
-		})
-	case resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:
-		return passwordprovider.Open(ctx, passwordprovider.Config{
-			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Password, ExecuteNative: s.resourceNativeTransaction,
-		})
-	default:
-		return nil, serviceprovider.ErrUnsupported
+	if !proto.Equal(record.GetIntent(), intent) || !bytes.Equal(digestBytes(record.GetIntentEnvelope()), record.GetIntentSha256()) {
+		return nil, errRecoveryHold
 	}
+	return packageprovider.Open(ctx, packageprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), StateDirectory: s.directory, Native: s.packageProvider,
+		Preparation: intent.GetPreparation(), IntentDigest: record.GetIntentSha256(),
+		NativeStage: s.packageNativeStage, NativeStageCancel: s.packageNativeCancel, NativeTransaction: s.packageNativeTransaction,
+	})
+}
+
+func openServiceResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	return serviceprovider.Open(ctx, serviceprovider.Config{
+		ExecutorIncarnation: o.service.incarnation, Ownership: o.intent.GetOwnership(), Platform: o.platform,
+	})
+}
+
+func openFileResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return fileprovider.Open(ctx, fileprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Files,
+		ProtectedPaths: s.nativeResources.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
+	})
+}
+
+func openAccountResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return accountprovider.Open(ctx, accountprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Accounts,
+		NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest, Secrets: o.secrets,
+		NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+			result, err := s.observeNativeResource(ctx, desired, o.platform, nil)
+			if err != nil {
+				return nil, err
+			}
+			return result.GetAfter(), nil
+		},
+	})
+}
+
+func openSysctlResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return sysctlprovider.Open(ctx, sysctlprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Sysctl, NativeApply: s.resourceNativeApply,
+	})
+}
+
+func openDefinitionResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return definitionprovider.Open(ctx, definitionprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), ExecuteNative: s.resourceNativeTransaction,
+	})
+}
+
+func openEncryptionResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return encryptionprovider.Open(ctx, encryptionprovider.Config{
+		ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		AuthenticatedEscrow: s.authenticatedResourceEscrow,
+		Observe: func(ctx context.Context) (*actionprovider.RootEncryptionEvidence, error) {
+			result, err := s.observeNativeResource(ctx, intent.GetDesired(), o.platform, nil)
+			if err != nil {
+				return nil, err
+			}
+			return rootEncryptionEvidence(result)
+		},
+	})
+}
+
+func openPasswordResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return passwordprovider.Open(ctx, passwordprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Password, ExecuteNative: s.resourceNativeTransaction,
+	})
 }
 
 func readBoottime() (uint64, error) {
@@ -616,8 +670,8 @@ func validateResourcePlan(plan *resourcev1.ResourcePlan) error {
 	if err := resource.ValidatePlan(plan); err != nil {
 		return err
 	}
-	if plan.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE {
-		return serviceprovider.ValidatePlan(plan)
+	if kind, err := resourceKinds.Lookup(plan.GetRef().GetKind()); err == nil && kind.plan != nil {
+		return kind.plan(plan)
 	}
 	return nil
 }
@@ -626,8 +680,8 @@ func validateResourceVerification(plan *resourcev1.ResourcePlan, verification *r
 	if err := resource.ValidatePlanVerification(plan, verification); err != nil {
 		return err
 	}
-	if plan.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE {
-		return serviceprovider.ValidateVerification(plan, verification)
+	if kind, err := resourceKinds.Lookup(plan.GetRef().GetKind()); err == nil && kind.verification != nil {
+		return kind.verification(plan, verification)
 	}
 	return nil
 }

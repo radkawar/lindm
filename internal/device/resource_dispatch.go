@@ -21,6 +21,7 @@ import (
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/resource"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -29,7 +30,7 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_service_work_request")
@@ -47,7 +48,7 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 	}
 	if choice != nil {
 		if s.identity == nil {
-			return nil, rpcError(connect.CodeFailedPrecondition, "service_authorization_unavailable")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_authorization_unavailable")
 		}
 		approval, authorizationErr := s.identity.AuthorizeFresh(ctx, choice.ActorID, identity.PermissionAssignResources)
 		if authorizationErr != nil && !assignmentAuthorizationDenied(authorizationErr) {
@@ -132,7 +133,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	var verifier *trust.ExecutionVerifier
 	if choice != nil && authorizationErr == nil {
 		if s.signing == nil {
-			return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+			return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 		}
 		snapshot, verifier, err = s.execution.CurrentInTransaction(ctx, tx)
 		if err != nil {
@@ -219,7 +220,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		// Issued start authority may have caused an effect. Expiry, reassignment and
 		// actor revocation never manufacture a replacement for an unreported effect.
 		if action.GenerationID != principal.GenerationID {
-			return nil, nil, rpcError(connect.CodeFailedPrecondition, "service_action_generation_pending")
+			return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_action_generation_pending")
 		}
 		work, err := issueResourceNonce(ctx, q, action, now)
 		if err != nil {
@@ -263,7 +264,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	}
 	if choice == nil {
 		if s.signing == nil {
-			return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+			return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, nil, err
@@ -271,7 +272,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, &head, nil
 	}
 	if choice.ID != head.ID {
-		return nil, nil, rpcError(connect.CodeAborted, "service_assignment_conflict")
+		return nil, nil, rpcreason.Error(connect.CodeAborted, "service_assignment_conflict")
 	}
 	if authorizationErr != nil || approval.Version() != uint64(head.AuthorizationVersion) {
 		if err := q.BlockServiceAssignment(ctx, devicedb.BlockServiceAssignmentParams{ID: head.ID, BlockedReason: "assignment_authority_changed"}); err != nil {
@@ -280,7 +281,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, nil, tx.Commit(ctx)
 	}
 	if snapshot == nil || snapshot.Delegation == nil {
-		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	operation := resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE
 	if release != nil {
@@ -310,7 +311,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, nil, err
 	}
 	if capacity.Actions >= 262144 {
-		return nil, nil, rpcError(connect.CodeResourceExhausted, "service_action_capacity")
+		return nil, nil, rpcreason.Error(connect.CodeResourceExhausted, "service_action_capacity")
 	}
 	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: int16(candidate.GetDesired().GetRef().GetKind()), CanonicalKey: candidate.GetDesired().GetRef().GetCanonicalKey()})
 	if err != nil {
@@ -325,7 +326,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		expires = snapshot.Delegation.GetExpiresAt().AsTime()
 	}
 	if !expires.After(notBefore) || !expires.After(now) {
-		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_window_empty")
+		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_window_empty")
 	}
 	ownership, err := s.resourceOwnership(ctx, tx, source, candidate)
 	if err != nil {
@@ -343,10 +344,10 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	}
 	envelope, err := s.authority.Sign(ctx, intent, s.signing.PlanKey)
 	if err != nil {
-		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_rejected")
+		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_rejected")
 	}
 	if _, err := verifier.VerifyResourceIntent(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
-		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_rejected")
+		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_rejected")
 	}
 	document, err := proto.Marshal(intent)
 	if err != nil {

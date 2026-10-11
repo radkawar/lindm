@@ -4,7 +4,6 @@
 package deploylab
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,15 +12,16 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 // ComposeResult contains only nonsecret observations of this disposable run.
@@ -149,17 +149,17 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 	if err != nil {
 		return result, err
 	}
-	version := new(commandOutput)
+	version := newCommandOutput()
 	if err := run.compose(ctx, "check Compose prerequisite", version, "version", "--short"); err != nil {
 		return result, err
 	}
 	result.ComposeVersion = strings.TrimSpace(version.String())
-	version = new(commandOutput)
+	version = newCommandOutput()
 	if err := run.command(ctx, "record Docker engine", version, "docker", "version", "--format", "{{.Server.Version}}"); err != nil {
 		return result, err
 	}
 	result.DockerVersion = strings.TrimSpace(version.String())
-	version = new(commandOutput)
+	version = newCommandOutput()
 	if err := run.command(ctx, "check cgroup v2 isolation", version, "docker", "info", "--format", "{{.CgroupVersion}}"); err != nil {
 		return result, err
 	}
@@ -183,7 +183,7 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 		return result, err
 	}
 	imageBuilt = true
-	imageID := new(commandOutput)
+	imageID := newCommandOutput()
 	if err := run.command(ctx, "record image identity", imageID, "docker", "image", "inspect", "--format", "{{.Id}}", run.image); err != nil {
 		return result, err
 	}
@@ -224,43 +224,29 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 	return result, nil
 }
 
-func (r *composeRun) compose(ctx context.Context, stage string, output io.Writer, args ...string) error {
+func (r *composeRun) compose(ctx context.Context, stage string, output *nativeexec.Buffer, args ...string) error {
 	base := []string{"compose", "--env-file", "/dev/null", "--project-name", r.project, "--file", filepath.Join(r.root, "deploy", "server", "compose.yml")}
 	return r.command(ctx, stage, output, "docker", append(base, args...)...)
 }
 
-func (r *composeRun) command(ctx context.Context, stage string, output io.Writer, name string, args ...string) error {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir, cmd.Env = r.root, r.env
-	cmd.Stdout, cmd.Stderr = output, io.Discard
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); !errors.Is(err, syscall.ESRCH) {
-			return err
-		}
-		return os.ErrProcessDone
+// newCommandOutput bounds a captured deployment command's stdout.
+func newCommandOutput() *nativeexec.Buffer { return nativeexec.NewBuffer(64 << 10) }
+
+// command discards stderr and captures stdout only into output, if any.
+func (r *composeRun) command(ctx context.Context, stage string, output *nativeexec.Buffer, name string, args ...string) error {
+	c := labexec.Command{Path: name, Args: args, Env: r.env, Dir: r.root}
+	if output != nil {
+		c.Stdout = output
 	}
-	cmd.WaitDelay = 5 * time.Second
-	if err := cmd.Run(); err != nil {
+	err := labexec.Run(ctx, c)
+	if err == nil && output != nil && output.Truncated() {
+		err = errors.New("deployment command output exceeds 64 KiB")
+	}
+	if err != nil {
 		return fmt.Errorf("deploylab %s (subprocess output withheld to protect credentials): %w", stage, err)
 	}
 	return nil
 }
-
-type commandOutput struct {
-	buffer bytes.Buffer
-}
-
-func (b *commandOutput) Write(p []byte) (int, error) {
-	if b.buffer.Len()+len(p) > 64<<10 {
-		return 0, errors.New("deployment command output exceeds 64 KiB")
-	}
-	return b.buffer.Write(p)
-}
-
-func (b *commandOutput) String() string { return b.buffer.String() }
-
-func (b *commandOutput) Bytes() []byte { return b.buffer.Bytes() }
 
 func fileSHA256(path string) (_ string, err error) {
 	file, err := os.Open(path)

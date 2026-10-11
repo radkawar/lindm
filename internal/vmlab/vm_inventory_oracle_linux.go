@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 // Native truth uses distribution tools and separate presentation/parsing from the
@@ -1110,7 +1111,7 @@ func (o vmInventoryOracle) applications(backend string) (*inventoryv1.Applicatio
 // compareVMDetails checks every schema field. Repeated identities are compared as
 // multisets, not by count or native presentation order. Only explicitly changing
 // measurements have a tolerance; matching errors are never a passing verdict.
-func compareVMDetails(distro, architecture string, before, after, actual *inventoryv1.NativeDetails) error {
+func compareVMDetails(release *platform.Release, architecture string, before, after, actual *inventoryv1.NativeDetails) error {
 	if before == nil || after == nil || actual == nil {
 		return errors.New("native inventory details omitted")
 	}
@@ -1118,7 +1119,7 @@ func compareVMDetails(distro, architecture string, before, after, actual *invent
 		return err
 	}
 	for _, details := range []*inventoryv1.NativeDetails{before, after, actual} {
-		context := inventoryHealthContext{distro: distro, host: &inventoryv1.HostObservation{Architecture: truthString(architecture)}, details: details}
+		context := inventoryHealthContext{release: release, host: &inventoryv1.HostObservation{Architecture: truthString(architecture)}, details: details}
 		if err := checkInventoryMessage(details.ProtoReflect(), "host.details", context, false); err != nil {
 			return err
 		}

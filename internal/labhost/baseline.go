@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // BaselineOptions explicitly authorizes the maintained package transaction. The
@@ -126,17 +127,20 @@ func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineRes
 		return result, fmt.Errorf("discover baseline host: %w", err)
 	}
 	result.Before = before
-	if before.Distribution != "ubuntu" || before.Release != "24.04" || !slices.Contains([]string{"amd64", "arm64"}, before.Architecture) {
-		return result, fmt.Errorf("labhost: unsupported baseline host %s %s %s; maintained pins support Ubuntu 24.04 amd64/arm64 only; add reviewed lab/baseline package pins before installing another release", before.Distribution, before.Release, before.Architecture)
+	// Maintained pins are per registry release (lab/baseline/<key>.packages)
+	// and installed with APT.
+	release := platform.Identify(platform.OSRelease{ID: before.Distribution, VersionID: before.Release})
+	if release.Native().Packages.Backend != platform.BackendAPT || !slices.Contains([]string{"amd64", "arm64"}, before.Architecture) {
+		return result, fmt.Errorf("labhost: unsupported baseline host %s %s %s; maintained pins are APT package pins for amd64/arm64", before.Distribution, before.Release, before.Architecture)
 	}
 	if before.UID == 0 {
 		return result, errors.New("labhost: run baseline as the intended unprivileged lab user, not root; privilege is obtained only with sudo -n")
 	}
-	pins, pinData, err := loadBaselinePins(opts.RepoDir)
+	result.PinFile = "lab/baseline/" + release.Key + ".packages"
+	pins, pinData, err := loadBaselinePins(opts.RepoDir, result.PinFile)
 	if err != nil {
 		return result, err
 	}
-	result.PinFile = "lab/baseline/ubuntu-24.04.packages"
 	digest := sha256.Sum256(pinData)
 	result.PinSHA256 = hex.EncodeToString(digest[:])
 	result.PackagesRequested = pins
@@ -192,7 +196,7 @@ func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineRes
 		transaction, err := baselineCommand(ctx, opts.Host, baselineInstall(pins), 30*time.Minute, opts.Diagnostics)
 		result.APTTransaction = string(transaction)
 		if err != nil {
-			return result, fmt.Errorf("install maintained exact pins; if a pin was retired, review lab/baseline/ubuntu-24.04.packages against apt-cache policy (do not install an unpinned substitute): %w", err)
+			return result, fmt.Errorf("install maintained exact pins; if a pin was retired, review %s against apt-cache policy (do not install an unpinned substitute): %w", result.PinFile, err)
 		}
 	}
 	if !slices.Contains(before.Groups, "kvm") {
@@ -260,10 +264,10 @@ func baselineAsUser(user, script string) string {
 	return "sudo -n -H -u " + baselineQuote(user) + " -- /bin/bash --noprofile --norc -s <<'LINDM_BASELINE_SESSION'\nset -euo pipefail\nexport LC_ALL=C\nexport PATH=/usr/sbin:/usr/bin:/sbin:/bin\n" + script + "\nLINDM_BASELINE_SESSION\n"
 }
 
-func loadBaselinePins(repo string) ([]string, []byte, error) {
-	file, err := os.Open(filepath.Join(repo, "lab", "baseline", "ubuntu-24.04.packages"))
+func loadBaselinePins(repo, pinFile string) ([]string, []byte, error) {
+	file, err := os.Open(filepath.Join(repo, filepath.FromSlash(pinFile)))
 	if err != nil {
-		return nil, nil, fmt.Errorf("open maintained baseline pins (use -repo CHECKOUT): %w", err)
+		return nil, nil, fmt.Errorf("open maintained baseline pins %s (use -repo CHECKOUT; add reviewed pins before installing another release): %w", pinFile, err)
 	}
 	data, readErr := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	if err := errors.Join(readErr, file.Close()); err != nil {

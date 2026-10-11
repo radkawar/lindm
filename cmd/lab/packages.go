@@ -48,7 +48,7 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		_, err = fmt.Fprintf(stdout, "development-only package signer\nhome %s\nfingerprint %s\nnot an execution, transport, TUF or production key\n", key.Home, key.Fingerprint)
 		return err
 	}
-	if args[0] != "build" && args[0] != "build-server" && args[0] != "build-cli" && args[0] != "apt" && args[0] != "rpm" && args[0] != "arch" {
+	if args[0] != "build" && args[0] != "build-server" && args[0] != "build-cli" && args[0] != "apt" && args[0] != "rpm" && args[0] != string(packaging.FormatArch) {
 		return errors.New("unknown packages command")
 	}
 	home := flags.String("signer-home", "", "isolated GnuPG package-signing home")
@@ -141,7 +141,7 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 			return errors.New("packages rpm requires one or more signed RPM paths")
 		}
 		result, err = packaging.PublishRPM(ctx, packaging.RPMRequest{OutputDir: *output, RPMs: artifacts, Signer: signer, SourceDateEpoch: *epoch})
-	case "arch":
+	case string(packaging.FormatArch):
 		if flags.NArg() == 0 {
 			return errors.New("packages arch requires signed .pkg.tar.zst paths with adjacent .sig files")
 		}

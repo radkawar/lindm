@@ -27,7 +27,7 @@ func TestNativeModuleVersionSemanticsAreClosed(t *testing.T) {
 		{"fedora", "44", "1.4.6-1.fc44", 1, false},
 		{"ubuntu", "24.04", "1.7.2-1", 3, false},
 		{"fedora", "45", "1.7.2-1.fc45", 2, false},
-		{"debian", "13", "1.4.5-1", 1, false},
+		{"debian", "13", "1.4.5-1", 1, true},
 		{"fedora", "44", "1.7.2-3.fc44", 0, false},
 		// EL 9.8 ships libpwquality 1.4.4 and pam 1.5.1; neither Fedora's nor a
 		// neighbouring EL minor's releases may stand in for them.
@@ -36,7 +36,7 @@ func TestNativeModuleVersionSemanticsAreClosed(t *testing.T) {
 		{"rhel", "9.8", "1.4.5-15.fc44", 1, false},
 		{"almalinux", "9.8", "1.7.2-3.fc44", 2, false},
 		{"almalinux", "9.7", "1.5.1-26.el9", 2, false},
-		{"rocky", "9.8", "1.4.4-8.el9", 1, false},
+		{"rocky", "9.8", "1.4.4-8.el9", 1, true},
 		{"almalinux", "10.2", "1.4.5-12.el10", 1, true},
 		{"rhel", "10.2", "1.6.1-9.el10", 3, true},
 		{"rhel", "10.2", "1.5.1-28.el9_8.1", 2, false},

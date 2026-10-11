@@ -120,11 +120,11 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 
 func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 	for _, test := range []struct {
-		name, distro, release, manager, packages, feed, sourceURL string
-		packageDigest                                             string
-		platform, platformDigest, stream, wantReason              string
-		format                                                    advisoryv1.FeedFormat
-		wantFindings                                              int
+		name, distro, release, manager, packages, feed, sourceURL, arch string
+		packageDigest                                                   string
+		platform, platformDigest, stream, wantReason                    string
+		format                                                          advisoryv1.FeedFormat
+		wantFindings                                                    int
 	}{
 		{
 			name: "ubuntu-noble", distro: "ubuntu", release: "24.04", manager: "dpkg",
@@ -132,6 +132,23 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 			sourceURL:     "https://api.osv.dev/v1/vulns/USN-6859-1",
 			packageDigest: "529f706837ea1d4d1adabce51b66c255def8aad158f05a0388a170f4d7c24248",
 			format:        advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON,
+		},
+		{
+			// Actual 26.04.1 openssl 3.5.5-1ubuntu3.5 on both architectures
+			// predates USN-8861-1's resolute fix 3.5.5-1ubuntu3.7: all three
+			// installed binaries are affected.
+			name: "ubuntu-resolute-amd64", distro: "ubuntu", release: "26.04", manager: "dpkg",
+			packages: "ubuntu-resolute-amd64-packages.json", feed: "ubuntu-USN-8861-1.json",
+			sourceURL:     "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip",
+			packageDigest: "5b6f29a9104b39e7d5874e1197a99d17512bc545f0e0f34ba633059ebe2ff67a",
+			format:        advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, wantFindings: 3,
+		},
+		{
+			name: "ubuntu-resolute-arm64", distro: "ubuntu", release: "26.04", manager: "dpkg", arch: "aarch64",
+			packages: "ubuntu-resolute-arm64-packages.json", feed: "ubuntu-USN-8861-1.json",
+			sourceURL:     "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip",
+			packageDigest: "49bbea1b10885fa9ab17faec97cf5867805804a18ce66ce1de7df4fd72150080",
+			format:        advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, wantFindings: 3,
 		},
 		{
 			name: "fedora44", distro: "fedora", release: "44", manager: "rpm",
@@ -190,6 +207,9 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 			host.Observation.OsId.Value = test.distro
 			host.Observation.OsVersion.Value = test.release
 			host.Observation.Architecture.Value = "x86_64"
+			if test.arch != "" {
+				host.Observation.Architecture.Value = test.arch
+			}
 			if test.platform != "" {
 				platformBytes, err := os.ReadFile("../advisory/testdata/" + test.platform)
 				if err != nil {
@@ -262,6 +282,13 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 				finding := response.Msg.Findings[0]
 				if finding.AdvisoryId != "FEDORA-2026-7d4732cbab" || finding.InstalledVersion != "0:1.9.17-7.p2.fc44" || finding.FixedVersion != "0:1.9.17-10.p2.fc44" || len(finding.Cves) != 1 || finding.Cves[0] != "CVE-2026-96512" {
 					t.Fatalf("recorded Fedora sudo exposure: %v", finding)
+				}
+			}
+			if test.release == "26.04" {
+				for _, finding := range response.Msg.Findings {
+					if finding.AdvisoryId != "USN-8861-1" || finding.InstalledVersion != "3.5.5-1ubuntu3.5" || finding.FixedVersion != "3.5.5-1ubuntu3.7" || len(finding.Cves) != 2 || finding.Cves[0] != "CVE-2026-42772" || finding.Cves[1] != "CVE-2026-54873" {
+						t.Fatalf("recorded resolute openssl exposure: %v", finding)
+					}
 				}
 			}
 		})

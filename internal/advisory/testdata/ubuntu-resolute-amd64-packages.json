@@ -1,0 +1,37 @@
+{
+  "packages": [
+    {
+      "name": "libssl3t64",
+      "version": "3.5.5-1ubuntu3.5",
+      "architecture": "amd64",
+      "manager": "dpkg",
+      "source_name": "openssl",
+      "source_version": "3.5.5-1ubuntu3.5",
+      "module": {
+        "status": "COLLECTION_STATUS_UNAVAILABLE"
+      }
+    },
+    {
+      "name": "openssl",
+      "version": "3.5.5-1ubuntu3.5",
+      "architecture": "amd64",
+      "manager": "dpkg",
+      "source_name": "openssl",
+      "source_version": "3.5.5-1ubuntu3.5",
+      "module": {
+        "status": "COLLECTION_STATUS_UNAVAILABLE"
+      }
+    },
+    {
+      "name": "openssl-provider-legacy",
+      "version": "3.5.5-1ubuntu3.5",
+      "architecture": "amd64",
+      "manager": "dpkg",
+      "source_name": "openssl",
+      "source_version": "3.5.5-1ubuntu3.5",
+      "module": {
+        "status": "COLLECTION_STATUS_UNAVAILABLE"
+      }
+    }
+  ]
+}

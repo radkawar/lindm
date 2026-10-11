@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"google.golang.org/protobuf/proto"
 
@@ -55,8 +57,12 @@ func parseDNFTransaction(data []byte) (*dnfTransaction, error) {
 }
 
 func (p *Provider) dnf(ctx context.Context, directory string, args []string) (nativeResult, error) {
+	return p.run(ctx, p.managerPath, p.dnfArgs(directory, args), "/", nil)
+}
+
+func (p *Provider) dnfArgs(directory string, args []string) []string {
 	fixed := []string{"--config=" + filepath.Join(directory, "dnf.conf"), "--setopt=reposdir=" + filepath.Join(directory, "repos"), "--setopt=cachedir=" + filepath.Join(directory, "cache"), "--setopt=logdir=" + filepath.Join(directory, "log"), "--setopt=system_cachedir=" + filepath.Join(directory, "cache"), "--setopt=plugins=false", "--setopt=install_weak_deps=false", "--setopt=clean_requirements_on_remove=false", "--setopt=keepcache=true", "--setopt=skip_if_unavailable=false", "--setopt=best=true", "--setopt=localpkg_gpgcheck=true", "--setopt=tsflags=", "--assumeyes"}
-	return p.run(ctx, p.managerPath, append(fixed, args...), "/", nil)
+	return append(fixed, args...)
 }
 func (p *Provider) prepareDNF(ctx context.Context, directory string, source *agentv1.NativePackageSource) ([]byte, error) {
 	rpm := source.GetRepository().GetRpm()
@@ -79,7 +85,7 @@ func (p *Provider) prepareDNF(ctx context.Context, directory string, source *age
 	if err := atomicFile(filepath.Join(directory, "repos", "approved.repo"), []byte(config), 0600); err != nil {
 		return nil, err
 	}
-	key, err := protectedFile(source.GetSigningKeyFile(), 4<<20)
+	key, err := custody.ReadRoot(source.GetSigningKeyFile(), 4<<20, false)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +162,7 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 	}); err != nil {
 		return nil, nil, err
 	}
-	data, err := protectedFile(filepath.Join(directory, "transaction", "transaction.json"), 4<<20)
+	data, err := custody.ReadRoot(filepath.Join(directory, "transaction", "transaction.json"), 4<<20, false)
 	if errors.Is(err, os.ErrNotExist) {
 		// DNF writes no bundle for an already satisfied request. Its database
 		// observation, rather than a success exit or missing file alone, must
@@ -360,10 +366,6 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 	}
 	return entries, nil
 }
-
-// minimumDNF5 is the first release that stores a transaction without
-// privileges; older releases refuse the staging sandbox's read-only /usr.
-const minimumDNF5 = "5.4.6.0"
 
 func checkRPMSignature(output []byte, fingerprint string) error {
 	valid := false

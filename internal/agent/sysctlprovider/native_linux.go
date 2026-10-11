@@ -14,10 +14,11 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
-type NativeConfig struct {
+type nativeConfig struct {
 	Native              *agentv1.NativeSysctlProviderConfig
 	Platform            *resourcev1.PlatformProduct
 	ExecutorIncarnation string
@@ -32,7 +33,7 @@ func NeedsPersistenceWrite(request *agentv1.NativeResourceTransactionRequest) bo
 	return !fileTargetMatches(request.GetBefore().GetSysctlPersistence(), request.GetTarget().GetSysctlPersistence())
 }
 
-// ExecuteNative is exclusively the fixed authenticated transient helper entry.
+// ApplyNative is exclusively the fixed authenticated transient helper entry.
 // The parent supplies root-local policy, makes /proc/sys writable only for a
 // runtime change (this helper writes only the planned key), and grants /etc/sysctl.d writable only if the target file image differs. CAP_LEASE
 // is needed whenever persistent ownership is pinned, including unchanged files.
@@ -41,7 +42,8 @@ func NeedsPersistenceWrite(request *agentv1.NativeResourceTransactionRequest) bo
 // CAP_SYS_ADMIN. The parent must keep all other proc/sys paths read-only.
 // No writable file is opened before native preconditions are pinned. There is
 // no compensating write: kernel effects cannot be rolled back transactionally.
-func ExecuteNative(ctx context.Context, config NativeConfig, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+	config := nativeConfig{Native: env.Config.GetSysctlProvider(), Platform: env.Platform, ExecutorIncarnation: env.ExecutorIncarnation}
 	if beforeEffect == nil || proto.Size(request) > 1<<20 {
 		return nil, ErrUnsupported
 	}

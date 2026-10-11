@@ -12,8 +12,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 // EncryptedFirmwareOptions pins installed distribution firmware, not a download.
@@ -50,38 +52,24 @@ func encryptedHostOutput(ctx context.Context, dir string, timeout time.Duration,
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "TMPDIR=" + dir, "LC_ALL=C", "LIBGUESTFS_BACKEND=direct", "LIBGUESTFS_TMPDIR=" + dir}
+	env := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "TMPDIR=" + dir, "LC_ALL=C", "LIBGUESTFS_BACKEND=direct", "LIBGUESTFS_TMPDIR=" + dir}
 	if name == "guestfish" {
 		kernel, modules, err := encryptedSuperminPaths()
 		if err != nil {
 			return nil, err
 		}
 		if kernel != "" {
-			cmd.Env = append(cmd.Env, "SUPERMIN_KERNEL="+kernel, "SUPERMIN_MODULES="+modules)
+			env = append(env, "SUPERMIN_KERNEL="+kernel, "SUPERMIN_MODULES="+modules)
 		}
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		} else {
-			return err
-		}
+	out := nativeexec.NewBuffer(4 << 20)
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: out, Timeout: timeout}); err != nil {
+		return nil, fmt.Errorf("encrypted lab %s failed: %w", name, err)
 	}
-	cmd.WaitDelay = 2 * time.Second
-	out := &limitedOutput{limit: 4 << 20}
-	cmd.Stdout, cmd.Stderr = out, io.Discard
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("encrypted lab %s failed: %w", name, errors.Join(err, ctx.Err()))
-	}
-	if out.exceeded {
+	if out.Truncated() {
 		return nil, fmt.Errorf("encrypted lab %s output exceeds limit", name)
 	}
-	return out.data, nil
+	return out.Bytes(), nil
 }
 
 func prepareEncryptedFirmware(ctx context.Context, dir string, opts EncryptedFirmwareOptions) (*EncryptedFirmwareEvidence, error) {

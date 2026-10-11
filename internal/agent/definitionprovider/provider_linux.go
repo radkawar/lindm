@@ -30,6 +30,8 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/platform"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -65,9 +67,9 @@ type Config struct {
 	ExecuteNative                                          func(context.Context, *agentv1.NativeResourceTransactionRequest, func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error)
 }
 
-// NativeConfig is root-local helper context. ScratchDirectory must be a private
+// nativeConfig is root-local helper context. ScratchDirectory must be a private
 // per-action directory supplied by the fixed helper, not transported policy.
-type NativeConfig struct {
+type nativeConfig struct {
 	ExecutorIncarnation string
 	Platform            *resourcev1.PlatformProduct
 	ScratchDirectory    string
@@ -80,6 +82,8 @@ type Provider struct {
 	gate    sync.Mutex
 	closed  bool
 }
+
+var _ resourceprovider.Provider = (*Provider)(nil)
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
@@ -106,7 +110,7 @@ func canonicalID(value string) bool {
 	id, err := uuid.Parse(value)
 	return err == nil && id != uuid.Nil && id.String() == value
 }
-func nativeContext(ctx context.Context, config NativeConfig) (*Provider, error) {
+func nativeContext(ctx context.Context, config nativeConfig) (*Provider, error) {
 	if ctx == nil || os.Geteuid() != 0 || !canonicalID(config.ExecutorIncarnation) {
 		return nil, ErrUnsupported
 	}
@@ -120,24 +124,13 @@ func nativeContext(ctx context.Context, config NativeConfig) (*Provider, error) 
 			return nil, err
 		}
 	}
-	// Ubuntu 24.04, Fedora 44 and EL 10 (systemd 257) were qualified on systemd
-	// 255 and newer; EL 9 ships systemd 252 for its whole life, whose timer and
-	// unit-file D-Bus interface and systemd-analyze verify options this provider
-	// uses.
-	minimum := 255
-	switch config.Platform.GetOsId() {
-	case "ubuntu", "fedora", "debian":
-	case "rhel", "almalinux":
-		switch major, _, _ := strings.Cut(config.Platform.GetVersion(), "."); major {
-		case "9":
-			minimum = 252
-		case "10":
-		default:
-			return nil, ErrUnsupported
-		}
-	default:
-		return nil, ErrUnsupported
+	// The floor is the oldest systemd whose timer and unit-file D-Bus interface
+	// and systemd-analyze verify options this provider uses on the release.
+	release := platform.Of(config.Platform)
+	if err := release.Gate(platform.Definitions); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
 	}
+	minimum := release.Native().Quirks.SystemdFloor
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
 	if err != nil {
 		return nil, err
@@ -169,7 +162,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	if err := validateMessage(config.Ownership); err != nil {
 		return nil, err
 	}
-	p, err := nativeContext(ctx, NativeConfig{ExecutorIncarnation: config.ExecutorIncarnation, Platform: config.Platform})
+	p, err := nativeContext(ctx, nativeConfig{ExecutorIncarnation: config.ExecutorIncarnation, Platform: config.Platform})
 	if err != nil {
 		return nil, err
 	}

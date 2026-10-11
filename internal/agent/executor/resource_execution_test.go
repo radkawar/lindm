@@ -90,6 +90,10 @@ func (n *boundaryNative) Plan(ctx context.Context, desired *resourcev1.ResourceD
 	}
 	return plan, nil
 }
+func (n *boundaryNative) Observe(context.Context, *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	return nil, errors.New("fixture does not observe")
+}
+
 func (n *boundaryNative) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

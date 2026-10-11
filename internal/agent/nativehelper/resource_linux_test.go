@@ -11,6 +11,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/accountprovider"
 )
 
 const nativeTestAction = "a2bca405-36e9-4a43-b5b5-d0b82a05e551"
@@ -27,7 +28,11 @@ func unitValue[T any](t *testing.T, values map[string]any, name string) T {
 
 func unitValues(t *testing.T, directory string, plan *resourcev1.ResourcePlan, before, target *agentv1.ResourceOwnershipSnapshot) map[string]any {
 	t.Helper()
-	properties, err := resourceProperties(directory, &agentv1.NativeResourceTransactionRequest{ActionId: nativeTestAction, Plan: plan, Before: before, Target: target})
+	kind, err := effectKind(plan.GetRef().GetKind())
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties, err := resourceProperties(kind, directory, &agentv1.NativeResourceTransactionRequest{ActionId: nativeTestAction, Plan: plan, Before: before, Target: target})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +89,7 @@ func TestManagedFileHelperOnlyReceivesSelectedParent(t *testing.T) {
 
 func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
-	root := filepath.Join(directory, "account-root")
+	root := filepath.Join(directory, accountprovider.NativeRootDirectory)
 	for _, tc := range []struct {
 		product *resourcev1.PlatformProduct
 		chroot  bool
@@ -119,6 +124,30 @@ func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 		}
 		if !slices.Equal(unitValue[[]bindPath](t, values, "BindPaths"), want) {
 			t.Fatalf("%s: native account binds were not exact and mandatory: %v", tc.product.GetOsId(), values["BindPaths"])
+		}
+	}
+}
+
+// The root helper's registry is the only kind dispatch: read-only compliance
+// kinds and unknown kinds never reach an effect unit, and only kinds the
+// executor cannot read itself get a native observer.
+func TestNativeKindRegistryIsClosed(t *testing.T) {
+	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_UNSPECIFIED, resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE} {
+		if _, err := effectKind(kind); err == nil {
+			t.Errorf("%s has a native effect", kind)
+		}
+	}
+	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION, resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY, resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE} {
+		if _, err := observedKind(kind); err == nil {
+			t.Errorf("%s gained a native observer the executor does not need", kind)
+		}
+	}
+	for _, kind := range []resourcev1.ResourceKind{resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE} {
+		if _, err := effectKind(kind); err != nil {
+			t.Errorf("%s lost its native effect: %v", kind, err)
+		}
+		if _, err := observedKind(kind); err != nil {
+			t.Errorf("%s lost its native observer: %v", kind, err)
 		}
 	}
 }

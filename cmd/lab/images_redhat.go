@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 	"lindm/internal/redhatimages"
 	"lindm/internal/vmlab"
 )
@@ -77,9 +78,14 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
+	major, _, _ := strings.Cut(image.Version, ".")
+	row, ok := platform.Lookup("rhel-" + major)
+	if !ok {
+		return fmt.Errorf("RHEL %s is not a registry release", image.Version)
+	}
 	manifest := &labv1.ImageManifest{
 		Id:           "rhel-" + image.Version + "-kvm-" + strings.ReplaceAll(image.Architecture, "_", "-"),
-		Distribution: "rhel", Version: image.Version, Architecture: image.Architecture, Edition: "KVM Guest Image",
+		Distribution: row.ID, Version: image.Version, Architecture: image.Architecture, Edition: "KVM Guest Image",
 		Release: image.Published.Format(time.RFC3339Nano), ImageFilename: image.Filename,
 		ImageUrl: image.DownloadURL(), ChecksumUrl: image.MetadataURL(), Sha256: image.SHA256,
 		ImageSizeBytes: receipt.ImageSizeBytes, ChecksumMode: labv1.ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED,

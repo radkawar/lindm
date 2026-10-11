@@ -21,6 +21,7 @@ import (
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	"lindm/internal/devlab"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -118,7 +119,7 @@ func probeUnattendedExhaustion(ctx context.Context, public *devlab.AgentFixture,
 
 func unattendedExhaustionReason(err error) (string, error) {
 	var rpc *connect.Error
-	if !errors.As(err, &rpc) || rpc.Code() != connect.CodeResourceExhausted || rpc.Meta().Get("Lindm-Reason") != "provisioning_token_exhausted" {
+	if !errors.As(err, &rpc) || rpc.Code() != connect.CodeResourceExhausted || rpcreason.Get(rpc) != "provisioning_token_exhausted" {
 		return "", errors.New("third distinct provisioning use did not return the exact exhaustion denial")
 	}
 	return "provisioning_token_exhausted", nil

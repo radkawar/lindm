@@ -11,6 +11,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/rpcreason"
 )
 
 // WithRemoteAssistance applies device remote-assistance policy. Absent or
@@ -42,26 +43,20 @@ var _ agentv1connect.SessionServiceHandler = (*sessionService)(nil)
 func (h *sessionService) SyncSession(ctx context.Context, req *connect.Request[agentv1.SyncSessionRequest]) (*connect.Response[agentv1.SyncSessionResponse], error) {
 	uid, ok := localrpc.PeerUID(ctx)
 	if !ok {
-		return nil, assistanceDenied(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	ctx, cancel := context.WithTimeout(ctx, rpcTimeout)
 	defer cancel()
 	response, err := h.broker.syncSession(ctx, uid, req.Msg)
 	switch {
 	case errors.Is(err, errNoGraphicalSession):
-		return nil, assistanceDenied(connect.CodePermissionDenied, "no_graphical_session")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "no_graphical_session")
 	case errors.Is(err, errAmbiguousGraphicalSession):
-		return nil, assistanceDenied(connect.CodePermissionDenied, "ambiguous_graphical_session")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "ambiguous_graphical_session")
 	case errors.Is(err, errLogindUnavailable):
-		return nil, assistanceDenied(connect.CodeUnavailable, "logind_unavailable")
+		return nil, rpcreason.Error(connect.CodeUnavailable, "logind_unavailable")
 	case err != nil:
 		return nil, mapError(err)
 	}
 	return noStore(response), nil
-}
-
-func assistanceDenied(code connect.Code, reason string) error {
-	out := connect.NewError(code, errors.New(reason))
-	out.Meta().Set("Lindm-Reason", reason)
-	return out
 }

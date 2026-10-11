@@ -11,6 +11,7 @@ import (
 	"runtime"
 
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 const updateInitialVersion = "0.1.0"
@@ -31,7 +32,7 @@ type updatePackageFixture struct {
 	fingerprint  string
 }
 
-func buildUpdatePackages(ctx context.Context, repository, work, distribution, architecture string) (*updatePackageFixture, error) {
+func buildUpdatePackages(ctx context.Context, repository, work string, release *platform.Release, architecture string) (*updatePackageFixture, error) {
 	var target string
 	switch architecture {
 	case "amd64", "x86_64":
@@ -41,15 +42,15 @@ func buildUpdatePackages(ctx context.Context, repository, work, distribution, ar
 	default:
 		return nil, errors.New("update lane requires a supported guest architecture")
 	}
-	format := packaging.FormatDEB
-	if distribution == "fedora" {
-		format = packaging.FormatRPM
-	} else if distribution != "ubuntu" {
-		return nil, errors.New("update lane requires Ubuntu or Fedora")
+	format, err := NativePackageFormat(release)
+	if err != nil {
+		return nil, err
+	}
+	if format != packaging.FormatDEB && format != packaging.FormatRPM {
+		return nil, errors.New("update lane requires DEB or RPM packages")
 	}
 	fixture := new(updatePackageFixture)
 	source := filepath.Join(work, "source")
-	var err error
 	fixture.sourceSHA256, err = snapshotServerSource(ctx, repository, source)
 	if err != nil {
 		return nil, err

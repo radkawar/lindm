@@ -22,6 +22,7 @@ import (
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/labexec"
 )
 
 // brokerUpstreamProxy is a real, uncached TLS transport to the upstream Admin API.
@@ -225,22 +226,13 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 	if err := options.register(origin); err != nil {
 		return nil, "", err
 	}
-	migration, cancel := context.WithTimeout(ctx, time.Minute)
-	cmd := exec.CommandContext(migration, binary, "migrate", "-config", f.configPath())
-	cmd.Stdout, cmd.Stderr, cmd.WaitDelay = f.log, f.log, 5*time.Second
-	err = cmd.Run()
-	cancel()
+	err = labexec.Run(ctx, labexec.Command{Path: binary, Args: []string{"migrate", "-config", f.configPath()}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute})
 	if err != nil {
 		return nil, "", errors.New("migrate isolated broker database failed")
 	}
 	if len(options.bootstrap) != 0 {
-		bootstrap, stop := context.WithTimeout(ctx, time.Minute)
 		args := append([]string{"bootstrap-owner", "-config", f.configPath()}, options.bootstrap...)
-		command := exec.CommandContext(bootstrap, binary, args...)
-		command.Stdout, command.Stderr, command.WaitDelay = f.log, f.log, 5*time.Second
-		command.Env = options.environment
-		err = command.Run()
-		stop()
+		err = labexec.Run(ctx, labexec.Command{Path: binary, Args: args, Env: options.environment, Stdout: f.log, Stderr: f.log, Timeout: time.Minute})
 		if err != nil {
 			secrets := []string{dsn.String()}
 			for _, secret := range options.secrets {
@@ -254,7 +246,7 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 	if err != nil {
 		return nil, "", err
 	}
-	cmd = exec.Command(binary, "serve", "-config", f.configPath())
+	cmd := exec.Command(binary, "serve", "-config", f.configPath())
 	cmd.Stdout, cmd.Stderr = f.log, f.log
 	cmd.Env = options.environment
 	if err := cmd.Start(); err != nil {

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 const (
@@ -89,7 +90,7 @@ func finishOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, valida
 
 // progress, when non-nil, is marked after each complete source record.
 func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input io.ReaderAt, size int64, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
-	ecosystem, err := osvEcosystem(config)
+	product, err := vendorProduct(config, platform.FeedOSV)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +149,12 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 		var scope osvRecordScope
 		clear(pending.Advisories)
 		pending.Advisories = pending.Advisories[:0]
-		ok, recordErr := appendScopedOSV(&pending, config, ecosystem, raw, &scope, validator)
+		ok, recordErr := appendScopedOSV(&pending, config, product, raw, &scope, validator)
 		if recordErr != nil {
 			// A source record is atomic: retain none of its partially decoded claims.
 			clear(pending.Advisories)
 			pending.Advisories = pending.Advisories[:0]
-			if err := rejectOSVRecord(doc, &pending, config, ecosystem, file.Name, &scope, recordErr, validator, &rejectedBytes); err != nil {
+			if err := rejectOSVRecord(doc, &pending, config, product, file.Name, &scope, recordErr, validator, &rejectedBytes); err != nil {
 				return nil, err
 			}
 		}
@@ -198,8 +199,10 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 	if err != nil {
 		return nil, err
 	}
-	vendor, _, _ := strings.Cut(ecosystem, ":")
-	doc.CompleteSnapshot = u.Host == "osv-vulnerabilities.storage.googleapis.com" && u.Path == "/"+vendor+"/all.zip" && u.RawQuery == "" && config.GetDistro() != "rocky"
+	// A complete vendor export is authoritative unless the registry records
+	// why its mappings still cannot establish a clean result.
+	vendor, _, _ := strings.Cut(product.Advisory.Ecosystem, ":")
+	doc.CompleteSnapshot = u.Host == "osv-vulnerabilities.storage.googleapis.com" && u.Path == "/"+vendor+"/all.zip" && u.RawQuery == "" && product.Advisory.Partial == ""
 	for _, rejected := range doc.RejectedRecords {
 		if rejected.Unscoped {
 			doc.CompleteSnapshot = false
@@ -222,7 +225,7 @@ type osvRecordScope struct {
 	} `json:"affected"`
 }
 
-func appendScopedOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecosystem string, raw []byte, scope *osvRecordScope, validator protovalidate.Validator) (bool, error) {
+func appendScopedOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, product *platform.Release, raw []byte, scope *osvRecordScope, validator protovalidate.Validator) (bool, error) {
 	if err := json.Unmarshal(raw, scope); err != nil {
 		return false, errors.New("feed: invalid OSV JSON")
 	}
@@ -243,7 +246,7 @@ func appendScopedOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource
 		if affected.Package.Ecosystem == "" {
 			return false, errors.New("feed: OSV missing ecosystem")
 		}
-		if affected.Package.Ecosystem == ecosystem {
+		if affected.Package.Ecosystem == product.Advisory.Ecosystem {
 			relevant = true
 		}
 	}
@@ -254,11 +257,11 @@ func appendScopedOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource
 	if err := json.Unmarshal(raw, &record); err != nil {
 		return true, errors.New("feed: invalid OSV record")
 	}
-	_, err := appendOSV(doc, config, ecosystem, &record, validator)
+	_, err := appendOSV(doc, config, product, &record, validator)
 	return true, err
 }
 
-func rejectOSVRecord(doc, pending *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecosystem, filename string, scope *osvRecordScope, recordErr error, validator protovalidate.Validator, rejectedBytes *int) error {
+func rejectOSVRecord(doc, pending *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, product *platform.Release, filename string, scope *osvRecordScope, recordErr error, validator protovalidate.Validator, rejectedBytes *int) error {
 	limit := uint32(1000)
 	if config.MaxRejectedRecords != nil {
 		limit = config.GetMaxRejectedRecords()
@@ -279,7 +282,7 @@ func rejectOSVRecord(doc, pending *advisoryv1.FeedDocument, config *advisoryv1.F
 		rejected.Reason = rejected.Reason[:512]
 	}
 	for _, affected := range scope.Affected {
-		if affected.Package.Ecosystem != "" && affected.Package.Ecosystem != ecosystem {
+		if affected.Package.Ecosystem != "" && affected.Package.Ecosystem != product.Advisory.Ecosystem {
 			continue
 		}
 		name := affected.Package.Name
@@ -317,7 +320,7 @@ func rejectOSVRecord(doc, pending *advisoryv1.FeedDocument, config *advisoryv1.F
 	for _, name := range rejected.PackageNames {
 		for _, source := range []bool{false, true} {
 			record := &advisoryv1.Advisory{Id: id, PackageName: name, SourcePackage: source, AssessmentUnknown: true, SourceRecordRejected: true, SourceUrl: config.GetUrl()}
-			if err := addRecord(pending, record, managerFor(config.GetDistro()), validator); err != nil {
+			if err := addRecord(pending, record, manager(product), validator); err != nil {
 				return err
 			}
 		}

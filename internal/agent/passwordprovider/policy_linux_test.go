@@ -220,7 +220,7 @@ func TestManagerEnablementDoesNotSelectOrForce(t *testing.T) {
 		calls = append(calls, append([]string{path}, args...))
 		return nil, nil
 	}
-	if err := changeManager(context.Background(), &resourcev1.PlatformProduct{OsId: "ubuntu"}, before, target, run); err != nil {
+	if err := changeManager(context.Background(), &resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, before, target, run); err != nil {
 		t.Fatal(err)
 	}
 	if len(calls) != 2 || strings.Join(calls[1], " ") != "/usr/sbin/pam-auth-update --enable lindm-faillock lindm-faillock-pre" {
@@ -228,7 +228,7 @@ func TestManagerEnablementDoesNotSelectOrForce(t *testing.T) {
 	}
 	interrupted := errors.New("interrupted")
 	run = func(context.Context, string, ...string) ([]byte, error) { return nil, interrupted }
-	if err := changeManager(context.Background(), &resourcev1.PlatformProduct{OsId: "fedora"}, before, target, run); !errors.Is(err, interrupted) {
+	if err := changeManager(context.Background(), &resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, before, target, run); !errors.Is(err, interrupted) {
 		t.Fatal(err)
 	}
 }

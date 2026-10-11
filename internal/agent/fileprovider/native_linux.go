@@ -13,15 +13,17 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
-// ExecuteNative is called only by the fixed root transient helper. It does not
+// ApplyNative is called only by the fixed root transient helper. It does not
 // open the live journal. The parent authenticates the protected request and nonce,
 // grants only filepath.Dir(plan.managed_file.desired.path) writable, and exchanges
 // its single-use permit through beforeEffect. A successful response is still
 // independently observed by the executor before journal completion.
-func ExecuteNative(ctx context.Context, config NativeConfig, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+	config := nativeConfig{Native: env.Config.GetFileProvider(), Platform: env.Platform, ExecutorIncarnation: env.ExecutorIncarnation, ProtectedPaths: env.ProtectedPaths}
 	if beforeEffect == nil || proto.Size(request) > 1<<20 {
 		return nil, ErrUnsupported
 	}

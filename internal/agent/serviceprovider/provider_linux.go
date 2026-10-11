@@ -33,6 +33,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
@@ -82,6 +83,8 @@ type Provider struct {
 	backend           *resourcev1.BackendSelection
 	ownershipRevision []byte
 }
+
+var _ resourceprovider.Provider = (*Provider)(nil)
 
 // Open connects only to the root-owned peer at the fixed local system bus socket.
 // ctx bounds dial, EXTERNAL authentication, Hello and subscription, not the
@@ -285,7 +288,11 @@ func (p *Provider) begin(ctx context.Context) (context.Context, func(), error) {
 	}, nil
 }
 
-func (p *Provider) Observe(ctx context.Context, unit string) (*resourcev1.ResourceObservation, error) {
+func (p *Provider) Observe(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	if desired.GetSystemdService() == nil {
+		return nil, fmt.Errorf("%w: non-systemd resource", ErrUnsupported)
+	}
+	unit := desired.GetSystemdService().GetUnit()
 	if err := validateUnit(unit); err != nil {
 		return nil, err
 	}

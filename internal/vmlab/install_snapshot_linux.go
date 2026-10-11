@@ -19,6 +19,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/statefs"
 )
@@ -194,20 +195,20 @@ func CheckInstallSnapshot(ctx context.Context, workDir string) (_ *InstallSnapsh
 	if err := snapshotAbsent(wanted); err != nil {
 		return nil, err
 	}
-	stdout, stderr := &limitedOutput{limit: 128 << 10}, &limitedOutput{limit: 32 << 10}
+	stdout, stderr := nativeexec.NewBuffer(128<<10), nativeexec.NewBuffer(32<<10)
 	command := exec.CommandContext(ctx, self, "native", "install-snapshot-child")
 	command.SysProcAttr = &syscall.SysProcAttr{Chroot: rootPath}
 	command.Dir, command.Env = "/", []string{"GOMAXPROCS=2"}
 	command.Stdout, command.Stderr = stdout, stderr
 	command.WaitDelay = time.Second
 	if err := runSnapshotCommand(command); err != nil {
-		return nil, fmt.Errorf("captured-root child: %w: %s", err, stderr.data)
+		return nil, fmt.Errorf("captured-root child: %w: %s", err, stderr.Bytes())
 	}
-	if stdout.exceeded || stderr.exceeded {
+	if stdout.Truncated() || stderr.Truncated() {
 		return nil, errors.New("captured-root child output exceeds limit")
 	}
 	var child snapshotChildEvidence
-	if err := json.Unmarshal(stdout.data, &child); err != nil {
+	if err := json.Unmarshal(stdout.Bytes(), &child); err != nil {
 		return nil, err
 	}
 	if child.State != "enabled" || child.UID != 0 || !child.ExecThreadCapabilitiesCleared {
@@ -313,7 +314,7 @@ func RunInstallSnapshotChild(ctx context.Context, output io.Writer) error {
 	if caps != [2]unix.CapUserData{} {
 		return errors.New("snapshot child retains capabilities")
 	}
-	diagnostics := &limitedOutput{limit: 32 << 10}
+	diagnostics := nativeexec.NewBuffer(32 << 10)
 	version, err := snapshotNative(ctx, input.UnitPaths, diagnostics, "--version")
 	if err != nil {
 		return err
@@ -331,25 +332,27 @@ func RunInstallSnapshotChild(ctx context.Context, output io.Writer) error {
 	if string(state) != "enabled\n" {
 		return fmt.Errorf("unexpected private native state %q", state)
 	}
-	return json.NewEncoder(output).Encode(snapshotChildEvidence{Version: strings.TrimSpace(string(version)), NativeStderr: string(diagnostics.data), EnableStdout: string(enabled), State: "enabled", UID: os.Getuid(), ExecThreadCapabilitiesCleared: true})
+	return json.NewEncoder(output).Encode(snapshotChildEvidence{Version: strings.TrimSpace(string(version)), NativeStderr: diagnostics.String(), EnableStdout: string(enabled), State: "enabled", UID: os.Getuid(), ExecThreadCapabilitiesCleared: true})
 }
 
-func snapshotNative(ctx context.Context, paths []string, diagnostics *limitedOutput, args ...string) ([]byte, error) {
+func snapshotNative(ctx context.Context, paths []string, diagnostics *nativeexec.Buffer, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, "/usr/bin/systemctl", args...)
 	command.Dir = "/"
 	command.Env = []string{"LC_ALL=C", "PATH=/usr/bin", "SYSTEMCTL_SKIP_SYSV=1", "SYSTEMD_LOG_TARGET=console", "SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat", "SYSTEMD_UNIT_PATH=" + strings.Join(paths, ":")}
-	stdout := &limitedOutput{limit: 64 << 10}
+	stdout := nativeexec.NewBuffer(64 << 10)
 	command.Stdout, command.Stderr = stdout, diagnostics
 	command.WaitDelay = time.Second
 	if err := runSnapshotCommand(command); err != nil {
-		return nil, fmt.Errorf("private native command: %w: %s: %s", err, stdout.data, diagnostics.data)
+		return nil, fmt.Errorf("private native command: %w: %s: %s", err, stdout.Bytes(), diagnostics.Bytes())
 	}
-	if stdout.exceeded || diagnostics.exceeded {
+	if stdout.Truncated() || diagnostics.Truncated() {
 		return nil, errors.New("private native command output exceeds limit")
 	}
-	return stdout.data, nil
+	return stdout.Bytes(), nil
 }
 
+// runSnapshotCommand is not labexec: a chroot or NNP child must be forked from
+// this locked, privilege-dropped thread, which also owns its Pdeathsig.
 func runSnapshotCommand(command *exec.Cmd) error {
 	// Linux parent-death signals belong to the creating thread. Keep it alive
 	// until Wait, so runtime thread retirement cannot kill a healthy child.

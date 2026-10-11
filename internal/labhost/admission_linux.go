@@ -96,7 +96,13 @@ func (m memoryAdmission) allows(guestBytes uint64) bool {
 
 // Serialize admission so lowering a configured limit also counts older slots
 // outside the new range. Never unlink those identities while holders may exist.
-func (s *Slots) tryAcquire(ctx context.Context) (_ *Lease, resultErr error) {
+// A lane's guests are admitted together or not at all: holding one slot while
+// waiting for another is a hold-and-wait deadlock once two multi-guest lanes
+// share a host. Memory admission covers the sum of the requested guests.
+func (s *Slots) tryAcquireN(ctx context.Context, guests uint32) (_ []*Lease, resultErr error) {
+	if guests == 0 || guests > s.capacity {
+		return nil, fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, s.capacity)
+	}
 	guard, err := s.openName(".admission.lock")
 	if err != nil {
 		return nil, err
@@ -107,34 +113,45 @@ func (s *Slots) tryAcquire(ctx context.Context) (_ *Lease, resultErr error) {
 		return nil, err
 	}
 	active, err := s.Count()
-	if err != nil || active >= s.capacity {
+	if err != nil || active > s.capacity-guests {
 		return nil, err
 	}
 	observation, err := s.memoryProbe(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("lab hosts: memory admission: %w", err)
 	}
-	guestBytes := uint64(s.memoryMib) << 20
+	guestBytes := uint64(guests) * (uint64(s.memoryMib) << 20)
 	if !observation.allows(guestBytes) {
 		return nil, nil
 	}
 	observation.GuestMemoryBytes, observation.HeadroomBytes = guestBytes, memoryHeadroomBytes
+	data, err := json.Marshal(observation)
+	if err != nil {
+		return nil, err
+	}
+	leases := make([]*Lease, 0, guests)
+	release := func(err error) ([]*Lease, error) {
+		for _, lease := range leases {
+			err = errors.Join(err, lease.Close())
+		}
+		return nil, err
+	}
 	for index := range s.capacity {
+		if uint32(len(leases)) == guests {
+			break
+		}
 		file, err := s.open(index)
 		if err != nil {
-			return nil, err
+			return release(err)
 		}
 		locked, lockErr := lockSlot(file)
 		if lockErr != nil || !locked {
 			if err := errors.Join(lockErr, file.Close()); err != nil {
-				return nil, err
+				return release(err)
 			}
 			continue
 		}
-		data, err := json.Marshal(observation)
-		if err == nil {
-			_, err = file.WriteAt(append(data, '\n'), 0)
-		}
+		_, err = file.WriteAt(append(data, '\n'), 0)
 		if err == nil {
 			err = file.Truncate(int64(len(data) + 1))
 		}
@@ -142,11 +159,15 @@ func (s *Slots) tryAcquire(ctx context.Context) (_ *Lease, resultErr error) {
 			err = file.Sync()
 		}
 		if err != nil {
-			return nil, errors.Join(err, file.Close())
+			return release(errors.Join(err, file.Close()))
 		}
-		return &Lease{file: file}, nil
+		leases = append(leases, &Lease{file: file})
 	}
-	return nil, nil
+	if uint32(len(leases)) != guests {
+		// Retired slots beyond a reduced limit can hold capacity; never admit part.
+		return release(nil)
+	}
+	return leases, nil
 }
 
 func (s *Slots) indices() ([]uint32, error) {

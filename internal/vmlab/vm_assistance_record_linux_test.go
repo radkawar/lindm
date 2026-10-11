@@ -137,3 +137,23 @@ func TestAssistanceEvidenceRejectsUnsafeNames(t *testing.T) {
 		t.Fatal("group-readable evidence directory accepted")
 	}
 }
+
+func TestSelectAssistanceScenariosKeepsLaneOrder(t *testing.T) {
+	all, err := selectAssistanceScenarios(nil)
+	if err != nil || len(all) != len(assistanceScenarios) {
+		t.Fatalf("nil selection = %d scenarios, %v", len(all), err)
+	}
+	none, err := selectAssistanceScenarios([]string{})
+	if err != nil || len(none) != 0 {
+		t.Fatalf("empty selection = %d scenarios, %v", len(none), err)
+	}
+	picked, err := selectAssistanceScenarios([]string{"lock", "decline"})
+	if err != nil || len(picked) != 2 || picked[0].name != "decline" || picked[1].name != "lock" {
+		t.Fatalf("subset = %+v, %v", picked, err)
+	}
+	for _, bad := range [][]string{{"decline", "decline"}, {"unknown"}, {""}} {
+		if _, err := selectAssistanceScenarios(bad); err == nil {
+			t.Errorf("selection %q accepted", bad)
+		}
+	}
+}

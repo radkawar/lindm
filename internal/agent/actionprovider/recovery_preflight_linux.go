@@ -147,7 +147,7 @@ func (p *Provider) recoveryOffTargetState(target blockNode) (bool, error) {
 	if path == "" {
 		return false, nil
 	}
-	if err := protectedDirectory(path); err != nil {
+	if err := privateStateDirectory(path); err != nil {
 		return false, err
 	}
 	var filesystem unix.Statfs_t

@@ -19,6 +19,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
@@ -216,7 +217,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 				return err
 			}
 			if count >= 256 {
-				return rpcError(connect.CodeResourceExhausted, "search_cursor_capacity")
+				return rpcreason.Error(connect.CodeResourceExhausted, "search_cursor_capacity")
 			}
 			cursor.ID = uuid.New()
 			if err := q.InsertDeviceSearchCursor(ctx, devicedb.InsertDeviceSearchCursorParams{ID: cursor.ID, ActorID: actor.ID, FilterDigest: digest, UpperEnrolledAt: cursor.UpperEnrolledAt, ExpiresAt: cursor.ExpiresAt}); err != nil {

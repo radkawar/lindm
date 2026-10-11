@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"lindm/internal/vmlab"
 )
@@ -35,11 +38,22 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&options.Encrypted.Firmware.Version, "firmware-version", "", "exact required firmware package version")
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
+	scenarios := flags.String("scenarios", "", "comma-separated subset of control,view,decline,portal-cancel,lock; -hold defaults to none")
+	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 || *manifestPath == "" || options.LabBinary == "" || options.LindmdBinary == "" || *evidence == "" {
 		return errors.New("vm assistance requires -manifest, -lab, -lindmd and -evidence NEW_DIRECTORY; no positional arguments")
+	}
+	if *scenarios != "" && !*hold {
+		return errors.New("vm assistance -scenarios requires -hold; a qualification record always runs every scenario")
+	}
+	if *hold {
+		options.Scenarios = []string{}
+		if *scenarios != "" {
+			options.Scenarios = strings.Split(*scenarios, ",")
+		}
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {
@@ -60,6 +74,11 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	options.Encrypted.Desktop = "gnome"
 	options.Encrypted.TPMBoot = true
 	options.Encrypted.Hardware = hardware
+	if *hold {
+		options.Hold = func(access *vmlab.AssistanceHold) error { return writeAssistanceHold(stdout, *evidence, access) }
+		_, err := vmlab.AssistanceVM(ctx, manifest, options)
+		return err
+	}
 	result, laneErr := vmlab.AssistanceVM(ctx, manifest, options)
 	if result == nil {
 		return laneErr
@@ -69,4 +88,26 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		return errors.Join(laneErr, err)
 	}
 	return errors.Join(laneErr, os.Chmod(record, 0o400))
+}
+
+// writeAssistanceHold puts the owner's secrets only in a new 0400 file inside
+// the private evidence directory; stdout (often a service log) gets the rest.
+func writeAssistanceHold(stdout io.Writer, dir string, access *vmlab.AssistanceHold) error {
+	path := filepath.Join(dir, "owner-access")
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "Enrollment URL: %s/enroll\nUsername: %s\nEnrollment secret (one-time): %s\nExpires at: %s\nGuest desktop user: %s\nGuest desktop password: %s\n", access.ConsoleOrigin, access.Username, access.EnrollmentSecret, access.ExpiresAt.Format(time.RFC3339), access.DesktopUser, access.DesktopPassword)
+	if err = errors.Join(err, file.Close()); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, `Remote-assistance demo is running; Ctrl-C stops lindmd and the VM and removes their state.
+Console: %s (trust .cache/dev/transport-ca.crt in a dedicated browser profile)
+Owner enrollment: %s/enroll as %s, expires %s; the one-time secret is in %s
+Device: %s (%s), GNOME Wayland, GDM autologin as %s; its password is in the same file
+Guest display (TigerVNC >= 1.11, Unix socket, no TCP listener): vncviewer %s
+Request assistance from the device page; consent is the guest user's own Allow/Decline.
+`, access.ConsoleOrigin, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket)
+	return err
 }

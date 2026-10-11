@@ -10,7 +10,15 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/ssh"
+
+	"lindm/internal/platform"
 )
+
+// labMedia is the cloud-installer media of an os-release ID's encrypted lab
+// release.
+func labMedia(distribution string) encryptedMedia {
+	return encryptedMedia{release: platform.ForManifest(distribution, map[string]string{"ubuntu": "24.04", "fedora": "44"}[distribution])}
+}
 
 func encryptedInstallerTestKeys(t *testing.T) (string, string, string) {
 	t.Helper()
@@ -34,7 +42,7 @@ func encryptedInstallerTestKeys(t *testing.T) (string, string, string) {
 func TestEncryptedUbuntuRecipe(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	passphrase := `quotes'"; $(touch /must-not-exist) # : [] {}`
-	recipe, err := encryptedInstallerRecipe("ubuntu", passphrase, login, private, public)
+	recipe, err := encryptedInstallerRecipe(labMedia("ubuntu"), passphrase, login, private, public)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +110,7 @@ func TestEncryptedUbuntuRecipe(t *testing.T) {
 func TestEncryptedFedoraRecipe(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, passphrase := range []string{"lab-passphrase", `quote'"; $(exit 99) # --nohome`, `spaces and \\ backslashes`} {
-		recipe, err := encryptedInstallerRecipe("fedora", passphrase, login, private, public)
+		recipe, err := encryptedInstallerRecipe(labMedia("fedora"), passphrase, login, private, public)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +168,7 @@ func TestEncryptedRecipeRejectsInjectionAndMismatchedKeys(t *testing.T) {
 			{"secret", login, private, login},
 			{"secret", login, "sensitive-invalid-private-key", public},
 		} {
-			_, err := encryptedInstallerRecipe(distribution, tc.pass, tc.login, tc.private, tc.public)
+			_, err := encryptedInstallerRecipe(labMedia(distribution), tc.pass, tc.login, tc.private, tc.public)
 			if err == nil {
 				t.Fatal("unsafe installer input was accepted")
 			}
@@ -174,7 +182,7 @@ func TestEncryptedRecipeRejectsInjectionAndMismatchedKeys(t *testing.T) {
 func TestEncryptedInstallerGRUBPreservesVendorBootPayload(t *testing.T) {
 	for _, distribution := range []string{"ubuntu", "fedora"} {
 		input := []byte("set default=1\nset timeout=60\nmenuentry 'vendor installer' {\n linuxefi /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Fedora-Server quiet rhgb rd.live.check ---\n initrdefi /images/pxeboot/initrd.img\n}\n")
-		got, err := encryptedInstallerGRUB(input, distribution)
+		got, err := encryptedInstallerGRUB(input, labMedia(distribution).release.Lab.Installer)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +204,7 @@ func TestEncryptedInstallerGRUBPreservesVendorBootPayload(t *testing.T) {
 			t.Fatal("kickstart kernel input is missing")
 		}
 	}
-	if _, err := encryptedInstallerGRUB([]byte("menuentry 'no kernel' {}"), "ubuntu"); err == nil {
+	if _, err := encryptedInstallerGRUB([]byte("menuentry 'no kernel' {}"), platform.Subiquity); err == nil {
 		t.Fatal("accepted an unpatchable vendor boot configuration")
 	}
 }
@@ -215,7 +223,7 @@ func TestEncryptedInstallerEFIOffset(t *testing.T) {
 }
 
 func TestEncryptedInstallerManifests(t *testing.T) {
-	for _, filename := range []string{"ubuntu-noble-encrypted-amd64.json", "fedora-44-encrypted-x86_64.json", "ubuntu-noble-encrypted-arm64.json", "fedora-44-encrypted-aarch64.json"} {
+	for _, filename := range []string{"ubuntu-noble-encrypted-amd64.json", "fedora-44-encrypted-x86_64.json", "ubuntu-noble-encrypted-arm64.json", "fedora-44-encrypted-aarch64.json", "ubuntu-resolute-desktop-encrypted-amd64.json"} {
 		manifest, err := LoadManifest("../../lab/images/" + filename)
 		if err != nil {
 			t.Fatal(err)
@@ -226,12 +234,82 @@ func TestEncryptedInstallerManifests(t *testing.T) {
 	}
 }
 
+func TestEncryptedInstallerDesktopMediaRecipe(t *testing.T) {
+	var desktopMedia encryptedMedia
+	for filename, want := range map[string]struct {
+		key     string
+		desktop bool
+	}{"ubuntu-resolute-desktop-encrypted-amd64.json": {"ubuntu-26.04", true}, "ubuntu-noble-encrypted-amd64.json": {"ubuntu-24.04", false}, "fedora-44-encrypted-x86_64.json": {"fedora-44", false}} {
+		manifest, err := LoadManifest("../../lab/images/" + filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := encryptedInstallerMedia(manifest)
+		if got.release.Key != want.key || got.desktop != want.desktop {
+			t.Fatalf("%s selects installer media %s desktop=%v, want %s desktop=%v", filename, got.release.Key, got.desktop, want.key, want.desktop)
+		}
+		if got.desktop {
+			desktopMedia = got
+		}
+	}
+	login, private, public := encryptedInstallerTestKeys(t)
+	for _, desktop := range []string{"", "kde"} {
+		if _, err := encryptedInstallerRecipeWithDesktop(desktopMedia, "lab-passphrase", login, private, public, desktop); err == nil {
+			t.Fatalf("desktop media accepted desktop %q instead of their own GNOME", desktop)
+		}
+	}
+	for _, tpmBoot := range []bool{false, true} {
+		recipe, err := encryptedInstallerRecipeWithOptions(desktopMedia, "lab-passphrase", login, private, public, "gnome", tpmBoot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var config struct {
+			Autoinstall map[string]json.RawMessage `json:"autoinstall"`
+		}
+		if err := json.Unmarshal(bytes.TrimPrefix(recipe, []byte("#cloud-config\n")), &config); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := config.Autoinstall["packages"]; ok {
+			t.Fatal("desktop media install packages over the network instead of their own source")
+		}
+		if string(config.Autoinstall["source"]) != `{"id":"ubuntu-desktop-minimal"}` {
+			t.Fatalf("desktop media source = %s", config.Autoinstall["source"])
+		}
+		var commands [][]string
+		if err := json.Unmarshal(config.Autoinstall["late-commands"], &commands); err != nil || len(commands) != 1 || len(commands[0]) != 8 {
+			t.Fatal("missing installed-root provisioning")
+		}
+		script := commands[0][7]
+		for _, required := range []string{"/etc/gdm3/custom.conf", "Session=ubuntu", "systemctl enable --force gdm3.service", "update-grub"} {
+			if !strings.Contains(script, required) {
+				t.Errorf("desktop media provisioning lacks %q", required)
+			}
+		}
+		// Resolute's default initramfs is dracut: initramfs-tools packages
+		// would remove it, and the TPM path must not replace packages.
+		for _, forbidden := range []string{"cryptsetup-initramfs", "apt-get", "update-initramfs", "lab-passphrase"} {
+			if strings.Contains(script, forbidden) {
+				t.Errorf("desktop media provisioning contains %q", forbidden)
+			}
+		}
+		tpm := strings.Contains(script, "systemd crypt tpm2-tss lvm systemd-cryptsetup") && strings.Contains(script, "tpm2-device=auto") && strings.Contains(script, `dracut --force "/boot/initrd.img-$kernel" "$kernel"`)
+		if tpm != tpmBoot || (!tpmBoot && strings.Contains(script, "dracut")) {
+			t.Fatalf("TPM-capable dracut configuration = %v, want %v", tpm, tpmBoot)
+		}
+		cmd := exec.Command("/bin/sh", "-n")
+		cmd.Stdin = strings.NewReader(script)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("invalid desktop media provisioning syntax: %v: %s", err, out)
+		}
+	}
+}
+
 func TestEncryptedInstallerDesktopRecipes(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, distribution := range []string{"ubuntu", "fedora"} {
 		for _, desktop := range []string{"gnome", "kde"} {
 			t.Run(distribution+"/"+desktop, func(t *testing.T) {
-				recipe, err := encryptedInstallerRecipeWithDesktop(distribution, "lab-passphrase", login, private, public, desktop)
+				recipe, err := encryptedInstallerRecipeWithDesktop(labMedia(distribution), "lab-passphrase", login, private, public, desktop)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -300,15 +378,15 @@ func TestEncryptedInstallerDesktopRecipes(t *testing.T) {
 				}
 			})
 		}
-		plain, err := encryptedInstallerRecipe(distribution, "lab-passphrase", login, private, public)
+		plain, err := encryptedInstallerRecipe(labMedia(distribution), "lab-passphrase", login, private, public)
 		if err != nil {
 			t.Fatal(err)
 		}
-		desktop, err := encryptedInstallerRecipeWithDesktop(distribution, "lab-passphrase", login, private, public, "")
+		desktop, err := encryptedInstallerRecipeWithDesktop(labMedia(distribution), "lab-passphrase", login, private, public, "")
 		if err != nil || !bytes.Equal(plain, desktop) {
 			t.Fatal("empty desktop changes the headless installer contract")
 		}
-		if _, err := encryptedInstallerRecipeWithDesktop(distribution, "lab-passphrase", login, private, public, "gnome\n%post"); err == nil {
+		if _, err := encryptedInstallerRecipeWithDesktop(labMedia(distribution), "lab-passphrase", login, private, public, "gnome\n%post"); err == nil {
 			t.Fatal("accepted desktop command injection")
 		}
 	}
@@ -319,7 +397,7 @@ func TestEncryptedInstallerTPMBootRecipes(t *testing.T) {
 	for _, distribution := range []string{"ubuntu", "fedora"} {
 		for _, desktop := range []string{"", "gnome", "kde"} {
 			t.Run(distribution+"/"+desktop, func(t *testing.T) {
-				recipe, err := encryptedInstallerRecipeWithOptions(distribution, "lab-passphrase", login, private, public, desktop, true)
+				recipe, err := encryptedInstallerRecipeWithOptions(labMedia(distribution), "lab-passphrase", login, private, public, desktop, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -384,11 +462,11 @@ func TestEncryptedInstallerTPMBootRecipes(t *testing.T) {
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Fatalf("invalid TPM provisioning syntax: %v: %s", err, out)
 				}
-				stock, err := encryptedInstallerRecipeWithDesktop(distribution, "lab-passphrase", login, private, public, desktop)
+				stock, err := encryptedInstallerRecipeWithDesktop(labMedia(distribution), "lab-passphrase", login, private, public, desktop)
 				if err != nil {
 					t.Fatal(err)
 				}
-				disabled, err := encryptedInstallerRecipeWithOptions(distribution, "lab-passphrase", login, private, public, desktop, false)
+				disabled, err := encryptedInstallerRecipeWithOptions(labMedia(distribution), "lab-passphrase", login, private, public, desktop, false)
 				if err != nil || !bytes.Equal(stock, disabled) {
 					t.Fatal("disabled TPM bootstrap changes the existing installer")
 				}
@@ -435,7 +513,7 @@ func TestEncryptedInstallerARMRecipes(t *testing.T) {
 	for _, distribution := range []string{"ubuntu", "fedora"} {
 		for _, desktop := range []string{"", "gnome", "kde"} {
 			for _, tpmBoot := range []bool{false, true} {
-				recipe, err := encryptedInstallerRecipeForMachine(distribution, passphrase, login, private, public, desktop, tpmBoot, "aarch64")
+				recipe, err := encryptedInstallerRecipeForMachine(labMedia(distribution), passphrase, login, private, public, desktop, tpmBoot, "aarch64")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -491,22 +569,22 @@ func TestEncryptedInstallerARMRecipes(t *testing.T) {
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Fatalf("invalid ARM provisioning syntax: %v: %s", err, out)
 				}
-				alias, err := encryptedInstallerRecipeForMachine(distribution, passphrase, login, private, public, desktop, tpmBoot, "arm64")
+				alias, err := encryptedInstallerRecipeForMachine(labMedia(distribution), passphrase, login, private, public, desktop, tpmBoot, "arm64")
 				if err != nil || !bytes.Equal(recipe, alias) {
 					t.Fatal("arm64 and aarch64 select different guest machines")
 				}
 			}
 		}
-		legacy, err := encryptedInstallerRecipeWithOptions(distribution, passphrase, login, private, public, "", false)
+		legacy, err := encryptedInstallerRecipeWithOptions(labMedia(distribution), passphrase, login, private, public, "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		amd64, err := encryptedInstallerRecipeForMachine(distribution, passphrase, login, private, public, "", false, "amd64")
+		amd64, err := encryptedInstallerRecipeForMachine(labMedia(distribution), passphrase, login, private, public, "", false, "amd64")
 		if err != nil || !bytes.Equal(legacy, amd64) {
 			t.Fatal("existing x86 helper changed machine behavior")
 		}
 	}
-	if _, err := encryptedInstallerRecipeForMachine("ubuntu", passphrase, login, private, public, "", false, "arm64;bad"); err == nil {
+	if _, err := encryptedInstallerRecipeForMachine(labMedia("ubuntu"), passphrase, login, private, public, "", false, "arm64;bad"); err == nil {
 		t.Fatal("accepted architecture injection")
 	}
 }
@@ -514,7 +592,7 @@ func TestEncryptedInstallerARMRecipes(t *testing.T) {
 func TestEncryptedInstallerARMGRUB(t *testing.T) {
 	original := []byte("serial --unit=0 --speed=115200\nterminal_input console serial\nterminal_output gfxterm\nmenuentry 'vendor' {\nlinux /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Fedora console=ttyS0,115200n8 quiet\ninitrd /images/pxeboot/initrd.img\n}\n")
 	for _, distribution := range []string{"ubuntu", "fedora"} {
-		result, err := encryptedInstallerGRUBForMachine(original, distribution, "aarch64")
+		result, err := encryptedInstallerGRUBForMachine(original, labMedia(distribution).release.Lab.Installer, "aarch64")
 		if err != nil {
 			t.Fatal(err)
 		}

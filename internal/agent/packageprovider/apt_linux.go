@@ -14,7 +14,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+
+	"lindm/internal/custody"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 
@@ -34,7 +37,7 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	if apt == nil {
 		return nil, ErrUnsupported
 	}
-	keyring, err := protectedFile(source.GetSigningKeyFile(), 1<<20)
+	keyring, err := custody.ReadRoot(source.GetSigningKeyFile(), 1<<20, false)
 	if err != nil {
 		return nil, err
 	}
@@ -73,16 +76,16 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	if err != nil {
 		return nil, err
 	}
+	verifier, err := p.nativeAPTVerifier(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var signers [][]byte
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), "_InRelease") {
 			continue
 		}
-		result, err := p.run(ctx, "/usr/bin/gpgv", []string{"--status-fd=1", "--keyring", keyPath, filepath.Join(directory, "lists", entry.Name())}, "/", nil)
-		if err != nil {
-			return nil, err
-		}
-		fingerprints, err := validSigners(result.stdout)
+		fingerprints, err := p.inReleaseSigners(ctx, verifier, keyPath, filepath.Join(directory, "lists", entry.Name()), filepath.Join(directory, "sqv-"+entry.Name()))
 		if err != nil {
 			return nil, err
 		}
@@ -98,6 +101,94 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	return &resourcev1.RepositorySnapshot{Repository: sourceRef(source), MetadataSha256: metadata, SignerSha256: signers}, nil
 }
 
+// aptVerifier is the OpenPGP verifier the device's own APT uses for InRelease.
+type aptVerifier int
+
+const (
+	aptVerifierGPGV aptVerifier = iota
+	aptVerifierSQV
+)
+
+const sqvPath = "/usr/bin/sqv"
+
+// selectAPTVerifier follows the native APT generation, not the distribution
+// name: APT 3 verifies with sqv when it is installed (Debian 13 no longer
+// installs gpgv beside it); older APT always uses gpgv. This provider's APT
+// configuration excludes host overrides of the verifier command.
+func selectAPTVerifier(aptVersion string, sqvInstalled bool) (aptVerifier, error) {
+	fields := strings.Fields(aptVersion)
+	if len(fields) < 2 || fields[0] != "apt" {
+		return 0, fmt.Errorf("%w: unrecognized APT version", ErrUnsupported)
+	}
+	text, _, _ := strings.Cut(fields[1], ".")
+	major, err := strconv.Atoi(text)
+	if err != nil || major < 1 {
+		return 0, fmt.Errorf("%w: unrecognized APT version", ErrUnsupported)
+	}
+	if major >= 3 && sqvInstalled {
+		return aptVerifierSQV, nil
+	}
+	return aptVerifierGPGV, nil
+}
+
+func (p *Provider) nativeAPTVerifier(ctx context.Context) (aptVerifier, error) {
+	result, err := p.run(ctx, "/usr/bin/apt-get", []string{"--version"}, "/", nil)
+	if err != nil {
+		return 0, err
+	}
+	version, _, _ := strings.Cut(strings.TrimSpace(string(result.stdout)), "\n")
+	info, err := os.Lstat(sqvPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return 0, err
+	}
+	return selectAPTVerifier(version, err == nil && info.Mode().IsRegular())
+}
+
+// inReleaseSigners independently verifies one fetched InRelease against the
+// approved keyring with the selected native verifier. Both verifiers bind the
+// signing certificate's primary fingerprint, so a subkey-signed repository
+// has one identity whichever APT generation fetched it.
+func (p *Provider) inReleaseSigners(ctx context.Context, verifier aptVerifier, keyPath, inRelease, output string) ([][]byte, error) {
+	if verifier == aptVerifierSQV {
+		// sqv writes the authenticated text only to a new private file.
+		if err := os.Remove(output); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		result, err := p.run(ctx, sqvPath, []string{"--keyring", keyPath, "--cleartext", "--output", output, inRelease}, "/", nil)
+		removeErr := os.Remove(output)
+		if err != nil {
+			return nil, err
+		}
+		if removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return nil, removeErr
+		}
+		return sqvSigners(result.stdout)
+	}
+	result, err := p.run(ctx, "/usr/bin/gpgv", []string{"--status-fd=1", "--keyring", keyPath, inRelease}, "/", nil)
+	if err != nil {
+		return nil, err
+	}
+	return validSigners(result.stdout)
+}
+
+func signerDigest(fingerprint string) ([]byte, error) {
+	decoded, err := hex.DecodeString(fingerprint)
+	if err != nil || (len(decoded) != 20 && len(decoded) != 32) {
+		return nil, errors.New("packageprovider: invalid signer fingerprint")
+	}
+	digest := sha256.Sum256(decoded)
+	return digest[:], nil
+}
+
+func appendSigner(signers [][]byte, digest []byte) [][]byte {
+	if slices.ContainsFunc(signers, func(other []byte) bool { return bytes.Equal(other, digest) }) {
+		return signers
+	}
+	return append(signers, digest)
+}
+
+// validSigners reads gpgv's status lines. VALIDSIG's last field is the
+// primary key fingerprint; its first is the signing (sub)key's.
 func validSigners(status []byte) ([][]byte, error) {
 	var signers [][]byte
 	for line := range strings.SplitSeq(string(status), "\n") {
@@ -109,18 +200,32 @@ func validSigners(status []byte) ([][]byte, error) {
 		case "BADSIG", "ERRSIG", "EXPSIG", "EXPKEYSIG", "REVKEYSIG", "NO_PUBKEY":
 			return nil, errors.New("packageprovider: untrusted repository signature")
 		case "VALIDSIG":
-			if len(f) < 11 {
+			if len(f) != 12 {
 				return nil, errors.New("packageprovider: incomplete signature status")
 			}
-			fingerprint, err := hex.DecodeString(f[2])
-			if err != nil || len(fingerprint) < 20 {
-				return nil, errors.New("packageprovider: invalid signer fingerprint")
+			digest, err := signerDigest(f[11])
+			if err != nil {
+				return nil, err
 			}
-			digest := sha256.Sum256(fingerprint)
-			if !slices.ContainsFunc(signers, func(other []byte) bool { return bytes.Equal(other, digest[:]) }) {
-				signers = append(signers, digest[:])
-			}
+			signers = appendSigner(signers, digest)
 		}
+	}
+	if len(signers) == 0 {
+		return nil, errors.New("packageprovider: signature did not identify its signer")
+	}
+	return signers, nil
+}
+
+// sqvSigners reads sqv's stdout: one certificate fingerprint per good
+// signature, nothing else.
+func sqvSigners(stdout []byte) ([][]byte, error) {
+	var signers [][]byte
+	for line := range strings.SplitSeq(strings.TrimSuffix(string(stdout), "\n"), "\n") {
+		digest, err := signerDigest(line)
+		if err != nil {
+			return nil, err
+		}
+		signers = appendSigner(signers, digest)
 	}
 	if len(signers) == 0 {
 		return nil, errors.New("packageprovider: signature did not identify its signer")

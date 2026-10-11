@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 func TestPlatformCanonicalEvidence(t *testing.T) {
@@ -151,12 +151,7 @@ with tempfile.TemporaryDirectory(prefix="lindm-config-reader-") as root:
 `
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-I", "-c", script)
-	cmd.Stdin = strings.NewReader(dnfConfigProbe)
-	cmd.Env = []string{"LANG=C", "LC_ALL=C", "HOME=/", "PATH=/usr/bin:/bin"}
-	cmd.Dir = "/"
-	cmd.WaitDelay = time.Second
-	status := runCommand(ctx, cmd, func(reader io.Reader) inventoryv1.CollectionStatus {
+	status := runCommand(ctx, nativeexec.Command{Path: "/usr/bin/python3", Args: []string{"-I", "-c", script}, Stdin: []byte(dnfConfigProbe), Env: []string{"HOME=/"}}, func(reader io.Reader) inventoryv1.CollectionStatus {
 		data, err := io.ReadAll(io.LimitReader(reader, 1025))
 		if err != nil || len(data) != 0 {
 			return invalid

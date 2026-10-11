@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 type autoyastProfile struct {
@@ -182,7 +183,7 @@ func TestTumbleweedInstallerManifestPinsSnapshotDVD(t *testing.T) {
 		t.Fatal(err)
 	}
 	spec, err := installerImageFor(manifest)
-	if err != nil || spec == nil || spec.media != "opensuse-tumbleweed" || spec.cache != "tumbleweed-installed" {
+	if err != nil || spec == nil || spec.installer != platform.AutoYaST || spec.cache != "tumbleweed-installed" {
 		t.Fatalf("snapshot DVD is not installer-built: %+v, %v", spec, err)
 	}
 	if manifest.GetImageSizeBytes() < 1<<30 || manifest.GetSignerProvenanceUrl() == "" || manifest.GetReleaseProvenanceUrl() == "" {
@@ -291,7 +292,7 @@ menuentry 'Upgrade' --class opensuse {
 
 func TestTumbleweedGRUBSelectsUnattendedInstallation(t *testing.T) {
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		patched, err := encryptedInstallerGRUBForMachine([]byte(tumbleweedVendorGRUB), "opensuse-tumbleweed", arch)
+		patched, err := encryptedInstallerGRUBForMachine([]byte(tumbleweedVendorGRUB), platform.AutoYaST, arch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -392,7 +393,7 @@ func TestTumbleweedRemasterPatchesEFIImageGRUB(t *testing.T) {
 	if err := os.Mkdir(stage, 0700); err != nil {
 		t.Fatal(err)
 	}
-	output, err := prepareInstallerFileForMachine(t.Context(), stage, input, "opensuse-tumbleweed", []byte("<profile/>"), "aarch64")
+	output, err := prepareInstallerFileForMachine(t.Context(), stage, input, platform.AutoYaST, []byte("<profile/>"), "aarch64")
 	if err != nil {
 		t.Fatal(err)
 	}

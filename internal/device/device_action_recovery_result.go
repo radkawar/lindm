@@ -17,6 +17,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Request[recoveryv1.CheckpointRecoveryActionRequest]) (*connect.Response[recoveryv1.CheckpointRecoveryActionResponse], error) {
@@ -26,7 +27,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 		return nil, invalid("invalid_recovery_checkpoint")
 	}
 	if s.execution == nil || s.signing == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	admission, err := s.authenticateRecovery(ctx, req.Msg.GetCredentialEnvelope(), req.Msg.GetRequestProof(), agentv1.RecoveryOperation_RECOVERY_OPERATION_CHECKPOINT, recoveryCheckpointPayload(req.Msg))
 	if err != nil {
@@ -35,7 +36,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 	checkpoint := req.Msg.GetCheckpoint()
 	effect := checkpoint.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED
 	if checkpoint.GetCredentialId() != admission.row.CredentialID.String() || checkpoint.GetActionId() != admission.row.ActionID.String() || checkpoint.GetBootId() != admission.proof.GetBootId() || checkpoint.GetExecutorIncarnation() != admission.proof.GetExecutorIncarnation() {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_checkpoint_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_checkpoint_binding_rejected")
 	}
 	// The durable effect gate rechecks both humans again, even if a granted
 	// challenge was revoked during its short network round trip.
@@ -87,7 +88,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 	}
 	if bytes.Equal(digest, row.CheckpointSha256) && int64(checkpoint.GetSequence()) == row.CheckpointSequence {
 		if !bytes.Equal(journalDocument, row.JournalDocument) {
-			return nil, rpcError(connect.CodeAlreadyExists, "recovery_journal_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_journal_conflict")
 		}
 		response = &recoveryv1.CheckpointRecoveryActionResponse{CheckpointSha256: digest, Sequence: checkpoint.GetSequence(), ReceiptEnvelope: row.CheckpointReceiptEnvelope}
 	} else {
@@ -96,16 +97,16 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 			return nil, mapErr(err)
 		}
 		if action.ClosedAt.Valid || int64(checkpoint.GetSequence()) != row.CheckpointSequence+1 || !bytes.Equal(checkpoint.GetPreviousSha256(), row.CheckpointSha256) || checkpoint.GetAt().AsTime().After(now.Add(time.Minute)) {
-			return nil, rpcError(connect.CodeAlreadyExists, "recovery_checkpoint_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_checkpoint_conflict")
 		}
 		switch checkpoint.GetPhase() {
 		case agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED:
 			if previous != nil || len(row.StartGrantEnvelope) > 0 || row.EffectCommittedAt.Valid || len(checkpoint.GetGrantSha256()) != 0 {
-				return nil, rpcError(connect.CodeFailedPrecondition, "recovery_boot_already_consumed")
+				return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_boot_already_consumed")
 			}
 		case agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED:
 			if pair == nil || authorization == nil || previous.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED || row.EffectCommittedAt.Valid || len(row.StartGrantEnvelope) == 0 {
-				return nil, rpcError(connect.CodeFailedPrecondition, "recovery_effect_already_consumed")
+				return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_effect_already_consumed")
 			}
 			challenge := new(agentv1.DeviceActionChallenge)
 			if proto.Unmarshal(row.ChallengeDocument, challenge) != nil {
@@ -113,7 +114,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 			}
 			grantDigest := sha256.Sum256(row.StartGrantEnvelope)
 			if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) || challenge.GetBootId() != checkpoint.GetBootId() || challenge.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() || previous.GetBootId() != checkpoint.GetBootId() || previous.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() {
-				return nil, rpcError(connect.CodePermissionDenied, "recovery_effect_binding_rejected")
+				return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_effect_binding_rejected")
 			}
 			// New effect authority is evaluated on server time, not the request's clock.
 			if _, err := verifier.VerifyRecoveryStart(ctx, snapshot.Root, snapshot.Delegation, row.StartGrantEnvelope, admission.credential.GetHandoff().GetIntent(), challenge, admission.credential, now); err != nil {
@@ -121,15 +122,15 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 			}
 		case agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL:
 			if previous == nil || previous.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL {
-				return nil, rpcError(connect.CodeAlreadyExists, "recovery_terminal_conflict")
+				return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_terminal_conflict")
 			}
 			if len(row.StartGrantEnvelope) > 0 {
 				grantDigest := sha256.Sum256(row.StartGrantEnvelope)
 				if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) {
-					return nil, rpcError(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
+					return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
 				}
 			} else if len(checkpoint.GetGrantSha256()) != 0 {
-				return nil, rpcError(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
+				return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
 			}
 		default:
 			return nil, invalid("invalid_recovery_checkpoint")
@@ -208,10 +209,10 @@ func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request
 	intent := admission.credential.GetHandoff().GetIntent()
 	digest := sha256.Sum256(action.IntentEnvelope)
 	if status.GetActionId() != action.ID.String() || !bytes.Equal(status.GetIntentSha256(), digest[:]) || status.GetVolatileResult() {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_result_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_result_binding_rejected")
 	}
 	if len(row.ResultNonce) != 32 || !bytes.Equal(row.ResultNonce, req.Msg.GetResultNonce()) || !row.NonceExpiresAt.Valid || !now.Before(row.NonceExpiresAt.Time) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_result_nonce_rejected")
 	}
 	checkpoint, err := recoveryCheckpoint(row)
 	if err != nil {
@@ -220,16 +221,16 @@ func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request
 	succeeded := status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED
 	unknown := status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
 	if !actionTerminal(status.GetState()) && !unknown {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_terminal_result_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_result_required")
 	}
 	if action.ClosedAt.Valid {
-		return nil, rpcError(connect.CodeAlreadyExists, "recovery_result_closed")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_result_closed")
 	}
 	if succeeded && (!row.EffectCommittedAt.Valid || checkpoint.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL || status.GetStartedAt() == nil || !status.GetVerification().GetVerified() || !proto.Equal(status.GetVerification().GetAfter().GetTarget(), intent.GetSpec().GetSanitize().GetTarget()) || status.GetVerification().GetAfter().GetEncrypted()) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_effect_proof_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_effect_proof_required")
 	}
 	if !succeeded && !unknown && checkpoint.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL {
-		return nil, rpcError(connect.CodeFailedPrecondition, "recovery_terminal_checkpoint_required")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_terminal_checkpoint_required")
 	}
 	if checkpoint.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL && !unknown {
 		journal, err := recoveryJournal(row)
@@ -241,16 +242,16 @@ func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request
 			before = journal.GetChallenge().GetNativePlan().GetBefore()
 		}
 		if !proto.Equal(before, status.GetBefore()) {
-			return nil, rpcError(connect.CodePermissionDenied, "recovery_terminal_observation_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_observation_rejected")
 		}
 		if journal.GetState() != status.GetState() || journal.GetFailure() != status.GetFailure() || !proto.Equal(journal.GetVerification(), status.GetVerification()) || !proto.Equal(journal.GetStartedAt(), status.GetStartedAt()) || !proto.Equal(journal.GetCompletedAt(), status.GetCompletedAt()) || !proto.Equal(journal.GetAcceptedAt(), status.GetAcceptedAt()) {
-			return nil, rpcError(connect.CodePermissionDenied, "recovery_terminal_snapshot_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_snapshot_rejected")
 		}
 	}
 	// If a previous process consumed an effect but only a restarted key holder is
 	// available, lack of positive verification remains durable UNKNOWN.
 	if row.EffectCommittedAt.Valid && !succeeded && status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED && !unknown {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_effect_outcome_unknown")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_effect_outcome_unknown")
 	}
 	document, err := proto.Marshal(status)
 	if err != nil {

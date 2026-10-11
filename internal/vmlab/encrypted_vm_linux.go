@@ -68,6 +68,7 @@ type encryptedProcess struct {
 }
 
 func startEncryptedProcess(ctx context.Context, dir, name string, args ...string) (*encryptedProcess, error) {
+	// Not labexec: the Pdeathsig must be bound to a thread locked for the process's lifetime.
 	p := &encryptedProcess{cmd: exec.CommandContext(ctx, name, args...), done: make(chan struct{}), log: new(vmLog)}
 	p.cmd.Dir = dir
 	p.cmd.Stdout, p.cmd.Stderr = p.log, p.log

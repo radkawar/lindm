@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/rpcreason"
 )
 
 // The console fixture previously delegated only systemd.service.v1. A fresh
@@ -29,7 +30,7 @@ func TestDeviceActionServiceOnlyDelegationIsTypedPrerequisite(t *testing.T) {
 			if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 				t.Fatalf("missing action delegation must be a prerequisite, not internal: %v", err)
 			}
-			if failure, ok := err.(*connect.Error); !ok || failure.Meta().Get("Lindm-Reason") != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Signer-Role") != "plan" || failure.Meta().Get("Lindm-Action-Capability") == "" {
+			if failure, ok := err.(*connect.Error); !ok || rpcreason.Get(failure) != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Signer-Role") != "plan" || failure.Meta().Get("Lindm-Action-Capability") == "" {
 				t.Fatalf("missing typed signer reason: %v", err)
 			}
 			var count int
@@ -47,7 +48,7 @@ func TestDeviceActionConfiguredStartKeyMustBeDelegatedBeforeCreate(t *testing.T)
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("undelegated start signer admitted doomed action: %v", err)
 	}
-	if failure, ok := err.(*connect.Error); !ok || failure.Meta().Get("Lindm-Reason") != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Signer-Role") != "start" || failure.Meta().Get("Lindm-Action-Capability") != "device.refresh-inventory.v1" {
+	if failure, ok := err.(*connect.Error); !ok || rpcreason.Get(failure) != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Signer-Role") != "start" || failure.Meta().Get("Lindm-Action-Capability") != "device.refresh-inventory.v1" {
 		t.Fatalf("missing typed start signer reason: %v", err)
 	}
 }
@@ -61,7 +62,7 @@ func TestDeviceActionStartSignerChangeIsTypedPrerequisite(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("undelegated start key returned an unexpected error: %v", err)
 	}
-	if failure, ok := err.(*connect.Error); !ok || failure.Meta().Get("Lindm-Reason") != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Action-Capability") != "device.refresh-inventory.v1" {
+	if failure, ok := err.(*connect.Error); !ok || rpcreason.Get(failure) != "device_action_capability_not_delegated" || failure.Meta().Get("Lindm-Action-Capability") != "device.refresh-inventory.v1" {
 		t.Fatalf("start lacks typed capability reason: %v", err)
 	}
 }

@@ -23,6 +23,7 @@ import (
 	updatev1 "lindm/gen/lindm/update/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 type VMUpdateOptions struct {
@@ -72,8 +73,12 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if (manifest.GetDistribution() != "ubuntu" || (manifest.GetVersion() != "24.04" && manifest.GetVersion() != "26.04") || manifest.GetArchitecture() != "amd64") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44" || manifest.GetArchitecture() != "x86_64") {
-		return nil, errors.New("vm updates requires Ubuntu 24.04/26.04 amd64 or Fedora 44 x86_64")
+	release := manifestRelease(manifest)
+	if err := release.LabLane(platform.LaneUpdates); err != nil {
+		return nil, err
+	}
+	if architecture := manifest.GetArchitecture(); architecture != "amd64" && architecture != "x86_64" {
+		return nil, errors.New("vm updates requires an amd64/x86_64 manifest")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Minute)
 	defer cancel()
@@ -96,7 +101,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(work)) }()
-	built, err := buildUpdatePackages(ctx, VMBuildRepository(options.Repository, options.BuildRepository), work, manifest.GetDistribution(), manifest.GetArchitecture())
+	built, err := buildUpdatePackages(ctx, VMBuildRepository(options.Repository, options.BuildRepository), work, release, manifest.GetArchitecture())
 	if err != nil {
 		return result, err
 	}
@@ -128,14 +133,14 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	result.SELinux = "not applicable"
-	if manifest.GetDistribution() == "fedora" {
+	if backend, _ := nativeBackend(release); backend.DNF() {
 		mode, err := vm.run(ctx, "getenforce", nil, 128, 10*time.Second)
 		if err != nil {
 			return result, err
 		}
 		result.SELinux = strings.TrimSpace(string(mode))
 		if result.SELinux != "Enforcing" {
-			return result, errors.New("fedora update lane requires SELinux Enforcing")
+			return result, errors.New("DNF update lane requires SELinux Enforcing")
 		}
 	}
 	packages, err := newNativeGuestPackages(ctx, vm, built.first, built.second, built.apt, built.publicKey, built.fingerprint)
@@ -203,7 +208,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	result.InitialTimestampSHA = initial.TimestampSHA256
-	if err := enableGuestUpdates(ctx, vm, packages, manifest.GetDistribution()); err != nil {
+	if err := enableGuestUpdates(ctx, vm, packages); err != nil {
 		return result, err
 	}
 	status, err := waitUpdateObservation(ctx, vm, nil, "no_update")
@@ -214,7 +219,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "signed paused channel holds initial version", Status: status})
-	result.InitialInventory, err = waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, nil)
+	result.InitialInventory, err = waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, nil)
 	if err != nil {
 		return result, err
 	}
@@ -394,7 +399,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := lifecycleCommand(ctx, vm, "verify recovered agent daemons", "systemctl is-active --quiet lindm-executor.service; systemctl is-active --quiet lindm-agent.service"); err != nil {
 		return result, err
 	}
-	result.FinalInventory, err = waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, result.InitialInventory)
+	result.FinalInventory, err = waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, result.InitialInventory)
 	if err != nil {
 		return result, err
 	}
@@ -439,7 +444,7 @@ func setUpdateRollout(ctx context.Context, fixture *devlab.AuthorityFixture, cha
 	return fixture.SetRollout(ctx, &releasemanagementv1.SetRolloutRequest{RequestId: uuid.NewString(), Ring: channel.GetRing(), Paused: paused, EligiblePercentage: percentage, ExpectedGeneration: channel.GetGeneration(), Reason: "Native unattended update qualification"})
 }
 
-func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestPackages, distribution string) error {
+func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestPackages) error {
 	data, err := vm.run(ctx, "sudo -n cat /etc/lindm/executor.json", nil, 64<<10, 10*time.Second)
 	if err != nil {
 		return err
@@ -449,7 +454,7 @@ func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestP
 		return err
 	}
 	manager := agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT
-	if distribution == "fedora" {
+	if packages.backend.DNF() {
 		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_DNF
 	}
 	cfg.Updates = &agentv1.AgentUpdateConfig{RepositoryUrl: "https://localhost:18444/updates/", Ring: "canary", PollIntervalSeconds: 1, Manager: manager}

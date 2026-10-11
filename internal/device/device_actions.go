@@ -20,6 +20,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func deviceActionPermission(spec *agentv1.DeviceActionSpec) identity.Permission {
@@ -98,27 +99,27 @@ func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation
 	}
 	host, err := q.GetHostObservation(ctx, generation)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_inventory_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_inventory_unavailable")
 	}
 	if err != nil {
 		return err
 	}
 	if !actionInventoryFresh(host, now) {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_inventory_stale")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_inventory_stale")
 	}
 	details := new(inventoryv1.NativeDetails)
 	if len(host.Details) == 0 || proto.Unmarshal(host.Details, details) != nil {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_inventory_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_inventory_unavailable")
 	}
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	if spec.GetTpm2Bind() != nil && !tpm2Available(details.GetTpm()) {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_tpm2_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_tpm2_unavailable")
 	}
 	if err := requireObservedStorageTargets(details, spec); err != nil {
 		return err
 	}
 	if spec.GetLockSessions() != nil && details.GetSessions().GetSessions().GetStatus() != success {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_sessions_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_sessions_unavailable")
 	}
 	return nil
 }
@@ -148,7 +149,7 @@ func requireActionRestriction(ctx context.Context, q *devicedb.Queries, id uuid.
 	if release := spec.GetReleaseQuarantine(); release != nil && release.GetQuarantineActionId() == restriction.ActionID.String() {
 		return nil
 	}
-	return rpcError(connect.CodeFailedPrecondition, "device_quarantined")
+	return rpcreason.Error(connect.CodeFailedPrecondition, "device_quarantined")
 }
 
 // The device row is locked by callers. Keep lock ownership independent of a
@@ -163,27 +164,27 @@ func requireLockActionRestriction(ctx context.Context, q *devicedb.Queries, devi
 	}
 	if spec.GetLockSessions() != nil {
 		if restriction.LockActionID != nil || restriction.SessionsLocked {
-			return rpcError(connect.CodeFailedPrecondition, "device_lock_release_required")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_lock_release_required")
 		}
 		return nil
 	}
 	release := spec.GetReleaseLock()
 	if restriction.LockActionID == nil || restriction.LockActionID.String() != release.GetLockActionId() || !restriction.SessionsLocked {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_lock_changed")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_lock_changed")
 	}
 	original, err := q.GetDeviceAction(ctx, *restriction.LockActionID)
 	if err != nil {
 		return err
 	}
 	if original.DeviceID != deviceID || original.GenerationID != generationID || len(original.StartGrantEnvelope) == 0 {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_lock_binding_rejected")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_lock_binding_rejected")
 	}
 	intent, err := actionIntent(original)
 	if err != nil {
 		return err
 	}
 	if intent.GetSpec().GetLockSessions() == nil {
-		return rpcError(connect.CodeFailedPrecondition, "device_action_lock_binding_rejected")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_lock_binding_rejected")
 	}
 	return nil
 }
@@ -286,8 +287,7 @@ func deviceActionSignerDelegated(delegation *agentv1.ExecutionDelegation, key ed
 }
 
 func deviceActionCapabilityError(capability, role string) error {
-	failure := connect.NewError(connect.CodeFailedPrecondition, errors.New("device_action_capability_not_delegated"))
-	failure.Meta().Set("Lindm-Reason", "device_action_capability_not_delegated")
+	failure := rpcreason.Error(connect.CodeFailedPrecondition, "device_action_capability_not_delegated")
 	failure.Meta().Set("Lindm-Action-Capability", capability)
 	failure.Meta().Set("Lindm-Signer-Role", role)
 	return failure

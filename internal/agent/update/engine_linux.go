@@ -223,7 +223,7 @@ func (e *Engine) cycle(ctx context.Context) error {
 	e.status.Phase = "checking"
 	e.status.Reason = ""
 	e.mu.Unlock()
-	selection, err := e.client.Select(ctx, releaseupdate.SelectionRequest{Ring: e.cfg.GetRing(), DeviceID: e.deviceID, CurrentVersion: current, Architecture: runtime.GOARCH, PackageFormat: packageFormat(e.cfg.GetManager()), ProtocolVersion: buildinfo.ProtocolVersion})
+	selection, err := e.client.Select(ctx, releaseupdate.SelectionRequest{Ring: e.cfg.GetRing(), DeviceID: e.deviceID, CurrentVersion: current, Architecture: runtime.GOARCH, PackageFormat: packageDB(e.cfg.GetManager()).PackageFormat(), ProtocolVersion: buildinfo.ProtocolVersion})
 	if err == nil || errors.Is(err, releaseupdate.ErrNoUpdate) {
 		state.LastMetadataAt = timestamppb.Now()
 		state.LastOutcome = "no_update"

@@ -16,6 +16,7 @@ import (
 
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	"lindm/internal/integrations/integrationdb"
+	"lindm/internal/rpcreason"
 )
 
 func deliveryMessage(row integrationdb.IntegrationDelivery) *integrationsv1.Delivery {
@@ -34,28 +35,28 @@ func (s *Service) cursor(token, filter string) (*integrationsv1.IntegrationPageC
 	}
 	data, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil || len(data) < sha256.Size {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	payload, signature := data[:len(data)-sha256.Size], data[len(data)-sha256.Size:]
 	mac := hmac.New(sha256.New, s.receiptKey[:])
 	mac.Write([]byte("cursor\x00"))
 	mac.Write(payload)
 	if !hmac.Equal(mac.Sum(nil), signature) {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	cursor := &integrationsv1.IntegrationPageCursor{}
 	if err = proto.Unmarshal(payload, cursor); err != nil || !hmac.Equal(cursor.FilterHash, digest[:]) || cursor.BeforeTime == nil || cursor.BeforeTime.CheckValid() != nil {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	if _, err = uuid.Parse(cursor.BeforeId); err != nil {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	return cursor, nil
 }
 func (s *Service) encodeCursor(cursor *integrationsv1.IntegrationPageCursor) (string, error) {
 	data, err := proto.Marshal(cursor)
 	if err != nil {
-		return "", rpcError(connect.CodeInternal, "cursor_encoding")
+		return "", rpcreason.Error(connect.CodeInternal, "cursor_encoding")
 	}
 	mac := hmac.New(sha256.New, s.receiptKey[:])
 	mac.Write([]byte("cursor\x00"))
@@ -72,7 +73,7 @@ func (s *Service) ListDestinations(ctx context.Context, req *connect.Request[int
 	}
 	before, err := uuid.Parse(cursor.BeforeId)
 	if err != nil {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	size := pageSize(req.Msg.PageSize)
 	rows, err := integrationdb.New(s.pool).ListDestinations(ctx, integrationdb.ListDestinationsParams{BeforeTime: pgtype.Timestamptz{Time: cursor.BeforeTime.AsTime(), Valid: true}, BeforeID: before, PageLimit: size + 1})
@@ -105,13 +106,13 @@ func (s *Service) ListDeliveries(ctx context.Context, req *connect.Request[integ
 	}
 	before, err := uuid.Parse(cursor.BeforeId)
 	if err != nil {
-		return nil, rpcError(connect.CodeInvalidArgument, "invalid_page_token")
+		return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_page_token")
 	}
 	var destinationID *uuid.UUID
 	if req.Msg.DestinationId != nil {
 		id, parseErr := uuid.Parse(*req.Msg.DestinationId)
 		if parseErr != nil {
-			return nil, rpcError(connect.CodeInvalidArgument, "invalid_request")
+			return nil, rpcreason.Error(connect.CodeInvalidArgument, "invalid_request")
 		}
 		destinationID = &id
 	}

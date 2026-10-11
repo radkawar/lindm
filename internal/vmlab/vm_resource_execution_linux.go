@@ -29,7 +29,7 @@ func exerciseSignedNativeResources(ctx context.Context, packages *nativeGuestPac
 	if err != nil {
 		return err
 	}
-	rpm := newResourcePackaging(result.Distribution, result.Architecture)
+	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	for _, kind := range []struct {
 		index   int
 		desired []*resourcev1.ResourceDesiredState

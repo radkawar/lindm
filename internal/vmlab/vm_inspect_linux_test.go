@@ -127,16 +127,6 @@ func TestVMChangingTruthIsNotCollectorMismatch(t *testing.T) {
 	}
 }
 
-func TestVMOutputBound(t *testing.T) {
-	out := &limitedOutput{limit: 4}
-	if n, err := out.Write([]byte("1234")); n != 4 || err != nil {
-		t.Fatalf("bounded write: %d, %v", n, err)
-	}
-	if _, err := out.Write([]byte("5")); err == nil || !out.exceeded || string(out.data) != "1234" {
-		t.Fatal("output overflow not bounded")
-	}
-}
-
 func TestInspectArchitectureRequiresMatchingELFMachine(t *testing.T) {
 	for _, test := range []struct {
 		input, canonical string

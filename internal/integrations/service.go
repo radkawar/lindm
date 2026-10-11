@@ -25,6 +25,7 @@ import (
 	"lindm/gen/lindm/integrations/v1/integrationsv1connect"
 	"lindm/internal/identity"
 	"lindm/internal/integrations/integrationdb"
+	"lindm/internal/rpcreason"
 )
 
 const messageLimit = 8 << 20
@@ -93,11 +94,6 @@ func (s *Service) AdminHandler() (string, http.Handler) {
 	})
 }
 
-func rpcError(code connect.Code, reason string) error {
-	e := connect.NewError(code, errors.New(reason))
-	e.Meta().Set("Lindm-Reason", reason)
-	return e
-}
 func storeError(err error) error {
 	if err == nil {
 		return nil
@@ -107,33 +103,33 @@ func storeError(err error) error {
 		return err
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return rpcError(connect.CodeNotFound, "not_found")
+		return rpcreason.Error(connect.CodeNotFound, "not_found")
 	}
 	if errors.Is(err, identity.ErrAuthorizationDenied) || errors.Is(err, identity.ErrAuthorizationChanged) || errors.Is(err, identity.ErrAuthorizationExpired) {
-		return rpcError(connect.CodePermissionDenied, "authorization_denied")
+		return rpcreason.Error(connect.CodePermissionDenied, "authorization_denied")
 	}
 	if errors.Is(err, context.Canceled) {
-		return rpcError(connect.CodeCanceled, "cancelled")
+		return rpcreason.Error(connect.CodeCanceled, "cancelled")
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return rpcError(connect.CodeDeadlineExceeded, "deadline_exceeded")
+		return rpcreason.Error(connect.CodeDeadlineExceeded, "deadline_exceeded")
 	}
-	return rpcError(connect.CodeUnavailable, "integration_store_unavailable")
+	return rpcreason.Error(connect.CodeUnavailable, "integration_store_unavailable")
 }
 func (s *Service) principal(ctx context.Context, msg proto.Message) (identity.Principal, error) {
 	p, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return p, rpcError(connect.CodeUnauthenticated, "session_required")
+		return p, rpcreason.Error(connect.CodeUnauthenticated, "session_required")
 	}
 	if !identity.Authorize(p, identity.PermissionManageIntegrations) {
-		return p, rpcError(connect.CodePermissionDenied, "permission_denied")
+		return p, rpcreason.Error(connect.CodePermissionDenied, "permission_denied")
 	}
 	unrestricted, _ := identity.DeviceScopes(p, identity.PermissionManageIntegrations)
 	if !unrestricted {
-		return p, rpcError(connect.CodePermissionDenied, "global_permission_required")
+		return p, rpcreason.Error(connect.CodePermissionDenied, "global_permission_required")
 	}
 	if err := s.rules.Validate(msg); err != nil {
-		return p, rpcError(connect.CodeInvalidArgument, "invalid_request")
+		return p, rpcreason.Error(connect.CodeInvalidArgument, "invalid_request")
 	}
 	return p, nil
 }
@@ -151,11 +147,11 @@ func (s *Service) mutate(ctx context.Context, requestID string, request, respons
 	}
 	unrestricted, _ := identity.DeviceScopes(approval.Principal(), identity.PermissionManageIntegrations)
 	if !unrestricted {
-		return rpcError(connect.CodePermissionDenied, "global_permission_required")
+		return rpcreason.Error(connect.CodePermissionDenied, "global_permission_required")
 	}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 	if err != nil {
-		return rpcError(connect.CodeInternal, "request_encoding")
+		return rpcreason.Error(connect.CodeInternal, "request_encoding")
 	}
 	defer clear(encoded)
 	mac := hmac.New(sha256.New, s.receiptKey[:])
@@ -165,7 +161,7 @@ func (s *Service) mutate(ctx context.Context, requestID string, request, respons
 	digest := mac.Sum(nil)
 	id, err := uuid.Parse(requestID)
 	if err != nil {
-		return rpcError(connect.CodeInvalidArgument, "invalid_request")
+		return rpcreason.Error(connect.CodeInvalidArgument, "invalid_request")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -191,11 +187,11 @@ func (s *Service) mutate(ctx context.Context, requestID string, request, respons
 		return storeError(err)
 	}
 	if !hmac.Equal(receipt.RequestHash, digest) {
-		return rpcError(connect.CodeAlreadyExists, "request_id_conflict")
+		return rpcreason.Error(connect.CodeAlreadyExists, "request_id_conflict")
 	}
 	if receipt.Response != nil {
 		if err = proto.Unmarshal(receipt.Response, response); err != nil {
-			return rpcError(connect.CodeInternal, "receipt_invalid")
+			return rpcreason.Error(connect.CodeInternal, "receipt_invalid")
 		}
 	} else {
 		if err = apply(q, p.ID); err != nil {
@@ -203,7 +199,7 @@ func (s *Service) mutate(ctx context.Context, requestID string, request, respons
 		}
 		encodedResponse, encodeErr := proto.Marshal(response)
 		if encodeErr != nil {
-			return rpcError(connect.CodeInternal, "response_encoding")
+			return rpcreason.Error(connect.CodeInternal, "response_encoding")
 		}
 		if encodedResponse == nil {
 			encodedResponse = []byte{}

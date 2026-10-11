@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -18,6 +19,7 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 type actionNativePackage struct {
@@ -52,9 +54,9 @@ func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest
 	if err != nil {
 		return nil, err
 	}
-	format := packaging.FormatDEB
-	if manifest.GetDistribution() == "fedora" {
-		format = packaging.FormatRPM
+	format := packaging.Format(platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Native().Packages.Backend.PackageFormat())
+	if format != packaging.FormatDEB && format != packaging.FormatRPM {
+		return nil, errors.New("native action package requires a DEB or RPM guest")
 	}
 	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: repository, Revision: "encrypted-device-actions-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
 	if err != nil {
@@ -196,15 +198,11 @@ func supplyActionCredential(ctx context.Context, vm *guestVM, actionID string, s
 	return err
 }
 
-func installActionPrerequisites(ctx context.Context, vm *guestVM, distribution string) error {
-	var command string
-	switch distribution {
-	case "ubuntu":
-		command = "apt-get -q update && apt-get -q -y install cryptsetup nftables iproute2 iputils-ping tpm2-tools dnsutils curl"
-	case "fedora":
-		command = "dnf -y install cryptsetup nftables iproute iputils systemd-udev tpm2-tools bind-utils curl"
-	default:
-		return errors.New("native action prerequisites require maintained Ubuntu or Fedora")
+func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest) error {
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	command, err := labInstallCommand(release, release.Lab.Guest.Actions)
+	if err != nil {
+		return fmt.Errorf("native action prerequisites: %w", err)
 	}
 	// Vendor-configured signature verification remains enabled. Network access
 	// is explicit disposable-QEMU user egress, never host routing or namespaces.
@@ -216,4 +214,20 @@ func installActionPrerequisites(ctx context.Context, vm *guestVM, distribution s
 		return fmt.Errorf("install native action prerequisites: guest exit %d: %s", result.ExitCode, result.Stderr)
 	}
 	return nil
+}
+
+// labInstallCommand installs maintained lab packages with the release's native
+// backend. Vendor-configured signature verification remains enabled.
+func labInstallCommand(release *platform.Release, packages []string) (string, error) {
+	if len(packages) == 0 {
+		return "", fmt.Errorf("no maintained lab package recipe for %s", release.Name)
+	}
+	switch backend := release.Native().Packages.Backend; {
+	case backend == platform.BackendAPT:
+		return "export DEBIAN_FRONTEND=noninteractive; apt-get -q update; apt-get -q -y install " + strings.Join(packages, " "), nil
+	case backend.DNF():
+		return "dnf -y install " + strings.Join(packages, " "), nil
+	default:
+		return "", fmt.Errorf("no lab package installer for %s", release.Name)
+	}
 }

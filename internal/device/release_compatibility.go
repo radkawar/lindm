@@ -17,6 +17,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/releaseupdate"
+	"lindm/internal/rpcreason"
 )
 
 var _ releasemanagementv1connect.ReleaseManagementServiceHandler = (*Service)(nil)
@@ -127,12 +128,12 @@ func admitReleaseSeries(rows []devicedb.ReleasedAgentSeries, next *releasemanage
 			continue
 		}
 		if !row.ReleasedAt.Time.Equal(next.GetReleasedAt().AsTime()) || uint32(row.MinimumProtocol) != next.GetMinimumProtocol() || uint32(row.MaximumProtocol) != next.GetMaximumProtocol() || next.GetSupportUntil().AsTime().Before(row.SupportUntil.Time) {
-			return rpcError(connect.CodeFailedPrecondition, "release_history_immutable")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "release_history_immutable")
 		}
 		return nil
 	}
 	if len(rows) >= 1024 {
-		return rpcError(connect.CodeResourceExhausted, "release_history_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "release_history_capacity")
 	}
 	// A newly announced end of support cannot strand an existing installation.
 	if next.GetSupportUntil().AsTime().Before(now.Add(90 * 24 * time.Hour)) {
@@ -150,7 +151,7 @@ func (s *Service) requireReleaseCompatibility(ctx context.Context, q *devicedb.Q
 	}
 	report, err := q.GetDeviceReleaseReport(ctx, generation)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return rpcError(connect.CodeFailedPrecondition, "agent_release_unknown")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "agent_release_unknown")
 	}
 	if err != nil {
 		return err
@@ -167,7 +168,7 @@ func (s *Service) requireReleaseCompatibility(ctx context.Context, q *devicedb.Q
 		return err
 	}
 	if !releaseSupported(rows, report.AgentRelease, uint32(report.ProtocolVersion), s.serverRelease, s.serverProtocol, now) {
-		return rpcError(connect.CodeFailedPrecondition, "agent_release_unsupported")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "agent_release_unsupported")
 	}
 	return nil
 }

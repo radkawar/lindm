@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func TestTargetingErrorPreservesAuthorizationAndConflict(t *testing.T) {
@@ -16,7 +17,7 @@ func TestTargetingErrorPreservesAuthorizationAndConflict(t *testing.T) {
 			t.Fatalf("authorization error became %v", got)
 		}
 	}
-	conflict := rpcError(connect.CodeFailedPrecondition, "resource_resolution_conflict")
+	conflict := rpcreason.Error(connect.CodeFailedPrecondition, "resource_resolution_conflict")
 	if !errors.Is(targetingError(conflict), conflict) {
 		t.Fatal("domain RPC failure was replaced")
 	}

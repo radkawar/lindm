@@ -1,5 +1,9 @@
-// Package custody defines the root-owned filesystem boundary used by privileged
-// agent readers. Callers retain descriptors and reject symlinks while traversing.
+// Package custody defines the filesystem boundary used by privileged agent
+// readers, native providers and local tooling: the directory predicate for
+// agent configuration and runtime paths, a strict no-follow walk for
+// root-protected native files and directories, and private-leaf checks.
+// Callers retain descriptors and reject symlinks while traversing. It is not an
+// authorization API and never creates, repairs or chmods anything.
 package custody
 
 import "golang.org/x/sys/unix"

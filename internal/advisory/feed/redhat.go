@@ -15,6 +15,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 const (
@@ -54,8 +55,11 @@ func parseRedHat(config *advisoryv1.FeedSource, raw []byte, validator protovalid
 }
 
 func redHatConfig(config *advisoryv1.FeedSource) error {
-	if config == nil || config.GetDistro() != "rhel" {
-		return errors.New("feed: Red Hat CSAF requires native RHEL, not a compatible distribution")
+	if config == nil {
+		return errors.New("feed: Red Hat CSAF source required")
+	}
+	if _, err := vendorProduct(config, platform.FeedRedHatCSAF); err != nil {
+		return err
 	}
 	parts := strings.Split(config.GetRelease(), ".")
 	if len(parts) > 2 || !suseDigits(parts[0]) || (len(parts) == 2 && !suseDigits(parts[1])) {
@@ -200,7 +204,7 @@ func redHatPackage(component redHatProduct) (redHatRPM, error) {
 		return pkg, errors.New("feed: invalid Red Hat RPM purl")
 	}
 	for key, values := range q {
-		if len(values) != 1 || key == "" || (native && key != "arch" && key != "epoch" && key != "rpmmod" && key != "repository_id") {
+		if len(values) != 1 || key == "" || (native && key != purlArch && key != "epoch" && key != "rpmmod" && key != "repository_id") {
 			return pkg, errors.New("feed: unsupported Red Hat RPM qualifier")
 		}
 	}
@@ -213,7 +217,7 @@ func redHatPackage(component redHatProduct) (redHatRPM, error) {
 		}
 		return pkg, errRedHatNonNativeRPM
 	}
-	pkg.name, pkg.arch = name, canonicalArch(q.Get("arch"))
+	pkg.name, pkg.arch = name, canonicalArch(q.Get(purlArch))
 	pkg.source = pkg.arch == "src" || pkg.arch == "nosrc"
 	if component.arch != "" && component.arch != pkg.arch {
 		return pkg, errors.New("feed: conflicting Red Hat RPM architecture")

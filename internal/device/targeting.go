@@ -13,6 +13,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/targeting"
 )
 
@@ -33,7 +34,7 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 		return nil, invalid("invalid_targeting_request")
 	}
 	if s.identity == nil || s.targeting == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "targeting_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "targeting_unavailable")
 	}
 	authorization, err := s.identity.AuthorizeFresh(ctx, actor.ID, permission)
 	if err != nil {
@@ -99,21 +100,21 @@ func targetingError(err error) error {
 	}
 	var database *pgconn.PgError
 	if errors.As(err, &database) && (database.Code == "40001" || database.Code == "40P01") {
-		return rpcError(connect.CodeAborted, "targeting_revision_conflict")
+		return rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
 	}
 	switch {
 	case errors.Is(err, targeting.ErrRejected):
 		return invalid("invalid_targeting_request")
 	case errors.Is(err, targeting.ErrConflict):
-		return rpcError(connect.CodeAborted, "targeting_revision_conflict")
+		return rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
 	case errors.Is(err, targeting.ErrNotFound), errors.Is(err, pgx.ErrNoRows):
-		return rpcError(connect.CodeNotFound, "targeting_not_found")
+		return rpcreason.Error(connect.CodeNotFound, "targeting_not_found")
 	case errors.Is(err, targeting.ErrCapacity):
-		return rpcError(connect.CodeResourceExhausted, "targeting_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "targeting_capacity")
 	case errors.Is(err, targeting.ErrPaused):
-		return rpcError(connect.CodeFailedPrecondition, "rollout_paused")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "rollout_paused")
 	case errors.Is(err, targeting.ErrNotReady):
-		return rpcError(connect.CodeFailedPrecondition, "targeting_not_ready")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "targeting_not_ready")
 	default:
 		return approvalError(err)
 	}

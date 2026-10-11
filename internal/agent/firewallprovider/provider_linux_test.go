@@ -387,7 +387,7 @@ func TestPendingStateNeverBecomesForwardReplayAuthority(t *testing.T) {
 
 func TestGuardIsMandatoryBeforeNativeEffects(t *testing.T) {
 	called := false
-	if err := ApplyNative(t.Context(), nil, nil, nil, func(context.Context) error { called = true; return nil }); !errors.Is(err, ErrUnsupported) || called {
+	if err := applyNative(t.Context(), nil, nil, nil, func(context.Context) error { called = true; return nil }); !errors.Is(err, ErrUnsupported) || called {
 		t.Fatal("missing independent guard reached native authority")
 	}
 }

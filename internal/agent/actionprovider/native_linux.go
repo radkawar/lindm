@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
-	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 // Native executables are a closed local implementation detail, never plan data.
@@ -47,63 +47,35 @@ type nativeRequest struct {
 
 type nativeRunner func(context.Context, nativeRequest) ([]byte, error)
 
-type boundedOutput struct {
-	bytes.Buffer
-	overflow bool
-}
-
-func (b *boundedOutput) Write(data []byte) (int, error) {
-	if len(data) > outputLimit-b.Len() {
-		b.overflow = true
-		return 0, errors.New("native_output_limit")
-	}
-	return b.Buffer.Write(data)
-}
-
 func runNative(ctx context.Context, request nativeRequest) ([]byte, error) {
 	if int(request.command) >= len(executable) {
 		return nil, ErrUnsupported
 	}
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, executable[request.command], request.args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin", "LANG=C", "LC_ALL=C", "SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat"}
-	cmd.Stdin = bytes.NewReader(request.input)
-	cmd.ExtraFiles = request.files
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.WaitDelay = time.Second
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return os.ErrProcessDone
-		}
-		err := unix.Kill(-cmd.Process.Pid, unix.SIGKILL)
-		if errors.Is(err, unix.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	var out, diagnostic boundedOutput
-	cmd.Stdout, cmd.Stderr = &out, &diagnostic
-	err := cmd.Run()
-	if out.overflow || diagnostic.overflow {
+	result, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path: executable[request.command], Args: request.args, Stdin: request.input, Files: request.files,
+		Env:     []string{"SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat"},
+		Timeout: 90 * time.Second, StdoutLimit: outputLimit, StderrLimit: outputLimit,
+	})
+	// Truncated evidence is never parsed; any overflow fails the call.
+	if result.StdoutTruncated || result.StderrTruncated {
 		return nil, errors.New("native_output_limit")
 	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
 	}
 	// Neither stderr nor argv is included: native helpers can echo credentials.
 	if err != nil {
-		if request.command == cryptsetup && len(request.args) > 0 && request.args[0] == "luksDump" && bytes.Contains(diagnostic.Bytes(), []byte("is not a valid LUKS device")) {
+		if request.command == cryptsetup && len(request.args) > 0 && request.args[0] == "luksDump" && bytes.Contains(result.Stderr, []byte("is not a valid LUKS device")) {
 			err = errors.Join(errNativeNotLUKS, err)
 		}
-		if request.command == nvme && nvmeUnsupportedDiagnostic(diagnostic.Bytes()) {
+		if request.command == nvme && nvmeUnsupportedDiagnostic(result.Stderr) {
 			// Preserve explicit emulated/firmware opcode refusal. A consumed
 			// command still remains outcome_unknown at the provider boundary.
 			err = errors.Join(ErrUnsupported, err)
 		}
 		return nil, fmt.Errorf("native %d failed: %w", request.command, err)
 	}
-	return out.Bytes(), nil
+	return result.Stdout, nil
 }
 
 // secretHandle keeps anonymous pages locked until the helper exits. Existing

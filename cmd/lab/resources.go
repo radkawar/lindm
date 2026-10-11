@@ -17,7 +17,7 @@ import (
 func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm resources", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "pinned Ubuntu 24.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9/10 image manifest")
+	manifestPath := flags.String("manifest", "", "pinned Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 44 or RHEL/AlmaLinux/Rocky 9/10 image manifest")
 	redhatToken := flags.String("redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL repository access (maintained registration, unregistration and activation-key deletion)")
 	server := flags.String("lindmd", "", "built real lindmd executable")
 	probe := flags.String("lab", "", "built lab executable; defaults to this executable")

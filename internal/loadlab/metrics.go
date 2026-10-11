@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+
+	"lindm/internal/rpcreason"
 )
 
 type RPCResult struct {
@@ -77,7 +79,7 @@ func (m *measurements) observe(name string, elapsed time.Duration, err error) {
 		h.codes[code.String()]++
 		var failure *connect.Error
 		if errors.As(err, &failure) {
-			reason := failure.Meta().Get("Lindm-Reason")
+			reason := rpcreason.Get(failure)
 			if len(reason) > 128 {
 				reason = "oversized_reason"
 			}

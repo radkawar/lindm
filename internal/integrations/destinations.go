@@ -16,35 +16,36 @@ import (
 
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	"lindm/internal/integrations/integrationdb"
+	"lindm/internal/rpcreason"
 )
 
 func validateTrust(config *integrationsv1.DestinationConfig) error {
 	endpoint, err := url.Parse(config.Endpoint)
 	if err != nil || endpoint.Hostname() == "" || endpoint.User != nil {
-		return rpcError(connect.CodeInvalidArgument, "invalid_endpoint")
+		return rpcreason.Error(connect.CodeInvalidArgument, "invalid_endpoint")
 	}
 	if config.Kind == integrationsv1.DestinationKind_DESTINATION_KIND_SYSLOG_TLS {
 		if _, _, err = net.SplitHostPort(endpoint.Host); err != nil {
-			return rpcError(connect.CodeInvalidArgument, "invalid_endpoint")
+			return rpcreason.Error(connect.CodeInvalidArgument, "invalid_endpoint")
 		}
 	}
 	if config.PinnedCaPem != "" {
 		remaining := bytes.TrimSpace([]byte(config.PinnedCaPem))
 		if len(remaining) == 0 {
-			return rpcError(connect.CodeInvalidArgument, "invalid_ca")
+			return rpcreason.Error(connect.CodeInvalidArgument, "invalid_ca")
 		}
 		for len(remaining) != 0 {
 			// Trust material is returned by read APIs. Reject key blocks and
 			// unparsed text rather than persisting an accidental private key.
 			if !bytes.HasPrefix(remaining, []byte("-----BEGIN CERTIFICATE-----")) {
-				return rpcError(connect.CodeInvalidArgument, "invalid_ca")
+				return rpcreason.Error(connect.CodeInvalidArgument, "invalid_ca")
 			}
 			block, rest := pem.Decode(remaining)
 			if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-				return rpcError(connect.CodeInvalidArgument, "invalid_ca")
+				return rpcreason.Error(connect.CodeInvalidArgument, "invalid_ca")
 			}
 			if _, err := x509.ParseCertificate(block.Bytes); err != nil {
-				return rpcError(connect.CodeInvalidArgument, "invalid_ca")
+				return rpcreason.Error(connect.CodeInvalidArgument, "invalid_ca")
 			}
 			remaining = bytes.TrimSpace(rest)
 		}
@@ -103,10 +104,10 @@ func (s *Service) UpdateDestination(ctx context.Context, req *connect.Request[in
 			return err
 		}
 		if uint64(current.Version) != req.Msg.ExpectedVersion {
-			return rpcError(connect.CodeAborted, "destination_version_changed")
+			return rpcreason.Error(connect.CodeAborted, "destination_version_changed")
 		}
 		if current.Kind != int32(cfg.Kind) {
-			return rpcError(connect.CodeInvalidArgument, "destination_kind_immutable")
+			return rpcreason.Error(connect.CodeInvalidArgument, "destination_kind_immutable")
 		}
 		row, err := q.UpdateDestination(ctx, integrationdb.UpdateDestinationParams{ID: id, DisplayName: cfg.DisplayName, Endpoint: cfg.Endpoint, PinnedCaPem: cfg.PinnedCaPem, Enabled: cfg.Enabled})
 		if err != nil {
@@ -132,7 +133,7 @@ func (s *Service) DeleteDestination(ctx context.Context, req *connect.Request[in
 			return err
 		}
 		if uint64(row.Version) != req.Msg.ExpectedVersion {
-			return rpcError(connect.CodeAborted, "destination_version_changed")
+			return rpcreason.Error(connect.CodeAborted, "destination_version_changed")
 		}
 		if err = q.DeleteDestination(ctx, id); err != nil {
 			return err
@@ -159,14 +160,14 @@ func (s *Service) RotateDestinationSecret(ctx context.Context, req *connect.Requ
 			return err
 		}
 		if uint64(current.Version) != req.Msg.ExpectedVersion {
-			return rpcError(connect.CodeAborted, "destination_version_changed")
+			return rpcreason.Error(connect.CodeAborted, "destination_version_changed")
 		}
 		if current.Kind != int32(integrationsv1.DestinationKind_DESTINATION_KIND_WEBHOOK) {
-			return rpcError(connect.CodeFailedPrecondition, "webhook_required")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "webhook_required")
 		}
 		// A second rotation must not silently discard a still-valid overlap key.
 		if current.PreviousSecretExpiresAt.Valid && s.clock().Before(current.PreviousSecretExpiresAt.Time) {
-			return rpcError(connect.CodeFailedPrecondition, "rotation_overlap_active")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "rotation_overlap_active")
 		}
 		ciphertext := s.aead.Seal(nil, nil, req.Msg.SigningSecret, id[:])
 		row, err := q.RotateDestinationSecret(ctx, integrationdb.RotateDestinationSecretParams{ID: id, Ciphertext: ciphertext, ExpiresAt: pgtype.Timestamptz{Time: s.clock().Add(time.Duration(req.Msg.OverlapSeconds) * time.Second), Valid: true}})
@@ -193,14 +194,14 @@ func (s *Service) ReplayDelivery(ctx context.Context, req *connect.Request[integ
 			return err
 		}
 		if row.Status != int32(integrationsv1.DeliveryStatus_DELIVERY_STATUS_DEAD_LETTER) {
-			return rpcError(connect.CodeFailedPrecondition, "dead_letter_required")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "dead_letter_required")
 		}
 		target, err := q.LoadDeliveryTarget(ctx, row.DestinationID)
 		if err != nil {
 			return err
 		}
 		if !target.Enabled {
-			return rpcError(connect.CodeFailedPrecondition, "destination_disabled")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "destination_disabled")
 		}
 		row, err = q.ReplayDelivery(ctx, id)
 		if err != nil {

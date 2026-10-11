@@ -5,7 +5,9 @@ package passwordprovider
 import (
 	"context"
 	"errors"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -13,6 +15,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/custody"
 )
 
 type interruptedStore struct {
@@ -57,7 +60,7 @@ func TestInterruptedPolicyRefusesObservationAndReplay(t *testing.T) {
 }
 func TestMissingModuleReturnsTypedPackageWithoutMutation(t *testing.T) {
 	store := &interruptedStore{}
-	missing := missingModule(&resourcev1.PlatformProduct{OsId: "ubuntu"}, 1, errors.New("missing ELF module"))
+	missing := missingModule(&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, 1, errors.New("missing ELF module"))
 	p := &Provider{store: store, config: Config{Ownership: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION, AdoptionApprovalId: proto.String("d3742200-85f7-4a40-8bc0-87e646c05fe6")}}}, observe: func(context.Context, *resourcev1.PasswordPolicyDesired) (*agentv1.ResourceOwnershipSnapshot, error) {
 		return nil, missing
 	}}
@@ -72,12 +75,12 @@ func TestMissingModuleReturnsTypedPackageWithoutMutation(t *testing.T) {
 	}
 }
 func TestRefusesCrossDistroManagerGuessing(t *testing.T) {
-	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "debian", Version: "13"}, {OsId: "ubuntu", Version: "22.04"}, {OsId: "fedora", Version: "43"}, {OsId: "rhel", Version: "10.1"}, {OsId: "almalinux", Version: "9.7"}, {OsId: "rocky", Version: "9.8"}} {
+	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "debian", Version: "11"}, {OsId: "ubuntu", Version: "25.10"}, {OsId: "fedora", Version: "43"}, {OsId: "rhel", Version: "10.1"}, {OsId: "almalinux", Version: "9.7"}, {OsId: "rocky", Version: "9.7"}} {
 		if productSupported(platform) {
 			t.Fatalf("unqualified native manager guessed: %v", platform)
 		}
 	}
-	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "ubuntu", Version: "24.04"}, {OsId: "fedora", Version: "44"}, {OsId: "rhel", Version: "9.8"}, {OsId: "almalinux", Version: "9.8"}, {OsId: "rhel", Version: "10.2"}, {OsId: "almalinux", Version: "10.2"}} {
+	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "ubuntu", Version: "24.04"}, {OsId: "ubuntu", Version: "22.04"}, {OsId: "debian", Version: "13"}, {OsId: "fedora", Version: "44"}, {OsId: "rhel", Version: "9.8"}, {OsId: "almalinux", Version: "9.8"}, {OsId: "rocky", Version: "9.8"}, {OsId: "rhel", Version: "10.2"}, {OsId: "almalinux", Version: "10.2"}} {
 		if !productSupported(platform) {
 			t.Fatal(platform)
 		}
@@ -97,7 +100,7 @@ func TestAuthselectFeaturePrerequisiteIsReadOnly(t *testing.T) {
 		}
 		return []byte("with-faillock\n"), nil
 	}
-	if err := managerChangeSupported(context.Background(), &resourcev1.PlatformProduct{OsId: "fedora"}, before, target, run); !errors.Is(err, ErrUnsupported) {
+	if err := managerChangeSupported(context.Background(), &resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, before, target, run); !errors.Is(err, ErrUnsupported) {
 		t.Fatal(err)
 	}
 	if calls != 1 {
@@ -154,5 +157,20 @@ func TestAuthselectSelectionRejectsOptionAndPathInjection(t *testing.T) {
 	}
 	if got, err := authselectSelection([]byte("custom/lindm-local with-pwhistory with-sudo\n")); err != nil || len(got) != 3 {
 		t.Fatalf("valid native selection rejected: %v %v", got, err)
+	}
+}
+func TestNativeCustodyRefusalsAreUnsupported(t *testing.T) {
+	path := t.TempDir() + "/pwquality.conf"
+	if err := os.WriteFile(path, []byte("minlen = 14\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readNative(path, 32768); !errors.Is(err, ErrUnsupported) || !errors.Is(err, custody.ErrUnsafe) {
+		t.Fatalf("unprotected native file read: %v", err)
+	}
+	if _, err := moduleDigest(path); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("unprotected module digested: %v", err)
+	}
+	if _, err := runNative(context.Background(), path); err == nil || !strings.HasPrefix(err.Error(), "password native pwquality.conf: ") {
+		t.Fatalf("executable outside /usr ran: %v", err)
 	}
 }

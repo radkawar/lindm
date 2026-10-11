@@ -18,6 +18,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -26,7 +27,7 @@ func (s *Service) GetDeviceActionWork(ctx context.Context, req *connect.Request[
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_device_action_work")
@@ -71,7 +72,7 @@ func (s *Service) GetDeviceActionWork(ctx context.Context, req *connect.Request[
 		return nil, mapErr(err)
 	}
 	if action.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_generation_pending")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_pending")
 	}
 	if len(action.StartGrantEnvelope) == 0 && !action.OutcomeUnknown {
 		if err := s.requireReleaseCompatibility(ctx, q, principal.GenerationID, req.Msg.GetSessionEpoch()); err != nil {
@@ -127,13 +128,13 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_device_action_start")
 	}
 	if s.identity == nil || s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	id, _ := uuid.Parse(req.Msg.GetActionId())
 	captured, err := devicedb.New(s.pool).GetDeviceAction(ctx, id)
@@ -141,22 +142,22 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 		return nil, mapErr(err)
 	}
 	if captured.DeviceID != principal.DeviceID || captured.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_binding_rejected")
 	}
 	intent, err := actionIntent(captured)
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if intent.GetSpec().GetSanitize().GetRecovery() != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_handoff_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_required")
 	}
 	challenge := new(agentv1.DeviceActionChallenge)
 	if err := s.authority.Verify(ctx, req.Msg.GetChallengeProof(), challenge, 1, principal.PublicKey); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_challenge_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_challenge_rejected")
 	}
 	digest := sha256.Sum256(captured.IntentEnvelope)
 	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetActionSequence() != intent.GetActionSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() || !bytes.Equal(challenge.GetIntentSha256(), digest[:]) || !bytes.Equal(challenge.GetSpecSha256(), intent.GetSpecSha256()) {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_challenge_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_challenge_binding_rejected")
 	}
 	permission := deviceActionPermission(intent.GetSpec())
 	var authorization *identity.Authorization
@@ -230,7 +231,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 	}
 	if len(action.StartGrantEnvelope) > 0 {
 		if !bytes.Equal(action.ChallengeProof, req.Msg.GetChallengeProof()) {
-			return nil, rpcError(connect.CodeAlreadyExists, "device_action_start_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "device_action_start_conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -241,7 +242,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 		return nil, mapErr(err)
 	}
 	if action.ClosedAt.Valid || !now.Before(action.ExpiresAt.Time) {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_expired")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_expired")
 	}
 	if err := requireDeviceScope(ctx, q, authorization.Principal(), permission, principal.DeviceID); err != nil {
 		return nil, mapErr(err)
@@ -272,10 +273,10 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 		return nil, mapErr(err)
 	}
 	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !bytes.Equal(planDigest, challenge.GetNativePlanSha256()) || !plan.GetBefore().GetSupported() {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_preflight_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_preflight_rejected")
 	}
 	if destructiveDeviceAction(intent.GetSpec()) && !liveRootAction(intent.GetSpec()) && (!plan.GetBefore().GetRecoveryEnvironment() || !plan.GetBefore().GetOffTargetJournal()) {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_recovery_environment_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_recovery_environment_required")
 	}
 	if err := validateLiveRootPlan(intent.GetSpec(), plan); err != nil {
 		return nil, err
@@ -283,7 +284,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 	issued := challenge.GetIssuedAt().AsTime()
 	expires := challenge.GetExpiresAt().AsTime()
 	if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(expires) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_clock_skew")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
 	}
 	if _, err := verifier.VerifyDeviceActionIntent(ctx, snapshot.Root, snapshot.Delegation, action.IntentEnvelope, now); err != nil {
 		return nil, executionError(err)
@@ -294,7 +295,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 		}
 	}
 	if !expires.After(issued) {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_start_window_empty")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_start_window_empty")
 	}
 	grant := &agentv1.DeviceActionStartGrant{Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: authorization.Version(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: challenge.GetIssuedAt(), ExpiresAt: timestamppb.New(expires)}
 	if consumption != nil {

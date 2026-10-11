@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -381,11 +380,7 @@ func TestApplicationNativeFailurePrecedence(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 			run := func(ctx context.Context, _ backend, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
-				cmd := exec.CommandContext(ctx, executable, "-test.run=^TestApplicationSubprocessHelper$")
-				cmd.Env = []string{"LINDM_APPLICATION_HELPER=" + tc.mode, "LANG=C", "LC_ALL=C"}
-				cmd.Dir = "/"
-				cmd.WaitDelay = time.Second
-				return runCommand(ctx, cmd, consume)
+				return runCommand(ctx, helperCommand(executable, "TestApplicationSubprocessHelper", "LINDM_APPLICATION_HELPER="+tc.mode), consume)
 			}
 			got := collectFlatpak(ctx, run)
 			if got.Status != tc.want || len(got.Applications) != 0 {

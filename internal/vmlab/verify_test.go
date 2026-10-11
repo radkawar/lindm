@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -241,15 +240,5 @@ func TestPublicKeyArmorCorruption(t *testing.T) {
 	}
 	if _, err := publicKeyring([]byte(strings.Join(lines, "\n"))); err == nil {
 		t.Fatal("corrupt key armor checksum accepted")
-	}
-}
-
-func TestVerifierOutputRemainsBoundedThroughCopy(t *testing.T) {
-	sink := boundedBuffer{limit: 8}
-	if _, err := io.Copy(&sink, strings.NewReader("123456789")); err == nil {
-		t.Fatal("verifier output exceeded its cap through io.Copy")
-	}
-	if len(sink.Bytes()) > sink.limit {
-		t.Fatal("verifier retained oversized output")
 	}
 }

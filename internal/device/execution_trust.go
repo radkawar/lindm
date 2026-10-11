@@ -13,6 +13,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) GetExecutionAuthority(ctx context.Context, _ *connect.Request[adminv1.GetExecutionAuthorityRequest]) (*connect.Response[adminv1.GetExecutionAuthorityResponse], error) {
@@ -56,7 +57,7 @@ func (s *Service) UpdateExecutionAuthority(ctx context.Context, req *connect.Req
 		return nil, invalid("invalid_execution_authority_request")
 	}
 	if s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionManageExecutionTrust)
 	if err != nil {
@@ -99,7 +100,7 @@ func (s *Service) GetExecutionTrust(ctx context.Context, req *connect.Request[de
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil {
 		return nil, invalid("invalid_execution_trust_cursor")
@@ -147,21 +148,21 @@ func (s *Service) GetExecutionTrust(ctx context.Context, req *connect.Request[de
 func executionError(err error) error {
 	switch {
 	case errors.Is(err, executionauthority.ErrRejected):
-		return rpcError(connect.CodePermissionDenied, "execution_authority_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "execution_authority_rejected")
 	case errors.Is(err, executionauthority.ErrIncompatible):
-		return rpcError(connect.CodeFailedPrecondition, "execution_authority_incompatible")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_incompatible")
 	case errors.Is(err, executionauthority.ErrServerBehind):
-		return rpcError(connect.CodeFailedPrecondition, "execution_authority_server_behind")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_server_behind")
 	case errors.Is(err, executionauthority.ErrReprovisioning):
-		return rpcError(connect.CodeFailedPrecondition, "execution_authority_reprovisioning_required")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_reprovisioning_required")
 	case errors.Is(err, executionauthority.ErrCapacity):
-		return rpcError(connect.CodeResourceExhausted, "execution_authority_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "execution_authority_capacity")
 	case errors.Is(err, executionauthority.ErrCorrupt), errors.Is(err, executionauthority.ErrConfigured):
-		return rpcError(connect.CodeFailedPrecondition, "execution_authority_recovery_hold")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_recovery_hold")
 	case errors.Is(err, identity.ErrAuthorizationDenied), errors.Is(err, identity.ErrAuthorizationExpired), errors.Is(err, identity.ErrAuthorizationChanged), errors.Is(err, identity.ErrSubjectUnqualified):
-		return rpcError(connect.CodePermissionDenied, "actor_authorization_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "actor_authorization_rejected")
 	case errors.Is(err, identity.ErrDirectoryUnavailable):
-		return rpcError(connect.CodeUnavailable, "directory_unavailable")
+		return rpcreason.Error(connect.CodeUnavailable, "directory_unavailable")
 	default:
 		return mapErr(err)
 	}

@@ -13,6 +13,7 @@ import (
 
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 type packageData struct {
@@ -73,7 +74,12 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		d.packageSequence++
 		host := r.historicalHost
 		if index != 0 || host == nil {
-			host = &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(d.boot), Hostname: observed(label(index)), OsId: observed("ubuntu"), OsVersion: observed("24.04"), Architecture: observed("x86_64"), KernelRelease: observed("6.8.0-90-generic"), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(label(index))}
+			// The simulator reports the registry's Ubuntu 24.04 identity.
+			release, ok := platform.Lookup("ubuntu-24.04")
+			if !ok {
+				return errors.New("simulated release is not in the platform registry")
+			}
+			host = &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(d.boot), Hostname: observed(label(index)), OsId: observed(release.ID), OsVersion: observed(release.Version.Value), Architecture: observed("x86_64"), KernelRelease: observed("6.8.0-90-generic"), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(label(index))}
 			host.Details = syntheticNativeDetails()
 		}
 		d.inventoryUpload = &pendingInventoryUpload{

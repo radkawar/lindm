@@ -14,6 +14,7 @@ import (
 
 	"lindm/internal/device/devicedb"
 	"lindm/internal/pki"
+	"lindm/internal/rpcreason"
 )
 
 type devicePrincipal struct {
@@ -38,11 +39,11 @@ func devicePrincipalFromContext(ctx context.Context) (devicePrincipal, bool) {
 // presentedIdentity validates the handshake chain itself. It never reads headers.
 func (s *Service) presentedIdentity(r *http.Request, now time.Time) (*x509.Certificate, uuid.UUID, uuid.UUID, error) {
 	if r == nil || r.TLS == nil || !r.TLS.HandshakeComplete || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.VerifiedChains[0]) == 0 || len(r.TLS.PeerCertificates) == 0 {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	leaf := r.TLS.VerifiedChains[0][0]
 	if leaf == nil || !leaf.Equal(r.TLS.PeerCertificates[0]) {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(s.ca)
@@ -51,17 +52,17 @@ func (s *Service) presentedIdentity(r *http.Request, now time.Time) (*x509.Certi
 		CurrentTime: now,
 		KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}); err != nil {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if len(leaf.URIs) != 1 || leaf.URIs[0] == nil {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	deployment, deviceID, generationID, err := pki.ParseDeviceIdentity(leaf.URIs[0].String())
 	if err != nil || deployment != s.deploymentID || pki.CheckDeviceCertificate(leaf, deployment, deviceID, generationID) != nil {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if key, ok := leaf.PublicKey.(ed25519.PublicKey); !ok || len(key) != ed25519.PublicKeySize {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	return leaf, deviceID, generationID, nil
 }
@@ -71,7 +72,7 @@ func (s *Service) bindCertificate(ctx context.Context, leaf *x509.Certificate, d
 	row, err := devicedb.New(s.pool).GetCertificateByFingerprint(ctx, sum[:])
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return devicePrincipal{}, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+			return devicePrincipal{}, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 		}
 		return devicePrincipal{}, mapErr(err)
 	}

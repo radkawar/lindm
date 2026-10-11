@@ -14,6 +14,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 const methodCreateRecoveryGrant = "CreateRecoveryEnrollmentGrant"
@@ -78,7 +79,7 @@ func (s *Service) CreateRecoveryEnrollmentGrant(ctx context.Context, req *connec
 			return nil, errGenerationMismatch
 		}
 		if (device.State == stateRevoked) != req.Msg.GetExpectedRevoked() {
-			return nil, rpcError(connect.CodeFailedPrecondition, "recovery_state_changed")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_state_changed")
 		}
 		secret, hash, err := newGrantSecret()
 		if err != nil {
@@ -120,14 +121,14 @@ func (s *Service) recoverEnrollment(ctx context.Context, q *devicedb.Queries, gr
 		return nil, uuid.Nil, uuid.Nil, errGenerationMismatch
 	}
 	if device.RevokedAt.Valid != binding.ExpectedRevokedAt.Valid || device.RevokedAt.Valid && !device.RevokedAt.Time.Equal(binding.ExpectedRevokedAt.Time) {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeFailedPrecondition, "recovery_state_changed")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_state_changed")
 	}
 	reused, err := q.RecoveryKeyAlreadyUsed(ctx, devicedb.RecoveryKeyAlreadyUsedParams{DeviceID: binding.DeviceID, PublicKeyFingerprint: pubHash})
 	if err != nil {
 		return nil, uuid.Nil, uuid.Nil, err
 	}
 	if reused {
-		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeFailedPrecondition, "recovery_key_reused")
+		return nil, uuid.Nil, uuid.Nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_key_reused")
 	}
 	now := s.now()
 	// Retire all old credentials and generations, including already-held ones.

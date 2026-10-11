@@ -3,18 +3,17 @@
 package packaging
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const (
@@ -82,40 +81,21 @@ func runTool(ctx context.Context, work string, cmd toolCmd) (stdout, stderr []by
 	if timeout <= 0 {
 		timeout = toolDeadline
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	proc := exec.CommandContext(ctx, path, cmd.Args...)
-	proc.Dir = cmd.Dir
-	if proc.Dir == "" {
-		proc.Dir = work
+	dir := cmd.Dir
+	if dir == "" {
+		dir = work
 	}
-	proc.Env = append(baseEnv(work), cmd.ExtraEnv...)
-	proc.Env = append(proc.Env, "TMPDIR="+filepath.Join(work, "tmp"), "TEMP="+filepath.Join(work, "tmp"), "TMP="+filepath.Join(work, "tmp"))
-	proc.Stdin = cmd.Stdin
-	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	proc.WaitDelay = 2 * time.Second
-	proc.Cancel = func() error {
-		if proc.Process == nil {
-			return os.ErrProcessDone
-		}
-		killErr := syscall.Kill(-proc.Process.Pid, syscall.SIGKILL)
-		if errors.Is(killErr, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return killErr
-	}
-	outBuf := &limitedWriter{limit: toolOutputLimit}
-	errBuf := &limitedWriter{limit: toolOutputLimit}
+	tmp := filepath.Join(work, "tmp")
+	env := append(append(baseEnv(work), cmd.ExtraEnv...), "TMPDIR="+tmp, "TEMP="+tmp, "TMP="+tmp)
+	outBuf, errBuf := nativeexec.NewBuffer(toolOutputLimit), nativeexec.NewBuffer(toolOutputLimit)
+	var sink io.Writer = outBuf
 	if cmd.Stdout != nil {
-		proc.Stdout = cmd.Stdout
-	} else {
-		proc.Stdout = outBuf
+		sink = cmd.Stdout
 	}
-	proc.Stderr = errBuf
-	runErr := proc.Run()
-	stdout = outBuf.buf.Bytes()
-	stderr = errBuf.buf.Bytes()
-	if outBuf.exceeded || errBuf.exceeded {
+	runErr := labexec.Run(ctx, labexec.Command{Path: path, Args: cmd.Args, Env: env, Dir: dir, Stdin: cmd.Stdin, Stdout: sink, Stderr: errBuf, Timeout: timeout})
+	stdout = outBuf.Bytes()
+	stderr = errBuf.Bytes()
+	if outBuf.Truncated() || errBuf.Truncated() {
 		return stdout, stderr, fmt.Errorf("%w: %s output exceeded limit", ErrArtifact, cmd.Name)
 	}
 	if runErr != nil {
@@ -142,26 +122,6 @@ func sanitize(data []byte) string {
 		}
 		return ' '
 	}, string(data))
-}
-
-type limitedWriter struct {
-	buf      bytes.Buffer
-	limit    int
-	exceeded bool
-}
-
-func (w *limitedWriter) Write(p []byte) (int, error) {
-	if w.buf.Len() >= w.limit {
-		w.exceeded = true
-		return len(p), nil
-	}
-	remain := w.limit - w.buf.Len()
-	if len(p) > remain {
-		w.exceeded = true
-		_, _ = w.buf.Write(p[:remain])
-		return len(p), nil
-	}
-	return w.buf.Write(p)
 }
 
 func toolVersion(ctx context.Context, work, name string, args ...string) ToolVersion {

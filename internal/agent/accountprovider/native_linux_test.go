@@ -250,23 +250,6 @@ func TestNativeAccountRootOptionSelectedBeforeEffects(t *testing.T) {
 // EL 9 shadow-utils labels a --prefix database from the prefixed path, so a
 // chroot product must chroot every tool and never fall back to --prefix.
 func TestChrootProductUsesRootForEveryTool(t *testing.T) {
-	for _, tc := range []struct {
-		platform *resourcev1.PlatformProduct
-		want     bool
-	}{
-		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
-		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
-		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "10.2"}, true},
-		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "10.2"}, true},
-		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "8.10"}, false},
-		{&resourcev1.PlatformProduct{OsId: "rocky", Version: "9.8"}, false},
-		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
-		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false},
-	} {
-		if got := ChrootAccountRoot(tc.platform); got != tc.want {
-			t.Fatalf("%v chroot=%t", tc.platform, got)
-		}
-	}
 	commands := []command{{tool: "/usr/sbin/useradd", args: []string{"--", "alice"}}, {tool: "/usr/bin/chage", args: []string{"--maxdays", "90", "--", "alice"}}}
 	both := func(context.Context, []byte, string, ...string) ([]byte, error) {
 		return []byte("  -P, --prefix PREFIX_DIR\n  -R, --root CHROOT_DIR\n"), nil
@@ -280,5 +263,15 @@ func TestChrootProductUsesRootForEveryTool(t *testing.T) {
 	}
 	if _, err := nativeToolOptions(context.Background(), prefixOnly, commands, true); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("chroot product fell back to a mislabeling --prefix: %v", err)
+	}
+}
+func TestRunNativeStderrFailsWithSanitizedFirstLine(t *testing.T) {
+	_, err := runNative(t.Context(), []byte("token\n"), "/usr/bin/sh", "-c", "read x; printf 'bad\\001line\\n%s\\n' \"$x\" >&2")
+	if err == nil || !strings.HasSuffix(err.Error(), "native diagnostic from sh: bad?line") || strings.Contains(err.Error(), "token") {
+		t.Fatalf("runNative stderr = %v", err)
+	}
+	out, err := runNative(t.Context(), nil, "/usr/bin/sh", "-c", "printf ok")
+	if err != nil || string(out) != "ok" {
+		t.Fatalf("runNative = %q, %v", out, err)
 	}
 }

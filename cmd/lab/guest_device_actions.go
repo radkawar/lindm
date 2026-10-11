@@ -27,6 +27,7 @@ import (
 	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/config"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/rpcreason"
 )
 
 // guestActionAuthorizationDenied is an unprivileged negative-qualification client.
@@ -128,7 +129,7 @@ func guestDeviceActionProbe(ctx context.Context, output io.Writer, denialExpecte
 		return writeGuestEvidence(output, started.Msg)
 	}
 	var denial *connect.Error
-	if !errors.As(rejected, &denial) || denial.Code() != connect.CodePermissionDenied || denial.Meta().Get("Lindm-Reason") == "" {
+	if !errors.As(rejected, &denial) || denial.Code() != connect.CodePermissionDenied || rpcreason.Get(denial) == "" {
 		return errors.New("server did not explicitly deny negative destructive start authority")
 	}
 	status, err := executor.GetDeviceAction(ctx, connect.NewRequest(input))
@@ -142,7 +143,7 @@ func guestDeviceActionProbe(ctx context.Context, output io.Writer, denialExpecte
 		Code       string    `json:"code"`
 		Reason     string    `json:"reason"`
 		ObservedAt time.Time `json:"observed_at"`
-	}{denial.Code().String(), denial.Meta().Get("Lindm-Reason"), time.Now().UTC()})
+	}{denial.Code().String(), rpcreason.Get(denial), time.Now().UTC()})
 }
 
 // guestNVMeIdentity is a read-only root lab probe. Approval receives the native

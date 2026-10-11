@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -32,6 +31,7 @@ import (
 	devicev1connect "lindm/gen/lindm/device/v1/devicev1connect"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/pki"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -386,9 +386,7 @@ func (f *replayFixture) sign(message proto.Message, key ed25519.PrivateKey) []by
 }
 
 func replayRPCError(code connect.Code, reason string) error {
-	err := connect.NewError(code, errors.New(reason))
-	err.Meta().Set("Lindm-Reason", reason)
-	return err
+	return rpcreason.Error(code, reason)
 }
 
 func replayKey(t *testing.T) ed25519.PrivateKey {

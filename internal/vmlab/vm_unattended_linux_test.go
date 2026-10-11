@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+
+	"lindm/internal/rpcreason"
 )
 
 func TestUnattendedSeedConfinesCredentialsToRootFiles(t *testing.T) {
@@ -82,7 +84,7 @@ func TestUnattendedExhaustionRequiresExactServerDenial(t *testing.T) {
 		{connect.CodeInvalidArgument, "provisioning_token_exhausted", false},
 	} {
 		rpc := connect.NewError(test.code, errors.New("private response must never be recorded"))
-		rpc.Meta().Set("Lindm-Reason", test.reason)
+		rpcreason.Set(rpc, test.reason)
 		reason, err := unattendedExhaustionReason(rpc)
 		if (err == nil) != test.accepted {
 			t.Fatalf("code %s reason %q accepted=%v", test.code, test.reason, err == nil)

@@ -13,6 +13,7 @@ import (
 	updatev1 "lindm/gen/lindm/update/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) GetRollout(ctx context.Context, req *connect.Request[releasemanagementv1.GetRolloutRequest]) (*connect.Response[releasemanagementv1.GetRolloutResponse], error) {
@@ -29,11 +30,11 @@ func (s *Service) GetRollout(ctx context.Context, req *connect.Request[releasema
 		return nil, invalid("invalid_rollout_request")
 	}
 	if s.releasePublisher == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "release_publisher_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "release_publisher_unconfigured")
 	}
 	channel, err := s.releasePublisher.Channel(ctx, req.Msg.GetRing())
 	if err != nil {
-		return nil, rpcError(connect.CodeUnavailable, "release_catalog_unavailable")
+		return nil, rpcreason.Error(connect.CodeUnavailable, "release_catalog_unavailable")
 	}
 	response := &releasemanagementv1.GetRolloutResponse{Channel: channel}
 	pending, err := devicedb.New(s.pool).GetPendingReleaseRollout(ctx, req.Msg.GetRing())
@@ -64,7 +65,7 @@ func (s *Service) SetRollout(ctx context.Context, req *connect.Request[releasema
 		return nil, invalid("invalid_rollout_request")
 	}
 	if s.releasePublisher == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "release_publisher_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "release_publisher_unconfigured")
 	}
 	digest, err := actionDigest(req.Msg)
 	if err != nil {
@@ -86,16 +87,16 @@ func (s *Service) SetRollout(ctx context.Context, req *connect.Request[releasema
 			return err
 		}
 		if _, err := q.GetPendingReleaseRollout(ctx, req.Msg.GetRing()); err == nil {
-			return rpcError(connect.CodeAborted, "release_rollout_pending")
+			return rpcreason.Error(connect.CodeAborted, "release_rollout_pending")
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
 		channel, err := s.releasePublisher.Channel(ctx, req.Msg.GetRing())
 		if err != nil {
-			return rpcError(connect.CodeUnavailable, "release_catalog_unavailable")
+			return rpcreason.Error(connect.CodeUnavailable, "release_catalog_unavailable")
 		}
 		if channel.GetGeneration() != req.Msg.GetExpectedGeneration() {
-			return rpcError(connect.CodeAborted, "release_generation_conflict")
+			return rpcreason.Error(connect.CodeAborted, "release_generation_conflict")
 		}
 		if err := q.InsertReleaseRollout(ctx, devicedb.InsertReleaseRolloutParams{RequestID: id, ActorID: actor.ID, RequestDigest: digest, Ring: req.Msg.GetRing(), ExpectedGeneration: int64(req.Msg.GetExpectedGeneration()), Paused: req.Msg.GetPaused(), EligiblePercentage: int32(req.Msg.GetEligiblePercentage()), Reason: req.Msg.GetReason()}); err != nil {
 			return err
@@ -123,7 +124,7 @@ func (s *Service) SetRollout(ctx context.Context, req *connect.Request[releasema
 		}
 		published, err = s.releasePublisher.SetRolloutRequest(ctx, row.Ring, row.Paused, uint32(row.EligiblePercentage), uint64(row.ExpectedGeneration), row.RequestID.String())
 		if err != nil {
-			return rpcError(connect.CodeUnavailable, "release_publication_pending")
+			return rpcreason.Error(connect.CodeUnavailable, "release_publication_pending")
 		}
 		encoded, err := proto.Marshal(published)
 		if err != nil {

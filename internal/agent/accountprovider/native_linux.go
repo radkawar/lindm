@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +23,8 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/custody"
 )
 
 type localDB struct {
@@ -34,70 +35,33 @@ type localDB struct {
 // nativeRun executes one fixed tool. stdin carries the only secret input any
 // shadow tool receives (chpasswd --encrypted); it never enters argv or env.
 type nativeRun func(ctx context.Context, stdin []byte, path string, args ...string) ([]byte, error)
-type boundedOutput struct{ bytes.Buffer }
 
-func (b *boundedOutput) Write(v []byte) (int, error) {
-	if b.Len()+len(v) > 1<<20 {
-		return 0, errors.New("accountprovider: native output limit")
-	}
-	return b.Buffer.Write(v)
-}
+// runNative keeps the historical policy that any shadow-utils stderr fails the
+// command: diagnostics name users and line numbers, never the stdin token, so
+// the sanitized first line is surfaced for the administrator.
 func runNative(ctx context.Context, stdin []byte, path string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
-	cmd.Dir = "/"
-	cmd.WaitDelay = time.Second
-	if stdin != nil {
-		cmd.Stdin = bytes.NewReader(stdin)
+	result, err := nativeexec.Run(ctx, nativeexec.Command{Path: path, Args: args, Stdin: stdin, Timeout: 20 * time.Second, StdoutLimit: 1 << 20, StderrLimit: 1 << 20})
+	if len(result.Stderr) != 0 {
+		return nil, fmt.Errorf("accountprovider: native diagnostic from %s: %s", filepath.Base(path), result.Diagnostic())
 	}
-	var out, diagnostic boundedOutput
-	cmd.Stdout = &out
-	cmd.Stderr = &diagnostic
-	err := cmd.Run()
-	if diagnostic.Len() != 0 {
-		// Shadow diagnostics name users and line numbers, never the stdin
-		// token; keep a bounded, printable first line for the administrator.
-		line, _, _ := strings.Cut(diagnostic.String(), "\n")
-		line = strings.Map(func(r rune) rune {
-			if r < 0x20 || r > 0x7e {
-				return '?'
-			}
-			return r
-		}, line)
-		if len(line) > 256 {
-			line = line[:256]
-		}
-		return nil, fmt.Errorf("accountprovider: native diagnostic from %s: %s", filepath.Base(path), line)
+	if err != nil {
+		return nil, err
 	}
-	return out.Bytes(), err
+	return result.Stdout, nil
 }
-func protectedRead(path string) (data []byte, err error) {
-	if err = protectedAncestry(filepath.Dir(path)); err != nil {
-		return nil, err
+
+// rootRead reads a root-protected, singly linked account file of at most 4 MiB.
+func rootRead(path string) ([]byte, error) {
+	data, err := custody.ReadRoot(path, 4<<20, false)
+	return data, unsafe(err)
+}
+
+// unsafe maps custody policy failures onto the provider's ErrUnsafe.
+func unsafe(err error) error {
+	if errors.Is(err, custody.ErrUnsafe) {
+		return fmt.Errorf("%w: %w", ErrUnsafe, err)
 	}
-	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-	if err != nil {
-		return nil, err
-	}
-	f := os.NewFile(uintptr(fd), path)
-	defer func() { err = errors.Join(err, f.Close()) }()
-	var st unix.Stat_t
-	if err = unix.Fstat(fd, &st); err != nil {
-		return nil, err
-	}
-	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != 0 || st.Mode&0022 != 0 || st.Nlink != 1 {
-		return nil, ErrUnsafe
-	}
-	data, err = io.ReadAll(io.LimitReader(f, 4<<20+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > 4<<20 {
-		return nil, ErrUnsafe
-	}
-	return data, nil
+	return err
 }
 func parseRecords(data []byte, fields int) (map[string][]string, error) {
 	records := make(map[string][]string)
@@ -127,7 +91,7 @@ func readDatabase(nativeDigest func(string, []byte) ([]byte, error)) (db *localD
 		count  int
 		target *map[string][]string
 	}{{"/etc/passwd", 7, &db.users}, {"/etc/group", 4, &db.groups}, {"/etc/shadow", 9, &db.shadow}, {"/etc/gshadow", 4, &db.gshadow}} {
-		data, e := protectedRead(item.path)
+		data, e := rootRead(item.path)
 		if e != nil {
 			return nil, e
 		}

@@ -20,6 +20,7 @@ import (
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // VMInspectOptions selects a built Linux guest agent and owned scratch parent.
@@ -74,7 +75,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if _, err := NativePackageFormat(manifest.Distribution); err != nil {
+	if _, err := NativePackageFormat(manifestRelease(manifest)); err != nil {
 		return nil, err
 	}
 	architecture, machine, err := inspectArchitecture(manifest.Architecture)
@@ -184,7 +185,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if err != nil {
 		return nil, err
 	}
-	before, err := collectVMTruth(ctx, vm, manifest.Distribution)
+	before, err := collectVMTruth(ctx, vm, manifestRelease(manifest))
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +194,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	// checks for a direct unprivileged inspection's expected permission failures.
 	inspected, inspectErr := vm.runResult(ctx, "sudo -n env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C "+guestAgent+" inspect", nil, maxGuestOutput, 90*time.Second)
 	actual = inspected.Stdout
-	after, err := collectVMTruth(ctx, vm, manifest.Distribution)
+	after, err := collectVMTruth(ctx, vm, manifestRelease(manifest))
 	if err != nil {
 		return nil, err
 	}
@@ -220,13 +221,13 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if err := validator.Validate(observation); err != nil {
 		return nil, errors.New("agent inspection failed NativeObservation validation")
 	}
-	if before.host[0] != manifest.Distribution || (manifest.Distribution != "arch" && before.host[1] != manifest.Version) || before.host[2] != architecture {
+	if before.host[0] != manifest.Distribution || (manifestRelease(manifest).Version.Rule != platform.VersionAbsent && before.host[1] != manifest.Version) || before.host[2] != architecture {
 		return nil, errors.New("guest OS identity does not match the selected manifest")
 	}
 	if err := compareVMObservation(before, observation); err != nil {
 		return nil, saveInspectComparisonFailure(ctx, vm, options.DiagnosticsDir, before.details, after.details, observation.GetHost().GetDetails(), err)
 	}
-	if err := compareVMDetails(before.host[0], before.host[2], before.details, after.details, observation.Host.Details); err != nil {
+	if err := compareVMDetails(before.release(), before.host[2], before.details, after.details, observation.Host.Details); err != nil {
 		return nil, saveInspectComparisonFailure(ctx, vm, options.DiagnosticsDir, before.details, after.details, observation.Host.Details, err)
 	}
 	if err := compareInspectHardware(&hardware, observation.Host.Details); err != nil {
@@ -484,16 +485,21 @@ type vmTruth struct {
 	details  *inventoryv1.NativeDetails
 }
 
-func collectVMTruth(ctx context.Context, vm *guestVM, distribution string) (*vmTruth, error) {
-	family, err := nativeDistributionFamily(distribution)
+// release identifies the guest from its observed os-release ID and VERSION_ID.
+func (t *vmTruth) release() *platform.Release {
+	return platform.Identify(platform.OSRelease{ID: t.host[0], VersionID: t.host[1]})
+}
+
+func collectVMTruth(ctx context.Context, vm *guestVM, release *platform.Release) (*vmTruth, error) {
+	backend, err := nativeBackend(release)
 	if err != nil {
 		return nil, err
 	}
 	command, manager := dpkgTruthCommand, "dpkg"
-	if family != familyAPT {
+	switch backend.PackageDB() {
+	case platform.PackageDBRPM:
 		command, manager = rpmTruthCommand, "rpm"
-	}
-	if family == familyPacman {
+	case platform.PackageDBPacman:
 		command, manager = pacmanTruthCommand, "pacman"
 	}
 	data, err := vm.run(ctx, command, nil, maxGuestOutput, time.Minute)
@@ -514,7 +520,7 @@ func collectVMTruth(ctx context.Context, vm *guestVM, distribution string) (*vmT
 	}
 	truth := &vmTruth{packages: packages, manager: manager}
 	for i := range truth.host {
-		if (lines[i] == "" && (i != 1 || distribution != "arch")) || strings.ContainsAny(lines[i], "\x00\r") {
+		if (lines[i] == "" && (i != 1 || release.Version.Rule != platform.VersionAbsent)) || strings.ContainsAny(lines[i], "\x00\r") {
 			return nil, errors.New("invalid native host truth")
 		}
 		truth.host[i] = lines[i]
@@ -607,10 +613,10 @@ func compareVMObservation(expected *vmTruth, actual *inventoryv1.NativeObservati
 	if actual.Packages.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS || actual.Packages.Backend != expected.manager {
 		return errors.New("agent package collection did not succeed with the native manager")
 	}
-	if err := CheckInventoryPackageHealth(expected.host[0], actual.Packages); err != nil {
+	if err := CheckInventoryPackageHealth(expected.release(), actual.Packages); err != nil {
 		return err
 	}
-	context := inventoryHealthContext{distro: expected.host[0], host: actual.Host, details: actual.Host.Details}
+	context := inventoryHealthContext{release: expected.release(), host: actual.Host, details: actual.Host.Details}
 	if err := checkInventoryMessage(actual.Host.ProtoReflect(), "host", context, false); err != nil {
 		return err
 	}
@@ -653,7 +659,7 @@ func vmHostFields(host *inventoryv1.HostObservation) [6]*inventoryv1.ObservedStr
 // control-plane publications. Arch's rolling os-release defines no VERSION_ID,
 // so its OS version must be an honest UNAVAILABLE, never a fabricated value.
 func vmHostFieldMatches(expected *vmTruth, i int, field *inventoryv1.ObservedString) bool {
-	if i == 1 && expected.host[0] == "arch" && expected.host[i] == "" {
+	if i == 1 && expected.release().Version.Rule == platform.VersionAbsent && expected.host[i] == "" {
 		return field != nil && field.Status == inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE && field.Value == ""
 	}
 	return field != nil && field.Status == inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS && field.Value != "" && field.Value == expected.host[i]

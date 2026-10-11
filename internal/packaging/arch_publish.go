@@ -101,7 +101,7 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 			result = nil
 		}
 	}()
-	repo := filepath.Join(work, "arch")
+	repo := filepath.Join(work, string(FormatArch))
 	if err := mkdir(repo, epoch); err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 		if err != nil {
 			return nil, err
 		}
-		product, version, arch := info["pkgname"][0], info["pkgver"][0], info["arch"][0]
+		product, version, arch := info["pkgname"][0], info["pkgver"][0], info[pkgInfoArch][0]
 		if seen[product] || (architecture != "" && architecture != arch) {
 			return nil, fmt.Errorf("%w: duplicate products or mixed Arch architectures", ErrArtifact)
 		}
@@ -178,7 +178,7 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 	if err := guard.close(ctx, work); err != nil {
 		return nil, err
 	}
-	final := filepath.Join(req.OutputDir, "arch")
+	final := filepath.Join(req.OutputDir, string(FormatArch))
 	if _, err := os.Lstat(final); !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("%w: Arch output already exists or is inaccessible", ErrArtifact)
 	}
@@ -296,7 +296,7 @@ func parseArchInfo(data []byte) (map[string][]string, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	for _, key := range []string{"pkgname", "pkgbase", "pkgver", "pkgdesc", "arch", "size", "builddate", "packager"} {
+	for _, key := range []string{"pkgname", "pkgbase", "pkgver", "pkgdesc", pkgInfoArch, "size", "builddate", "packager"} {
 		if len(fields[key]) != 1 {
 			return nil, fmt.Errorf("%w: missing/duplicate .PKGINFO %s", ErrArtifact, key)
 		}
@@ -316,7 +316,7 @@ func parseArchInfo(data []byte) (map[string][]string, error) {
 	if _, err := parseVersion(version); err != nil || !ok || fields["pkgname"][0] != PackageName || fields["pkgbase"][0] != PackageName {
 		return nil, fmt.Errorf("%w: unsupported Arch product/version", ErrArtifact)
 	}
-	if arch := fields["arch"][0]; arch != "x86_64" && arch != "aarch64" {
+	if arch := fields[pkgInfoArch][0]; arch != "x86_64" && arch != "aarch64" {
 		return nil, ErrArchitecture
 	}
 	for _, key := range []string{"size", "builddate"} {

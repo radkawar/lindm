@@ -19,6 +19,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/advisory/advisorydb"
 	"lindm/internal/advisory/feed"
+	"lindm/internal/platform"
 )
 
 // candidatePage bounds one candidate query: at most 500 records of at most
@@ -82,8 +83,9 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	if err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
+	host := platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion})
 	platformStream := ""
-	if d.OsID == "rhel" {
+	if host.Advisory.PlatformStreams {
 		platformStream, err = rhelStream(d.HostDetails, d.OsVersion, d.Architecture)
 		if err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
@@ -96,7 +98,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		if err := proto.Unmarshal(feeds[i].ConfigBytes, &source); err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
-		if feed.Applies(&source, d.OsID, d.OsVersion, d.Architecture) && (d.OsID != "rhel" || platformStream != "" && source.GetPlatformStream() == platformStream) {
+		if feed.Applies(&source, d.OsID, d.OsVersion, d.Architecture) && (!host.Advisory.PlatformStreams || platformStream != "" && source.GetPlatformStream() == platformStream) {
 			selected = &feeds[i]
 			selectedSource = &source
 			break
@@ -120,9 +122,9 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 			unknown("inventory_stale")
 		}
 	}
-	// Official Arch has no VERSION_ID. Explicit native absence identifies the
-	// rolling product; failed collection and stale host evidence do not.
-	releaseUsable := d.OsVersionStatus.Int16 == 1 || (d.OsID == "arch" && d.OsVersion == "" && d.OsVersionStatus.Int16 == int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE))
+	// A rolling release without VERSION_ID (official Arch) is identified by
+	// explicit native absence; failed collection and stale host evidence are not.
+	releaseUsable := d.OsVersionStatus.Int16 == 1 || (host.Version.Rule == platform.VersionAbsent && d.OsVersionStatus.Int16 == int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE))
 	if !d.HostFinishedAt.Valid || d.HostFinishedAt.Time.After(now) || !now.Before(d.HostFinishedAt.Time.Add(s.inventoryAge)) || d.OsIDStatus.Int16 != 1 || !releaseUsable || d.ArchitectureStatus.Int16 != 1 {
 		unknown("host_inventory_stale_or_failed")
 	}
@@ -133,7 +135,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		unknown("package_collection_failed")
 	}
 	if selected == nil {
-		if d.OsID == "rhel" && platformStream == "" {
+		if host.Advisory.PlatformStreams && platformStream == "" {
 			unknown("rhel_platform_stream_unavailable")
 		} else {
 			unknown("feed_unavailable")
@@ -181,7 +183,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
 		for _, arch := range architectures {
-			if arch == "" || (arch != "all" && arch != "noarch" && (d.OsID != "arch" || arch != "any") && !feed.Applies(selectedSource, d.OsID, d.OsVersion, arch)) {
+			if arch == "" || (arch != "all" && arch != "noarch" && (host.Native().Packages.Backend.PackageDB() != platform.PackageDBPacman || arch != "any") && !feed.Applies(selectedSource, d.OsID, d.OsVersion, arch)) {
 				unknown("package_architecture_uncovered")
 			}
 		}
@@ -247,6 +249,8 @@ func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advis
 		}
 	}
 	findings := make(map[uuid.UUID]advisorydb.InsertAdvisorySetFindingsParams)
+	// Per-stream vendor feeds bind native module name/stream identity.
+	modules := platform.ForFeed(selectedSource.GetDistro(), selectedSource.GetRelease()).Advisory.PlatformStreams
 	afterPosition, afterRecord := int32(-1), uuid.Nil
 matching:
 	for {
@@ -260,7 +264,7 @@ matching:
 				unknown("advisory_record_invalid")
 				break matching
 			}
-			if selectedSource.GetDistro() == "rhel" && !record.GetSourceRecordRejected() {
+			if modules && !record.GetSourceRecordRejected() {
 				if row.ModuleStatus != 1 {
 					unknown("native_module_identity_unavailable")
 					continue

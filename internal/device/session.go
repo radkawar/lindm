@@ -12,6 +12,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devicev1.AcquireSessionRequest]) (*connect.Response[devicev1.AcquireSessionResponse], error) {
@@ -19,7 +20,7 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validAuthorityProof(req.Msg.GetAuthorityProof()) {
 		return nil, invalid("authority_proof")
@@ -92,7 +93,7 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 			return nil
 		}
 		if predecessor > current {
-			return rpcError(connect.CodeFailedPrecondition, "session_predecessor")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "session_predecessor")
 		}
 		if current >= maxSessionReceipts {
 			return errReceiptCapacity
@@ -144,7 +145,7 @@ func (s *Service) GetSyncState(ctx context.Context, req *connect.Request[devicev
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")

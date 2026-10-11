@@ -28,7 +28,7 @@ func Mirror(ctx context.Context, cfg MirrorConfig) (err error) {
 	if cfg.OpenTarget == nil {
 		return errors.New("releaseupdate: streaming target transport required")
 	}
-	if err = protectedDirectory(cfg.Directory); err != nil {
+	if err = ownedDirectory(cfg.Directory); err != nil {
 		return err
 	}
 	lock, err := acquireLock(cfg.Directory)

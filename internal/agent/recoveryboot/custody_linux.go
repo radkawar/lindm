@@ -18,33 +18,20 @@ import (
 	"lindm/internal/custody"
 )
 
-// protectedPath rejects links at every component and uses the shared root/group-0
-// ancestry boundary. The leaf directory must additionally be private.
-func protectedPath(name string, private bool) error {
-	if !filepath.IsAbs(name) || filepath.Clean(name) != name {
-		return errors.New("recoveryboot: absolute_clean_path_required")
+// rootDirectory requires a directory reached by a no-follow walk through
+// root-owned, non-group/world-writable components.
+func rootDirectory(name string) error {
+	f, _, err := custody.OpenRoot(name, unix.O_PATH|unix.O_DIRECTORY)
+	if err != nil {
+		return err
 	}
-	current := "/"
-	for _, component := range strings.Split(name, "/") {
-		current = filepath.Join(current, component)
-		var st unix.Stat_t
-		if err := unix.Lstat(current, &st); err != nil {
-			return err
-		}
-		if !custody.TrustedDirectory(&st) {
-			return errors.New("recoveryboot: unowned_or_linked_directory")
-		}
-		if current == name && private && st.Mode&0077 != 0 {
-			return errors.New("recoveryboot: private_directory_required")
-		}
-	}
-	return nil
+	return f.Close()
 }
 
 // ProvisionKey creates exactly one new one-action key, never loads or overwrites
 // a device key. The caller must register its public key with the signed handoff.
 func ProvisionKey(name string) (ed25519.PrivateKey, error) {
-	if err := protectedPath(filepath.Dir(name), true); err != nil {
+	if err := custody.PrivateDirectory(filepath.Dir(name)); err != nil {
 		return nil, err
 	}
 	_, key, err := ed25519.GenerateKey(rand.Reader)
@@ -73,7 +60,7 @@ func ProvisionKey(name string) (ed25519.PrivateKey, error) {
 // LoadKey cannot create state on reboot. Ordinary device keys are rejected by
 // the handoff public-key binding in Stage and the recovery runtime.
 func LoadKey(name string) (_ ed25519.PrivateKey, err error) {
-	if err := protectedPath(filepath.Dir(name), true); err != nil {
+	if err := custody.PrivateDirectory(filepath.Dir(name)); err != nil {
 		return nil, err
 	}
 	fd, err := unix.Open(name, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
@@ -120,7 +107,7 @@ func syncDirectory(name string) (err error) {
 }
 
 func offTargetState(name string, targets []string) error {
-	if err := protectedPath(name, true); err != nil {
+	if err := custody.PrivateDirectory(name); err != nil {
 		return err
 	}
 	if len(targets) == 0 {
@@ -223,7 +210,7 @@ func WriteCapsule(stateDirectory, actionID string, snapshot []byte) (string, []b
 	if !uuidText(actionID) || len(snapshot) == 0 || len(snapshot) > 4<<20 {
 		return "", nil, errors.New("recoveryboot: invalid_capsule")
 	}
-	if err := protectedPath(stateDirectory, true); err != nil {
+	if err := custody.PrivateDirectory(stateDirectory); err != nil {
 		return "", nil, err
 	}
 	name := filepath.Join(stateDirectory, "lindm-recovery-"+actionID+".capsule")

@@ -28,6 +28,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // The firewall lane's fixed two-guest topology. nic1 of the device and of an
@@ -75,9 +76,10 @@ type firewallLane struct {
 	authority *devlab.ConnectivityProbeAuthority
 	deviceIf  string
 	peerIf    string
-	// distro is the device's os-release ID. It selects the active native
-	// firewall manager the zone coexists with: UFW on Ubuntu, firewalld on Fedora.
-	distro string
+	// release is the device's registry row. Its native package database selects
+	// the active firewall manager the zone coexists with (UFW on dpkg,
+	// firewalld on RPM).
+	release *platform.Release
 	// native maps every foreign nftables table (native manager and lab
 	// baseline) to the digest of its stateless, handle-inclusive listing.
 	native map[string]string
@@ -168,7 +170,9 @@ func firewallTargets(public ed25519.PublicKey) []*agentv1.ConnectivityProbeTarge
 
 // firewallLinkScript assigns persistent static addresses to the NIC with the
 // exact permanent MAC and prints its kernel name once both are usable.
-// Ubuntu's netplan renders systemd-networkd; Fedora uses NetworkManager.
+// Ubuntu's netplan renders systemd-networkd; Debian installer images use
+// ifupdown, whose interfaces file sources interfaces.d; Fedora/EL use
+// NetworkManager.
 const firewallLinkScript = `set -eu
 mac=$1; v4=$2; v6=$3
 ifname=
@@ -203,7 +207,22 @@ EOF
  networkctl reload
  networkctl reconfigure "$ifname"
  ;;
-fedora|rhel|almalinux)
+debian)
+ grep -qx 'source /etc/network/interfaces.d/\*' /etc/network/interfaces
+ cat > /etc/network/interfaces.d/lindm-lab-peer-link <<EOF
+auto $ifname
+iface $ifname inet static
+ address $v4/24
+
+iface $ifname inet6 static
+ address $v6/64
+ accept_ra 0
+ dad-attempts 0
+EOF
+ chmod 0644 /etc/network/interfaces.d/lindm-lab-peer-link
+ ifup "$ifname"
+ ;;
+fedora|rhel|almalinux|rocky)
  cat > /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection <<EOF
 [connection]
 id=lindm-lab-peer-link
@@ -535,11 +554,12 @@ until test "$(ss -Hltn '( sport = :8080 or sport = :8081 or sport = :8083 )' | w
 	if err := lifecycleCommand(ctx, vm, "activate native firewall manager and install lab baseline and oracle listener", script); err != nil {
 		return nil, err
 	}
-	distro, err := vm.run(ctx, ". /etc/os-release; printf '%s' \"$ID\"", nil, 128, 10*time.Second)
+	identity, err := vm.run(ctx, ". /etc/os-release; printf '%s\\n%s' \"$ID\" \"${VERSION_ID-}\"", nil, 128, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	f.distro = string(distro)
+	id, versionID, _ := strings.Cut(string(identity), "\n")
+	f.release = platform.Identify(platform.OSRelease{ID: id, VersionID: versionID})
 	config, err := readGuestAgentConfig(ctx, vm)
 	if err != nil {
 		return nil, err

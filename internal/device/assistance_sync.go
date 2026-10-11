@@ -12,6 +12,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 )
 
 // SyncAssistance exchanges the device's complete observed session state for
@@ -22,7 +23,7 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_assistance_sync")
@@ -115,7 +116,7 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 	// Directives are the device's whole authorization; never emit one the
 	// agent contract would reject.
 	if err := s.rules.Validate(response); err != nil {
-		return nil, rpcError(connect.CodeInternal, "assistance_directive_invalid")
+		return nil, rpcreason.Error(connect.CodeInternal, "assistance_directive_invalid")
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)

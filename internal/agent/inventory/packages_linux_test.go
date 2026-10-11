@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -16,6 +15,7 @@ import (
 	"buf.build/go/protovalidate"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 func TestDPKGInstalledEvidence(t *testing.T) {
@@ -132,9 +132,9 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 		"var/lib/dpkg/status":               {Data: []byte("native db")},
 		"usr/lib/sysimage/rpm/rpmdb.sqlite": {Data: []byte("native db")},
 	}
-	for _, id := range []string{"ubuntu", "debian", "fedora", "rhel", "rocky", "almalinux", "centos", "opensuse-leap", "opensuse-tumbleweed", "sles", "sled"} {
-		t.Run(id, func(t *testing.T) {
-			selected, status := selectBackend(map[string]string{"ID": id, "VERSION_ID": "42"}, fixtureStat(files))
+	for _, release := range [][2]string{{"ubuntu", "24.04"}, {"debian", "13"}, {"fedora", "44"}, {"rhel", "9.8"}, {"rocky", "10.1"}, {"almalinux", "9.6"}, {"centos", "10"}, {"opensuse-leap", "16.0"}, {"opensuse-tumbleweed", "20261001"}, {"sles", "15.7"}, {"sled", "15.7"}, {"linuxmint", "22.3"}} {
+		t.Run(release[0], func(t *testing.T) {
+			selected, status := selectBackend(map[string]string{"ID": release[0], "VERSION_ID": release[1]}, fixtureStat(files))
 			if status != success || selected.name == "" {
 				t.Fatalf("backend=%v status=%s", selected, status)
 			}
@@ -145,6 +145,7 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 		{"ID": "nixos", "VERSION_ID": "42"},
 		{"ID": "unknown", "ID_LIKE": "rhel", "VERSION_ID": "42"},
 		{"ID": "ubuntu"},
+		{"ID": "ubuntu", "VERSION_ID": "25.10"},
 		{"ID": "fedora", "VERSION_ID": "42", "VARIANT_ID": "silverblue"},
 		{"ID": "fedora", "VERSION_ID": "42", "VARIANT_ID": "coreos"},
 		{"ID": "fedora", "VERSION_ID": "42", "VARIANT_ID": "future-atomic"},
@@ -158,7 +159,7 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 		t.Fatalf("missing DB status=%s", status)
 	}
 	files["run/ostree-booted"] = &fstest.MapFile{}
-	if _, status := selectBackend(map[string]string{"ID": "fedora", "VERSION_ID": "42"}, fixtureStat(files)); status != unavailable {
+	if _, status := selectBackend(map[string]string{"ID": "fedora", "VERSION_ID": "44"}, fixtureStat(files)); status != unavailable {
 		t.Fatalf("immutable host status=%s", status)
 	}
 }
@@ -189,6 +190,9 @@ func TestNativeSubprocess(t *testing.T) {
 		{"failure", commandFailure},
 		{"warning", commandFailure},
 		{"truncated", invalid},
+		// A parser that rejects unbounded output stops the tool's whole
+		// process group; the parser's verdict, not the kill, is reported.
+		{"endless", invalid},
 		{"stderr-capacity", capacity},
 		{"wait", inventoryv1.CollectionStatus_COLLECTION_STATUS_TIMEOUT},
 	} {
@@ -203,11 +207,7 @@ func TestNativeSubprocess(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.CommandContext(ctx, executable, "-test.run=^TestInventorySubprocessHelper$")
-			cmd.Env = []string{"LINDM_INVENTORY_HELPER=" + tc.mode, "LANG=C", "LC_ALL=C"}
-			cmd.Dir = "/"
-			cmd.WaitDelay = time.Second
-			status := runCommand(ctx, cmd, func(reader io.Reader) inventoryv1.CollectionStatus {
+			status := runCommand(ctx, helperCommand(executable, "TestInventorySubprocessHelper", "LINDM_INVENTORY_HELPER="+tc.mode), func(reader io.Reader) inventoryv1.CollectionStatus {
 				_, status := parsePackages(ctx, reader, "dpkg", parseLimits{maxRecords, maxOutputBytes})
 				return status
 			})
@@ -236,11 +236,7 @@ func TestNativeExitPrecedesParserRejection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.CommandContext(ctx, executable, "-test.run=^TestInventorySubprocessHelper$")
-			cmd.Env = []string{"LINDM_INVENTORY_HELPER=" + tc.mode, "LANG=C", "LC_ALL=C"}
-			cmd.Dir = "/"
-			cmd.WaitDelay = time.Second
-			status := runCommand(ctx, cmd, func(reader io.Reader) inventoryv1.CollectionStatus {
+			status := runCommand(ctx, helperCommand(executable, "TestInventorySubprocessHelper", "LINDM_INVENTORY_HELPER="+tc.mode), func(reader io.Reader) inventoryv1.CollectionStatus {
 				_, status := readStorageGraph(reader)
 				return status
 			})
@@ -269,6 +265,13 @@ func TestInventorySubprocessHelper(t *testing.T) {
 		}
 	case "truncated":
 		output = "ii \tgood\t1\tamd64\tgood\t1"
+	case "endless":
+		line := strings.Repeat("x", 4096) + "\n"
+		for {
+			if _, err := io.WriteString(os.Stdout, line); err != nil {
+				os.Exit(9)
+			}
+		}
 	case "stderr-capacity":
 		diagnostic = strings.Repeat("x", 65<<10)
 	case "wait":
@@ -366,4 +369,10 @@ func TestRPMModuleIdentityIsNativeEvidence(t *testing.T) {
 	if err != nil || dpkg.Module.Status != unavailable {
 		t.Fatalf("non-RPM module evidence: %v %v", dpkg, err)
 	}
+}
+
+// helperCommand re-executes the test binary through /usr/bin/env so the run
+// takes the production nativeexec path (custody, process group, limits).
+func helperCommand(executable, test, env string) nativeexec.Command {
+	return nativeexec.Command{Path: "/usr/bin/env", Args: []string{env, executable, "-test.run=^" + test + "$"}}
 }

@@ -19,6 +19,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/protodata"
+	"lindm/internal/rpcreason"
 )
 
 const (
@@ -101,7 +102,7 @@ func (s *Service) BeginPackageSnapshot(ctx context.Context, req *connect.Request
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")
@@ -275,7 +276,7 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")
@@ -378,7 +379,7 @@ func (s *Service) CommitPackageSnapshot(ctx context.Context, req *connect.Reques
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")

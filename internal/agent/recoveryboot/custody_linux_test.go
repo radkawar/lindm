@@ -77,3 +77,21 @@ func TestFirmwareDBRequiresExactSignerAndWellFormedList(t *testing.T) {
 		t.Fatal("zero signature size accepted")
 	}
 }
+
+// The strict ancestry walk rejects group-writable directories that the old
+// TrustedDirectory boundary accepted when group-owned by gid 0.
+func TestRootDirectoryRejectsGroupWritable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o770); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chown(dir, 0, 0); err != nil && os.Geteuid() == 0 {
+		t.Fatal(err)
+	}
+	if err := rootDirectory(dir); err == nil {
+		t.Fatal("group-writable directory accepted")
+	}
+	if err := rootDirectory("/usr"); err != nil {
+		t.Fatalf("root-owned directory rejected: %v", err)
+	}
+}

@@ -60,7 +60,7 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 			return nil, err
 		}
 	}
-	if err := lifecycleCommand(ctx, vm, "crash executor during native service job", "systemctl kill --kill-whom=main --signal=KILL lindm-executor.service"); err != nil {
+	if err := lifecycleCommand(ctx, vm, "crash executor during native service job", "systemctl kill "+systemctlKillWhom+"=main --signal=KILL lindm-executor.service"); err != nil {
 		return nil, err
 	}
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {

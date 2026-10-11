@@ -15,11 +15,13 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
-func nativeProvider(ctx context.Context, c NativeConfig) (*Provider, error) {
-	if err := CheckNative(ctx, c); err != nil {
+func nativeProvider(ctx context.Context, c nativeConfig) (*Provider, error) {
+	if err := checkNative(ctx, c); err != nil {
 		return nil, err
 	}
 	if c.NativeDigest == nil {
@@ -28,15 +30,14 @@ func nativeProvider(ctx context.Context, c NativeConfig) (*Provider, error) {
 	p := &Provider{config: Config{Native: c.Native, Platform: c.Platform, ExecutorIncarnation: c.ExecutorIncarnation, NativeDigest: c.NativeDigest}, run: runNative, readDB: func() (*localDB, error) { return readDatabase(c.NativeDigest) }}
 	var version []byte
 	var err error
-	switch c.Platform.GetOsId() {
-	case "ubuntu", "debian":
+	release := platform.Of(c.Platform)
+	if err = release.Gate(platform.Accounts); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
+	}
+	switch release.Native().Packages.Backend.PackageDB() {
+	case platform.PackageDBDpkg:
 		version, err = p.run(ctx, nil, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "passwd")
-	case "fedora", "rhel", "almalinux":
-		// Of Enterprise Linux only EL 9 (shadow-utils 4.9) and EL 10 (4.15) are
-		// qualified; both use the chroot account root.
-		if c.Platform.GetOsId() != "fedora" && !ChrootAccountRoot(c.Platform) {
-			return nil, ErrUnsupported
-		}
+	case platform.PackageDBRPM:
 		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "shadow-utils")
 	default:
 		return nil, ErrUnsupported
@@ -59,7 +60,11 @@ func nativeProvider(ctx context.Context, c NativeConfig) (*Provider, error) {
 // ObserveNative runs only in the fixed read-only helper. Homes are read-only,
 // not hidden; the executor's own ProtectHome policy is never relaxed. It opens
 // no ownership journal and grants no authority to modify an account.
-func ObserveNative(ctx context.Context, c NativeConfig, d *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+func ObserveNative(ctx context.Context, env resourceprovider.NativeEnv, d *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+	return observeNative(ctx, configFromEnv(env), d)
+}
+
+func observeNative(ctx context.Context, c nativeConfig, d *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := resource.ValidateDesired(d); err != nil {
@@ -115,7 +120,7 @@ func (p *Provider) approvedHome(u *resourcev1.LocalUserDesired) error {
 	if root == "" || !filepath.IsAbs(root) || filepath.Clean(root) != root || !strings.HasPrefix(path, root+"/") || filepath.Clean(path) != path {
 		return ErrUnsafe
 	}
-	return protectedAncestry(filepath.Dir(path))
+	return rootDirectory(filepath.Dir(path))
 }
 func (p *Provider) observe(ctx context.Context, d *resourcev1.ResourceDesiredState, l *agentv1.ResourceOwnershipLedger) (*agentv1.ResourceOwnershipSnapshot, *resourcev1.ProbeReceipt, *localDB, error) {
 	if p.config.NativeObserve == nil {

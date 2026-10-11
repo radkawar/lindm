@@ -21,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	pathcustody "lindm/internal/custody"
 )
 
 // These bounds cap native reads as well as the corresponding protobuf fields.
@@ -68,7 +69,7 @@ func openCustody(path string) (_ *custody, err error) {
 		if err = unix.Fstat(fd, &st); err != nil {
 			return nil, err
 		}
-		if st.Mode&unix.S_IFMT != unix.S_IFDIR || st.Uid != 0 || st.Mode&0022 != 0 {
+		if st.Mode&unix.S_IFMT != unix.S_IFDIR || !pathcustody.RootProtected(&st) {
 			return nil, ErrUnsafePath
 		}
 		c.stats = append(c.stats, st)

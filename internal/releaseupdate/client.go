@@ -77,7 +77,7 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	if err := protectedDirectory(cfg.StateDir); err != nil {
+	if err := ownedDirectory(cfg.StateDir); err != nil {
 		return nil, err
 	}
 	root, err := metadata.Root().FromBytes(cfg.BootstrapRoot)
@@ -530,7 +530,7 @@ func (c *Client) stageTarget(ctx context.Context, selection *Selection, target *
 	if !filepath.IsAbs(destination) {
 		return errors.New("releaseupdate: absolute staging destination required")
 	}
-	if err := protectedDirectory(filepath.Dir(destination)); err != nil {
+	if err := ownedDirectory(filepath.Dir(destination)); err != nil {
 		return fmt.Errorf("staging directory: %w", err)
 	}
 	ctx, cancel := context.WithDeadline(ctx, selection.expires)

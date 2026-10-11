@@ -20,6 +20,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -62,13 +63,13 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_recovery_handoff")
 	}
 	if s.identity == nil || s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	id, _ := uuid.Parse(req.Msg.GetActionId())
 	captured, err := devicedb.New(s.pool).GetDeviceAction(ctx, id)
@@ -76,7 +77,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 		return nil, mapErr(err)
 	}
 	if captured.DeviceID != principal.DeviceID || captured.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_action_binding_rejected")
 	}
 	block, rest := pem.Decode(req.Msg.GetCertificatePem())
 	if block == nil || block.Type != "CERTIFICATE" || len(bytes.TrimSpace(rest)) != 0 {
@@ -92,7 +93,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	}
 	handoff := new(agentv1.DeviceActionRecoveryHandoff)
 	if err := s.authority.Verify(ctx, req.Msg.GetHandoffProof(), handoff, 1, principal.PublicKey); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_handoff_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_rejected")
 	}
 	intent, err := actionIntent(captured)
 	if err != nil {
@@ -100,11 +101,11 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	}
 	digest := sha256.Sum256(captured.IntentEnvelope)
 	if intent.GetSpec().GetSanitize().GetRecovery() == nil || !proto.Equal(handoff.GetIntent(), intent) || !bytes.Equal(handoff.GetIntentSha256(), digest[:]) || handoff.GetOriginalBootId() != handoff.GetChallenge().GetBootId() {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_handoff_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_binding_rejected")
 	}
 	planDigest, err := trust.RecoveryPlanDigest(handoff.GetChallenge().GetNativePlan())
 	if err != nil || !bytes.Equal(planDigest[:], handoff.GetNativePlanSha256()) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_plan_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_plan_binding_rejected")
 	}
 	var authorization *identity.Authorization
 	var pair *identity.ApprovalConsumption
@@ -151,12 +152,12 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 		return nil, mapErr(errCertificateRejected)
 	}
 	if _, err := s.authority.VerifyDeviceActionRecoveryHandoff(ctx, req.Msg.GetHandoffProof(), req.Msg.GetCertificatePem(), s.ca, intent, digest, now, trust.MaxDeviceClockSkew); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_handoff_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_rejected")
 	}
 	existing, lookupErr = q.GetDeviceActionRecovery(ctx, id)
 	if lookupErr == nil {
 		if !bytes.Equal(existing.HandoffProof, req.Msg.GetHandoffProof()) {
-			return nil, rpcError(connect.CodeAlreadyExists, "recovery_handoff_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_handoff_conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -170,7 +171,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 		return nil, mapErr(err)
 	}
 	if action.ClosedAt.Valid || action.OutcomeUnknown || len(action.StartGrantEnvelope) > 0 || !now.Before(action.ExpiresAt.Time) || pair == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "recovery_action_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_action_unavailable")
 	}
 	if err := requireActionRestriction(ctx, q, principal.DeviceID, intent.GetSpec()); err != nil {
 		return nil, mapErr(err)
@@ -182,12 +183,12 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 		return nil, executionError(err)
 	}
 	if snapshot.Delegation == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	issued := handoff.GetChallenge().GetIssuedAt().AsTime()
 	expires := handoff.GetChallenge().GetExpiresAt().AsTime()
 	if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(expires) {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_clock_skew")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
 	}
 	for _, limit := range []time.Time{issued.Add(30 * time.Second), issued.Add(authorization.ExpiresAt().Sub(now)), handoff.GetExpiresAt().AsTime(), snapshot.Delegation.GetExpiresAt().AsTime()} {
 		if limit.Before(expires) {
@@ -195,7 +196,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 		}
 	}
 	if !expires.After(issued) || !now.Before(handoff.GetExpiresAt().AsTime()) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_handoff_expired")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_expired")
 	}
 	credential := &agentv1.DeviceActionRecoveryCredential{CredentialId: uuid.NewString(), Handoff: handoff, RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), IssuedAt: timestamppb.New(now), ExpiresAt: handoff.GetExpiresAt()}
 	credentialEnvelope, err := s.authority.Sign(ctx, credential, s.signing.StartKey)

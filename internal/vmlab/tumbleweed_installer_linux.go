@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // tumbleweedInstallerEdition names signed openSUSE Tumbleweed snapshot DVD
@@ -48,17 +49,18 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 	if _, err := time.Parse("20060102", m.GetVersion()); err != nil || len(m.GetVersion()) != 8 {
 		return nil, errors.New("tumbleweed installer requires a dated snapshot version")
 	}
-	if m.GetDistribution() != "opensuse-tumbleweed" || m.GetEdition() != tumbleweedInstallerEdition || m.GetRelease() != "Snapshot"+m.GetVersion() ||
+	release := platform.ForManifest(m.GetDistribution(), m.GetVersion())
+	if release.Lab.Installer != platform.AutoYaST || m.GetEdition() != tumbleweedInstallerEdition || m.GetRelease() != "Snapshot"+m.GetVersion() ||
 		m.GetImageFilename() != "openSUSE-Tumbleweed-DVD-"+architecture+"-Snapshot"+m.GetVersion()+"-Media.iso" ||
 		m.GetChecksumMode() != labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
 		return nil, errors.New("tumbleweed installed image requires a signed snapshot-pinned Tumbleweed DVD manifest")
 	}
 	version := m.GetVersion()
 	return &installerImage{
-		label:   "tumbleweed",
-		media:   "opensuse-tumbleweed",
-		cache:   "tumbleweed-installed",
-		version: tumbleweedInstallerRecipeVersion,
+		label:     "tumbleweed",
+		installer: platform.AutoYaST,
+		cache:     "tumbleweed-installed",
+		version:   tumbleweedInstallerRecipeVersion,
 		// YaST resolves the full DVD repository in memory.
 		memoryMiB: 4096,
 		recipe:    tumbleweedInstallerRecipe,
@@ -66,7 +68,7 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 			return tumbleweedRepositorySnapshot(ctx, m, root, staging, phase)
 		},
 		probes: []installedProbe{
-			{"distribution", ". /etc/os-release; test \"$ID\" = opensuse-tumbleweed"},
+			{"distribution", ". /etc/os-release; test \"$ID\" = " + nativeQuote(release.ID)},
 			// os-release VERSION_ID is the installed snapshot date.
 			{"version", ". /etc/os-release; test \"$VERSION_ID\" = " + nativeQuote(version)},
 			{"source_marker", installerSourceMarkerProbe(installerSourceMarkerPath, m.GetSha256())},

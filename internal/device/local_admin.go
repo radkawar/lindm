@@ -18,6 +18,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/escrow"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -99,7 +100,7 @@ func (s *Service) localAdminMutation(ctx context.Context, message proto.Message,
 		return nil, err
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -159,14 +160,14 @@ func (s *Service) localAdminMutation(ctx context.Context, message proto.Message,
 // reject it while the administrator is present rather than block silently.
 func (s *Service) requireLocalAdminSigning(ctx context.Context) error {
 	if s.signing == nil || s.execution == nil {
-		return rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	snapshot, err := s.execution.Get(ctx)
 	if err != nil {
 		return executionError(err)
 	}
 	if snapshot.Delegation == nil {
-		return rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	if !deviceActionSignerDelegated(snapshot.Delegation, s.signing.PlanKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, localAdminCapability) {
 		return deviceActionCapabilityError(localAdminCapability, "plan")
@@ -193,7 +194,7 @@ func (s *Service) SetLocalAdminPasswordPolicy(ctx context.Context, req *connect.
 	policy := req.Msg.GetPolicy()
 	status, err := s.localAdminMutation(ctx, req.Msg, methodSetLocalAdminPolicy, deviceID, requestID, func(ctx context.Context, q *devicedb.Queries, authorization *identity.Authorization, device devicedb.GetDeviceForUpdateRow, now time.Time) error {
 		if device.State != stateActive {
-			return rpcError(connect.CodeFailedPrecondition, "device_not_active")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_not_active")
 		}
 		interval := policy.GetRotationInterval().AsDuration()
 		due := now
@@ -255,10 +256,10 @@ func (s *Service) RequestLocalAdminPasswordRotation(ctx context.Context, req *co
 	deviceID, requestID := uuid.MustParse(req.Msg.GetDeviceId()), uuid.MustParse(req.Msg.GetRequestId())
 	status, err := s.localAdminMutation(ctx, req.Msg, methodRequestLocalAdminRotate, deviceID, requestID, func(ctx context.Context, q *devicedb.Queries, authorization *identity.Authorization, device devicedb.GetDeviceForUpdateRow, now time.Time) error {
 		if device.State != stateActive {
-			return rpcError(connect.CodeFailedPrecondition, "device_not_active")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_not_active")
 		}
 		if _, err := q.LockLocalAdminPolicy(ctx, deviceID); errors.Is(err, pgx.ErrNoRows) {
-			return rpcError(connect.CodeFailedPrecondition, "local_admin_policy_required")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "local_admin_policy_required")
 		} else if err != nil {
 			return err
 		}
@@ -493,7 +494,7 @@ func (s *Service) mintLocalAdminAction(ctx context.Context, principal devicePrin
 func (s *Service) ingestLocalAdminEscrow(ctx context.Context, q *devicedb.Queries, action devicedb.DeviceAction, intent *agentv1.DeviceActionIntent, incoming *agentv1.DeviceActionEscrow) error {
 	rotate := intent.GetSpec().GetLocalAdminPasswordRotate()
 	if len(action.StartGrantEnvelope) == 0 || s.escrow == nil || incoming.GetEscrowKeyId() != s.escrow.KeyID() || incoming.GetEscrowKeyId() != rotate.GetEscrowKeyId() || incoming.GetLuksUuid() != "" {
-		return rpcError(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
 	}
 	challenge := new(agentv1.DeviceActionChallenge)
 	if err := proto.Unmarshal(action.ChallengeDocument, challenge); err != nil {
@@ -501,7 +502,7 @@ func (s *Service) ingestLocalAdminEscrow(ctx context.Context, q *devicedb.Querie
 	}
 	planned := challenge.GetNativePlan().GetLocalAdminBinding()
 	if planned == nil || !proto.Equal(planned, incoming.GetLocalAdmin()) || planned.GetDeviceId() != intent.GetDeviceId() || planned.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || planned.GetActionId() != intent.GetActionId() || planned.GetAccountName() != rotate.GetAccountName() || planned.GetAccountUid() == 0 {
-		return rpcError(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
 	}
 	canonical, err := proto.MarshalOptions{Deterministic: true}.Marshal(planned)
 	if err != nil {
@@ -510,7 +511,7 @@ func (s *Service) ingestLocalAdminEscrow(ctx context.Context, q *devicedb.Querie
 	retained, err := q.GetDeviceActionEscrow(ctx, action.ID)
 	if err == nil {
 		if !bytes.Equal(retained.BindingDocument, canonical) || !bytes.Equal(retained.SecretSha256, incoming.GetRecoveryKeySha256()) {
-			return rpcError(connect.CodeAlreadyExists, "device_action_escrow_conflict")
+			return rpcreason.Error(connect.CodeAlreadyExists, "device_action_escrow_conflict")
 		}
 		return nil
 	}
@@ -519,10 +520,10 @@ func (s *Service) ingestLocalAdminEscrow(ctx context.Context, q *devicedb.Querie
 	}
 	sealed, err := s.escrow.OpenAndSealLocalAdminPassword(canonical, incoming.GetCiphertext())
 	if err != nil {
-		return rpcError(connect.CodePermissionDenied, "device_action_escrow_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_rejected")
 	}
 	if !bytes.Equal(sealed.SecretSHA256, incoming.GetRecoveryKeySha256()) {
-		return rpcError(connect.CodePermissionDenied, "device_action_escrow_digest_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_digest_rejected")
 	}
 	if _, err := q.InsertDeviceActionEscrow(ctx, devicedb.InsertDeviceActionEscrowParams{ActionID: action.ID, BindingDocument: canonical, KeyID: sealed.KeyID, WrappedKey: sealed.WrappedKey, Ciphertext: sealed.Ciphertext, SecretSha256: sealed.SecretSHA256}); err != nil {
 		return err
@@ -540,7 +541,7 @@ func settleLocalAdminPassword(ctx context.Context, q *devicedb.Queries, action d
 	switch status.GetState() {
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED:
 		if !status.GetVerification().GetVerified() || len(action.EscrowReceiptEnvelope) == 0 {
-			return rpcError(connect.CodeFailedPrecondition, "device_action_escrow_receipt_required")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_escrow_receipt_required")
 		}
 		state = "current"
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN:
@@ -586,10 +587,10 @@ func (s *Service) RevealLocalAdminPassword(ctx context.Context, req *connect.Req
 		return nil, invalid("invalid_local_admin_reveal")
 	}
 	if s.identity == nil || s.escrow == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "escrow_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_unconfigured")
 	}
 	if err := s.identity.RequireRecentStepUp(ctx, 5*time.Minute); err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "recent_step_up_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recent_step_up_required")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -632,7 +633,7 @@ func (s *Service) RevealLocalAdminPassword(ctx context.Context, req *connect.Req
 	}
 	// A FAILED row was verified never set; every other state may be in effect.
 	if row.State == "failed" {
-		return nil, rpcError(connect.CodeFailedPrecondition, "local_admin_password_not_in_effect")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "local_admin_password_not_in_effect")
 	}
 	stored, err := q.GetDeviceActionEscrow(ctx, id)
 	if err != nil {
@@ -672,7 +673,7 @@ func (s *Service) RevealLocalAdminPassword(ctx context.Context, req *connect.Req
 	}
 	password, err := s.escrow.RevealLocalAdminPassword(stored.BindingDocument, &escrow.Record{KeyID: stored.KeyID, WrappedKey: stored.WrappedKey, Ciphertext: stored.Ciphertext, SecretSHA256: stored.SecretSha256})
 	if err != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "escrow_custody_rejected")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_custody_rejected")
 	}
 	return noStore(&adminv1.RevealLocalAdminPasswordResponse{Password: password, Escrow: localAdminEscrowMessage(row), RotationDueAt: rotationDue}), nil
 }

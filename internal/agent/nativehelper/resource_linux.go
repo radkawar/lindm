@@ -8,7 +8,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -17,15 +16,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
-	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/accountprovider"
 	"lindm/internal/agent/config"
-	"lindm/internal/agent/definitionprovider"
-	"lindm/internal/agent/fileprovider"
-	"lindm/internal/agent/firewallprovider"
-	"lindm/internal/agent/passwordprovider"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/statefs"
-	"lindm/internal/agent/sysctlprovider"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
@@ -67,7 +62,7 @@ func resourceDirectory(stateDirectory, category, id string, create bool) (string
 }
 
 // LaunchResource uses the same one-use native-preflight handshake as package
-// transactions. Paths and capabilities come only from this closed kind switch.
+// transactions. Paths and capabilities come only from the closed kind registry.
 func LaunchResource(ctx context.Context, stateDirectory string, input *agentv1.NativeResourceTransactionRequest, authorize func(context.Context) (*agentv1.NativeEffectPermit, error)) (*agentv1.ResourceOwnershipSnapshot, error) {
 	request := proto.CloneOf(input)
 	if request == nil {
@@ -85,16 +80,20 @@ func LaunchResource(ctx context.Context, stateDirectory string, input *agentv1.N
 	if err := resource.ValidatePlan(request.GetPlan()); err != nil {
 		return nil, err
 	}
+	kind, err := effectKind(request.GetPlan().GetRef().GetKind())
+	if err != nil {
+		return nil, err
+	}
 	directory, err := resourceDirectory(stateDirectory, "resource-transactions", request.GetActionId(), true)
 	if err != nil {
 		return nil, err
 	}
-	if kind := request.GetPlan().GetRef().GetKind(); kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER || kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP {
-		if err := prepareAccountRoot(directory, accountprovider.ChrootAccountRoot(request.GetPlan().GetBackend().GetProduct())); err != nil {
+	if kind.prepare != nil {
+		if err := kind.prepare(directory, request); err != nil {
 			return nil, err
 		}
 	}
-	properties, err := resourceProperties(directory, request)
+	properties, err := resourceProperties(kind, directory, request)
 	if err != nil {
 		return nil, err
 	}
@@ -139,38 +138,17 @@ func RunResource(ctx context.Context, document *config.Document, actionID string
 	if err := writeProtected(directory, "apply-invocation.pb", encoded); err != nil {
 		return err
 	}
-	return serveEffect(ctx, directory, encoded, request.GetNonce(), func(ctx context.Context, gate func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error) {
-		platform := request.GetPlan().GetBackend().GetProduct()
-		incarnation := request.GetBefore().GetObservation().GetMetadata().GetExecutorIncarnation()
-		switch request.GetPlan().GetRef().GetKind() {
-		case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
-			return fileprovider.ExecuteNative(ctx, fileprovider.NativeConfig{Native: document.Proto.GetFileProvider(), Platform: platform, ExecutorIncarnation: incarnation, ProtectedPaths: document.ProtectedPaths}, request, gate)
-		case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:
-			return nil, accountprovider.ExecuteNative(ctx, accountprovider.NativeConfig{Native: document.Proto.GetAccountProvider(), Platform: platform, ExecutorIncarnation: incarnation, AccountRoot: filepath.Join(directory, "account-root"), NativeDigest: custody.Digest}, request, gate)
-		case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
-			return sysctlprovider.ExecuteNative(ctx, sysctlprovider.NativeConfig{Native: document.Proto.GetSysctlProvider(), Platform: platform, ExecutorIncarnation: incarnation}, request, gate)
-		case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
-			return definitionprovider.ExecuteNative(ctx, definitionprovider.NativeConfig{Platform: platform, ExecutorIncarnation: incarnation, ScratchDirectory: directory}, request, gate)
-		case resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:
-			return passwordprovider.ExecuteNative(ctx, document.Proto.GetPasswordProvider(), request, gate)
-		case resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:
-			return applyFirewall(ctx, document, request, gate)
-		default:
-			return nil, errors.New("native_resource_kind_not_supported")
-		}
-	})
-}
-
-func applyFirewall(ctx context.Context, document *config.Document, request *agentv1.NativeResourceTransactionRequest, gate func(context.Context) error) (_ *agentv1.ResourceOwnershipSnapshot, resultErr error) {
-	guard, closeGuard, err := newFirewallGuard(ctx, document, request)
+	kind, err := effectKind(request.GetPlan().GetRef().GetKind())
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer func() { resultErr = errors.Join(resultErr, closeGuard()) }()
-	if err := firewallprovider.ApplyNative(ctx, document.Proto.GetFirewallProvider(), request, guard, gate); err != nil {
-		return nil, err
+	env := resourceprovider.NativeEnv{
+		Config: document.Proto, ProtectedPaths: document.ProtectedPaths, Directory: directory, Digest: custody.Digest,
+		Platform: request.GetPlan().GetBackend().GetProduct(), ExecutorIncarnation: request.GetBefore().GetObservation().GetMetadata().GetExecutorIncarnation(),
 	}
-	return firewallprovider.ReadNative(ctx, document.Proto.GetFirewallProvider(), request.GetBefore().GetObservation())
+	return serveEffect(ctx, directory, encoded, request.GetNonce(), func(ctx context.Context, gate func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error) {
+		return kind.apply(ctx, document, env, request, gate)
+	})
 }
 
 func setProperty(properties []unitProperty, name string, value any) []unitProperty {
@@ -183,130 +161,49 @@ func setProperty(properties []unitProperty, name string, value any) []unitProper
 	return append(properties, unitProperty{Name: name, Value: dbus.MakeVariant(value)})
 }
 
-func resourceProperties(directory string, request *agentv1.NativeResourceTransactionRequest) ([]unitProperty, error) {
+func resourceProperties(kind nativeKind, directory string, request *agentv1.NativeResourceTransactionRequest) ([]unitProperty, error) {
 	desired := resource.PlanDesired(request.GetPlan())
 	if desired == nil {
 		return nil, errors.New("native_resource_desired_missing")
 	}
-	paths := []string{directory}
-	caps := uint64(1) << unix.CAP_DAC_READ_SEARCH
-	privateNetwork := true
-	kernelTunables := true
-	protectHome := "yes"
-	families := []string{"AF_UNIX"}
-	var accountRoot string
-	addFileCaps := func() {
-		for _, capability := range []uint{unix.CAP_CHOWN, unix.CAP_DAC_OVERRIDE, unix.CAP_FOWNER, unix.CAP_FSETID, unix.CAP_LEASE} {
-			caps |= uint64(1) << capability
-		}
+	sandbox := effectSandbox{
+		paths: []string{directory}, caps: uint64(1) << unix.CAP_DAC_READ_SEARCH, privateNetwork: true, kernelTunables: true,
+		protectHome: "yes", families: []string{"AF_UNIX"}, memoryMax: 512 << 20,
 	}
-	switch desired.GetRef().GetKind() {
-	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
-		paths = append(paths, filepath.Dir(desired.GetManagedFile().GetPath()))
-		addFileCaps()
-	case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:
-		accountRoot = filepath.Join(directory, "account-root")
-		paths = append(paths, filepath.Join(accountRoot, "etc"))
-		addFileCaps()
-		protectHome = "read-only"
-		caps |= uint64(1) << unix.CAP_SYS_CHROOT
-		privateNetwork = false
-		families = append(families, "AF_INET", "AF_INET6")
-		if user := desired.GetLocalUser(); user != nil && user.GetHome().GetCreation() == resourcev1.HomeCreation_HOME_CREATION_CREATE_IF_ABSENT {
-			paths = append(paths, filepath.Dir(user.GetHomeDirectory()))
-		}
-	case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
-		key := desired.GetSysctl().GetKey()
-		if strings.HasPrefix(key, "net.") {
-			privateNetwork = false
-		}
-		if sysctlprovider.NeedsRuntimeWrite(request) {
-			// ProtectKernelTunables=no leaves /proc/sys writable; a bind mount of
-			// the procfs file itself is refused by SELinux on Fedora.
-			kernelTunables = false
-			if strings.HasPrefix(key, "net.") {
-				caps |= uint64(1) << unix.CAP_NET_ADMIN
-				privateNetwork = false
-			} else {
-				caps |= uint64(1) << unix.CAP_SYS_ADMIN
-			}
-		}
-		if sysctlprovider.NeedsPersistenceWrite(request) {
-			paths = append(paths, filepath.Dir(sysctlprovider.StanzaPath(key)))
-		}
-		addFileCaps()
-	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
-		path, err := definitionprovider.DefinitionPath(desired)
-		if err != nil {
-			return nil, err
-		}
-		parent := filepath.Dir(path)
-		// Creating a missing drop-in directory, or releasing one this ledger
-		// created, writes the unit root itself.
-		createdParent := request.GetPlan().GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && request.GetOwnership().GetBaseline().GetDefinitionFile().GetParentMissing()
-		if _, err := os.Lstat(parent); errors.Is(err, os.ErrNotExist) || createdParent {
-			parent = filepath.Dir(parent)
-		} else if err != nil {
-			return nil, err
-		}
-		paths = append(paths, parent)
-		addFileCaps()
-	case resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:
-		// Atomic login.defs replacement needs its parent. Native authselect also
-		// rewrites /etc/nsswitch.conf and its PAM/dconf symlinks, not a file bind.
-		paths = append(paths, "/etc")
-		addFileCaps()
-		switch request.GetPlan().GetBackend().GetProduct().GetOsId() {
-		case "ubuntu":
-			paths = append(paths, "/usr/share/pam-configs", "/var/lib/pam", "/var/cache/debconf")
-		case "fedora", "rhel", "almalinux":
-			paths = append(paths, "/var/lib/authselect")
-		default:
-			return nil, errors.New("native_password_platform_not_supported")
-		}
-	case resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:
-		paths = append(paths, firewallprovider.StateDirectory, "/var/lib/lindm/connectivity-guard")
-		addFileCaps()
-		caps |= uint64(1)<<unix.CAP_NET_ADMIN | uint64(1)<<unix.CAP_NET_RAW
-		privateNetwork = false
-		families = append(families, "AF_INET", "AF_INET6", "AF_NETLINK")
-	default:
-		return nil, errors.New("native_resource_kind_not_supported")
+	if err := kind.effect(&sandbox, directory, request, desired); err != nil {
+		return nil, err
 	}
 	properties := transientProperties(directory, request.GetActionId(), "apply")
 	properties = setProperty(properties, "Description", "Lindm bounded native resource transaction")
 	properties = setProperty(properties, "ExecStart", []unitExec{{Path: helperExecutable, Arguments: []string{helperExecutable, "resource-transaction", "-transaction", request.GetActionId()}}})
-	properties = setProperty(properties, "ReadWritePaths", paths)
-	properties = setProperty(properties, "CapabilityBoundingSet", caps)
-	properties = setProperty(properties, "PrivateNetwork", privateNetwork)
-	properties = setProperty(properties, "ProtectHome", protectHome)
-	properties = setProperty(properties, "ProtectKernelTunables", kernelTunables)
-	properties = setProperty(properties, "RestrictAddressFamilies", struct {
-		AllowList bool
-		Families  []string
-	}{true, families})
+	properties = setProperty(properties, "ReadWritePaths", sandbox.paths)
+	properties = setProperty(properties, "CapabilityBoundingSet", sandbox.caps)
+	properties = setProperty(properties, "PrivateNetwork", sandbox.privateNetwork)
+	properties = setProperty(properties, "ProtectHome", sandbox.protectHome)
+	properties = setProperty(properties, "ProtectKernelTunables", sandbox.kernelTunables)
+	properties = setProperty(properties, "RestrictAddressFamilies", addressFamilies(sandbox.families...))
 	properties = setProperty(properties, "RestrictSUIDSGID", true)
 	properties = setProperty(properties, "NoNewPrivileges", true)
-	if accountRoot != "" {
-		properties = setProperty(properties, "BindPaths", accountRootBinds(accountRoot, request.GetPlan().GetBackend().GetProduct()))
-		if accountprovider.ChrootAccountRoot(request.GetPlan().GetBackend().GetProduct()) {
+	if sandbox.accountRoot != "" {
+		chroot := platform.Of(request.GetPlan().GetBackend().GetProduct()).Native().Quirks.AccountChroot
+		properties = setProperty(properties, "BindPaths", accountRootBinds(sandbox.accountRoot, chroot))
+		if chroot {
 			// The bound procfs lacks the unit's own ProtectKernelTunables and
 			// ProtectKernelLogs overmounts; repeat them inside the account root.
 			readOnly := make([]string, 0, len(protectedProcEntries))
 			for _, entry := range protectedProcEntries {
-				readOnly = append(readOnly, "-"+filepath.Join(accountRoot, "proc", entry))
+				readOnly = append(readOnly, "-"+filepath.Join(sandbox.accountRoot, "proc", entry))
 			}
 			properties = setProperty(properties, "ReadOnlyPaths", readOnly)
-			properties = setProperty(properties, "InaccessiblePaths", []string{"-" + filepath.Join(accountRoot, "proc", "kmsg")})
+			properties = setProperty(properties, "InaccessiblePaths", []string{"-" + filepath.Join(sandbox.accountRoot, "proc", "kmsg")})
 			// The tools' own login-shell check resolves the host shells there.
-			properties = setProperty(properties, "BindReadOnlyPaths", []bindPath{{"/usr", filepath.Join(accountRoot, "usr"), false, 0}})
+			properties = setProperty(properties, "BindReadOnlyPaths", []bindPath{{"/usr", filepath.Join(sandbox.accountRoot, "usr"), false, 0}})
 		}
 	}
-	properties = setProperty(properties, "MemoryMax", uint64(512<<20))
+	properties = setProperty(properties, "MemoryMax", sandbox.memoryMax)
 	properties = setProperty(properties, "TasksMax", uint64(64))
-	if desired.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE {
-		properties = setProperty(properties, "MemoryMax", uint64(128<<20))
-		properties = setProperty(properties, "RuntimeMaxUSec", uint64(time.Minute/time.Microsecond))
+	if sandbox.runtimeMax != 0 {
+		properties = setProperty(properties, "RuntimeMaxUSec", uint64(sandbox.runtimeMax/time.Microsecond))
 	}
 	return properties, nil
 }
@@ -323,12 +220,12 @@ type bindPath struct {
 }
 
 // accountRootBinds exposes the host /etc to the account helper; a chroot
-// product (see accountprovider.ChrootAccountRoot) also needs the host procfs
+// product (platform Quirks.AccountChroot) also needs the host procfs
 // for SELinux file-creation contexts and selinuxfs for chage's access check.
 // Neither is recursive, so no other mount below them is exposed.
-func accountRootBinds(accountRoot string, platform *resourcev1.PlatformProduct) []bindPath {
+func accountRootBinds(accountRoot string, chroot bool) []bindPath {
 	binds := []bindPath{{"/etc", filepath.Join(accountRoot, "etc"), false, 0}}
-	if accountprovider.ChrootAccountRoot(platform) {
+	if chroot {
 		binds = append(binds, bindPath{"/proc", filepath.Join(accountRoot, "proc"), false, 0}, bindPath{"/sys/fs/selinux", filepath.Join(accountRoot, "sys", "fs", "selinux"), false, 0})
 	}
 	return binds
@@ -340,10 +237,10 @@ func prepareAccountRoot(directory string, chroot bool) error {
 		return err
 	}
 	defer func() { _ = unix.Close(parent) }()
-	if err := unix.Mkdirat(parent, "account-root", 0700); err != nil && !errors.Is(err, unix.EEXIST) {
+	if err := unix.Mkdirat(parent, accountprovider.NativeRootDirectory, 0700); err != nil && !errors.Is(err, unix.EEXIST) {
 		return err
 	}
-	root, err := statefs.OpenDirectory(filepath.Join(directory, "account-root"))
+	root, err := statefs.OpenDirectory(filepath.Join(directory, accountprovider.NativeRootDirectory))
 	if err != nil {
 		return err
 	}
@@ -370,7 +267,7 @@ func prepareAccountRoot(directory string, chroot bool) error {
 			return err
 		}
 	}
-	target, err := statefs.OpenDirectory(filepath.Join(directory, "account-root", "etc"))
+	target, err := statefs.OpenDirectory(filepath.Join(directory, accountprovider.NativeRootDirectory, "etc"))
 	if err != nil {
 		return err
 	}

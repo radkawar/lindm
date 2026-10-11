@@ -11,6 +11,9 @@ const (
 	FormatArch Format = "arch"
 )
 
+// pkgInfoArch is the pacman .PKGINFO architecture field key.
+const pkgInfoArch = "arch"
+
 // Custody separates development package-signing keys from production custody.
 // Production keys are never generated here.
 type Custody string

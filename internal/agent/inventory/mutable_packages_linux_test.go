@@ -19,7 +19,7 @@ func TestMutableDistributionPackageManagerIdentity(t *testing.T) {
 		{"debian", "13", "var/lib/dpkg/status", "dpkg", "ii \tlindm-agent\t0.1.0\tamd64\tlindm-agent\t0.1.0\n"},
 		{"rocky", "9.6", "var/lib/rpm/rpmdb.sqlite", "rpm", "lindm-agent\t0\t0.1.0\t1\tx86_64\t(none)\n"},
 		{"almalinux", "9.6", "var/lib/rpm/rpmdb.sqlite", "rpm", "lindm-agent\t0\t0.1.0\t1\tx86_64\t(none)\n"},
-		{"opensuse-leap", "15.6", "var/lib/rpm/Packages", "rpm", "lindm-agent\t0\t0.1.0\t1\tx86_64\t(none)\n"},
+		{"sles", "15.7", "var/lib/rpm/Packages", "rpm", "lindm-agent\t0\t0.1.0\t1\tx86_64\t(none)\n"},
 		// Leap 16.0 Build18.75 images ship only the ndb Index.db/Packages.db pair.
 		{"opensuse-leap", "16.0", "usr/lib/sysimage/rpm/Packages.db", "rpm", "lindm-agent\t0\t0.1.0\t1\taarch64\t(none)\n"},
 		{"opensuse-tumbleweed", "20261001", "usr/lib/sysimage/rpm/rpmdb.sqlite", "rpm", "lindm-agent\t0\t0.1.0\t1\tx86_64\t(none)\n"},

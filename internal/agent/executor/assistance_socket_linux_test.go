@@ -18,6 +18,7 @@ import (
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/rpcreason"
 )
 
 // serveSessionSocket binds the real session listener in a temporary directory.
@@ -110,7 +111,7 @@ func TestSessionSocketBindsPeerCredentialToLogindSession(t *testing.T) {
 	f.setLogind("42", func(s *actionprovider.LogindSession) { s.Locked = true })
 	_, err = client.SyncSession(t.Context(), connect.NewRequest(&agentv1.SyncSessionRequest{}))
 	var connectErr *connect.Error
-	if connect.CodeOf(err) != connect.CodePermissionDenied || !errors.As(err, &connectErr) || connectErr.Meta().Get("Lindm-Reason") != "no_graphical_session" {
+	if connect.CodeOf(err) != connect.CodePermissionDenied || !errors.As(err, &connectErr) || rpcreason.Get(connectErr) != "no_graphical_session" {
 		t.Fatalf("locked caller: %v", err)
 	}
 }

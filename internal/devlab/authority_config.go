@@ -63,11 +63,7 @@ func validateAuthorityFixture(dir string) error {
 		return errors.New("authority fixture manifest binding changed")
 	}
 	for _, name := range []string{"transport-ca.crt", "transport-ca.key", "device-ca.crt", "device-ca.key", "server.crt", "server.key", "postgres-password", "database-url", "migration-database-url", "console-secret", "directory-secret", "owner-password"} {
-		path := filepath.Join(dir, name)
-		if err := protected(path, false); err != nil {
-			return err
-		}
-		data, err := os.ReadFile(path)
+		data, err := readOwned(filepath.Join(dir, name))
 		if err != nil {
 			return err
 		}

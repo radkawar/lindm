@@ -67,6 +67,32 @@ func TestPasswordPinsAreMinorExact(t *testing.T) {
 	}
 }
 
+func TestForFeedReleaseConventions(t *testing.T) {
+	for _, test := range []struct {
+		distro, release, key string
+	}{
+		{"ubuntu", "24.04", "ubuntu-24.04"},
+		{"ubuntu", "noble", "ubuntu-24.04"},
+		{"ubuntu", "jammy", ""},
+		{"rhel", "9", "rhel-9"},
+		{"rhel", "9.4", "rhel-9"},
+		{"rhel", "9.4.1", ""},
+		{"sles", "15.6", "sles-15"},
+		{"arch", "rolling", "arch"},
+		{"arch", "", ""},
+		{"opensuse-tumbleweed", "rolling", "opensuse-tumbleweed"},
+		{"opensuse-tumbleweed", "20240615", ""},
+	} {
+		if got := ForFeed(test.distro, test.release); got.Key != test.key {
+			t.Errorf("ForFeed(%q, %q) = %q, want %q", test.distro, test.release, got.Key, test.key)
+		}
+	}
+	arch, tumbleweed, noble := ForFeed("arch", "rolling"), ForFeed("opensuse-tumbleweed", "rolling"), ForFeed("ubuntu", "24.04")
+	if arch.FeedRelease("") != "rolling" || tumbleweed.FeedRelease("20261007") != "rolling" || noble.FeedRelease("noble") != "24.04" || noble.FeedRelease("24.04") != "24.04" {
+		t.Fatal("observed releases lost their feed spelling")
+	}
+}
+
 // TestRegistryConsistent catches registry rows that providers cannot act on.
 func TestRegistryConsistent(t *testing.T) {
 	var keys []string
@@ -85,7 +111,7 @@ func TestRegistryConsistent(t *testing.T) {
 		if (r.Supported(Packages) || r.Supported(Inventory) || r.Supported(Lifecycle)) && n.Packages.Backend == BackendNone {
 			t.Errorf("%s: package capability without a backend", r.Key)
 		}
-		if r.Supported(Advisories) && r.Advisory.Feed == "" {
+		if r.Supported(Advisories) && (len(r.Advisory.Feeds) == 0 || r.Advisory.Ecosystem == "") {
 			t.Errorf("%s: advisories without a feed", r.Key)
 		}
 		for c := range r.Gates {
@@ -116,4 +142,43 @@ func overlaps(a, b *Release) bool {
 		}
 	}
 	return false
+}
+
+// Natively qualified host providers on the arm64 resource lane: Debian 12
+// (systemd 252 floor) and 13, Ubuntu 22.04 without definitions (systemd 249),
+// Rocky Linux 9.8 and 10.2 with the EL chroot account root.
+func TestNativelyQualifiedHostResourceReleases(t *testing.T) {
+	for _, tc := range []struct {
+		id, version string
+		floor       int
+		pins        PasswordPins
+		chroot      bool
+		definitions bool
+	}{
+		{"debian", "12", 252, PasswordPins{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}, false, true},
+		{"debian", "13", 255, PasswordPins{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}, false, true},
+		{"ubuntu", "22.04", 255, PasswordPins{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}, false, false},
+		{"rocky", "9.8", 252, PasswordPins{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}, true, true},
+		{"rocky", "10.2", 255, PasswordPins{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}, true, true},
+	} {
+		r := Identify(OSRelease{ID: tc.id, VersionID: tc.version})
+		for _, c := range []Capability{Packages, Accounts, Sysctl, Firewall, Password} {
+			if err := r.Gate(c); err != nil {
+				t.Errorf("%s %s %s gated: %v", tc.id, tc.version, c, err)
+			}
+		}
+		if (r.Gate(Definitions) == nil) != tc.definitions {
+			t.Errorf("%s %s definitions supported=%t", tc.id, tc.version, !tc.definitions)
+		}
+		q := r.Native().Quirks
+		if q.SystemdFloor != tc.floor || q.AccountChroot != tc.chroot {
+			t.Errorf("%s %s quirks %+v", tc.id, tc.version, q)
+		}
+		if pins, ok := r.PasswordPins(tc.version); !ok || pins != tc.pins {
+			t.Errorf("%s %s pins %+v %t", tc.id, tc.version, pins, ok)
+		}
+	}
+	if err := Identify(OSRelease{ID: "rocky", VersionID: "8.10"}).Gate(Sysctl); err == nil {
+		t.Error("Rocky Linux 8 host providers admitted")
+	}
 }

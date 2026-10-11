@@ -26,6 +26,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/actionprovider"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -58,6 +59,8 @@ type Provider struct {
 	mu      sync.Mutex
 	closed  bool
 }
+
+var _ resourceprovider.Provider = (*Provider)(nil)
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
@@ -212,6 +215,16 @@ func matchesEscrow(native *actionprovider.RootEncryptionEvidence, recovery actio
 	v := r.GetVerification()
 	escrow := v.GetEscrow()
 	return intent.GetActionId() == recovery.ActionID && proto.Equal(intent.GetSpec().GetEscrowRotate().GetTarget(), native.Target) && v.GetVerified() && escrow != nil && escrow.GetLuksUuid() == native.Target.GetLuksUuid() && escrow.GetNewKeyslot() == recovery.Keyslot && len(recovery.KeySHA256) == sha256.Size && bytes.Equal(escrow.GetRecoveryKeySha256(), recovery.KeySHA256) && bytes.Equal(v.GetAfter().GetMetadataSha256(), native.MetadataSHA256)
+}
+
+// Observe reads root-encryption compliance through the native observer.
+func (p *Provider) Observe(ctx context.Context, d *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.desired(d); err != nil {
+		return nil, err
+	}
+	return p.observe(ctx, d.GetEncryptionCompliance())
 }
 
 func (p *Provider) Plan(ctx context.Context, d *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {

@@ -18,6 +18,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/gen/lindm/recovery/v1/recoveryv1connect"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -54,13 +55,13 @@ func (s *Service) authenticateRecovery(ctx context.Context, envelope, proof []by
 	digest := sha256.Sum256(envelope)
 	row, err := devicedb.New(s.pool).GetRecoveryCredential(ctx, digest[:])
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, rpcError(connect.CodeUnauthenticated, "recovery_credential_rejected")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "recovery_credential_rejected")
 	}
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if !bytes.Equal(row.CredentialEnvelope, envelope) {
-		return nil, rpcError(connect.CodeUnauthenticated, "recovery_credential_rejected")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "recovery_credential_rejected")
 	}
 	credential := new(agentv1.DeviceActionRecoveryCredential)
 	if proto.Unmarshal(row.CredentialDocument, credential) != nil || !bytes.Equal(credential.GetHandoff().GetRecoveryPublicKey(), row.PublicKey) {
@@ -73,9 +74,9 @@ func (s *Service) authenticateRecovery(ctx context.Context, envelope, proof []by
 	verified, err := s.authority.VerifyRecoveryRequestProof(ctx, proof, envelope, credential, operation, payload, now)
 	if err != nil {
 		if errors.Is(err, trust.ErrRecoveryRequestPayloadMismatch) || errors.Is(err, trust.ErrRecoveryRequestClockAhead) || errors.Is(err, trust.ErrRecoveryRequestExpired) {
-			return nil, rpcError(connect.CodePermissionDenied, err.Error())
+			return nil, rpcreason.Error(connect.CodePermissionDenied, err.Error())
 		}
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_request_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_request_rejected")
 	}
 	action, err := devicedb.New(s.pool).GetDeviceAction(ctx, row.ActionID)
 	if err != nil {
@@ -129,7 +130,7 @@ func lockRecovery(ctx context.Context, q *devicedb.Queries, admission *recoveryA
 	// Proof freshness is checked again after locks. Historical reads and terminal
 	// reports can reconcile expired credentials; no such path grants a new effect.
 	if now.Before(admission.proof.GetIssuedAt().AsTime()) || !now.Before(admission.proof.GetExpiresAt().AsTime()) || (!history && !now.Before(row.ExpiresAt.Time)) {
-		return devicedb.DeviceAction{}, devicedb.DeviceActionRecovery{}, time.Time{}, rpcError(connect.CodePermissionDenied, "recovery_authority_expired")
+		return devicedb.DeviceAction{}, devicedb.DeviceActionRecovery{}, time.Time{}, rpcreason.Error(connect.CodePermissionDenied, "recovery_authority_expired")
 	}
 	return action, row, now, nil
 }
@@ -144,7 +145,7 @@ func recoveryRequestReplay(ctx context.Context, q *devicedb.Queries, admission *
 		return false, err
 	}
 	if !bytes.Equal(receipt.RequestSha256, admission.proofSHA256[:]) || !bytes.Equal(receipt.Nonce, admission.proof.GetNonce()) {
-		return false, rpcError(connect.CodeAlreadyExists, "recovery_request_conflict")
+		return false, rpcreason.Error(connect.CodeAlreadyExists, "recovery_request_conflict")
 	}
 	if proto.Unmarshal(receipt.ResponseDocument, response) != nil {
 		return false, errInternalState
@@ -157,7 +158,7 @@ func storeRecoveryRequest(ctx context.Context, q *devicedb.Queries, admission *r
 		return err
 	}
 	if count >= 262144 {
-		return rpcError(connect.CodeResourceExhausted, "recovery_request_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "recovery_request_capacity")
 	}
 	encoded, err := proto.Marshal(response)
 	if err != nil {
@@ -192,14 +193,14 @@ func recoveryJournal(row devicedb.DeviceActionRecovery) (*agentv1.RecoveryJourna
 }
 func recoveryJournalDocument(journal *agentv1.RecoveryJournal, checkpoint *agentv1.RecoveryCheckpoint, action devicedb.DeviceAction, row devicedb.DeviceActionRecovery, credential *agentv1.DeviceActionRecoveryCredential, root *agentv1.ExecutionRoot, delegation []byte) ([]byte, error) {
 	if journal == nil || proto.Size(journal) > 512<<10 || !bytes.Equal(journal.GetCredentialEnvelope(), row.CredentialEnvelope) || !bytes.Equal(journal.GetIntentEnvelope(), action.IntentEnvelope) || !proto.Equal(journal.GetHandoff(), credential.GetHandoff()) || !proto.Equal(journal.GetCheckpoint(), checkpoint) || len(journal.GetCheckpointReceiptEnvelope()) != 0 || !bytes.Equal(journal.GetStartGrantEnvelope(), row.StartGrantEnvelope) || !proto.Equal(journal.GetAcceptedRoot(), root) || !bytes.Equal(journal.GetDelegationEnvelope(), delegation) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_journal_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_journal_binding_rejected")
 	}
 	credentialRoot := new(agentv1.ExecutionRoot)
 	if protojson.Unmarshal(row.RootJson, credentialRoot) != nil {
 		return nil, errInternalState
 	}
 	if !proto.Equal(journal.GetCredentialRoot(), credentialRoot) || !bytes.Equal(journal.GetCredentialDelegationEnvelope(), row.DelegationEnvelope) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_journal_trust_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_journal_trust_rejected")
 	}
 	if len(row.ChallengeDocument) > 0 {
 		challenge := new(agentv1.DeviceActionChallenge)
@@ -207,7 +208,7 @@ func recoveryJournalDocument(journal *agentv1.RecoveryJournal, checkpoint *agent
 			return nil, errInternalState
 		}
 		if !proto.Equal(journal.GetChallenge(), challenge) {
-			return nil, rpcError(connect.CodePermissionDenied, "recovery_journal_challenge_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_journal_challenge_rejected")
 		}
 	}
 	return proto.MarshalOptions{Deterministic: true}.Marshal(journal)

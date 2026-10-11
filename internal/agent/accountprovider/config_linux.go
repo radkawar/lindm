@@ -12,11 +12,14 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/custody"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -56,25 +59,21 @@ func validateNativeConfig(c *agentv1.NativeAccountProviderConfig) error {
 	}
 	return nil
 }
-func protectedAncestry(path string) error {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+
+// rootDirectory requires a directory whose whole no-follow ancestry and leaf
+// are root-owned without group/other write.
+func rootDirectory(path string) error {
+	file, stat, err := custody.OpenRoot(path, unix.O_PATH|unix.O_DIRECTORY)
+	if err != nil {
+		return unsafe(err)
+	}
+	if err = file.Close(); err != nil {
+		return err
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFDIR {
 		return ErrUnsafe
 	}
-	for current := path; ; current = filepath.Dir(current) {
-		info, err := os.Lstat(current)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {
-			return ErrUnsafe
-		}
-		if err := rootOwned(info); err != nil {
-			return err
-		}
-		if current == "/" {
-			return nil
-		}
-	}
+	return nil
 }
 func validateNativeTarget(ctx context.Context, p *Provider, r *agentv1.NativeResourceTransactionRequest, db *localDB) error {
 	if err := validateMessage(r); err != nil {
@@ -147,8 +146,8 @@ func sameTarget(a, b *agentv1.ResourceOwnershipSnapshot) bool {
 	return proto.Equal(a, b)
 }
 
-// CheckNative is a read-only launcher prerequisite; it does not authorize effects.
-func CheckNative(ctx context.Context, c NativeConfig) error {
+// checkNative is a read-only launcher prerequisite; it does not authorize effects.
+func checkNative(ctx context.Context, c nativeConfig) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -162,10 +161,7 @@ func CheckNative(ctx context.Context, c NativeConfig) error {
 	if err != nil {
 		return err
 	}
-	if err = protectedAncestry(filepath.Dir(resolved)); err != nil {
-		return err
-	}
-	data, err := protectedRead(resolved)
+	data, err := rootRead(resolved)
 	if err != nil {
 		return err
 	}

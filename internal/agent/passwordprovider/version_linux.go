@@ -9,36 +9,23 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/platform"
 )
 
-// nativeVersions are the exact upstream releases qualified for one product:
-// libpwquality, the PAM modules package and the PAM manager.
-type nativeVersions struct{ quality, pam, manager string }
-
-func pinnedVersions(p *resourcev1.PlatformProduct) (nativeVersions, bool) {
-	switch {
-	case p.GetOsId() == "ubuntu" && p.GetVersion() == "24.04":
-		return nativeVersions{quality: "1.4.5", pam: "1.5.3", manager: "1.5.3"}, true
-	case p.GetOsId() == "fedora" && p.GetVersion() == "44":
-		return nativeVersions{quality: "1.4.5", pam: "1.7.2", manager: "1.7.1"}, true
-	case (p.GetOsId() == "rhel" || p.GetOsId() == "almalinux") && p.GetVersion() == "9.8":
-		return nativeVersions{quality: "1.4.4", pam: "1.5.1", manager: "1.2.6"}, true
-	case (p.GetOsId() == "rhel" || p.GetOsId() == "almalinux") && p.GetVersion() == "10.2":
-		return nativeVersions{quality: "1.4.5", pam: "1.6.1", manager: "1.5.2"}, true
-	default:
-		return nativeVersions{}, false
+// pinnedVersions returns the libpwquality, PAM modules and PAM manager
+// releases qualified for the observed product.
+func pinnedVersions(p *resourcev1.PlatformProduct) (platform.PasswordPins, bool) {
+	release := platform.Of(p)
+	if release.Gate(platform.Password) != nil {
+		return platform.PasswordPins{}, false
 	}
+	return release.PasswordPins(p.GetVersion())
 }
 
-// authselectProduct reports RPM products whose PAM stacks authselect owns;
-// the other qualified products use Debian's pam-auth-update.
+// authselectProduct reports products whose PAM stacks authselect owns; the
+// other qualified products use Debian's pam-auth-update.
 func authselectProduct(p *resourcev1.PlatformProduct) bool {
-	switch p.GetOsId() {
-	case "fedora", "rhel", "almalinux":
-		return true
-	default:
-		return false
-	}
+	return platform.Of(p).Native().Quirks.PAMManager == platform.PAMManagerAuthselect
 }
 
 func modulePackageName(platform *resourcev1.PlatformProduct, feature agentv1.PasswordNativeFeature) string {
@@ -74,7 +61,7 @@ func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, n
 		return "", err
 	}
 	version := strings.TrimSuffix(string(output), "\n")
-	if platform.GetOsId() == "ubuntu" {
+	if !authselectProduct(platform) {
 		status, value, ok := strings.Cut(version, "\t")
 		if !ok || (status != "ii " && status != "hi ") {
 			return "", ErrUnsupported
@@ -104,9 +91,9 @@ func moduleVersionSupported(platform *resourcev1.PlatformProduct, feature agentv
 		return false
 	}
 	if feature == 1 {
-		return upstreamVersion(version) == pinned.quality
+		return upstreamVersion(version) == pinned.Quality
 	}
-	return upstreamVersion(version) == pinned.pam
+	return upstreamVersion(version) == pinned.PAM
 }
 func managerVersion(ctx context.Context, platform *resourcev1.PlatformProduct, run commandRunner) (string, error) {
 	pinned, ok := pinnedVersions(platform)
@@ -121,7 +108,7 @@ func managerVersion(ctx context.Context, platform *resourcev1.PlatformProduct, r
 	if err != nil {
 		return "", err
 	}
-	if upstreamVersion(version) != pinned.manager {
+	if upstreamVersion(version) != pinned.Manager {
 		return "", fmt.Errorf("%w: unsupported PAM manager %s version", ErrUnsupported, name)
 	}
 	return version, nil

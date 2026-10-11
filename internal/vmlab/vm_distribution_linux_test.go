@@ -6,30 +6,34 @@ import (
 	"testing"
 
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 func TestNativeDistributionRouting(t *testing.T) {
 	for _, tc := range []struct {
-		id     string
-		family nativeFamily
-		format packaging.Format
+		id, version string
+		backend     platform.Backend
+		format      packaging.Format
 	}{
-		{"arch", familyPacman, packaging.FormatArch},
-		{"ubuntu", familyAPT, packaging.FormatDEB},
-		{"debian", familyAPT, packaging.FormatDEB},
-		{"fedora", familyDNF, packaging.FormatRPM},
-		{"rhel", familyDNF, packaging.FormatRPM},
-		{"rocky", familyDNF, packaging.FormatRPM},
-		{"almalinux", familyDNF, packaging.FormatRPM},
-		{"opensuse-leap", familyZypper, packaging.FormatRPM},
-		{"opensuse-tumbleweed", familyZypper, packaging.FormatRPM},
+		{"arch", "rolling", platform.BackendPacman, packaging.FormatArch},
+		{"omarchy", "4.0.4", platform.BackendPacman, packaging.FormatArch},
+		{"ubuntu", "24.04", platform.BackendAPT, packaging.FormatDEB},
+		{"linuxmint", "22.3", platform.BackendAPT, packaging.FormatDEB},
+		{"debian", "13", platform.BackendAPT, packaging.FormatDEB},
+		{"fedora", "44", platform.BackendDNF5, packaging.FormatRPM},
+		{"rhel", "9.6", platform.BackendDNF4, packaging.FormatRPM},
+		{"rocky", "10.0", platform.BackendDNF4, packaging.FormatRPM},
+		{"almalinux", "8.10", platform.BackendDNF4, packaging.FormatRPM},
+		{"opensuse-leap", "16.0", platform.BackendZypper, packaging.FormatRPM},
+		{"opensuse-tumbleweed", "20260901", platform.BackendZypper, packaging.FormatRPM},
 	} {
 		t.Run(tc.id, func(t *testing.T) {
-			family, err := nativeDistributionFamily(tc.id)
-			if err != nil || family != tc.family {
-				t.Fatalf("native family = %v, %v; want %v", family, err, tc.family)
+			release := platform.ForManifest(tc.id, tc.version)
+			backend, err := nativeBackend(release)
+			if err != nil || backend != tc.backend {
+				t.Fatalf("native backend = %v, %v; want %v", backend, err, tc.backend)
 			}
-			format, err := NativePackageFormat(tc.id)
+			format, err := NativePackageFormat(release)
 			if err != nil || format != tc.format {
 				t.Fatalf("native artifact format = %q, %v; want %q", format, err, tc.format)
 			}
@@ -40,13 +44,17 @@ func TestNativeDistributionRouting(t *testing.T) {
 func TestNativeDistributionRejectsAliasesAndImmutableDerivatives(t *testing.T) {
 	for _, id := range []string{"", "unknown", "Debian", "alma", "opensuse", "suse", "opensuse-microos", "opensuse-aeon", "fedora-coreos", "nixos"} {
 		t.Run(id, func(t *testing.T) {
-			if family, err := nativeDistributionFamily(id); err == nil || family != 0 {
-				t.Fatalf("unsupported distribution selected mutable family: %v, %v", family, err)
+			release := platform.ForManifest(id, "1")
+			if backend, err := nativeBackend(release); err == nil || backend != platform.BackendNone {
+				t.Fatalf("unsupported distribution selected mutable backend: %v, %v", backend, err)
 			}
-			if format, err := NativePackageFormat(id); err == nil || format != "" {
+			if format, err := NativePackageFormat(release); err == nil || format != "" {
 				t.Fatalf("unsupported distribution selected native artifact: %q, %v", format, err)
 			}
 		})
+	}
+	if _, err := nativeBackend(platform.Identify(platform.OSRelease{ID: "fedora", VersionID: "44", VariantID: "silverblue"})); err == nil {
+		t.Fatal("image-based Fedora Atomic selected a mutable backend")
 	}
 }
 
@@ -70,11 +78,11 @@ func TestSUSEOracleKeepsRPMIdentity(t *testing.T) {
 	before.Backends.Rpm.Value, before.Backends.Zypper.Value = true, true
 	after.Backends.Rpm.Value, after.Backends.Zypper.Value = true, true
 	actual.Backends.Rpm.Value, actual.Backends.Zypper.Value = true, true
-	if err := compareVMDetails("opensuse-leap", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("opensuse-leap", "16.0"), "x86_64", before, after, actual); err != nil {
 		t.Fatalf("independent RPM and zypper presence rejected: %v", err)
 	}
 	actual.Backends.Zypper.Value = false
-	if err := compareVMDetails("opensuse-leap", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("opensuse-leap", "16.0"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("missing zypper backend accepted when RPM was present")
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"lindm/gen/lindm/admin/v1/adminv1connect"
 	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/devlab/webauthnlab"
+	"lindm/internal/labexec"
 )
 
 type localAuthority struct {
@@ -68,13 +68,9 @@ func (b *enrollmentOutput) Write(p []byte) (int, error) {
 }
 
 func (f *AuthorityFixture) bootstrapLocalOwner(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
 	var output enrollmentOutput
 	defer clear(output.data[:])
-	cmd := exec.CommandContext(ctx, f.binary, "bootstrap-owner", "-config", f.configPath(), "-username", "owner")
-	cmd.Stdout, cmd.Stderr, cmd.WaitDelay = &output, f.log, 5*time.Second
-	if err := cmd.Run(); err != nil {
+	if err := labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"bootstrap-owner", "-config", f.configPath(), "-username", "owner"}, Stdout: &output, Stderr: f.log, Timeout: time.Minute}); err != nil {
 		return "", errors.New("bootstrap local fixture owner failed")
 	}
 	lines := bytes.Split(bytes.TrimSpace(output.data[:output.n]), []byte("\n"))

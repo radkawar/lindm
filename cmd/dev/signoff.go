@@ -15,6 +15,7 @@ import (
 
 	"lindm/internal/devlab"
 	"lindm/internal/devlab/worktree"
+	"lindm/internal/labexec"
 )
 
 const signoffUsage = `Usage: go run ./cmd/dev signoff [-acceptance] [options]
@@ -85,10 +86,37 @@ func runSignoff(args []string) (resultErr error) {
 		return fmt.Errorf("HEAD %s is not pushed (no remote-tracking branch contains it); push, or fetch if it was pushed elsewhere", sha)
 	}
 	stamp := time.Now().UTC().Format("20060102T150405Z")
-	clean, err := repo.Add(ctx, "signoff-"+sha[:12]+"-"+stamp, sha, os.Stderr)
+	contexts := []string{"unit", "integration"}
+	if *acceptance {
+		contexts = []string{"acceptance"}
+	}
+	if err := inClean(ctx, repo, "signoff", sha, func(clean string) error {
+		fmt.Printf("Signoff %s in clean worktree %s; fixture %s\n", sha, clean, devlab.FixturePath(checkout))
+		if *acceptance {
+			evidence := filepath.Join(checkout, "artifacts", "acceptance-"+stamp)
+			labFlags := strings.TrimSpace(fmt.Sprintf("-fixture %s -cache %s -golden-cache %s %s", checkout, filepath.Join(checkout, ".cache/lab/images"), filepath.Join(checkout, ".cache/lab/encrypted"), *acceptanceFlags))
+			return stream(ctx, clean, nil, "make", "acceptance", "ACCEPTANCE_EVIDENCE="+evidence, "ACCEPTANCE_FLAGS="+labFlags)
+		}
+		if err := makeCheck(ctx, clean); err != nil {
+			return err
+		}
+		return devlab.TestIntegration(ctx, checkout, clean)
+	}); err != nil {
+		return err
+	}
+	if err := stream(ctx, checkout, nil, "gh", append([]string{"signoff", "create", "--commit", sha}, contexts...)...); err != nil {
+		return err
+	}
+	return stream(ctx, checkout, nil, "gh", "signoff", "status", "--commit", sha)
+}
+
+// inClean runs gates in a temporary clean worktree of sha, removing it
+// afterwards even when the gates fail or the run is interrupted.
+func inClean(ctx context.Context, repo *worktree.Repository, purpose, sha string, gates func(clean string) error) (resultErr error) {
+	name := purpose + "-" + sha[:12] + "-" + time.Now().UTC().Format("20060102T150405Z")
+	clean, err := repo.Add(ctx, name, sha, os.Stderr)
 	if clean != "" {
 		defer func() {
-			// Removal must outlive an interrupted or expired run.
 			cleanup, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
 			resultErr = errors.Join(resultErr, repo.Remove(cleanup, clean))
@@ -97,27 +125,20 @@ func runSignoff(args []string) (resultErr error) {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Signoff %s in clean worktree %s; fixture %s\n", sha, clean, devlab.FixturePath(checkout))
-	contexts := []string{"unit", "integration"}
-	if *acceptance {
-		contexts = []string{"acceptance"}
-		evidence := filepath.Join(checkout, "artifacts", "acceptance-"+stamp)
-		labFlags := strings.TrimSpace(fmt.Sprintf("-fixture %s -cache %s -golden-cache %s %s", checkout, filepath.Join(checkout, ".cache/lab/images"), filepath.Join(checkout, ".cache/lab/encrypted"), *acceptanceFlags))
-		if err := stream(ctx, clean, "make", "acceptance", "ACCEPTANCE_EVIDENCE="+evidence, "ACCEPTANCE_FLAGS="+labFlags); err != nil {
-			return err
-		}
-	} else {
-		if err := stream(ctx, clean, "make", "check"); err != nil {
-			return err
-		}
-		if err := devlab.TestIntegration(ctx, checkout, clean); err != nil {
-			return err
-		}
-	}
-	if err := stream(ctx, checkout, "gh", append([]string{"signoff", "create", "--commit", sha}, contexts...)...); err != nil {
+	return gates(clean)
+}
+
+// makeCheck runs make check in a clean worktree without golangci-lint's
+// machine-wide runner lock, using a cache reserved for clean-worktree gates, so
+// agents linting concurrently neither block nor fail the gate. golangci-lint's
+// cache, like Go's build cache, tolerates concurrent writers.
+func makeCheck(ctx context.Context, clean string) error {
+	cache, err := os.UserCacheDir()
+	if err != nil {
 		return err
 	}
-	return stream(ctx, checkout, "gh", "signoff", "status", "--commit", sha)
+	env := append(os.Environ(), "GOLANGCI_LINT_CACHE="+filepath.Join(cache, "lindm-clean-golangci"))
+	return stream(ctx, clean, env, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners")
 }
 
 func output(ctx context.Context, dir, name string, args ...string) (string, error) {
@@ -130,15 +151,10 @@ func output(ctx context.Context, dir, name string, args ...string) (string, erro
 	return strings.TrimSpace(string(out)), nil
 }
 
-// stream runs a gate's output; cancellation kills its whole process group so
+// stream runs a gate with its output streamed (env nil inherits ours); cancellation kills its whole process group so
 // make's test and build children cannot outlive a failed signoff.
-func stream(ctx context.Context, dir, name string, args ...string) error {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = dir, os.Stdout, os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
-	cmd.WaitDelay = 10 * time.Second
-	if err := cmd.Run(); err != nil {
+func stream(ctx context.Context, dir string, env []string, name string, args ...string) error {
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: os.Stdout, Stderr: os.Stderr}); err != nil {
 		return fmt.Errorf("%s %s in %s: %w", name, strings.Join(args, " "), dir, err)
 	}
 	return nil

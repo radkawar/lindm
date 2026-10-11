@@ -30,6 +30,7 @@ import (
 	"lindm/internal/agent/statefs"
 	"lindm/internal/agent/update"
 	"lindm/internal/protodata"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -607,9 +608,7 @@ func mapError(err error) error {
 		// The wire carries only the generic reason; keep the cause locally.
 		slog.Warn("executor request failed internally", "error", err)
 	}
-	out := connect.NewError(code, errors.New(reason))
-	out.Meta().Set("Lindm-Reason", reason)
-	return out
+	return rpcreason.Error(code, reason)
 }
 
 func reasonOf(err error) string {

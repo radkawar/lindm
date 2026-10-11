@@ -11,12 +11,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 	"lindm/internal/labhost"
 )
 
@@ -96,42 +97,22 @@ func runBrowserBaseline(ctx context.Context, args []string, stdout, stderr io.Wr
 		}
 		resultErr = errors.Join(resultErr, writeErr, file.Close())
 	}()
-	bounded, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
-	command := exec.CommandContext(bounded, "/bin/bash", "--noprofile", "--norc", "-s")
+	command := labexec.Command{Path: "/bin/bash", Args: []string{"--noprofile", "--norc", "-s"}, Timeout: 20 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 5 * time.Second}
 	if !local {
-		command = exec.CommandContext(bounded, "ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ControlMaster=no", "-o", "ControlPath=none", "--", alias, "/bin/bash --noprofile --norc -s")
+		command.Path, command.Args = "ssh", []string{"-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ControlMaster=no", "-o", "ControlPath=none", "--", alias, "/bin/bash --noprofile --norc -s"}
 	}
-	command.Stdin = bytes.NewReader(script)
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGTERM)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	command.WaitDelay = 5 * time.Second
-	output := &browserBaselineOutput{}
+	output := nativeexec.NewBuffer(4 << 20)
 	writer := io.MultiWriter(output, stderr)
-	command.Stdout, command.Stderr = writer, writer
-	err = command.Run()
-	evidence.Transcript = output.buffer.String()
+	command.Stdin, command.Stdout, command.Stderr = bytes.NewReader(script), writer, writer
+	err = labexec.Run(ctx, command)
+	if err == nil && output.Truncated() {
+		err = errors.New("browser baseline output exceeds 4 MiB evidence bound")
+	}
+	evidence.Transcript = output.String()
 	if err != nil {
 		return fmt.Errorf("browser prerequisite transaction failed; private evidence retained at %s: %w", *record, err)
 	}
 	evidence.Installed = true
 	_, err = fmt.Fprintf(stdout, "Browser prerequisites installed; actual versions and paths recorded in %s. Native WebAuthn acceptance remains unqualified until lab acceptance runs.\n", *record)
 	return err
-}
-
-type browserBaselineOutput struct {
-	buffer bytes.Buffer
-}
-
-func (b *browserBaselineOutput) Write(data []byte) (int, error) {
-	if len(data) > (4<<20)-b.buffer.Len() {
-		return 0, errors.New("browser baseline output exceeds 4 MiB evidence bound")
-	}
-	return b.buffer.Write(data)
 }

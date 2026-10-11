@@ -28,6 +28,8 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/platform"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -77,6 +79,8 @@ type Provider struct {
 	closed  bool
 }
 
+var _ resourceprovider.Provider = (*Provider)(nil)
+
 func validateMessage(message proto.Message) error {
 	if message == nil || !message.ProtoReflect().IsValid() {
 		return ErrUnsupported
@@ -107,15 +111,8 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 			return nil, err
 		}
 	}
-	switch id := config.Platform.GetOsId(); id {
-	case "ubuntu", "fedora":
-	case "rhel", "almalinux":
-		// Of Enterprise Linux only EL 9 and EL 10 are qualified.
-		if major, _, _ := strings.Cut(config.Platform.GetVersion(), "."); major != "9" && major != "10" {
-			return nil, ErrUnsupported
-		}
-	default:
-		return nil, ErrUnsupported
+	if err := platform.Of(config.Platform).Gate(platform.Firewall); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
 	}
 	for _, marker := range []string{"/run/ostree-booted", "/etc/NIXOS"} {
 		if _, err := os.Stat(marker); err == nil {
@@ -344,6 +341,18 @@ func (p *Provider) makePlan(desired *resourcev1.ResourceDesiredState, operation 
 	}
 	return plan, nil
 }
+
+// Observe reads the owned zone through the read-only native observer.
+func (p *Provider) Observe(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	p.gate.Lock()
+	defer p.gate.Unlock()
+	before, err := p.observe(ctx, desired)
+	if err != nil {
+		return nil, err
+	}
+	return before.GetObservation(), nil
+}
+
 func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
 	p.gate.Lock()
 	defer p.gate.Unlock()

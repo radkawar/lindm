@@ -14,6 +14,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/rpcreason"
 )
 
 // The unbuffered handoff serializes refresh with periodic collection and spool
@@ -73,7 +74,7 @@ func (r *runner) refreshInventory(ctx context.Context, status *agentv1.DeviceAct
 	// ordinary receipt handling has removed both local pending payloads.
 	if err := r.confirmInventoryPublication(ctx, authority.authorized, status.GetActionId(), digest); err == nil {
 		return nil
-	} else if connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "inventory_refresh_not_published" {
+	} else if connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcreason.Get(err) != "inventory_refresh_not_published" {
 		return err
 	}
 	startedAt := current.GetStatus().GetStartedAt().AsTime()

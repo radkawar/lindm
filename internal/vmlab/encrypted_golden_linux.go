@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // Bump when installer recipes or machine layout change. Cached installs are never
@@ -58,9 +59,12 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err = validateManifest(m); err != nil {
 		return nil, err
 	}
-	supported := (m.Distribution == "ubuntu" && (m.Version == "24.04" || m.Version == "26.04")) || (m.Distribution == "fedora" && m.Version == "44")
-	if !strings.HasSuffix(m.ImageFilename, ".iso") || !supported {
-		return nil, errors.New("encrypted lab requires Ubuntu 24.04/26.04 or Fedora 44 official installer ISO manifest")
+	if !strings.HasSuffix(m.ImageFilename, ".iso") {
+		return nil, errors.New("encrypted lab requires an official installer ISO manifest")
+	}
+	media := encryptedInstallerMedia(m)
+	if err = media.release.Gate(platform.Encryption); err != nil {
+		return nil, err
 	}
 	hardware, err := encryptedMachineHardware(m, opts)
 	if err != nil {
@@ -155,11 +159,11 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if _, err = hostCommand(ctx, staging, "qemu-img", nil, "create", "-f", "qcow2", "disk.qcow2", "24G"); err != nil {
 		return nil, err
 	}
-	recipe, err := encryptedInstallerRecipeForMachine(m.Distribution, state.Secret, loginPublic, string(state.HostKey), hostPublic, opts.Desktop, opts.TPMBoot, hardware.Architecture)
+	recipe, err := encryptedInstallerRecipeForMachine(media, state.Secret, loginPublic, string(state.HostKey), hostPublic, opts.Desktop, opts.TPMBoot, hardware.Architecture)
 	if err != nil {
 		return nil, err
 	}
-	installer, err := prepareEncryptedInstallerForMachine(ctx, staging, verified.Path, m.Distribution, recipe, hardware.Architecture)
+	installer, err := prepareEncryptedInstallerForMachine(ctx, staging, verified.Path, media.release.Lab.Installer, recipe, hardware.Architecture)
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,9 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/statefs"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
@@ -30,12 +32,11 @@ type command struct {
 	stdin []byte
 }
 
-// ExecuteNative is only for the fixed root account transient helper. The parent
-// provisions a private account-root with the exact host /etc bind and no other
-// children. Shadow tools use that fixed prefix (chage may use a preselected root)
-// so implicit UID/GID chown cannot reach host homes or mail. New home creation
-// remains an exact approved host mkdir. No caller supplies argv or scripts.
-type NativeConfig struct {
+// NativeRootDirectory is the private account root the fixed helper provisions
+// inside the action's scratch directory.
+const NativeRootDirectory = "account-root"
+
+type nativeConfig struct {
 	Native              *agentv1.NativeAccountProviderConfig
 	Platform            *resourcev1.PlatformProduct
 	ExecutorIncarnation string
@@ -43,18 +44,32 @@ type NativeConfig struct {
 	NativeDigest        func(string, []byte) ([]byte, error)
 }
 
-func ExecuteNative(ctx context.Context, config NativeConfig, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) error {
+func configFromEnv(env resourceprovider.NativeEnv) nativeConfig {
+	return nativeConfig{Native: env.Config.GetAccountProvider(), Platform: env.Platform, ExecutorIncarnation: env.ExecutorIncarnation, AccountRoot: filepath.Join(env.Directory, NativeRootDirectory), NativeDigest: env.Digest}
+}
+
+// ApplyNative is only for the fixed root account transient helper. The parent
+// provisions a private account-root with the exact host /etc bind and no other
+// children. Shadow tools use that fixed prefix (chage may use a preselected root)
+// so implicit UID/GID chown cannot reach host homes or mail. New home creation
+// remains an exact approved host mkdir. No caller supplies argv or scripts. The
+// returned after-image is observed after the effect, like every other kind's.
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	if err := CheckNative(ctx, config); err != nil {
-		return err
+	config := configFromEnv(env)
+	if err := checkNative(ctx, config); err != nil {
+		return nil, err
 	}
-	if err := validateAccountRoot(config.AccountRoot, ChrootAccountRoot(config.Platform)); err != nil {
-		return err
+	if err := validateAccountRoot(config.AccountRoot, platform.Of(config.Platform).Native().Quirks.AccountChroot); err != nil {
+		return nil, err
 	}
-	return executeNative(ctx, config, request, beforeEffect, runNative, func() (*localDB, error) { return readDatabase(config.NativeDigest) })
+	if err := executeNative(ctx, config, request, beforeEffect, runNative, func() (*localDB, error) { return readDatabase(config.NativeDigest) }); err != nil {
+		return nil, err
+	}
+	return observeNative(ctx, config, resource.PlanDesired(request.GetPlan()))
 }
-func executeNative(ctx context.Context, config NativeConfig, r *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error, run nativeRun, readDB func() (*localDB, error)) error {
+func executeNative(ctx context.Context, config nativeConfig, r *agentv1.NativeResourceTransactionRequest, beforeEffect func(context.Context) error, run nativeRun, readDB func() (*localDB, error)) error {
 	if r == nil || r.Plan == nil || r.Before == nil || r.Target == nil || beforeEffect == nil {
 		return ErrUnsafe
 	}
@@ -159,7 +174,7 @@ func executeNative(ctx context.Context, config NativeConfig, r *agentv1.NativeRe
 			}
 		}
 	}
-	options, err := nativeToolOptions(ctx, run, commands, ChrootAccountRoot(config.Platform))
+	options, err := nativeToolOptions(ctx, run, commands, platform.Of(config.Platform).Native().Quirks.AccountChroot)
 	if err != nil {
 		return err
 	}
@@ -215,7 +230,7 @@ func runCommands(ctx context.Context, commands []command, revision []byte, befor
 	return nil
 }
 func checkHooks() error {
-	data, err := protectedRead("/etc/login.defs")
+	data, err := rootRead("/etc/login.defs")
 	if err != nil {
 		return err
 	}
@@ -444,7 +459,7 @@ func createHome(u *resourcev1.LocalUserObservation) (err error) {
 	if path == "" || filepath.Clean(path) != path {
 		return ErrUnsafe
 	}
-	if err = protectedAncestry(filepath.Dir(path)); err != nil {
+	if err = rootDirectory(filepath.Dir(path)); err != nil {
 		return err
 	}
 	parent, err := statefs.OpenTemporaryParent(filepath.Dir(path))

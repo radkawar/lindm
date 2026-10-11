@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,11 +32,7 @@ func newAuthorityDatabase(ctx context.Context, document *config.Document, shared
 	if cfg.ConnConfig.User != "lindm_migrator" || cfg.ConnConfig.Database != "lindm" {
 		return nil, errors.New("isolated authority database requires the maintained development fixture")
 	}
-	passwordPath := filepath.Join(shared, "postgres-password")
-	if err := protected(passwordPath, false); err != nil {
-		return nil, err
-	}
-	password, err := os.ReadFile(passwordPath)
+	password, err := readOwned(filepath.Join(shared, "postgres-password"))
 	if err != nil {
 		return nil, err
 	}

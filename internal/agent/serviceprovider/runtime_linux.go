@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/custody"
 )
 
 const (
@@ -23,7 +25,6 @@ const (
 	maxRuntimeListStdout    = 64 << 10
 	maxRuntimeListStderr    = 32 << 10
 	runtimeDiscoveryTimeout = 10 * time.Second
-	runtimeWaitDelay        = time.Second
 	// PT_INTERP is the absolute path plus exactly one trailing NUL.
 	maxInterpreterSegment = maxDefinitionPath + 1
 	maxLoaderLine         = 2*maxDefinitionPath + 64
@@ -97,7 +98,7 @@ func InstallRuntimeFiles(ctx context.Context) ([]string, error) {
 }
 
 func openRuntimeFile(path string) (*os.File, error) {
-	file, _, stat, err := openProtectedFile(path, maxRuntimeBytes)
+	file, _, stat, err := custody.OpenResolved(path, maxRuntimeBytes, maxDefinitionPath, maxSymlinks)
 	if err != nil {
 		return nil, fmt.Errorf("%w: unsafe runtime file %q: %w", ErrUnsupported, path, err)
 	}
@@ -109,7 +110,7 @@ func openRuntimeFile(path string) (*os.File, error) {
 }
 
 func runtimeFileStat(stat unix.Stat_t) error {
-	// openProtectedFile already requires a root-owned, non-writable regular
+	// custody.OpenResolved already requires a root-owned, non-writable regular
 	// file. Refuse modes that would change privileges if this path is executed.
 	if stat.Size <= 0 || stat.Mode&unix.S_ISUID != 0 || stat.Mode&unix.S_ISGID != 0 {
 		return fmt.Errorf("refusing empty or privileged runtime file")
@@ -191,55 +192,33 @@ func runLoaderList(ctx context.Context, interpreter string) ([]byte, error) {
 	if !validRuntimePath(interpreter) {
 		return nil, fmt.Errorf("%w: refusing interpreter %q", ErrUnsupported, interpreter)
 	}
-	cmd := exec.CommandContext(ctx, interpreter, "--list", systemctlPath)
-	cmd.Dir = "/"
-	cmd.Env = []string{"LANG=C", "LC_ALL=C"}
-	cmd.WaitDelay = runtimeWaitDelay
-	// CommandContext uses the process handle for cancellation. A numeric PGID
-	// can already be reused after Wait reaps this non-forking loader.
-	stdout := &boundedCapture{limit: maxRuntimeListStdout}
-	stderr := &boundedCapture{limit: maxRuntimeListStderr}
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err := cmd.Run()
+	// The whole discovery shares runtimeDiscoveryTimeout through ctx; the
+	// explicit per-call bound is the same, so the earlier of the two applies.
+	result, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path:        interpreter,
+		Args:        []string{"--list", systemctlPath},
+		Timeout:     runtimeDiscoveryTimeout,
+		StdoutLimit: maxRuntimeListStdout,
+		StderrLimit: maxRuntimeListStderr,
+	})
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	return classifyLoaderResult(stdout, stderr, err)
+	return classifyLoaderResult(result, err)
 }
 
-func classifyLoaderResult(stdout, stderr *boundedCapture, runErr error) ([]byte, error) {
-	if stdout.exceeded || stderr.exceeded {
+func classifyLoaderResult(result nativeexec.Result, runErr error) ([]byte, error) {
+	if result.StdoutTruncated || result.StderrTruncated {
 		return nil, fmt.Errorf("%w: loader listing exceeded limit", ErrUnsupported)
 	}
 	if runErr != nil {
 		return nil, fmt.Errorf("%w: loader listing command failed: %w", ErrUnsupported, runErr)
 	}
 	// Diagnostics are not an alternate listing. A clean --list writes none.
-	if stderr.buf.Len() != 0 {
+	if len(result.Stderr) != 0 {
 		return nil, fmt.Errorf("%w: loader listing wrote diagnostics", ErrUnsupported)
 	}
-	return stdout.buf.Bytes(), nil
-}
-
-type boundedCapture struct {
-	buf      bytes.Buffer
-	limit    int
-	exceeded bool
-}
-
-func (w *boundedCapture) Write(p []byte) (int, error) {
-	if w.exceeded || w.buf.Len() >= w.limit {
-		w.exceeded = true
-		return len(p), nil
-	}
-	remain := w.limit - w.buf.Len()
-	if len(p) > remain {
-		w.exceeded = true
-		_, _ = w.buf.Write(p[:remain])
-		return len(p), nil
-	}
-	return w.buf.Write(p)
+	return result.Stdout, nil
 }
 
 // parseLoaderListing accepts only the observed loader --list forms:

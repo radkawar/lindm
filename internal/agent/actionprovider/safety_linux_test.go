@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/sys/unix"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 func TestSecretDescriptorSealsAndErasesAnonymousLockedPages(t *testing.T) {
@@ -74,12 +76,25 @@ func TestSecretDescriptorSealsAndErasesAnonymousLockedPages(t *testing.T) {
 }
 
 func TestNativeOutputLimitRejectsRatherThanTruncatesEvidence(t *testing.T) {
-	var output boundedOutput
-	if _, err := output.Write(bytes.Repeat([]byte{'x'}, outputLimit)); err != nil {
-		t.Fatal(err)
+	// Output past the limit is drained, then the call fails rather than parsing
+	// truncated evidence. dmsetup is driven through /usr/bin/sh only in tests.
+	original := executable[dmsetup]
+	executable[dmsetup] = "/usr/bin/sh"
+	t.Cleanup(func() { executable[dmsetup] = original })
+	out, err := runNative(t.Context(), nativeRequest{command: dmsetup, args: []string{"-c", "/usr/bin/head -c 1048577 /dev/zero"}})
+	if err == nil || err.Error() != "native_output_limit" || out != nil {
+		t.Fatalf("oversized native evidence accepted: %v %d", err, len(out))
 	}
-	if _, err := output.Write([]byte("more")); err == nil || !output.overflow || output.Len() != outputLimit {
-		t.Fatal("oversized native evidence was accepted or expanded")
+}
+
+func TestNativeFailureOmitsStderrAndKeepsExitStatus(t *testing.T) {
+	original := executable[dmsetup]
+	executable[dmsetup] = "/usr/bin/sh"
+	t.Cleanup(func() { executable[dmsetup] = original })
+	_, err := runNative(t.Context(), nativeRequest{command: dmsetup, args: []string{"-c", "echo secret-credential >&2; exit 3"}})
+	var exit *nativeexec.ExitError
+	if !errors.As(err, &exit) || exit.Code != 3 || strings.Contains(err.Error(), "secret-credential") {
+		t.Fatalf("native failure leaked stderr or lost exit status: %v", err)
 	}
 }
 

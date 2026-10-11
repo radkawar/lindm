@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -191,13 +190,9 @@ func brokerInputs(root string) (map[string]string, error) {
 	}
 	secrets := make(map[string]string, 4)
 	for _, name := range []string{"broker-directory-secret", "broker-admin-secret", "broker-upstream-directory-secret", "broker-upstream-admin-secret"} {
-		path := filepath.Join(dir, name)
-		if err := protected(path, false); err != nil {
-			return nil, fmt.Errorf("broker fixture input %s unavailable; owner must explicitly regenerate maintained fixture: %w", name, err)
-		}
-		data, err := os.ReadFile(path)
+		data, err := readOwned(filepath.Join(dir, name))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("broker fixture input %s unavailable; owner must explicitly regenerate maintained fixture: %w", name, err)
 		}
 		secrets[name] = strings.TrimSpace(string(data))
 		clear(data)

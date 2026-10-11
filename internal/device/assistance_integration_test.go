@@ -23,6 +23,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/assistrelay"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 const assistanceRelayIP = "127.0.0.1"
@@ -127,7 +128,7 @@ func reasonOf(err error) string {
 	if !errors.As(err, &connectErr) {
 		return ""
 	}
-	return connectErr.Meta().Get("Lindm-Reason")
+	return rpcreason.Get(connectErr)
 }
 
 // newEnrolledOn enrolls, activates and observes a second device on f's service.

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,25 +30,6 @@ type ReleaseMetadataSnapshot struct {
 	timestamp        []byte
 	targets          []byte
 	rollout          []byte
-}
-
-func releaseFixtureRead(filename string) (data []byte, resultErr error) {
-	if err := protected(filename, false); err != nil {
-		return nil, err
-	}
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { resultErr = errors.Join(resultErr, file.Close()) }()
-	data, err = io.ReadAll(io.LimitReader(file, releaseupdate.MaxMetadataBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > releaseupdate.MaxMetadataBytes {
-		return nil, errors.New("release fixture metadata exceeds limit")
-	}
-	return data, nil
 }
 
 func releaseFixtureReplace(filename string, data []byte) (resultErr error) {
@@ -90,7 +70,7 @@ func (f *AuthorityFixture) CaptureReleaseMetadata(ctx context.Context) (*Release
 		return nil, err
 	}
 	directory := filepath.Join(f.directory, "release-repository", "metadata")
-	rootBytes, err := releaseFixtureRead(filepath.Join(directory, "root.json"))
+	rootBytes, err := readOwned(filepath.Join(directory, "root.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +78,7 @@ func (f *AuthorityFixture) CaptureReleaseMetadata(ctx context.Context) (*Release
 	if err != nil {
 		return nil, err
 	}
-	timestampBytes, err := releaseFixtureRead(filepath.Join(directory, "timestamp.json"))
+	timestampBytes, err := readOwned(filepath.Join(directory, "timestamp.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +93,7 @@ func (f *AuthorityFixture) CaptureReleaseMetadata(ctx context.Context) (*Release
 	if snapshotInfo == nil {
 		return nil, errors.New("release fixture timestamp omits snapshot")
 	}
-	snapshotBytes, err := releaseFixtureRead(filepath.Join(directory, fmt.Sprintf("%d.snapshot.json", snapshotInfo.Version)))
+	snapshotBytes, err := readOwned(filepath.Join(directory, fmt.Sprintf("%d.snapshot.json", snapshotInfo.Version)))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +111,7 @@ func (f *AuthorityFixture) CaptureReleaseMetadata(ctx context.Context) (*Release
 	if targetsInfo == nil {
 		return nil, errors.New("release fixture snapshot omits targets")
 	}
-	targetsBytes, err := releaseFixtureRead(filepath.Join(directory, fmt.Sprintf("%d.targets.json", targetsInfo.Version)))
+	targetsBytes, err := readOwned(filepath.Join(directory, fmt.Sprintf("%d.targets.json", targetsInfo.Version)))
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +129,7 @@ func (f *AuthorityFixture) CaptureReleaseMetadata(ctx context.Context) (*Release
 	if rolloutInfo == nil {
 		return nil, errors.New("release fixture snapshot omits rollout")
 	}
-	rolloutBytes, err := releaseFixtureRead(filepath.Join(directory, fmt.Sprintf("%d.rollout.json", rolloutInfo.Version)))
+	rolloutBytes, err := readOwned(filepath.Join(directory, fmt.Sprintf("%d.rollout.json", rolloutInfo.Version)))
 	if err != nil {
 		return nil, err
 	}

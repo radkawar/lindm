@@ -20,6 +20,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
@@ -105,7 +106,7 @@ func fileFixture(t *testing.T) (*Provider, *memoryOwnership, string) {
 	}
 	incarnation := uuid.NewString()
 	protected := []string{"/etc/lindm", "/var/lib/lindm"}
-	backend, boot, err := nativeContext(t.Context(), NativeConfig{Native: native, Platform: platform, ExecutorIncarnation: incarnation, ProtectedPaths: protected})
+	backend, boot, err := nativeContext(t.Context(), nativeConfig{Native: native, Platform: platform, ExecutorIncarnation: incarnation, ProtectedPaths: protected})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func fileFixture(t *testing.T) (*Provider, *memoryOwnership, string) {
 	p := &Provider{config: Config{Native: native, Platform: platform, ExecutorIncarnation: incarnation, Ownership: owner, ActionID: uuid.NewString(), DeploymentID: uuid.NewString(), DeviceID: uuid.NewString(), EnrollmentGeneration: uuid.NewString(), ProtectedPaths: protected}, journal: store, backend: backend, boot: boot}
 	p.config.ExecuteNative = func(ctx context.Context, request *agentv1.NativeResourceTransactionRequest, gate func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error) {
 		request.Nonce = bytes.Repeat([]byte{1}, 32)
-		return ExecuteNative(ctx, NativeConfig{Native: native, Platform: platform, ExecutorIncarnation: incarnation, ProtectedPaths: protected}, request, gate)
+		return ApplyNative(ctx, resourceprovider.NativeEnv{Config: &agentv1.AgentConfig{FileProvider: native}, Platform: platform, ExecutorIncarnation: incarnation, ProtectedPaths: protected}, request, gate)
 	}
 	t.Cleanup(func() {
 		if err := p.Close(); err != nil {
@@ -394,7 +395,7 @@ func TestFileHelperRecomputesTargetBeforeAuthority(t *testing.T) {
 func TestFileProtectedContextDisallowsCustomExecutorRoots(t *testing.T) {
 	p, _, path := fileFixture(t)
 	for _, protected := range []string{filepath.Dir(path), path, filepath.Dir(filepath.Dir(path))} {
-		_, _, err := nativeContext(t.Context(), NativeConfig{Native: p.config.Native, Platform: p.config.Platform, ExecutorIncarnation: p.config.ExecutorIncarnation, ProtectedPaths: []string{protected}})
+		_, _, err := nativeContext(t.Context(), nativeConfig{Native: p.config.Native, Platform: p.config.Platform, ExecutorIncarnation: p.config.ExecutorIncarnation, ProtectedPaths: []string{protected}})
 		if !errors.Is(err, ErrUnsafePath) {
 			t.Fatalf("custom executor path overlaps approved file root: %v", err)
 		}

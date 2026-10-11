@@ -22,6 +22,7 @@ import (
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -144,7 +145,7 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 			return nil, err
 		}
 		if token.UsedCount >= token.MaxUses {
-			return nil, rpcError(connect.CodeResourceExhausted, "provisioning_token_exhausted")
+			return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
 		}
 		deviceID, generationID := uuid.New(), uuid.New()
 		if err := q.InsertDevice(ctx, devicedb.InsertDeviceParams{ID: deviceID, EnrolledAt: timestamptz(now)}); err != nil {
@@ -196,7 +197,7 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 			return nil, err
 		}
 		if consumed != 1 {
-			return nil, rpcError(connect.CodePermissionDenied, "provisioning_token_expired")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_expired")
 		}
 		if err := insertAudit(ctx, q, &token.CreatedBy, "provisioning.reserve", deviceID.String(), token.Reason); err != nil {
 			return nil, err
@@ -221,7 +222,7 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 			return nil, err
 		}
 		if !now.Before(offlineExpiry) {
-			return nil, rpcError(connect.CodePermissionDenied, "offline_enrollment_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "offline_enrollment_rejected")
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -232,10 +233,10 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 
 func provisioningTokenUsable(token devicedb.ProvisioningToken, now time.Time) error {
 	if token.RevokedAt.Valid {
-		return rpcError(connect.CodePermissionDenied, "provisioning_token_revoked")
+		return rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_revoked")
 	}
 	if !token.ExpiresAt.Valid || !now.Before(token.ExpiresAt.Time) {
-		return rpcError(connect.CodePermissionDenied, "provisioning_token_expired")
+		return rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_expired")
 	}
 	return nil
 }
@@ -275,7 +276,7 @@ func (s *Service) provisioningResponse(ctx context.Context, q *devicedb.Queries,
 			return nil, err
 		}
 		if decision.State == "rejected" {
-			return nil, rpcError(connect.CodePermissionDenied, "enrollment_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "enrollment_rejected")
 		}
 		if !now.Before(decision.ExpiresAt.Time) {
 			return nil, approvalError(identity.ErrAuthorizationExpired)
@@ -283,7 +284,7 @@ func (s *Service) provisioningResponse(ctx context.Context, q *devicedb.Queries,
 		return response, nil
 	}
 	if receipt.State != "ready" || receipt.CertificateID == nil {
-		return nil, rpcError(connect.CodePermissionDenied, "enrollment_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "enrollment_rejected")
 	}
 	certificate, err := q.GetCertificateByID(ctx, *receipt.CertificateID)
 	if err != nil {
@@ -307,7 +308,7 @@ func (s *Service) RetrieveProvisioningIssuance(ctx context.Context, req *connect
 		return nil, mapErr(err)
 	}
 	defer s.release()
-	denied := rpcError(connect.CodeUnauthenticated, "unauthenticated")
+	denied := rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	var envelope dsse.Envelope
 	if err := json.Unmarshal(req.Msg.GetAuthorityProof(), &envelope); err != nil || envelope.PayloadType != trust.ProvisioningRetrievalType {
 		return nil, denied
@@ -327,7 +328,7 @@ func (s *Service) RetrieveProvisioningIssuance(ctx context.Context, req *connect
 	q := devicedb.New(s.pool)
 	receipt, err := q.GetProvisioningEnrollment(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, rpcError(connect.CodeNotFound, "enrollment_transaction_not_found")
+		return nil, rpcreason.Error(connect.CodeNotFound, "enrollment_transaction_not_found")
 	}
 	if err != nil {
 		return nil, mapErr(err)

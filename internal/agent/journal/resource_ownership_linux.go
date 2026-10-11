@@ -442,17 +442,8 @@ func sameDimensions(left, right []agentv1.ResourceOwnedDimension) bool {
 
 func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapshot *agentv1.ResourceOwnershipSnapshot) bool {
 	observation := snapshot.GetObservation()
-	if observation.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL {
-		return sysctlOwnershipAcquisitionAllowed(intent, snapshot)
-	}
-	if observation.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION {
-		return definitionOwnershipAcquisitionAllowed(intent, snapshot)
-	}
-	if observation.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY {
-		return passwordOwnershipAcquisitionAllowed(intent, snapshot)
-	}
-	if observation.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE {
-		return firewallOwnershipAcquisitionAllowed(intent, snapshot)
+	if rules := ownershipRules(observation.GetRef().GetKind()); rules.acquisition != nil {
+		return rules.acquisition(intent, snapshot)
 	}
 	if group := observation.GetLocalGroup(); group != nil && group.GetOrigin() != resourcev1.NSSOrigin_NSS_ORIGIN_LOCAL_FILES {
 		return false

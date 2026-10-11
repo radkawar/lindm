@@ -91,7 +91,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	if err != nil {
 		return evidence, err
 	}
-	evidence.Boot, err = provisionActionOwnedBoot(ctx, vm, options.RecoveryManifest.GetDistribution(), signer)
+	evidence.Boot, err = provisionActionOwnedBoot(ctx, vm, options.RecoveryManifest, signer)
 	err = finishBootDiagnostics(err)
 	if err != nil {
 		return evidence, err

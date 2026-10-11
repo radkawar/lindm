@@ -10,8 +10,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
-	"syscall"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -20,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/labexec"
 )
 
 const redHatGuestOwner = "/var/tmp/lindm-native-lab/redhat-registration-owned"
@@ -130,11 +129,9 @@ func guestRedHat(ctx context.Context, operation string) error {
 	case "redhat-identity":
 		return runRedHatSubscription(ctx, "identity", nil)
 	case "redhat-repositories":
-		command := redHatGuestCommand(ctx, "/usr/bin/python3", "-c", redHatRepositoriesScript, "-q", "repolist", "--enabled")
 		var output serviceProofOutput
-		command.Stdout = &output
 		defer func() { clear(output.buffer.Bytes()) }()
-		if err := command.Run(); err != nil {
+		if err := redHatGuest(ctx, nil, &output, "-c", redHatRepositoriesScript, "-q", "repolist", "--enabled"); err != nil {
 			return errors.New("redhat enabled repository observation failed (native output suppressed)")
 		}
 		// Refuse an empty repository set; makecache alone can succeed without
@@ -142,8 +139,7 @@ func guestRedHat(ctx context.Context, operation string) error {
 		if !redHatEnabledRepositories(output.buffer.Bytes()) {
 			return errors.New("redhat guest has no enabled repositories")
 		}
-		command = redHatGuestCommand(ctx, "/usr/bin/python3", "-c", redHatRepositoriesScript, "-q", "--setopt=*.skip_if_unavailable=False", "--refresh", "makecache")
-		if err := command.Run(); err != nil {
+		if err := redHatGuest(ctx, nil, nil, "-c", redHatRepositoriesScript, "-q", "--setopt=*.skip_if_unavailable=False", "--refresh", "makecache"); err != nil {
 			return errors.New("redhat repository metadata refresh failed (native output suppressed)")
 		}
 		return nil
@@ -167,26 +163,15 @@ func redHatEnabledRepositories(data []byte) bool {
 	return false
 }
 
-func redHatGuestCommand(ctx context.Context, executable string, args ...string) *exec.Cmd {
-	command := exec.CommandContext(ctx, executable, args...)
-	command.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C", "LC_ALL=C"}
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	command.WaitDelay = time.Second
-	// Nil stdout/stderr go directly to /dev/null, never a diagnostic buffer.
-	return command
+// redHatGuest runs the guest's python3 with a fixed environment. Nil stdout
+// goes directly to /dev/null and stderr always does, never to a diagnostic buffer.
+func redHatGuest(ctx context.Context, stdin io.Reader, stdout io.Writer, args ...string) error {
+	env := []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C", "LC_ALL=C"}
+	return labexec.Run(ctx, labexec.Command{Path: "/usr/bin/python3", Args: args, Env: env, Stdin: stdin, Stdout: stdout})
 }
 
 func runRedHatSubscription(ctx context.Context, operation string, payload []byte) error {
-	command := redHatGuestCommand(ctx, "/usr/bin/python3", "-c", redHatSubscriptionScript, operation)
-	command.Stdin = bytes.NewReader(payload)
-	if err := command.Run(); err != nil {
+	if err := redHatGuest(ctx, bytes.NewReader(payload), nil, "-c", redHatSubscriptionScript, operation); err != nil {
 		return errors.New("redhat subscription-manager operation failed (native output suppressed)")
 	}
 	return nil

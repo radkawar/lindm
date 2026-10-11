@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/custody"
 )
 
 const maxGraphBytes = 4 << 20
@@ -214,14 +215,13 @@ func readConfiguration() ([]configFile, error) {
 	var files []configFile
 	total := 0
 	for _, directory := range []string{"/etc/sysctl.d", "/run/sysctl.d", "/usr/local/lib/sysctl.d", "/usr/lib/sysctl.d"} {
-		fd, err := openProtected(directory, unix.O_RDONLY|unix.O_DIRECTORY)
+		dir, _, err := custody.OpenRoot(directory, unix.O_RDONLY|unix.O_DIRECTORY)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, conflict(err)
 		}
-		dir := os.NewFile(uintptr(fd), directory)
 		entries, readErr := dir.ReadDir(257)
 		closeErr := dir.Close()
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
@@ -246,7 +246,7 @@ func readConfiguration() ([]configFile, error) {
 			}
 			file := configFile{path: path, masked: resolved == "/dev/null"}
 			if !file.masked {
-				file.data, err = protectedRead(resolved, 1<<20)
+				file.data, err = rootRead(resolved, 1<<20)
 				if err != nil {
 					return nil, err
 				}
@@ -263,63 +263,18 @@ func readConfiguration() ([]configFile, error) {
 }
 
 // Configuration symlinks may name root-protected files (Ubuntu's
-// 99-sysctl.conf -> ../sysctl.conf), but traversal and the opened target must
-// remain root-owned and non-writable by other principals.
-func openProtected(path string, flags int) (int, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-		return -1, ErrUnsupported
-	}
-	fd, err := unix.Open("/", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
-	if err != nil {
-		return -1, err
-	}
-	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	for i, part := range parts {
-		mode := unix.O_RDONLY | unix.O_DIRECTORY
-		if i == len(parts)-1 {
-			mode = flags
-		}
-		// systemd RestrictSUIDSGID= fails openat2 with ENOSYS. A single clean
-		// component opened with O_NOFOLLOW cannot escape or follow a link.
-		next, openErr := unix.Openat(fd, part, mode|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
-		closeErr := unix.Close(fd)
-		if openErr != nil {
-			return -1, errors.Join(openErr, closeErr)
-		}
-		fd = next
-		var st unix.Stat_t
-		if err := unix.Fstat(fd, &st); err != nil {
-			_ = unix.Close(fd)
-			return -1, err
-		}
-		if closeErr != nil || st.Uid != 0 || st.Mode&0022 != 0 {
-			_ = unix.Close(fd)
-			return -1, errors.Join(ErrConflict, closeErr)
-		}
-	}
-	return fd, nil
+// 99-sysctl.conf -> ../sysctl.conf); custody walks the resolved target without
+// following links and requires root-protected ancestry and leaf. Vendor files
+// must be singly linked: OSTree hardlink farms are refused by context checks.
+func rootRead(path string, maximum int64) ([]byte, error) {
+	data, err := custody.ReadRoot(path, maximum, false)
+	return data, conflict(err)
 }
-func protectedRead(path string, maximum int64) ([]byte, error) {
-	fd, err := openProtected(path, unix.O_RDONLY)
-	if err != nil {
-		return nil, err
+
+// conflict maps custody policy failures onto the provider's ErrConflict.
+func conflict(err error) error {
+	if errors.Is(err, custody.ErrUnsafe) {
+		return fmt.Errorf("%w: %w", ErrConflict, err)
 	}
-	file := os.NewFile(uintptr(fd), path)
-	var before, after unix.Stat_t
-	if err := unix.Fstat(fd, &before); err != nil {
-		return nil, errors.Join(err, file.Close())
-	}
-	if before.Mode&unix.S_IFMT != unix.S_IFREG {
-		return nil, errors.Join(ErrUnsupported, file.Close())
-	}
-	data, readErr := io.ReadAll(io.LimitReader(file, maximum+1))
-	statErr := unix.Fstat(fd, &after)
-	closeErr := file.Close()
-	if readErr != nil || statErr != nil || closeErr != nil {
-		return nil, errors.Join(readErr, statErr, closeErr)
-	}
-	if int64(len(data)) > maximum || before.Ino != after.Ino || before.Dev != after.Dev || before.Mtim != after.Mtim || before.Ctim != after.Ctim {
-		return nil, ErrConflict
-	}
-	return data, nil
+	return err
 }

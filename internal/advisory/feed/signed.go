@@ -25,6 +25,7 @@ import (
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 const (
@@ -75,22 +76,24 @@ func newVendorTrust() (*vendorTrust, error) {
 	return t, nil
 }
 
+// signedPublisher selects the vendor trust root from the adapter the source's
+// registry release accepts; a compatible rebuild never borrows a vendor key.
 func signedPublisher(config *advisoryv1.FeedSource) (string, error) {
 	if config == nil {
 		return "", errors.New("feed: signed source required")
 	}
+	adapter, fingerprint := platform.FeedRedHatCSAF, redHatFingerprint
 	switch config.GetFormat() {
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES:
-		if config.GetDistro() == "rhel" {
-			return redHatFingerprint, nil
-		}
 	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF:
-		switch config.GetDistro() {
-		case "sles", "opensuse-leap", "opensuse-tumbleweed":
-			return suseFingerprint, nil
-		}
+		adapter, fingerprint = platform.FeedSUSECSAF, suseFingerprint
+	default:
+		return "", errors.New("feed: format has no vendor signer")
 	}
-	return "", errors.New("feed: signed format does not match vendor distro")
+	if _, err := vendorProduct(config, adapter); err != nil {
+		return "", fmt.Errorf("feed: signed format does not match vendor distro: %w", err)
+	}
+	return fingerprint, nil
 }
 
 // verify authenticates complete original bytes, never canonicalized JSON/text.

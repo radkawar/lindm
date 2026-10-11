@@ -12,6 +12,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/secretseal"
 )
 
@@ -20,10 +21,10 @@ const actionDeviceEncryptionKeyRegistered = "device_encryption_key.registered"
 var (
 	// errDeviceEncryptionKeyUnavailable: no key attested by a currently valid
 	// certificate of the live generation; delivery is blocked, never unsealed.
-	errDeviceEncryptionKeyUnavailable = rpcError(connect.CodeFailedPrecondition, "device_encryption_key_unavailable")
+	errDeviceEncryptionKeyUnavailable = rpcreason.Error(connect.CodeFailedPrecondition, "device_encryption_key_unavailable")
 	// errDeviceEncryptionKeyConflict: the identity already attested another key,
 	// or the key is registered under another identity of the generation.
-	errDeviceEncryptionKeyConflict = rpcError(connect.CodeAlreadyExists, "device_encryption_key_conflict")
+	errDeviceEncryptionKeyConflict = rpcreason.Error(connect.CodeAlreadyExists, "device_encryption_key_conflict")
 )
 
 // RegisterEncryptionKey stores the HPKE recipient key attested by the
@@ -33,7 +34,7 @@ func (s *Service) RegisterEncryptionKey(ctx context.Context, req *connect.Reques
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")

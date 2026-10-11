@@ -24,6 +24,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const labUser = "lindm-lab"
@@ -118,34 +121,16 @@ func (l *vmLog) diagnostic(dir string) string {
 }
 
 func hostCommand(ctx context.Context, dir, name string, files []*os.File, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
+	out, log := nativeexec.NewBuffer(1<<20), new(vmLog)
 	// cloud-localds copies private user-data into TMPDIR. Its EXIT trap cannot
 	// run after SIGKILL, so all staging must remain inside owned cleanup.
-	cmd.Env = append(os.Environ(), "TMPDIR="+dir)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		// Stop the script and its ISO/image-builder descendants together.
-		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		} else {
-			return err
-		}
-	}
-	cmd.ExtraFiles = files
-	cmd.WaitDelay = 2 * time.Second
-	out := &limitedOutput{limit: 1 << 20}
-	log := new(vmLog)
-	cmd.Stdout, cmd.Stderr = out, log
-	if err := cmd.Run(); err != nil {
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: append(os.Environ(), "TMPDIR="+dir), Dir: dir, Files: files, Stdout: out, Stderr: log, Timeout: time.Minute}); err != nil {
 		return nil, fmt.Errorf("%s failed: %w; %s", name, err, log.diagnostic(dir))
 	}
-	if out.exceeded {
+	if out.Truncated() {
 		return nil, fmt.Errorf("%s output exceeded limit", name)
 	}
-	return out.data, nil
+	return out.Bytes(), nil
 }
 
 func newConfiguredGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions) (_ *guestVM, err error) {
@@ -280,6 +265,7 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	if err != nil {
 		return nil, err
 	}
+	// Not labexec: QEMU's Pdeathsig must be bound to a thread locked for the VM's lifetime.
 	vm.cmd = exec.CommandContext(ctx, "qemu-system-"+h.Architecture, args...)
 	vm.cmd.Dir = dir
 	vm.cmd.ExtraFiles = []*os.File{base}
@@ -464,21 +450,6 @@ func (v *guestVM) closeWithExpectedExit(expected bool) error {
 	return errors.Join(err, os.RemoveAll(v.dir))
 }
 
-type limitedOutput struct {
-	data     []byte
-	limit    int
-	exceeded bool
-}
-
-func (w *limitedOutput) Write(p []byte) (int, error) {
-	if len(p) > w.limit-len(w.data) {
-		w.exceeded = true
-		return 0, errors.New("command output exceeds capacity")
-	}
-	w.data = append(w.data, p...)
-	return len(p), nil
-}
-
 // guestCommandResult keeps bounded diagnostics private to the lab caller.
 // ExitCode is meaningful only when runResult returns a nil transport error.
 type guestCommandResult struct {
@@ -544,8 +515,7 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 		return result, fmt.Errorf("open pinned SSH session: %v (transport closure: %w)", err, transportErr)
 	}
 	defer func() { _ = session.Close() }() // Run already checked remote completion.
-	stdout := &limitedOutput{limit: limit}
-	stderr := &limitedOutput{limit: limit}
+	stdout, stderr := nativeexec.NewBuffer(limit), nativeexec.NewBuffer(limit)
 	session.Stdin, session.Stdout, session.Stderr = input, stdout, stderr
 	err = session.Run(command)
 	if v.captureDiagnostics {
@@ -554,10 +524,10 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 			v.lastOperation = &guestOperationDiagnostic{
 				Command: command, ExitCode: result.ExitCode,
 				Completed:       ctx.Err() == nil && (err == nil || errors.As(err, &exit)),
-				Stdout:          string(stdout.data[:min(len(stdout.data), 16<<10)]),
-				Stderr:          string(stderr.data[:min(len(stderr.data), 16<<10)]),
-				StdoutTruncated: len(stdout.data) > 16<<10 || stdout.exceeded,
-				StderrTruncated: len(stderr.data) > 16<<10 || stderr.exceeded,
+				Stdout:          string(stdout.Bytes()[:min(stdout.Len(), 16<<10)]),
+				Stderr:          string(stderr.Bytes()[:min(stderr.Len(), 16<<10)]),
+				StdoutTruncated: stdout.Len() > 16<<10 || stdout.Truncated(),
+				StderrTruncated: stderr.Len() > 16<<10 || stderr.Truncated(),
 			}
 		}()
 	}
@@ -567,10 +537,10 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 	if ctx.Err() != nil {
 		return result, fmt.Errorf("guest operation deadline: %w", ctx.Err())
 	}
-	if stdout.exceeded || stderr.exceeded {
+	if stdout.Truncated() || stderr.Truncated() {
 		return result, errors.New("guest operation output exceeds capacity")
 	}
-	result.Stdout, result.Stderr = stdout.data, stderr.data
+	result.Stdout, result.Stderr = stdout.Bytes(), stderr.Bytes()
 	// Do not print guest-controlled stderr: it may contain host facts or seed keys.
 	if err != nil {
 		var exit *ssh.ExitError

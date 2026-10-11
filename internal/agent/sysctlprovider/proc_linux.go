@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -44,11 +46,12 @@ func openProc(key string, writable bool) (*procKey, error) {
 	if writable {
 		flags = unix.O_RDWR
 	}
-	fd, err := openProtected(procPath(key), flags)
+	file, _, err := custody.OpenRoot(procPath(key), flags)
 	if err != nil {
-		return nil, err
+		return nil, conflict(err)
 	}
-	p := &procKey{file: os.NewFile(uintptr(fd), procPath(key)), key: key}
+	fd := int(file.Fd())
+	p := &procKey{file: file, key: key}
 	fail := func(err error) (*procKey, error) { return nil, errors.Join(err, p.file.Close()) }
 	var fs unix.Statfs_t
 	if err := unix.Fstatfs(fd, &fs); err != nil {
@@ -63,7 +66,7 @@ func openProc(key string, writable bool) (*procKey, error) {
 	if p.stat.Mode&unix.S_IFMT != unix.S_IFREG {
 		return fail(ErrUnsupported)
 	}
-	boot, err := protectedRead("/proc/sys/kernel/random/boot_id", 64)
+	boot, err := rootRead("/proc/sys/kernel/random/boot_id", 64)
 	if err != nil {
 		return fail(err)
 	}

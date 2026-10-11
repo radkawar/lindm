@@ -80,6 +80,10 @@ func (n *preparingNative) Plan(ctx context.Context, desired *resourcev1.Resource
 	}
 	return plan, nil
 }
+func (n *preparingNative) Observe(context.Context, *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	return nil, errors.New("fixture does not observe")
+}
+
 func (n *preparingNative) Verify(context.Context, *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	return nil, errors.New("unexpected verification")
 }

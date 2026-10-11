@@ -20,6 +20,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/platform"
 )
 
 // resourceDispatch uses real immutable profiles, assignment CAS, online signer,
@@ -156,9 +157,8 @@ func resourceCreatePolicy() *resourcev1.OwnershipPolicy {
 // and, for RPM, the native DNF generation (EL DNF4 versus Fedora DNF5).
 type resourcePackaging struct{ rpm, arm, dnf4 bool }
 
-func newResourcePackaging(distribution, architecture string) resourcePackaging {
-	el := distribution == "rhel" || distribution == "almalinux" || distribution == "rocky"
-	return resourcePackaging{rpm: distribution == "fedora" || el, arm: architecture == "arm64", dnf4: el}
+func newResourcePackaging(backend platform.Backend, architecture string) resourcePackaging {
+	return resourcePackaging{rpm: backend.DNF(), arm: architecture == "arm64", dnf4: backend == platform.BackendDNF4}
 }
 
 // dnf4VersionlockList is the native DNF4 versionlock plugin's lock list.
@@ -307,7 +307,7 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
 	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot}
-	rpm := newResourcePackaging(result.Distribution, result.Architecture)
+	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	kinds := result.Resources.Kinds
 	if selected["packages"] {
 		if err := exerciseResourcePackages(ctx, r, rpm, &kinds[0]); err != nil {

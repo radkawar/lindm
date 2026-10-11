@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Ubuntu 22.04 LTS                                                                          | Ubuntu 24.04 LTS                           | Ubuntu 26.04 LTS                                                                          |
-| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                               | implemented                                | implemented                                                                               |
-| lifecycle         | implemented                                                                               | implemented                                | implemented                                                                               |
-| dispatch          | implemented                                                                               | implemented                                | implemented                                                                               |
-| packages          | implemented                                                                               | implemented                                | implemented                                                                               |
-| accounts          | implemented                                                                               | implemented                                | implemented                                                                               |
-| sysctl            | implemented                                                                               | implemented                                | implemented                                                                               |
-| definitions       | gated: systemd 249 is below the definition provider floor 255                             | implemented                                | implemented                                                                               |
-| password          | gated: libpwquality/PAM/manager versions not measured on this release                     | implemented                                | implemented                                                                               |
-| firewall          | implemented                                                                               | implemented                                | implemented                                                                               |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| self-update       | implemented                                                                               | implemented                                | implemented                                                                               |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| advisories        | implemented                                                                               | implemented                                | implemented                                                                               |
-| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed | gated: OS patch policy provider not landed                                                |
-| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  | gated: release upgrade is not implemented                                                 |
+| Capability        | Ubuntu 22.04 LTS                                                                          | Ubuntu 24.04 LTS                           | Ubuntu 26.04 LTS                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------- |
+| inventory         | implemented                                                                               | implemented                                | implemented                                                           |
+| lifecycle         | implemented                                                                               | implemented                                | implemented                                                           |
+| dispatch          | implemented                                                                               | implemented                                | implemented                                                           |
+| packages          | implemented                                                                               | implemented                                | implemented                                                           |
+| accounts          | implemented                                                                               | implemented                                | implemented                                                           |
+| sysctl            | implemented                                                                               | implemented                                | implemented                                                           |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                             | implemented                                | implemented                                                           |
+| password          | implemented                                                                               | implemented                                | implemented                                                           |
+| firewall          | implemented                                                                               | implemented                                | implemented                                                           |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | gated: owned-boot recovery fixture not maintained for the 26.04 media |
+| self-update       | implemented                                                                               | implemented                                | implemented                                                           |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden | implemented                                | implemented                                                           |
+| advisories        | implemented                                                                               | implemented                                | implemented                                                           |
+| os-update         | gated: OS patch policy provider not landed                                                | gated: OS patch policy provider not landed | gated: OS patch policy provider not landed                            |
+| release-upgrade   | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented  | gated: release upgrade is not implemented                             |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -53,7 +53,11 @@ SHA-256 `601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f`,
 and the Ubuntu CD image key `843938DF228D22F7B3742BC0D94AA3F0EFE21092`, as the
 Noble live-server manifests are. All three passed `lab images fetch` on 2026-10-11.
 A verified image is an input, not a successful installation, desktop, encryption or
-agent lifecycle result.
+agent lifecycle result. The lab admits that desktop media to the encryption, wipe,
+report-loss, lock and assistance lanes (its own dracut 110 initramfs with the split
+`systemd-cryptsetup` module, no network packages); recovery-sanitize stays gated
+until the owned-boot recovery fixture is maintained for 26.04. Admission is not
+qualification.
 
 Observed Ubuntu 26.04 x86_64 cloud lanes, under
 `$HOME/.cache/lindm-platformlanes-20261009/`:

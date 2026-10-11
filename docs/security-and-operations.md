@@ -248,12 +248,16 @@ root-authorized.
 
 Path walks pin directory descriptors and open components with `O_NOFOLLOW`;
 symlink metadata is never accepted as directory metadata. Systemd's separately
-bounded, descriptor-pinned vendor-link resolver retains its existing checks on
-both source and resolved ancestry. Private state/spool and temporary-parent APIs
+bounded, descriptor-pinned vendor-link resolver lives in `custody.OpenResolved`
+and retains its existing checks on both source and resolved ancestry.
+Private state/spool and temporary-parent APIs
 retain their separate caller-ownership and sticky-directory protections; their
 final private directory still requires its exact owner and mode `0700`.
 Configuration files, secret files and executable files retain their stricter
 file-specific permissions; the group-zero exception is only for directories.
+Native providers, recovery boot state and native executables use the stricter
+`custody.OpenRoot` walk instead, which admits no group write at all (see
+architecture "Native process and file custody policy").
 
 Recovery secrets use envelope encryption with per-record data keys and a separately
 protected wrapping key. The API never returns them in inventory, exports or routine

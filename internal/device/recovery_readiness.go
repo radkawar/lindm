@@ -19,6 +19,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/releaseupdate"
+	"lindm/internal/rpcreason"
 )
 
 // recoveryReadinessApprovalScope runs after identity's fresh authorization and scoped
@@ -39,7 +40,7 @@ func (s *Service) recoveryReadinessApprovalScope(request *adminv1.CreateDeviceAc
 		}
 		generation, err := uuid.Parse(request.GetEnrollmentGeneration())
 		if err != nil || device.State != stateActive || device.CurrentGenerationID == nil || *device.CurrentGenerationID != generation {
-			return rpcError(connect.CodeFailedPrecondition, "device_action_generation_rejected")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_rejected")
 		}
 		now, err := dispatchClock(ctx, q)
 		if err != nil {
@@ -76,7 +77,7 @@ func (s *Service) requireRecoveryReadiness(ctx context.Context, q *devicedb.Quer
 		message = fmt.Sprintf("%s needed=%d available=%d", message, readiness.GetNeededBytes(), readiness.GetAvailableBytes())
 	}
 	failure := connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
-	failure.Meta().Set("Lindm-Reason", readiness.GetReason())
+	rpcreason.Set(failure, readiness.GetReason())
 	detail, err := connect.NewErrorDetail(readiness)
 	if err != nil {
 		return err

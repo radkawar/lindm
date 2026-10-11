@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/rpcreason"
 )
 
 const (
@@ -281,7 +282,7 @@ func TestExecutorRefusalEndsImmediately(t *testing.T) {
 	h.offered(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
 	h.client.set(func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error) {
 		err := connect.NewError(connect.CodePermissionDenied, errors.New("locked"))
-		err.Meta().Set("Lindm-Reason", "no_graphical_session")
+		rpcreason.Set(err, "no_graphical_session")
 		return nil, err
 	})
 	h.helper.syncOnce(h.ctx, h.ctx)

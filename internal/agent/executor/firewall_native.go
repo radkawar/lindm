@@ -23,7 +23,8 @@ type nativeFirewallResource struct {
 	evidence *agentv1.ConnectivityVerificationEvidence
 }
 
-func (s *Service) openFirewallResource(ctx context.Context, intent *agentv1.ResourceExecutionIntent, platform *resourcev1.PlatformProduct) (nativeResource, error) {
+func openFirewallResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent, platform := o.service, o.intent, o.platform
 	holder := new(nativeFirewallResource)
 	provider, err := firewallprovider.Open(ctx, firewallprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,

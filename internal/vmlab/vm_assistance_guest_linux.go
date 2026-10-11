@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // assistanceUserPrelude runs a command inside the autologin user's session
@@ -107,11 +110,11 @@ func pollGuest(ctx context.Context, vm *guestVM, timeout time.Duration, what, co
 
 // prepareAssistanceDesktop logs the lab user into GNOME through GDM autologin
 // and removes first-login and idle surfaces that would cover the consent
-// controls: the release-upgrade prompt (Ubuntu), the welcome tour and initial
-// overview (Fedora), idle blanking and the automatic screen lock.
-func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, distribution string) (*actionDesktopEvidence, error) {
-	if distribution == "ubuntu" {
-		if _, err := vm.Run(ctx, `sudo -n sh -eu -c 'if test -f /etc/update-manager/release-upgrades; then sed -i "s/^Prompt=.*/Prompt=never/" /etc/update-manager/release-upgrades; fi'`, nil); err != nil {
+// controls: the release-upgrade prompt, the welcome tour and initial
+// overview, idle blanking and the automatic screen lock.
+func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, release *platform.Release) (*actionDesktopEvidence, error) {
+	if prompt := release.Lab.Session.UpgradePrompt; prompt != "" {
+		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote("if test -f "+nativeQuote(prompt)+"; then sed -i 's/^Prompt=.*/Prompt=never/' "+nativeQuote(prompt)+"; fi"), nil); err != nil {
 			return nil, fmt.Errorf("suppress release-upgrade prompt: %w", err)
 		}
 	}
@@ -215,15 +218,15 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, evidence *assis
 // openAssistanceTerminal starts a terminal in the lab user's session whose
 // shell reads exactly one line into path. Only keyboard input that reaches the
 // focused window can produce the file.
-func openAssistanceTerminal(ctx context.Context, vm *guestVM, distribution, path string) (string, error) {
-	terminal := map[string]string{"ubuntu": "gnome-terminal", "fedora": "ptyxis"}[distribution]
-	args := map[string]string{"ubuntu": "--", "fedora": "--new-window --"}[distribution]
-	if terminal == "" {
-		return "", errors.New("assistance terminal requires Ubuntu or Fedora")
+func openAssistanceTerminal(ctx context.Context, vm *guestVM, release *platform.Release, path string) (string, error) {
+	argv := release.Lab.Session.Terminal
+	if len(argv) == 0 {
+		return "", fmt.Errorf("assistance terminal is not maintained for %s", release.Name)
 	}
+	terminal := argv[0]
 	reader := `IFS= read -r line && printf %s "$line" > ` + nativeQuote(path)
 	script := `rm -f ` + nativeQuote(path) + `
-setsid sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus WAYLAND_DISPLAY=wayland-0 ` + terminal + ` ` + args + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
+setsid sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus WAYLAND_DISPLAY=wayland-0 ` + strings.Join(argv, " ") + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
 	if _, err := vm.run(ctx, assistanceRootScript(script), nil, 4096, 30*time.Second); err != nil {
 		return "", fmt.Errorf("open %s in the lab session: %w", terminal, err)
 	}
@@ -258,10 +261,16 @@ func lockAssistanceSession(ctx context.Context, vm *guestVM, sessionID string, l
 }
 
 // observeAssistancePackages records the guest's capture stack versions.
-func observeAssistancePackages(ctx context.Context, vm *guestVM, distribution string) ([]string, error) {
-	command := `dpkg-query -W -f='${Package}=${Version}\n' xdg-desktop-portal xdg-desktop-portal-gnome pipewire gstreamer1.0-pipewire gstreamer1.0-plugins-good gnome-shell lindm-agent`
-	if distribution == "fedora" {
-		command = `rpm -q xdg-desktop-portal xdg-desktop-portal-gnome pipewire pipewire-gstreamer gstreamer1-plugins-good gnome-shell lindm-agent`
+func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platform.Release) ([]string, error) {
+	packages := strings.Join(append(slices.Clone(release.Lab.Session.Capture), packaging.PackageName), " ")
+	var command string
+	switch release.Native().Packages.Backend.PackageDB() {
+	case platform.PackageDBDpkg:
+		command = `dpkg-query -W -f='${Package}=${Version}\n' ` + packages
+	case platform.PackageDBRPM:
+		command = "rpm -q " + packages
+	default:
+		return nil, fmt.Errorf("capture stack packages are not observable on %s", release.Name)
 	}
 	out, err := vm.run(ctx, command, nil, 16<<10, 30*time.Second)
 	if err != nil {

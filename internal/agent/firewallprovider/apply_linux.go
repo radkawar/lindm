@@ -20,13 +20,24 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/resource"
 )
 
-// ApplyNative independently derives the complete target from a validated closed
+// ApplyNative applies one transaction under the helper's connectivity guard and
+// returns the after-image read back from the kernel, like every other kind.
+func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *agentv1.NativeResourceTransactionRequest, guard Guard, beforeEffect func(context.Context) error) (*agentv1.ResourceOwnershipSnapshot, error) {
+	config := env.Config.GetFirewallProvider()
+	if err := applyNative(ctx, config, request, guard, beforeEffect); err != nil {
+		return nil, err
+	}
+	return ReadNative(ctx, config, request.GetBefore().GetObservation())
+}
+
+// applyNative independently derives the complete target from a validated closed
 // plan and protected ownership baseline. Caller-provided private bytes are never
 // treated as a netlink program. No persistent file or kernel effect precedes gate.
-func ApplyNative(ctx context.Context, config *agentv1.NativeFirewallProviderConfig, request *agentv1.NativeResourceTransactionRequest, guard Guard, beforeEffect func(context.Context) error) error {
+func applyNative(ctx context.Context, config *agentv1.NativeFirewallProviderConfig, request *agentv1.NativeResourceTransactionRequest, guard Guard, beforeEffect func(context.Context) error) error {
 	if guard == nil || beforeEffect == nil || os.Geteuid() != 0 {
 		return ErrUnsupported
 	}

@@ -20,6 +20,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -34,7 +35,7 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 		return nil, invalid("invalid_offline_authorization")
 	}
 	if s.identity == nil || s.execution == nil || s.signing == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -101,14 +102,14 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 			return nil, mapErr(err)
 		}
 		if token.UsedCount >= token.MaxUses {
-			return nil, rpcError(connect.CodeResourceExhausted, "provisioning_token_exhausted")
+			return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
 		}
 		snapshot, verifier, err := s.execution.CurrentInTransaction(ctx, tx)
 		if err != nil {
 			return nil, executionError(err)
 		}
 		if snapshot.Delegation == nil {
-			return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 		}
 		_, update, err := s.execution.ForDevice(ctx, tx, req.Msg.GetBootstrapRootVersion(), 0, 0, req.Msg.GetBootstrapRootSha256(), nil)
 		if err != nil {
@@ -129,7 +130,7 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 			return nil, executionError(err)
 		}
 		if _, err := verifier.VerifyOfflineAuthorization(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
-			return nil, rpcError(connect.CodeFailedPrecondition, "offline_enrollment_plan_signer_not_delegated")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "offline_enrollment_plan_signer_not_delegated")
 		}
 		file.AuthorizationEnvelope, file.DelegationEnvelope, file.RootTransitions = envelope, update.GetDelegationEnvelope(), update.GetRootTransitions()
 		document, err := proto.Marshal(file)
@@ -159,7 +160,7 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 // authorization, CSR proof of possession and device-signed immutable transaction.
 // Neither file-selected roots nor unsigned DSSE payload fields confer authority.
 func (s *Service) verifyOfflineEnrollmentRequest(ctx context.Context, q *devicedb.Queries, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, file *agentv1.OfflineEnrollmentRequestFile, now time.Time) (*agentv1.OfflineEnrollmentRequestProof, uuid.UUID, error) {
-	denied := rpcError(connect.CodePermissionDenied, "offline_enrollment_rejected")
+	denied := rpcreason.Error(connect.CodePermissionDenied, "offline_enrollment_rejected")
 	authorization, err := verifier.VerifyOfflineAuthorization(ctx, snapshot.Root, snapshot.Delegation, file.GetAuthorization().GetAuthorizationEnvelope(), now)
 	if err != nil {
 		return nil, uuid.Nil, denied
@@ -203,7 +204,7 @@ func (s *Service) ImportOfflineEnrollmentRequest(ctx context.Context, req *conne
 		return nil, invalid("invalid_offline_request")
 	}
 	if s.identity == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -255,7 +256,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 		return nil, invalid("invalid_offline_request")
 	}
 	if s.identity == nil || s.execution == nil || s.signing == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -299,7 +300,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 	id, _ := uuid.Parse(proof.GetTransactionId())
 	receipt, err := q.LockProvisioningEnrollment(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, rpcError(connect.CodeNotFound, "offline_request_not_imported")
+		return nil, rpcreason.Error(connect.CodeNotFound, "offline_request_not_imported")
 	}
 	if err != nil {
 		return nil, mapErr(err)
@@ -312,7 +313,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 		return nil, mapErr(err)
 	}
 	if enrollment.GetState() != "ready" {
-		return nil, rpcError(connect.CodeFailedPrecondition, "enrollment_pending_approval")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "enrollment_pending_approval")
 	}
 	expires := proof.GetExpiresAt().AsTime()
 	for _, limit := range []time.Time{enrollment.GetExpiresAt().AsTime(), snapshot.Delegation.GetExpiresAt().AsTime()} {
@@ -326,7 +327,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 		return nil, executionError(err)
 	}
 	if _, err := verifier.VerifyOfflineResponse(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "offline_enrollment_start_signer_not_delegated")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "offline_enrollment_start_signer_not_delegated")
 	}
 	if err := insertAudit(ctx, q, &actor.ID, "enrollment.offline_response", id.String(), req.Msg.GetReason()); err != nil {
 		return nil, mapErr(err)
@@ -346,7 +347,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 // revocation race between file verification and consuming a bounded token use.
 func (s *Service) validateProvisioningImport(ctx context.Context, tx pgx.Tx, tokenID uuid.UUID, request *enrollmentv1.ProvisionRequest, file *agentv1.OfflineEnrollmentRequestFile) (time.Time, error) {
 	if s.execution == nil {
-		return time.Time{}, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return time.Time{}, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	snapshot, verifier, err := s.execution.CurrentInTransaction(ctx, tx)
 	if err != nil {

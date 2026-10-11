@@ -851,8 +851,8 @@ variants normally enroll against the shared development console; add
 `-local-authority -lindmd /absolute/path/to/lindmd` to run them against the same kind
 of private server and local password/WebAuthn owners instead (remote hosts always do
 this). The private server receives the fixture's public execution root, so the
-offline-signed trust updates and service intents are unchanged.
-creates a unique disposable PostgreSQL database and starts the real server on
+offline-signed trust updates and service intents are unchanged. In every private mode
+the lab creates a unique disposable PostgreSQL database and starts the real server on
 private host ports. Only lab code uses the protected development PostgreSQL admin
 credential to create/drop that database; the server receives its non-superuser
 migrator credential. Production database option validation is unchanged. Shared

@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 func fixture(t *testing.T, name string) []byte {
@@ -89,7 +90,7 @@ func TestVendorBackports(t *testing.T) {
 				version string
 				want    int
 			}{{test.before, -1}, {test.fixed, 0}, {test.after, 1}} {
-				got, err := Compare(managerFor(test.distro), comparison.version, found.GetFixedVersion())
+				got, err := Compare(manager(platform.ForFeed(test.distro, test.release)), comparison.version, found.GetFixedVersion())
 				if err != nil || got != comparison.want {
 					t.Errorf("backport %s: compare=%d err=%v; want %d", comparison.version, got, err, comparison.want)
 				}

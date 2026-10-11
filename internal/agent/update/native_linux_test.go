@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 func TestNativeSuccessRequiresExactProductVersionArchitectureAndConfiguredState(t *testing.T) {
@@ -98,10 +99,10 @@ func TestExpiredStagingIsNotInterruptedNativeAuthority(t *testing.T) {
 }
 
 func TestNativeObservationErrorsDoNotInventAbsenceOrEffects(t *testing.T) {
-	if !missingNativePackage("rpm", []byte("package lindm-agent is not installed\n"), "", 1) {
+	if !missingNativePackage(platform.PackageDBRPM, []byte("package lindm-agent is not installed\n"), "", 1) {
 		t.Fatal("authoritative native absence not recognized")
 	}
-	if missingNativePackage("rpm", nil, "database corrupt", 1) || missingNativePackage("deb", nil, "permission denied", 1) {
+	if missingNativePackage(platform.PackageDBRPM, nil, "database corrupt", 1) || missingNativePackage(platform.PackageDBDpkg, nil, "permission denied", 1) {
 		t.Fatal("failed native database query invented absence")
 	}
 	tx := &agentv1.AgentUpdateTransaction{Manager: agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT, Architecture: "amd64", NativeVersion: "0.2.0-1", PreviousNativeVersion: "0.1.0-1"}
@@ -124,13 +125,13 @@ func TestNativeObservationErrorsDoNotInventAbsenceOrEffects(t *testing.T) {
 
 func TestArchSignatureCustodyRejectsMissingSymlinkAndOversize(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "agent.pkg.tar.zst.sig")
-	if err := protectedSignature(path); err == nil {
+	if err := admitSignature(path); err == nil {
 		t.Fatal("missing native signature accepted")
 	}
 	if err := os.WriteFile(path, []byte("bounded native signature"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := protectedSignature(path); err != nil {
+	if err := admitSignature(path); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(path, path+".real"); err != nil {
@@ -139,7 +140,7 @@ func TestArchSignatureCustodyRejectsMissingSymlinkAndOversize(t *testing.T) {
 	if err := os.Symlink(path+".real", path); err != nil {
 		t.Fatal(err)
 	}
-	if err := protectedSignature(path); err == nil {
+	if err := admitSignature(path); err == nil {
 		t.Fatal("signature symlink accepted")
 	}
 	if err := os.Remove(path); err != nil {
@@ -148,7 +149,7 @@ func TestArchSignatureCustodyRejectsMissingSymlinkAndOversize(t *testing.T) {
 	if err := os.WriteFile(path, make([]byte, (64<<10)+1), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := protectedSignature(path); err == nil {
+	if err := admitSignature(path); err == nil {
 		t.Fatal("oversized signature accepted")
 	}
 }

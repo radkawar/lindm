@@ -20,6 +20,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // EncryptedStorageInspectOptions packages an already-built, version-stamped agent.
@@ -78,8 +79,8 @@ func InspectEncryptedStorage(ctx context.Context, manifest *labv1.ImageManifest,
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if (manifest.Distribution != "ubuntu" || manifest.Version != "24.04") && (manifest.Distribution != "fedora" || manifest.Version != "44") {
-		return nil, errors.New("encrypted storage capture requires Ubuntu 24.04 or Fedora 44")
+	if err := platform.ForManifest(manifest.Distribution, manifest.Version).Gate(platform.Encryption); err != nil {
+		return nil, fmt.Errorf("encrypted storage capture: %w", err)
 	}
 	if options.Repository == "" || options.Agent == "" || options.FixtureOutput == "" {
 		return nil, errors.New("encrypted storage capture requires repository, versioned agent and new fixture output")
@@ -339,7 +340,7 @@ func buildStorageInspectPackage(ctx context.Context, manifest *labv1.ImageManife
 	if err != nil {
 		return nil, "", err
 	}
-	format, err := NativePackageFormat(manifest.Distribution)
+	format, err := NativePackageFormat(manifestRelease(manifest))
 	if err != nil {
 		return nil, "", err
 	}

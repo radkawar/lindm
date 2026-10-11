@@ -5,47 +5,33 @@ package vmlab
 import (
 	"fmt"
 
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
-type nativeFamily uint8
-
-const (
-	familyAPT nativeFamily = iota + 1
-	familyDNF
-	familyZypper
-	familyPacman
-)
-
-// nativeDistributionFamily uses the actual os-release ID, never ID_LIKE. In
-// particular, immutable derivatives must not inherit a mutable transaction path.
-func nativeDistributionFamily(distribution string) (nativeFamily, error) {
-	switch distribution {
-	case "arch":
-		return familyPacman, nil
-	case "ubuntu", "debian":
-		return familyAPT, nil
-	case "fedora", "rhel", "rocky", "almalinux":
-		return familyDNF, nil
-	case "opensuse-leap", "opensuse-tumbleweed":
-		return familyZypper, nil
-	default:
-		return 0, fmt.Errorf("unsupported native distribution %q", distribution)
-	}
+// manifestRelease is the registry row a lab image manifest boots.
+func manifestRelease(manifest *labv1.ImageManifest) *platform.Release {
+	return platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
 }
 
-// NativePackageFormat selects the native artifact format for a supported mutable
-// distribution. Unknown and immutable distributions are rejected explicitly.
-func NativePackageFormat(distribution string) (packaging.Format, error) {
-	family, err := nativeDistributionFamily(distribution)
+// nativeBackend is the release's native package backend (its base's for a
+// derivative). Unknown and image-based releases have none and are rejected, so
+// immutable derivatives never inherit a mutable transaction path.
+func nativeBackend(release *platform.Release) (platform.Backend, error) {
+	backend := release.Native().Packages.Backend
+	if backend == platform.BackendNone {
+		return backend, fmt.Errorf("unsupported native distribution %s", release.Name)
+	}
+	return backend, nil
+}
+
+// NativePackageFormat selects the native artifact format for a supported
+// mutable release.
+func NativePackageFormat(release *platform.Release) (packaging.Format, error) {
+	backend, err := nativeBackend(release)
 	if err != nil {
 		return "", err
 	}
-	if family == familyAPT {
-		return packaging.FormatDEB, nil
-	}
-	if family == familyPacman {
-		return packaging.FormatArch, nil
-	}
-	return packaging.FormatRPM, nil
+	return packaging.Format(backend.PackageFormat()), nil
 }

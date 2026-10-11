@@ -3,7 +3,6 @@ package update
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,20 +15,22 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 )
 
 func failingNativeChild(t *testing.T, stdout, stderr string) error {
 	t.Helper()
 	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
-	path := filepath.Join(t.TempDir(), "apt-get")
-	script := "#!/bin/sh\nprintf '%s' " + quote(stdout) + "\nprintf '%s' " + quote(stderr) + " >&2\nexit 100\n"
-	if err := os.WriteFile(path, []byte(script), 0700); err != nil {
-		t.Fatal(err)
-	}
-	_, err := nativeCommand(t.Context(), "simulate", path, "--never-log-this-argument")
-	var exit *exec.ExitError
+	script := "printf '%s' " + quote(stdout) + "\nprintf '%s' " + quote(stderr) + " >&2\nexit 100\n"
+	_, err := nativeCommand(t.Context(), "simulate", "/usr/bin/sh", "-c", script, "--never-log-this-argument")
+	var exit *nativeexec.ExitError
 	if !errors.As(err, &exit) || exit.ExitCode() != 100 {
 		t.Fatalf("real child exit was lost: %v", err)
+	}
+	// The child stands in for apt-get; only root-protected /usr tools may run.
+	var failure *nativeFailure
+	if errors.As(err, &failure) {
+		failure.program, failure.diagnostic.Manager = "apt-get", "apt-get"
 	}
 	return err
 }
@@ -97,14 +98,30 @@ func TestNativeFailureKeepsFinalErrorAfterOutputOverflow(t *testing.T) {
 	}
 }
 
-func TestNativeDiagnosticWithholdsPEMBodyAcrossChunksAndTailRotation(t *testing.T) {
-	var stdout, stderr commandOutput
-	for _, chunk := range []string{"-----BE", "GIN PRIVATE KEY-----\n", strings.Repeat("cHJpdmF0ZS1rZXktbWF0ZXJpYWw=\n", 3000), "-----END PRIVATE KEY-----\n"} {
-		if _, err := stderr.Write([]byte(chunk)); err != nil {
-			t.Fatal(err)
-		}
+func TestNativeOutputOverflowFailsClosedOnSuccessfulExit(t *testing.T) {
+	out, err := nativeCommand(t.Context(), "validation", "/usr/bin/sh", "-c", "head -c 70000 /dev/zero")
+	var failure *nativeFailure
+	if out != nil || !errors.As(err, &failure) || !failure.outputOverflow || !errors.Is(err, nativeexec.ErrOutputLimit) {
+		t.Fatalf("oversized native reply admitted: %d bytes, %v", len(out), err)
 	}
-	diagnostic := commandDiagnostic("apt-get", "apply", verificationExit(100), &stdout, &stderr)
+}
+
+func TestNativeCommandRejectsUntrustedExecutable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "apt-get")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := nativeCommand(t.Context(), "apply", path); !errors.Is(err, nativeexec.ErrUntrustedExecutable) {
+		t.Fatalf("executable outside root-protected /usr ran: %v", err)
+	}
+}
+
+func TestNativeDiagnosticWithholdsPEMBodyAcrossChunksAndTailRotation(t *testing.T) {
+	var stdout, stderr nativeOutputTail
+	for _, chunk := range []string{"-----BE", "GIN PRIVATE KEY-----\n", strings.Repeat("cHJpdmF0ZS1rZXktbWF0ZXJpYWw=\n", 3000), "-----END PRIVATE KEY-----\n"} {
+		stderr.write([]byte(chunk))
+	}
+	diagnostic := commandDiagnostic("apt-get", "apply", verificationExit(100), true, &stdout, &stderr)
 	if strings.Join(diagnostic.GetErrorLines(), "\n") != "[redacted sensitive native output]" || !diagnostic.GetTruncated() {
 		t.Fatalf("PEM body survived source sanitization: %v", diagnostic)
 	}

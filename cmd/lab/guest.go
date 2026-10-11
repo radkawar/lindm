@@ -32,6 +32,7 @@ import (
 	"lindm/internal/agent/enrollment"
 	"lindm/internal/agent/localrpc"
 	"lindm/internal/pki"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -431,7 +432,7 @@ func guestConnection(connection *agentv1.GetConnectionResponse) error {
 
 func guestRejection(err error, code connect.Code, reason string) bool {
 	var rpcErr *connect.Error
-	return errors.As(err, &rpcErr) && rpcErr.Code() == code && rpcErr.Meta().Get("Lindm-Reason") == reason
+	return errors.As(err, &rpcErr) && rpcErr.Code() == code && rpcreason.Get(rpcErr) == reason
 }
 
 func guestRPCFailure(operation string, err error) error {

@@ -1,7 +1,6 @@
 package loadlab
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const (
@@ -248,30 +250,8 @@ func (s *HostSampler) Snapshot() HostContention {
 }
 
 func runIOStat(ctx context.Context, binary string, args []string, stdout, stderr io.Writer) error {
-	cmd := exec.CommandContext(ctx, binary, args...)
 	// iostat needs no application environment, especially no fixture credentials.
-	cmd.Env = []string{"LC_ALL=C", "LANG=C", "PATH=/usr/bin:/bin"}
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	cmd.WaitDelay = time.Second
-	return cmd.Run()
-}
-
-// hostSampleOutput drains an overlong command output without retaining
-// it; it reports truncation instead of treating a partial report as valid data.
-type hostSampleOutput struct {
-	data      bytes.Buffer
-	truncated bool
-}
-
-func (b *hostSampleOutput) Write(data []byte) (int, error) {
-	n := len(data)
-	remaining := maxIOStatBytes - b.data.Len()
-	if len(data) > remaining {
-		data = data[:remaining]
-		b.truncated = true
-	}
-	_, _ = b.data.Write(data)
-	return n, nil
+	return labexec.Run(ctx, labexec.Command{Path: binary, Args: args, Env: []string{"LC_ALL=C", "LANG=C", "PATH=/usr/bin:/bin"}, Stdout: stdout, Stderr: stderr})
 }
 
 func (s *HostSampler) sampleIOStat(ctx context.Context) IOStatObservation {
@@ -279,15 +259,15 @@ func (s *HostSampler) sampleIOStat(ctx context.Context) IOStatObservation {
 		return IOStatObservation{Status: "unavailable", Error: "iostat was not found; disk utilization and await were not measured"}
 	}
 	start := s.deps.now()
-	var stdout, stderr hostSampleOutput
-	err := s.deps.run(ctx, s.iostat, []string{"-dx", "1", "2"}, &stdout, &stderr)
-	result := IOStatObservation{WindowSeconds: 1, DurationSeconds: s.deps.now().Sub(start).Seconds(), Output: stdout.data.String()}
+	stdout, stderr := nativeexec.NewBuffer(maxIOStatBytes), nativeexec.NewBuffer(maxIOStatBytes)
+	err := s.deps.run(ctx, s.iostat, []string{"-dx", "1", "2"}, stdout, stderr)
+	result := IOStatObservation{WindowSeconds: 1, DurationSeconds: s.deps.now().Sub(start).Seconds(), Output: stdout.String()}
 	if err != nil {
 		result.Status = "failed"
-		result.Error = fmt.Sprintf("iostat: %v; %s", err, strings.TrimSpace(stderr.data.String()))
+		result.Error = fmt.Sprintf("iostat: %v; %s", err, strings.TrimSpace(stderr.String()))
 		return result
 	}
-	if stdout.truncated || stderr.truncated {
+	if stdout.Truncated() || stderr.Truncated() {
 		result.Status, result.Error = "truncated", "iostat output exceeded the per-stream 64 KiB limit"
 		return result
 	}

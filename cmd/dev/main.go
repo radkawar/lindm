@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|generate-docs> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|worktree|signoff|pre-push|generate-docs> [options]
 
   generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
          fails instead when any block is stale (make generate / make lint).
@@ -37,6 +37,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   worktree add|list|prune  Private worktrees in <main>.worktrees; see worktree help.
   signoff  Gate a clean worktree of the pushed HEAD and post gh-signoff
          statuses for that SHA; see signoff -h.
+  pre-push  Git hook body: make check in a clean worktree of each pushed SHA
+         unless it already has a green signoff/unit; see pre-push -h.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
 40m for test-integration).
@@ -75,6 +77,8 @@ func run() error {
 		return runWorktree(os.Args[2:])
 	case "signoff":
 		return runSignoff(os.Args[2:])
+	case "pre-push":
+		return runPrePush(os.Args[2:])
 	}
 	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" {
 		return fmt.Errorf("unknown command %q; use help", verb)

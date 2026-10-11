@@ -97,6 +97,8 @@ func startRemoteGenerator(ctx context.Context, host, binary, sshConfig string, s
 	if sshConfig != "" {
 		args = append([]string{"-F", sshConfig}, args...)
 	}
+	// Not labexec: one ssh process whose stdin and stdout carry the streaming
+	// generator protocol for the whole run.
 	command := exec.CommandContext(ctx, "ssh", append(args, host, "--", binary, "load-generator")...)
 	command.Stderr = stderr
 	command.WaitDelay = 30 * time.Second

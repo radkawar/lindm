@@ -9,12 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"lindm/internal/custody"
+	"lindm/internal/labexec"
 )
 
 // Init creates a protected fixture atomically, or validates the existing one.
@@ -145,7 +147,7 @@ func locked(ctx context.Context, repoRoot string, operation func(string) error) 
 	}
 	lock := os.NewFile(uintptr(fd), lockPath)
 	defer func() { err = errors.Join(err, lock.Close()) }()
-	if err := protected(lockPath, false); err != nil {
+	if _, err := custody.Owned(lockPath, false); err != nil {
 		return err
 	}
 	for {
@@ -182,21 +184,9 @@ func compose(ctx context.Context, root string, args ...string) error {
 }
 
 func command(ctx context.Context, root string, env []string, name string, args ...string) error {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir, cmd.Env = root, env
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	// go run and Compose may spawn children. Cancellation must not leave a
-	// migration/bootstrap process running after its caller has reported failure.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	cmd.WaitDelay = 5 * time.Second
-	if err := cmd.Run(); err != nil {
+	// go run and Compose may spawn children. Cancellation kills the whole group,
+	// so no migration/bootstrap process outlives its caller's reported failure.
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: root, Stdout: os.Stdout, Stderr: os.Stderr}); err != nil {
 		return fmt.Errorf("%s %s failed: %w", name, strings.Join(args, " "), err)
 	}
 	return nil

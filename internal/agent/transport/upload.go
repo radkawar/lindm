@@ -13,6 +13,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/spool"
+	"lindm/internal/rpcreason"
 )
 
 func flush(ctx context.Context, store *spool.Store, authority *authorized, status *agentv1.TransportStatus) error {
@@ -160,7 +161,7 @@ func finishPackage(ctx context.Context, store *spool.Store, sequence, high uint6
 }
 
 func expireIfRejected(ctx context.Context, store *spool.Store, authority *authorized, sequence uint64, uploadErr error, status *agentv1.TransportStatus) error {
-	if connect.CodeOf(uploadErr) != connect.CodeFailedPrecondition || rpcReason(uploadErr) != "snapshot_expired" {
+	if connect.CodeOf(uploadErr) != connect.CodeFailedPrecondition || rpcreason.Get(uploadErr) != "snapshot_expired" {
 		return uploadErr
 	}
 	state, err := syncState(ctx, authority, status)
@@ -196,14 +197,6 @@ func recordContact(status *agentv1.TransportStatus, serverTime *timestamppb.Time
 	return nil
 }
 
-func rpcReason(err error) string {
-	var rpcErr *connect.Error
-	if errors.As(err, &rpcErr) {
-		return rpcErr.Meta().Get("Lindm-Reason")
-	}
-	return ""
-}
-
 func continueAfter(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, spool.ErrNeedsSync) {
 		return false
@@ -212,7 +205,7 @@ func continueAfter(err error) bool {
 	case connect.CodeUnauthenticated, connect.CodePermissionDenied, connect.CodeUnavailable, connect.CodeDeadlineExceeded, connect.CodeCanceled:
 		return false
 	case connect.CodeFailedPrecondition:
-		return rpcReason(err) == "open_upload"
+		return rpcreason.Get(err) == "open_upload"
 	default:
 		return true
 	}

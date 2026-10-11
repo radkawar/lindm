@@ -13,13 +13,16 @@ import (
 
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // pinArchRepositories changes only the disposable guest's mirror selection. The
 // immutable signed cloud image supplies the initial package state; every later
 // vendor transaction is restricted to this dated Arch Linux Archive snapshot.
 func pinArchRepositories(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest) error {
-	if manifest.GetDistribution() != "arch" {
+	// Only a row that itself ships the pacman repositories (not a derivative
+	// inheriting them) is pinned to the Arch Linux Archive.
+	if manifestRelease(manifest).Packages.Backend != platform.BackendPacman {
 		return nil
 	}
 	date, err := time.Parse("2006-01-02", manifest.GetRepositorySnapshotDate())

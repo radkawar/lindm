@@ -3,7 +3,6 @@
 package releasebuild
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,11 +11,13 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const maxDocument = 32 << 20
@@ -24,27 +25,16 @@ const maxArtifact = 1 << 30
 
 // command never inherits Go, npm, shell startup or signing credentials.
 func command(ctx context.Context, dir string, environment []string, name string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
-	cmd.Env = append([]string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C", "TZ=UTC"}, environment...)
-	cmd.WaitDelay = 5 * time.Second
-	var stdout, stderr boundedBuffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	stdout, stderr := nativeexec.NewBuffer(maxDocument), nativeexec.NewBuffer(maxDocument)
+	env := append([]string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C", "TZ=UTC"}, environment...)
+	err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: stdout, Stderr: stderr, Timeout: 15 * time.Minute})
+	if err == nil && (stdout.Truncated() || stderr.Truncated()) {
+		err = errors.New("releasebuild: tool output exceeds bound")
+	}
+	if err != nil {
 		return nil, fmt.Errorf("releasebuild: %s: %w\nstdout:\n%s\nstderr:\n%s", name, err, stdout.String(), stderr.String())
 	}
 	return stdout.Bytes(), nil
-}
-
-type boundedBuffer struct{ bytes.Buffer }
-
-func (b *boundedBuffer) Write(p []byte) (int, error) {
-	if len(p) > maxDocument-b.Len() {
-		return 0, errors.New("releasebuild: tool output exceeds bound")
-	}
-	return b.Buffer.Write(p)
 }
 
 func digestFile(path string) (sum string, size int64, err error) {

@@ -191,7 +191,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if _, err := provider.Apply(ctx, stale, serviceProofAuthorize); !errors.Is(err, serviceprovider.ErrConflict) {
 		return nil, fmt.Errorf("stale service plan must fail with conflict: %w", err)
 	}
-	after, err := provider.Observe(ctx, serviceProofUnit)
+	after, err := provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if _, err := provider.Apply(canceled, plan, serviceProofAuthorize); !errors.Is(err, context.Canceled) {
 		return nil, fmt.Errorf("pre-start canceled service apply must fail with cancellation: %w", err)
 	}
-	after, err = provider.Observe(ctx, serviceProofUnit)
+	after, err = provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		{"oneshot-rejected", serviceProofOneshot},
 		{"legacy-include-rejected", serviceProofLegacyInclude},
 	} {
-		before, err := provider.Observe(ctx, serviceProofUnit)
+		before, err := provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 		if err != nil {
 			return nil, err
 		}
@@ -283,7 +283,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		if _, err := provider.Plan(ctx, desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, serviceprovider.ErrUnsupported) {
 			return nil, fmt.Errorf("%s must fail as unsupported: %w", target.name, err)
 		}
-		after, err := provider.Observe(ctx, serviceProofUnit)
+		after, err := provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +296,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		}
 		evidence.Steps = append(evidence.Steps, vmlab.VMServiceStep{Name: target.name, Target: target.unit, Before: before, After: after, NativeBefore: nativeBefore, NativeAfter: nativeAfter, Rejection: "unsupported"})
 	}
-	beforeLength, err := provider.Observe(ctx, serviceProofUnit)
+	beforeLength, err := provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	// The helper has removed its drop-in and reaped its source process before
 	// this observation. The native refusal snapshots were taken before cleanup.
 	lengthStep.Before = beforeLength
-	lengthStep.After, err = provider.Observe(ctx, serviceProofUnit)
+	lengthStep.After, err = provider.Observe(ctx, serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNSPECIFIED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNSPECIFIED))
 	if err != nil {
 		return nil, err
 	}

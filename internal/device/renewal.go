@@ -13,6 +13,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[devicev1.RenewIdentityRequest]) (*connect.Response[devicev1.RenewIdentityResponse], error) {
@@ -20,7 +21,7 @@ func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[device
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req.Msg == nil || !validAuthorityProof(req.Msg.GetAuthorityProof()) {
 		return nil, invalid("authority_proof")

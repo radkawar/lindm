@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -63,8 +64,6 @@ func runHosts(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 // runScheduledVM is the only public CLI admission path. Lanes keep their existing
 // resource requests; configuration is a ceiling, never an implicit resize.
 func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
-	defer cancel()
 	name, arch := "", ""
 	clean := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
@@ -94,6 +93,12 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 			continue
 		}
 		clean = append(clean, args[i])
+	}
+	held := vmHolds(clean)
+	if !held {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 3*time.Hour)
+		defer cancel()
 	}
 	manifestPath := labhost.FlagValue(clean, "manifest")
 	if manifestPath == "" {
@@ -164,6 +169,9 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if _, err = fmt.Fprintf(stderr, "lab host %s (%s), guest %s, capacity %d\n", chosen.Name, chosen.Transport, arch, chosen.MaxGuests); err != nil {
 		return err
 	}
+	if held && (chosen.Transport == "ssh" || chosen.Runtime == "container") {
+		return errors.New("a held lane serves a loopback console and a local display socket; choose a local lab host")
+	}
 	if chosen.Transport == "ssh" || chosen.Runtime == "container" {
 		repo := labhost.FlagValue(clean, "repo")
 		if repo == "" {
@@ -189,12 +197,31 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		clean = labhost.SetFlag(clean, workFlag, work)
 	}
-	leases, err := acquireLaneLeases(ctx, slots, vmGuestCount(clean[1], clean))
+	leases, err := slots.AcquireN(ctx, vmGuestCount(clean[1], clean))
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, closeLaneLeases(leases)) }()
 	return runUnscheduled(ctx, clean, stdout, stderr)
+}
+
+// vmHolds reports a hands-on lane that runs until interrupted (lab vm
+// assistance -hold). It has no lane deadline and runs only on a local host,
+// so its loopback console and display socket reach the owner.
+func vmHolds(args []string) bool {
+	held := false
+	if len(args) < 2 || args[1] != "assistance" {
+		return false
+	}
+	for _, arg := range args[2:] {
+		name, value, explicit := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "=")
+		if !strings.HasPrefix(arg, "-") || name != "hold" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		held = !explicit || (err == nil && parsed)
+	}
+	return held
 }
 
 func vmHasHardwareFlags(command string) bool {
@@ -236,25 +263,11 @@ func vmRequiresKVM(cfg *labv1.LabConfig, command, accelerator, architecture stri
 // vmGuestCount is the number of concurrent guests a lane boots. The firewall
 // resource lane adds an independent probe-peer guest beside the device; every
 // guest holds its own capacity slot for the lane's whole lifetime.
-func vmGuestCount(lane string, args []string) int {
+func vmGuestCount(lane string, args []string) uint32 {
 	if lane == "resources" && slices.Contains(strings.Split(labhost.FlagValue(args, "kinds"), ","), "firewall") {
 		return 2
 	}
 	return 1
-}
-
-// acquireLaneLeases holds one capacity slot per concurrent lane guest until
-// every guest has exited. A partial reservation is released on failure.
-func acquireLaneLeases(ctx context.Context, slots *labhost.Slots, guests int) ([]*labhost.Lease, error) {
-	leases := make([]*labhost.Lease, 0, guests)
-	for range guests {
-		lease, err := slots.Acquire(ctx)
-		if err != nil {
-			return nil, errors.Join(err, closeLaneLeases(leases))
-		}
-		leases = append(leases, lease)
-	}
-	return leases, nil
 }
 
 func closeLaneLeases(leases []*labhost.Lease) error {
@@ -294,7 +307,7 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	if err != nil {
 		return err
 	}
-	leases, err := acquireLaneLeases(ctx, slots, vmGuestCount(args[2], args))
+	leases, err := slots.AcquireN(ctx, vmGuestCount(args[2], args))
 	if err != nil {
 		return err
 	}

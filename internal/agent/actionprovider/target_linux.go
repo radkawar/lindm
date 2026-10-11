@@ -326,7 +326,7 @@ func (p *Provider) offlineTarget(ctx context.Context, spec *agentv1.DeviceAction
 	if !p.config.GetRecoveryEnvironment() || qualification.GetQualificationId() == "" || node.Type != "disk" || p.config.GetProtectedStateDirectory() == "" {
 		return fmt.Errorf("%w: recovery_qualification_required", ErrUnsupported)
 	}
-	if err := protectedDirectory(p.config.GetProtectedStateDirectory()); err != nil {
+	if err := privateStateDirectory(p.config.GetProtectedStateDirectory()); err != nil {
 		return err
 	}
 	var filesystem unix.Statfs_t

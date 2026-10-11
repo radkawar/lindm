@@ -94,6 +94,10 @@ func (n *secretNative) Plan(ctx context.Context, desired *resourcev1.ResourceDes
 	return plan, resource.ValidatePlan(plan)
 }
 
+func (n *secretNative) Observe(context.Context, *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	return nil, errors.New("fixture does not observe")
+}
+
 func (n *secretNative) Verify(context.Context, *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	// Drifting account plans are never verified read-only during preparation.
 	return nil, errors.New("unexpected read-only verification")

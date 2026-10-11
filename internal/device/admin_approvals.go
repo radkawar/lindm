@@ -12,14 +12,15 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func approvalError(err error) error {
 	switch {
 	case errors.Is(err, identity.ErrApprovalRequired):
-		return rpcError(connect.CodePermissionDenied, "approval_required")
+		return rpcreason.Error(connect.CodePermissionDenied, "approval_required")
 	case errors.Is(err, identity.ErrApprovalInvalid):
-		return rpcError(connect.CodePermissionDenied, "approval_invalid")
+		return rpcreason.Error(connect.CodePermissionDenied, "approval_invalid")
 	default:
 		return executionError(err)
 	}
@@ -27,7 +28,7 @@ func approvalError(err error) error {
 
 func (s *Service) prepareActionApproval(ctx context.Context, actor identity.Principal, permission identity.Permission, id string, payload proto.Message) (*identity.ApprovalConsumption, error) {
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if !s.identity.ApprovalRequired(permission) && id == "" {
 		return nil, nil
@@ -68,13 +69,13 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 	defer cancel()
 	actor, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if actor.ServiceAccount {
 		return nil, approvalError(identity.ErrAuthorizationDenied)
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_approval")
@@ -95,10 +96,10 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 	defer cancel()
 	actor, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_approval")
@@ -144,7 +145,7 @@ func (s *Service) ApproveApproval(ctx context.Context, req *connect.Request[admi
 		return nil, approvalError(identity.ErrAuthorizationDenied)
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_approval")
@@ -175,7 +176,7 @@ func (s *Service) RejectApproval(ctx context.Context, req *connect.Request[admin
 		return nil, approvalError(identity.ErrAuthorizationDenied)
 	}
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_approval")

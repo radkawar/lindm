@@ -20,6 +20,7 @@ import (
 
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/config"
+	"lindm/internal/labexec"
 	"lindm/internal/releaseupdate"
 )
 
@@ -286,11 +287,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		return nil, fmt.Errorf("resolve isolated authority server: %w", err)
 	}
 	resolved.HTTPClient.CloseIdleConnections()
-	migration, migrationCancel := context.WithTimeout(ctx, time.Minute)
-	migrate := exec.CommandContext(migration, f.binary, "migrate", "-config", f.configPath())
-	migrate.Stdout, migrate.Stderr, migrate.WaitDelay = f.log, f.log, 5*time.Second
-	err = migrate.Run()
-	migrationCancel()
+	err = labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"migrate", "-config", f.configPath()}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute})
 	if err != nil {
 		return nil, errors.New("migrate isolated authority database failed")
 	}
@@ -301,11 +298,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	} else {
-		bootstrap, stop := context.WithTimeout(ctx, time.Minute)
-		cmd := exec.CommandContext(bootstrap, f.binary, "bootstrap-owner", "-config", f.configPath(), "-issuer", issuer, "-subject", ownerSubject)
-		cmd.Stdout, cmd.Stderr, cmd.WaitDelay = f.log, f.log, 5*time.Second
-		err = cmd.Run()
-		stop()
+		err = labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"bootstrap-owner", "-config", f.configPath(), "-issuer", issuer, "-subject", ownerSubject}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute})
 		if err != nil {
 			return nil, errors.New("bootstrap owner in isolated authority database failed")
 		}

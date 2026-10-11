@@ -15,6 +15,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // Enrollment is a global operation. Scope-bearing labels/groups additionally need
@@ -34,7 +35,7 @@ func provisioningAssignmentAuthority(principal identity.Principal, assignment *a
 	}
 	for _, permission := range permissions {
 		if !identity.Authorize(principal, permission) {
-			return rpcError(connect.CodePermissionDenied, "permission_denied")
+			return rpcreason.Error(connect.CodePermissionDenied, "permission_denied")
 		}
 		if err := requireUnrestrictedPrincipal(principal, permission); err != nil {
 			return err
@@ -66,7 +67,7 @@ func (s *Service) CreateProvisioningToken(ctx context.Context, req *connect.Requ
 	}
 	defer s.release()
 	if s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	authorization, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionManageEnrollment)
 	if err != nil {
@@ -253,7 +254,7 @@ func (s *Service) RevokeProvisioningToken(ctx context.Context, req *connect.Requ
 
 func (s *Service) provisioningAuthorization(ctx context.Context, token devicedb.ProvisioningToken) (*identity.Authorization, *adminv1.CreateProvisioningTokenRequest, error) {
 	if s.identity == nil {
-		return nil, nil, rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	authorization, err := s.identity.AuthorizeFresh(ctx, token.CreatedBy, identity.PermissionManageEnrollment)
 	if err != nil {

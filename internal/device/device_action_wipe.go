@@ -9,6 +9,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 )
 
 func liveRootAction(spec *agentv1.DeviceActionSpec) bool {
@@ -65,7 +66,7 @@ func requireLiveRootEscrow(ctx context.Context, q *devicedb.Queries, deviceID uu
 			}
 		}
 		if !included {
-			return rpcError(connect.CodeFailedPrecondition, "device_action_escrow_scope_incomplete")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_escrow_scope_incomplete")
 		}
 	}
 	return nil
@@ -78,7 +79,7 @@ func validateLiveRootPlan(spec *agentv1.DeviceActionSpec, plan *agentv1.DeviceAc
 	targets := spec.GetCryptoErase().GetTargets()
 	frozen := plan.GetCryptoEraseTargets()
 	if len(targets) == 0 || len(targets) != len(frozen) || len(frozen) != len(plan.GetBefore().GetCryptoEraseTargets()) {
-		return rpcError(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
 	}
 	rootBacking := false
 	for i, target := range frozen {
@@ -86,7 +87,7 @@ func validateLiveRootPlan(spec *agentv1.DeviceActionSpec, plan *agentv1.DeviceAc
 			rootBacking = true
 		}
 		if !proto.Equal(target, plan.GetBefore().GetCryptoEraseTargets()[i]) || len(target.GetMetadataSha256()) != 32 || len(target.GetRootMappingSha256()) != 32 || target.GetLuksHeaderBytes() == 0 {
-			return rpcError(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
 		}
 		matches := 0
 		for _, expected := range targets {
@@ -100,11 +101,11 @@ func validateLiveRootPlan(spec *agentv1.DeviceActionSpec, plan *agentv1.DeviceAc
 			}
 		}
 		if matches != 1 {
-			return rpcError(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_plan_rejected")
 		}
 	}
 	if !rootBacking {
-		return rpcError(connect.CodePermissionDenied, "device_action_root_backing_missing")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_root_backing_missing")
 	}
 	return nil
 }
@@ -112,7 +113,7 @@ func validateLiveRootPlan(spec *agentv1.DeviceActionSpec, plan *agentv1.DeviceAc
 func validateLiveRootResult(spec *agentv1.DeviceActionSpec, challenge *agentv1.DeviceActionChallenge, status *agentv1.DeviceActionStatus) error {
 	if !liveRootAction(spec) {
 		if status.GetVolatileResult() {
-			return rpcError(connect.CodePermissionDenied, "device_action_volatile_result_rejected")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_volatile_result_rejected")
 		}
 		return nil
 	}
@@ -125,11 +126,11 @@ func validateLiveRootResult(spec *agentv1.DeviceActionSpec, challenge *agentv1.D
 	}
 	results := status.GetVerification().GetCryptoEraseResults()
 	if !status.GetVolatileResult() || status.GetStartedAt() == nil || !status.GetVerification().GetVerified() || len(results) != len(plan.GetCryptoEraseTargets()) {
-		return rpcError(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
+		return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
 	}
 	for i, result := range results {
 		if !result.GetNativeLuksErase() || !result.GetRawZeroVerified() || !result.GetMetadataAbsent() {
-			return rpcError(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
 		}
 		matches := 0
 		for _, frozen := range plan.GetCryptoEraseTargets() {
@@ -143,7 +144,7 @@ func validateLiveRootResult(spec *agentv1.DeviceActionSpec, challenge *agentv1.D
 			}
 		}
 		if matches != 1 {
-			return rpcError(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_aggregate_result_rejected")
 		}
 	}
 	return nil

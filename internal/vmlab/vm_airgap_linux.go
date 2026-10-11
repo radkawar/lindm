@@ -29,6 +29,7 @@ import (
 	"lindm/internal/devlab"
 	"lindm/internal/offlinebundle"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 const airgapGuestDir = nativeGuestDir + "/airgap"
@@ -115,8 +116,9 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return nil, err
 	}
 	distribution := manifest.GetDistribution()
-	if (distribution != "ubuntu" || manifest.GetVersion() != "24.04") && (distribution != "fedora" || manifest.GetVersion() != "44") {
-		return nil, errors.New("vm airgap requires Ubuntu 24.04 or Fedora 44")
+	release := manifestRelease(manifest)
+	if err := release.LabLane(platform.LaneAirgap); err != nil {
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 75*time.Minute)
 	defer cancel()
@@ -236,13 +238,13 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	result.SELinux = "not applicable"
-	if distribution == "fedora" {
+	if backend, _ := nativeBackend(release); backend.DNF() {
 		mode, err := vm.run(ctx, "getenforce", nil, 128, 10*time.Second)
 		if err != nil {
 			return result, err
 		}
 		if result.SELinux = strings.TrimSpace(string(mode)); result.SELinux != "Enforcing" {
-			return result, errors.New("fedora air-gap lane requires SELinux Enforcing")
+			return result, errors.New("DNF air-gap lane requires SELinux Enforcing")
 		}
 	}
 	// Prove the guest itself has no external path before it is given only the
@@ -285,7 +287,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	architecture := map[string]string{"amd64": "amd64", "x86_64": "amd64", "arm64": "arm64", "aarch64": "arm64"}[manifest.GetArchitecture()]
-	if err := installOfflineAgent(ctx, guest, distribution, architecture, result.FirstVersion); err != nil {
+	if err := installOfflineAgent(ctx, guest, architecture, result.FirstVersion); err != nil {
 		return result, err
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "agent " + result.FirstVersion + " installed only from the site-served signed " + distribution + " repository"})
@@ -309,7 +311,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	result.DeviceID, result.EnrollmentGeneration = issued.GetDeviceId(), issued.GetEnrollmentGeneration()
-	if err := enableGuestUpdates(ctx, vm, guest, distribution); err != nil {
+	if err := enableGuestUpdates(ctx, vm, guest); err != nil {
 		return result, err
 	}
 	status, err := waitUpdateObservation(ctx, vm, nil, "no_update")
@@ -317,7 +319,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "imported channel is staged paused; enrolled agent holds " + result.FirstVersion, Status: status})
-	if result.InitialInventory, err = waitLifecycleInventory(ctx, vm, control, distribution, result.DeviceID, nil); err != nil {
+	if result.InitialInventory, err = waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, nil); err != nil {
 		return result, err
 	}
 	initialIdentity, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED)
@@ -392,7 +394,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 	if err != nil {
 		return result, err
 	}
-	if err := assertOfflineAgentVersion(ctx, guest, distribution, result.SecondVersion); err != nil {
+	if err := assertOfflineAgentVersion(ctx, guest, result.SecondVersion); err != nil {
 		return result, err
 	}
 	if err := lifecycleCommand(ctx, vm, "verify updated agent daemons", "systemctl is-active --quiet lindm-executor.service; systemctl is-active --quiet lindm-agent.service"); err != nil {
@@ -409,7 +411,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, errors.New("updated agent did not acquire an authenticated successor session")
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "audited rollout installed " + result.SecondVersion + " from imported TUF targets with enrollment preserved", Status: status})
-	if result.FinalInventory, err = waitLifecycleInventory(ctx, vm, control, distribution, result.DeviceID, result.InitialInventory); err != nil {
+	if result.FinalInventory, err = waitLifecycleInventory(ctx, vm, control, release, result.DeviceID, result.InitialInventory); err != nil {
 		return result, err
 	}
 	feeds, err := control.session.Admin.ListAdvisoryFeeds(ctx, connect.NewRequest(&adminv1.ListAdvisoryFeedsRequest{}))
@@ -568,9 +570,9 @@ func pinnedPackageKey(ctx context.Context, path, fingerprint, work string) ([]by
 
 // installOfflineAgent uses only the site server's signed repository through
 // the forwarded administrative listener, with the station key pinned locally.
-func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, distribution, architecture, version string) error {
+func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, architecture, version string) error {
 	base := "https://localhost:18444/offline/repositories/" + architecture
-	if distribution == "ubuntu" {
+	if guest.backend == platform.BackendAPT {
 		source := "Types: deb\nURIs: " + base + "/apt/\nSuites: stable\nComponents: main\nSigned-By: " + airgapGuestDir + "/signer.asc\n"
 		if err := guest.uploadBytes(ctx, airgapGuestDir+"/offline.sources", []byte(source)); err != nil {
 			return err
@@ -592,12 +594,12 @@ func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, distri
 			return err
 		}
 	}
-	return assertOfflineAgentVersion(ctx, guest, distribution, version)
+	return assertOfflineAgentVersion(ctx, guest, version)
 }
 
-func assertOfflineAgentVersion(ctx context.Context, guest *nativeGuestPackages, distribution, version string) error {
+func assertOfflineAgentVersion(ctx context.Context, guest *nativeGuestPackages, version string) error {
 	query := "rpm -q --qf '%{VERSION}\\n' lindm-agent"
-	if distribution == "ubuntu" {
+	if guest.backend == platform.BackendAPT {
 		query = "dpkg-query -W -f='${db:Status-Status} ${Version}\\n' lindm-agent"
 		version = "installed " + version
 	}

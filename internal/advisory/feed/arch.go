@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 // These are the vendor's two JSON exports, not lindm serialization contracts.
@@ -43,8 +44,11 @@ type archPublishedAdvisory struct {
 }
 
 func parseArch(config *advisoryv1.FeedSource, raw []byte, validator protovalidate.Validator) (*advisoryv1.FeedDocument, error) {
-	if config.GetDistro() != "arch" || config.GetRelease() != "rolling" || canonicalArch(config.GetArchitecture()) != "x86_64" {
-		return nil, errors.New("feed: Arch tracker requires arch/rolling/x86_64; derivatives and Arch Linux ARM are not covered")
+	if _, err := vendorProduct(config, platform.FeedArchASA); err != nil {
+		return nil, err
+	}
+	if canonicalArch(config.GetArchitecture()) != "x86_64" {
+		return nil, errors.New("feed: Arch tracker covers x86_64 only; Arch Linux ARM is not covered")
 	}
 	// The tracker export filters out packages absent from its current repository
 	// cache. It cannot assert coverage of historical, AUR or third-party packages,

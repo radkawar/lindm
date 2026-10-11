@@ -5,27 +5,30 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"sync"
-	"syscall"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 const (
-	gstLaunch          = "gst-launch-1.0"
-	gstInspect         = "gst-inspect-1.0"
+	gstLaunch          = "/usr/bin/gst-launch-1.0"
+	gstInspect         = "/usr/bin/gst-inspect-1.0"
 	gstInspectTimeout  = 10 * time.Second
+	gstInspectStdout   = 4 << 10
 	gstStderrTail      = 4 << 10
-	gstWaitDelay       = 2 * time.Second
 	gstElementsTimeout = 30 * time.Second
+	// gstLifetime is a backstop: the session closes the capture when the
+	// invitation ends, consent is withdrawn or the peer is lost. Assistance
+	// sessions last at most 30 minutes (admin.v1 max_duration_seconds), so an
+	// hour never cuts a legitimate session short yet bounds a leaked pipeline.
+	gstLifetime = time.Hour
 )
 
-// GStreamer runs the gst-launch-1.0 encoder pipeline. Binaries are resolved
-// from PATH at each start so a later package install takes effect.
+// GStreamer runs the gst-launch-1.0 encoder pipeline from its fixed /usr/bin
+// path, verified on each start so a later package install takes effect.
 type GStreamer struct {
 	logger *slog.Logger
 }
@@ -47,45 +50,42 @@ func (g *GStreamer) Start(ctx context.Context, request CaptureRequest) (Capture,
 	if request.PipeWire == nil {
 		return nil, errors.New("missing pipewire remote")
 	}
-	launch, err := exec.LookPath(gstLaunch)
-	if err != nil {
+	if _, err := nativeexec.Executable(gstLaunch); err != nil {
 		return nil, unavailable("gst_launch_missing", err)
 	}
 	if err := checkGstElements(ctx); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(launch, gstArguments(request.Stream.NodeID, request.Stream.Width, request.Stream.Height)...)
-	cmd.ExtraFiles = []*os.File{request.PipeWire}
-	stderr := &tailBuffer{limit: gstStderrTail}
-	cmd.Stderr = stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
-	cmd.WaitDelay = gstWaitDelay
-	stdout, err := cmd.StdoutPipe()
+	process, err := nativeexec.Start(ctx, nativeexec.Command{
+		Path:        gstLaunch,
+		Args:        gstArguments(request.Stream.NodeID, request.Stream.Width, request.Stream.Height),
+		Files:       []*os.File{request.PipeWire},
+		Timeout:     gstLifetime,
+		StderrLimit: gstStderrTail,
+	})
 	if err != nil {
-		return nil, unavailable("gst_pipe_failed", err)
-	}
-	if err := cmd.Start(); err != nil {
 		return nil, unavailable("gst_start_failed", err)
 	}
-	g.logger.Info("capture pipeline started", "pid", cmd.Process.Pid, "node", request.Stream.NodeID)
-	return &gstCapture{cmd: cmd, reader: newRTPStreamReader(stdout), stderr: stderr, logger: g.logger}, nil
+	g.logger.Info("capture pipeline started", "node", request.Stream.NodeID)
+	return &gstCapture{process: process, reader: newRTPStreamReader(process.Stdout()), logger: g.logger}, nil
 }
 
 // checkGstElements requires gst-inspect-1.0 (packaged with gst-launch-1.0
 // on the supported distributions) to report every pipeline element.
 func checkGstElements(ctx context.Context) error {
-	inspect, err := exec.LookPath(gstInspect)
-	if err != nil {
+	if _, err := nativeexec.Executable(gstInspect); err != nil {
 		return unavailable("gst_inspect_missing", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, gstElementsTimeout)
 	defer cancel()
 	for _, element := range gstElements {
-		check, cancelCheck := context.WithTimeout(ctx, gstInspectTimeout)
-		cmd := exec.CommandContext(check, inspect, "--exists", element)
-		cmd.WaitDelay = gstWaitDelay
-		err := cmd.Run()
-		cancelCheck()
+		_, err := nativeexec.Run(ctx, nativeexec.Command{
+			Path:        gstInspect,
+			Args:        []string{"--exists", element},
+			Timeout:     gstInspectTimeout,
+			StdoutLimit: gstInspectStdout,
+			StderrLimit: gstStderrTail,
+		})
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -97,12 +97,11 @@ func checkGstElements(ctx context.Context) error {
 }
 
 type gstCapture struct {
-	cmd    *exec.Cmd
-	reader *rtpStreamReader
-	stderr *tailBuffer
-	logger *slog.Logger
-	once   sync.Once
-	err    error
+	process *nativeexec.Process
+	reader  *rtpStreamReader
+	logger  *slog.Logger
+	once    sync.Once
+	err     error
 }
 
 func (c *gstCapture) ReadPacket(buf []byte) (int, error) {
@@ -112,48 +111,11 @@ func (c *gstCapture) ReadPacket(buf []byte) (int, error) {
 // Close kills the whole process group and reaps the pipeline.
 func (c *gstCapture) Close() error {
 	c.once.Do(func() {
-		pid := c.cmd.Process.Pid
-		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
-			c.err = fmt.Errorf("kill capture process group: %w", err)
-		}
-		waitErr := c.cmd.Wait()
-		var exitErr *exec.ExitError
-		if waitErr != nil && !errors.As(waitErr, &exitErr) {
-			c.err = errors.Join(c.err, fmt.Errorf("wait capture: %w", waitErr))
-		}
-		if tail := c.stderr.String(); tail != "" {
-			c.logger.Info("capture pipeline stopped", "state", c.cmd.ProcessState.String(), "stderr", tail)
+		var result nativeexec.Result
+		result, c.err = c.process.Close()
+		if len(result.Stderr) != 0 {
+			c.logger.Info("capture pipeline stopped", "exit_code", result.ExitCode, "stderr", string(result.Stderr))
 		}
 	})
 	return c.err
-}
-
-// tailBuffer keeps the last limit bytes written.
-type tailBuffer struct {
-	mu    sync.Mutex
-	limit int
-	data  []byte
-}
-
-var _ io.Writer = (*tailBuffer)(nil)
-
-func (b *tailBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	written := len(p)
-	if len(p) >= b.limit {
-		p = p[len(p)-b.limit:]
-		b.data = b.data[:0]
-	}
-	if overflow := len(b.data) + len(p) - b.limit; overflow > 0 {
-		b.data = append(b.data[:0], b.data[overflow:]...)
-	}
-	b.data = append(b.data, p...)
-	return written, nil
-}
-
-func (b *tailBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return string(b.data)
 }

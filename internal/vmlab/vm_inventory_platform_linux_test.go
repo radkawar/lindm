@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 func TestNativeModuleTruthPreservesStreamIdentity(t *testing.T) {
@@ -102,7 +103,7 @@ func TestNativeRepositoriesCompareIDsNotProductNames(t *testing.T) {
 func TestNativePlatformComparisonRequiresFreshCompleteEvidence(t *testing.T) {
 	before, after, actual := nativeDetailsFixture(), nativeDetailsFixture(), nativeDetailsFixture()
 	// Historical observations may all lack the optional platform category.
-	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("rhel", "9.6"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	for _, details := range []*inventoryv1.NativeDetails{before, after, actual} {
@@ -115,15 +116,15 @@ func TestNativePlatformComparisonRequiresFreshCompleteEvidence(t *testing.T) {
 		}
 	}
 	actual.Platform.Repositories.Ids[0], actual.Platform.Repositories.Ids[1] = actual.Platform.Repositories.Ids[1], actual.Platform.Repositories.Ids[0]
-	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("rhel", "9.6"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.Platform.ReleaseverLock = truthString("")
-	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("rhel", "9.6"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("lost release lock accepted")
 	}
 	actual.Platform = nil
-	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err == nil {
+	if err := compareVMDetails(platform.ForManifest("rhel", "9.6"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("fresh expected platform accepted omitted category")
 	}
 }
@@ -252,7 +253,7 @@ func TestNativePlatformComparisonCoversEveryConfigurationField(t *testing.T) {
 	config := repositories.Configurations[1]
 	config.BaseUrls[0], config.BaseUrls[1] = config.BaseUrls[1], config.BaseUrls[0]
 	config.GpgKeys[0], config.GpgKeys[1] = config.GpgKeys[1], config.GpgKeys[0]
-	if err := compareVMDetails("fedora", "x86_64", before, after, actual); err != nil {
+	if err := compareVMDetails(platform.ForManifest("fedora", "44"), "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	for _, mutate := range []func(*inventoryv1.PlatformDetails){
@@ -269,7 +270,7 @@ func TestNativePlatformComparisonCoversEveryConfigurationField(t *testing.T) {
 	} {
 		changed := proto.CloneOf(before)
 		mutate(changed.Platform)
-		if err := compareVMDetails("fedora", "x86_64", before, after, changed); err == nil {
+		if err := compareVMDetails(platform.ForManifest("fedora", "44"), "x86_64", before, after, changed); err == nil {
 			t.Fatal("configuration field mismatch accepted")
 		}
 	}

@@ -112,13 +112,23 @@ func (s *Slots) Count() (uint32, error) {
 // lease and must keep it until all guests and helpers have exited and been waited
 // for. Pass a timeout/deadline context when admission must have a fixed time bound.
 func (s *Slots) Acquire(ctx context.Context) (*Lease, error) {
+	leases, err := s.AcquireN(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	return leases[0], nil
+}
+
+// AcquireN waits until all guests of one lane are admitted together, holding
+// no slot while it waits; a lane never owns part of its capacity.
+func (s *Slots) AcquireN(ctx context.Context, guests uint32) ([]*Lease, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		lease, err := s.tryAcquire(ctx)
-		if err != nil || lease != nil {
-			return lease, err
+		leases, err := s.tryAcquireN(ctx, guests)
+		if err != nil || leases != nil {
+			return leases, err
 		}
 		timer := time.NewTimer(50 * time.Millisecond)
 		select {

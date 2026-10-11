@@ -235,7 +235,7 @@ func exercisePackageInterruption(ctx context.Context, r *resourceDispatch, rpm r
 	if err != nil {
 		return err
 	}
-	if err := lifecycleCommand(ctx, r.vm, "interrupt real running package effect", "systemctl stop lindm-agent.service; for k in /sys/fs/cgroup/system.slice/lindm-package-*-apply.service/cgroup.kill; do echo 1 > \"$k\"; done; systemctl kill --kill-whom=main --signal=KILL lindm-executor.service; systemctl start lindm-executor.service; systemctl start lindm-agent.service"); err != nil {
+	if err := lifecycleCommand(ctx, r.vm, "interrupt real running package effect", "systemctl stop lindm-agent.service; for k in /sys/fs/cgroup/system.slice/lindm-package-*-apply.service/cgroup.kill; do echo 1 > \"$k\"; done; systemctl kill "+systemctlKillWhom+"=main --signal=KILL lindm-executor.service; systemctl start lindm-executor.service; systemctl start lindm-agent.service"); err != nil {
 		return err
 	}
 	s.Action, err = r.action(ctx, true)

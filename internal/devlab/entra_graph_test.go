@@ -128,18 +128,6 @@ func TestEntraBadRequestDoesNotClaimMissingRole(t *testing.T) {
 	}
 }
 
-func TestEntraCaptureBound(t *testing.T) {
-	capture := entraCapture{limit: 8}
-	for range 4 {
-		if n, err := capture.Write([]byte("secret-response")); n != len("secret-response") || err != nil {
-			t.Fatal("bounded capture failed to drain subprocess output")
-		}
-	}
-	if len(capture.data) != 8 || !capture.overflow {
-		t.Fatal("subprocess capture was not bounded")
-	}
-}
-
 // Cleanup must survive caller cancellation, re-check exact ownership immediately
 // before DELETE, and refuse lookalikes even when discovery returned them.
 func TestEntraCleanupCancellationAndOwnership(t *testing.T) {

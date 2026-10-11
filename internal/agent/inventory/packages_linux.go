@@ -8,7 +8,6 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -19,6 +18,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/platform"
 )
 
 const (
@@ -48,34 +49,29 @@ var rpm = backend{
 	args: []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{MODULARITYLABEL}\n"},
 }
 
-// selectBackend requires explicit vendor/version and native database evidence.
-// ID_LIKE is deliberately not a provider selector. Immutable variants require a
-// dedicated provider even when they expose an RPM database.
+// selectBackend requires a registry release with inventory and native database
+// evidence. ID_LIKE is never a provider selector. Image-based variants are
+// separate registry rows (by VARIANT_ID) and require a dedicated provider even
+// when they expose an RPM database.
 func selectBackend(release map[string]string, stat func(string) (fs.FileInfo, error)) (backend, inventoryv1.CollectionStatus) {
-	if release["VERSION_ID"] == "" && release["ID"] != "arch" {
+	r := platform.Identify(platform.OSRelease{ID: release["ID"], VersionID: release["VERSION_ID"], VariantID: release["VARIANT_ID"]})
+	if r.Gate(platform.Inventory) != nil {
 		return backend{}, unavailable
 	}
 	var selected backend
 	var databases []string
-	switch release["ID"] {
-	case "arch":
+	switch r.Native().Packages.Backend.PackageDB() {
+	case platform.PackageDBPacman:
 		selected = backend{name: "pacman", path: "/var/lib/pacman/local"}
 		databases = []string{selected.path}
-	case "ubuntu", "debian":
+	case platform.PackageDBDpkg:
 		selected = dpkg
 		databases = []string{"/var/lib/dpkg/status"}
-	case "fedora", "rhel", "rocky", "almalinux", "centos", "opensuse", "opensuse-leap", "opensuse-tumbleweed", "sles", "sled":
+	case platform.PackageDBRPM:
 		selected = rpm
 		// openSUSE Leap 16 and Tumbleweed default to rpm's ndb backend
 		// (Packages.db); Fedora/EL use sqlite and older SUSE BerkeleyDB.
 		databases = []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/usr/lib/sysimage/rpm/Packages.db", "/var/lib/rpm/Packages.db", "/var/lib/rpm/Packages", "/usr/lib/sysimage/rpm/Packages"}
-		if release["ID"] == "fedora" {
-			switch release["VARIANT_ID"] {
-			case "", "workstation", "server", "cloud", "container":
-			default:
-				return backend{}, unavailable
-			}
-		}
 		for _, marker := range []string{"/run/ostree-booted", "/ostree/repo", "/sysroot/ostree/repo", "/etc/transactional-update.conf"} {
 			_, err := stat(marker)
 			if err == nil {
@@ -103,96 +99,55 @@ func selectBackend(release map[string]string, stat func(string) (fs.FileInfo, er
 	return selected, unavailable
 }
 
+// nativeStderrLimit bounds retained native diagnostics; overflow is capacity.
+const nativeStderrLimit = 64 << 10
+
 // runNative never inherits PATH, HOME, RPM/Dpkg overrides, or the caller's cwd.
 // The runner boundary is private: callers cannot choose a tool or arguments.
 func runNative(ctx context.Context, selected backend, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
-	cmd := exec.CommandContext(ctx, selected.path, selected.args...)
-	cmd.Env = []string{"LANG=C", "LC_ALL=C", "PATH=/usr/bin:/bin", "HOME=/", "TZ=UTC"}
-	cmd.Dir = "/"
-	cmd.WaitDelay = time.Second
-	return runCommand(ctx, cmd, consume)
+	return runCommand(ctx, nativeexec.Command{Path: selected.path, Args: selected.args, Env: []string{"HOME=/", "TZ=UTC"}}, consume)
 }
 
-// runCommand is also exercised with a fixed test subprocess (never a shell).
-func runCommand(ctx context.Context, cmd *exec.Cmd, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
-	stderr := &boundedDiscard{remaining: 64 << 10}
-	cmd.Stderr = stderr
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return commandFailure
+// runCommand streams stdout to consume through nativeexec. Every collector
+// already bounds ctx (at most commandTimeout); commandTimeout is the backstop.
+// It is also exercised with a fixed test subprocess (never a shell).
+func runCommand(ctx context.Context, c nativeexec.Command, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
+	status, consumed := commandFailure, false
+	c.Timeout, c.StderrLimit = commandTimeout, nativeStderrLimit
+	c.Stream = func(reader io.Reader) { consumed, status = true, consume(reader) }
+	result, err := nativeexec.Run(ctx, c)
+	if ctx.Err() != nil {
+		return statusFor(ctx.Err())
 	}
-	if err = cmd.Start(); err != nil {
-		_ = stdout.Close() // Start failed; preserve its collection failure.
-		if ctx.Err() != nil {
-			return statusFor(ctx.Err())
-		}
+	if errors.Is(err, nativeexec.ErrDeadline) {
+		return statusFor(context.DeadlineExceeded)
+	}
+	if !consumed {
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
 			return statusFor(err)
 		}
 		return commandFailure
 	}
-	stop := context.AfterFunc(ctx, func() { _ = stdout.Close() })
-	defer stop()
-	output := &drainObserver{reader: stdout}
-	status := consume(output)
-	// A parser that stopped early must not wait for unbounded native output.
-	// After stdout reached EOF the tool is already finishing on its own (lsblk
-	// closes stdout before exit), so killing it would race and hide its exit
-	// status; the context still bounds that wait.
-	if status != success && !output.drained {
-		_ = cmd.Process.Kill()
-	}
-	err = cmd.Wait()
-	if ctx.Err() != nil {
-		return statusFor(ctx.Err())
-	}
-	if stderr.exceeded {
+	if result.StderrTruncated {
 		return capacity
 	}
 	if status != success {
 		// A native tool that exited on its own with a failure status (for
 		// example EL8 util-linux 2.32 lsblk rejecting a newer --output column)
 		// is a native command failure, not malformed output. Only our own kill
-		// leaves the parser's verdict authoritative.
-		var exited *exec.ExitError
-		if errors.As(err, &exited) && exited.Exited() {
+		// of a stopped consumer leaves the parser's verdict authoritative.
+		var exited *nativeexec.ExitError
+		if !result.Stopped && errors.As(err, &exited) {
 			return commandFailure
 		}
 		return status
 	}
 	// Warnings may describe unreadable/ignored database records. Even a zero
 	// exit is not accepted as a complete snapshot when the native tool warns.
-	if err != nil || stderr.remaining != 64<<10 {
+	if err != nil || len(result.Stderr) != 0 {
 		return commandFailure
 	}
 	return success
-}
-
-type drainObserver struct {
-	reader  io.Reader
-	drained bool
-}
-
-func (r *drainObserver) Read(p []byte) (int, error) {
-	n, err := r.reader.Read(p)
-	if err == io.EOF {
-		r.drained = true
-	}
-	return n, err
-}
-
-type boundedDiscard struct {
-	remaining int
-	exceeded  bool
-}
-
-func (w *boundedDiscard) Write(p []byte) (int, error) {
-	if len(p) > w.remaining {
-		w.exceeded = true
-		return 0, errCapacity
-	}
-	w.remaining -= len(p)
-	return len(p), nil
 }
 
 var packageName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.-]*$`)

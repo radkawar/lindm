@@ -7,16 +7,12 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"lindm/internal/rpcreason"
 )
 
-func rpcError(code connect.Code, reason string) error {
-	err := connect.NewError(code, errors.New(reason))
-	err.Meta().Set("Lindm-Reason", reason)
-	return err
-}
-
 func invalid(reason string) error {
-	return rpcError(connect.CodeInvalidArgument, reason)
+	return rpcreason.Error(connect.CodeInvalidArgument, reason)
 }
 
 func mapErr(err error) error {
@@ -28,10 +24,10 @@ func mapErr(err error) error {
 		return err
 	}
 	if errors.Is(err, context.Canceled) {
-		return rpcError(connect.CodeCanceled, "canceled")
+		return rpcreason.Error(connect.CodeCanceled, "canceled")
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return rpcError(connect.CodeDeadlineExceeded, "deadline_exceeded")
+		return rpcreason.Error(connect.CodeDeadlineExceeded, "deadline_exceeded")
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
@@ -39,11 +35,11 @@ func mapErr(err error) error {
 		case "23514", "23502", "22001":
 			return invalid("constraint")
 		case "23505":
-			return rpcError(connect.CodeAborted, "conflict")
+			return rpcreason.Error(connect.CodeAborted, "conflict")
 		}
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return rpcError(connect.CodeInternal, "internal")
+		return rpcreason.Error(connect.CodeInternal, "internal")
 	}
-	return rpcError(connect.CodeInternal, "internal")
+	return rpcreason.Error(connect.CodeInternal, "internal")
 }

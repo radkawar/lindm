@@ -12,6 +12,7 @@ import (
 	"buf.build/go/protovalidate"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	"lindm/internal/platform"
 )
 
 // These wire types belong to Debian's security-tracker export, not lindm's
@@ -35,13 +36,11 @@ type debianTrackerRelease struct {
 }
 
 func parseDebianTracker(config *advisoryv1.FeedSource, raw []byte, validator protovalidate.Validator) (*advisoryv1.FeedDocument, error) {
-	if config.GetDistro() != "debian" {
-		return nil, errors.New("feed: Debian tracker requires Debian product")
-	}
-	release, err := debianTrackerCodename(config.GetRelease())
+	product, err := vendorProduct(config, platform.FeedDebianTracker)
 	if err != nil {
 		return nil, err
 	}
+	release := product.Codename
 	if len(raw) > maxBytes {
 		return nil, errors.New("feed: Debian tracker document byte limit exceeded")
 	}
@@ -157,19 +156,6 @@ func appendDebianTracker(doc *advisoryv1.FeedDocument, name, id string, release 
 	// outside security support). Preserve severity via the shared normalizer.
 	// Architecture and publication date remain absent: the vendor supplies none.
 	return addRecord(doc, record, "dpkg", validator)
-}
-
-func debianTrackerCodename(release string) (string, error) {
-	switch release {
-	case "11":
-		return "bullseye", nil
-	case "12":
-		return "bookworm", nil
-	case "13":
-		return "trixie", nil
-	default:
-		return "", errors.New("feed: unsupported Debian tracker release")
-	}
 }
 
 func debianTrackerDelimiter(decoder *json.Decoder, want json.Delim) error {

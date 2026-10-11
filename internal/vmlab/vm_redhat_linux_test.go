@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 func TestVMRedHatCleanupAlwaysDeletesAfterUnregister(t *testing.T) {
@@ -61,13 +62,13 @@ func TestVMRedHatCleanupAlwaysDeletesAfterUnregister(t *testing.T) {
 }
 
 func TestVMRedHatTokenScope(t *testing.T) {
-	for _, distribution := range []string{"ubuntu", "fedora", "rhel"} {
-		if err := validateVMRedHatToken(distribution, ""); err != nil {
+	for _, release := range []*platform.Release{platform.ForManifest("ubuntu", "24.04"), platform.ForManifest("fedora", "44"), platform.ForManifest("rhel", "9.6")} {
+		if err := validateVMRedHatToken(release, ""); err != nil {
 			t.Fatal("offline native package lanes must not require registration")
 		}
-		err := validateVMRedHatToken(distribution, "/protected/token-file")
-		if (err == nil) != (distribution == "rhel") {
-			t.Fatalf("registration token accepted outside RHEL: %s", distribution)
+		err := validateVMRedHatToken(release, "/protected/token-file")
+		if (err == nil) != (release.ID == "rhel") {
+			t.Fatalf("registration token accepted outside RHEL: %s", release.Name)
 		}
 	}
 }

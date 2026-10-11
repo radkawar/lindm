@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 const nativeGuestDir = "/var/tmp/lindm-native-lab"
@@ -31,7 +32,7 @@ var nativeFingerprint = regexp.MustCompile(`^(?:[A-F0-9]{40}|[A-F0-9]{64})$`)
 // It owns no VM and must be closed before its VM is removed.
 type nativeGuestPackages struct {
 	vm        *guestVM
-	family    nativeFamily
+	backend   platform.Backend
 	first     packaging.Artifact
 	second    packaging.Artifact
 	apt       *packaging.APTRepository
@@ -88,16 +89,17 @@ func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second pack
 	if first.Format != second.Format || !nativeFingerprint.MatchString(signerFingerprint) {
 		return nil, errors.New("native packages require matching formats and a pinned signing fingerprint")
 	}
-	release, err := vm.run(ctx, "if [ -r /etc/os-release ]; then . /etc/os-release; else . /usr/lib/os-release; fi; printf '%s\\n' \"$ID\"", nil, 4096, 15*time.Second)
+	release, err := vm.run(ctx, "if [ -r /etc/os-release ]; then . /etc/os-release; else . /usr/lib/os-release; fi; printf '%s\\n%s\\n' \"$ID\" \"${VERSION_ID-}\"", nil, 4096, 15*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("read native package distribution: %w", err)
 	}
-	distribution := strings.TrimSpace(string(release))
-	family, err := nativeDistributionFamily(distribution)
+	id, versionID, _ := strings.Cut(strings.TrimSpace(string(release)), "\n")
+	guest := platform.Identify(platform.OSRelease{ID: id, VersionID: versionID})
+	backend, err := nativeBackend(guest)
 	if err != nil {
 		return nil, err
 	}
-	format, err := NativePackageFormat(distribution)
+	format, err := NativePackageFormat(guest)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +124,7 @@ func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second pack
 			return nil, errors.New("positive APT lifecycle requires InRelease")
 		}
 	}
-	p := &nativeGuestPackages{vm: vm, family: family, first: first, second: second, apt: apt, arch: arch}
+	p := &nativeGuestPackages{vm: vm, backend: backend, first: first, second: second, apt: apt, arch: arch}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, p.Close())
@@ -201,7 +203,7 @@ func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second pack
 		if err := p.command(ctx, "import pinned RPM key", "rpmkeys --dbpath "+nativeGuestDir+"/rpmkeys --import "+p.keyPath+"; rpmkeys --import "+p.keyPath, nil); err != nil {
 			return nil, err
 		}
-		if family == familyZypper {
+		if backend == platform.BackendZypper {
 			// Local RPM transactions have no repository metadata. Require the
 			// package signature itself, including in negative-authentication cases.
 			config := "[main]\ngpgcheck = true\nrepo_gpgcheck = true\npkg_gpgcheck = true\n"
@@ -345,7 +347,7 @@ func (p *nativeGuestPackages) zypperCommand(action string) string {
 }
 
 func (p *nativeGuestPackages) rpmInstallCommand(destination string, upgrade bool) string {
-	if p.family == familyZypper {
+	if p.backend == platform.BackendZypper {
 		// Zypper install accepts a local RPM for both installation and upgrade.
 		return p.zypperCommand("install --no-recommends " + nativeQuote(destination))
 	}
@@ -515,7 +517,7 @@ done
 test -d /run/lindm; check /run/lindm "0:$gid:750"
 test -S /run/lindm/executor.sock; check /run/lindm/executor.sock "0:$gid:660"
 `
-		if p.family == familyDNF {
+		if p.backend.DNF() {
 			command += `
 test "$(getenforce)" = Enforcing
 matchpathcon -V ` + packaging.BinaryPath + `
@@ -578,7 +580,7 @@ func (p *nativeGuestPackages) Remove(ctx context.Context, purge bool) error {
 		// protected state in both requested lifecycle lanes.
 		if p.installed {
 			command := p.dnfCommand("remove lindm-agent")
-			if p.family == familyZypper {
+			if p.backend == platform.BackendZypper {
 				command = p.zypperCommand("remove lindm-agent")
 			}
 			if err := p.command(ctx, "erase native RPM", command, nil); err != nil {
@@ -696,7 +698,7 @@ func (p *nativeGuestPackages) RejectArtifact(ctx context.Context, artifact packa
 	}
 	if artifact.Format == packaging.FormatRPM {
 		expectedExit = 1
-		if p.family == familyZypper {
+		if p.backend == platform.BackendZypper {
 			expectedExit = 8 // ZYPPER_EXIT_ERR_COMMIT: package authentication failed.
 		}
 	}

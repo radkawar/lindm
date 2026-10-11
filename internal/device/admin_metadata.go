@@ -15,6 +15,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/targeting"
 )
 
@@ -26,7 +27,7 @@ func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, 
 		return err
 	}
 	if s.identity == nil {
-		return rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionManageInventory)
 	if err != nil {
@@ -107,7 +108,7 @@ func (s *Service) SetDeviceMetadata(ctx context.Context, req *connect.Request[ad
 		// metadata, but only access administrators can change those scope inputs.
 		if !sameInventoryLabels(labels, metadata.GetLabels()) {
 			if !identity.Authorize(authorized, identity.PermissionManageAccounts) {
-				return rpcError(connect.CodePermissionDenied, "permission_denied")
+				return rpcreason.Error(connect.CodePermissionDenied, "permission_denied")
 			}
 			if err := requireUnrestrictedPrincipal(authorized, identity.PermissionManageAccounts); err != nil {
 				return err
@@ -170,7 +171,7 @@ func (s *Service) SetAttributeDefinition(ctx context.Context, req *connect.Reque
 			return err
 		}
 		if incompatible {
-			return rpcError(connect.CodeFailedPrecondition, "attribute_values_incompatible")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "attribute_values_incompatible")
 		}
 		encoded, err := proto.Marshal(definition)
 		if err != nil {

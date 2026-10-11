@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"golang.org/x/sys/unix"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
@@ -87,7 +89,7 @@ func parseAPTSteps(output []byte) ([]aptStep, error) {
 	return steps, nil
 }
 func dpkgTransactionArgs(directory string, d *resourcev1.NativePackageDesired, manifest *resourcev1.PackageTransactionManifest) ([][]string, error) {
-	data, err := protectedFile(filepath.Join(directory, "native-transaction.txt"), maxOutput)
+	data, err := custody.ReadRoot(filepath.Join(directory, "native-transaction.txt"), maxOutput, false)
 	if err != nil {
 		return nil, err
 	}

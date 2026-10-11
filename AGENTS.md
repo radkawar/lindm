@@ -63,7 +63,7 @@ make generate         # buf generate + sqlc generate (CI fails if the output dif
 make fmt              # format everything
 make lint             # prettier, markdownlint, eslint, tsc, buf lint/format, golangci-lint
 make test             # builds web assets, then go test -race ./cmd/... ./db/... ./gen/... ./internal/... ./web/...
-make check            # default target and pre-push hook: lint + test + audit (npm audit + govulncheck)
+make check            # default target: lint + test + audit (npm audit + govulncheck)
 make test-integration # dev-up, then go run ./cmd/dev test-integration (real Postgres)
 make signoff          # local CI: clean worktree of the pushed HEAD runs check + test-integration (shared fixture), then gh signoff create --commit SHA unit integration
 go run ./cmd/dev worktree add NAME [-base REV]   # private worktree in ../lindm.worktrees/NAME; prints the path
@@ -130,7 +130,7 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
 
 - Go 1.26.9 (`GOTOOLCHAIN` is pinned in the Makefile). Node 24.21.0 (`.node-version`) with **npm**, exact dependency versions and ESM.
 - Use the tools in `.tools/bin` (golangci-lint, buf, sqlc, …) instead of system copies.
-- Hooks: pre-commit runs lint-staged and pre-push runs `make check`. Enable them with `npm run hooks:install`.
+- Hooks: pre-commit runs lint-staged; pre-push (`make pre-push`) runs `make check` in a clean worktree of each pushed SHA, skipping SHAs that already have a green `signoff/unit`. Enable them with `npm run hooks:install`.
 - To change the API or SQL: edit the `.proto` files or `db/queries`/`db/migrations`, run `make generate`, and commit the generated output.
 - Never commit `.cache/dev` (it holds secrets).
 - Private lindm worktrees: create them only with `go run ./cmd/dev worktree add NAME`; they live in `~/dev/minor/lindm.worktrees/NAME` and share `node_modules` only when the lockfile matches. Clean up with `go run ./cmd/dev worktree prune` (it never removes a tree in use or unmerged work without `-archive-dirty`, which archives to `~/.cache/lindm-worktree-archive`). `~/dev/minor/clones` is only for third-party source clones.

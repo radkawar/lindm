@@ -28,6 +28,7 @@ import (
 	integrationsv1connect "lindm/gen/lindm/integrations/v1/integrationsv1connect"
 	"lindm/internal/identity"
 	"lindm/internal/reports/reportdb"
+	"lindm/internal/rpcreason"
 )
 
 const maxArtifactBytes = 32 * 1024 * 1024
@@ -95,12 +96,6 @@ func New(pool *pgxpool.Pool, identities *identity.Service, signer crypto.Signer,
 		algorithm: algorithm, publicKey: public, fingerprint: sha256.Sum256(public), certificates: chain}, nil
 }
 
-func rpcError(code connect.Code, reason string) error {
-	err := connect.NewError(code, errors.New(reason))
-	err.Meta().Set("Lindm-Reason", reason)
-	return err
-}
-
 func reportError(err error) error {
 	if err == nil {
 		return nil
@@ -110,29 +105,29 @@ func reportError(err error) error {
 		return rpc
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return rpcError(connect.CodeNotFound, "report_not_found")
+		return rpcreason.Error(connect.CodeNotFound, "report_not_found")
 	}
 	if errors.Is(err, identity.ErrAuthorizationDenied) || errors.Is(err, identity.ErrAuthorizationChanged) || errors.Is(err, identity.ErrAuthorizationExpired) {
-		return rpcError(connect.CodePermissionDenied, "report_authorization_denied")
+		return rpcreason.Error(connect.CodePermissionDenied, "report_authorization_denied")
 	}
 	var database *pgconn.PgError
 	if errors.As(err, &database) && database.Code == "23505" {
-		return rpcError(connect.CodeAlreadyExists, "report_conflict")
+		return rpcreason.Error(connect.CodeAlreadyExists, "report_conflict")
 	}
-	return rpcError(connect.CodeUnavailable, "report_store_unavailable")
+	return rpcreason.Error(connect.CodeUnavailable, "report_store_unavailable")
 }
 
 func (s *Service) require(ctx context.Context, request proto.Message) (identity.Principal, error) {
 	principal, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return identity.Principal{}, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return identity.Principal{}, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	unrestricted, _ := identity.DeviceScopes(principal, identity.PermissionManageIntegrations)
 	if !unrestricted {
-		return identity.Principal{}, rpcError(connect.CodePermissionDenied, "unrestricted_integrations_required")
+		return identity.Principal{}, rpcreason.Error(connect.CodePermissionDenied, "unrestricted_integrations_required")
 	}
 	if err := s.validator.Validate(request); err != nil {
-		return identity.Principal{}, rpcError(connect.CodeInvalidArgument, "invalid_report_request")
+		return identity.Principal{}, rpcreason.Error(connect.CodeInvalidArgument, "invalid_report_request")
 	}
 	return principal, nil
 }
@@ -154,7 +149,7 @@ func (s *Service) mutate(ctx context.Context, request proto.Message, requestID s
 	}
 	unrestricted, _ := identity.DeviceScopes(authorization.Principal(), identity.PermissionManageIntegrations)
 	if !unrestricted {
-		return rpcError(connect.CodePermissionDenied, "unrestricted_integrations_required")
+		return rpcreason.Error(connect.CodePermissionDenied, "unrestricted_integrations_required")
 	}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 	if err != nil {
@@ -180,7 +175,7 @@ func (s *Service) mutate(ctx context.Context, request proto.Message, requestID s
 	receipt, err := q.GetReportMutation(ctx, reportdb.GetReportMutationParams{ActorID: principal.ID, RequestID: id})
 	if err == nil {
 		if !bytes.Equal(receipt.RequestHash, requestHash) {
-			return rpcError(connect.CodeAlreadyExists, "request_id_reused")
+			return rpcreason.Error(connect.CodeAlreadyExists, "request_id_reused")
 		}
 		if err := proto.Unmarshal(receipt.Response, response); err != nil {
 			return err
@@ -265,7 +260,7 @@ func (s *Service) UpsertReportSchedule(ctx context.Context, request *connect.Req
 				Name: input.GetName(), Kind: int16(input.GetKind()), Format: int16(input.GetFormat()),
 				IntervalSeconds: int32(input.GetIntervalSeconds()), RetentionDays: int32(input.GetRetentionDays()), Enabled: input.GetEnabled(), ExpectedRevision: int64(input.GetRevision())})
 			if errors.Is(err, pgx.ErrNoRows) {
-				return rpcError(connect.CodeAborted, "report_schedule_revision_changed")
+				return rpcreason.Error(connect.CodeAborted, "report_schedule_revision_changed")
 			}
 		}
 		if err != nil {
@@ -291,7 +286,7 @@ func (s *Service) CreateAuditExport(ctx context.Context, request *connect.Reques
 		}
 		after := int64(request.Msg.GetAfterSequence())
 		if after > head.Sequence {
-			return rpcError(connect.CodeFailedPrecondition, "audit_checkpoint_ahead")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "audit_checkpoint_ahead")
 		}
 		previous := make([]byte, sha256.Size)
 		if after > 0 {
@@ -302,7 +297,7 @@ func (s *Service) CreateAuditExport(ctx context.Context, request *connect.Reques
 			previous = row.RowHash
 		}
 		if !bytes.Equal(previous, request.Msg.GetAfterHash()) {
-			return rpcError(connect.CodeFailedPrecondition, "audit_checkpoint_mismatch")
+			return rpcreason.Error(connect.CodeFailedPrecondition, "audit_checkpoint_mismatch")
 		}
 		final := head.Sequence
 		if final-after > int64(request.Msg.GetMaxEvents()) {
@@ -404,11 +399,11 @@ func (s *Service) DownloadReportArtifact(ctx context.Context, request *connect.R
 		return nil, reportError(err)
 	}
 	if row.State != "published" {
-		return nil, rpcError(connect.CodeFailedPrecondition, "report_not_published")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "report_not_published")
 	}
 	index := int32(request.Msg.GetChunkIndex())
 	if index >= row.ChunkCount && (index != 0 || row.ChunkCount != 0) {
-		return nil, rpcError(connect.CodeOutOfRange, "report_chunk_out_of_range")
+		return nil, rpcreason.Error(connect.CodeOutOfRange, "report_chunk_out_of_range")
 	}
 	artifact, err := artifactMessage(row)
 	if err != nil {

@@ -13,26 +13,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/statefs"
 )
-
-// ChrootAccountRoot reports products whose shadow tools must chroot (--root)
-// into the account root rather than use --prefix. EL 9's shadow-utils 4.9 and
-// EL 10's 4.15 take the SELinux label of a rewritten database from the prefixed
-// path (var_run_t or var_lib_t), which locks every confined reader out of
-// /etc/passwd and /etc/shadow; EL 9's chage has no --prefix at all. In a chroot
-// the tools label the real /etc paths; libselinux then needs the host procfs
-// and selinuxfs there.
-func ChrootAccountRoot(platform *resourcev1.PlatformProduct) bool {
-	switch platform.GetOsId() {
-	case "rhel", "almalinux":
-		major, _, _ := strings.Cut(platform.GetVersion(), ".")
-		return major == "9" || major == "10"
-	default:
-		return false
-	}
-}
 
 // validateAccountRoot proves the helper-only account root exposes exactly the
 // host /etc bind and no home, mail or data tree; a chroot root additionally

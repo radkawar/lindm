@@ -7,12 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
-	"time"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 func buildRPM(ctx context.Context, work, payload, version string, arch Architecture, epoch int64, key SigningKey, payloadSHA string, staged []stagedFile, p product) (Artifact, error) {
@@ -297,51 +297,32 @@ func pipeTools(ctx context.Context, work string, producer, consumer toolCmd) err
 	}
 	ctx, cancel := context.WithTimeout(ctx, toolDeadline)
 	defer cancel()
-	prod := exec.CommandContext(ctx, prodPath, producer.Args...)
-	cons := exec.CommandContext(ctx, consPath, consumer.Args...)
-	stdout, err := prod.StdoutPipe()
+	read, write, err := os.Pipe()
 	if err != nil {
 		return err
 	}
-	cons.Stdin = stdout
-	prod.Dir, cons.Dir = work, work
-	if consumer.Dir != "" {
-		cons.Dir = consumer.Dir
-	}
 	env := baseEnv(work)
-	prod.Env, cons.Env = env, env
-	prod.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	prodErr := &limitedWriter{limit: toolOutputLimit}
-	consErr := &limitedWriter{limit: toolOutputLimit}
-	prod.Stderr, cons.Stderr = prodErr, consErr
-	prod.WaitDelay = 2 * time.Second
-	cons.WaitDelay = 2 * time.Second
-	killGroup := func() {
-		if prod.Process != nil {
-			_ = syscall.Kill(-prod.Process.Pid, syscall.SIGKILL)
-		}
+	consDir := work
+	if consumer.Dir != "" {
+		consDir = consumer.Dir
 	}
-	prod.Cancel = func() error {
-		killGroup()
-		return os.ErrProcessDone
+	prodErr, consErr := nativeexec.NewBuffer(toolOutputLimit), nativeexec.NewBuffer(toolOutputLimit)
+	prod, err := labexec.Start(ctx, labexec.Command{Path: prodPath, Args: producer.Args, Env: env, Dir: work, Stdout: write, Stderr: prodErr})
+	closeErr := write.Close()
+	if err != nil {
+		return errors.Join(err, closeErr, read.Close())
 	}
-	if err := prod.Start(); err != nil {
-		return err
+	consRun := labexec.Run(ctx, labexec.Command{Path: consPath, Args: consumer.Args, Env: env, Dir: consDir, Stdin: read, Stderr: consErr})
+	// Closing the read end stops a producer that the consumer abandoned.
+	closeErr = errors.Join(closeErr, read.Close())
+	prodRun := prod.Wait()
+	if closeErr != nil {
+		return closeErr
 	}
-	cons.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: prod.Process.Pid}
-	cons.Cancel = prod.Cancel
-	if err := cons.Start(); err != nil {
-		killGroup()
-		_ = prod.Wait()
-		return err
-	}
-	consErrRun := cons.Wait()
-	_ = stdout.Close()
-	prodErrRun := prod.Wait()
-	if prodErr.exceeded || consErr.exceeded {
+	if prodErr.Truncated() || consErr.Truncated() {
 		return fmt.Errorf("%w: extract output exceeded limit", ErrArtifact)
 	}
-	if prodErrRun != nil || consErrRun != nil {
+	if prodRun != nil || consRun != nil {
 		return fmt.Errorf("%w: rpm payload extract failed", ErrArtifact)
 	}
 	return nil

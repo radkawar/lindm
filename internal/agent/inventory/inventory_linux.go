@@ -16,6 +16,7 @@ import (
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/actionprovider"
+	"lindm/internal/platform"
 )
 
 // Collect returns actual host and native-package evidence. Collection failures
@@ -58,9 +59,11 @@ func collect(ctx context.Context, rootObservation bool) (*inventoryv1.NativeObse
 	return result, nil
 }
 
+// nativePackageIdentityAvailable requires an observed VERSION_ID unless the
+// release is a rolling registry row that has none.
 func nativePackageIdentityAvailable(host *inventoryv1.HostObservation) bool {
 	return host.OsId.Status == success && (host.OsVersion.Status == success ||
-		host.OsId.Value == "arch" && host.OsVersion.Status == unavailable)
+		host.OsVersion.Status == unavailable && platform.Identify(platform.OSRelease{ID: host.OsId.Value}).Version.Rule == platform.VersionAbsent)
 }
 
 func boundHostDetails(host *inventoryv1.HostObservation) error {

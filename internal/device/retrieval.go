@@ -17,6 +17,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -27,7 +28,7 @@ func (s *Service) RetrieveIssuance(ctx context.Context, req *connect.Request[enr
 		return nil, mapErr(err)
 	}
 	defer s.release()
-	denied := rpcError(connect.CodeUnauthenticated, "unauthenticated")
+	denied := rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	if req.Msg == nil || !validAuthorityProof(req.Msg.GetAuthorityProof()) {
 		return nil, denied
 	}

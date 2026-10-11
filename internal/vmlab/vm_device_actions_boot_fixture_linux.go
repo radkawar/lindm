@@ -27,6 +27,8 @@ import (
 	"github.com/google/uuid"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // The key signs only this run's owned firmware-db boot artifacts. It is never
@@ -218,21 +220,17 @@ func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTar
 
 // Conversion touches only this disposable guest's ESP, fstab and private NVRAM.
 // The baseline vendor golden and host boot configuration remain unchanged.
-func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, distribution string, signer *actionBootSigner) (_ *actionOwnedBootEvidence, err error) {
+func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest, signer *actionBootSigner) (_ *actionOwnedBootEvidence, err error) {
 	evidence := &actionOwnedBootEvidence{SignerPEMSHA256: hex.EncodeToString(signer.certificateSHA256)}
 	root, state, err := actionOwnedCloudTargets(ctx, vm)
 	if err != nil {
 		return evidence, err
 	}
 	evidence.OriginalTarget, evidence.StateTarget = *root, *state
-	install := ""
-	switch distribution {
-	case "ubuntu":
-		install = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y systemd-boot systemd-boot-efi systemd-ukify sbsigntool busybox-static cryptsetup-bin dmsetup nvme-cli e2fsprogs kmod zstd"
-	case "fedora":
-		install = "dnf -y install systemd-boot-unsigned systemd-ukify sbsigntools busybox cryptsetup device-mapper nvme-cli e2fsprogs kmod zstd"
-	default:
-		return evidence, errors.New("owned boot fixture requires a maintained Ubuntu/Fedora package recipe")
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	install, err := labInstallCommand(release, release.Lab.Guest.OwnedBoot)
+	if err != nil || release.Lab.Guest.Initrd == "" {
+		return evidence, errors.Join(fmt.Errorf("owned boot fixture requires a maintained package recipe and initramfs path for %s", release.Name), err)
 	}
 	installed, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(install), nil, 1<<20, 15*time.Minute)
 	if err != nil {
@@ -254,10 +252,7 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, distribution str
 	if vm.hardware.Architecture == "aarch64" {
 		loader, stub, fallback = "systemd-bootaa64.efi", "linuxaa64.efi.stub", "BOOTAA64.EFI"
 	}
-	initrd := "/boot/initrd.img-" + evidence.KernelRelease
-	if distribution == "fedora" {
-		initrd = "/boot/initramfs-" + evidence.KernelRelease + ".img"
-	}
+	initrd := fmt.Sprintf(release.Lab.Guest.Initrd, evidence.KernelRelease)
 	prepare := "install -d -m 0700 /run/lindm-native-owned-boot; test -d /boot/efi/EFI; mount -o remount,umask=0077 /boot/efi; ukify build --linux=" + nativeQuote("/boot/vmlinuz-"+evidence.KernelRelease) + " --initrd=" + nativeQuote(initrd) + " --stub=" + nativeQuote("/usr/lib/systemd/boot/efi/"+stub) + " --cmdline=@/proc/cmdline --output=/run/lindm-native-owned-boot/ordinary-unsigned.efi"
 	prepared, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(prepare), nil, 8192, 3*time.Minute)
 	if err != nil {

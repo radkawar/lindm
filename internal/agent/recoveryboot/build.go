@@ -12,13 +12,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
 )
 
 // Ingredient is a release-approved regular file. SHA256 is mandatory, including
@@ -291,18 +292,15 @@ func closeExclusive(out *os.File, owned os.FileInfo, err error) error {
 // Output is bounded and deliberately excludes private-key contents and native
 // stdout/stderr from errors. Standard tools authenticate their own formats.
 func native(ctx context.Context, extraEnv []string, command string, args ...string) error {
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
 	switch command {
 	case "ukify", "sbsign", "sbverify", "bootctl", "systemctl":
 	default:
 		return errors.New("recoveryboot: unapproved_native_tool")
 	}
-	cmd := exec.CommandContext(ctx, "/usr/bin/"+command, args...)
-	cmd.WaitDelay = time.Second
-	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}, extraEnv...)
-	cmd.Stdout, cmd.Stderr = io.Discard, io.Discard
-	if err := cmd.Run(); err != nil {
+	if _, err := nativeexec.Run(ctx, nativeexec.Command{
+		Path: "/usr/bin/" + command, Args: args, Env: extraEnv,
+		Timeout: 90 * time.Second, StdoutLimit: 64 << 10, StderrLimit: 64 << 10,
+	}); err != nil {
 		return fmt.Errorf("recoveryboot: %s: %w", command, err)
 	}
 	return nil

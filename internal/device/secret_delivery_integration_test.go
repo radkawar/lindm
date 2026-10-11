@@ -287,7 +287,7 @@ func operatorIdentity(t *testing.T, f *deliveryFixture) *identity.Service {
 	t.Helper()
 	read := func(name string) string {
 		t.Helper()
-		data, err := os.ReadFile(filepath.Join("..", "..", ".cache", "dev", name))
+		data, err := os.ReadFile(filepath.Join(devFixture(t), name))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"lindm/internal/labexec"
 )
 
 const affinityEnvironment = "LINDM_LOAD_CPU_REEXEC"
@@ -180,33 +182,15 @@ func NewAffinityController(deps AffinityDependencies) *AffinityController {
 	return &AffinityController{deps: deps}
 }
 
-func newAffinityCommand(ctx context.Context, binary string, args, environment []string, stdout, stderr io.Writer) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, binary, args...)
-	cmd.Env, cmd.Stdin, cmd.Stdout, cmd.Stderr = environment, os.Stdin, stdout, stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	cmd.WaitDelay = affinityCleanupGrace
-	return cmd
+// affinityCommand cancels by TERMing the child's process group so it can run
+// its owned cleanup; survivors are killed once the leader exits or after
+// affinityCleanupGrace, so no descendant server is orphaned.
+func affinityCommand(binary string, args, environment []string, stdout, stderr io.Writer) labexec.Command {
+	return labexec.Command{Path: binary, Args: args, Env: environment, Stdin: os.Stdin, Stdout: stdout, Stderr: stderr, Interrupt: syscall.SIGTERM, Grace: affinityCleanupGrace}
 }
 
 func runAffinityCommand(ctx context.Context, binary string, args, environment []string, stdout, stderr io.Writer) error {
-	cmd := newAffinityCommand(ctx, binary, args, environment, stdout, stderr)
-	err := cmd.Run()
-	if ctx.Err() != nil && cmd.Process != nil {
-		// WaitDelay bounds graceful fixture cleanup; also stop any descendant
-		// that ignored the process-group TERM instead of orphaning a server.
-		killErr := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		if killErr != nil && !errors.Is(killErr, syscall.ESRCH) {
-			err = errors.Join(err, fmt.Errorf("kill cancelled affinity process group: %w", killErr))
-		}
-	}
-	return err
+	return labexec.Run(ctx, affinityCommand(binary, args, environment, stdout, stderr))
 }
 
 func statusCPUList(data []byte) (string, error) {

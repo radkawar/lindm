@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
+
+	"lindm/internal/labexec"
 )
 
 // assistanceBrowser drives one real headless Chromium through the maintained
@@ -21,8 +21,9 @@ import (
 // private protocol. The operator signs in through the console UI; the lane
 // never injects cookies, RPCs or alternate application code into the page.
 type assistanceBrowser struct {
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
+	process *labexec.Process
+	stdin   *os.File
+	stdout  *os.File
 	replies chan assistanceBrowserReply
 	done    chan struct{}
 	waitErr error
@@ -65,24 +66,24 @@ func startAssistanceBrowser(ctx context.Context, repository, private string, cfg
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, os.Remove(path)) }()
-	cmd := exec.Command("node", filepath.Join(repository, "web/acceptance/assistance.mjs"), path)
-	cmd.Dir = repository
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
-	// Framework diagnostics can echo filled credentials; replies are the only
-	// channel the lane reads.
-	cmd.Stderr = io.Discard
-	stdin, err := cmd.StdinPipe()
+	childStdin, stdin, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	stdout, childStdout, err := os.Pipe()
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, childStdin.Close(), stdin.Close())
 	}
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start assistance browser runner: %w", err)
+	// Framework diagnostics can echo filled credentials, so stderr is discarded;
+	// replies are the only channel the lane reads. Close owns the lifetime.
+	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/assistance.mjs"), path}, Dir: repository, Stdin: childStdin, Stdout: childStdout})
+	if closeErr := errors.Join(childStdin.Close(), childStdout.Close()); err != nil || closeErr != nil {
+		if err == nil {
+			err = errors.Join(closeErr, process.Close())
+		}
+		return nil, errors.Join(fmt.Errorf("start assistance browser runner: %w", err), stdin.Close(), stdout.Close())
 	}
-	b := &assistanceBrowser{cmd: cmd, stdin: stdin, replies: make(chan assistanceBrowserReply, 1), done: make(chan struct{})}
+	b := &assistanceBrowser{process: process, stdin: stdin, stdout: stdout, replies: make(chan assistanceBrowserReply, 1), done: make(chan struct{})}
 	go b.read(stdout)
 	defer func() {
 		if err != nil {
@@ -155,18 +156,19 @@ func (b *assistanceBrowser) call(ctx context.Context, op string, args map[string
 	}
 }
 
-// Close asks the runner to close Chromium, then kills the process group if it
-// has not exited within a bounded grace period.
+// Close asks the runner to close Chromium, waits a bounded grace period for it
+// to finish, then kills whatever remains of its process group and reaps it.
 func (b *assistanceBrowser) Close() error {
-	if b.cmd == nil {
+	if b.process == nil {
 		return nil
 	}
-	cmd := b.cmd
-	b.cmd = nil
+	process := b.process
+	b.process = nil
 	_, _ = b.stdin.Write([]byte(`{"op":"close"}` + "\n"))
 	_ = b.stdin.Close()
 	// Drain stray replies so the reader can observe EOF and finish.
 	replies, grace, killed := b.replies, time.After(20*time.Second), false
+	var err error
 	for waiting := true; waiting; {
 		select {
 		case <-b.done:
@@ -176,11 +178,15 @@ func (b *assistanceBrowser) Close() error {
 				replies = nil
 			}
 		case <-grace:
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			err = process.Close()
 			grace, killed = nil, true
 		}
 	}
-	err := cmd.Wait()
+	if !killed {
+		// Also stops a Chromium the runner left behind.
+		err = process.Close()
+	}
+	err = errors.Join(err, b.stdout.Close())
 	if killed {
 		return errors.Join(errors.New("assistance browser runner required forced shutdown"), err)
 	}

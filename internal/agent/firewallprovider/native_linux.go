@@ -175,7 +175,31 @@ func persistenceReady(template *resourcev1.ResourceObservation) bool {
 		return false
 	}
 	target, err := os.Readlink(RestoreEnablePath)
-	return err == nil && target == RestoreUnitPath
+	return err == nil && restoreLinkAccepted(target, mergedUsrLib())
+}
+
+// restoreSplitUsrPath is the restore unit's name in the split-/usr compatible
+// search path: systemd 249 (Ubuntu 22.04) and 252 (Debian 12) search
+// /lib/systemd/system before /usr/lib/systemd/system, so "systemctl enable"
+// links the packaged unit through /lib.
+const restoreSplitUsrPath = "/lib/systemd/system/lindm-firewall-restore.service"
+
+// restoreLinkAccepted admits only links naming the verified packaged unit: its
+// /usr path, or its /lib name when /lib is the root-owned merged-/usr link to
+// usr/lib and therefore the same file. A separate /lib tree is a different,
+// unverified unit.
+func restoreLinkAccepted(target string, mergedUsr bool) bool {
+	return target == RestoreUnitPath || (mergedUsr && target == restoreSplitUsrPath)
+}
+
+// mergedUsrLib reports whether /lib is root's merged-/usr symbolic link.
+func mergedUsrLib() bool {
+	var st unix.Stat_t
+	if err := unix.Lstat("/lib", &st); err != nil || st.Uid != 0 || st.Mode&unix.S_IFMT != unix.S_IFLNK {
+		return false
+	}
+	link, err := os.Readlink("/lib")
+	return err == nil && (link == "usr/lib" || link == "/usr/lib")
 }
 
 // ReadNative runs only inside the fixed CAP_NET_ADMIN host-network helper. It

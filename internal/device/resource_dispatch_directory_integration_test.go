@@ -34,9 +34,20 @@ type dispatchDirectory struct {
 	name, user, group string
 }
 
+// devFixture is the running dev fixture that `go run ./cmd/dev test-integration`
+// names; it need not lie inside the checkout under test.
+func devFixture(t *testing.T) string {
+	t.Helper()
+	repository := os.Getenv("LINDM_NATIVE_REPOSITORY")
+	if repository == "" {
+		t.Fatal("directory integration tests require LINDM_NATIVE_REPOSITORY; use go run ./cmd/dev test-integration")
+	}
+	return filepath.Join(repository, ".cache", "dev")
+}
+
 func dispatchIdentity(t *testing.T, pool *pgxpool.Pool, scopes ...*authv1.DeviceScope) (*identity.Service, identity.Principal, *dispatchDirectory) {
 	t.Helper()
-	dir := filepath.Join("..", "..", ".cache", "dev")
+	dir := devFixture(t)
 	read := func(name string) []byte {
 		t.Helper()
 		data, err := os.ReadFile(filepath.Join(dir, name))

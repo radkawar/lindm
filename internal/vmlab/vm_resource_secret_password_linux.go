@@ -22,9 +22,11 @@ import (
 
 // A dedicated account in the root-approved lane range, distinct from the
 // accounts kind, receives its password only as a sealed SecretRef delivery.
+// Its UID is free in the host fixture, which secret-password also installs:
+// rlabforeign holds 24003 for the accounts kind's UID-collision refusal.
 const (
 	resourceSecretUser   = "rlabsecret"
-	resourceSecretUserID = 24003
+	resourceSecretUserID = 24006
 )
 
 // VMSecretPasswordEvidence is metadata only: secret identity, pinned versions

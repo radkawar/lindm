@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/platform"
 )
 
 func healthyInventoryFixture() (*inventoryv1.HostObservation, *inventoryv1.PackageObservation) {
@@ -41,7 +42,7 @@ func TestInventoryHealthAllowsReasonedNativeAbsence(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, rule := range inventoryUnavailableRules {
-		if strings.TrimSpace(rule.reason) == "" || len(rule.distros) == 0 || strings.ContainsAny(rule.path, "*?") {
+		if strings.TrimSpace(rule.reason) == "" || strings.ContainsAny(rule.path, "*?") {
 			t.Fatalf("unreasoned or wildcard exception: %s", rule.path)
 		}
 	}
@@ -153,7 +154,7 @@ func TestInventoryHealthRejectsEveryNonSuccessOutsideExactExceptions(t *testing.
 			for _, details := range []*inventoryv1.NativeDetails{before, after, actual} {
 				details.Memory.TotalBytes.Status = status
 			}
-			if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+			if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 				t.Fatal("matching native failures were accepted")
 			}
 		})
@@ -169,7 +170,7 @@ func TestInventoryHealthNeverAllowsFailuresAtAllowlistedFields(t *testing.T) {
 		}
 		before, after, actual := nativeDetailsFixture(), nativeDetailsFixture(), nativeDetailsFixture()
 		before.Snap.Status, after.Snap.Status, actual.Snap.Status = status, status, status
-		if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
+		if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 			t.Fatalf("matching allowlisted-field failures accepted: %s", status)
 		}
 	}

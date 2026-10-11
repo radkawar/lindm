@@ -1,7 +1,6 @@
 package vmlab
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -12,12 +11,13 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 // Artifacts names existing local files. Checksum is a signed vendor checksum or
@@ -160,21 +160,18 @@ func verifySignedBytes(ctx context.Context, fingerprint string, clearsigned bool
 			return "", "", nil, err
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 	args := []string{"--homedir", dir, "--keyring", filepath.Join(dir, "keyring.gpg"), "--status-fd", "2"}
 	if clearsigned {
 		args = append(args, "--output", "-", filepath.Join(dir, "checksums"))
 	} else {
 		args = append(args, filepath.Join(dir, "signature"), filepath.Join(dir, "checksums"))
 	}
-	cmd := exec.CommandContext(ctx, "gpgv", args...)
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GNUPGHOME=" + dir}
-	cmd.WaitDelay = time.Second
-	stdout := boundedBuffer{limit: maxMetadataBytes}
-	stderr := boundedBuffer{limit: 64 << 10}
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	stdout, stderr := nativeexec.NewBuffer(maxMetadataBytes), nativeexec.NewBuffer(64<<10)
+	err = labexec.Run(ctx, labexec.Command{Path: "gpgv", Args: args, Env: []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GNUPGHOME=" + dir}, Stdout: stdout, Stderr: stderr, Timeout: 30 * time.Second})
+	if err == nil && (stdout.Truncated() || stderr.Truncated()) {
+		err = errors.New("gpgv output exceeds limit")
+	}
+	if err != nil {
 		return "", "", nil, fmt.Errorf("verify checksum signature with gpgv: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	signing, primary, err = validSigner(stderr.String(), fingerprint)
@@ -186,22 +183,6 @@ func verifySignedBytes(ctx context.Context, fingerprint string, clearsigned bool
 	}
 	return signing, primary, data, nil
 }
-
-type boundedBuffer struct {
-	buffer bytes.Buffer
-	limit  int
-}
-
-func (b *boundedBuffer) Write(p []byte) (int, error) {
-	if len(p) > b.limit-b.buffer.Len() {
-		return 0, errors.New("gpgv output exceeds limit")
-	}
-	return b.buffer.Write(p)
-}
-
-func (b *boundedBuffer) Bytes() []byte { return b.buffer.Bytes() }
-
-func (b *boundedBuffer) String() string { return b.buffer.String() }
 
 func validSigner(status, pinned string) (string, string, error) {
 	var signing, primary string

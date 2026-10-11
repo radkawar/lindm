@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"lindm/internal/custody"
+
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -28,7 +30,7 @@ func (p *Provider) pinPath(ref *resourcev1.ResourceRef) string {
 	return "/etc/apt/preferences.d/lindm-" + hex.EncodeToString(digest[:])
 }
 func readPin(path string) (*resourcev1.FileIdentity, []byte, error) {
-	data, err := protectedFile(path, maxPin)
+	data, err := custody.ReadRoot(path, maxPin, false)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil, nil
 	}

@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/custody"
 )
 
 func TestInstallRuntimeFilesRejectsContext(t *testing.T) {
@@ -74,7 +77,7 @@ func TestInstallRuntimeFilesProtectedDiscovery(t *testing.T) {
 		if isVirtualDSO(path) || strings.Contains(path, "\x00") || !validRuntimePath(path) {
 			t.Fatalf("discovered path is not an original filesystem path: %q", path)
 		}
-		file, canonical, stat, err := openProtectedFile(path, maxRuntimeBytes)
+		file, canonical, stat, err := custody.OpenResolved(path, maxRuntimeBytes, maxDefinitionPath, maxSymlinks)
 		if err != nil {
 			t.Fatalf("discovered path %q: %v", path, err)
 		}
@@ -123,30 +126,21 @@ func TestRuntimeFileRefusesPrivilegedOrEmpty(t *testing.T) {
 }
 
 func TestLoaderResultBoundaries(t *testing.T) {
-	stdout := &boundedCapture{limit: 4}
-	stderr := &boundedCapture{limit: 4}
-	if _, err := stdout.Write([]byte("abc")); err != nil || stdout.exceeded || stdout.buf.String() != "abc" {
-		t.Fatalf("bounded write changed a short listing: exceeded=%v %q", stdout.exceeded, stdout.buf.Bytes())
-	}
-	if _, err := stdout.Write([]byte("def")); err != nil || !stdout.exceeded || stdout.buf.String() != "abcd" {
-		t.Fatalf("overflow was not retained as a bounded prefix: exceeded=%v %q", stdout.exceeded, stdout.buf.Bytes())
-	}
-	if _, err := classifyLoaderResult(stdout, stderr, nil); !errors.Is(err, ErrUnsupported) {
+	truncated := nativeexec.Result{Stdout: []byte("abcd"), StdoutTruncated: true}
+	if _, err := classifyLoaderResult(truncated, nil); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("truncated listing: %v", err)
 	}
-	stdout = &boundedCapture{limit: 8}
-	_, _ = stdout.Write([]byte("ok\n"))
-	stderr = &boundedCapture{limit: 8}
-	_, _ = stderr.Write([]byte("warn"))
-	if _, err := classifyLoaderResult(stdout, stderr, nil); !errors.Is(err, ErrUnsupported) {
+	if _, err := classifyLoaderResult(nativeexec.Result{Stdout: []byte("ok\n"), StderrTruncated: true}, nil); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("truncated diagnostics: %v", err)
+	}
+	if _, err := classifyLoaderResult(nativeexec.Result{Stdout: []byte("ok\n"), Stderr: []byte("warn")}, nil); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("diagnostics accepted: %v", err)
 	}
-	stderr = &boundedCapture{limit: 8}
 	runErr := errors.New("loader exited")
-	if _, err := classifyLoaderResult(stdout, stderr, runErr); !errors.Is(err, ErrUnsupported) || !errors.Is(err, runErr) {
+	if _, err := classifyLoaderResult(nativeexec.Result{Stdout: []byte("ok\n")}, runErr); !errors.Is(err, ErrUnsupported) || !errors.Is(err, runErr) {
 		t.Fatalf("nonzero listing exit: %v", err)
 	}
-	listing, err := classifyLoaderResult(stdout, stderr, nil)
+	listing, err := classifyLoaderResult(nativeexec.Result{Stdout: []byte("ok\n")}, nil)
 	if err != nil || string(listing) != "ok\n" {
 		t.Fatalf("clean listing = %q, %v", listing, err)
 	}

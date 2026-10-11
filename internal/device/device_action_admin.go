@@ -16,6 +16,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -36,13 +37,13 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	// Only the policy scheduler or RequestLocalAdminPasswordRotation mint this
 	// arm, authorized as the policy actor with the server's own escrow key.
 	if req.Msg.GetSpec().GetLocalAdminPasswordRotate() != nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "local_admin_policy_required")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "local_admin_policy_required")
 	}
 	if s.identity == nil || s.signing == nil || s.execution == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}
 	if actor.ServiceAccount && destructiveDeviceAction(req.Msg.GetSpec()) {
-		return nil, rpcError(connect.CodePermissionDenied, "human_approval_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "human_approval_required")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -75,7 +76,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		return nil, executionError(err)
 	}
 	if snapshot.Delegation == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	q := devicedb.New(tx)
 	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
@@ -111,14 +112,14 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		return nil, mapErr(err)
 	}
 	if device.State != stateActive || device.CurrentGenerationID == nil || *device.CurrentGenerationID != generationID {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_generation_rejected")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_rejected")
 	}
 	generation, err := q.GetGenerationAuthority(ctx, generationID)
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if generation.State != stateActive || generation.SessionEpoch <= 0 {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_session_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_session_unavailable")
 	}
 	now, err := dispatchClock(ctx, q)
 	if err != nil {
@@ -126,7 +127,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	}
 	// Intent is an online preflight, not an offline destructive queue.
 	if !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > time.Minute {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_offline")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_offline")
 	}
 	expires := req.Msg.GetExpiresAt().AsTime()
 	if !expires.After(now) || expires.After(now.Add(10*time.Minute)) || expires.After(snapshot.Delegation.GetExpiresAt().AsTime()) {
@@ -149,7 +150,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	}
 	if rotate := req.Msg.GetSpec().GetEscrowRotate(); rotate != nil {
 		if s.escrow == nil || rotate.GetEscrowKeyId() != s.escrow.KeyID() || !bytes.Equal(rotate.GetEscrowPublicKey(), s.escrow.PublicKey()) {
-			return nil, rpcError(connect.CodeFailedPrecondition, "escrow_key_rejected")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_key_rejected")
 		}
 	}
 	open, err := q.GetOpenDeviceAction(ctx, deviceID)
@@ -162,7 +163,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		if inverse {
 			reason = "outcome_unknown"
 		} else if open.OutcomeUnknown || len(open.StartGrantEnvelope) > 0 || now.Before(open.ExpiresAt.Time) {
-			return nil, rpcError(connect.CodeFailedPrecondition, "device_action_pending")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_pending")
 		}
 		if err := q.CloseDeviceAction(ctx, devicedb.CloseDeviceActionParams{ID: open.ID, ClosedAt: timestamptz(now), ClosedReason: reason}); err != nil {
 			return nil, mapErr(err)
@@ -183,7 +184,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		return nil, mapErr(err)
 	}
 	if count >= 262144 {
-		return nil, rpcError(connect.CodeResourceExhausted, "device_action_capacity")
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "device_action_capacity")
 	}
 	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: generationID, ResourceKind: 1, CanonicalKey: "device.actions"})
 	if err != nil {
@@ -315,7 +316,7 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 	}
 	if len(response.Actions) < len(rows) {
 		if len(response.Actions) == 0 {
-			return nil, rpcError(connect.CodeResourceExhausted, "device_action_page_capacity")
+			return nil, rpcreason.Error(connect.CodeResourceExhausted, "device_action_page_capacity")
 		}
 		last := rows[len(response.Actions)-1]
 		response.NextPageToken, err = encodeCursor(last.IssuedAt.Time, last.ID)

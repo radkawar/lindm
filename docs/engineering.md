@@ -313,6 +313,42 @@ simulator through its authenticated inventory RPC, then labels that device
 not a live recollection or native qualification; package data and service work
 remain synthetic. Keep capture provenance alongside screenshots.
 
+To try remote assistance hands-on with one real enrolled desktop, hold the
+maintained assistance lane (`docs/verification.md`) instead of running its
+scenarios. Use `make acceptance-build` and the lane's usual flags:
+
+```sh
+artifacts/bin/lab vm assistance -host local -hold \
+  -manifest lab/images/ubuntu-noble-encrypted-amd64.json \
+  -repo . -lab artifacts/bin/lab -lindmd artifacts/bin/lindmd \
+  -cache .cache/lab/images -golden-cache .cache/lab/encrypted -require-cached-golden \
+  -firmware-code /usr/share/OVMF/OVMF_CODE_4M.ms.fd \
+  -firmware-vars /usr/share/OVMF/OVMF_VARS_4M.ms.fd -firmware-package ovmf \
+  -firmware-version 2024.02-2ubuntu0.10 -secure-boot -evidence /new/private/dir
+```
+
+It provisions exactly like the lane: an encrypted GNOME (Wayland) clone with the
+signed agent and `lindm-session.service`, an isolated `lindmd` with the embedded
+TURN relay, and GDM autologin with locking off. It then holds one lab slot, with
+no lane deadline, until Ctrl-C tears everything down. Held runs need a local lab
+host and never write a qualification record. Stdout gets these nonsecret details:
+
+- the loopback console origin; trust the development CA as for `lab console`;
+- the `console-owner` enrollment URL and its expiry;
+- the device hostname and ID;
+- `vncviewer SOCKET` for the guest display. This is QEMU's VNC server on a Unix
+  socket inside the VM's private 0700 directory, with no TCP listener. It needs
+  TigerVNC 1.11 or later (`tigervnc-viewer`); `remote-viewer` cannot open VNC
+  sockets.
+
+The one-time enrollment secret and a fresh desktop-user password go only to
+`EVIDENCE/owner-access` (mode 0400). Nothing is seeded for the device. Every
+request still needs the guest user's own **Allow** and the portal dialog. To
+check the path before handing it over, add `-scenarios decline`. The lane's
+`assistance-operator` browser then requests a session and declines it in the
+guest, which leaves that real declined session in history. Its console and guest
+screenshots go to the same directory.
+
 Organize `web/src` around working product features:
 
 | Directory                                                      | Responsibility                                                     |
@@ -1209,8 +1245,8 @@ Private worktrees live in `<main>.worktrees/NAME` (here
 `HEAD`) and links the main checkout's `node_modules` only when `package.json` and
 `package-lock.json` are byte-identical; otherwise it runs `npm ci --ignore-scripts`
 in the worktree, because a shared install from another lockfile would test the
-wrong packages. `.tools` is not shared: each checkout's Makefile installs its own
-pinned tools. `worktree list` shows HEAD, ahead/behind `main`, dirty state, newest
+wrong packages. `.tools` is not shared: `add` runs `make tools`, so the worktree's own
+Makefile pins the tools its hooks and gates use. `worktree list` shows HEAD, ahead/behind `main`, dirty state, newest
 mtime outside `node_modules` and allocated size. `worktree prune [-older-than D]
 [-dry-run] [-archive-dirty] [PATH...]` (default: every worktree under
 `<main>.worktrees`) removes clean worktrees whose HEAD is an ancestor of `main`.
@@ -1233,6 +1269,14 @@ with `lab acceptance -fixture <main>` and the main checkout's image and golden
 caches, writes evidence to `<main>/artifacts/acceptance-<ts>`, and posts the
 `acceptance` context. The temporary worktree is removed afterwards, also on
 failure or interrupt.
+
+The pre-push hook (`make pre-push`, `go run ./cmd/dev pre-push`) reads git's
+pushed refs and, for each pushed SHA without a green `signoff/unit` status, runs
+`make check` in a temporary clean worktree of that SHA, so the shared dirty tree
+never decides a push. Clean-worktree `make check` (pre-push and signoff) runs
+golangci-lint with `--allow-parallel-runners` and a cache reserved for those
+gates (`~/.cache/lindm-clean-golangci`), so concurrent interactive lint runs
+neither block nor fail it.
 
 The control-plane trust VM lane uses a separate disposable PostgreSQL **database**,
 not `testdb`'s schema. It invokes the real `lindmd` executable, whose protected

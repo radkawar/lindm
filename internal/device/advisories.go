@@ -12,6 +12,7 @@ import (
 	"lindm/internal/advisory"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) ListDeviceFindings(ctx context.Context, req *connect.Request[adminv1.ListDeviceFindingsRequest]) (*connect.Response[adminv1.ListDeviceFindingsResponse], error) {
@@ -32,7 +33,7 @@ func (s *Service) ListDeviceFindings(ctx context.Context, req *connect.Request[a
 		return nil, mapErr(err)
 	}
 	if s.advisories == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "advisory_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "advisory_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -64,7 +65,7 @@ func (s *Service) ListAdvisorySummary(ctx context.Context, req *connect.Request[
 		return nil, mapErr(err)
 	}
 	if s.advisories == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "advisory_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "advisory_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -87,7 +88,7 @@ func (s *Service) ListAdvisoryFeeds(ctx context.Context, req *connect.Request[ad
 		return nil, invalid("invalid_advisory_request")
 	}
 	if s.advisories == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "advisory_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "advisory_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -118,7 +119,7 @@ func (s *Service) AcceptAdvisoryFinding(ctx context.Context, req *connect.Reques
 		return nil, mapErr(err)
 	}
 	if s.advisories == nil || s.identity == nil {
-		return nil, rpcError(connect.CodeFailedPrecondition, "advisory_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "advisory_unavailable")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
@@ -159,9 +160,9 @@ func advisoryError(err error) error {
 	case errors.Is(err, advisory.ErrInvalid):
 		return invalid("invalid_advisory_request")
 	case errors.Is(err, advisory.ErrConflict):
-		return rpcError(connect.CodeAborted, "advisory_evidence_changed")
+		return rpcreason.Error(connect.CodeAborted, "advisory_evidence_changed")
 	case errors.Is(err, advisory.ErrCapacity):
-		return rpcError(connect.CodeResourceExhausted, "advisory_capacity")
+		return rpcreason.Error(connect.CodeResourceExhausted, "advisory_capacity")
 	default:
 		return mapErr(err)
 	}

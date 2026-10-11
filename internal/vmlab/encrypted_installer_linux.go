@@ -8,39 +8,71 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
+	"lindm/internal/platform"
 )
+
+// encryptedDesktopMediaEdition is the manifest edition of a vendor Ubuntu desktop
+// ISO. Its installer is ubuntu-desktop-bootstrap over the subiquity autoinstall
+// backend, and the installed system, GNOME included, comes from the media's
+// squashfs layers rather than from packages installed over the network.
+const encryptedDesktopMediaEdition = "desktop-encrypted-lab"
+
+// encryptedMedia is the release and installer layout of one encrypted
+// installer manifest.
+type encryptedMedia struct {
+	release *platform.Release
+	// desktop selects the encryptedDesktopMediaEdition recipe.
+	desktop bool
+}
+
+// encryptedInstallerMedia maps a manifest to its installer recipe layout.
+func encryptedInstallerMedia(m *labv1.ImageManifest) encryptedMedia {
+	return encryptedMedia{release: platform.ForManifest(m.GetDistribution(), m.GetVersion()), desktop: m.GetEdition() == encryptedDesktopMediaEdition}
+}
+
+// encryptedInstallerDracutKernels rebuilds every installed kernel's initrd at
+// the Debian name GRUB loads.
+const encryptedInstallerDracutKernels = `for modules in /lib/modules/*; do
+    kernel=${modules##*/}
+    test -f "/boot/vmlinuz-$kernel" || continue
+    dracut --force "/boot/initrd.img-$kernel" "$kernel"
+done
+`
 
 // encryptedInstallerRecipe produces private installer input, not a cloud disk
 // conversion. Only the guest installer partitions /dev/vda. The ISO, recipe and
 // resulting disk contain lab secrets and must stay in the private run directory.
-func encryptedInstallerRecipe(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey string) ([]byte, error) {
-	return encryptedInstallerRecipeWithDesktop(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, "")
+func encryptedInstallerRecipe(media encryptedMedia, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey string) ([]byte, error) {
+	return encryptedInstallerRecipeWithDesktop(media, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, "")
 }
 
 // encryptedInstallerRecipeWithDesktop additionally installs a real GNOME or KDE
 // session. Automatic login is deliberately lab-only; SSH remains key-only.
-func encryptedInstallerRecipeWithDesktop(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string) ([]byte, error) {
-	return encryptedInstallerRecipeWithOptions(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, false)
+func encryptedInstallerRecipeWithDesktop(media encryptedMedia, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string) ([]byte, error) {
+	return encryptedInstallerRecipeWithOptions(media, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, false)
 }
 
 // encryptedInstallerRecipeWithOptions prepares TPM-capable early userspace only
 // when requested. It never enrolls a TPM token: native action enrollment remains
 // the subject of the lab, and the first boot still uses the LUKS passphrase.
-func encryptedInstallerRecipeWithOptions(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string, tpmBoot bool) ([]byte, error) {
-	return encryptedInstallerRecipeForMachine(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, tpmBoot, "x86_64")
+func encryptedInstallerRecipeWithOptions(media encryptedMedia, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string, tpmBoot bool) ([]byte, error) {
+	return encryptedInstallerRecipeForMachine(media, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, tpmBoot, "x86_64")
 }
 
 // encryptedInstallerRecipeForMachine keeps the signed vendor boot chain while
 // selecting the guest's console and architecture-specific package repository.
-func encryptedInstallerRecipeForMachine(distribution, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string, tpmBoot bool, architecture string) ([]byte, error) {
+func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop string, tpmBoot bool, architecture string) ([]byte, error) {
 	architecture, serialConsole, err := encryptedInstallerArchitecture(architecture)
 	if err != nil {
 		return nil, err
@@ -49,11 +81,19 @@ func encryptedInstallerRecipeForMachine(distribution, passphrase, loginPublicKey
 	if architecture == "aarch64" {
 		grubTerminal = "GRUB_TERMINAL=\"console\"\n"
 	}
+	lab := media.release.Lab
 	if desktop != "" && desktop != "gnome" && desktop != "kde" {
 		return nil, errors.New("encrypted installer: unsupported desktop")
 	}
-	if distribution != "ubuntu" && distribution != "fedora" {
-		return nil, errors.New("encrypted installer: unsupported distribution")
+	if media.desktop {
+		if desktop != "gnome" || lab.Installer != platform.Subiquity {
+			return nil, errors.New("encrypted installer: Ubuntu desktop media install their own GNOME session; desktop must be gnome")
+		}
+	} else if desktop != "" && len(lab.Session.Desktops[desktop]) == 0 {
+		return nil, fmt.Errorf("encrypted installer: no maintained %s desktop for %s", desktop, media.release.Name)
+	}
+	if lab.Installer != platform.Subiquity && lab.Installer != platform.Anaconda {
+		return nil, fmt.Errorf("encrypted installer: no maintained recipe for %s", media.release.Name)
 	}
 	// Serial unlock is line-oriented. Exclude control characters rather than
 	// allowing a passphrase which cannot be entered through the runtime console.
@@ -79,17 +119,19 @@ func encryptedInstallerRecipeForMachine(distribution, passphrase, loginPublicKey
 	}
 	provision := encryptedInstallerProvision(login, hostPrivateKey, host)
 	if desktop != "" {
-		provision += encryptedInstallerDesktopProvision(distribution, desktop, architecture)
+		provision += encryptedInstallerDesktopProvision(media.release, desktop, architecture)
 	}
-	if distribution == "ubuntu" {
-		packages := []string{"cryptsetup-initramfs"}
-		switch desktop {
-		case "gnome":
-			packages = append(packages, "ubuntu-desktop-minimal")
-		case "kde":
-			packages = append(packages, "kubuntu-desktop")
+	if lab.Installer == platform.Subiquity {
+		var packages []string
+		initramfsConfig := " /etc/cryptsetup-initramfs"
+		if media.desktop {
+			// The desktop source already carries GNOME and dracut; curtin adds
+			// cryptsetup for the LUKS layout itself.
+			initramfsConfig = ""
+		} else {
+			packages = append([]string{"cryptsetup-initramfs"}, lab.Session.Desktops[desktop]...)
 		}
-		provision += `install -d -m 0755 /etc/cloud/cloud.cfg.d /etc/default/grub.d /etc/cryptsetup-initramfs
+		provision += `install -d -m 0755 /etc/cloud/cloud.cfg.d /etc/default/grub.d` + initramfsConfig + `
 cat > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg <<'LINDM_CLOUD'
 ssh_deletekeys: false
 ssh_genkeytypes: [ed25519]
@@ -102,22 +144,23 @@ GRUB_CMDLINE_LINUX="console=tty0 console=` + serialConsole + `"
 ` + grubTerminal + `GRUB_TIMEOUT=1
 LINDM_GRUB
 `
-		if tpmBoot {
+		switch {
+		case tpmBoot:
 			// Keep curtin's stock initramfs tooling until its work finishes;
-			// dracut Conflicts with initramfs-tools in Noble packaging.
-			provision += encryptedInstallerTPMProvision(distribution)
-			provision += `DEBIAN_FRONTEND=noninteractive apt-get -y install dracut systemd tpm2-tools libtss2-tcti-device0t64 cryptsetup-initramfs-
-for modules in /lib/modules/*; do
-    kernel=${modules##*/}
-    test -f "/boot/vmlinuz-$kernel" || continue
-    dracut --force "/boot/initrd.img-$kernel" "$kernel"
-done
-`
-		} else {
+			// dracut Conflicts with initramfs-tools in Noble packaging. Media
+			// that install dracut themselves list no TPM packages.
+			provision += encryptedInstallerTPMProvision(lab.TPM.Modules)
+			if len(lab.TPM.Packages) != 0 {
+				provision += "DEBIAN_FRONTEND=noninteractive apt-get -y install " + strings.Join(lab.TPM.Packages, " ") + "\n"
+			}
+			provision += encryptedInstallerDracutKernels
+		case !media.desktop:
 			provision += "printf '%s\\n' 'CRYPTSETUP=y' > /etc/cryptsetup-initramfs/conf-hook\nupdate-initramfs -u -k all\n"
 		}
+		// Desktop media keep the installer's own dracut initramfs on the
+		// passphrase path: curtin regenerates it after adding cryptsetup.
 		provision += "update-grub\nsystemctl enable ssh\n"
-		config := map[string]any{"autoinstall": map[string]any{
+		autoinstall := map[string]any{
 			"version":           1,
 			"refresh-installer": map[string]bool{"update": false},
 			"locale":            "en_US.UTF-8",
@@ -128,11 +171,17 @@ done
 				"match": map[string]string{"path": "/dev/vda"},
 			}},
 			"ssh":           map[string]any{"install-server": true, "allow-pw": false, "authorized-keys": []string{strings.TrimSpace(login)}},
-			"packages":      packages,
 			"user-data":     map[string]any{"ssh_deletekeys": false, "ssh_genkeytypes": []string{"ed25519"}, "ssh": map[string]bool{"emit_keys_to_console": false}},
 			"late-commands": [][]string{{"curtin", "in-target", "--target=/target", "--", "/bin/sh", "-eu", "-c", provision}},
 			"shutdown":      "poweroff",
-		}}
+		}
+		if len(packages) != 0 {
+			autoinstall["packages"] = packages
+		}
+		if media.desktop {
+			autoinstall["source"] = map[string]string{"id": "ubuntu-desktop-minimal"}
+		}
+		config := map[string]any{"autoinstall": autoinstall}
 		data, err := json.Marshal(config)
 		if err != nil {
 			return nil, errors.New("encrypted installer: encode autoinstall")
@@ -142,8 +191,8 @@ done
 		return append([]byte("#cloud-config\n"), data...), nil
 	}
 	if tpmBoot {
-		provision += encryptedInstallerFedoraDNF("lindm-tpm", architecture) + "install systemd-udev tpm2-tools tpm2-tss\n"
-		provision += encryptedInstallerTPMProvision(distribution)
+		provision += encryptedInstallerReleaseDNF(media.release, "lindm-tpm", architecture) + "install " + strings.Join(lab.TPM.Packages, " ") + "\n"
+		provision += encryptedInstallerTPMProvision(lab.TPM.Modules)
 	}
 	provision += `install -d -m 0755 /etc/dracut.conf.d
 printf '%s\n' 'omit_dracutmodules+=" plymouth "' 'hostonly="no"' > /etc/dracut.conf.d/99-lindm-lab.conf
@@ -156,7 +205,7 @@ dracut --regenerate-all --force
 restorecon -RF /home/lindm-lab/.ssh /etc/ssh /etc/sudoers.d
 systemctl enable sshd
 `
-	return []byte("#version=F44\ntext\ncdrom\nlang en_US.UTF-8\nkeyboard us\ntimezone UTC --utc\nnetwork --bootproto=dhcp --device=link --activate --onboot=yes --hostname=lindm-lab\nrootpw --lock\nuser --name=lindm-lab --groups=wheel --lock --shell=/bin/bash\nfirewall --enabled --service=ssh\nselinux --enforcing\nservices --enabled=sshd\nignoredisk --only-use=vda\nzerombr\nclearpart --all --initlabel --drives=vda\nautopart --type=lvm --encrypted --luks-version=luks2 --passphrase=" + nativeQuote(passphrase) + "\nbootloader --boot-drive=vda --append=\"console=tty0 console=" + serialConsole + "\"\npoweroff\n%packages\n@core\nopenssh-server\nsudo\ncryptsetup\ngrub2-tools\ngrubby\ndnf5\n%end\n%post --erroronfail --interpreter=/bin/sh\nset -eu\numask 077\n" + provision + "%end\n"), nil
+	return []byte("#version=" + lab.Kickstart + "\ntext\ncdrom\nlang en_US.UTF-8\nkeyboard us\ntimezone UTC --utc\nnetwork --bootproto=dhcp --device=link --activate --onboot=yes --hostname=lindm-lab\nrootpw --lock\nuser --name=lindm-lab --groups=wheel --lock --shell=/bin/bash\nfirewall --enabled --service=ssh\nselinux --enforcing\nservices --enabled=sshd\nignoredisk --only-use=vda\nzerombr\nclearpart --all --initlabel --drives=vda\nautopart --type=lvm --encrypted --luks-version=luks2 --passphrase=" + nativeQuote(passphrase) + "\nbootloader --boot-drive=vda --append=\"console=tty0 console=" + serialConsole + "\"\npoweroff\n%packages\n@core\nopenssh-server\nsudo\ncryptsetup\ngrub2-tools\ngrubby\ndnf5\n%end\n%post --erroronfail --interpreter=/bin/sh\nset -eu\numask 077\n" + provision + "%end\n"), nil
 }
 
 func encryptedInstallerArchitecture(architecture string) (canonical, console string, err error) {
@@ -170,13 +219,15 @@ func encryptedInstallerArchitecture(architecture string) (canonical, console str
 	}
 }
 
-func encryptedInstallerFedoraDNF(repository, architecture string) string {
-	return fmt.Sprintf(`dnf5 -y --releasever=44 --disable-repo='*' \
- --repofrompath=%[1]s,https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%[2]s/os/ \
+// encryptedInstallerReleaseDNF installs from the release's immutable, signed
+// package tree rather than Anaconda's unsigned RPM path.
+func encryptedInstallerReleaseDNF(release *platform.Release, repository, architecture string) string {
+	return fmt.Sprintf(`dnf5 -y --releasever=%[3]s --disable-repo='*' \
+ --repofrompath=%[1]s,%[4]s \
  --enable-repo=%[1]s \
  --setopt=%[1]s.gpgcheck=1 \
- --setopt=%[1]s.gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%[2]s \
- `, repository, architecture)
+ --setopt=%[1]s.gpgkey=file://%[5]s \
+ `, repository, architecture, release.Version.Value, fmt.Sprintf(release.Lab.Repository, architecture), fmt.Sprintf(release.Lab.RepositoryKey, architecture))
 }
 
 // The native installers already name their LUKS mappings by UUID. Preserve those
@@ -200,42 +251,28 @@ NF < 2 || NF > 4 || $2 !~ /^UUID=/ { exit 1 }
 END { if (!found) exit 1 }
 `
 
-func encryptedInstallerTPMProvision(distribution string) string {
-	modules := "systemd crypt tpm2-tss lvm"
-	if distribution == "fedora" {
-		// Fedora's dracut 108 splits this out of the crypt module; Noble's
-		// dracut 060 still installs systemd-cryptsetup from crypt itself.
-		modules += " systemd-cryptsetup"
-	}
+func encryptedInstallerTPMProvision(dracutModules []string) string {
+	modules := strings.Join(dracutModules, " ")
 	return "install -d -m 0755 /etc/dracut.conf.d\n" +
 		"printf '%s\\n' 'hostonly=\"no\"' 'omit_dracutmodules+=\" plymouth \"' 'add_dracutmodules+=\" " + modules + " \"' 'install_items+=\" /etc/crypttab \"' > /etc/dracut.conf.d/98-lindm-tpm.conf\n" +
 		"awk " + nativeQuote(encryptedInstallerTPMCrypttabProgram) + " /etc/crypttab > /etc/crypttab.lindm\n" +
 		"chmod 0600 /etc/crypttab.lindm\nmv /etc/crypttab.lindm /etc/crypttab\n"
 }
 
-func encryptedInstallerDesktopProvision(distribution, desktop, architecture string) string {
+func encryptedInstallerDesktopProvision(release *platform.Release, desktop, architecture string) string {
 	var script strings.Builder
-	if distribution == "fedora" {
-		// The vendor DVD authenticates the base system. Desktop packages come
-		// from the immutable release tree, not Anaconda's unsigned RPM path.
-		// DNF verifies RPM signatures with the key supplied by that base.
-		script.WriteString(encryptedInstallerFedoraDNF("lindm-desktop", architecture))
-		script.WriteString("group install base-graphical desktop-accessibility fonts guest-desktop-agents hardware-support input-methods networkmanager-submodules ")
-		if desktop == "gnome" {
-			script.WriteString("gnome-desktop\n")
-		} else {
-			script.WriteString("kde-desktop\n")
-		}
+	session, anaconda := release.Lab.Session, release.Lab.Installer == platform.Anaconda
+	if anaconda {
+		// The vendor DVD authenticates the base system. DNF verifies RPM
+		// signatures with the key supplied by that base.
+		script.WriteString(encryptedInstallerReleaseDNF(release, "lindm-desktop", architecture))
+		script.WriteString("group install " + strings.Join(session.Desktops[desktop], " ") + "\n")
 	}
 	if desktop == "gnome" {
-		config, service, session := "/etc/gdm/custom.conf", "gdm", "gnome"
-		if distribution == "ubuntu" {
-			config, service, session = "/etc/gdm3/custom.conf", "gdm3", "ubuntu"
-		}
-		fmt.Fprintf(&script, "cat > %s <<'LINDM_GDM'\n[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=lindm-lab\nInitialSetupEnable=False\nLINDM_GDM\n", config)
+		fmt.Fprintf(&script, "cat > %s <<'LINDM_GDM'\n[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=lindm-lab\nInitialSetupEnable=False\nLINDM_GDM\n", session.GDMConfig)
 		script.WriteString("install -d -m 0755 /var/lib/AccountsService/users\n")
-		fmt.Fprintf(&script, "cat > /var/lib/AccountsService/users/lindm-lab <<'LINDM_SESSION'\n[User]\nSystemAccount=false\nSession=%s\nXSession=%s\nLINDM_SESSION\n", session, session)
-		fmt.Fprintf(&script, "systemctl enable --force %s.service\n", service)
+		fmt.Fprintf(&script, "cat > /var/lib/AccountsService/users/lindm-lab <<'LINDM_SESSION'\n[User]\nSystemAccount=false\nSession=%s\nXSession=%s\nLINDM_SESSION\n", session.Name, session.Name)
+		fmt.Fprintf(&script, "systemctl enable --force %s.service\n", release.Desktop.DisplayManager)
 	} else {
 		script.WriteString(`install -d -m 0755 /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/99-lindm-lab.conf <<'LINDM_SDDM'
@@ -247,9 +284,9 @@ LINDM_SDDM
 systemctl enable --force sddm.service
 `)
 	}
-	if distribution == "fedora" {
+	if anaconda {
 		if desktop == "gnome" {
-			script.WriteString("restorecon -RF /etc/gdm /var/lib/AccountsService\n")
+			script.WriteString("restorecon -RF " + path.Dir(session.GDMConfig) + " /var/lib/AccountsService\n")
 		} else {
 			script.WriteString("restorecon -RF /etc/sddm.conf.d\n")
 		}
@@ -284,20 +321,20 @@ func encryptedInstallerProvision(login, hostPrivate, hostPublic string) string {
 
 // prepareEncryptedInstallerForMachine remasters a Fetcher-verified vendor ISO.
 // xorriso replays the original El Torito/GPT boot equipment; no kernel, shim or
-// signed GRUB binary is replaced. Fedora also stores grub.cfg inside its EFI FAT
-// boot image, so mcopy patches that configuration in the output ISO, not a host
+// signed GRUB binary is replaced. Installers whose EFI FAT boot image also
+// stores grub.cfg get that copy patched by mcopy in the output ISO, not a host
 // mount or block device. The caller owns removal of this private run directory.
-func prepareEncryptedInstallerForMachine(ctx context.Context, dir, isoPath, distribution string, recipe []byte, architecture string) (_ string, err error) {
+func prepareEncryptedInstallerForMachine(ctx context.Context, dir, isoPath string, installer platform.Installer, recipe []byte, architecture string) (_ string, err error) {
 	input, err := openRegular(isoPath)
 	if err != nil {
 		return "", fmt.Errorf("encrypted installer: open verified ISO: %w", err)
 	}
 	defer func() { err = errors.Join(err, input.Close()) }()
-	return prepareInstallerFileForMachine(ctx, dir, input, distribution, recipe, architecture)
+	return prepareInstallerFileForMachine(ctx, dir, input, installer, recipe, architecture)
 }
 
 // prepareInstallerFileForMachine borrows a pinned verified media descriptor.
-func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.File, distribution string, recipe []byte, architecture string) (_ string, err error) {
+func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.File, installer platform.Installer, recipe []byte, architecture string) (_ string, err error) {
 	if input == nil {
 		return "", errors.New("installer media descriptor is required")
 	}
@@ -309,19 +346,11 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err != nil {
 		return "", err
 	}
-	grubPath, recipeFile := "/boot/grub/grub.cfg", "ks.cfg"
-	switch distribution {
-	case "fedora":
-		grubPath = "/EFI/BOOT/grub.cfg"
-	case "ubuntu":
-		recipeFile = "user-data"
-	case "debian":
-		recipeFile = "preseed.cfg"
-	case "opensuse-tumbleweed":
-		grubPath, recipeFile = "/EFI/BOOT/grub.cfg", "autoinst.xml"
-	default:
-		return "", errors.New("encrypted installer: unsupported distribution")
+	layout, ok := installer.Media()
+	if !ok {
+		return "", errors.New("encrypted installer: unsupported installer")
 	}
+	grubPath := layout.GRUB
 	if len(recipe) == 0 || len(recipe) > maxMetadataBytes {
 		return "", errors.New("encrypted installer: invalid recipe size")
 	}
@@ -346,7 +375,7 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err != nil {
 		return "", err
 	}
-	patched, err := encryptedInstallerGRUBForMachine(original, distribution, architecture)
+	patched, err := encryptedInstallerGRUBForMachine(original, installer, architecture)
 	if err != nil {
 		return "", err
 	}
@@ -360,12 +389,12 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err := os.Mkdir(seed, 0700); err != nil {
 		return "", err
 	}
-	if distribution == "ubuntu" {
+	if installer == platform.Subiquity {
 		if err := os.WriteFile(filepath.Join(seed, "meta-data"), []byte("instance-id: lindm-encrypted-installer\n"), 0600); err != nil {
 			return "", err
 		}
 	}
-	if err := os.WriteFile(filepath.Join(seed, recipeFile), recipe, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(seed, layout.Seed), recipe, 0600); err != nil {
 		return "", err
 	}
 	output := filepath.Join(stage, "installer.iso")
@@ -377,10 +406,8 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 		return "", err
 	}
 	boot := []string{"-boot_image", "any", "replay"}
-	if distribution == "opensuse-tumbleweed" {
-		// openSUSE's ARM DVD catalogs its EFI FAT image with platform 0 and
-		// points a hybrid MBR partition at that file, which xorriso cannot
-		// replay. Optical boot needs only the El Torito entry: re-declare the
+	if layout.RedeclareEFI {
+		// Optical boot needs only the El Torito entry: re-declare the
 		// unchanged vendor FAT image as the UEFI entry, without the USB MBR.
 		boot = []string{"-boot_image", "any", "discard", "-boot_image", "any", "system_area=/dev/zero", "-boot_image", "any", "efi_path=/boot/" + architecture + "/efi"}
 	}
@@ -388,7 +415,7 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if _, err := encryptedInstallerCommand(ctx, stage, []*os.File{input}, "xorriso", append(args, "-commit", "-end")...); err != nil {
 		return "", err
 	}
-	if distribution == "fedora" || distribution == "opensuse-tumbleweed" {
+	if layout.EFIImage {
 		report, err := encryptedInstallerCommand(ctx, stage, nil, "xorriso", "-no_rc", "-abort_on", "FAILURE", "-indev", output, "-report_el_torito", "plain")
 		if err != nil {
 			return "", err
@@ -399,43 +426,27 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 		}
 		// mtools accesses a regular image at a byte offset. It never opens the
 		// host's EFI system partition, mounts a filesystem, or rewrites a PE.
-		if _, err := encryptedInstallerCommand(ctx, stage, nil, "mcopy", "-o", "-i", output+"@@"+strconv.FormatInt(offset, 10), grubFile, "::/EFI/BOOT/grub.cfg"); err != nil {
+		if _, err := encryptedInstallerCommand(ctx, stage, nil, "mcopy", "-o", "-i", output+"@@"+strconv.FormatInt(offset, 10), grubFile, "::"+grubPath); err != nil {
 			return "", err
 		}
 	}
 	return output, nil
 }
 
-func encryptedInstallerGRUB(original []byte, distribution string) ([]byte, error) {
-	return encryptedInstallerGRUBForMachine(original, distribution, "x86_64")
+func encryptedInstallerGRUB(original []byte, installer platform.Installer) ([]byte, error) {
+	return encryptedInstallerGRUBForMachine(original, installer, "x86_64")
 }
 
-func encryptedInstallerGRUBForMachine(original []byte, distribution, architecture string) ([]byte, error) {
+func encryptedInstallerGRUBForMachine(original []byte, installer platform.Installer, architecture string) ([]byte, error) {
 	architecture, serialConsole, err := encryptedInstallerArchitecture(architecture)
 	if err != nil {
 		return nil, err
 	}
-	var args string
-	defaultEntry := "0"
-	switch distribution {
-	case "ubuntu":
-		args = "autoinstall noprompt ds=nocloud\\;s=/cdrom/lindm-seed/ console=tty0 console=" + serialConsole
-	case "fedora":
-		args = "inst.ks=cdrom:/lindm-seed/ks.cfg inst.text console=tty0 console=" + serialConsole
-	case "debian":
-		args = "auto=true priority=critical preseed/file=/cdrom/lindm-seed/preseed.cfg DEBIAN_FRONTEND=text net.ifnames=0 biosdevname=0 console=tty0 console=" + serialConsole
-		// Debian's first entry uses the graphical initrd. Select the vendor's
-		// text installer by title rather than replacing its kernel or initrd.
-		defaultEntry = "'Install'"
-	case "opensuse-tumbleweed":
-		// linuxrc reads the profile from the installation DVD itself and
-		// configures DHCP for the snapshot-bound online repository. The
-		// installer self-update would fetch content outside both pins.
-		args = "autoyast=cd:/lindm-seed/autoinst.xml textmode=1 self_update=0 net.ifnames=0 ifcfg=eth0=dhcp console=tty0 console=" + serialConsole
-		defaultEntry = "'Installation'"
-	default:
-		return nil, errors.New("encrypted installer: unsupported distribution")
+	layout, ok := installer.Media()
+	if !ok {
+		return nil, errors.New("encrypted installer: unsupported installer")
 	}
+	args, defaultEntry := layout.Args+" console=tty0 console="+serialConsole, layout.Entry
 	lines := strings.Split(string(original), "\n")
 	kernels := 0
 	for i, line := range lines {
@@ -485,7 +496,7 @@ func encryptedInstallerGRUBForMachine(original []byte, distribution, architectur
 			}
 		}
 		lines[i] = strings.Join(kept, " ") + " " + args
-		if distribution == "ubuntu" || distribution == "debian" {
+		if layout.Separator {
 			lines[i] += " ---"
 		}
 		kernels++
@@ -526,30 +537,14 @@ func encryptedInstallerEFIOffset(report []byte) (int64, error) {
 }
 
 func encryptedInstallerCommand(ctx context.Context, dir string, files []*os.File, name string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "TMPDIR="+dir, "HOME="+dir, "MTOOLSRC=/dev/null", "LC_ALL=C")
-	cmd.ExtraFiles = files
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		} else {
-			return err
-		}
-	}
-	cmd.WaitDelay = 2 * time.Second
-	out := &limitedOutput{limit: maxMetadataBytes}
-	cmd.Stdout = out
-	cmd.Stderr = new(vmLog)
-	if err := cmd.Run(); err != nil {
-		// Do not include tool diagnostics: the ISO carries keys and a passphrase.
+	out := nativeexec.NewBuffer(maxMetadataBytes)
+	env := append(os.Environ(), "TMPDIR="+dir, "HOME="+dir, "MTOOLSRC=/dev/null", "LC_ALL=C")
+	// Tool diagnostics are discarded: the ISO carries keys and a passphrase.
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Files: files, Stdout: out, Timeout: 15 * time.Minute}); err != nil {
 		return nil, fmt.Errorf("encrypted installer: %s failed: %w", name, err)
 	}
-	if out.exceeded {
+	if out.Truncated() {
 		return nil, errors.New("encrypted installer: command output exceeded limit")
 	}
-	return out.data, nil
+	return out.Bytes(), nil
 }

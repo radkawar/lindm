@@ -19,6 +19,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -27,7 +28,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	defer cancel()
 	principal, ok := devicePrincipalFromContext(ctx)
 	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_device_action_result")
@@ -51,7 +52,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		return nil, mapErr(err)
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_binding_rejected")
 	}
 	now, err := dispatchClock(ctx, q)
 	if err != nil {
@@ -83,7 +84,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		}
 		accepted := new(agentv1.DeviceActionAttestation)
 		if err := s.authority.Verify(ctx, action.AttestationEnvelope, accepted, 1, public); err != nil || accepted.GetSessionEpoch() != req.Msg.GetSessionEpoch() {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_result_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_result_rejected")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -95,17 +96,17 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		return noStore(&devicev1.ReportDeviceActionResultResponse{Closed: action.ClosedAt.Valid, EscrowReceiptEnvelope: receipt}), nil
 	}
 	if len(action.ResultNonce) != 32 || !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_result_nonce_rejected")
 	}
 	binding := &trust.DeviceActionAttestationBinding{DeploymentID: s.deploymentID, DeviceID: principal.DeviceID, EnrollmentGeneration: principal.GenerationID, SessionEpoch: req.Msg.GetSessionEpoch(), ActionID: id, IntentSHA256: sha256.Sum256(action.IntentEnvelope)}
 	copy(binding.Nonce[:], action.ResultNonce)
 	attestation, err := s.authority.VerifyDeviceActionAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), s.ca, binding, now, trust.MaxDeviceClockSkew)
 	if err != nil {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_result_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_result_rejected")
 	}
 	previous := action.ActionRevision
 	if !previous.Valid || previous.Int == nil || !previous.Int.IsUint64() || attestation.GetActionRevision() <= previous.Int.Uint64() {
-		return nil, rpcError(connect.CodeAlreadyExists, "device_action_result_conflict")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "device_action_result_conflict")
 	}
 	status := attestation.GetStatus()
 	intent, err := actionIntent(action)
@@ -113,16 +114,16 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		return nil, mapErr(err)
 	}
 	if action.ClosedAt.Valid {
-		return nil, rpcError(connect.CodeAlreadyExists, "device_action_result_closed")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "device_action_result_closed")
 	}
 	if status.GetStartedAt() != nil && len(action.StartGrantEnvelope) == 0 {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_ungranted_result")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_ungranted_result")
 	}
 	if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED && len(action.StartGrantEnvelope) == 0 {
-		return nil, rpcError(connect.CodePermissionDenied, "device_action_ungranted_result")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_ungranted_result")
 	}
 	if intent.GetSpec().GetSanitize().GetRecovery() != nil && (status.GetStartedAt() != nil || action.OutcomeUnknown) {
-		return nil, rpcError(connect.CodePermissionDenied, "recovery_result_endpoint_required")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_result_endpoint_required")
 	}
 	admittedChallenge := new(agentv1.DeviceActionChallenge)
 	if len(action.ChallengeDocument) > 0 && proto.Unmarshal(action.ChallengeDocument, admittedChallenge) != nil {
@@ -137,13 +138,13 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	if intent.GetSpec().GetRefreshInventory() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		sequence := status.GetVerification().GetInventorySequence()
 		if sequence == 0 || !status.GetVerification().GetVerified() || !status.GetVerification().GetAfter().GetSupported() || admittedChallenge.GetIssuedAt() == nil {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_unverified")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_inventory_unverified")
 		}
 		if action.InventoryPackageSequence != int64(sequence) {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
 		}
 		if len(action.InventoryReceiptEnvelope) == 0 {
-			return nil, rpcError(connect.CodeFailedPrecondition, "device_action_inventory_receipt_required")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_inventory_receipt_required")
 		}
 		// This document was committed with the verified server-signed receipt.
 		// Do not reverify historical custody with a possibly rotated current key
@@ -153,7 +154,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 			return nil, mapErr(errInternalState)
 		}
 		if receipt.GetPackageSequence() != sequence || receipt.GetHostSequence() != uint64(action.InventoryHostSequence) {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
 		}
 	}
 	incoming := status.GetVerification().GetEscrow()
@@ -163,7 +164,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		}
 	} else if incoming != nil {
 		if intent.GetSpec().GetEscrowRotate() == nil || len(action.StartGrantEnvelope) == 0 || s.escrow == nil || incoming.GetEscrowKeyId() != s.escrow.KeyID() || incoming.GetLocalAdmin() != nil || incoming.GetLuksUuid() != intent.GetSpec().GetEscrowRotate().GetTarget().GetLuksUuid() {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
 		}
 		challenge := new(agentv1.DeviceActionChallenge)
 		if err := proto.Unmarshal(action.ChallengeDocument, challenge); err != nil {
@@ -171,7 +172,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		}
 		recovery := challenge.GetNativePlan().GetRecoveryBinding()
 		if recovery.GetDeviceId() != intent.GetDeviceId() || recovery.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || recovery.GetActionId() != intent.GetActionId() || recovery.GetLuksUuid() != incoming.GetLuksUuid() || recovery.GetNewKeyslot() != incoming.GetNewKeyslot() {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
 		}
 		canonical, err := proto.MarshalOptions{Deterministic: true}.Marshal(recovery)
 		if err != nil {
@@ -181,10 +182,10 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		if errors.Is(err, pgx.ErrNoRows) {
 			sealed, err := s.escrow.OpenAndSeal(canonical, incoming.GetCiphertext())
 			if err != nil {
-				return nil, rpcError(connect.CodePermissionDenied, "device_action_escrow_rejected")
+				return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_rejected")
 			}
 			if !bytes.Equal(sealed.SecretSHA256, incoming.GetRecoveryKeySha256()) {
-				return nil, rpcError(connect.CodePermissionDenied, "device_action_escrow_digest_rejected")
+				return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_escrow_digest_rejected")
 			}
 			if _, err := q.InsertDeviceActionEscrow(ctx, devicedb.InsertDeviceActionEscrowParams{ActionID: id, BindingDocument: canonical, KeyID: sealed.KeyID, WrappedKey: sealed.WrappedKey, Ciphertext: sealed.Ciphertext, SecretSha256: sealed.SecretSHA256}); err != nil {
 				return nil, mapErr(err)
@@ -195,7 +196,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		} else if err != nil {
 			return nil, mapErr(err)
 		} else if !bytes.Equal(retained.BindingDocument, canonical) || !bytes.Equal(retained.SecretSha256, incoming.GetRecoveryKeySha256()) {
-			return nil, rpcError(connect.CodeAlreadyExists, "device_action_escrow_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "device_action_escrow_conflict")
 		}
 	}
 	if incoming != nil {
@@ -205,12 +206,12 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 				return nil, mapErr(errInternalState)
 			}
 			if previousEscrow := previousStatus.GetVerification().GetEscrow(); previousEscrow != nil && !proto.Equal(previousEscrow, incoming) {
-				return nil, rpcError(connect.CodeAlreadyExists, "device_action_escrow_conflict")
+				return nil, rpcreason.Error(connect.CodeAlreadyExists, "device_action_escrow_conflict")
 			}
 		}
 	}
 	if (intent.GetSpec().GetEscrowRotate() != nil || intent.GetSpec().GetLocalAdminPasswordRotate() != nil) && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED && len(action.EscrowReceiptEnvelope) == 0 {
-		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_escrow_receipt_required")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_escrow_receipt_required")
 	}
 	encoded, err := proto.Marshal(status)
 	if err != nil {
@@ -237,7 +238,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 			return nil, mapErr(err)
 		}
 		if restriction.ActionID.String() != release.GetQuarantineActionId() {
-			return nil, rpcError(connect.CodeAborted, "device_action_quarantine_changed")
+			return nil, rpcreason.Error(connect.CodeAborted, "device_action_quarantine_changed")
 		}
 		if err := q.SetDeviceActionRestriction(ctx, devicedb.SetDeviceActionRestrictionParams{DeviceID: principal.DeviceID, ActionID: id, SetQuarantine: true, Quarantined: false, UpdatedAt: timestamptz(now)}); err != nil {
 			return nil, mapErr(err)
@@ -245,7 +246,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	}
 	if release := intent.GetSpec().GetReleaseLock(); release != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		if !status.GetVerification().GetVerified() || !status.GetVerification().GetAfter().GetSupported() {
-			return nil, rpcError(connect.CodePermissionDenied, "device_action_lock_release_unverified")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "device_action_lock_release_unverified")
 		}
 		lockID, _ := uuid.Parse(release.GetLockActionId())
 		if err := q.ReleaseDeviceActionLock(ctx, devicedb.ReleaseDeviceActionLockParams{DeviceID: principal.DeviceID, LockActionID: &lockID, UpdatedAt: timestamptz(now)}); err != nil {
@@ -272,16 +273,16 @@ func validatePowerActionResult(spec *agentv1.DeviceActionSpec, challenge *agentv
 		// An accepted request or later contact proves neither power-off nor its
 		// duration. Preserve the signed evidence, never convert it to success.
 		if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED || verification.GetVerified() {
-			return rpcError(connect.CodePermissionDenied, "device_action_shutdown_unverifiable")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_shutdown_unverifiable")
 		}
 		if verification.GetPowerRequestAccepted() && (status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN || verification.GetEvidence() != "outcome_unknown_until_contact") {
-			return rpcError(connect.CodePermissionDenied, "device_action_shutdown_outcome_unknown")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_shutdown_outcome_unknown")
 		}
 	}
 	if spec.GetRestart() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		boot := verification.GetBootId()
 		if challenge.GetBootId() == "" || boot == "" || boot == challenge.GetBootId() || boot != verification.GetAfter().GetBootId() || !verification.GetVerified() || !verification.GetAfter().GetSupported() {
-			return rpcError(connect.CodePermissionDenied, "device_action_restart_unverified")
+			return rpcreason.Error(connect.CodePermissionDenied, "device_action_restart_unverified")
 		}
 	}
 	return nil

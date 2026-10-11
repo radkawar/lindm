@@ -158,16 +158,16 @@ func sanitizeNativeLine(line string) (string, bool) {
 	return value[:end], true
 }
 
-func commandDiagnostic(program, phase string, err error, stdout, stderr *commandOutput) *agentv1.NativeUpdateDiagnostic {
-	diagnostic := &agentv1.NativeUpdateDiagnostic{Manager: program, Phase: phase, ExitCode: -1, Truncated: stdout.overflow || stderr.overflow}
+func commandDiagnostic(program, phase string, err error, overflow bool, stdout, stderr *nativeOutputTail) *agentv1.NativeUpdateDiagnostic {
+	diagnostic := &agentv1.NativeUpdateDiagnostic{Manager: program, Phase: phase, ExitCode: -1, Truncated: overflow}
 	var exit interface{ ExitCode() int }
 	if errors.As(err, &exit) {
 		diagnostic.ExitCode = int32(exit.ExitCode())
 	}
 	// Prefer final stderr when both streams exceed the eight-line envelope;
 	// dnf and native verifiers also report actual failures on stdout.
-	for _, output := range []*commandOutput{stdout, stderr} {
-		for line := range strings.SplitSeq(output.tail.text(), "\n") {
+	for _, tail := range []*nativeOutputTail{stdout, stderr} {
+		for line := range strings.SplitSeq(tail.text(), "\n") {
 			line, truncated := sanitizeNativeLine(line)
 			diagnostic.Truncated = diagnostic.Truncated || truncated
 			if line == "" {

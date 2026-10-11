@@ -124,7 +124,7 @@ func consoleAsset(index []byte) (string, error) {
 }
 
 func (r *composeRun) proveIsolation(ctx context.Context, uid, gid int) error {
-	container := new(commandOutput)
+	container := newCommandOutput()
 	if err := r.compose(ctx, "find owned server container", container, "ps", "--quiet", "lindmd"); err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (r *composeRun) proveIsolation(ctx context.Context, uid, gid int) error {
 	if id == "" || strings.ContainsAny(id, "\r\n\t ") {
 		return errors.New("owned server container identity is missing or ambiguous")
 	}
-	output := new(commandOutput)
+	output := newCommandOutput()
 	if err := r.command(ctx, "inspect runtime isolation", output, "docker", "inspect", id); err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ AND NOT coalesce(has_sequence_privilege('lindm_runtime', pg_get_serial_sequence(
 AND EXISTS (SELECT 1 FROM pg_stat_activity a JOIN pg_stat_ssl s USING (pid)
  WHERE a.usename = 'lindm_runtime' AND s.ssl AND s.version = 'TLSv1.3')
 FROM pg_roles WHERE rolname = 'lindm_runtime'`
-	output := new(commandOutput)
+	output := newCommandOutput()
 	if err := r.compose(ctx, "prove database TLS and role separation", output, "exec", "-T", "--user", "postgres", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "lindm", "-At", "-c", query); err != nil {
 		return err
 	}

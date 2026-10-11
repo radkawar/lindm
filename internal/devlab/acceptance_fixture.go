@@ -3,6 +3,7 @@ package devlab
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -15,6 +16,7 @@ import (
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/advisory"
 	"lindm/internal/config"
+	"lindm/internal/platform"
 )
 
 // CreateAcceptanceEnrollment issues a distinct browser-owned account through the
@@ -85,11 +87,22 @@ func (f *AuthorityFixture) RefreshAcceptanceFeeds(ctx context.Context, cacheDire
 	defer func() { result.Artifacts = cache.artifacts }()
 	client := *resources.HTTPClient
 	client.Transport = cache
-	cfg := &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{
-		{Id: "acceptance-ubuntu", Distro: "ubuntu", Release: "24.04", Architecture: "amd64", Url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP, MaxAgeSeconds: 86400},
-		{Id: "acceptance-fedora", Distro: "fedora", Release: "44", Architecture: "x86_64", Url: "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD, MaxAgeSeconds: 86400},
-		{Id: "acceptance-rhel", Distro: "rhel", Release: "9", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800},
-	}}
+	cfg := &configv1.AdvisoryConfig{}
+	for _, feed := range []struct {
+		release string
+		source  *advisoryv1.FeedSource
+	}{
+		{"ubuntu-24.04", &advisoryv1.FeedSource{Id: "acceptance-ubuntu", Architecture: "amd64", Url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP, MaxAgeSeconds: 86400}},
+		{"fedora-44", &advisoryv1.FeedSource{Id: "acceptance-fedora", Architecture: "x86_64", Url: "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD, MaxAgeSeconds: 86400}},
+		{"rhel-9", &advisoryv1.FeedSource{Id: "acceptance-rhel", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800}},
+	} {
+		release, ok := platform.Lookup(feed.release)
+		if !ok {
+			return result, fmt.Errorf("acceptance feed release %s is not in the platform registry", feed.release)
+		}
+		feed.source.Distro, feed.source.Release = release.ID, release.Version.Value
+		cfg.Feeds = append(cfg.Feeds, feed.source)
+	}
 	service, err := advisory.New(ctx, pool, cfg, &client)
 	if err != nil {
 		return result, err

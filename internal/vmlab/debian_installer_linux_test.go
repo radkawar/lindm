@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"lindm/internal/platform"
 )
 
 func TestDebianPreseedBindsUnencryptedTargetAndCredentials(t *testing.T) {
@@ -97,7 +99,7 @@ func TestDebianPreseedRejectsWrongAuthorityAndTarget(t *testing.T) {
 func TestDebianGRUBPreservesVendorKernelAndInitrd(t *testing.T) {
 	original := []byte("set default=0\nset timeout=30\nmenuentry 'Install' {\n linux /install.amd/vmlinuz quiet ---\n initrd /install.amd/initrd.gz\n}\n")
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		patched, err := encryptedInstallerGRUBForMachine(original, "debian", arch)
+		patched, err := encryptedInstallerGRUBForMachine(original, platform.DebianInstaller, arch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +116,7 @@ func TestDebianGRUBPreservesVendorKernelAndInitrd(t *testing.T) {
 			t.Fatalf("missing architecture console: %s", patched)
 		}
 	}
-	if _, err := prepareInstallerFileForMachine(t.Context(), t.TempDir(), nil, "debian", []byte("preseed"), "x86_64"); err == nil {
+	if _, err := prepareInstallerFileForMachine(t.Context(), t.TempDir(), nil, platform.DebianInstaller, []byte("preseed"), "x86_64"); err == nil {
 		t.Fatal("nil borrowed media accepted")
 	}
 	dir, err := os.Open(t.TempDir())
@@ -122,7 +124,7 @@ func TestDebianGRUBPreservesVendorKernelAndInitrd(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = dir.Close() }()
-	if _, err := prepareInstallerFileForMachine(t.Context(), t.TempDir(), dir, "debian", []byte("preseed"), "x86_64"); err == nil {
+	if _, err := prepareInstallerFileForMachine(t.Context(), t.TempDir(), dir, platform.DebianInstaller, []byte("preseed"), "x86_64"); err == nil {
 		t.Fatal("nonregular media accepted")
 	}
 }

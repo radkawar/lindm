@@ -19,6 +19,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -53,6 +54,8 @@ type Provider struct {
 	mu      sync.Mutex
 	closed  bool
 }
+
+var _ resourceprovider.Provider = (*Provider)(nil)
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
 
@@ -206,6 +209,21 @@ func desiredMatches(d, effective *resourcev1.PasswordPolicyDesired) bool {
 	}
 	return true
 }
+
+// Observe reads the native password policy without effects.
+func (p *Provider) Observe(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*resourcev1.ResourceObservation, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.validateDesired(desired); err != nil {
+		return nil, err
+	}
+	before, err := p.observe(ctx, desired.GetPasswordPolicy())
+	if err != nil {
+		return nil, err
+	}
+	return before.GetObservation(), nil
+}
+
 func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

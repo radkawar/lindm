@@ -17,9 +17,12 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"io"
+
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/config"
+	"lindm/internal/custody"
 )
 
 const fixtureVersion = 2
@@ -33,22 +36,28 @@ type manifest struct {
 // FixturePath returns the sole directory managed by the local harness.
 func FixturePath(repoRoot string) string { return filepath.Join(repoRoot, ".cache", "dev") }
 
-func protected(path string, directory bool) error {
-	info, err := os.Lstat(path)
+// maxFixtureFile bounds every fixture file read.
+const maxFixtureFile = 1 << 20
+
+// readOwned reads a fixture file that custody.Owned admits, within maxFixtureFile.
+func readOwned(path string) (_ []byte, err error) {
+	if _, err := custody.Owned(path, false); err != nil {
+		return nil, err
+	}
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || info.IsDir() != directory || (!directory && !info.Mode().IsRegular()) {
-		return fmt.Errorf("%s must be a non-symlink %s", path, map[bool]string{true: "directory", false: "regular file"}[directory])
+	defer func() { err = errors.Join(err, file.Close()) }()
+	data, err := io.ReadAll(io.LimitReader(file, maxFixtureFile+1))
+	if err != nil {
+		return nil, err
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || stat.Uid != uint32(os.Geteuid()) || info.Mode().Perm()&0077 != 0 {
-		return fmt.Errorf("%s must be owned by current user with no group/other permissions", path)
+	if len(data) > maxFixtureFile {
+		clear(data)
+		return nil, fmt.Errorf("%s exceeds fixture file size limit", path)
 	}
-	if !directory && info.Size() > 1<<20 {
-		return fmt.Errorf("%s exceeds fixture file size limit", path)
-	}
-	return nil
+	return data, nil
 }
 
 func initialize(root, authentication string) (err error) {
@@ -184,10 +193,7 @@ func validateFixture(dir string) error {
 	}
 	for _, name := range names {
 		path := filepath.Join(dir, name)
-		if err := protected(path, false); err != nil {
-			return err
-		}
-		data, err := os.ReadFile(path)
+		data, err := readOwned(path)
 		if err != nil {
 			return err
 		}
@@ -200,14 +206,10 @@ func validateFixture(dir string) error {
 }
 
 func readManifest(dir string) (*manifest, error) {
-	if err := protected(dir, true); err != nil {
+	if _, err := custody.Owned(dir, true); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(dir, "manifest.json")
-	if err := protected(path, false); err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(path)
+	data, err := readOwned(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return nil, err
 	}

@@ -471,6 +471,55 @@ locale and working directory. No shell interpolation, arbitrary path writes, or
 server-supplied executable names in a typed policy. Protect config writes against
 symlink/path races and validate syntax before atomic replacement/reload.
 
+Every resource kind implements `resourceprovider.Provider` (`Observe`, `Plan`,
+`Apply`, `Verify`, `Close`); `Plan` binds the observed before snapshot, which is
+the ownership baseline for release and restore. Kind dispatch goes only through
+closed per-kind registries: the executor's opener table, the root helper's
+native table (effect sandbox grants, `ApplyNative` returning the after-image for
+every kind, and native observation for kinds the executor cannot read in its
+own sandbox: accounts, firewall zones and root-encryption evidence) and the
+journal's ownership-rule table. Every native `ApplyNative` receives the same
+`resourceprovider.NativeEnv`. Native package transactions implement the same
+executor contract but keep their staged helper protocol (stage, cancel,
+transaction), which a single apply call cannot express; device actions keep
+their own `DeviceActionProvider` contract.
+
+### Native process and file custody policy
+
+Every native process the agent starts goes through `internal/agent/nativeexec`;
+a test fails on any other `os/exec`, `os.StartProcess`, `syscall` or `unix`
+spawn in non-test agent code, except reviewed allowlist entries with a reason.
+One policy applies to every call:
+
+- argv only, never a shell; the executable path is absolute and clean, resolves
+  under `/usr/`, is reached through root-owned directories without group or other
+  write and is itself a root-owned, non-writable executable regular file. The
+  verified target runs with the requested name as `argv[0]`;
+- a clean environment: `PATH=/usr/sbin:/usr/bin`, `LANG=C`, `LC_ALL=C` plus only
+  allowlisted keys (`HOME`, `TZ`, `DEBIAN_FRONTEND`, `APT_CONFIG`,
+  `DPKG_FRONTEND_LOCKED`, `SYSTEMD_*` display/unit-path knobs,
+  `SOURCE_DATE_EPOCH`); the working directory defaults to `/`;
+- an explicit deadline and separate stdout/stderr limits on every call. Output
+  beyond a limit is drained, not SIGPIPEd, and the call fails with
+  `output_limit`;
+- its own process group. On deadline or cancellation the whole group gets
+  SIGKILL while the leader is still unreaped, so the numeric group cannot name a
+  reused process. Steps that mutate the system package database opt into
+  `TerminateOnly`: the group gets SIGTERM and the run waits for exit, because a
+  killed dpkg/rpm can leave packages half-configured; the transient unit timeout
+  bounds that wait;
+- structured results (stdout, stderr, truncation, exit code). Errors never carry
+  stderr, argv or the environment; a caller may surface only the sanitized,
+  bounded first stderr line (`Result.Diagnostic`).
+
+Root-protected filesystem reads use `internal/custody`: `OpenRoot` walks from
+`/` one `O_NOFOLLOW` component at a time and requires every directory and the
+leaf to be root-owned without group or other write; `ReadRoot` adds a regular,
+single-link (unless a caller documents vendor hardlinks), bounded and
+identity-stable read; `PrivateDirectory` adds an effective-user-owned leaf
+without group/other permissions. Unprivileged tools check only their own leaf
+with `Owned`. Lab tooling captures output with the same `nativeexec.Buffer`.
+
 ### Closed resources and targeting: control-plane cutover
 
 `lindm.resource.v1` is the shared closed vocabulary for twenty-four resource kinds.

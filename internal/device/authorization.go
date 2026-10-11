@@ -10,6 +10,7 @@ import (
 
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 // deviceScopeFilter is the SQL representation of only the bindings granting perm.
@@ -29,7 +30,7 @@ func deviceScopeFilter(principal identity.Principal, perm identity.Permission) (
 func requireUnrestrictedPrincipal(principal identity.Principal, perm identity.Permission) error {
 	unrestricted, _ := identity.DeviceScopes(principal, perm)
 	if !unrestricted {
-		return rpcError(connect.CodePermissionDenied, "permission_denied")
+		return rpcreason.Error(connect.CodePermissionDenied, "permission_denied")
 	}
 	return nil
 }
@@ -85,7 +86,7 @@ func lockDeviceScope(ctx context.Context, q *devicedb.Queries, principal identit
 // fences both entry and commit. No cached request principal authorizes a write.
 func (s *Service) withinUnrestrictedAuthorization(ctx context.Context, actor identity.Principal, perm identity.Permission, fn func(context.Context, *devicedb.Queries) error) error {
 	if s.identity == nil {
-		return rpcError(connect.CodeFailedPrecondition, "authorization_unavailable")
+		return rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
 	authorization, err := s.identity.AuthorizeFresh(ctx, actor.ID, perm)
 	if err != nil {
