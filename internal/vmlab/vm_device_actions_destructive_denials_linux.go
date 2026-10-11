@@ -31,12 +31,8 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 			return evidence, err
 		}
 		request := actionRequestFor(deviceID, generation, spec)
-		lifetime := 40 * time.Second
-		if scenario == "destructive_expired_approval" {
-			lifetime = 110 * time.Second
-		}
-		request.ExpiresAt = timestamppb.New(time.Now().Add(lifetime))
-		created, err := owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 60, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: request}}))
+		request.ExpiresAt = timestamppb.New(time.Now().Add(destructiveNegativeLifetime(scenario)))
+		created, err := owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: uint32(destructiveNegativeApprovalLifetime / time.Second), Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: request}}))
 		if err != nil {
 			return evidence, err
 		}
@@ -123,4 +119,21 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 		}
 	}
 	return evidence, waitNativeActionPresence(ctx, owner, deviceID)
+}
+
+// destructiveNegativeApprovalLifetime is the short approval the expired-approval
+// probe outlives before presenting it.
+const destructiveNegativeApprovalLifetime = 60 * time.Second
+
+// destructiveNegativeLifetime is the approved request's own validity. The
+// approval binds it, so it must still be unexpired when CreateDeviceAction
+// finally runs: after the approval-expiry wait (expired probe only) and the
+// bounded presence/inventory wait. A fixed 40/110 s let a slow inventory
+// publication turn the intended approval denial into device_action_expiry.
+func destructiveNegativeLifetime(scenario string) time.Duration {
+	lifetime := 40*time.Second + nativeActionPresenceTimeout
+	if scenario == "destructive_expired_approval" {
+		lifetime += destructiveNegativeApprovalLifetime + time.Second
+	}
+	return lifetime
 }

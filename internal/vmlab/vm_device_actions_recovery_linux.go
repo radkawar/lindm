@@ -187,8 +187,11 @@ func nativeRecoveryDestruction(ctx context.Context, target *EncryptedVM, manifes
 	return result, nil
 }
 
+// nativeActionPresenceTimeout bounds waiting for fresh presence and inventory.
+const nativeActionPresenceTimeout = 3 * time.Minute
+
 func waitNativeActionPresence(ctx context.Context, owner *devlab.OwnerSession, deviceID string) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, nativeActionPresenceTimeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
