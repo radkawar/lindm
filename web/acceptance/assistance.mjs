@@ -212,13 +212,15 @@ const commands = {
     return {};
   },
   async ended(args) {
+    // The viewer states the end cause in the paragraph after its
+    // "Why this session ended" heading.
     const cause = await until(
       () =>
         driver.page.evaluate(() => {
-          const term = [...document.querySelectorAll("dt")].find(
-            (node) => node.textContent.trim() === "End cause",
+          const heading = [...document.querySelectorAll("h2")].find(
+            (node) => node.textContent.trim() === "Why this session ended",
           );
-          return term?.nextElementSibling?.innerText.trim() ?? "";
+          return heading?.nextElementSibling?.innerText.trim() ?? "";
         }),
       timeout(args),
       "console_end_cause_timeout",
