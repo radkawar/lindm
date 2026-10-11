@@ -292,8 +292,13 @@ func (c *vmControlPlane) WaitFailedAttempt(ctx context.Context, deviceID string,
 		if err != nil {
 			return nil, err
 		}
-		if evidence.AttemptSequence <= before.AttemptSequence || evidence.Status != status {
+		if evidence.AttemptSequence <= before.AttemptSequence {
 			return nil, errors.New("expected later failed package attempt has not arrived")
+		}
+		if evidence.Status != status {
+			// The public enum identifies a different native failure than the
+			// lane induced; the deadline reports it instead of "not arrived".
+			return nil, fmt.Errorf("later package attempt %d reported %s, want %s", evidence.AttemptSequence, evidence.Status, status)
 		}
 		if evidence.EnrollmentGeneration != before.EnrollmentGeneration || evidence.HostSequence < before.HostSequence || evidence.SnapshotID != before.SnapshotID || evidence.SnapshotSequence != before.SnapshotSequence || evidence.PackageCount != before.PackageCount || !evidence.SnapshotReceivedAt.Equal(before.SnapshotReceivedAt) || !evidence.SnapshotCommittedAt.Equal(before.SnapshotCommittedAt) || evidence.AttemptReceivedAt.Before(before.AttemptReceivedAt) || detail.GetPackageAttempt().GetSnapshotId() != "" {
 			return nil, errors.New("failed attempt did not preserve the previous successful snapshot")
