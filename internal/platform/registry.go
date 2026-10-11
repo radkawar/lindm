@@ -224,9 +224,11 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
-		// The 26.04 desktop ISO carries dracut 110 and the TSS2 stack itself.
+		// The 26.04 desktop ISO carries dracut 110, systemd-cryptsetup and the
+		// TSS2 libraries, but not tpm2-tools, whose tpm2 binary dracut's
+		// tpm2-tss module requires.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
-			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
+			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		// Measured natively (recovery-nvme-01): the owned-boot UKI holds the
 		// vendor kernel plus the non-hostonly dracut initrd (72 MB; 24.04's

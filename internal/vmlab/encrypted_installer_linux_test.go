@@ -360,14 +360,18 @@ func TestEncryptedInstallerDesktopMediaRecipe(t *testing.T) {
 			}
 		}
 		// Resolute's default initramfs is dracut: initramfs-tools packages
-		// would remove it, and the TPM path must not replace packages.
-		for _, forbidden := range []string{"cryptsetup-initramfs", "apt-get", "update-initramfs", "lab-passphrase"} {
+		// would remove it, so the TPM path never replaces packages.
+		for _, forbidden := range []string{"cryptsetup-initramfs", "update-initramfs", "lab-passphrase"} {
 			if strings.Contains(script, forbidden) {
 				t.Errorf("desktop media provisioning contains %q", forbidden)
 			}
 		}
-		tpm := strings.Contains(script, "systemd crypt tpm2-tss lvm systemd-cryptsetup") && strings.Contains(script, "tpm2-device=auto") && strings.Contains(script, `dracut --force "/boot/initrd.img-$kernel" "$kernel"`)
-		if tpm != tpmBoot || (!tpmBoot && strings.Contains(script, "dracut")) {
+		// dracut's tpm2-tss module check() requires the tpm2 binary, which
+		// the desktop media do not install; without it dracut fails and the
+		// installer stops at its error screen instead of powering off.
+		tpm := strings.Contains(script, "systemd crypt tpm2-tss lvm systemd-cryptsetup") && strings.Contains(script, "tpm2-device=auto") && strings.Contains(script, `dracut --force "/boot/initrd.img-$kernel" "$kernel"`) &&
+			strings.Contains(script, "apt-get -y install tpm2-tools\n") && strings.Index(script, "apt-get -y install tpm2-tools") < strings.Index(script, "dracut --force")
+		if tpm != tpmBoot || (!tpmBoot && (strings.Contains(script, "dracut") || strings.Contains(script, "apt-get"))) {
 			t.Fatalf("TPM-capable dracut configuration = %v, want %v", tpm, tpmBoot)
 		}
 		cmd := exec.Command("/bin/sh", "-n")

@@ -155,7 +155,7 @@ LINDM_GRUB
 		case tpmBoot:
 			// Keep curtin's stock initramfs tooling until its work finishes;
 			// dracut Conflicts with initramfs-tools in Noble packaging. Media
-			// that install dracut themselves list no TPM packages.
+			// that install dracut themselves add only what its modules need.
 			provision += encryptedInstallerTPMProvision(lab.TPM, architecture)
 			if len(lab.TPM.Packages) != 0 {
 				provision += "DEBIAN_FRONTEND=noninteractive apt-get -y install " + strings.Join(lab.TPM.Packages, " ") + "\n"
