@@ -552,6 +552,118 @@ func (x *ListProfilesResponse) GetNextPageToken() string {
 	return ""
 }
 
+type ListProfileRevisionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	PageSize      uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProfileRevisionsRequest) Reset() {
+	*x = ListProfileRevisionsRequest{}
+	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProfileRevisionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProfileRevisionsRequest) ProtoMessage() {}
+
+func (x *ListProfileRevisionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProfileRevisionsRequest.ProtoReflect.Descriptor instead.
+func (*ListProfileRevisionsRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListProfileRevisionsRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *ListProfileRevisionsRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListProfileRevisionsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListProfileRevisionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revisions     []*ProfileSummary      `protobuf:"bytes,1,rep,name=revisions,proto3" json:"revisions,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProfileRevisionsResponse) Reset() {
+	*x = ListProfileRevisionsResponse{}
+	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProfileRevisionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProfileRevisionsResponse) ProtoMessage() {}
+
+func (x *ListProfileRevisionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProfileRevisionsResponse.ProtoReflect.Descriptor instead.
+func (*ListProfileRevisionsResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListProfileRevisionsResponse) GetRevisions() []*ProfileSummary {
+	if x != nil {
+		return x.Revisions
+	}
+	return nil
+}
+
+func (x *ListProfileRevisionsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_lindm_admin_v1_profiles_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_profiles_proto_rawDesc = "" +
@@ -606,6 +718,15 @@ const file_lindm_admin_v1_profiles_proto_rawDesc = "" +
 	"specSha256\"z\n" +
 	"\x14ListProfilesResponse\x12:\n" +
 	"\bprofiles\x18\x01 \x03(\v2\x1e.lindm.admin.v1.ProfileSummaryR\bprofiles\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xbc\x01\n" +
+	"\x1bListProfileRevisionsRequest\x12M\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\tprofileId\x12%\n" +
+	"\tpage_size\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\x84\x01\n" +
+	"\x1cListProfileRevisionsResponse\x12<\n" +
+	"\trevisions\x18\x01 \x03(\v2\x1e.lindm.admin.v1.ProfileSummaryR\trevisions\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
@@ -620,7 +741,7 @@ func file_lindm_admin_v1_profiles_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_profiles_proto_rawDescData
 }
 
-var file_lindm_admin_v1_profiles_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_lindm_admin_v1_profiles_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_lindm_admin_v1_profiles_proto_goTypes = []any{
 	(*ProfileRevision)(nil),                // 0: lindm.admin.v1.ProfileRevision
 	(*PublishProfileRevisionRequest)(nil),  // 1: lindm.admin.v1.PublishProfileRevisionRequest
@@ -630,22 +751,25 @@ var file_lindm_admin_v1_profiles_proto_goTypes = []any{
 	(*ListProfilesRequest)(nil),            // 5: lindm.admin.v1.ListProfilesRequest
 	(*ProfileSummary)(nil),                 // 6: lindm.admin.v1.ProfileSummary
 	(*ListProfilesResponse)(nil),           // 7: lindm.admin.v1.ListProfilesResponse
-	(*v1.ResourceProfile)(nil),             // 8: lindm.policy.v1.ResourceProfile
-	(*timestamppb.Timestamp)(nil),          // 9: google.protobuf.Timestamp
+	(*ListProfileRevisionsRequest)(nil),    // 8: lindm.admin.v1.ListProfileRevisionsRequest
+	(*ListProfileRevisionsResponse)(nil),   // 9: lindm.admin.v1.ListProfileRevisionsResponse
+	(*v1.ResourceProfile)(nil),             // 10: lindm.policy.v1.ResourceProfile
+	(*timestamppb.Timestamp)(nil),          // 11: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_profiles_proto_depIdxs = []int32{
-	8, // 0: lindm.admin.v1.ProfileRevision.spec:type_name -> lindm.policy.v1.ResourceProfile
-	9, // 1: lindm.admin.v1.ProfileRevision.published_at:type_name -> google.protobuf.Timestamp
-	8, // 2: lindm.admin.v1.PublishProfileRevisionRequest.spec:type_name -> lindm.policy.v1.ResourceProfile
-	0, // 3: lindm.admin.v1.PublishProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
-	0, // 4: lindm.admin.v1.GetProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
-	9, // 5: lindm.admin.v1.ProfileSummary.published_at:type_name -> google.protobuf.Timestamp
-	6, // 6: lindm.admin.v1.ListProfilesResponse.profiles:type_name -> lindm.admin.v1.ProfileSummary
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	10, // 0: lindm.admin.v1.ProfileRevision.spec:type_name -> lindm.policy.v1.ResourceProfile
+	11, // 1: lindm.admin.v1.ProfileRevision.published_at:type_name -> google.protobuf.Timestamp
+	10, // 2: lindm.admin.v1.PublishProfileRevisionRequest.spec:type_name -> lindm.policy.v1.ResourceProfile
+	0,  // 3: lindm.admin.v1.PublishProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
+	0,  // 4: lindm.admin.v1.GetProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
+	11, // 5: lindm.admin.v1.ProfileSummary.published_at:type_name -> google.protobuf.Timestamp
+	6,  // 6: lindm.admin.v1.ListProfilesResponse.profiles:type_name -> lindm.admin.v1.ProfileSummary
+	6,  // 7: lindm.admin.v1.ListProfileRevisionsResponse.revisions:type_name -> lindm.admin.v1.ProfileSummary
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_profiles_proto_init() }
@@ -661,7 +785,7 @@ func file_lindm_admin_v1_profiles_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_profiles_proto_rawDesc), len(file_lindm_admin_v1_profiles_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -21,7 +21,6 @@ import { TechnicalDetails } from "@/components/ui/technical-details";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -30,6 +29,7 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
+import { useTargetPickers } from "./pickers";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
 type PreviewSession = {
@@ -55,11 +55,12 @@ function subscribe(listener: () => void) {
 }
 subscribeAuthLifetime(() => update({}));
 
-export function TargetPreviewView() {
+export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: string }) {
+  const { devicePicker: DevicePicker } = useTargetPickers();
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const current = useSyncExternalStore(subscribe, () => session);
-  const [deviceId, setDeviceId] = useState(current.preview?.deviceId ?? "");
+  const [deviceId, setDeviceId] = useState(initialDevice || current.preview?.deviceId || "");
   const [reason, setReason] = useState("");
   const [validationError, setValidationError] = useState("");
   const preview = current.preview;
@@ -175,7 +176,7 @@ export function TargetPreviewView() {
               return;
             const id = canonicalUuid(deviceId);
             if (!id) {
-              setValidationError("Enter a valid device ID.");
+              setValidationError("Choose a device.");
               return;
             }
             setValidationError("");
@@ -184,15 +185,14 @@ export function TargetPreviewView() {
           }}
         >
           <div className="grid min-w-0 grow gap-1.5">
-            <Label htmlFor="target-preview-device">Device ID</Label>
-            <Input
-              id="target-preview-device"
+            <DevicePicker
+              label="Device"
               value={deviceId}
               disabled={!!current.loading || unresolved}
-              onChange={(event) => setDeviceId(event.target.value)}
+              onChange={setDeviceId}
             />
           </div>
-          <Button disabled={!!current.loading || unresolved}>
+          <Button type="submit" disabled={!!current.loading || unresolved}>
             {current.loading ? "Loading preview…" : "Preview"}
           </Button>
         </form>
@@ -208,6 +208,12 @@ export function TargetPreviewView() {
         ) : null}
         {preview ? (
           <>
+            <DevicePicker
+              label="Previewed device"
+              value={preview.deviceId}
+              disabled
+              onChange={setDeviceId}
+            />
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">Checked</dt>
@@ -433,6 +439,7 @@ export function TargetPreviewView() {
                 </p>
               ) : null}
               <Button
+                type="submit"
                 className="w-fit"
                 disabled={
                   !!current.loading ||

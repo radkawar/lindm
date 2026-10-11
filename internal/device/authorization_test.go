@@ -68,6 +68,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"PublishProfileRevision":               {identity.PermissionManageProfiles, operators, true},
 		"GetProfileRevision":                   {identity.PermissionReadFleet, readers, true},
 		"ListProfiles":                         {identity.PermissionReadFleet, readers, true},
+		"ListProfileRevisions":                 {identity.PermissionReadFleet, readers, true},
 		"SetResourceAssignment":                {identity.PermissionAssignResources, operators, false},
 		"GetDeviceResourceState":               {identity.PermissionReadFleet, readers, false},
 		"PutDynamicGroup":                      {identity.PermissionManageInventory, admins, false},

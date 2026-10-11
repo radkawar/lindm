@@ -152,6 +152,37 @@ func (s *Store) List(ctx context.Context, after uuid.UUID, pageSize int32) ([]*a
 	return result, next, nil
 }
 
+// ListRevisions returns retained metadata newest first, without loading resources.
+func (s *Store) ListRevisions(ctx context.Context, profileID uuid.UUID, before int64, pageSize int32) ([]*adminv1.ProfileSummary, int64, error) {
+	if profileID == uuid.Nil || before < 0 || pageSize < 1 || pageSize > 200 {
+		return nil, 0, ErrProfileRejected
+	}
+	q := profiledb.New(s.pool)
+	if _, err := q.GetProfileRevision(ctx, profiledb.GetProfileRevisionParams{ProfileID: profileID}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, 0, ErrProfileNotFound
+		}
+		return nil, 0, err
+	}
+	rows, err := q.ListProfileRevisions(ctx, profiledb.ListProfileRevisionsParams{ProfileID: profileID, BeforeRevision: before, PageLimit: pageSize + 1})
+	if err != nil {
+		return nil, 0, err
+	}
+	var next int64
+	if len(rows) > int(pageSize) {
+		rows = rows[:pageSize]
+		next = rows[len(rows)-1].RevisionNumber
+	}
+	result := make([]*adminv1.ProfileSummary, 0, len(rows))
+	for _, row := range rows {
+		if !validRevisionMetadata(row) {
+			return nil, 0, ErrProfileCorrupt
+		}
+		result = append(result, &adminv1.ProfileSummary{ProfileId: row.ProfileID.String(), RevisionId: row.ID.String(), RevisionNumber: uint64(row.RevisionNumber), Name: row.Name, Description: row.Description, ResourceCount: uint32(row.ResourceCount), ActorId: row.ActorID.String(), PublishedAt: timestamppb.New(row.PublishedAt.Time), SpecSha256: row.SpecDigest})
+	}
+	return result, next, nil
+}
+
 func validRevisionMetadata(row profiledb.ProfileRevision) bool {
 	return row.ID != uuid.Nil && row.ProfileID != uuid.Nil && row.ActorID != uuid.Nil && row.RevisionNumber > 0 && row.ResourceCount >= 1 && row.ResourceCount <= 64 && len(row.SpecDigest) == sha256.Size && finiteProfileTime(row.PublishedAt)
 }

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { isUnauthenticated, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
@@ -38,7 +39,13 @@ export function accountsQueryOptions(lifetime: AuthLifetime) {
   });
 }
 
-export function Accounts() {
+export function Accounts({
+  devicePicker,
+  groupPicker,
+}: {
+  devicePicker: PickerSlot;
+  groupPicker: PickerSlot;
+}) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const session = useQuery(sessionQueryOptions());
@@ -161,7 +168,13 @@ export function Accounts() {
           onValueChange={(value) => setRole(value)}
           options={accounts.data?.roles.map((name) => ({ value: name, label: name })) ?? []}
         />
-        <ScopeEditor scopes={scopes} disabled={busy} onChange={setScopes} />
+        <ScopeEditor
+          scopes={scopes}
+          disabled={busy}
+          onChange={setScopes}
+          devicePicker={devicePicker}
+          groupPicker={groupPicker}
+        />
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -207,6 +220,8 @@ export function Accounts() {
             account={account}
             roles={accounts.data?.roles ?? []}
             busy={busy}
+            devicePicker={devicePicker}
+            groupPicker={groupPicker}
             onSave={(enabled, selectedRole, breakGlass, selectedScopes) =>
               void perform("Account saved", () =>
                 updateAccount(
@@ -245,12 +260,16 @@ function AccountEditor({
   busy,
   onSave,
   onReset,
+  devicePicker,
+  groupPicker,
 }: {
   account: LocalAccount;
   roles: string[];
   busy: boolean;
   onSave: (enabled: boolean, role: string, breakGlass: boolean, scopes: DeviceScope[]) => void;
   onReset: () => void;
+  devicePicker: PickerSlot;
+  groupPicker: PickerSlot;
 }) {
   const [enabled, setEnabled] = useState(account.enabled);
   const [role, setRole] = useState(account.role);
@@ -290,7 +309,13 @@ function AccountEditor({
           ]}
         />
       </label>
-      <ScopeEditor scopes={scopes} disabled={busy} onChange={setScopes} />
+      <ScopeEditor
+        scopes={scopes}
+        disabled={busy}
+        onChange={setScopes}
+        devicePicker={devicePicker}
+        groupPicker={groupPicker}
+      />
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"

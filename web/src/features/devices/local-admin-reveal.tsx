@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { validateInventory } from "./validation";
+import { deviceQueryOptions } from "./queries";
 
 export function LocalAdminPasswordReveal({
   deviceId,
@@ -30,6 +31,8 @@ export function LocalAdminPasswordReveal({
 }) {
   const lifetime = useAuthLifetime();
   const queryClient = useQueryClient();
+  const device = useQuery(deviceQueryOptions(lifetime, deviceId));
+  const confirmationName = device.data?.device?.hostname.trim() || deviceId;
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [approvalId, setApprovalId] = useState("");
@@ -81,7 +84,10 @@ export function LocalAdminPasswordReveal({
 
   function capture() {
     if (!request.current) {
-      if (confirmation !== deviceId) throw new Error("Type the device ID exactly to confirm.");
+      if (device.error || !device.data?.device)
+        throw new Error("Refresh the device details before revealing the password.");
+      if (confirmation !== confirmationName)
+        throw new Error("Type the device name exactly as shown to confirm.");
       const payload = create(RevealLocalAdminPasswordRequestSchema, {
         requestId: newRequestId(),
         deviceId,
@@ -230,9 +236,12 @@ export function LocalAdminPasswordReveal({
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
       />
-      <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>Type the device ID to confirm</Label>
-      <p className="break-all text-xs text-muted-foreground">
-        <code className="font-mono">{deviceId}</code>
+      {device.error ? <RpcError failure={toRpcFailure(device.error)} /> : null}
+      <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>
+        Type the device name to confirm
+      </Label>
+      <p className="break-all text-sm">
+        {device.data?.device ? confirmationName : "Loading device name…"}
       </p>
       <Input
         id={`laps-reveal-confirmation-${actionId}`}
@@ -243,6 +252,7 @@ export function LocalAdminPasswordReveal({
       />
       <TechnicalDetails
         items={[
+          { label: "Device ID", value: deviceId },
           { label: "Password action ID", value: actionId },
           { label: "Approval ID", value: approvalId },
         ]}

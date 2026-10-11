@@ -146,6 +146,15 @@ secret or a confirmation ID. Title records by name: devices use the hostname and
 back to "Unnamed device"; lifecycle states read Waiting to enroll, Enrolled, Revoked
 and Recovery hold. Toasts state the outcome in a few words ("Assignment saved",
 "Couldn't confirm the assignment") with a description only when it adds a next step.
+Never ask operators to type a record ID. Choose devices, groups, profiles and revisions,
+accounts and secrets with the searchable pickers in `components/ui/search-picker.tsx`
+(each domain owns its picker; routes compose them into other features). Typed
+confirmations use the displayed name (hostname, secret name), falling back to the ID
+only when no name exists. `/rollouts?device=ID` preselects the previewed device.
+Profile references without a listing API (approved home roots, artifacts, Nix
+catalogs and inputs, security tokens, certificate credentials and issuers, network
+connections, person bindings, external approved package sources) still take the
+issued reference as text, labelled by what it is; they need catalog APIs.
 Use commas, colons or periods rather than em or en dashes; ESLint checks string literals,
 template text and JSX text in handwritten `web/src` code. Distinguish unavailable,
 unknown, stale and empty results. A failed read must not look like an empty list or
@@ -534,7 +543,11 @@ each starting from scroll position zero:
   control or menu item declaring `aria-haspopup="dialog"` opens a named dialog that
   takes focus, traps Tab and Shift+Tab when modal, closes on Escape and returns focus;
 - copy: `copy-rules.json` applied to visible text, placeholders, labels and titles,
-  excluding `TechnicalDetails`, `RpcError` support details and `pre`/`code`/`kbd`.
+  excluding `TechnicalDetails`, `RpcError` support details and `pre`/`code`/`kbd`;
+- forms: every rendered form has an explicit submit button (console buttons default
+  to `type="button"`);
+- ID inputs: reject rendered inputs, textareas, selects and comboboxes whose labels
+  or placeholders ask for IDs or UUIDs, except read-only fields in `TechnicalDetails`.
 
 Once per theme and viewport it also checks the Control-K and Command-K palette
 (open, search, Escape, focus restore) and saves device details to raise a real
@@ -1769,6 +1782,15 @@ relational identities and dependency references/conditions. Reads validate both
 representations and the deterministic revision digest. Expected-head CAS,
 actor-bound request receipts, original-revision retries and append-only history
 remain independent of device activation.
+
+`ListProfiles` lists catalog heads. `ListProfileRevisions` lists one profile's
+retained revision metadata newest first by revision number, reusing `ProfileSummary`
+without loading resource specifications. Both require unrestricted `fleet.read`.
+Revision pages default to 50, accept at most 200 entries, and may be shortened by
+the response byte budget. Continue with the opaque, profile-bound `next_page_token`;
+new publication does not shift an existing keyset cursor. Unknown profiles return
+the same NotFound reason as `GetProfileRevision`. Listing history neither activates
+a revision nor claims native compliance.
 
 Resolution retains priority and contributor provenance across heterogeneous
 resources. Equal-priority optional dimensions merge only when compatible;

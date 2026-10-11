@@ -61,6 +61,7 @@ service AdminService {
   rpc PublishProfileRevision(PublishProfileRevisionRequest) returns (PublishProfileRevisionResponse);
   rpc GetProfileRevision(GetProfileRevisionRequest) returns (GetProfileRevisionResponse);
   rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc ListProfileRevisions(ListProfileRevisionsRequest) returns (ListProfileRevisionsResponse);
   rpc SetResourceAssignment(SetResourceAssignmentRequest) returns (SetResourceAssignmentResponse);
   rpc GetDeviceResourceState(GetDeviceResourceStateRequest) returns (GetDeviceResourceStateResponse);
   rpc PutDynamicGroup(PutDynamicGroupRequest) returns (PutDynamicGroupResponse);

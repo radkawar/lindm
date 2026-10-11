@@ -35,21 +35,20 @@ export function ResourceFields({
   const field = desiredField(arm);
   const desired = object(document.desired);
   const id = `resource-${resource.resourceId}`;
-  const references: ReferenceChoice[] = resources
-    .filter((entry) => entry.resourceId !== resource.resourceId)
-    .flatMap((entry, position) => {
-      const candidate = withDerivedRef(object(JSON.parse(entry.document)));
-      const ref = object(object(candidate.desired).ref);
-      const candidateKind = resourceKinds.find((item) => item.arm === selectedKind(candidate));
-      return ref.canonicalKey
-        ? [
-            {
-              ref,
-              label: `${candidateKind?.label ?? "Setting"}: ${String(ref.canonicalKey)} (${position + 1})`,
-            },
-          ]
-        : [];
-    });
+  const references: ReferenceChoice[] = resources.flatMap((entry, position) => {
+    if (entry.resourceId === resource.resourceId) return [];
+    const candidate = withDerivedRef(object(JSON.parse(entry.document)));
+    const ref = object(object(candidate.desired).ref);
+    const candidateKind = resourceKinds.find((item) => item.arm === selectedKind(candidate));
+    return ref.canonicalKey
+      ? [
+          {
+            ref,
+            label: `${candidateKind?.label ?? "Setting"} (setting ${position + 1})`,
+          },
+        ]
+      : [];
+  });
   function update(next: JsonObject) {
     onChange({ ...resource, document: JSON.stringify(withDerivedRef(next), null, 2) });
   }

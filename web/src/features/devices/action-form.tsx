@@ -44,6 +44,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { SearchPicker, type PickerOption, type PickerProps } from "@/components/ui/search-picker";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -124,6 +125,73 @@ const actionSummaries: Record<DeviceActionKind, string> = {
   localAdminPasswordRotate: "Set a new password for the managed local admin account.",
   patchNow: "Install OS updates now. Results appear in Patch status.",
 };
+
+function QuarantineActionPicker({ deviceId, ...props }: PickerProps & { deviceId: string }) {
+  const lifetime = useAuthLifetime();
+  const [pageToken, setPageToken] = useState("");
+  const [selected, setSelected] = useState<PickerOption>();
+  const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, pageToken));
+  const options: PickerOption[] = query.error
+    ? []
+    : (query.data?.actions
+        .filter((action) => action.spec?.action.case === "quarantine")
+        .map((action) => ({
+          value: action.actionId,
+          label: `Quarantine requested ${formatTimestamp(action.createdAt).local}`,
+          description: `Expires ${formatTimestamp(action.expiresAt).local}`,
+        })) ?? []);
+  if (selected?.value === props.value && !options.some((option) => option.value === props.value)) {
+    options.unshift(selected);
+  }
+  return (
+    <SearchPicker
+      {...props}
+      disabled={props.disabled || query.isPending || !!query.error}
+      options={options}
+      onChange={(value) => {
+        setSelected(options.find((option) => option.value === value));
+        props.onChange(value);
+      }}
+      note="Searches this page of actions. Use Next page for older actions."
+    >
+      {query.isPending ? <p role="status">Loading quarantine actions…</p> : null}
+      {query.error ? (
+        <RpcError failure={toRpcFailure(query.error)} title="Couldn't load quarantine actions" />
+      ) : null}
+      {!query.isPending && !query.error && !options.length ? (
+        <p className="text-sm text-muted-foreground">No quarantine actions on this page.</p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={props.disabled || query.isFetching || !pageToken}
+          onClick={() => setPageToken("")}
+        >
+          First page
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={
+            props.disabled || query.isFetching || !!query.error || !query.data?.nextPageToken
+          }
+          onClick={() => setPageToken(query.data!.nextPageToken)}
+        >
+          Next page
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={props.disabled || query.isFetching}
+          onClick={() => void query.refetch()}
+        >
+          Refresh actions
+        </Button>
+      </div>
+    </SearchPicker>
+  );
+}
 
 export function DeviceActionForm({
   deviceId,
@@ -930,15 +998,13 @@ export function DeviceActionForm({
                 </>
               ) : null}
               {kind === "releaseQuarantine" ? (
-                <>
-                  <Label htmlFor={`${prefix}-quarantine`}>Quarantine action ID</Label>
-                  <Input
-                    id={`${prefix}-quarantine`}
-                    required
-                    value={quarantineId}
-                    onChange={(event) => setQuarantineId(event.target.value)}
-                  />
-                </>
+                <QuarantineActionPicker
+                  deviceId={deviceId}
+                  label="Quarantine to undo"
+                  value={quarantineId}
+                  onChange={setQuarantineId}
+                  disabled={busy || frozen}
+                />
               ) : null}
               {kind === "sanitize" ? (
                 <>
@@ -1053,7 +1119,7 @@ export function DeviceActionForm({
               {storage ? (
                 <div className="grid gap-2">
                   <Label htmlFor={`${prefix}-confirm`}>
-                    Type {detail.data?.device?.hostname ? "hostname" : "device ID"}{" "}
+                    Type {detail.data?.device?.hostname ? "hostname " : ""}
                     <code className="font-mono">{confirmationName}</code> to confirm
                   </Label>
                   <Input
@@ -1094,7 +1160,16 @@ export function DeviceActionForm({
                 Review action
               </Button>
             </>
-          ) : null}
+          ) : (
+            <>
+              <p id={`${prefix}-target-required`} className="text-sm text-muted-foreground">
+                Choose a storage target above to continue.
+              </p>
+              <Button type="submit" disabled aria-describedby={`${prefix}-target-required`}>
+                Review action
+              </Button>
+            </>
+          )}
         </form>
       ) : (
         <div className="grid gap-3">

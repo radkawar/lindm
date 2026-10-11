@@ -169,7 +169,7 @@ export function DeviceRecoveryRevealPage({
       title="Reveal recovery key"
       description="Get access to the recovery key for this volume."
     >
-      {() => (
+      {(device) => (
         <div className="grid gap-4">
           {query.isPending ? <p role="status">Loading recovery key record…</p> : null}
           {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
@@ -185,6 +185,7 @@ export function DeviceRecoveryRevealPage({
                     <RecoveryKeyReveal
                       key={`${lifetime.generation}:${deviceId}:${actionId}`}
                       deviceId={deviceId}
+                      deviceName={device.hostname}
                       actionId={actionId}
                     />
                   </CardContent>

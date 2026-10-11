@@ -2,6 +2,9 @@ package dispatch
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
+	"math"
 
 	"lindm/internal/device/core"
 
@@ -149,4 +152,82 @@ func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1
 		}
 	}
 	return core.NoStore(&adminv1.ListProfilesResponse{Profiles: rows, NextPageToken: core.EncodeProfileCursor(next)}), nil
+}
+
+func (s *Service) ListProfileRevisions(ctx context.Context, req *connect.Request[adminv1.ListProfileRevisionsRequest]) (*connect.Response[adminv1.ListProfileRevisionsResponse], error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	if _, err := s.RequireUnrestricted(ctx, identity.PermissionReadFleet); err != nil {
+		return nil, err
+	}
+	if err := s.Acquire(ctx); err != nil {
+		return nil, core.MapErr(err)
+	}
+	defer s.Release()
+	if req == nil || req.Msg == nil {
+		return nil, core.Invalid("invalid_profile_request")
+	}
+	if err := s.Rules.Validate(req.Msg); err != nil {
+		return nil, core.Invalid("invalid_profile_request")
+	}
+	id, err := uuid.Parse(req.Msg.GetProfileId())
+	if err != nil {
+		return nil, core.Invalid("invalid_profile_request")
+	}
+	before, err := decodeProfileRevisionCursor(req.Msg.GetPageToken(), id)
+	if err != nil {
+		return nil, err
+	}
+	limit := req.Msg.GetPageSize()
+	if limit == 0 {
+		limit = 50
+	}
+	rows, next, err := s.Profiles.ListRevisions(ctx, id, before, int32(limit))
+	if err != nil {
+		return nil, core.ProfileError(err)
+	}
+	var budget core.ResponsePageBudget
+	for i, row := range rows {
+		fits, err := budget.Take(row)
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		if !fits {
+			if i == 0 {
+				return nil, core.MapErr(core.ErrInternalState)
+			}
+			rows = rows[:i]
+			next = int64(rows[i-1].GetRevisionNumber())
+			break
+		}
+	}
+	return core.NoStore(&adminv1.ListProfileRevisionsResponse{Revisions: rows, NextPageToken: EncodeProfileRevisionCursor(id, next)}), nil
+}
+
+// EncodeProfileRevisionCursor binds the profile and the last returned revision number.
+func EncodeProfileRevisionCursor(id uuid.UUID, before int64) string {
+	if before == 0 {
+		return ""
+	}
+	var encoded [25]byte
+	encoded[0] = 'R'
+	copy(encoded[1:17], id[:])
+	binary.BigEndian.PutUint64(encoded[17:], uint64(before))
+	return base64.RawURLEncoding.EncodeToString(encoded[:])
+}
+
+func decodeProfileRevisionCursor(token string, id uuid.UUID) (int64, error) {
+	if token == "" {
+		return 0, nil
+	}
+	decoded, err := base64.RawURLEncoding.Strict().DecodeString(token)
+	if err != nil || len(decoded) != 25 || decoded[0] != 'R' {
+		return 0, core.Invalid("page_token")
+	}
+	profileID, err := uuid.FromBytes(decoded[1:17])
+	before := binary.BigEndian.Uint64(decoded[17:])
+	if err != nil || profileID != id || before == 0 || before > math.MaxInt64 {
+		return 0, core.Invalid("page_token")
+	}
+	return int64(before), nil
 }

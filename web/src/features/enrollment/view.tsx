@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
@@ -30,7 +31,15 @@ import { OfflineEnrollment } from "./offline";
 
 type GrantPayload = { requestId: string; lifetimeSeconds: number; reason: string };
 
-export function EnrollmentView() {
+export function EnrollmentView({
+  accountPicker,
+  groupPicker,
+  profileRevisionPicker,
+}: {
+  accountPicker: PickerSlot;
+  groupPicker: PickerSlot;
+  profileRevisionPicker: PickerSlot;
+}) {
   const lifetime = useAuthLifetime();
   const [method, setMethod] = useState<"grant" | "provisioning" | null>(null);
   const [credential, setCredential] = useState<EnrollmentCredential | null>(null);
@@ -108,6 +117,9 @@ export function EnrollmentView() {
         <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
           <IssueProvisioningToken
             key={tokenFormVersion}
+            accountPicker={accountPicker}
+            groupPicker={groupPicker}
+            profileRevisionPicker={profileRevisionPicker}
             onCancel={() => setMethod(null)}
             onIssued={(result) =>
               issued({

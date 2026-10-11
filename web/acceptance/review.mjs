@@ -559,6 +559,8 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
       })),
   };
   entry.checks.copy = { findings: await probe(page, "copy") };
+  entry.checks.forms = { findings: await probe(page, "forms") };
+  entry.checks.idInputs = { findings: await probe(page, "idInputs") };
   entry.checks.expected = { findings: [] };
   for (const name of expectedButtons) {
     const problem = await probe(page, "expectButton", name);
@@ -803,6 +805,17 @@ async function main() {
         viewerControls,
       );
       viewerRoute.visits += 1;
+    }
+    if (viewerUrl) {
+      // Leave no open session behind: stop it as the operator would.
+      try {
+        await visit(requester, viewerUrl);
+        const stop = requester.getByRole("button", { name: "Stop session", exact: true });
+        await stop.click();
+        await stop.waitFor({ state: "detached", timeout: 30_000 });
+      } catch {
+        report.failures.push("assistance: could not stop the requested session from the viewer");
+      }
     }
   } finally {
     await driver.close();

@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { MultiPicker, type PickerSlot } from "@/components/ui/search-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -97,9 +98,15 @@ export function ProvisioningTokens() {
 export function IssueProvisioningToken({
   onIssued,
   onCancel,
+  accountPicker: AccountPicker,
+  groupPicker,
+  profileRevisionPicker,
 }: {
   onIssued: (result: CreateProvisioningTokenResponse) => void;
   onCancel?: () => void;
+  accountPicker: PickerSlot;
+  groupPicker: PickerSlot;
+  profileRevisionPicker: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
@@ -108,6 +115,9 @@ export function IssueProvisioningToken({
   const [busy, setBusy] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [ownerKind, setOwnerKind] = useState("");
+  const [ownerAccount, setOwnerAccount] = useState("");
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [profileRevisionIds, setProfileRevisionIds] = useState<string[]>([]);
   const [failure, setFailure] = useState<RpcFailure | null>(null);
 
   async function issue(data: FormData) {
@@ -126,7 +136,7 @@ export function IssueProvisioningToken({
         const owner = String(data.get("owner") ?? "").trim();
         metadata.owner =
           ownerKind === "ownerPrincipalId"
-            ? { case: "ownerPrincipalId", value: owner }
+            ? { case: "ownerPrincipalId", value: ownerAccount }
             : ownerKind === "ownerText"
               ? { case: "ownerText", value: owner }
               : { case: undefined };
@@ -137,12 +147,8 @@ export function IssueProvisioningToken({
           approvalRequired: data.get("approval") === "on",
           reason: String(data.get("reason") ?? "").trim(),
           metadata,
-          groupIds: String(data.get("groups") ?? "")
-            .split(/\s+/)
-            .filter(Boolean),
-          profileRevisionIds: String(data.get("profile") ?? "")
-            .split(/\s+/)
-            .filter(Boolean),
+          groupIds: groupIds.filter(Boolean),
+          profileRevisionIds: profileRevisionIds.filter(Boolean),
         });
         validateEnrollment(CreateProvisioningTokenRequestSchema, request);
         setCaptured(request);
@@ -237,23 +243,36 @@ export function IssueProvisioningToken({
               options={[
                 { value: "", label: "Unassigned" },
                 { value: "ownerText", label: "Owner name" },
-                { value: "ownerPrincipalId", label: "Owner account ID" },
+                { value: "ownerPrincipalId", label: "Owner account" },
               ]}
             />
-            {ownerKind ? (
+            {ownerKind === "ownerPrincipalId" ? (
+              <AccountPicker
+                label="Owner account"
+                value={ownerAccount}
+                onChange={setOwnerAccount}
+                disabled={busy || captured !== null || completed}
+              />
+            ) : ownerKind === "ownerText" ? (
               <label className="grid gap-1.5 text-sm font-medium">
-                Owner
+                Owner name
                 <Input name="owner" required />
               </label>
             ) : null}
-            <label className="grid gap-1.5 text-sm font-medium">
-              Group IDs (space separated)
-              <Textarea name="groups" spellCheck={false} />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Profile revision ID
-              <Input name="profile" spellCheck={false} />
-            </label>
+            <MultiPicker
+              label="Groups"
+              values={groupIds}
+              onChange={setGroupIds}
+              picker={groupPicker}
+              disabled={busy || captured !== null || completed}
+            />
+            <MultiPicker
+              label="Profile revisions"
+              values={profileRevisionIds}
+              onChange={setProfileRevisionIds}
+              picker={profileRevisionPicker}
+              disabled={busy || captured !== null || completed}
+            />
             <label className="grid gap-1.5 text-sm font-medium">
               Custom attributes (JSON)
               <Textarea

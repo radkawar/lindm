@@ -313,6 +313,51 @@ func (q *Queries) ListProfileResources(ctx context.Context, revisionID uuid.UUID
 	return items, nil
 }
 
+const listProfileRevisions = `-- name: ListProfileRevisions :many
+SELECT id, profile_id, revision_number, name, description, resource_count,
+       spec_digest, actor_id, published_at
+FROM profile_revisions
+WHERE profile_id = $1
+  AND ($2::bigint = 0 OR revision_number < $2::bigint)
+ORDER BY revision_number DESC LIMIT $3::integer
+`
+
+type ListProfileRevisionsParams struct {
+	ProfileID      uuid.UUID
+	BeforeRevision int64
+	PageLimit      int32
+}
+
+func (q *Queries) ListProfileRevisions(ctx context.Context, arg ListProfileRevisionsParams) ([]ProfileRevision, error) {
+	rows, err := q.db.Query(ctx, listProfileRevisions, arg.ProfileID, arg.BeforeRevision, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProfileRevision{}
+	for rows.Next() {
+		var i ProfileRevision
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProfileID,
+			&i.RevisionNumber,
+			&i.Name,
+			&i.Description,
+			&i.ResourceCount,
+			&i.SpecDigest,
+			&i.ActorID,
+			&i.PublishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockProfile = `-- name: LockProfile :one
 SELECT id, head_revision_id, created_at FROM profiles WHERE id = $1 FOR UPDATE
 `

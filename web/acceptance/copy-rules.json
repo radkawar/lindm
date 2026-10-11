@@ -29,6 +29,7 @@
       "flags": ""
     }
   ],
+  "idInputPattern": { "pattern": "\\b(?:ids?|uuids?)\\b", "flags": "i" },
   "excludedRegions": [
     "[data-slot=\"technical-details\"]",
     "[data-slot=\"support-details\"]",

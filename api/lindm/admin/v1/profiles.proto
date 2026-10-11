@@ -83,3 +83,17 @@ message ListProfilesResponse {
   repeated ProfileSummary profiles = 1;
   string next_page_token = 2;
 }
+
+message ListProfileRevisionsRequest {
+  string profile_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 3 [(buf.validate.field).string.max_len = 512];
+}
+
+message ListProfileRevisionsResponse {
+  repeated ProfileSummary revisions = 1;
+  string next_page_token = 2;
+}

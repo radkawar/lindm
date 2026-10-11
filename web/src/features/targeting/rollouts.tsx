@@ -27,7 +27,7 @@ import { rolloutsQueryOptions, targetAssignmentsQueryOptions } from "./queries";
 import { ListStatus, TargetPagination } from "./list";
 import { TargetPreviewView } from "./preview";
 
-export function RolloutsView() {
+export function RolloutsView({ initialDevice = "" }: { initialDevice?: string }) {
   const principal = usePrincipal();
   return (
     <section className="grid min-w-0 gap-6">
@@ -35,7 +35,7 @@ export function RolloutsView() {
         title="Rollouts"
         description="Assign profiles to devices and groups, and roll them out in stages."
       />
-      <TargetPreviewView />
+      <TargetPreviewView key={initialDevice} initialDevice={initialDevice} />
       {canPermission(principal, "resources.assign", true) ? (
         <>
           <Assignments />

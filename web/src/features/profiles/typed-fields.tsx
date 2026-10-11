@@ -12,9 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { SearchPicker } from "@/components/ui/search-picker";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
 import { object, sameReference } from "./resource-draft";
+import { useProfilePickers } from "./field-pickers";
 
 const labels: Record<string, string> = {
   nativeName: "Package name",
@@ -23,8 +26,32 @@ const labels: Record<string, string> = {
   runtime: "Running state",
   enablement: "Start at boot",
   unit: "Unit name",
-  gid: "Group ID",
-  uid: "User ID",
+  gid: "GID",
+  uid: "UID",
+  secretId: "Secret",
+  deviceId: "Device",
+  personId: "Person",
+  principalId: "Account",
+  approvedRootId: "Approved home folder root",
+  subjectBindingId: "Secret subject",
+  artifactId: "Artifact",
+  catalogId: "Nix catalog entry",
+  approvedInputId: "Approved Nix input",
+  approvedTokenId: "Approved security token",
+  credentialId: "Certificate credential",
+  issuerProfileId: "Certificate issuer",
+  connectionUuid: "Network connection",
+  enrollmentGeneration: "Device enrollment",
+  uidGeneration: "Local account incarnation",
+  assignmentId: "Person assignment",
+  ruleId: "Rule reference",
+  zoneId: "Zone reference",
+  repositoryId: "Repository reference",
+  hardwareId: "Hardware match",
+  osId: "Operating system",
+  appId: "Application name",
+  nativeId: "Native name",
+  collectionId: "Collection name",
   any: "Any approved version",
   exact: "Pin exact version",
   deb: "DEB version",
@@ -201,11 +228,25 @@ function TypedField({
   references: ReferenceChoice[];
   disabled: boolean;
 }) {
+  const pickers = useProfilePickers();
+  const Picker =
+    field.jsonName === "secretId"
+      ? pickers.secret
+      : field.jsonName === "deviceId"
+        ? pickers.device
+        : ["personId", "principalId"].includes(field.jsonName)
+          ? pickers.account
+          : undefined;
   const label =
     field.jsonName === "mode" && field.fieldKind === "scalar"
       ? "Permissions (octal)"
       : fieldLabel(field.jsonName);
   const rules = getOption(field, validationRules);
+  const recordReference =
+    field.fieldKind === "scalar" &&
+    rules.type.case === "string" &&
+    ["uuid", "tuuid"].includes(rules.type.value.wellKnown.case ?? "");
+  const generatedReference = ["ruleId", "zoneId", "repositoryId"].includes(field.jsonName);
   const optional =
     !field.oneof && (field.fieldKind === "message" ? !rules.required : field.proto.proto3Optional);
   if (field.fieldKind === "list") {
@@ -287,7 +328,7 @@ function TypedField({
   return (
     <div className="grid min-w-0 gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label htmlFor={id}>{label}</Label>
+        {Picker ? null : <Label htmlFor={id}>{label}</Label>}
         {optional ? (
           <Button
             type="button"
@@ -363,6 +404,13 @@ function TypedField({
           ]}
           onValueChange={(next) => onChange(next === "true")}
         />
+      ) : Picker ? (
+        <Picker label={label} value={String(value ?? "")} onChange={onChange} disabled={disabled} />
+      ) : recordReference && generatedReference ? (
+        <>
+          <p className="text-xs text-muted-foreground">Created automatically for this setting.</p>
+          <TechnicalDetails items={[{ label, value: String(value ?? "") }]} />
+        </>
       ) : field.scalar === ScalarType.BYTES && field.jsonName === "content" ? (
         <FileContent id={id} value={String(value ?? "")} onChange={onChange} disabled={disabled} />
       ) : (
@@ -374,7 +422,11 @@ function TypedField({
               ? value.toString(8)
               : String(value ?? "")
           }
-          readOnly={["ruleId", "zoneId", "repositoryId"].includes(field.jsonName)}
+          aria-describedby={
+            recordReference || ["uid", "gid"].includes(field.jsonName)
+              ? `${id}-description`
+              : undefined
+          }
           type={
             field.scalar === ScalarType.STRING ||
             field.scalar === ScalarType.BYTES ||
@@ -404,6 +456,19 @@ function TypedField({
           }}
         />
       )}
+      {recordReference && !generatedReference && !Picker ? (
+        <p id={`${id}-description`} className="text-xs text-muted-foreground">
+          Copy this reference from the system that issued it; the server does not provide a
+          selection catalog.
+        </p>
+      ) : null}
+      {["uid", "gid"].includes(field.jsonName) ? (
+        <p id={`${id}-description`} className="text-xs text-muted-foreground">
+          {field.jsonName === "uid"
+            ? "Numeric user ID on the device"
+            : "Numeric group ID on the device"}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -417,6 +482,38 @@ function MessageInput({
   references,
   disabled,
 }: Props & { label: string }) {
+  const pickers = useProfilePickers();
+  const BindingPicker =
+    schema.typeName === "lindm.resource.v1.SecretRef"
+      ? pickers.secretReference
+      : schema.typeName === "lindm.resource.v1.DeviceBinding"
+        ? pickers.deviceBinding
+        : undefined;
+  if (BindingPicker) {
+    return (
+      <div className="grid gap-3">
+        <BindingPicker
+          label={label}
+          value={JSON.stringify(value)}
+          disabled={disabled}
+          onChange={(next) => onChange(next === "" ? {} : object(JSON.parse(next)))}
+        />
+        {schema.typeName === "lindm.resource.v1.SecretRef" && value.secretId ? (
+          <TypedFields
+            schema={{
+              ...schema,
+              fields: schema.fields.filter((field) => field.jsonName === "version"),
+            }}
+            value={value}
+            onChange={onChange}
+            id={id}
+            references={references}
+            disabled={disabled}
+          />
+        ) : null}
+      </div>
+    );
+  }
   if (schema.typeName === "lindm.resource.v1.ResourceRef") {
     const allowed = id.endsWith("-repository")
       ? references.filter(
@@ -432,38 +529,27 @@ function MessageInput({
     const repository = id.endsWith("-repository");
     return (
       <div className="grid gap-1.5">
-        <SelectField
-          id={id}
-          aria-label={label}
+        <SearchPicker
+          label={label}
           disabled={disabled}
-          value={current < 0 ? "" : String(current)}
-          options={[
-            {
-              value: "",
-              label: value.canonicalKey
-                ? `Current: ${String(value.canonicalKey)}`
-                : repository
-                  ? "Choose a repository in this profile"
-                  : "Choose a setting in this profile",
-            },
-            ...choices,
-          ]}
-          onValueChange={(next) => {
-            if (next !== "" && allowed[Number(next)]) onChange({ ...allowed[Number(next)].ref });
+          value={current < 0 ? (value.canonicalKey ? "unavailable" : "") : String(current)}
+          options={choices}
+          onChange={(next) => {
+            if (next === "") onChange({});
+            else if (allowed[Number(next)]) onChange({ ...allowed[Number(next)].ref });
           }}
         />
+        <TechnicalDetails
+          items={[{ label: "Current reference", value: String(value.canonicalKey ?? "") }]}
+        />
         {repository ? (
-          // Approved package sources are provisioned root-locally on each device.
-          // Their identity is apt/<repository ID> or rpm/<repository ID>.
-          <>
-            <Label htmlFor={`${id}-approved`}>
-              Approved source (apt/ or rpm/ followed by the repository ID)
-            </Label>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${id}-approved`}>Approved source</Label>
             <Input
               id={`${id}-approved`}
               disabled={disabled}
               spellCheck={false}
-              placeholder="apt/00000000-0000-0000-0000-000000000000"
+              aria-describedby={`${id}-approved-description`}
               value={current < 0 ? String(value.canonicalKey ?? "") : ""}
               onChange={(event) =>
                 onChange(
@@ -476,7 +562,11 @@ function MessageInput({
                 )
               }
             />
-          </>
+            <p id={`${id}-approved-description`} className="text-xs text-muted-foreground">
+              Copy the full apt/ or rpm/ reference from the device's approved source configuration;
+              the server does not provide a selection catalog.
+            </p>
+          </div>
         ) : allowed.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             Add the setting this depends on to this profile first.

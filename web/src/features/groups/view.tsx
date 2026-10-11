@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { Textarea } from "@/components/ui/textarea";
+import { MultiPicker, type PickerSlot } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -43,7 +43,7 @@ export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   });
 }
 
-export function GroupsView() {
+export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const [createGeneration, setCreateGeneration] = useState(0);
@@ -56,6 +56,7 @@ export function GroupsView() {
       />
       <GroupEditor
         key={createGeneration}
+        devicePicker={devicePicker}
         onCreated={() => setCreateGeneration((value) => value + 1)}
       />
       <Button
@@ -78,7 +79,11 @@ export function GroupsView() {
         </RpcError>
       ) : null}
       {list.data?.groups.map((group) => (
-        <GroupEditor key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`} group={group} />
+        <GroupEditor
+          key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`}
+          group={group}
+          devicePicker={devicePicker}
+        />
       ))}
       {!list.error && list.data?.groups.length === 0 ? (
         <EmptyState title="No device groups yet" description="Create one above." />
@@ -103,12 +108,20 @@ export function GroupsView() {
   );
 }
 
-function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: () => void }) {
+function GroupEditor({
+  group,
+  onCreated,
+  devicePicker,
+}: {
+  group?: DeviceGroup;
+  onCreated?: () => void;
+  devicePicker: PickerSlot;
+}) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const [groupId] = useState(() => group?.id ?? crypto.randomUUID());
   const [name, setName] = useState(group?.name ?? "");
-  const [members, setMembers] = useState(group?.deviceIds.join("\n") ?? "");
+  const [members, setMembers] = useState(group?.deviceIds ?? []);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -133,7 +146,7 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
             groupId,
             name,
             reason,
-            deviceIds: members.split(/\s+/).filter(Boolean),
+            deviceIds: members.filter(Boolean),
           }));
     const validation =
       exact.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
@@ -199,16 +212,13 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <label className="grid gap-2 text-sm font-medium">
-        Member device IDs (one per line or space separated)
-        <Textarea
-          className="min-h-28 font-mono text-xs"
-          aria-label="Member device IDs"
-          value={members}
-          disabled={busy || attempt !== null}
-          onChange={(event) => setMembers(event.target.value)}
-        />
-      </label>
+      <MultiPicker
+        label="Member devices"
+        values={members}
+        onChange={setMembers}
+        picker={devicePicker}
+        disabled={busy || attempt !== null}
+      />
       <label className="grid gap-2 text-sm font-medium">
         Reason
         <Input

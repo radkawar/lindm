@@ -3,21 +3,21 @@ import {
   fromJsonString,
   toJsonString,
   type DescMessage,
+  type JsonObject,
   type MessageShape,
 } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useId, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { ProtobufFields } from "@/components/ui/protobuf-fields";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { TargetFields } from "./fields";
+import { useTargetPickers } from "./pickers";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
 type Attempt = {
@@ -56,8 +56,9 @@ export function TargetMutation<S extends DescMessage>({
   onAccepted?: () => void;
 }) {
   const lifetime = useAuthLifetime();
+  const pickers = useTargetPickers();
   const client = useQueryClient();
-  const id = useId();
+  const [formGeneration, setFormGeneration] = useState(0);
   const attempt = useSyncExternalStore(subscribe, () => attempts.get(formKey));
   const [document, setDocument] = useState(() =>
     toJsonString(schema, initial(), { prettySpaces: 2 }),
@@ -124,20 +125,16 @@ export function TargetMutation<S extends DescMessage>({
         }
       }}
     >
-      <Label htmlFor={id}>{title} (JSON)</Label>
-      <p className="text-sm text-muted-foreground">
-        Include a reason. Once sent, edits are locked.
-      </p>
-      <Textarea
-        id={id}
-        rows={12}
-        className="font-mono text-xs"
-        spellCheck={false}
-        value={attempt?.document ?? document}
-        readOnly={!!attempt}
-        onChange={(event) => setDocument(event.target.value)}
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-sm text-muted-foreground">Once sent, edits are locked.</p>
+      <TargetFields
+        key={formGeneration}
+        schema={schema}
+        value={JSON.parse(attempt?.document ?? document) as JsonObject}
+        onChange={(value) => setDocument(JSON.stringify(value))}
+        pickers={pickers}
+        disabled={!!attempt}
       />
-      <ProtobufFields schema={schema} />
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -169,6 +166,7 @@ export function TargetMutation<S extends DescMessage>({
             onClick={() => {
               // A new attempt must have a distinct request ID, never silently reuse the frozen identity.
               setDocument(toJsonString(schema, initial(), { prettySpaces: 2 }));
+              setFormGeneration((current) => current + 1);
               attempts.delete(formKey);
               notify();
               setError("");

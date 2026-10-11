@@ -74,7 +74,7 @@ export function CommandPalette({
       >
         <Command>
           <CommandInput
-            placeholder="Search pages, device names, or IDs…"
+            placeholder="Search pages or device names…"
             aria-label="Search pages and devices"
           />
           <CommandList>

@@ -171,6 +171,7 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                 <SecretReveal
                   key={`${secret.secretId}:${version}`}
                   secretId={secret.secretId}
+                  secretName={secret.displayName}
                   version={version}
                 />
               </CardContent>

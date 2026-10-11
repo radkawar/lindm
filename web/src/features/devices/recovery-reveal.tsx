@@ -19,7 +19,16 @@ import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { validateInventory } from "./validation";
 
-export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; actionId: string }) {
+export function RecoveryKeyReveal({
+  deviceId,
+  deviceName,
+  actionId,
+}: {
+  deviceId: string;
+  deviceName: string;
+  actionId: string;
+}) {
+  const confirmationName = deviceName.trim() || deviceId;
   const lifetime = useAuthLifetime();
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -72,7 +81,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
 
   function capture() {
     if (!request.current) {
-      if (confirmation !== deviceId) throw new Error("Type the device ID exactly to confirm.");
+      if (confirmation !== confirmationName)
+        throw new Error("Type the device name exactly as shown to confirm.");
       const payload = create(RevealRecoveryKeyRequestSchema, {
         requestId: newRequestId(),
         deviceId,
@@ -215,10 +225,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
       />
-      <Label htmlFor={`reveal-confirmation-${actionId}`}>Type the device ID to confirm</Label>
-      <p className="break-all text-xs text-muted-foreground">
-        <code className="font-mono">{deviceId}</code>
-      </p>
+      <Label htmlFor={`reveal-confirmation-${actionId}`}>Type the device name to confirm</Label>
+      <p className="break-all text-sm">{confirmationName}</p>
       <Input
         id={`reveal-confirmation-${actionId}`}
         value={confirmation}
@@ -226,7 +234,12 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
         readOnly={busy || request.current !== null}
         autoComplete="off"
       />
-      <TechnicalDetails items={[{ label: "Approval ID", value: approvalId }]} />
+      <TechnicalDetails
+        items={[
+          { label: "Device ID", value: deviceId },
+          { label: "Approval ID", value: approvalId },
+        ]}
+      />
       {approvalState !== null ? (
         <p>
           Approval: {ApprovalState[approvalState]?.toLowerCase()}.{" "}

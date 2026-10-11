@@ -28,7 +28,16 @@ const approvalStateLabels: Partial<Record<ApprovalState, string>> = {
   [ApprovalState.EXPIRED]: "expired",
 };
 
-export function SecretReveal({ secretId, version }: { secretId: string; version: bigint }) {
+export function SecretReveal({
+  secretId,
+  secretName,
+  version,
+}: {
+  secretId: string;
+  secretName: string;
+  version: bigint;
+}) {
+  const confirmationName = secretName.trim() || secretId;
   const lifetime = useAuthLifetime();
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -82,8 +91,8 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
 
   function capture() {
     if (!request.current) {
-      if (confirmation !== secretId)
-        throw new Error("Type the secret ID exactly as shown to confirm.");
+      if (confirmation !== confirmationName)
+        throw new Error("Type the secret name exactly as shown to confirm.");
       const payload = create(RevealSecretRequestSchema, {
         requestId: newRequestId(),
         secretId,
@@ -225,14 +234,14 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
       />
-      <TechnicalDetails items={[]}>
-        <div className="mt-2 grid gap-2">
-          <Label htmlFor={`${idPrefix}-approval`}>Approval ID</Label>
-          <Input id={`${idPrefix}-approval`} value={approvalId} readOnly autoComplete="off" />
-        </div>
-      </TechnicalDetails>
+      <TechnicalDetails
+        items={[
+          { label: "Secret ID", value: secretId },
+          { label: "Approval ID", value: approvalId },
+        ]}
+      />
       <Label htmlFor={`${idPrefix}-confirmation`}>
-        Type <code className="break-all font-mono">{secretId}</code> to confirm
+        Type <span className="break-all">{confirmationName}</span> to confirm
       </Label>
       <Input
         id={`${idPrefix}-confirmation`}

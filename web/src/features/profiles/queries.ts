@@ -40,3 +40,24 @@ export function profileRevisionQueryOptions(
     },
   });
 }
+
+export function profileRevisionsQueryOptions(
+  lifetime: AuthLifetime,
+  profileId: string,
+  pageToken: string,
+) {
+  return queryOptions({
+    queryKey: ["profile-revisions", lifetime.generation, profileId, pageToken] as const,
+    meta: { authGeneration: lifetime.generation },
+    enabled: !!profileId,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listProfileRevisions(
+        { profileId, pageSize: 100, pageToken },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}

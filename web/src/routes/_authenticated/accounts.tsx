@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Accounts } from "@/features/auth/accounts";
+import { DevicePicker } from "@/features/devices/picker";
+import { GroupPicker } from "@/features/groups/picker";
 import { canPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/accounts")({
@@ -7,5 +9,9 @@ export const Route = createFileRoute("/_authenticated/accounts")({
     if (!canPermission(context.principal, "accounts.manage"))
       throw new Error("Account management is not authorized.");
   },
-  component: Accounts,
+  component: AccountsPage,
 });
+
+function AccountsPage() {
+  return <Accounts devicePicker={DevicePicker} groupPicker={GroupPicker} />;
+}

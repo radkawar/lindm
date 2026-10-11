@@ -35,6 +35,14 @@ FROM profiles p JOIN profile_revisions r ON r.id = p.head_revision_id AND r.prof
 WHERE p.id > sqlc.arg(after_id)::uuid
 ORDER BY p.id LIMIT sqlc.arg(page_limit)::integer;
 
+-- name: ListProfileRevisions :many
+SELECT id, profile_id, revision_number, name, description, resource_count,
+       spec_digest, actor_id, published_at
+FROM profile_revisions
+WHERE profile_id = sqlc.arg(profile_id)
+  AND (sqlc.arg(before_revision)::bigint = 0 OR revision_number < sqlc.arg(before_revision)::bigint)
+ORDER BY revision_number DESC LIMIT sqlc.arg(page_limit)::integer;
+
 -- name: InsertProfileRevision :exec
 INSERT INTO profile_revisions (id, profile_id, revision_number, name, description,
     resource_count, spec_digest, actor_id, published_at)

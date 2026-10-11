@@ -33,6 +33,8 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
   const [failure, setFailure] = useState<RpcFailure | null>(null);
   const held = device.lifecycleState === DeviceState.RECOVERY_HOLD;
   const allowed = canPermission(principal, "device.revoke") && !principal.serviceAccount;
+  const hostname = device.hostname.trim();
+  const confirmationName = hostname || device.id;
 
   async function requestApproval(data: FormData) {
     if (inFlight.current || lifetime.signal.aborted || !allowed) return;
@@ -41,8 +43,10 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
     setFailure(null);
     let submitted = false;
     try {
-      if (!captured && String(data.get("confirmation") ?? "").trim() !== device.id)
-        throw new Error("Type the device ID exactly as shown to confirm.");
+      if (!captured && String(data.get("confirmation") ?? "").trim() !== confirmationName)
+        throw new Error(
+          `Type ${hostname ? "the hostname" : "the value"} exactly as shown to confirm.`,
+        );
       const request =
         captured ??
         create(CreateRecoveryEnrollmentGrantRequestSchema, {
@@ -94,10 +98,8 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
             Once used, the device's old credentials stop working. Clones must enroll as new devices.
           </AlertDescription>
         </Alert>
-        <p className="break-all text-sm">Device: {device.hostname.trim() || "Unnamed device"}</p>
-        <p className="break-all text-sm">
-          Device ID (needed to confirm): <code className="font-mono">{device.id}</code>
-        </p>
+        <p className="break-all text-sm">Device: {hostname || "Unnamed device"}</p>
+        <TechnicalDetails items={[{ label: "Device ID", value: device.id }]} />
         {allowed ? (
           <form
             className="grid gap-3"
@@ -108,7 +110,8 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
           >
             <fieldset className="grid gap-3" disabled={busy || captured !== null || !!approvalId}>
               <label className="grid gap-1.5 text-sm font-medium">
-                Type the device ID to confirm
+                Type {hostname ? "hostname " : ""}
+                <code className="font-mono">{confirmationName}</code> to confirm
                 <Input name="confirmation" required autoComplete="off" />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">

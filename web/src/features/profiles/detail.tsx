@@ -12,8 +12,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
@@ -33,6 +31,7 @@ import {
 } from "./model";
 import { profileRevisionQueryOptions } from "./queries";
 import type { ProfileDetailSearch } from "./search";
+import { ProfileRevisionPicker } from "./picker";
 
 type EditorSource = {
   draft: DraftSpec;
@@ -133,7 +132,7 @@ export function ProfileDetailView({
       <Card>
         <CardHeader>
           <CardTitle>Find a revision</CardTitle>
-          <CardDescription>Open an older version by its revision ID.</CardDescription>
+          <CardDescription>Choose a saved version to inspect.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -142,7 +141,7 @@ export function ProfileDetailView({
               event.preventDefault();
               const canonical = usableUuid(lookup);
               if (canonical === null) {
-                setLookupError("Enter a valid revision ID.");
+                setLookupError("Choose a revision.");
                 return;
               }
               setLookupError("");
@@ -150,13 +149,11 @@ export function ProfileDetailView({
             }}
           >
             <div className="grid min-w-0 grow basis-64 gap-1.5">
-              <Label htmlFor="exact-revision">Revision ID</Label>
-              <Input
-                id="exact-revision"
+              <ProfileRevisionPicker
+                label="Saved revision"
+                profileId={profileId}
                 value={lookup}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => setLookup(event.target.value)}
+                onChange={setLookup}
               />
             </div>
             <Button type="submit">Open revision</Button>

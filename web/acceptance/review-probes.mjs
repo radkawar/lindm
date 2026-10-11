@@ -199,6 +199,7 @@ export function installProbes(rules) {
       regex: new RegExp(item.pattern, item.flags ?? "i"),
     })),
   ];
+  const idInputPattern = new RegExp(rules.idInputPattern.pattern, rules.idInputPattern.flags);
 
   window.__review = {
     describe,
@@ -336,6 +337,41 @@ export function installProbes(rules) {
         for (const attribute of ["placeholder", "aria-label", "title"]) {
           const value = node.getAttribute(attribute);
           if (value) inspect(value, node, attribute);
+        }
+      }
+      return findings;
+    },
+    idInputs() {
+      const findings = [];
+      const labels = [...document.querySelectorAll("label")];
+      for (const node of document.querySelectorAll('input,textarea,select,[role="combobox"]')) {
+        if (!rendered(node)) continue;
+        if (
+          node.closest('[data-slot="technical-details"]') &&
+          (node.readOnly || node.getAttribute("aria-readonly") === "true")
+        )
+          continue;
+        const sources = [
+          node.getAttribute("aria-label") ?? "",
+          ...(node.getAttribute("aria-labelledby") ?? "")
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((id) => document.getElementById(id)?.textContent ?? ""),
+          ...labels
+            .filter((label) => (node.id && label.htmlFor === node.id) || label.contains(node))
+            .map((label) => label.textContent ?? ""),
+          node.getAttribute("placeholder") ?? "",
+        ];
+        const prompt = sources.find((value) => {
+          idInputPattern.lastIndex = 0;
+          return idInputPattern.test(value);
+        });
+        if (prompt) {
+          findings.push({
+            check: "id-input",
+            message: `Input asks for an ID: "${normalize(prompt)}". Use a searchable picker.`,
+            elements: [describe(node)],
+          });
         }
       }
       return findings;
@@ -500,6 +536,21 @@ export function installProbes(rules) {
           .filter(rendered)
           .map((node) => normalize(node.innerText)),
       };
+    },
+    // A rendered form needs a submit control: shadcn/Base UI buttons default to
+    // type="button", so a form without an explicit submit button never submits.
+    forms() {
+      return [...document.querySelectorAll("form")]
+        .filter(
+          (form) =>
+            rendered(form) &&
+            !form.querySelector('button[type="submit"],input[type="submit"],input[type="image"]'),
+        )
+        .map((form) => ({
+          check: "form-submit",
+          message: "Form has no submit button",
+          elements: [describe(form)],
+        }));
     },
     // A named button must be visible; when disabled it must reference a visible reason.
     expectButton(name) {

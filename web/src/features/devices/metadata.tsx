@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
@@ -28,9 +29,11 @@ import { validateInventory } from "./validation";
 export function DeviceMetadataCard({
   deviceId,
   metadata,
+  accountPicker,
 }: {
   deviceId: string;
   metadata: DeviceMetadata | undefined;
+  accountPicker?: PickerSlot;
 }) {
   const principal = usePrincipal();
   const [editing, setEditing] = useState<DeviceMetadata | null>(null);
@@ -77,7 +80,12 @@ export function DeviceMetadataCard({
         </dl>
         {canPermission(principal, "inventory.manage") ? (
           editing ? (
-            <MetadataForm deviceId={deviceId} metadata={editing} onClose={() => setEditing(null)} />
+            <MetadataForm
+              deviceId={deviceId}
+              metadata={editing}
+              accountPicker={accountPicker}
+              onClose={() => setEditing(null)}
+            />
           ) : (
             <Button className="w-fit" onClick={() => setEditing(value)}>
               Edit
@@ -97,10 +105,12 @@ function MetadataForm({
   deviceId,
   metadata,
   onClose,
+  accountPicker,
 }: {
   deviceId: string;
   metadata: DeviceMetadata;
   onClose: () => void;
+  accountPicker?: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -108,6 +118,9 @@ function MetadataForm({
   const queryClient = useQueryClient();
   const [attributes, setAttributes] = useState(metadata.attributes);
   const [ownerKind, setOwnerKind] = useState(metadata.owner.case ?? "");
+  const [ownerPrincipalId, setOwnerPrincipalId] = useState(
+    metadata.owner.case === "ownerPrincipalId" ? metadata.owner.value : "",
+  );
   const [captured, setCaptured] = useState<SetDeviceMetadataRequest | null>(null);
   const [inputError, setInputError] = useState("");
   const inFlight = useRef(false);
@@ -159,7 +172,7 @@ function MetadataForm({
                 : metadata.labels,
               owner:
                 ownerKind === "ownerPrincipalId"
-                  ? { case: "ownerPrincipalId", value: ownerText }
+                  ? { case: "ownerPrincipalId", value: ownerPrincipalId }
                   : ownerKind === "ownerText"
                     ? { case: "ownerText", value: ownerText }
                     : undefined,
@@ -193,19 +206,28 @@ function MetadataForm({
             options={[
               { value: "", label: "Unassigned" },
               { value: "ownerText", label: "Name" },
-              { value: "ownerPrincipalId", label: "Console user ID" },
+              { value: "ownerPrincipalId", label: "Console account" },
             ]}
           />
         </div>
-        {ownerKind ? (
+        {ownerKind === "ownerPrincipalId" ? (
+          accountPicker ? (
+            accountPicker({
+              label: "Owner account",
+              value: ownerPrincipalId,
+              onChange: setOwnerPrincipalId,
+              disabled: captured !== null,
+            })
+          ) : (
+            <p role="status">Account selection is unavailable.</p>
+          )
+        ) : ownerKind === "ownerText" ? (
           <div className="grid gap-1.5">
-            <Label htmlFor="metadata-owner">
-              Owner {ownerKind === "ownerPrincipalId" ? "user ID" : "name"}
-            </Label>
+            <Label htmlFor="metadata-owner">Owner name</Label>
             <Input
               id="metadata-owner"
               name="owner"
-              defaultValue={metadata.owner.value ?? ""}
+              defaultValue={metadata.owner.case === "ownerText" ? metadata.owner.value : ""}
               required
             />
           </div>
@@ -246,7 +268,14 @@ function MetadataForm({
       ) : null}
       {mutation.isSuccess ? <p role="status">Saved.</p> : null}
       <div className="flex gap-2">
-        <Button type="submit" disabled={mutation.isPending || mutation.isSuccess}>
+        <Button
+          type="submit"
+          disabled={
+            mutation.isPending ||
+            mutation.isSuccess ||
+            (!captured && ownerKind === "ownerPrincipalId" && !accountPicker)
+          }
+        >
           {mutation.isPending ? "Saving…" : captured ? "Retry" : "Save"}
         </Button>
         <Button

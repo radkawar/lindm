@@ -420,6 +420,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.PublishProfileRevisionRequest{},
 		&adminv1.GetProfileRevisionRequest{},
 		&adminv1.ListProfilesRequest{},
+		&adminv1.ListProfileRevisionsRequest{},
 		&adminv1.SetResourceAssignmentRequest{},
 		&adminv1.GetDeviceResourceStateRequest{},
 		&adminv1.PutDynamicGroupRequest{},
