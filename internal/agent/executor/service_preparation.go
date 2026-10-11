@@ -21,7 +21,7 @@ import (
 
 // These two helpers take ownership of the caller's authority lock. Admission is
 // durable before opening the provider, so a killed RPC cannot orphan its stage.
-func (s *Service) admitResourcePreparationLocked(ctx context.Context, loaded *bound, intent *agentv1.ResourceExecutionIntent, envelope []byte) (*agentv1.PrepareResourceExecutionResponse, error) {
+func (s *Service) admitResourcePreparationLocked(ctx context.Context, loaded *bound, intent *agentv1.ResourceExecutionIntent, envelope []byte, sealed [][]byte) (*agentv1.PrepareResourceExecutionResponse, error) {
 	if !s.now().Before(intent.GetPreparation().GetDeadline().AsTime()) {
 		s.mu.Unlock()
 		return nil, errResourceExpired
@@ -32,6 +32,9 @@ func (s *Service) admitResourcePreparationLocked(ctx context.Context, loaded *bo
 		AcceptedRoot: proto.CloneOf(loaded.execution.root), AcceptedDelegationEnvelope: bytes.Clone(loaded.execution.state.GetDelegationEnvelope()),
 		AcceptedAt: protoTimestamp(s.now()), State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING,
 		Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE,
+	}
+	for _, delivery := range sealed {
+		record.SealedSecrets = append(record.SealedSecrets, bytes.Clone(delivery))
 	}
 	if err := s.verifyResourceRecord(ctx, loaded, record); err != nil {
 		s.mu.Unlock()
@@ -76,7 +79,7 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 	}()
 	defer cancel()
 	defer stop()
-	provider, operationErr := s.openResource(ctx, record.GetIntent())
+	provider, operationErr := s.openResource(ctx, record.GetIntent(), s.resourceSecrets(record.GetIntent(), record.GetSealedSecrets()))
 	var plan *resourcev1.ResourcePlan
 	var verification *resourcev1.ResourceVerification
 	if operationErr == nil {

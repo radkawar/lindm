@@ -19,6 +19,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/pki"
+	"lindm/internal/secretseal"
 	"lindm/internal/trust"
 )
 
@@ -37,10 +38,13 @@ type bound struct {
 	admission      time.Time
 	identityKey    ed25519.PrivateKey
 	identityPublic ed25519.PublicKey
-	cert           *x509.Certificate
-	renewal        *boundRenewal
-	prior          *boundPrior
-	execution      boundExecutionTrust
+	// encryptionPublic is the raw X25519 recipient key of state's scalar, nil
+	// only for journals created before secret delivery.
+	encryptionPublic []byte
+	cert             *x509.Certificate
+	renewal          *boundRenewal
+	prior            *boundPrior
+	execution        boundExecutionTrust
 }
 
 type boundRenewal struct {
@@ -55,12 +59,13 @@ type boundRenewal struct {
 }
 
 type boundPrior struct {
-	key         ed25519.PrivateKey
-	public      ed25519.PublicKey
-	cert        *x509.Certificate
-	pem         []byte
-	retain      time.Time
-	fingerprint [32]byte
+	key              ed25519.PrivateKey
+	public           ed25519.PublicKey
+	cert             *x509.Certificate
+	pem              []byte
+	retain           time.Time
+	fingerprint      [32]byte
+	encryptionPublic []byte
 }
 
 func bind(ctx context.Context, authority *trust.Authority, state *agentv1.ExecutorJournalState, now time.Time) (*bound, error) {
@@ -108,12 +113,17 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 	if err != nil {
 		return nil, err
 	}
+	encryptionPublic, err := recipientPublic(state.GetEncryptionPrivateKey())
+	if err != nil {
+		return nil, err
+	}
 	out := &bound{
-		state:          state,
-		bootstrap:      verified,
-		admission:      admission,
-		identityKey:    key,
-		identityPublic: public,
+		state:            state,
+		bootstrap:        verified,
+		admission:        admission,
+		identityKey:      key,
+		identityPublic:   public,
+		encryptionPublic: encryptionPublic,
 	}
 	if len(state.GetCertificatePem()) > 0 {
 		device, err := canonicalUUID(state.GetDeviceId())
@@ -129,6 +139,9 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 			return nil, err
 		}
 		out.cert = cert
+	}
+	if acknowledged := state.GetEncryptionKeyAcknowledgedSha256(); len(acknowledged) > 0 && (out.cert == nil || encryptionPublic == nil || !bytes.Equal(acknowledged, secretseal.KeyID(encryptionPublic))) {
+		return nil, errKey
 	}
 	if receipt := state.GetRenewalReceipt(); receipt != nil {
 		if out.cert == nil || !bytes.Equal(receipt.GetCertificateSha256(), fingerprint(out.cert)) {
@@ -152,6 +165,9 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 			return nil, err
 		}
 		if _, err := parseCSR(pending.GetCsrPem(), nextPublic); err != nil {
+			return nil, err
+		}
+		if _, err := recipientPublic(pending.GetEncryptionPrivateKey()); err != nil {
 			return nil, err
 		}
 		if err := verifyRenewalProofs(ctx, authority, state, pending, public, nextPublic, out.cert); err != nil {
@@ -181,9 +197,14 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 		if err != nil || prior.GetRetainUntil() == nil {
 			return nil, errCert
 		}
+		priorEncryption, err := recipientPublic(prior.GetEncryptionPrivateKey())
+		if err != nil {
+			return nil, err
+		}
 		out.prior = &boundPrior{
 			key: priorKey, public: priorPublic, cert: cert, pem: bytes.Clone(prior.GetCertificatePem()),
 			retain: prior.GetRetainUntil().AsTime(), fingerprint: sha256.Sum256(cert.Raw),
+			encryptionPublic: priorEncryption,
 		}
 	}
 	if pending := state.GetPendingSession(); pending != nil {
@@ -246,6 +267,19 @@ func consistentKey(raw []byte) (ed25519.PrivateKey, ed25519.PublicKey, error) {
 		return nil, nil, errKey
 	}
 	return key, ed25519.PublicKey(bytes.Clone(key[ed25519.SeedSize:])), nil
+}
+
+// recipientPublic derives the public key of an optional stored X25519 scalar.
+// Empty means a journal from before secret delivery; anything else must parse.
+func recipientPublic(private []byte) ([]byte, error) {
+	if len(private) == 0 {
+		return nil, nil
+	}
+	public, err := secretseal.PublicKey(private)
+	if err != nil {
+		return nil, errKey
+	}
+	return public, nil
 }
 
 func newSoftwareKey(rand io.Reader) (ed25519.PrivateKey, []byte, error) {

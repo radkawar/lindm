@@ -44,7 +44,7 @@ type nativeResource interface {
 	Close() error
 }
 
-func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.ResourceExecutionIntent) (nativeResource, error) {
+func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
 	if err := resource.ValidateDesired(intent.GetDesired()); err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.Resour
 			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
 			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
 			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Accounts,
-			NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest,
+			NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest, Secrets: secrets,
 			NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
 				result, err := s.observeNativeResource(ctx, desired, platform, nil)
 				if err != nil {
@@ -239,7 +239,9 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 		return nil, err
 	}
 	if old, revision, err := s.loadResourceAction(ctx, loaded, actionID); err == nil {
-		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) {
+		// Replays carry the exact deliveries the signed intent authenticated;
+		// another action's ciphertext or changed bytes never reach a provider.
+		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) || !sameResourceSecrets(old, req.GetSealedSecrets()) {
 			s.mu.Unlock()
 			return nil, errIdempotencyConflict
 		}
@@ -257,8 +259,12 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 		s.mu.Unlock()
 		return nil, err
 	}
+	if err := s.verifyResourceSecrets(loaded, intent, req.GetSealedSecrets()); err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
 	if intent.GetPreparation() != nil {
-		return s.admitResourcePreparationLocked(ctx, loaded, intent, req.GetIntentEnvelope())
+		return s.admitResourcePreparationLocked(ctx, loaded, intent, req.GetIntentEnvelope(), req.GetSealedSecrets())
 	}
 	// Admission and Add are serialized with Close. Native preflight never holds
 	// the authority mutex and is canceled by either the RPC or service lifetime.
@@ -269,7 +275,7 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	defer s.operations.Done()
 	defer cancel()
 	defer stop()
-	provider, err := s.openResource(ctx, intent)
+	provider, err := s.openResource(ctx, intent, s.resourceSecrets(intent, req.GetSealedSecrets()))
 	if err != nil {
 		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}
@@ -298,7 +304,7 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	}
 	// A concurrent identical request may have completed preflight first.
 	if old, _, err := s.loadResourceAction(ctx, loaded, actionID); err == nil {
-		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) {
+		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) || !sameResourceSecrets(old, req.GetSealedSecrets()) {
 			return nil, errIdempotencyConflict
 		}
 		return resourcePreparation(old), nil
@@ -307,6 +313,10 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	}
 	intent, err = s.currentResourceIntent(ctx, loaded, req.GetIntentEnvelope())
 	if err != nil {
+		return nil, err
+	}
+	// Identity may have renewed during preflight; reauthenticate the deliveries.
+	if err := s.verifyResourceSecrets(loaded, intent, req.GetSealedSecrets()); err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -324,6 +334,10 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	if resourceDrift(plan) {
 		if err := s.makeResourceChallenge(ctx, loaded, record); err != nil {
 			return nil, err
+		}
+		// Only authenticated ciphertext is journaled, and only until terminal.
+		for _, sealed := range req.GetSealedSecrets() {
+			record.SealedSecrets = append(record.SealedSecrets, bytes.Clone(sealed))
 		}
 	} else {
 		recordReadOnlyResourceResult(record, verification)

@@ -102,6 +102,24 @@ export function recoveryReadinessTone(reason: string): "neutral" | "warning" {
   }
 }
 
+const BLOCKED_REASON_LABELS: Record<string, string> = {
+  secret_unavailable: "Blocked: the referenced secret version is unavailable on the server.",
+  secret_binding_mismatch:
+    "Blocked: the secret reference does not match the stored purpose or subject binding.",
+  device_encryption_key_unavailable:
+    "Blocked: the device has no current attested encryption key for secret delivery.",
+  secret_delivery_unauthorized:
+    "Blocked: the assigning administrator no longer holds secret management for this device.",
+  policy_authority_changed:
+    "Blocked: the policy author's authorization changed. Set the policy again to resume rotation.",
+  escrow_unconfigured: "Blocked: the server escrow transport key is not configured.",
+};
+
+// Server-recorded blocked or attention reasons; unknown reasons are shown verbatim.
+export function blockedReasonLabel(reason: string): string {
+  return BLOCKED_REASON_LABELS[reason] ?? reason;
+}
+
 export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation {
   // Match expected conditions only under their documented transport code.
   // An internal error carrying a familiar reason must remain a real failure.
@@ -157,6 +175,34 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           title: "Inventory not available",
           message: "The device has not reported the inventory required for this action.",
           action: "Wait for a successful inventory report, then refresh.",
+        };
+      case "secret_version_conflict":
+        return {
+          tone: "warning",
+          title: "Secret changed",
+          message: "Another version was added after this page loaded.",
+          action: "Reload the secret and rotate against its current version with a new request.",
+        };
+      case "secret_unavailable":
+        return {
+          tone: "neutral",
+          title: "Secret not available",
+          message: "The server cannot open this secret version.",
+          action: "Check the secret version and the server escrow configuration.",
+        };
+      case "local_admin_policy_required":
+        return {
+          tone: "neutral",
+          title: "No local-admin policy",
+          message: "This device has no managed local-admin password policy.",
+          action: "Set a policy before requesting rotation.",
+        };
+      case "policy_authority_changed":
+        return {
+          tone: "warning",
+          title: "Policy authority changed",
+          message: "The policy author's authorization changed or was revoked.",
+          action: "Set the policy again with current authority.",
         };
       case "snapshot_unavailable":
         return {
@@ -221,6 +267,22 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Sign-in required",
       message: "Your session could not authorize this request.",
       action: "Sign in again to continue.",
+    };
+  }
+  if (failure.code === Code.InvalidArgument && failure.reason === "secret_purpose_mismatch") {
+    return {
+      tone: "warning",
+      title: "Purpose does not match",
+      message: "The material or reference does not match the secret's immutable purpose.",
+      action: "Use material of the kind this secret's purpose requires.",
+    };
+  }
+  if (failure.code === Code.AlreadyExists && failure.reason === "request_id_reused") {
+    return {
+      tone: "warning",
+      title: "Request ID already used",
+      message: "A different request was already recorded with this request ID.",
+      action: "Prepare a new request. The earlier request is not repeated.",
     };
   }
   if (failure.code === Code.Unimplemented) {

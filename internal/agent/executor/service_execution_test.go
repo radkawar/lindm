@@ -170,6 +170,8 @@ type serviceFixture struct {
 	wall              atomic.Int64
 	bootClock         atomic.Uint64
 	boot              string
+	// openNative replaces the systemd boundary harness for a single test.
+	openNative func(*Service, secretAccessor) (nativeResource, error)
 }
 
 func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *serviceFixture {
@@ -204,7 +206,10 @@ func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *se
 func (f *serviceFixture) options() []Option {
 	return []Option{WithClock(func() time.Time { return time.Unix(0, f.wall.Load()).UTC() }), WithBootID(func() (string, error) { return f.boot, nil }), func(s *Service) {
 		s.boottime = func() (uint64, error) { return f.bootClock.Load(), nil }
-		s.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) {
+		s.openResource = func(_ context.Context, _ *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
+			if f.openNative != nil {
+				return f.openNative(s, secrets)
+			}
 			f.native.mu.Lock()
 			f.native.incarnation = s.incarnation
 			f.native.mu.Unlock()

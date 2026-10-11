@@ -23,9 +23,11 @@ import { Route as AuthenticatedGroupsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
 import { Route as AuthenticatedProfilesRouteImport } from './routes/_authenticated/profiles'
 import { Route as AuthenticatedRolloutsRouteImport } from './routes/_authenticated/rollouts'
+import { Route as AuthenticatedSecretsRouteImport } from './routes/_authenticated/secrets'
 import { Route as AuthenticatedDevicesDeviceIdRouteImport } from './routes/_authenticated/devices_.$deviceId'
 import { Route as AuthenticatedProfilesProfileIdRouteImport } from './routes/_authenticated/profiles_.$profileId'
 import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenticated/profiles_.new'
+import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets_.$secretId'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryEnrollmentRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery-enrollment'
 import { Route as AuthenticatedDevicesDeviceIdActionsActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.actions.$actionId'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery.$actionId'
@@ -101,6 +103,11 @@ const AuthenticatedRolloutsRoute = AuthenticatedRolloutsRouteImport.update({
   path: '/rollouts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSecretsRoute = AuthenticatedSecretsRouteImport.update({
+  id: '/secrets',
+  path: '/secrets',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDevicesDeviceIdRoute =
   AuthenticatedDevicesDeviceIdRouteImport.update({
     id: '/devices_/$deviceId',
@@ -117,6 +124,12 @@ const AuthenticatedProfilesNewRoute =
   AuthenticatedProfilesNewRouteImport.update({
     id: '/profiles_/new',
     path: '/profiles/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSecretsSecretIdRoute =
+  AuthenticatedSecretsSecretIdRouteImport.update({
+    id: '/secrets_/$secretId',
+    path: '/secrets/$secretId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute =
@@ -158,9 +171,11 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsRoute
   '/profiles': typeof AuthenticatedProfilesRoute
   '/rollouts': typeof AuthenticatedRolloutsRoute
+  '/secrets': typeof AuthenticatedSecretsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
+  '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/devices/$deviceId/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
@@ -180,9 +195,11 @@ export interface FileRoutesByTo {
   '/integrations': typeof AuthenticatedIntegrationsRoute
   '/profiles': typeof AuthenticatedProfilesRoute
   '/rollouts': typeof AuthenticatedRolloutsRoute
+  '/secrets': typeof AuthenticatedSecretsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
+  '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/devices/$deviceId/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
@@ -204,9 +221,11 @@ export interface FileRoutesById {
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
   '/_authenticated/profiles': typeof AuthenticatedProfilesRoute
   '/_authenticated/rollouts': typeof AuthenticatedRolloutsRoute
+  '/_authenticated/secrets': typeof AuthenticatedSecretsRoute
   '/_authenticated/devices_/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/_authenticated/profiles_/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/_authenticated/profiles_/new': typeof AuthenticatedProfilesNewRoute
+  '/_authenticated/secrets_/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/_authenticated/devices_/$deviceId_/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/_authenticated/devices_/$deviceId_/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/_authenticated/devices_/$deviceId_/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
@@ -228,9 +247,11 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/profiles'
     | '/rollouts'
+    | '/secrets'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
+    | '/secrets/$secretId'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
     | '/devices/$deviceId/recovery/$actionId'
@@ -250,9 +271,11 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/profiles'
     | '/rollouts'
+    | '/secrets'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
+    | '/secrets/$secretId'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
     | '/devices/$deviceId/recovery/$actionId'
@@ -273,9 +296,11 @@ export interface FileRouteTypes {
     | '/_authenticated/integrations'
     | '/_authenticated/profiles'
     | '/_authenticated/rollouts'
+    | '/_authenticated/secrets'
     | '/_authenticated/devices_/$deviceId'
     | '/_authenticated/profiles_/$profileId'
     | '/_authenticated/profiles_/new'
+    | '/_authenticated/secrets_/$secretId'
     | '/_authenticated/devices_/$deviceId_/recovery-enrollment'
     | '/_authenticated/devices_/$deviceId_/actions/$actionId'
     | '/_authenticated/devices_/$deviceId_/recovery/$actionId'
@@ -388,6 +413,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRolloutsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/secrets': {
+      id: '/_authenticated/secrets'
+      path: '/secrets'
+      fullPath: '/secrets'
+      preLoaderRoute: typeof AuthenticatedSecretsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/devices_/$deviceId': {
       id: '/_authenticated/devices_/$deviceId'
       path: '/devices/$deviceId'
@@ -407,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles/new'
       fullPath: '/profiles/new'
       preLoaderRoute: typeof AuthenticatedProfilesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/secrets_/$secretId': {
+      id: '/_authenticated/secrets_/$secretId'
+      path: '/secrets/$secretId'
+      fullPath: '/secrets/$secretId'
+      preLoaderRoute: typeof AuthenticatedSecretsSecretIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/devices_/$deviceId_/recovery-enrollment': {
@@ -452,9 +491,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
   AuthenticatedProfilesRoute: typeof AuthenticatedProfilesRoute
   AuthenticatedRolloutsRoute: typeof AuthenticatedRolloutsRoute
+  AuthenticatedSecretsRoute: typeof AuthenticatedSecretsRoute
   AuthenticatedDevicesDeviceIdRoute: typeof AuthenticatedDevicesDeviceIdRoute
   AuthenticatedProfilesProfileIdRoute: typeof AuthenticatedProfilesProfileIdRoute
   AuthenticatedProfilesNewRoute: typeof AuthenticatedProfilesNewRoute
+  AuthenticatedSecretsSecretIdRoute: typeof AuthenticatedSecretsSecretIdRoute
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute: typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   AuthenticatedDevicesDeviceIdActionsActionIdRoute: typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   AuthenticatedDevicesDeviceIdRecoveryActionIdRoute: typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
@@ -473,9 +514,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
   AuthenticatedProfilesRoute: AuthenticatedProfilesRoute,
   AuthenticatedRolloutsRoute: AuthenticatedRolloutsRoute,
+  AuthenticatedSecretsRoute: AuthenticatedSecretsRoute,
   AuthenticatedDevicesDeviceIdRoute: AuthenticatedDevicesDeviceIdRoute,
   AuthenticatedProfilesProfileIdRoute: AuthenticatedProfilesProfileIdRoute,
   AuthenticatedProfilesNewRoute: AuthenticatedProfilesNewRoute,
+  AuthenticatedSecretsSecretIdRoute: AuthenticatedSecretsSecretIdRoute,
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute:
     AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute,
   AuthenticatedDevicesDeviceIdActionsActionIdRoute:

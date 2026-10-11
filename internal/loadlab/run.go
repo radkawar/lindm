@@ -119,6 +119,9 @@ type runner struct {
 	profileOrigin       string
 	agentRelease        string
 	agentProtocol       uint32
+	// effects, when set, journals each simulated service execution before its
+	// report; the HA lane uses it to detect duplicate effects.
+	effects func(device, action string, sequence uint64) error
 }
 
 // prepare composes the same real authority, enrollment and inventory workload for

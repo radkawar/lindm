@@ -60,6 +60,9 @@ const (
 	// DeviceServiceRenewIdentityProcedure is the fully-qualified name of the DeviceService's
 	// RenewIdentity RPC.
 	DeviceServiceRenewIdentityProcedure = "/lindm.device.v1.DeviceService/RenewIdentity"
+	// DeviceServiceRegisterEncryptionKeyProcedure is the fully-qualified name of the DeviceService's
+	// RegisterEncryptionKey RPC.
+	DeviceServiceRegisterEncryptionKeyProcedure = "/lindm.device.v1.DeviceService/RegisterEncryptionKey"
 	// DeviceServiceGetResourceWorkProcedure is the fully-qualified name of the DeviceService's
 	// GetResourceWork RPC.
 	DeviceServiceGetResourceWorkProcedure = "/lindm.device.v1.DeviceService/GetResourceWork"
@@ -97,6 +100,9 @@ type DeviceServiceClient interface {
 	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
 	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
+	// Registers the identity-signed HPKE recipient key of the presented
+	// certificate. Idempotent; the key only receives sealed secret deliveries.
+	RegisterEncryptionKey(context.Context, *connect.Request[v1.RegisterEncryptionKeyRequest]) (*connect.Response[v1.RegisterEncryptionKeyResponse], error)
 	// Returns the current server-owned service action, minting it only when no
 	// open action exists. Never implies the device is compliant.
 	GetResourceWork(context.Context, *connect.Request[v1.GetResourceWorkRequest]) (*connect.Response[v1.GetResourceWorkResponse], error)
@@ -177,6 +183,12 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("RenewIdentity")),
 			connect.WithClientOptions(opts...),
 		),
+		registerEncryptionKey: connect.NewClient[v1.RegisterEncryptionKeyRequest, v1.RegisterEncryptionKeyResponse](
+			httpClient,
+			baseURL+DeviceServiceRegisterEncryptionKeyProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("RegisterEncryptionKey")),
+			connect.WithClientOptions(opts...),
+		),
 		getResourceWork: connect.NewClient[v1.GetResourceWorkRequest, v1.GetResourceWorkResponse](
 			httpClient,
 			baseURL+DeviceServiceGetResourceWorkProcedure,
@@ -239,6 +251,7 @@ type deviceServiceClient struct {
 	putPackageBatch                    *connect.Client[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse]
 	commitPackageSnapshot              *connect.Client[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse]
 	renewIdentity                      *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
+	registerEncryptionKey              *connect.Client[v1.RegisterEncryptionKeyRequest, v1.RegisterEncryptionKeyResponse]
 	getResourceWork                    *connect.Client[v1.GetResourceWorkRequest, v1.GetResourceWorkResponse]
 	authorizeResourceStart             *connect.Client[v1.AuthorizeResourceStartRequest, v1.AuthorizeResourceStartResponse]
 	reportResourceResult               *connect.Client[v1.ReportResourceResultRequest, v1.ReportResourceResultResponse]
@@ -294,6 +307,11 @@ func (c *deviceServiceClient) RenewIdentity(ctx context.Context, req *connect.Re
 	return c.renewIdentity.CallUnary(ctx, req)
 }
 
+// RegisterEncryptionKey calls lindm.device.v1.DeviceService.RegisterEncryptionKey.
+func (c *deviceServiceClient) RegisterEncryptionKey(ctx context.Context, req *connect.Request[v1.RegisterEncryptionKeyRequest]) (*connect.Response[v1.RegisterEncryptionKeyResponse], error) {
+	return c.registerEncryptionKey.CallUnary(ctx, req)
+}
+
 // GetResourceWork calls lindm.device.v1.DeviceService.GetResourceWork.
 func (c *deviceServiceClient) GetResourceWork(ctx context.Context, req *connect.Request[v1.GetResourceWorkRequest]) (*connect.Response[v1.GetResourceWorkResponse], error) {
 	return c.getResourceWork.CallUnary(ctx, req)
@@ -346,6 +364,9 @@ type DeviceServiceHandler interface {
 	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
 	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
+	// Registers the identity-signed HPKE recipient key of the presented
+	// certificate. Idempotent; the key only receives sealed secret deliveries.
+	RegisterEncryptionKey(context.Context, *connect.Request[v1.RegisterEncryptionKeyRequest]) (*connect.Response[v1.RegisterEncryptionKeyResponse], error)
 	// Returns the current server-owned service action, minting it only when no
 	// open action exists. Never implies the device is compliant.
 	GetResourceWork(context.Context, *connect.Request[v1.GetResourceWorkRequest]) (*connect.Response[v1.GetResourceWorkResponse], error)
@@ -422,6 +443,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("RenewIdentity")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServiceRegisterEncryptionKeyHandler := connect.NewUnaryHandler(
+		DeviceServiceRegisterEncryptionKeyProcedure,
+		svc.RegisterEncryptionKey,
+		connect.WithSchema(deviceServiceMethods.ByName("RegisterEncryptionKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	deviceServiceGetResourceWorkHandler := connect.NewUnaryHandler(
 		DeviceServiceGetResourceWorkProcedure,
 		svc.GetResourceWork,
@@ -490,6 +517,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceCommitPackageSnapshotHandler.ServeHTTP(w, r)
 		case DeviceServiceRenewIdentityProcedure:
 			deviceServiceRenewIdentityHandler.ServeHTTP(w, r)
+		case DeviceServiceRegisterEncryptionKeyProcedure:
+			deviceServiceRegisterEncryptionKeyHandler.ServeHTTP(w, r)
 		case DeviceServiceGetResourceWorkProcedure:
 			deviceServiceGetResourceWorkHandler.ServeHTTP(w, r)
 		case DeviceServiceAuthorizeResourceStartProcedure:
@@ -549,6 +578,10 @@ func (UnimplementedDeviceServiceHandler) CommitPackageSnapshot(context.Context, 
 
 func (UnimplementedDeviceServiceHandler) RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.RenewIdentity is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) RegisterEncryptionKey(context.Context, *connect.Request[v1.RegisterEncryptionKeyRequest]) (*connect.Response[v1.RegisterEncryptionKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.RegisterEncryptionKey is not implemented"))
 }
 
 func (UnimplementedDeviceServiceHandler) GetResourceWork(context.Context, *connect.Request[v1.GetResourceWorkRequest]) (*connect.Response[v1.GetResourceWorkResponse], error) {

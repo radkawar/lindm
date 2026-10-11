@@ -30,7 +30,10 @@ type localDB struct {
 	users, groups, shadow, gshadow map[string][]string
 	revision                       []byte
 }
-type nativeRun func(context.Context, string, ...string) ([]byte, error)
+
+// nativeRun executes one fixed tool. stdin carries the only secret input any
+// shadow tool receives (chpasswd --encrypted); it never enters argv or env.
+type nativeRun func(ctx context.Context, stdin []byte, path string, args ...string) ([]byte, error)
 type boundedOutput struct{ bytes.Buffer }
 
 func (b *boundedOutput) Write(v []byte) (int, error) {
@@ -39,20 +42,23 @@ func (b *boundedOutput) Write(v []byte) (int, error) {
 	}
 	return b.Buffer.Write(v)
 }
-func runNative(ctx context.Context, path string, args ...string) ([]byte, error) {
+func runNative(ctx context.Context, stdin []byte, path string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
 	cmd.Dir = "/"
 	cmd.WaitDelay = time.Second
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	}
 	var out, diagnostic boundedOutput
 	cmd.Stdout = &out
 	cmd.Stderr = &diagnostic
 	err := cmd.Run()
 	if diagnostic.Len() != 0 {
-		// Shadow tools never receive secrets on this path; keep a bounded,
-		// printable first line for the local administrator.
+		// Shadow diagnostics name users and line numbers, never the stdin
+		// token; keep a bounded, printable first line for the administrator.
 		line, _, _ := strings.Cut(diagnostic.String(), "\n")
 		line = strings.Map(func(r rune) rune {
 			if r < 0x20 || r > 0x7e {
@@ -170,7 +176,7 @@ func members(s string) []string {
 	return slices.Compact(out)
 }
 func (p *Provider) nss(ctx context.Context, table, key string, local []string) ([]byte, error) {
-	out, err := p.run(ctx, "/usr/bin/getent", table, key)
+	out, err := p.run(ctx, nil, "/usr/bin/getent", table, key)
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && exit.ExitCode() == 2 && local == nil && len(out) == 0 {
@@ -185,7 +191,7 @@ func (p *Provider) nss(ctx context.Context, table, key string, local []string) (
 	if string(out) != expected {
 		return nil, fmt.Errorf("%w: NSS/local mismatch", ErrUnsafe)
 	}
-	numeric, err := p.run(ctx, "/usr/bin/getent", table, local[2])
+	numeric, err := p.run(ctx, nil, "/usr/bin/getent", table, local[2])
 	if err != nil || !bytes.Equal(out, numeric) {
 		return nil, fmt.Errorf("%w: NSS numeric collision", ErrUnsafe)
 	}

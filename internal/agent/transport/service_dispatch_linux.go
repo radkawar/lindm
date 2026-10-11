@@ -90,7 +90,9 @@ func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.
 }
 
 func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devicev1.ResourceWork, digest [sha256.Size]byte) (*agentv1.ResourceExecutionStatus, error) {
-	prepared, err := rpc(ctx, m.executor.PrepareResourceExecution, &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: work.GetIntentEnvelope()})
+	// Sealed secrets are opaque HPKE ciphertext for the executor; the relay
+	// neither stores nor inspects them and the signed intent binds their digests.
+	prepared, err := rpc(ctx, m.executor.PrepareResourceExecution, &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: work.GetIntentEnvelope(), SealedSecrets: work.GetSealedSecrets()})
 	if err != nil {
 		return nil, fmt.Errorf("prepare service execution: %w", err)
 	}

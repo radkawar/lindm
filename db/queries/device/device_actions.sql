@@ -79,7 +79,7 @@ WHERE device_id = sqlc.arg('device_id') AND lock_action_id = sqlc.arg('lock_acti
 -- name: LatestDeviceActionEscrow :one
 SELECT a.* FROM device_actions a JOIN device_action_escrow e ON e.action_id = a.id
 JOIN devices d ON d.id = a.device_id AND d.current_generation_id = a.generation_id
-WHERE a.device_id = sqlc.arg('device_id') AND (sqlc.narg('luks_uuid')::uuid IS NULL OR a.luks_uuids @> ARRAY[sqlc.narg('luks_uuid')::uuid])
+WHERE a.device_id = sqlc.arg('device_id') AND a.capability = 'device.escrow-rotate.v1' AND (sqlc.narg('luks_uuid')::uuid IS NULL OR a.luks_uuids @> ARRAY[sqlc.narg('luks_uuid')::uuid])
 ORDER BY e.committed_at DESC, a.id DESC LIMIT 1;
 
 -- name: LatestDeviceActionObservation :one

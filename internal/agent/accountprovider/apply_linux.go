@@ -62,7 +62,7 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if !proto.Equal(rebuilt, plan) {
 		return nil, ErrConflict
 	}
-	target, edges, err := p.target(d, plan.GetOperation(), before, db, l)
+	target, edges, err := p.target(ctx, d, plan.GetOperation(), before, db, l)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (p *Provider) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*
 		}
 		target = l.GetLastApplied()
 	} else {
-		target, _, err = p.target(d, plan.GetOperation(), after, db, l)
+		target, _, err = p.target(ctx, d, plan.GetOperation(), after, db, l)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,7 @@ func verification(plan *resourcev1.ResourcePlan, target, after *agentv1.Resource
 		uid := !want.GetExists() || (want.GetUid() == got.GetUid() && want.GetUidGeneration() == got.GetUidGeneration())
 		fields := !want.GetExists() || (want.GetGid() == got.GetGid() && want.GetShell() == got.GetShell() && homeMatches(want.GetHome(), got.GetHome()))
 		groups := slices.Equal(want.GetGroups(), got.GetGroups())
-		password := !want.GetExists() || want.GetPasswordLocked() == got.GetPasswordLocked() && target.GetAccountPrivate().GetPasswordToken() == after.GetAccountPrivate().GetPasswordToken()
+		password := !want.GetExists() || want.GetPasswordLocked() == got.GetPasswordLocked() && sameToken(target.GetAccountPrivate().GetPasswordToken(), after.GetAccountPrivate().GetPasswordToken())
 		aging := !want.GetExists() || proto.Equal(want.GetAging(), got.GetAging())
 		converged = identityMatch && uid && fields && groups && password && aging && receipt.GetPassed()
 		v.Checks = &resourcev1.ResourceVerification_LocalUser{LocalUser: &resourcev1.LocalUserChecks{LocalIdentityMatches: identityMatch, UidGenerationMatches: uid, FieldsMatch: fields, MembershipsMatch: groups, PasswordPolicyMatches: password, AgingMatches: aging, NssReread: receipt, Converged: converged}}

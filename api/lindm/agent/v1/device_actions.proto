@@ -4,6 +4,8 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/private_custody.proto";
+import "lindm/agent/v1/secret_delivery.proto";
 import "lindm/agent/v1/trust.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
@@ -310,6 +312,27 @@ message ShutdownAction {
   }];
 }
 message RefreshInventoryAction {}
+// Rotates the password of one local account that the root-owned executor
+// configuration independently allowlists. The executor generates the password;
+// remote input never supplies it, a hash, or a native command.
+message LocalAdminPasswordRotateAction {
+  string account_name = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"];
+  string escrow_key_id = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  // RSA public key encoded as PKIX DER; private custody remains on the server.
+  bytes escrow_public_key = 3 [(buf.validate.field).bytes = {
+    min_len: 256
+    max_len: 1024
+  }];
+}
+// Public account identity and shadow-change day only; never the shadow field.
+message LocalAdminAccountObservation {
+  string account_name = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"];
+  uint32 account_uid = 2;
+  // Shadow field is a usable (not locked or empty) password hash.
+  bool password_usable = 3;
+  // Shadow last-change field in days since the epoch; 0 when absent.
+  uint32 password_changed_day = 4 [(buf.validate.field).uint32.lte = 1000000];
+}
 
 // Closed immutable action specification. No executable, command, script, path,
 // arbitrary native arguments, or generic extension map exists in this contract.
@@ -327,6 +350,7 @@ message DeviceActionSpec {
     RestartAction restart = 9;
     ShutdownAction shutdown = 10;
     RefreshInventoryAction refresh_inventory = 11;
+    LocalAdminPasswordRotateAction local_admin_password_rotate = 12;
   }
 }
 // Public token inventory only: no native token blobs, sealed secrets or keys.
@@ -385,6 +409,8 @@ message DeviceActionObservation {
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
     (buf.validate.field).string.uuid = true
   ];
+  // Managed local-admin account facts. Public name/UID only; no shadow field.
+  LocalAdminAccountObservation local_admin = 21;
   option (buf.validate.message).cel = {
     id: "device_action_observation.token_ids"
     message: "native token IDs must be unique"
@@ -397,6 +423,7 @@ message DeviceActionPlan {
   string action_id = 3 [(buf.validate.field).string.uuid = true];
   RecoveryKeyBinding recovery_binding = 4;
   repeated CryptoEraseTargetPlan crypto_erase_targets = 5 [(buf.validate.field).repeated.max_items = 8];
+  LocalAdminPasswordBinding local_admin_binding = 6;
 }
 // RSA-OAEP-SHA256 ingress ciphertext; plaintext never enters the journal.
 message DeviceActionEscrow {
@@ -407,9 +434,22 @@ message DeviceActionEscrow {
   }];
   bytes recovery_key_sha256 = 3 [(buf.validate.field).bytes.len = 32];
   uint32 new_keyslot = 4 [(buf.validate.field).uint32.lte = 31];
-  string luks_uuid = 5 [(buf.validate.field).string.uuid = true];
-  bytes metadata_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  string luks_uuid = 5 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  bytes metadata_sha256 = 6 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
   uint32 token_id = 7 [(buf.validate.field).uint32.lte = 31];
+  // Present exactly for local-admin password escrow; the LUKS fields are then empty.
+  LocalAdminPasswordBinding local_admin = 8;
+  option (buf.validate.message).cel = {
+    id: "device_action_escrow.kind"
+    message: "escrow is either one LUKS slot or one local-admin password"
+    expression: "has(this.local_admin) ? (this.luks_uuid == '' && this.metadata_sha256.size() == 0 && this.new_keyslot == 0u && this.token_id == 0u) : (this.luks_uuid != '' && this.metadata_sha256.size() == 32)"
+  };
 }
 message DeviceActionVerification {
   bool verified = 1;
@@ -609,6 +649,9 @@ message DeviceActionRecord {
   bytes inventory_receipt_envelope = 30 [(buf.validate.field).bytes.max_len = 16384];
   ExecutionRoot inventory_receipt_root = 31;
   bytes inventory_receipt_delegation_envelope = 32 [(buf.validate.field).bytes.max_len = 16384];
+  // Private-custody envelope of the generated local-admin password, retained
+  // only between escrow and native set; never plaintext and never attested.
+  PrivateCustodyEnvelope local_admin_password = 33;
   option (buf.validate.message).cel = {
     id: "device_action_record.receipt"
     message: "consumed receipt must retain its accepted trust snapshot"
@@ -706,11 +749,20 @@ message DeviceActionEscrowReceipt {
   bytes escrow_sha256 = 6 [(buf.validate.field).bytes.len = 32];
   bytes recovery_key_sha256 = 7 [(buf.validate.field).bytes.len = 32];
   uint32 new_keyslot = 8 [(buf.validate.field).uint32.lte = 31];
-  string luks_uuid = 9 [(buf.validate.field).string.uuid = true];
+  string luks_uuid = 9 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
   string escrow_key_id = 10 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
   google.protobuf.Timestamp stored_at = 11 [(buf.validate.field).required = true];
   uint64 root_version = 12 [(buf.validate.field).uint64.gt = 0];
   uint64 delegation_version = 13 [(buf.validate.field).uint64.gt = 0];
+  LocalAdminPasswordBinding local_admin = 14;
+  option (buf.validate.message).cel = {
+    id: "device_action_escrow_receipt.kind"
+    message: "receipt binds either one LUKS slot or one local-admin password"
+    expression: "has(this.local_admin) ? (this.luks_uuid == '' && this.new_keyslot == 0u) : this.luks_uuid != ''"
+  };
 }
 message PrepareDeviceActionRequest {
   bytes intent_envelope = 1 [(buf.validate.field).bytes = {

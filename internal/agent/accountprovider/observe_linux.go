@@ -30,9 +30,9 @@ func nativeProvider(ctx context.Context, c NativeConfig) (*Provider, error) {
 	var err error
 	switch c.Platform.GetOsId() {
 	case "ubuntu", "debian":
-		version, err = p.run(ctx, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "passwd")
+		version, err = p.run(ctx, nil, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "passwd")
 	case "fedora":
-		version, err = p.run(ctx, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "shadow-utils")
+		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "shadow-utils")
 	default:
 		return nil, ErrUnsupported
 	}

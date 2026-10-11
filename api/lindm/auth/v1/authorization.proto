@@ -49,7 +49,7 @@ message RoleDefinition {
   }];
   repeated string permissions = 2 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 21,
+    (buf.validate.field).repeated.max_items = 23,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -73,7 +73,9 @@ message RoleDefinition {
         "encryption.manage",
         "actions.lock",
         "actions.release-lock",
-        "actions.quarantine"
+        "actions.quarantine",
+        "secrets.manage",
+        "secrets.reveal"
       ]
     }
   ];
@@ -118,7 +120,8 @@ message AuthorizationPolicy {
         "encryption.manage",
         "actions.lock",
         "actions.release-lock",
-        "actions.quarantine"
+        "actions.quarantine",
+        "secrets.reveal"
       ]
     }
   ];

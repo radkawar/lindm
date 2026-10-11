@@ -53,6 +53,18 @@ func (s *Service) GetDeviceActionWork(ctx context.Context, req *connect.Request[
 	}
 	action, err := q.GetOpenDeviceAction(ctx, principal.DeviceID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		// Policy minting re-authorizes its actor before locking this device, so
+		// end this transaction first; a committed action is then served below.
+		if err := tx.Rollback(ctx); err != nil {
+			return nil, mapErr(err)
+		}
+		minted, err := s.mintLocalAdminRotation(ctx, principal, req.Msg.GetSessionEpoch())
+		if err != nil {
+			return nil, err
+		}
+		if minted {
+			return s.GetDeviceActionWork(ctx, req)
+		}
 		return noStore(&devicev1.GetDeviceActionWorkResponse{}), nil
 	}
 	if err != nil {
@@ -166,7 +178,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 			if err != nil {
 				return nil, approvalError(err)
 			}
-		} else if destructiveDeviceAction(intent.GetSpec()) || s.identity.ApprovalRequired(permission) {
+		} else if destructiveDeviceAction(intent.GetSpec()) || s.identity.ApprovalRequired(permission) && !policyMintedAction(intent.GetSpec()) {
 			return nil, approvalError(identity.ErrApprovalRequired)
 		}
 	}

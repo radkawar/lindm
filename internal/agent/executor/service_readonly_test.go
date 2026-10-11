@@ -88,7 +88,9 @@ func (n *readOnlyNative) Apply(context.Context, *resourcev1.ResourcePlan, func(c
 func (n *readOnlyNative) option() Option {
 	return func(s *Service) {
 		n.service = s
-		s.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) { return n, nil }
+		s.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
+			return n, nil
+		}
 	}
 }
 func readOnlyFixture(t *testing.T, disposition resourcev1.VerificationDisposition) (*serviceFixture, *readOnlyNative, *agentv1.ResourceExecutionIntent) {

@@ -22,6 +22,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	assignments := flags.Int("assignment-percent", 20, "percentage assigned synthetic service work (1..100)")
 	workers := flags.Int("enrollment-workers", 8, "bounded parallel enrollments (1..64)")
 	hostObservation := flags.String("host-observation", "", "captured HostObservation protobuf JSON to replay on one simulated device (historical, at most 1 MiB)")
+	revealApproval := flags.Bool("reveal-approval", false, "require a second human to approve secret and local-admin password reveals")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -35,6 +36,11 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, fixture.Close()) }()
+	if *revealApproval {
+		if err := fixture.RequireConsoleRevealApproval(setup); err != nil {
+			return err
+		}
+	}
 	population, err := loadlab.Populate(setup, fixture, loadlab.PopulateOptions{Devices: *devices, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, HostObservationFile: *hostObservation})
 	if err != nil {
 		return err

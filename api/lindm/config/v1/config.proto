@@ -91,6 +91,14 @@ message ServerConfig {
   // Independent native firewall probe peers, provisioned by the server operator.
   // The enrolled device endpoint only confirms these exact external targets.
   repeated lindm.agent.v1.ConnectivityProbeTarget connectivity_probes = 22 [(buf.validate.field).repeated.max_items = 32];
+  // Offline bundle import authority and the served native repository root.
+  // Absent disables `lindmd bundle-import` and the /offline/ handler.
+  OfflineBundleConfig offline_bundles = 23;
+  option (buf.validate.message).cel = {
+    id: "offline_bundles.release_repository"
+    message: "offline bundle import requires a signing release repository"
+    expression: "!has(this.offline_bundles) || (has(this.release_repository) && has(this.release_repository.signing) && has(this.execution_bootstrap))"
+  };
   option (buf.validate.message).cel = {
     id: "connectivity_probes.authority"
     message: "native connectivity confirmation requires configured signing and at least four approved peers"
@@ -153,6 +161,24 @@ message ReleaseRepositoryConfig {
   // Required to admit recovery handoff; root trust comes from execution_bootstrap.
   optional string verification_state_directory = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
+// Every authority below is independently provisioned out of band; nothing in a
+// bundle can replace these pins.
+message OfflineBundleConfig {
+  // PEM SubjectPublicKeyInfo of the dedicated Ed25519 bundle-signing key.
+  string signing_public_key_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // SHA-256 of that key's SPKI DER, pinned independently of the file.
+  string signing_key_id = 2 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  // PEM release-attestation public key and its pinned SPKI SHA-256; release
+  // SBOM/provenance/artifact statements are re-verified on every import.
+  string release_attestation_public_key_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string release_attestation_key_id = 4 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  // Server-owned private directory. Imports stage below it and atomically
+  // publish native repositories at repositories/ and the release export at
+  // release/; only those two trees are served read-only below /offline/ on the
+  // administrative listener.
+  string directory = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
 message ReleaseRepositorySigning {
   // Protected directory with rollout.pem, snapshot.pem and timestamp.pem only.
   // Offline root.pem and targets.pem must not be present or exposed to lindmd.
@@ -479,7 +505,7 @@ message BreakGlassPolicy {
   // This allowlist always applies, including when console_only is true.
   repeated string allowed_permissions = 1 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 21,
+    (buf.validate.field).repeated.max_items = 23,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -503,7 +529,9 @@ message BreakGlassPolicy {
         "encryption.manage",
         "actions.lock",
         "actions.release-lock",
-        "actions.quarantine"
+        "actions.quarantine",
+        "secrets.manage",
+        "secrets.reveal"
       ]
     }
   ];

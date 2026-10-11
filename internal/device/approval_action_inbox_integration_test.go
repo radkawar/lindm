@@ -4,6 +4,7 @@ package device
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -27,6 +28,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 	specs["quarantine"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}}
 	specs["release_quarantine"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{QuarantineActionId: uuid.NewString()}}}
 	specs["restart"], specs["shutdown"], specs["refresh_inventory"] = restartActionSpec(), shutdownActionSpec(), refreshActionSpec()
+	specs["local_admin_password_rotate"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: "lapsadmin", EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}}
 	fields := new(agentv1.DeviceActionSpec).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
 	if len(specs) != fields.Len() {
 		t.Fatal("closed action schema needs an inbox fixture")
@@ -42,6 +44,13 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 			// Native recovery-readiness preflight belongs to CreateDeviceAction, not
 			// this identity inbox visibility regression.
 			created, err := f.svc.identity.CreateApproval(t.Context(), owner.ID, &adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: f.request(spec)}}, f.svc.approvalScope)
+			if spec.GetLocalAdminPasswordRotate() != nil {
+				// Only a local-admin policy mints this arm; nothing exists to approve.
+				if !errors.Is(err, identity.ErrApprovalInvalid) {
+					t.Fatalf("approval for a server-minted action: %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}

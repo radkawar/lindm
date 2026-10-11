@@ -145,15 +145,22 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 			return nil
 		}
 		var result *agentv1.DeviceActionVerification
+		var sealed *agentv1.PrivateCustodyEnvelope
 		var operationErr error
-		if confirm {
+		localAdmin := record.GetIntent().GetSpec().GetLocalAdminPasswordRotate() != nil
+		switch {
+		case confirm && localAdmin:
+			result, operationErr = s.actionProvider.SetLocalAdminPassword(work, record.GetNativePlan(), record.GetVerification(), record.GetLocalAdminPassword(), gate)
+		case confirm:
 			result, operationErr = s.actionProvider.ConfirmEscrow(work, record.GetNativePlan(), record.GetVerification(), credential, gate)
-		} else if record.GetIntent().GetSpec().GetRefreshInventory() != nil {
+		case localAdmin:
+			result, sealed, operationErr = s.actionProvider.StageLocalAdminPassword(work, record.GetNativePlan(), gate)
+		case record.GetIntent().GetSpec().GetRefreshInventory() != nil:
 			result, operationErr = s.beginInventoryRefresh(work, record, gate)
-		} else {
+		default:
 			result, operationErr = s.actionProvider.Apply(work, record.GetNativePlan(), credential, gate)
 		}
-		s.finishDeviceAction(actionID, result, operationErr, confirm)
+		s.finishDeviceAction(actionID, result, sealed, operationErr, confirm)
 		if !consumed {
 			if operationErr == nil {
 				operationErr = errInternal
@@ -273,7 +280,8 @@ func (s *Service) authorizeDeviceActionReceipt(ctx context.Context, loaded *boun
 
 // Completion is independent of current authorization, RPC cancellation and the
 // grant deadline. Any ambiguity after consumption remains OUTCOME_UNKNOWN.
-func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActionVerification, operationErr error, confirm bool) {
+// sealed is the private-custody envelope of a staged local-admin password.
+func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActionVerification, sealed *agentv1.PrivateCustodyEnvelope, operationErr error, confirm bool) {
 	if errors.Is(operationErr, errInventoryPublicationPending) {
 		return
 	}
@@ -323,6 +331,10 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 		}
 	}
 	next.CompletedAt = protoTimestamp(s.now())
+	spec := record.GetIntent().GetSpec()
+	escrowed := spec.GetEscrowRotate() != nil || spec.GetLocalAdminPasswordRotate() != nil
+	// Custody of a generated password ends with the action's last phase.
+	next.LocalAdminPassword = nil
 	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
 		next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_PRECONDITION
 		if errors.Is(operationErr, errResourceExpired) || errors.Is(operationErr, context.Canceled) || errors.Is(operationErr, context.DeadlineExceeded) {
@@ -341,11 +353,14 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 			}
 			next.Verification.Evidence = "outcome_unknown_until_contact"
 		}
-	} else if operationErr == nil && !confirm && record.GetIntent().GetSpec().GetEscrowRotate() != nil && result.GetEscrow() != nil {
-		// Verification covers the newly staged key, not completion of rotation.
+	} else if operationErr == nil && !confirm && escrowed && result.GetEscrow() != nil && (spec.GetLocalAdminPasswordRotate() == nil || sealed != nil) {
+		// Verification covers the newly staged secret, not completion of rotation.
 		// The encrypted stage is durable before any server can attest/store it.
 		next.State, next.CompletedAt = agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW, nil
-	} else if operationErr == nil && result.GetVerified() && (confirm || record.GetIntent().GetSpec().GetEscrowRotate() == nil) {
+		if spec.GetLocalAdminPasswordRotate() != nil {
+			next.LocalAdminPassword = sealed
+		}
+	} else if operationErr == nil && result.GetVerified() && (confirm || !escrowed) {
 		next.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED
 	} else {
 		next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_OBSERVATION
@@ -392,6 +407,9 @@ func (s *Service) recoverDeviceActions(ctx context.Context) error {
 			record.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
 		}
 		record.Failure, record.CompletedAt = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED, protoTimestamp(s.now())
+		// A restart ends local custody of a staged password; the server's escrow
+		// record remains the candidate for an unknown native set.
+		record.LocalAdminPassword = nil
 		if record.GetStartedAt() != nil && record.GetIntent().GetSpec().GetShutdown() != nil && record.GetVerification() == nil {
 			record.Verification = &agentv1.DeviceActionVerification{After: proto.CloneOf(record.GetNativePlan().GetBefore()), Evidence: "outcome_unknown_until_contact"}
 		}

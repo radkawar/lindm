@@ -105,6 +105,17 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 			authorizationErr = identity.ErrAuthorizationDenied
 		}
 	}
+	// Delivered material was authorized by the actor's secrets.manage authority;
+	// losing it is an authority change like any other, never a silent start.
+	if approval != nil && authorizationErr == nil && len(intent.GetSecrets()) != 0 {
+		reason, err := secretDeliveryAuthority(ctx, q, approval, principal.DeviceID)
+		if err != nil {
+			return nil, mapErr(err)
+		}
+		if reason != "" {
+			authorizationErr = identity.ErrAuthorizationDenied
+		}
+	}
 	if uint64(device.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
 		return nil, mapErr(errSessionFenced)
 	}

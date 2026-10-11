@@ -156,9 +156,11 @@ export function ConsoleShell({
                               : pathname.endsWith("/recovery-enrollment")
                                 ? "Recover enrollment"
                                 : "Device details"
-                        : pathname.endsWith("/new")
-                          ? "Create profile"
-                          : "Profile details"}
+                        : currentPage.to === "/secrets"
+                          ? "Secret details"
+                          : pathname.endsWith("/new")
+                            ? "Create profile"
+                            : "Profile details"}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>

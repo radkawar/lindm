@@ -165,6 +165,26 @@ Official Fedora metadata may not satisfy that policy; qualification needs an
 approved signed repository, never a signature-check bypass. Private-worktree
 implementation is not a landed capability claim.
 
+### Air-gapped offline bundles
+
+Offline sites install from the bundle's per-architecture RPM repository served at
+`https://SITE/offline/repositories/<amd64|arm64>/rpm/`. The lane writes one repo file
+into a private `reposdir` (DNF5 accepts `--setopt=reposdir=`), with `gpgcheck=1`,
+`repo_gpgcheck=1` (createrepo_c `repomd.xml.asc` signed by the station package key),
+`gpgkey=file://` for the pinned key and `sslcacert` for the site CA; no Fedora mirror
+is consulted. The advisory snapshot is the updates `repomd.xml`-referenced
+`updateinfo.xml.zst`, verified against repomd at acquisition and recorded with both
+URLs.
+
+`lab vm airgap` passed on Fedora 44 x86_64 with SELinux Enforcing inside a no-route
+namespace: `$HOME/.cache/lindm-airgap-20261011/records/fedora-44-r1.json`, SHA-256
+`f7aa073c11240b3ba93cd069a36c1e114c4474576a855f107da508264a175f38`
+([verification L16](../verification.md#3-acceptance-scenario-families)): install from
+the site repository, enrollment, rejected expired/corrupt/forged/replayed bundles,
+paused staging, audited update to 0.30.1 and advisory freshness advanced to the
+second bundle's signed acquisition time. aarch64 RPM repositories are built but not
+exercised.
+
 ## Encryption and recovery
 
 Fedora 44 Server GNOME, TPM-capable dracut, Secure Boot on and software TPM2 passed
@@ -230,6 +250,21 @@ authselect feature transactions; sysctl persistence is an
 owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
+
+Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
+reading `name:hash` on stdin with `--prefix` (shadow-utils 4.14 and later).
+With `-e`, Fedora's chpasswd accepts only `$y$`, `$2[abxy]$`, `$6$`, `$5$`, a `!`
+prefix, `*` or an empty field and rejects lock markers such as `!!`, so lindm
+restores pure lock markers with `usermod --password` and sends only real hashes
+through chpasswd. Upstream source shows that `--prefix` skips SELinux
+file-context handling, as `useradd`/`usermod --prefix` already do; the record
+does not separately inspect the `/etc/shadow` label. Managed local-admin rotation runs
+`/usr/sbin/chpasswd` in `/` with system PAM hashing and needs the
+`action-sandbox` exception described in
+[security and operations](../security-and-operations.md#managed-secrets-and-local-admin-passwords).
+Both paths are qualified on Fedora 44 aarch64 with SELinux enforcing and SSH
+password logins
+([secret delivery and local-admin records](../verification.md#secret-delivered-password-hash-and-managed-local-admin-password)).
 
 Firewall zones use the same dedicated `inet lindm_z_<zone>` netlink table, root
 provisioning, packaged guard/restore units, dedicated probe peer and static
@@ -357,7 +392,9 @@ and [`inventory_unavailable_linux.go`](../../internal/vmlab/inventory_unavailabl
 
 ## Gaps
 
-Full desktop/edition coverage, native aarch64, physical TPM/media, air-gap lifecycle
+Full desktop/edition coverage, native aarch64, physical TPM/media, air-gap topology
+beyond the x86_64 offline-bundle lane (site DNS/NTP/IdP, server install/restore from
+a bundle)
 and production signing custody remain separate obligations. Fedora 43
 inspection/signed-service lifecycle, Fedora 44 self-update and Fedora 44 encryption
 cover different cells. DNF5 package

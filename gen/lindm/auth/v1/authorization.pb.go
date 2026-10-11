@@ -331,21 +331,21 @@ const file_lindm_auth_v1_authorization_proto_rawDesc = "" +
 	"\vRoleBinding\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12 \n" +
 	"\vpermissions\x18\x02 \x03(\tR\vpermissions\x122\n" +
-	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeR\x06scopes\"\xb3\x04\n" +
+	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeR\x06scopes\"\xd3\x04\n" +
 	"\x0eRoleDefinition\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xbaHFrD\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$Z\x05ownerZ\x05adminZ\boperatorZ\bhelpdeskZ\aauditorR\x04name\x12\xc1\x03\n" +
-	"\vpermissions\x18\x02 \x03(\tB\x9e\x03\xbaH\x9a\x03\x92\x01\x96\x03\b\x01\x10\x15\x18\x01\"\x8d\x03r\x8a\x03R\n" +
+	"\x04name\x18\x01 \x01(\tBI\xbaHFrD\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$Z\x05ownerZ\x05adminZ\boperatorZ\bhelpdeskZ\aauditorR\x04name\x12\xe1\x03\n" +
+	"\vpermissions\x18\x02 \x03(\tB\xbe\x03\xbaH\xba\x03\x92\x01\xb6\x03\b\x01\x10\x17\x18\x01\"\xad\x03r\xaa\x03R\n" +
 	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
-	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\vpermissions\"\xa2\x01\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\vpermissions\"\xa2\x01\n" +
 	"\fGroupBinding\x12 \n" +
 	"\x05group\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x05group\x122\n" +
 	"\x04role\x18\x02 \x01(\tB\x1e\xbaH\x1br\x19\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$R\x04role\x12<\n" +
-	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes\"\xa6\x06\n" +
+	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes\"\xb6\x06\n" +
 	"\x13AuthorizationPolicy\x12=\n" +
 	"\x05roles\x18\x01 \x03(\v2\x1d.lindm.auth.v1.RoleDefinitionB\b\xbaH\x05\x92\x01\x02\x10dR\x05roles\x12M\n" +
-	"\x0egroup_bindings\x18\x02 \x03(\v2\x1b.lindm.auth.v1.GroupBindingB\t\xbaH\x06\x92\x01\x03\x10\xe8\aR\rgroupBindings\x12\x86\x02\n" +
-	"\x1dapproval_required_permissions\x18\x03 \x03(\tB\xc1\x01\xbaH\xbd\x01\x92\x01\xb9\x01\x18\x01\"\xb4\x01r\xb1\x01R\x10resources.assignR\x16execution_trust.manageR\x14remote_execution.runR\x10inventory.manageR\x12recovery_keys.readR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x1bapprovalRequiredPermissions:\xf7\x02\xbaH\xf3\x02\x1a\x8d\x01\n" +
+	"\x0egroup_bindings\x18\x02 \x03(\v2\x1b.lindm.auth.v1.GroupBindingB\t\xbaH\x06\x92\x01\x03\x10\xe8\aR\rgroupBindings\x12\x96\x02\n" +
+	"\x1dapproval_required_permissions\x18\x03 \x03(\tB\xd1\x01\xbaH\xcd\x01\x92\x01\xc9\x01\x18\x01\"\xc4\x01r\xc1\x01R\x10resources.assignR\x16execution_trust.manageR\x14remote_execution.runR\x10inventory.manageR\x12recovery_keys.readR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.revealR\x1bapprovalRequiredPermissions:\xf7\x02\xbaH\xf3\x02\x1a\x8d\x01\n" +
 	"\x1aauthorization.unique_roles\x12 custom role names must be unique\x1aMthis.roles.all(r, this.roles.filter(other, other.name == r.name).size() == 1)\x1a\xe0\x01\n" +
 	"\x19authorization.known_roles\x12;group bindings must reference a built-in or configured role\x1a\x85\x01this.group_bindings.all(b, b.role in ['owner', 'admin', 'operator', 'helpdesk', 'auditor'] || this.roles.exists(r, r.name == b.role))B Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
 

@@ -76,7 +76,7 @@ func protectedAncestry(path string) error {
 		}
 	}
 }
-func validateNativeTarget(p *Provider, r *agentv1.NativeResourceTransactionRequest, db *localDB) error {
+func validateNativeTarget(ctx context.Context, p *Provider, r *agentv1.NativeResourceTransactionRequest, db *localDB) error {
 	if err := validateMessage(r); err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func validateNativeTarget(p *Provider, r *agentv1.NativeResourceTransactionReque
 	// adoption of dimensions is not ownership of the entire native account.
 	l := proto.CloneOf(r.Ownership)
 	l.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED
-	expected, edges, err := p.target(d, r.Plan.GetOperation(), r.Before, db, l)
+	expected, edges, err := p.target(ctx, d, r.Plan.GetOperation(), r.Before, db, l)
 	if err != nil {
 		return err
 	}

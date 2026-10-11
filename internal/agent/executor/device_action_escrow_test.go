@@ -54,7 +54,7 @@ func (f *deviceActionFixture) escrowReceipt(t *testing.T, record *agentv1.Device
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mustSign(t, f.svc.authority, &agentv1.DeviceActionEscrowReceipt{DeploymentId: i.GetDeploymentId(), DeviceId: i.GetDeviceId(), EnrollmentGeneration: i.GetEnrollmentGeneration(), ActionId: i.GetActionId(), IntentSha256: record.GetIntentSha256(), EscrowSha256: digest, RecoveryKeySha256: e.GetRecoveryKeySha256(), NewKeyslot: e.GetNewKeyslot(), LuksUuid: e.GetLuksUuid(), EscrowKeyId: e.GetEscrowKeyId(), StoredAt: protoTimestamp(f.now), RootVersion: 1, DelegationVersion: version}, f.startKey)
+	return mustSign(t, f.svc.authority, &agentv1.DeviceActionEscrowReceipt{DeploymentId: i.GetDeploymentId(), DeviceId: i.GetDeviceId(), EnrollmentGeneration: i.GetEnrollmentGeneration(), ActionId: i.GetActionId(), IntentSha256: record.GetIntentSha256(), EscrowSha256: digest, RecoveryKeySha256: e.GetRecoveryKeySha256(), NewKeyslot: e.GetNewKeyslot(), LuksUuid: e.GetLuksUuid(), EscrowKeyId: e.GetEscrowKeyId(), StoredAt: protoTimestamp(f.now), RootVersion: 1, DelegationVersion: version, LocalAdmin: e.GetLocalAdmin()}, f.startKey)
 }
 
 func TestDeviceActionEscrowReceiptPrecedesRetirement(t *testing.T) {

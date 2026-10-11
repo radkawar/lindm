@@ -20,6 +20,8 @@ var approvalPayloadPermissions = map[protoreflect.FullName]Permission{
 	"lindm.admin.v1.ActivateTargetPreviewRequest":         PermissionAssignResources,
 	"lindm.admin.v1.UpdateExecutionAuthorityRequest":      PermissionManageExecutionTrust,
 	"lindm.admin.v1.RevealRecoveryKeyRequest":             PermissionReadRecoveryKeys,
+	"lindm.admin.v1.RevealSecretRequest":                  PermissionRevealSecrets,
+	"lindm.admin.v1.RevealLocalAdminPasswordRequest":      PermissionRevealSecrets,
 }
 var deviceActionPermissions = map[protoreflect.Name]Permission{
 	"escrow_rotate":      PermissionManageEncryption,
@@ -33,6 +35,8 @@ var deviceActionPermissions = map[protoreflect.Name]Permission{
 	"restart":            PermissionRunRemoteExecution,
 	"shutdown":           PermissionRunRemoteExecution,
 	"refresh_inventory":  PermissionManageInventory,
+	// Server-minted from a managed policy; the policy actor's secrets.manage authority.
+	"local_admin_password_rotate": PermissionManageSecrets,
 }
 
 // Supplemental grants retain their own scope intersection in both decisions and

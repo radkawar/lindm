@@ -25,8 +25,9 @@ import (
 )
 
 type command struct {
-	tool string
-	args []string
+	tool  string
+	args  []string
+	stdin []byte
 }
 
 // ExecuteNative is only for the fixed root account transient helper. The parent
@@ -74,14 +75,14 @@ func executeNative(ctx context.Context, config NativeConfig, r *agentv1.NativeRe
 		return ErrConflict
 	}
 	// Independent NSS checks include every member and referenced numeric identity.
-	p := &Provider{run: run, config: Config{Native: config.Native, NativeDigest: config.NativeDigest, Ownership: r.GetOwnership().GetOwner(), ActionID: r.GetActionId()}}
+	p := &Provider{run: run, config: Config{Native: config.Native, NativeDigest: config.NativeDigest, Ownership: r.GetOwnership().GetOwner(), ActionID: r.GetActionId(), Secrets: helperPasswordHash(r)}}
 	if err := p.validateDesired(resource.PlanDesired(r.Plan)); err != nil {
 		return err
 	}
 	if p.isAdministrator(db, r.Plan.GetRef().GetCanonicalKey()) {
 		return ErrUnsafe
 	}
-	if err := validateNativeTarget(p, r, db); err != nil {
+	if err := validateNativeTarget(ctx, p, r, db); err != nil {
 		return err
 	}
 	commands, err := nativeCommands(r, db)
@@ -200,7 +201,9 @@ func runCommands(ctx context.Context, commands []command, revision []byte, befor
 				return ErrOutcomeUnknown
 			}
 		}
-		if _, err = run(ctx, cmd.tool, cmd.args...); err != nil {
+		_, err = run(ctx, cmd.stdin, cmd.tool, cmd.args...)
+		clear(cmd.stdin)
+		if err != nil {
 			return errors.Join(ErrOutcomeUnknown, err)
 		}
 		fresh, err = readDB()
@@ -244,6 +247,12 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 		}
 		out = append(out, command{tool: path, args: args})
 	}
+	// The encrypted token reaches chpasswd only on stdin, never argv or env.
+	setPassword := func(user, token string) {
+		stdin := make([]byte, 0, len(user)+len(token)+2)
+		stdin = append(append(append(append(stdin, user...), ':'), token...), '\n')
+		out = append(out, command{tool: "/usr/sbin/chpasswd", args: []string{"--encrypted"}, stdin: stdin})
+	}
 	if g := target.GetLocalGroup(); g != nil {
 		old := before.GetLocalGroup()
 		switch {
@@ -262,9 +271,16 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 		}
 	} else {
 		old, u := before.GetLocalUser(), target.GetLocalUser()
+		from, to := r.Before.GetAccountPrivate().GetPasswordToken(), r.Target.GetAccountPrivate().GetPasswordToken()
 		switch {
 		case !old.GetExists() && u.GetExists():
 			appendCommand("useradd", "--no-create-home", "--no-user-group", "--no-log-init", "--uid", decimal(u.GetUid()), "--gid", decimal(u.GetGid()), "--home-dir", u.GetHome().GetPath(), "--shell", u.GetShell(), "--password", "!", "--inactive", "-1", "--expiredate", "", "--", name)
+			if to != "!" {
+				if !encryptedToken(to) {
+					return nil, fmt.Errorf("%w: created password token", ErrUnsafe)
+				}
+				setPassword(name, to)
+			}
 		case old.GetExists() && !u.GetExists():
 			if db.groups[name] != nil {
 				return nil, fmt.Errorf("%w: userdel could remove an unrelated private group", ErrUnsafe)
@@ -285,19 +301,29 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 			if old.GetShell() != u.GetShell() {
 				args = append(args, "--shell", u.GetShell())
 			}
-			if r.Before.GetAccountPrivate().GetPasswordToken() != r.Target.GetAccountPrivate().GetPasswordToken() {
-				from, to := r.Before.GetAccountPrivate().GetPasswordToken(), r.Target.GetAccountPrivate().GetPasswordToken()
-				if to == "!"+from {
+			password := ""
+			if from != to {
+				switch {
+				case to == "!"+from:
 					args = append(args, "--lock")
-				} else if from == "!"+to && to != "" && !strings.HasPrefix(to, "!") && !strings.HasPrefix(to, "*") {
+				case from == "!"+to && to != "" && !strings.HasPrefix(to, "!") && !strings.HasPrefix(to, "*"):
 					args = append(args, "--unlock")
-				} else {
+				case lockMarker(to):
+					// A bare lock marker is not credential material; newer
+					// chpasswd rejects "!!" as an invalid hash.
+					args = append(args, "--password", to)
+				case encryptedToken(to):
+					password = to
+				default:
 					return nil, fmt.Errorf("%w: private password restoration mismatch", ErrUnsafe)
 				}
 			}
 			if len(args) > 0 {
 				args = append(args, "--", name)
 				appendCommand("usermod", args...)
+			}
+			if password != "" {
+				setPassword(name, password)
 			}
 		}
 		if u.GetExists() {
@@ -341,7 +367,7 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 		appendCommand("usermod", "--groups", strings.Join(byUser[user], ","), "--", user)
 	}
 	for _, cmd := range out {
-		if len(cmd.args) > 64 {
+		if len(cmd.args) > 64 || len(cmd.stdin) > 1024 {
 			return nil, ErrUnsafe
 		}
 		size := 0
@@ -356,6 +382,31 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 		}
 	}
 	return out, nil
+}
+
+// lockMarker is a shadow password field made only of lock characters, such as
+// "!" or "!!": it contains no credential and may be restored through usermod.
+func lockMarker(token string) bool {
+	return token != "" && strings.Trim(token, "!*") == ""
+}
+
+// encryptedToken accepts a nonempty single shadow field for chpasswd
+// --encrypted. Empty (passwordless) tokens are never written.
+func encryptedToken(token string) bool {
+	return token != "" && len(token) <= 520 && !strings.ContainsAny(token, ":\x00\r\n") && !lockMarker(token)
+}
+
+// helperPasswordHash serves the root helper's target recomputation. Its only
+// source is the executor-built target, derived from the authenticated sealed
+// delivery; target() revalidates the hash shape and declared algorithm.
+func helperPasswordHash(r *agentv1.NativeResourceTransactionRequest) func(context.Context, *resourcev1.SecretRef) (*agentv1.SecretMaterial, error) {
+	return func(_ context.Context, ref *resourcev1.SecretRef) (*agentv1.SecretMaterial, error) {
+		hashed := resource.PlanDesired(r.GetPlan()).GetLocalUser().GetPassword().GetHashed()
+		if hashed == nil || !proto.Equal(hashed.GetHash(), ref) || r.GetPlan().GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
+			return nil, ErrUnsafe
+		}
+		return &agentv1.SecretMaterial{Material: &agentv1.SecretMaterial_PasswordHash{PasswordHash: []byte(r.GetTarget().GetAccountPrivate().GetPasswordToken())}}, nil
+	}
 }
 func decimal(v uint32) string { return strconv.FormatUint(uint64(v), 10) }
 func agingArgs(old, next *resourcev1.PasswordAging) []string {

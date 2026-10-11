@@ -11,13 +11,13 @@ import (
 )
 
 func TestBuiltInPermissionMatrix(t *testing.T) {
-	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice}
+	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets}
 	for _, test := range []struct {
 		role   string
 		grants []Permission
 	}{
 		{RoleOwner, all},
-		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice}},
+		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets}},
 		{RoleOperator, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionManageProfiles, PermissionAssignResources}},
 		{RoleHelpdesk, []Permission{PermissionReadFleet, PermissionManageEnrollment}},
 		{RoleAuditor, []Permission{PermissionReadFleet, PermissionReadAudit}},
@@ -126,7 +126,7 @@ func TestConfiguredSensitiveApprovalPermissions(t *testing.T) {
 		PermissionAssignResources, PermissionManageExecutionTrust,
 		PermissionRunRemoteExecution, PermissionReadRecoveryKeys,
 		PermissionManageInventory,
-		PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice,
+		PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionRevealSecrets,
 	} {
 		t.Run(string(permission), func(t *testing.T) {
 			service := &Service{policy: testPolicy(t, Config{Local: true})}

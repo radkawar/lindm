@@ -124,3 +124,33 @@ func TestTargetPreviewApprovalCannotSubstitutePayload(t *testing.T) {
 		t.Fatalf("unscoped preview activation accepted: %v", err)
 	}
 }
+
+func TestRevealApprovalBindings(t *testing.T) {
+	secret := &adminv1.RevealSecretRequest{RequestId: uuid.NewString(), SecretId: uuid.NewString(), Version: 1, Reason: "audit", ApprovalId: uuid.NewString()}
+	binding, err := bindApproval(secret)
+	if err != nil || binding.action != "secret.reveal" || binding.permission != PermissionRevealSecrets || binding.target != uuid.Nil || binding.mutation != secret.GetRequestId() {
+		t.Fatalf("secret reveal binding=%+v err=%v", binding, err)
+	}
+	device := uuid.New()
+	password := &adminv1.RevealLocalAdminPasswordRequest{RequestId: uuid.NewString(), DeviceId: device.String(), ActionId: uuid.NewString(), Reason: "audit", ApprovalId: uuid.NewString()}
+	binding, err = bindApproval(password)
+	if err != nil || binding.action != "local_admin.reveal" || binding.permission != PermissionRevealSecrets || binding.target != device || binding.mutation != password.GetRequestId() {
+		t.Fatalf("local admin reveal binding=%+v err=%v", binding, err)
+	}
+	password.DeviceId = "not-a-uuid"
+	if _, err := bindApproval(password); !errors.Is(err, ErrApprovalInvalid) {
+		t.Fatal("local admin reveal accepted an untargeted payload")
+	}
+	rotate := &adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: device.String(), Spec: &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{}}}}
+	if _, err := bindApproval(rotate); !errors.Is(err, ErrApprovalInvalid) {
+		t.Fatal("server-minted local-admin rotation accepted a manual approval")
+	}
+	for _, request := range []*adminv1.CreateApprovalRequest{
+		{Payload: &adminv1.CreateApprovalRequest_RevealSecret{RevealSecret: secret}},
+		{Payload: &adminv1.CreateApprovalRequest_RevealLocalAdminPassword{RevealLocalAdminPassword: password}},
+	} {
+		if approvalPayload(request) == nil {
+			t.Fatalf("approval payload arm missing: %v", request)
+		}
+	}
+}

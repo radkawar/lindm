@@ -122,6 +122,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		((manifest.GetDistribution() != "ubuntu" || manifest.GetVersion() != "24.04") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44"))) {
 		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04 or Fedora 44, without power actions or console hold")
 	}
+	if (options.ResourceKinds["secret-password"] || options.ResourceKinds["local-admin"]) && (!options.Resources || options.ResourceExecutionOnly) {
+		return nil, errors.New("secret delivery and managed local-admin kinds require the connected resource phase")
+	}
+	// Step-up and the second human's approval exist only in the local authority.
+	if options.ResourceKinds["local-admin"] && !options.LocalAuthority {
+		return nil, errors.New("the local-admin kind requires -local-authority for reveal step-up and approval")
+	}
 	format, err := NativePackageFormat(manifest.GetDistribution())
 	if err != nil {
 		return nil, err
@@ -338,7 +345,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		defer resourceSigner.Close()
 		delegation = resourceSigner.Initial
 	} else {
-		delegation, err = fixture.ConfigureServiceDispatch(ctx)
+		configure := fixture.ConfigureServiceDispatch
+		if options.ResourceKinds["secret-password"] || options.ResourceKinds["local-admin"] {
+			configure = fixture.ConfigureServiceDispatchWithEscrow
+		}
+		delegation, err = configure(ctx)
 		if err != nil {
 			return result, err
 		}

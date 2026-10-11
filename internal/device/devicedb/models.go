@@ -149,6 +149,44 @@ type InventoryAttributeDefinition struct {
 	Definition []byte
 }
 
+type LocalAdminPassword struct {
+	ActionID       uuid.UUID
+	DeviceID       uuid.UUID
+	GenerationID   uuid.UUID
+	AccountName    string
+	AccountUid     int64
+	State          string
+	EscrowedAt     pgtype.Timestamptz
+	SettledAt      pgtype.Timestamptz
+	LastRevealedAt pgtype.Timestamptz
+}
+
+type LocalAdminPasswordPolicy struct {
+	DeviceID                uuid.UUID
+	AccountName             string
+	RotationIntervalSeconds int32
+	PostRevealDelaySeconds  int32
+	ActorID                 uuid.UUID
+	AuthorizationVersion    int64
+	RequestID               uuid.UUID
+	RotateDueAt             pgtype.Timestamptz
+	BlockedReason           string
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+}
+
+type ManagedSecret struct {
+	ID               uuid.UUID
+	Purpose          int16
+	SubjectBindingID uuid.UUID
+	DisplayName      string
+	CurrentVersion   int64
+	RequestID        uuid.UUID
+	CreatedBy        uuid.UUID
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type OfflineEnrollmentAuthorization struct {
 	ID                    uuid.UUID
 	TokenID               uuid.UUID

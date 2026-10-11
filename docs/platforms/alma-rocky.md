@@ -136,7 +136,8 @@ digests. The current independent status is:
 | Rocky 9.8 x86_64       | Native inspection matched 422 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
 | Rocky 10.2 x86_64      | Native inspection matched 443 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
 | AlmaLinux 9.8 x86_64   | Native inspection matched 387 RPM records. Earlier packaged lifecycle failed signed service; corrected connected dispatch passed independently. A full packaged lifecycle rerun is still required. |
-| AlmaLinux 10.2 x86_64  | Native UEFI inspection matched 380 RPM records (2026-10-10, record below); lifecycle and dispatch not yet run.                                                                                     |
+| AlmaLinux 10.2 x86_64  | Passed UEFI inspect (380 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 382-package publications) and nine native dispatch scenarios locally; SELinux Enforcing (records below).                   |
+| AlmaLinux 8.10 x86_64  | Passed UEFI inspect (434 RPMs), full signed lifecycle (five 436-package publications) and nine native dispatch scenarios locally after the systemd 239 readiness fix below; SELinux Enforcing.     |
 | Legacy 8               | Consult each vendor's separate acquisition/native rows; do not inherit 9/10 results.                                                                                                               |
 | Rocky 9.8 aarch64      | Passed inspect (418 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 420-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
 | Rocky 10.2 aarch64     | Passed inspect (440 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 442-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
@@ -226,10 +227,29 @@ are under `$HOME/.cache/lindm-mutabledistros5-20261010/`:
 | `rocky8-arm64-dgx21-lifecycle.json` | `e550555f5f8624edcc55276ad4bb282e1324492f2945bf4b13017e36e8e15e18` |
 | `rocky8-arm64-dgx21-dispatch.json`  | `6a7f8f8a1423fe5cda697e8342e86ca488e9700370cf88ddcfdeaa82c1f4bda2` |
 
-AlmaLinux 10.2 x86_64 inspection (`alma10-x86_64-local-inspect.json`, SHA-256
-`76575dcfc770c61da3d0c570f697c77c7fbea2d59845f79f2e0c7bfaf2bfc9bb`, same directory)
-ran locally under OVMF `2024.02-2ubuntu0.10` (Secure Boot disabled) from `4d74dcf`
-plus the MutableDistros5 lab delta.
+AlmaLinux 10.2 and 8.10 x86_64 ran locally (KVM, OVMF `2024.02-2ubuntu0.10`,
+Secure Boot disabled, virtio-blk, no TPM/desktop, isolated local password/WebAuthn
+authority) from `4d74dcf` plus the MutableDistros5 lab delta, with signed x86_64
+RPMs `ebafbefb…`/`f2c8da50…`. AlmaLinux 8.10 inspection first failed `native
+system startup is not settled`. The inspection readiness gate added after the ARM
+EL8 pin runs `systemctl is-system-running --wait`, but systemd 239 ignores `--wait`
+there (support arrived in v240) and answers `starting` at once. Only after such a
+transient answer and a `systemctl --version` below 240 does the gate now poll within
+its one-minute deadline ([`vm_inspect_readiness_linux.go`](../../internal/vmlab/vm_inspect_readiness_linux.go);
+`TestInspectReadinessPollsSystemdWithoutWait`). The passing record shows `degraded`
+settled after 14 s. Records are in the same directory:
+
+| Record                               | SHA-256                                                            |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `alma10-x86_64-local-inspect.json`   | `76575dcfc770c61da3d0c570f697c77c7fbea2d59845f79f2e0c7bfaf2bfc9bb` |
+| `alma10-x86_64-local-lifecycle.json` | `0aaf17e8edcb8c4c9a51ec97bb285af804fea82ba19b6c9864a6f43941c2a060` |
+| `alma10-x86_64-local-dispatch.json`  | `20be65dafef62626575e71eeabb5b3b133009cd1e163ad4af51b695248d70df8` |
+| `alma8-x86_64-local-inspect.json`    | `c33350a7dc4f74c6174cbd2fedd73777da8e31c6b7ccaca93087f0097c429f3d` |
+| `alma8-x86_64-local-lifecycle.json`  | `4ea01b9bf89e9a9610a45b229c65e99ff9cd104b08546d472020957b9ff0f769` |
+| `alma8-x86_64-local-dispatch.json`   | `f3e10b1dd10eaf438415199911d7234b8c67941e91245d3b480ed1511acfdf5c` |
+
+The Rocky 8.10 and AlmaLinux 8.10 ARM records predate that gate (`d303cec` pin); an
+EL8 inspection at the current tree needs the readiness fix.
 
 The original x86 records are under `$HOME/.cache/lindm-mutabledistros-20261010/`,
 indexed by its `evidence-index.json`:
@@ -243,9 +263,9 @@ indexed by its `evidence-index.json`:
 
 ## Gaps
 
-Rocky x86_64, AlmaLinux 10.2 x86_64 lifecycle/dispatch, AlmaLinux 8.10 x86_64 and a
-rerun AlmaLinux 9.8 x86_64 lifecycle still require the separate complete cells.
-RHEL 8 inherits nothing from the AlmaLinux/Rocky 8.10 ARM rows. EL8 device actions are not covered: the action
+Rocky x86_64 and a rerun AlmaLinux 9.8 x86_64 lifecycle still require the separate
+complete cells. RHEL 8 inherits nothing from the AlmaLinux/Rocky 8.10 rows. EL8
+device actions are not covered: the action
 provider still requests `PTTYPE`/`PTUUID`/`MOUNTPOINTS`. Desktop, other legacy
 rows, air-gap, actions and physical-machine evidence
 remain exact-scope requirements. The dbus-broker fix closes a demonstrated AlmaLinux

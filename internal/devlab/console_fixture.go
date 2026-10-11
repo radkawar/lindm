@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,10 +15,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/config"
 	"lindm/internal/trust"
 )
 
@@ -45,6 +50,60 @@ func (f *AuthorityFixture) configureConsoleIntegrations(cfg *configv1.ServerConf
 	return nil
 }
 
+// Fresh per-fixture escrow transport and wrapping keys make managed secrets
+// and local-admin custody usable in the console. Reveal approval starts off so
+// the single console owner can reveal; RequireConsoleRevealApproval enables it.
+func (f *AuthorityFixture) configureConsoleEscrow(cfg *configv1.ServerConfig) error {
+	transport, err := rsa.GenerateKey(rand.Reader, 3072)
+	if err != nil {
+		return err
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(transport)
+	if err != nil {
+		return err
+	}
+	encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	clear(der)
+	const transportName, wrappingName = "console-escrow-transport.pem", "console-escrow-wrapping.key"
+	err = os.WriteFile(filepath.Join(f.directory, transportName), encoded, 0600)
+	clear(encoded)
+	if err != nil {
+		return fmt.Errorf("write console escrow transport key: %w", err)
+	}
+	var wrapping [32]byte
+	if _, err := rand.Read(wrapping[:]); err != nil {
+		return err
+	}
+	err = os.WriteFile(filepath.Join(f.directory, wrappingName), wrapping[:], 0600)
+	clear(wrapping[:])
+	if err != nil {
+		return fmt.Errorf("write console escrow wrapping key: %w", err)
+	}
+	cfg.Escrow = &configv1.EscrowConfig{TransportKeyFile: transportName, WrappingKeyFile: wrappingName}
+	return nil
+}
+
+// RequireConsoleRevealApproval restarts the console server with two-person
+// reveal required, preserving its database, accounts and escrow keys.
+func (f *AuthorityFixture) RequireConsoleRevealApproval(ctx context.Context) error {
+	document, err := config.Load(f.configPath())
+	if err != nil {
+		return err
+	}
+	if document.Proto.GetEscrow() == nil {
+		return errors.New("console reveal approval requires configured escrow")
+	}
+	document.Proto.Escrow.RevealApprovalRequired = true
+	encoded, err := protojson.Marshal(document.Proto)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+		return err
+	}
+	return f.Restart(ctx)
+}
+
 // CreateConsoleEnrollment returns the one-time secret for the fixed console-owner
 // account in this disposable local database. Never log it as ordinary evidence or
 // place it in a URL. The browser chooses its own password and authenticator.
@@ -71,7 +130,7 @@ func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (_ *auth
 // ReadAgentFixture returns this live fixture's public provisioning material,
 // including its own signed origins, not necessarily the shared dev origins.
 func (f *AuthorityFixture) ReadAgentFixture(ctx context.Context) (*AgentFixture, error) {
-	if f == nil || f.closed || f.process == nil || f.database == nil {
+	if f == nil || f.closed || (f.process == nil && (f.ha == nil || !f.ha.running())) || f.database == nil {
 		return nil, errors.New("authority fixture is not live")
 	}
 	root, err := os.ReadFile(filepath.Join(f.directory, "execution-root.json"))

@@ -49,6 +49,10 @@ type VMResourceEvidence struct {
 	// This lane is deliberately not a claim that all resource kinds or physical
 	// encryption/authentication/connectivity requirements have been qualified.
 	LaunchGateOpen bool `json:"launch_gate_open"`
+	// SecretPassword names the managed secret delivered to Kinds[9]; it
+	// carries metadata only, never material.
+	SecretPassword *VMSecretPasswordEvidence `json:"secret_password,omitempty"`
+	LocalAdmin     *VMLocalAdminEvidence     `json:"local_admin,omitempty"`
 }
 
 func newVMResourceEvidence() *VMResourceEvidence {
@@ -62,6 +66,7 @@ func newVMResourceEvidence() *VMResourceEvidence {
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, Unproven: []string{"independent allow/deny packet probes and connectivity guard not exercised"}},
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE, Unproven: []string{"approved disposable encrypted machine required; no owner demo access authorized"}},
 		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY, Unproven: []string{"real weak-password rejection and lockout/login preservation not exercised"}},
+		{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, Unproven: []string{"SecretRef password hash delivery and SSH password login not exercised"}},
 	}}
 }
 

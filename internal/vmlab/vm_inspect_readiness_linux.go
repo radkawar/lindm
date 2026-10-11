@@ -7,10 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const inspectSystemReadinessCommand = "env LC_ALL=C systemctl is-system-running --wait"
+const inspectSystemdVersionCommand = "env LC_ALL=C systemctl --version"
+
+// systemd before v240 accepts --wait but ignores it for is-system-running and
+// reports the current transient state at once (observed on AlmaLinux 8.10's
+// systemd 239). Only such a manager is polled.
+const inspectSystemWaitVersion = 240
 const inspectNetworkReadinessCommand = "if command -v nm-online >/dev/null 2>&1; then env LC_ALL=C nm-online -s -q --timeout=30 && printf 'complete\\n'; else printf 'not-installed\\n'; fi"
 
 type vmInspectReadiness struct {
@@ -31,6 +39,21 @@ func collectInspectReadiness(ctx context.Context, run func(context.Context, stri
 	system, err := run(ctx, inspectSystemReadinessCommand, nil, 1024, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("native system startup readiness: %w", err)
+	}
+	if inspectSystemTransient(system) {
+		if err := requireLegacySystemWait(ctx, run); err != nil {
+			return nil, err
+		}
+		for inspectSystemTransient(system) {
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("native system startup readiness: %w", ctx.Err())
+			case <-time.After(time.Second):
+			}
+			if system, err = run(ctx, inspectSystemReadinessCommand, nil, 1024, 30*time.Second); err != nil {
+				return nil, fmt.Errorf("native system startup readiness: %w", err)
+			}
+		}
 	}
 	switch {
 	case system.ExitCode == 0 && string(system.Stdout) == "running\n" && len(system.Stderr) == 0:
@@ -57,4 +80,31 @@ func collectInspectReadiness(ctx context.Context, run func(context.Context, stri
 	}
 	proof.CompletedAt = time.Now().UTC()
 	return proof, nil
+}
+
+func inspectSystemTransient(system guestCommandResult) bool {
+	state := string(system.Stdout)
+	return system.ExitCode == 1 && len(system.Stderr) == 0 && (state == "initializing\n" || state == "starting\n")
+}
+
+// requireLegacySystemWait accepts a transient answer to --wait only from a
+// systemd that predates the switch; a newer manager must have waited.
+func requireLegacySystemWait(ctx context.Context, run func(context.Context, string, io.Reader, int, time.Duration) (guestCommandResult, error)) error {
+	version, err := run(ctx, inspectSystemdVersionCommand, nil, 4096, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("native systemd version: %w", err)
+	}
+	first, _, _ := strings.Cut(string(version.Stdout), "\n")
+	fields := strings.Fields(first)
+	if version.ExitCode != 0 || len(version.Stderr) != 0 || len(fields) < 2 || fields[0] != "systemd" {
+		return errors.New("invalid native systemd version")
+	}
+	number, err := strconv.Atoi(fields[1])
+	if err != nil || number <= 0 {
+		return errors.New("invalid native systemd version")
+	}
+	if number >= inspectSystemWaitVersion {
+		return errors.New("native system startup is not settled")
+	}
+	return nil
 }

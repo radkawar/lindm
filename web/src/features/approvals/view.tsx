@@ -10,7 +10,6 @@ import {
   ApprovalState,
   type Approval,
 } from "../../../gen/lindm/admin/v1/approvals_pb";
-import type { RevealRecoveryKeyResponse } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -22,6 +21,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission, permissionLabels } from "@/lib/permissions";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { approvalsQueryOptions } from "./queries";
@@ -46,16 +46,21 @@ const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> 
   approvePendingEnrollment: "Approve device enrollment",
   recoverDevice: "Recover device enrollment",
   activateTargetPreview: "Activate assignment rollout",
+  revealSecret: "Reveal secret",
+  revealLocalAdminPassword: "Reveal local-admin password",
 };
+
+// Revealed bytes stay in page memory only and are zeroized on dismissal.
+type Revealed = { label: string; secret: Uint8Array; note: string };
 
 export function ApprovalsView() {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
-  const [revealed, setRevealed] = useState<RevealRecoveryKeyResponse | null>(null);
+  const [revealed, setRevealed] = useState<Revealed | null>(null);
   useEffect(() => {
     if (!revealed) return;
     const dismiss = () => {
-      revealed.recoveryKey.fill(0);
+      revealed.secret.fill(0);
       setRevealed(null);
     };
     const timer = window.setTimeout(dismiss, 30_000);
@@ -67,11 +72,12 @@ export function ApprovalsView() {
       window.removeEventListener("blur", dismiss);
       document.removeEventListener("visibilitychange", dismiss);
       lifetime.signal.removeEventListener("abort", dismiss);
-      revealed.recoveryKey.fill(0);
+      revealed.secret.fill(0);
     };
   }, [revealed, lifetime]);
   const list = useQuery(approvalsQueryOptions(lifetime, pageToken));
   const failure = list.error ? toRpcFailure(list.error) : null;
+  const shown = revealed ? revealedText(revealed.secret) : null;
   return (
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
       <PageHeader
@@ -81,18 +87,20 @@ export function ApprovalsView() {
       {revealed ? (
         <section
           className="grid min-w-0 gap-3 border border-warning/30 bg-warning/10 p-4"
-          aria-label="Revealed recovery key"
+          aria-label={`Revealed ${revealed.label}`}
         >
-          <h2 className="font-semibold">Sensitive recovery key</h2>
+          <h2 className="font-semibold">Sensitive {revealed.label}</h2>
           <p>
-            Keep this key in trusted custody. It remains only in page memory for 30 seconds and is
+            Keep this value in trusted custody. It remains only in page memory for 30 seconds and is
             cleared when dismissed, focus changes, or you leave.
           </p>
-          <pre className="whitespace-pre-wrap break-all select-all">
-            {new TextDecoder().decode(revealed.recoveryKey)}
-          </pre>
+          {revealed.note ? <p>{revealed.note}</p> : null}
+          {shown?.hex ? (
+            <p className="text-sm">Shown as hexadecimal: the value is not valid UTF-8 text.</p>
+          ) : null}
+          <pre className="whitespace-pre-wrap break-all select-all">{shown?.text}</pre>
           <Button className="w-fit" variant="outline" onClick={() => setRevealed(null)}>
-            Dismiss recovery key
+            Dismiss {revealed.label}
           </Button>
         </section>
       ) : null}
@@ -145,7 +153,7 @@ function ApprovalCard({
   onReveal,
 }: {
   approval: Approval;
-  onReveal: (response: RevealRecoveryKeyResponse) => void;
+  onReveal: (revealed: Revealed) => void;
 }) {
   const principal = usePrincipal();
   const lifetime = useAuthLifetime();
@@ -275,7 +283,49 @@ function ApprovalCard({
               response.recoveryKey.fill(0);
               throw new ConnectError("Unsupported recovery-key encoding.", Code.FailedPrecondition);
             }
-            onReveal(response);
+            onReveal({ label: "recovery key", secret: response.recoveryKey, note: "" });
+            break;
+          }
+          case "revealSecret": {
+            const response = await adminClient.revealSecret(
+              { ...approval.payload.value, approvalId: approval.id },
+              options,
+            );
+            const material = response.material?.material.value;
+            if (lifetime.signal.aborted) {
+              material?.fill(0);
+              lifetime.signal.throwIfAborted();
+            }
+            if (!material)
+              throw new ConnectError(
+                "The server returned no secret material.",
+                Code.FailedPrecondition,
+              );
+            onReveal({
+              label: "secret",
+              secret: material,
+              note: `Secret ${approval.payload.value.secretId}, version ${approval.payload.value.version.toString()}.`,
+            });
+            break;
+          }
+          case "revealLocalAdminPassword": {
+            const response = await adminClient.revealLocalAdminPassword(
+              { ...approval.payload.value, approvalId: approval.id },
+              options,
+            );
+            if (lifetime.signal.aborted) {
+              response.password.fill(0);
+              lifetime.signal.throwIfAborted();
+            }
+            onReveal({
+              label: "local-admin password",
+              secret: response.password,
+              note: `Account ${response.escrow?.accountName || "not reported"}. ${
+                response.rotationDueAt
+                  ? `Post-reveal rotation is due ${formatTimestamp(response.rotationDueAt).local}.`
+                  : "No rotation is scheduled because the device has no policy."
+              }`,
+            });
             break;
           }
           default:
@@ -290,8 +340,12 @@ function ApprovalCard({
         await client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
         await client.invalidateQueries({ queryKey: ["device-resources", lifetime.generation] });
       }
-      if (exact.action === "execute")
+      if (exact.action === "execute") {
         await client.invalidateQueries({ queryKey: ["devices", lifetime.generation] });
+        await client.invalidateQueries({
+          queryKey: ["local-admin-password", lifetime.generation],
+        });
+      }
     } catch (error) {
       if (!lifetime.signal.aborted) {
         const next = toRpcFailure(error);
@@ -350,6 +404,8 @@ function ApprovalCard({
               "Assignment rollout"
             ) : approval.payload.case === "approvePendingEnrollment" ? (
               "Pending device enrollment"
+            ) : approval.payload.case === "revealSecret" ? (
+              `Secret ${approval.payload.value.secretId}, version ${approval.payload.value.version.toString()}`
             ) : (
               "Deployment"
             )}

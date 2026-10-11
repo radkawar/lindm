@@ -242,8 +242,11 @@ type ResourceExecutionIntent struct {
 	Operation            v1.ResourceOperation          `protobuf:"varint,15,opt,name=operation,proto3,enum=lindm.resource.v1.ResourceOperation" json:"operation,omitempty"`
 	Ownership            *ResourceOwnershipBinding     `protobuf:"bytes,16,opt,name=ownership,proto3" json:"ownership,omitempty"`
 	Preparation          *ResourceExecutionPreparation `protobuf:"bytes,17,opt,name=preparation,proto3" json:"preparation,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// One entry per SecretRef in desired state. Ciphertext travels outside the
+	// signature, in the same order, and is authenticated by sealed_sha256.
+	Secrets       []*ResourceSecretDelivery `protobuf:"bytes,18,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResourceExecutionIntent) Reset() {
@@ -391,6 +394,13 @@ func (x *ResourceExecutionIntent) GetOwnership() *ResourceOwnershipBinding {
 func (x *ResourceExecutionIntent) GetPreparation() *ResourceExecutionPreparation {
 	if x != nil {
 		return x.Preparation
+	}
+	return nil
+}
+
+func (x *ResourceExecutionIntent) GetSecrets() []*ResourceSecretDelivery {
+	if x != nil {
+		return x.Secrets
 	}
 	return nil
 }
@@ -798,8 +808,12 @@ type ResourceExecutionRecord struct {
 	// Full signed packet/native verdict proof stays in root custody. Attestations
 	// expose its digest through the verification receipts, not private endpoints.
 	FirewallEvidence *ConnectivityVerificationEvidence `protobuf:"bytes,24,opt,name=firewall_evidence,json=firewallEvidence,proto3" json:"firewall_evidence,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Exact HPKE deliveries from preparation, in intent order. Only the executor
+	// recipient key opens them; plaintext is never journaled. Cleared when the
+	// record becomes terminal.
+	SealedSecrets [][]byte `protobuf:"bytes,25,rep,name=sealed_secrets,json=sealedSecrets,proto3" json:"sealed_secrets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResourceExecutionRecord) Reset() {
@@ -1000,9 +1014,17 @@ func (x *ResourceExecutionRecord) GetFirewallEvidence() *ConnectivityVerificatio
 	return nil
 }
 
+func (x *ResourceExecutionRecord) GetSealedSecrets() [][]byte {
+	if x != nil {
+		return x.SealedSecrets
+	}
+	return nil
+}
+
 type PrepareResourceExecutionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	IntentEnvelope []byte                 `protobuf:"bytes,1,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
+	SealedSecrets  [][]byte               `protobuf:"bytes,2,rep,name=sealed_secrets,json=sealedSecrets,proto3" json:"sealed_secrets,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1040,6 +1062,13 @@ func (*PrepareResourceExecutionRequest) Descriptor() ([]byte, []int) {
 func (x *PrepareResourceExecutionRequest) GetIntentEnvelope() []byte {
 	if x != nil {
 		return x.IntentEnvelope
+	}
+	return nil
+}
+
+func (x *PrepareResourceExecutionRequest) GetSealedSecrets() [][]byte {
+	if x != nil {
+		return x.SealedSecrets
 	}
 	return nil
 }
@@ -2062,7 +2091,7 @@ var File_lindm_agent_v1_service_execution_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/agent/v1/service_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\"\xed\r\n" +
+	"&lindm/agent/v1/service_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/secret_delivery.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\"\xa2\x11\n" +
 	"\x17ResourceExecutionIntent\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
@@ -2085,7 +2114,9 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\toperation\x18\x0f \x01(\x0e2$.lindm.resource.v1.ResourceOperationB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\toperation\x12N\n" +
 	"\townership\x18\x10 \x01(\v2(.lindm.agent.v1.ResourceOwnershipBindingB\x06\xbaH\x03\xc8\x01\x01R\townership\x12N\n" +
-	"\vpreparation\x18\x11 \x01(\v2,.lindm.agent.v1.ResourceExecutionPreparationR\vpreparation:\xd6\x05\xbaH\xd2\x05\x1a\x8e\x02\n" +
+	"\vpreparation\x18\x11 \x01(\v2,.lindm.agent.v1.ResourceExecutionPreparationR\vpreparation\x12J\n" +
+	"\asecrets\x18\x12 \x03(\v2&.lindm.agent.v1.ResourceSecretDeliveryB\b\xbaH\x05\x92\x01\x02\x10\bR\asecrets:\xbf\b\xbaH\xbb\b\x1a\xe6\x02\n" +
+	"\x1eresource_intent.secret_binding\x12Bsecret deliveries must bind this exact device, action and resource\x1a\xff\x01this.secrets.all(s, s.binding.deployment_id == this.deployment_id && s.binding.device_id == this.device_id && s.binding.enrollment_generation == this.enrollment_generation && s.binding.action_id == this.action_id && s.binding.resource == this.desired.ref)\x1a\x8e\x02\n" +
 	"\x1bresource_intent.preparation\x126only native packages require immutable bounded staging\x1a\xb6\x01has(this.preparation) == has(this.desired.native_package) && (!has(this.preparation) || (this.preparation.deadline > this.not_before && this.preparation.deadline <= this.expires_at))\x1a\xbe\x01\n" +
 	"\x18resource_intent.validity\x12Fexecution intent validity must be positive and at most fifteen minutes\x1aZthis.expires_at > this.not_before && this.expires_at - this.not_before <= duration('900s')\x1a\xfd\x01\n" +
 	" resource_intent.nonzero_identity\x12*execution identities must be nonzero UUIDs\x1a\xac\x01[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.actor_id].all(id, id != '00000000-0000-0000-0000-000000000000')\"\x95\x01\n" +
@@ -2131,7 +2162,7 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:\xe3\x02\xbaH\xdf\x02\x1a\xe7\x01\n" +
 	"\x17resource_start.validity\x12@start validity must fit the challenge and at most thirty seconds\x1a\x89\x01this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at\x1as\n" +
-	"\x14resource_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\xf3)\n" +
+	"\x14resource_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\x86,\n" +
 	"\x17ResourceExecutionRecord\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x124\n" +
@@ -2163,7 +2194,9 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x11grant_accepted_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\x0fgrantAcceptedAt\x12[\n" +
 	"\x13preparation_outcome\x18\x16 \x01(\v2*.lindm.agent.v1.ResourcePreparationOutcomeR\x12preparationOutcome\x12U\n" +
 	"\x11admission_refusal\x18\x17 \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal\x12]\n" +
-	"\x11firewall_evidence\x18\x18 \x01(\v20.lindm.agent.v1.ConnectivityVerificationEvidenceR\x10firewallEvidence:\xeb\x1c\xbaH\xe7\x1c\x1a\x81\x02\n" +
+	"\x11firewall_evidence\x18\x18 \x01(\v20.lindm.agent.v1.ConnectivityVerificationEvidenceR\x10firewallEvidence\x128\n" +
+	"\x0esealed_secrets\x18\x19 \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets:\xc4\x1e\xbaH\xc0\x1e\x1a\xd6\x01\n" +
+	"\x1eresource_record.sealed_secrets\x12Wjournaled sealed secrets must match the signed delivery manifest until terminal cleanup\x1a[this.sealed_secrets.size() == 0 || this.sealed_secrets.size() == this.intent.secrets.size()\x1a\x81\x02\n" +
 	"!resource_record.firewall_evidence\x12Gretained packet proof requires the exact terminal firewall verification\x1a\x92\x01!has(this.firewall_evidence) || (has(this.verification) && this.verification.ref.kind == 8 && this.firewall_evidence.ref == this.verification.ref)\x1a\xb9\x05\n" +
 	"$resource_record.preparation_evidence\x12cmissing native evidence is restricted to effect-free preparation or authenticated admission refusal\x1a\xab\x04(has(this.native_plan) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal))) && (this.state != 9 || has(this.intent.preparation)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.preparation == this.intent.preparation && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at) && !has(this.verification)))\x1a\xe5\x01\n" +
 	"\x1fresource_record.desired_binding\x12=native plan must describe exactly the signed desired resource\x1a\x82\x01!has(this.native_plan) || (this.native_plan.ref == this.intent.desired.ref && this.native_plan.operation == this.intent.operation)\x1a\xc1\x02\n" +
@@ -2172,9 +2205,10 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x19resource_record.lifecycle\x121execution state must retain its required evidence\x1a\xa8\x04((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && (this.verification.disposition == 1 || (this.verification.disposition == 5 && this.intent.operation == 2 && !has(this.challenge) && !has(this.started_at)))))\x1a\x8a\x01\n" +
 	"\x1dresource_record.failure_shape\x121successful or pending work cannot carry a failure\x1a6(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)\x1a\xb5\x04\n" +
 	"\"resource_record.read_only_evidence\x12Ceffect-free native evidence must retain a terminal verified finding\x1a\xc9\x03(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))\x1a\xe8\x03\n" +
-	"!resource_record.admission_refusal\x12Uadmission refusal is an effect-free terminal rejection of exactly the signed resource\x1a\xeb\x02!has(this.admission_refusal) || (this.state == 5 && !has(this.intent.preparation) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))\"W\n" +
+	"!resource_record.admission_refusal\x12Uadmission refusal is an effect-free terminal rejection of exactly the signed resource\x1a\xeb\x02!has(this.admission_refusal) || (this.state == 5 && !has(this.intent.preparation) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))\"\x91\x01\n" +
 	"\x1fPrepareResourceExecutionRequest\x124\n" +
-	"\x0fintent_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\"\x86\x05\n" +
+	"\x0fintent_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x128\n" +
+	"\x0esealed_secrets\x18\x02 \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets\"\x86\x05\n" +
 	" PrepareResourceExecutionResponse\x12G\n" +
 	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\x12@\n" +
 	"\vnative_plan\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanR\n" +
@@ -2343,15 +2377,16 @@ var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),             // 25: google.protobuf.Timestamp
 	(*v1.ResourceDesiredState)(nil),           // 26: lindm.resource.v1.ResourceDesiredState
 	(v1.ResourceOperation)(0),                 // 27: lindm.resource.v1.ResourceOperation
-	(*v1.ResourceRef)(nil),                    // 28: lindm.resource.v1.ResourceRef
-	(*v1.ResourcePlan)(nil),                   // 29: lindm.resource.v1.ResourcePlan
-	(*ExecutionRoot)(nil),                     // 30: lindm.agent.v1.ExecutionRoot
-	(*v1.ResourceVerification)(nil),           // 31: lindm.resource.v1.ResourceVerification
-	(*ConnectivityVerificationEvidence)(nil),  // 32: lindm.agent.v1.ConnectivityVerificationEvidence
-	(*v1.ResourceObservation)(nil),            // 33: lindm.resource.v1.ResourceObservation
-	(*StorageTarget)(nil),                     // 34: lindm.agent.v1.StorageTarget
-	(*emptypb.Empty)(nil),                     // 35: google.protobuf.Empty
-	(*v1.OwnershipPolicy)(nil),                // 36: lindm.resource.v1.OwnershipPolicy
+	(*ResourceSecretDelivery)(nil),            // 28: lindm.agent.v1.ResourceSecretDelivery
+	(*v1.ResourceRef)(nil),                    // 29: lindm.resource.v1.ResourceRef
+	(*v1.ResourcePlan)(nil),                   // 30: lindm.resource.v1.ResourcePlan
+	(*ExecutionRoot)(nil),                     // 31: lindm.agent.v1.ExecutionRoot
+	(*v1.ResourceVerification)(nil),           // 32: lindm.resource.v1.ResourceVerification
+	(*ConnectivityVerificationEvidence)(nil),  // 33: lindm.agent.v1.ConnectivityVerificationEvidence
+	(*v1.ResourceObservation)(nil),            // 34: lindm.resource.v1.ResourceObservation
+	(*StorageTarget)(nil),                     // 35: lindm.agent.v1.StorageTarget
+	(*emptypb.Empty)(nil),                     // 36: google.protobuf.Empty
+	(*v1.OwnershipPolicy)(nil),                // 37: lindm.resource.v1.OwnershipPolicy
 }
 var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
 	25, // 0: lindm.agent.v1.ResourceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
@@ -2360,61 +2395,62 @@ var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
 	27, // 3: lindm.agent.v1.ResourceExecutionIntent.operation:type_name -> lindm.resource.v1.ResourceOperation
 	22, // 4: lindm.agent.v1.ResourceExecutionIntent.ownership:type_name -> lindm.agent.v1.ResourceOwnershipBinding
 	4,  // 5: lindm.agent.v1.ResourceExecutionIntent.preparation:type_name -> lindm.agent.v1.ResourceExecutionPreparation
-	25, // 6: lindm.agent.v1.ResourceExecutionPreparation.deadline:type_name -> google.protobuf.Timestamp
-	4,  // 7: lindm.agent.v1.ResourcePreparationOutcome.preparation:type_name -> lindm.agent.v1.ResourceExecutionPreparation
-	1,  // 8: lindm.agent.v1.ResourcePreparationOutcome.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
-	25, // 9: lindm.agent.v1.ResourceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
-	25, // 10: lindm.agent.v1.ResourceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 11: lindm.agent.v1.ResourceExecutionChallenge.ref:type_name -> lindm.resource.v1.ResourceRef
-	27, // 12: lindm.agent.v1.ResourceExecutionChallenge.operation:type_name -> lindm.resource.v1.ResourceOperation
-	6,  // 13: lindm.agent.v1.ResourceExecutionStartGrant.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
-	25, // 14: lindm.agent.v1.ResourceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
-	25, // 15: lindm.agent.v1.ResourceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
-	3,  // 16: lindm.agent.v1.ResourceExecutionRecord.intent:type_name -> lindm.agent.v1.ResourceExecutionIntent
-	29, // 17: lindm.agent.v1.ResourceExecutionRecord.native_plan:type_name -> lindm.resource.v1.ResourcePlan
-	30, // 18: lindm.agent.v1.ResourceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	25, // 19: lindm.agent.v1.ResourceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
-	0,  // 20: lindm.agent.v1.ResourceExecutionRecord.state:type_name -> lindm.agent.v1.ResourceExecutionState
-	1,  // 21: lindm.agent.v1.ResourceExecutionRecord.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
-	6,  // 22: lindm.agent.v1.ResourceExecutionRecord.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
-	25, // 23: lindm.agent.v1.ResourceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
-	25, // 24: lindm.agent.v1.ResourceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
-	31, // 25: lindm.agent.v1.ResourceExecutionRecord.verification:type_name -> lindm.resource.v1.ResourceVerification
-	25, // 26: lindm.agent.v1.ResourceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
-	5,  // 27: lindm.agent.v1.ResourceExecutionRecord.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
-	24, // 28: lindm.agent.v1.ResourceExecutionRecord.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
-	32, // 29: lindm.agent.v1.ResourceExecutionRecord.firewall_evidence:type_name -> lindm.agent.v1.ConnectivityVerificationEvidence
-	17, // 30: lindm.agent.v1.PrepareResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	29, // 31: lindm.agent.v1.PrepareResourceExecutionResponse.native_plan:type_name -> lindm.resource.v1.ResourcePlan
-	17, // 32: lindm.agent.v1.StartResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	17, // 33: lindm.agent.v1.GetResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	17, // 34: lindm.agent.v1.CancelResourcePreparationResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	0,  // 35: lindm.agent.v1.ResourceExecutionStatus.state:type_name -> lindm.agent.v1.ResourceExecutionState
-	1,  // 36: lindm.agent.v1.ResourceExecutionStatus.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
-	25, // 37: lindm.agent.v1.ResourceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
-	25, // 38: lindm.agent.v1.ResourceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
-	25, // 39: lindm.agent.v1.ResourceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
-	33, // 40: lindm.agent.v1.ResourceExecutionStatus.before:type_name -> lindm.resource.v1.ResourceObservation
-	31, // 41: lindm.agent.v1.ResourceExecutionStatus.verification:type_name -> lindm.resource.v1.ResourceVerification
-	5,  // 42: lindm.agent.v1.ResourceExecutionStatus.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
-	18, // 43: lindm.agent.v1.ResourceExecutionStatus.remediations:type_name -> lindm.agent.v1.ResourceActionRemediation
-	24, // 44: lindm.agent.v1.ResourceExecutionStatus.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
-	34, // 45: lindm.agent.v1.ResourceActionRemediation.target:type_name -> lindm.agent.v1.StorageTarget
-	35, // 46: lindm.agent.v1.ResourceActionRemediation.escrow_rotate:type_name -> google.protobuf.Empty
-	35, // 47: lindm.agent.v1.ResourceActionRemediation.tpm2_bind:type_name -> google.protobuf.Empty
-	25, // 48: lindm.agent.v1.ResourceExecutionAttestation.issued_at:type_name -> google.protobuf.Timestamp
-	25, // 49: lindm.agent.v1.ResourceExecutionAttestation.expires_at:type_name -> google.protobuf.Timestamp
-	17, // 50: lindm.agent.v1.ResourceExecutionAttestation.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	23, // 51: lindm.agent.v1.ResourceOwnershipBinding.sources:type_name -> lindm.agent.v1.ResourceOwnershipSource
-	36, // 52: lindm.agent.v1.ResourceOwnershipBinding.policy:type_name -> lindm.resource.v1.OwnershipPolicy
-	28, // 53: lindm.agent.v1.ResourceAdmissionRefusal.ref:type_name -> lindm.resource.v1.ResourceRef
-	27, // 54: lindm.agent.v1.ResourceAdmissionRefusal.operation:type_name -> lindm.resource.v1.ResourceOperation
-	2,  // 55: lindm.agent.v1.ResourceAdmissionRefusal.reason:type_name -> lindm.agent.v1.ResourceAdmissionRefusalReason
-	56, // [56:56] is the sub-list for method output_type
-	56, // [56:56] is the sub-list for method input_type
-	56, // [56:56] is the sub-list for extension type_name
-	56, // [56:56] is the sub-list for extension extendee
-	0,  // [0:56] is the sub-list for field type_name
+	28, // 6: lindm.agent.v1.ResourceExecutionIntent.secrets:type_name -> lindm.agent.v1.ResourceSecretDelivery
+	25, // 7: lindm.agent.v1.ResourceExecutionPreparation.deadline:type_name -> google.protobuf.Timestamp
+	4,  // 8: lindm.agent.v1.ResourcePreparationOutcome.preparation:type_name -> lindm.agent.v1.ResourceExecutionPreparation
+	1,  // 9: lindm.agent.v1.ResourcePreparationOutcome.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	25, // 10: lindm.agent.v1.ResourceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
+	25, // 11: lindm.agent.v1.ResourceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	29, // 12: lindm.agent.v1.ResourceExecutionChallenge.ref:type_name -> lindm.resource.v1.ResourceRef
+	27, // 13: lindm.agent.v1.ResourceExecutionChallenge.operation:type_name -> lindm.resource.v1.ResourceOperation
+	6,  // 14: lindm.agent.v1.ResourceExecutionStartGrant.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
+	25, // 15: lindm.agent.v1.ResourceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
+	25, // 16: lindm.agent.v1.ResourceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 17: lindm.agent.v1.ResourceExecutionRecord.intent:type_name -> lindm.agent.v1.ResourceExecutionIntent
+	30, // 18: lindm.agent.v1.ResourceExecutionRecord.native_plan:type_name -> lindm.resource.v1.ResourcePlan
+	31, // 19: lindm.agent.v1.ResourceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	25, // 20: lindm.agent.v1.ResourceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
+	0,  // 21: lindm.agent.v1.ResourceExecutionRecord.state:type_name -> lindm.agent.v1.ResourceExecutionState
+	1,  // 22: lindm.agent.v1.ResourceExecutionRecord.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	6,  // 23: lindm.agent.v1.ResourceExecutionRecord.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
+	25, // 24: lindm.agent.v1.ResourceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
+	25, // 25: lindm.agent.v1.ResourceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
+	32, // 26: lindm.agent.v1.ResourceExecutionRecord.verification:type_name -> lindm.resource.v1.ResourceVerification
+	25, // 27: lindm.agent.v1.ResourceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
+	5,  // 28: lindm.agent.v1.ResourceExecutionRecord.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
+	24, // 29: lindm.agent.v1.ResourceExecutionRecord.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
+	33, // 30: lindm.agent.v1.ResourceExecutionRecord.firewall_evidence:type_name -> lindm.agent.v1.ConnectivityVerificationEvidence
+	17, // 31: lindm.agent.v1.PrepareResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	30, // 32: lindm.agent.v1.PrepareResourceExecutionResponse.native_plan:type_name -> lindm.resource.v1.ResourcePlan
+	17, // 33: lindm.agent.v1.StartResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	17, // 34: lindm.agent.v1.GetResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	17, // 35: lindm.agent.v1.CancelResourcePreparationResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	0,  // 36: lindm.agent.v1.ResourceExecutionStatus.state:type_name -> lindm.agent.v1.ResourceExecutionState
+	1,  // 37: lindm.agent.v1.ResourceExecutionStatus.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	25, // 38: lindm.agent.v1.ResourceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
+	25, // 39: lindm.agent.v1.ResourceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
+	25, // 40: lindm.agent.v1.ResourceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
+	34, // 41: lindm.agent.v1.ResourceExecutionStatus.before:type_name -> lindm.resource.v1.ResourceObservation
+	32, // 42: lindm.agent.v1.ResourceExecutionStatus.verification:type_name -> lindm.resource.v1.ResourceVerification
+	5,  // 43: lindm.agent.v1.ResourceExecutionStatus.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
+	18, // 44: lindm.agent.v1.ResourceExecutionStatus.remediations:type_name -> lindm.agent.v1.ResourceActionRemediation
+	24, // 45: lindm.agent.v1.ResourceExecutionStatus.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
+	35, // 46: lindm.agent.v1.ResourceActionRemediation.target:type_name -> lindm.agent.v1.StorageTarget
+	36, // 47: lindm.agent.v1.ResourceActionRemediation.escrow_rotate:type_name -> google.protobuf.Empty
+	36, // 48: lindm.agent.v1.ResourceActionRemediation.tpm2_bind:type_name -> google.protobuf.Empty
+	25, // 49: lindm.agent.v1.ResourceExecutionAttestation.issued_at:type_name -> google.protobuf.Timestamp
+	25, // 50: lindm.agent.v1.ResourceExecutionAttestation.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 51: lindm.agent.v1.ResourceExecutionAttestation.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	23, // 52: lindm.agent.v1.ResourceOwnershipBinding.sources:type_name -> lindm.agent.v1.ResourceOwnershipSource
+	37, // 53: lindm.agent.v1.ResourceOwnershipBinding.policy:type_name -> lindm.resource.v1.OwnershipPolicy
+	29, // 54: lindm.agent.v1.ResourceAdmissionRefusal.ref:type_name -> lindm.resource.v1.ResourceRef
+	27, // 55: lindm.agent.v1.ResourceAdmissionRefusal.operation:type_name -> lindm.resource.v1.ResourceOperation
+	2,  // 56: lindm.agent.v1.ResourceAdmissionRefusal.reason:type_name -> lindm.agent.v1.ResourceAdmissionRefusalReason
+	57, // [57:57] is the sub-list for method output_type
+	57, // [57:57] is the sub-list for method input_type
+	57, // [57:57] is the sub-list for extension type_name
+	57, // [57:57] is the sub-list for extension extendee
+	0,  // [0:57] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_service_execution_proto_init() }
@@ -2424,6 +2460,7 @@ func file_lindm_agent_v1_service_execution_proto_init() {
 	}
 	file_lindm_agent_v1_connectivity_guard_proto_init()
 	file_lindm_agent_v1_device_actions_proto_init()
+	file_lindm_agent_v1_secret_delivery_proto_init()
 	file_lindm_agent_v1_trust_proto_init()
 	file_lindm_agent_v1_service_execution_proto_msgTypes[15].OneofWrappers = []any{
 		(*ResourceActionRemediation_EscrowRotate)(nil),

@@ -67,6 +67,12 @@ func setupHostResourceFixtures(ctx context.Context, vm *guestVM) error {
 // resourceStep assigns one desired state and records the device-signed outcome
 // beside an independent native oracle. Repeats must not acquire start authority.
 func resourceStep(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence, name string, desired *resourcev1.ResourceDesiredState, policy *resourcev1.OwnershipPolicy, repeat bool, oracle func(context.Context) (VMResourceNativeRecord, error)) error {
+	return resourceStepRecords(ctx, r, evidence, name, desired, policy, repeat, singleOracle(oracle))
+}
+
+// resourceStepRecords is resourceStep for scenarios whose independent proof
+// spans several native records, such as a shadow oracle and a real login.
+func resourceStepRecords(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence, name string, desired *resourcev1.ResourceDesiredState, policy *resourcev1.OwnershipPolicy, repeat bool, oracle func(context.Context) ([]VMResourceNativeRecord, error)) error {
 	evidence.Scenarios = append(evidence.Scenarios, VMResourceScenario{Name: name, StartedAt: time.Now().UTC()})
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	fail := func(err error) error {
@@ -89,7 +95,7 @@ func resourceStep(ctx context.Context, r *resourceDispatch, evidence *VMResource
 	if err != nil {
 		return fail(err)
 	}
-	s.Native = []VMResourceNativeRecord{native}
+	s.Native = native
 	s.FinishedAt = time.Now().UTC()
 	s.Passed = true
 	return nil
@@ -98,6 +104,10 @@ func resourceStep(ctx context.Context, r *resourceDispatch, evidence *VMResource
 // resourceReleaseStep clears the assignment and requires an attested release
 // whose native result an independent oracle then confirms.
 func resourceReleaseStep(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence, name string, ref *resourcev1.ResourceRef, oracle func(context.Context) (VMResourceNativeRecord, error)) error {
+	return resourceReleaseStepRecords(ctx, r, evidence, name, ref, singleOracle(oracle))
+}
+
+func resourceReleaseStepRecords(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence, name string, ref *resourcev1.ResourceRef, oracle func(context.Context) ([]VMResourceNativeRecord, error)) error {
 	evidence.Scenarios = append(evidence.Scenarios, VMResourceScenario{Name: name, StartedAt: time.Now().UTC()})
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	var err error
@@ -113,10 +123,20 @@ func resourceReleaseStep(ctx context.Context, r *resourceDispatch, evidence *VMR
 		s.Native = append(s.Native, r.failureDiagnostics(ctx)...)
 		return fmt.Errorf("%s: %w", name, err)
 	}
-	s.Native = []VMResourceNativeRecord{native}
+	s.Native = native
 	s.FinishedAt = time.Now().UTC()
 	s.Passed = true
 	return nil
+}
+
+func singleOracle(oracle func(context.Context) (VMResourceNativeRecord, error)) func(context.Context) ([]VMResourceNativeRecord, error) {
+	return func(ctx context.Context) ([]VMResourceNativeRecord, error) {
+		native, err := oracle(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return []VMResourceNativeRecord{native}, nil
+	}
 }
 
 // executorDiagnostics retains the installed executor's recent journal for a
@@ -324,7 +344,7 @@ func ResourceKindSelection(value string) (map[string]bool, error) {
 	selected := make(map[string]bool)
 	for name := range strings.SplitSeq(value, ",") {
 		switch name {
-		case "packages", "files", "accounts", "sysctl", "definitions", "password", "firewall":
+		case "packages", "files", "accounts", "sysctl", "definitions", "password", "firewall", "secret-password", "local-admin":
 			selected[name] = true
 		default:
 			return nil, fmt.Errorf("unknown resource lane kind %q", name)

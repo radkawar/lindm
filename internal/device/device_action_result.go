@@ -157,8 +157,12 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		}
 	}
 	incoming := status.GetVerification().GetEscrow()
-	if incoming != nil {
-		if intent.GetSpec().GetEscrowRotate() == nil || len(action.StartGrantEnvelope) == 0 || s.escrow == nil || incoming.GetEscrowKeyId() != s.escrow.KeyID() || incoming.GetLuksUuid() != intent.GetSpec().GetEscrowRotate().GetTarget().GetLuksUuid() {
+	if incoming != nil && intent.GetSpec().GetLocalAdminPasswordRotate() != nil {
+		if err := s.ingestLocalAdminEscrow(ctx, q, action, intent, incoming); err != nil {
+			return nil, mapErr(err)
+		}
+	} else if incoming != nil {
+		if intent.GetSpec().GetEscrowRotate() == nil || len(action.StartGrantEnvelope) == 0 || s.escrow == nil || incoming.GetEscrowKeyId() != s.escrow.KeyID() || incoming.GetLocalAdmin() != nil || incoming.GetLuksUuid() != intent.GetSpec().GetEscrowRotate().GetTarget().GetLuksUuid() {
 			return nil, rpcError(connect.CodePermissionDenied, "device_action_escrow_binding_rejected")
 		}
 		challenge := new(agentv1.DeviceActionChallenge)
@@ -193,6 +197,8 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		} else if !bytes.Equal(retained.BindingDocument, canonical) || !bytes.Equal(retained.SecretSha256, incoming.GetRecoveryKeySha256()) {
 			return nil, rpcError(connect.CodeAlreadyExists, "device_action_escrow_conflict")
 		}
+	}
+	if incoming != nil {
 		if len(action.StatusDocument) > 0 {
 			previousStatus := new(agentv1.DeviceActionStatus)
 			if proto.Unmarshal(action.StatusDocument, previousStatus) != nil {
@@ -203,7 +209,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 			}
 		}
 	}
-	if intent.GetSpec().GetEscrowRotate() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED && len(action.EscrowReceiptEnvelope) == 0 {
+	if (intent.GetSpec().GetEscrowRotate() != nil || intent.GetSpec().GetLocalAdminPasswordRotate() != nil) && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED && len(action.EscrowReceiptEnvelope) == 0 {
 		return nil, rpcError(connect.CodeFailedPrecondition, "device_action_escrow_receipt_required")
 	}
 	encoded, err := proto.Marshal(status)
@@ -217,6 +223,11 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	terminal := actionTerminal(status.GetState())
 	if terminal {
 		if err := q.CloseDeviceAction(ctx, devicedb.CloseDeviceActionParams{ID: id, ClosedAt: timestamptz(now), ClosedReason: "result"}); err != nil {
+			return nil, mapErr(err)
+		}
+	}
+	if intent.GetSpec().GetLocalAdminPasswordRotate() != nil {
+		if err := settleLocalAdminPassword(ctx, q, action, status, now); err != nil {
 			return nil, mapErr(err)
 		}
 	}

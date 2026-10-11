@@ -265,12 +265,27 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	if started != (len(record.GetStartGrantEnvelope()) != 0 || len(bootGrant) != 0) {
 		return ErrDeviceActionRejected
 	}
+	localAdmin := i.GetSpec().GetLocalAdminPasswordRotate()
+	if binding := record.GetNativePlan().GetLocalAdminBinding(); (localAdmin != nil) != (binding != nil) || localAdmin != nil && (binding.GetDeviceId() != i.GetDeviceId() || binding.GetEnrollmentGeneration() != i.GetEnrollmentGeneration() || binding.GetActionId() != i.GetActionId() || binding.GetAccountName() != localAdmin.GetAccountName() || binding.GetAccountUid() == 0) {
+		return ErrDeviceActionRejected
+	}
 	if v := record.GetVerification(); v != nil && v.GetEscrow() != nil {
 		e, rotate := v.GetEscrow(), i.GetSpec().GetEscrowRotate()
-		if rotate == nil || record.GetNativePlan().GetRecoveryBinding() == nil || e.GetNewKeyslot() != record.GetNativePlan().GetRecoveryBinding().GetNewKeyslot() || e.GetLuksUuid() != rotate.GetTarget().GetLuksUuid() || e.GetEscrowKeyId() != rotate.GetEscrowKeyId() || rotate.RetireKeyslot != nil && e.GetNewKeyslot() == rotate.GetRetireKeyslot() {
+		if localAdmin != nil {
+			if !proto.Equal(e.GetLocalAdmin(), record.GetNativePlan().GetLocalAdminBinding()) || e.GetEscrowKeyId() != localAdmin.GetEscrowKeyId() {
+				return ErrDeviceActionRejected
+			}
+		} else if rotate == nil || e.GetLocalAdmin() != nil || record.GetNativePlan().GetRecoveryBinding() == nil || e.GetNewKeyslot() != record.GetNativePlan().GetRecoveryBinding().GetNewKeyslot() || e.GetLuksUuid() != rotate.GetTarget().GetLuksUuid() || e.GetEscrowKeyId() != rotate.GetEscrowKeyId() || rotate.RetireKeyslot != nil && e.GetNewKeyslot() == rotate.GetRetireKeyslot() {
 			return ErrDeviceActionRejected
 		}
 	}
+	// The generated password exists locally only between durable escrow staging
+	// and the receipt-authorized native set; every other state has cleared it.
+	staged := record.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW || record.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RETIRING_ESCROW
+	if (record.GetLocalAdminPassword() != nil) != (localAdmin != nil && staged) {
+		return ErrDeviceActionRejected
+	}
+	escrowed := i.GetSpec().GetEscrowRotate() != nil || localAdmin != nil
 	if (len(record.GetEscrowReceiptEnvelope()) != 0) != (record.GetEscrowConfirmedAt() != nil) {
 		return ErrDeviceActionRejected
 	}
@@ -314,7 +329,7 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 				return ErrDeviceActionRejected
 			}
 		}
-		if !started || !record.GetVerification().GetVerified() || i.GetSpec().GetEscrowRotate() != nil && len(record.GetEscrowReceiptEnvelope()) == 0 {
+		if !started || !record.GetVerification().GetVerified() || escrowed && len(record.GetEscrowReceiptEnvelope()) == 0 {
 			return ErrDeviceActionRejected
 		}
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN:
@@ -372,7 +387,12 @@ func rejectDeviceActionTransition(current, next *agentv1.DeviceActionRecord) err
 	base.InventoryReceiptEnvelope = current.GetInventoryReceiptEnvelope()
 	base.InventoryReceiptRoot = current.GetInventoryReceiptRoot()
 	base.InventoryReceiptDelegationEnvelope = current.GetInventoryReceiptDelegationEnvelope()
+	base.LocalAdminPassword = current.GetLocalAdminPassword()
 	if !proto.Equal(base, current) {
+		return ErrDeviceActionRejected
+	}
+	// Staged custody is written once and never replaced by another password.
+	if current.GetLocalAdminPassword() != nil && next.GetLocalAdminPassword() != nil && !proto.Equal(current.GetLocalAdminPassword(), next.GetLocalAdminPassword()) {
 		return ErrDeviceActionRejected
 	}
 	starting, retiring := false, false

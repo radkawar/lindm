@@ -80,7 +80,7 @@ func (s *Service) deviceActionReceipt(ctx context.Context, principal devicePrinc
 	if snapshot.Delegation == nil {
 		return nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
-	receipt := &agentv1.DeviceActionEscrowReceipt{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), IntentSha256: intentDigest[:], EscrowSha256: escrowDigest, RecoveryKeySha256: stored.SecretSha256, NewKeyslot: recovery.GetNewKeyslot(), LuksUuid: recovery.GetLuksUuid(), EscrowKeyId: recovery.GetEscrowKeyId(), StoredAt: timestamppb.New(stored.CommittedAt.Time), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion()}
+	receipt := &agentv1.DeviceActionEscrowReceipt{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), IntentSha256: intentDigest[:], EscrowSha256: escrowDigest, RecoveryKeySha256: stored.SecretSha256, NewKeyslot: recovery.GetNewKeyslot(), LuksUuid: recovery.GetLuksUuid(), EscrowKeyId: recovery.GetEscrowKeyId(), StoredAt: timestamppb.New(stored.CommittedAt.Time), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), LocalAdmin: recovery.GetLocalAdmin()}
 	envelope, err := s.authority.Sign(ctx, receipt, s.signing.StartKey)
 	if err != nil {
 		return nil, executionError(err)
@@ -225,7 +225,7 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 	if err != nil {
 		return nil, mapErr(notFoundIfMissing(err))
 	}
-	if action.DeviceID != deviceID {
+	if action.DeviceID != deviceID || action.Capability != "device.escrow-rotate.v1" {
 		return nil, mapErr(errNotFound)
 	}
 	stored, err := q.GetDeviceActionEscrow(ctx, id)

@@ -22,7 +22,7 @@ import (
 	policyv1 "lindm/gen/lindm/policy/v1"
 )
 
-const usage = "usage: lindmctl {login|logout|whoami|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list|execution delegation sign} [flags]"
+const usage = "usage: lindmctl {login|logout|whoami|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list|execution delegation sign|bundle export|verify|development-key} [flags]"
 
 // Run executes one command. Secret-issuing operations write their response only
 // once to stdout and are never retried. Browser invocation is injected by main.
@@ -35,6 +35,10 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 	}
 	if args[0] == "execution" {
 		return runOwnerDelegation(ctx, args[1:], stdout, time.Now)
+	}
+	if args[0] == "bundle" {
+		// Flag errors are discarded like other commands: paths may be private.
+		return runBundle(ctx, args[1:], stdout, io.Discard, time.Now)
 	}
 	command, args := args[0], args[1:]
 	switch command {

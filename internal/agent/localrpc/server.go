@@ -59,6 +59,8 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{},
 		&agentv1.CommitRenewalRequest{},
+		&agentv1.PrepareEncryptionKeyRequest{},
+		&agentv1.AcknowledgeEncryptionKeyRequest{},
 		&agentv1.UpdateExecutionTrustRequest{},
 		&agentv1.GetExecutionTrustRequest{},
 		&agentv1.GetRecoveryReadinessRequest{},
@@ -155,6 +157,8 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceCommitSessionProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareRenewalProcedure ||
 		procedure == agentv1connect.ExecutorServiceCommitRenewalProcedure ||
+		procedure == agentv1connect.ExecutorServicePrepareEncryptionKeyProcedure ||
+		procedure == agentv1connect.ExecutorServiceAcknowledgeEncryptionKeyProcedure ||
 		procedure == agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure ||

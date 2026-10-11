@@ -71,7 +71,7 @@ func TestNSSSupplementaryDirectoryMembershipIsNotLocal(t *testing.T) {
 	p := testProvider()
 	db := fixtureDB()
 	user := fixtureSnapshot(false).Observation.GetLocalUser()
-	p.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+	p.run = func(_ context.Context, _ []byte, _ string, args ...string) ([]byte, error) {
 		if args[0] == "initgroups" {
 			return []byte("alice 2000 2003 9999\n"), nil
 		}
@@ -122,11 +122,33 @@ func TestMemberCommandPreservesUnownedLocalEdges(t *testing.T) {
 		t.Fatal("group change overwrote unrelated user membership")
 	}
 }
-func TestCredentialPolicyRefusesUnintegratedSecret(t *testing.T) {
+
+// A hashed password is only ever the authenticated delivery of exactly the
+// referenced secret, in the declared algorithm; anything else is refused.
+func TestHashedPasswordRequiresMatchingDelivery(t *testing.T) {
 	p := testProvider()
 	d := userDesired()
-	d.GetLocalUser().Password = &resourcev1.PasswordState{State: &resourcev1.PasswordState_Hashed{Hashed: &resourcev1.HashedPasswordPolicy{Hash: &resourcev1.SecretRef{SecretId: uuid.NewString(), Version: 1, Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, SubjectBindingId: uuid.NewString()}, Algorithm: resourcev1.PasswordHashAlgorithm_PASSWORD_HASH_ALGORITHM_SHA512_CRYPT}}}
-	requireError(t, p.validateDesired(d))
+	ref := &resourcev1.SecretRef{SecretId: uuid.NewString(), Version: 1, Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, SubjectBindingId: uuid.NewString()}
+	d.GetLocalUser().Password = &resourcev1.PasswordState{State: &resourcev1.PasswordState_Hashed{Hashed: &resourcev1.HashedPasswordPolicy{Hash: ref, Algorithm: resourcev1.PasswordHashAlgorithm_PASSWORD_HASH_ALGORITHM_SHA512_CRYPT}}}
+	if err := p.validateDesired(d); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(false), fixtureDB(), nil)
+	if !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("hashed password without delivery = %v", err)
+	}
+	for name, hash := range map[string]string{"algorithm": yescryptHash, "shape": "$6$not-a-hash"} {
+		p.config.Secrets = staticHash(t, ref, hash)
+		if _, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(false), fixtureDB(), nil); !errors.Is(err, ErrUnsafe) {
+			t.Fatalf("%s mismatch accepted: %v", name, err)
+		}
+	}
+	other := proto.CloneOf(ref)
+	other.Version = 2
+	p.config.Secrets = staticHash(t, other, sha512Hash)
+	if _, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(false), fixtureDB(), nil); err == nil {
+		t.Fatal("delivery of another secret version accepted")
+	}
 }
 func TestHomeMetadataRejectsSymlinkWithoutTouchingData(t *testing.T) {
 	dir := t.TempDir()
@@ -196,7 +218,7 @@ func TestAbsentUserOwnsNoDimensions(t *testing.T) {
 func TestNativeAccountRootOptionSelectedBeforeEffects(t *testing.T) {
 	commands := []command{{tool: "/usr/sbin/usermod", args: []string{"--uid", "2002", "--", "alice"}}, {tool: "/usr/bin/chage", args: []string{"--maxdays", "90", "--", "alice"}}}
 	calls := 0
-	run := func(_ context.Context, path string, args ...string) ([]byte, error) {
+	run := func(_ context.Context, _ []byte, path string, args ...string) ([]byte, error) {
 		calls++
 		if !slices.Equal(args, []string{"--help"}) {
 			t.Fatal("capability discovery attempted an effect")
@@ -217,7 +239,7 @@ func TestNativeAccountRootOptionSelectedBeforeEffects(t *testing.T) {
 	if !slices.Equal(commands[0].args[:2], []string{"--prefix", "/run/lindm/test/account-root"}) || !slices.Equal(commands[1].args[:2], []string{"--root", "/run/lindm/test/account-root"}) {
 		t.Fatal("native utility could escape account-only view")
 	}
-	_, err = nativeToolOptions(context.Background(), func(context.Context, string, ...string) ([]byte, error) {
+	_, err = nativeToolOptions(context.Background(), func(context.Context, []byte, string, ...string) ([]byte, error) {
 		return []byte("unsupported native interface"), nil
 	}, commands)
 	if !errors.Is(err, ErrUnsupported) {

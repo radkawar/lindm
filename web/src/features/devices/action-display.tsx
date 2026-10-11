@@ -25,6 +25,7 @@ export const actionLabels: Record<DeviceActionKind, string> = {
   restart: "Restart device",
   shutdown: "Shut down device",
   refreshInventory: "Refresh inventory",
+  localAdminPasswordRotate: "Rotate managed local-admin password",
 };
 export const actionPermissions: Record<DeviceActionKind, string> = {
   escrowRotate: "encryption.manage",
@@ -38,6 +39,7 @@ export const actionPermissions: Record<DeviceActionKind, string> = {
   restart: "remote_execution.run",
   shutdown: "remote_execution.run",
   refreshInventory: "inventory.manage",
+  localAdminPasswordRotate: "secrets.manage",
 };
 export const actionStateLabels: Record<DeviceActionState, string> = {
   [DeviceActionState.UNSPECIFIED]: "No protected result",
@@ -153,6 +155,14 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
         <p>
           Collect and publish a new full inventory snapshot. Collection alone is not completion.
         </p>
+      ) : null}
+      {action.case === "localAdminPasswordRotate" ? (
+        <dl className="grid gap-2 text-sm">
+          <Fact label="Account">{action.value.accountName}</Fact>
+          <Fact label="Escrow transport key">
+            <span className="break-all font-mono text-xs">{action.value.escrowKeyId}</span>
+          </Fact>
+        </dl>
       ) : null}
       {action.case === "lockSessions" ? (
         <dl className="grid gap-2 text-sm">

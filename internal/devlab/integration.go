@@ -64,7 +64,8 @@ func TestIntegration(ctx context.Context, repoRoot string) (resultErr error) {
 		}
 	}
 	env = append(env, "LINDM_TEST_DATABASE_URL="+strings.TrimSpace(string(dsn)), "LINDM_NATIVE_SERVER_BINARY="+server, "LINDM_NATIVE_REPOSITORY="+root)
-	// The device suite alone runs about six minutes under -race against real
-	// PostgreSQL; a per-binary deadline below that reports false timeouts.
-	return command(ctx, root, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=15m", "./internal/...")
+	// The device suite runs six to fifteen minutes under -race against real
+	// PostgreSQL, depending on concurrent package and host load; a per-binary
+	// deadline near that reports false timeouts. The command deadline is 40m.
+	return command(ctx, root, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=30m", "./internal/...")
 }

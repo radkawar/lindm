@@ -176,32 +176,34 @@ const (
 	evaluationBudget = 45 * time.Second
 )
 
-// Run owns no detached goroutines: it joins its evaluation loop before
-// returning, and the caller cancels and joins Run before closing the pool.
-// Inventory matching continues with egress disabled, preserving unknown
-// freshness instead of pretending an air-gapped feed is current. Evaluation
-// runs beside, not behind, a long feed refresh.
-func (s *Service) Run(ctx context.Context) {
-	evaluationDone := make(chan struct{})
-	go func() {
-		defer close(evaluationDone)
-		s.runEvaluations(ctx)
-	}()
-	defer func() { <-evaluationDone }()
+// RunMaintenance is the exclusive refresh, publication-cleanup and retention
+// job. It returns only on cancellation. The refresh schedule derives from each
+// feed's durable attempted_at, so a leadership change or rolling restart does
+// not repeat a vendor fetch. Inventory matching continues with egress disabled
+// in RunEvaluations, which runs beside, not behind, a long feed refresh.
+func (s *Service) RunMaintenance(ctx context.Context) error {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	var nextRefresh time.Time
+	// The local floor keeps the previous per-process cadence even if recording
+	// an attempt fails; durable attempts add the cross-instance schedule.
+	var nextLocalRefresh time.Time
 	for {
 		cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
 		if err := s.drainAdvisoryGenerationCleanup(cleanupCtx); err != nil && ctx.Err() == nil {
 			slog.Warn("advisory generation cleanup deferred", "error", err)
 		}
 		cleanupCancel()
-		if s.config.GetRefreshEnabled() && !s.clock().Before(nextRefresh) {
-			if err := s.Refresh(ctx); err != nil && ctx.Err() == nil {
-				slog.Warn("advisory refresh failed", "error", err)
+		if s.config.GetRefreshEnabled() && !s.clock().Before(nextLocalRefresh) {
+			due, err := s.refreshDue(ctx)
+			if err != nil && ctx.Err() == nil {
+				slog.Warn("advisory refresh schedule unavailable", "error", err)
 			}
-			nextRefresh = s.clock().Add(s.refreshInterval)
+			if due {
+				if err := s.Refresh(ctx); err != nil && ctx.Err() == nil {
+					slog.Warn("advisory refresh failed", "error", err)
+				}
+				nextLocalRefresh = s.clock().Add(s.refreshInterval)
+			}
 		}
 		bounded, cancel := context.WithTimeout(ctx, 45*time.Second)
 		q := advisorydb.New(s.pool)
@@ -214,16 +216,42 @@ func (s *Service) Run(ctx context.Context) {
 		cancel()
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 		}
 	}
 }
 
-// runEvaluations does not gate on this process's configured feeds: feeds are
+// refreshDue reports whether any configured feed lacks an attempt within the
+// refresh interval. Every attempt, successful or failed, records attempted_at.
+func (s *Service) refreshDue(ctx context.Context) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	feeds, err := advisorydb.New(s.pool).ListAdvisoryFeeds(ctx)
+	if err != nil {
+		return false, fmt.Errorf("list advisory feeds: %w", err)
+	}
+	attempted := make(map[string]time.Time, len(feeds))
+	for _, row := range feeds {
+		if row.AttemptedAt.Valid {
+			attempted[row.ID] = row.AttemptedAt.Time
+		}
+	}
+	now := s.clock()
+	for _, source := range s.config.GetFeeds() {
+		last, ok := attempted[source.GetId()]
+		if !ok || !now.Before(last.Add(s.refreshInterval)) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// RunEvaluations is the exclusive evaluation job and returns only on
+// cancellation. It does not gate on this process's configured feeds: feeds are
 // configured and published in the shared database, possibly by another
 // process, and reads depend on this job alone for evaluation.
-func (s *Service) runEvaluations(ctx context.Context) {
+func (s *Service) RunEvaluations(ctx context.Context) error {
 	ticker := time.NewTicker(evaluationPoll)
 	defer ticker.Stop()
 	for {
@@ -241,7 +269,7 @@ func (s *Service) runEvaluations(ctx context.Context) {
 		cancel()
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 		}
 	}

@@ -26,7 +26,7 @@ func (s *Service) verifyResourceRecord(ctx context.Context, loaded *bound, recor
 	if s.admit(record) != nil || record.GetInstallationId() != loaded.state.GetInstallationId() || !resourceTarget(loaded, record.GetIntent()) {
 		return errRecoveryHold
 	}
-	if !bytes.Equal(digestBytes(record.GetIntentEnvelope()), record.GetIntentSha256()) {
+	if !bytes.Equal(digestBytes(record.GetIntentEnvelope()), record.GetIntentSha256()) || !validateRetainedSecrets(record) {
 		return errRecoveryHold
 	}
 	accepted := record.GetAcceptedAt().AsTime()
@@ -169,6 +169,10 @@ func (s *Service) loadResourceAction(ctx context.Context, loaded *bound, actionI
 }
 
 func (s *Service) updateResourceAction(ctx context.Context, loaded *bound, revision int64, next *agentv1.ResourceExecutionRecord) error {
+	// Sealed deliveries are retained only while a native use may still follow.
+	if next.GetCompletedAt() != nil {
+		next.SealedSecrets = nil
+	}
 	if err := s.verifyResourceRecord(ctx, loaded, next); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

@@ -114,6 +114,8 @@ const actionSummaries: Record<DeviceActionKind, string> = {
   restart: "Request a device restart. Completion requires evidence of a new boot.",
   shutdown: "Request device shutdown. Native acceptance does not prove power-off.",
   refreshInventory: "Collect and publish a new full inventory snapshot from this device.",
+  localAdminPasswordRotate:
+    "Generate, escrow and then set a new password for the managed local-admin account.",
 };
 
 export function DeviceActionForm({

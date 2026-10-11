@@ -5,6 +5,7 @@ package advisory
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -180,4 +181,53 @@ type planNode struct {
 	RelationName string     `json:"Relation Name"`
 	IndexName    string     `json:"Index Name"`
 	Plans        []planNode `json:"Plans"`
+}
+
+// Ubuntu's OSV export lists thousands of open CVEs against the kernel source
+// package, and every installed binary of that source matches each of them.
+// One package's candidates span several keyset pages, and the device exceeds
+// the former 10,000-finding bound; it must still be evaluated, not UNKNOWN.
+func TestKernelScaleSourceRecordsPageAndAdmit(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	ctx := t.Context()
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	var revision uuid.UUID
+	if err := pool.QueryRow(ctx, "SELECT revision FROM advisory_feeds WHERE id=$1", source.Id).Scan(&revision); err != nil {
+		t.Fatal(err)
+	}
+	const cves, binaries = 1200, 10
+	records := make([][]any, 0, cves)
+	for i := range cves {
+		cve := fmt.Sprintf("CVE-2026-%05d", i)
+		encoded, err := proto.Marshal(&advisoryv1.Advisory{Id: "OPEN-" + cve, PackageName: "kernel", SourcePackage: true, Severity: "medium", Cves: []string{cve}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		records = append(records, []any{revision, uuid.New(), source.Id, "OPEN-" + cve, "kernel", true, "", encoded})
+	}
+	if _, err := pool.CopyFrom(ctx, pgx.Identifier{"advisory_record_generations"}, []string{"generation", "id", "feed_id", "advisory_id", "package_name", "source_package", "architecture", "record_bytes"}, pgx.CopyFromRows(records)); err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "kernel-core-0", Version: "0:6.17.1-300.fc44", Architecture: "x86_64", Manager: "rpm", SourceName: "kernel", SourceVersion: "0:6.17.1-300.fc44"})
+	mustExec(t, ctx, pool, `INSERT INTO snapshot_packages(snapshot_id,position,name,version,architecture,manager,source_name,source_version)
+SELECT s.id,g,'kernel-core-'||g,'0:6.17.1-300.fc44','x86_64','rpm','kernel','0:6.17.1-300.fc44'
+FROM package_snapshots s, generate_series(1,$2::int-1) g WHERE s.device_id=$1`, id, binaries)
+	mustExec(t, ctx, pool, "UPDATE package_snapshots SET package_count=$2 WHERE device_id=$1", id, binaries)
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Freshness.GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
+		t.Fatalf("kernel-scale exposure: %v", out.Freshness)
+	}
+	var findings int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM advisory_findings WHERE device_id=$1", id).Scan(&findings); err != nil {
+		t.Fatal(err)
+	}
+	if findings != cves*binaries {
+		t.Fatalf("paged matching lost or duplicated candidates: %d findings", findings)
+	}
 }

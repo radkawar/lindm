@@ -835,6 +835,138 @@ receipt checks. This narrows rather than extends existing credential, delegation
 and grant lifetimes. Missing time, failed signatures, nonce substitutions,
 monotonic rollback and expired authority fail closed before destructive effects.
 
+### Secret custody, per-device delivery and managed local-admin passwords
+
+Profiles reference credentials only by `resource.v1.SecretRef`
+(`secret_id`, `version`, `purpose`, `subject_binding_id`). The material lives in
+a server secret store, travels only HPKE-sealed to one device's attested
+encryption key, and exists in plaintext only in server memory during
+create/reveal/seal and in root-executor memory during one native use. Managed
+local-admin passwords (LAPS-like) reverse the direction: the device generates
+the password, seals it to the server escrow transport key and sets it only
+after the server has durably stored it.
+
+Threats and required controls:
+
+| Threat                                   | Control                                                                                                                                                        | Residual limit                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Database or backup theft                 | Per-version AES-256-GCM data key wrapped by the escrow KEK, record-bound AAD, no plaintext digest of low-entropy material, sealed deliveries need a device key | A live server holding the KEK can decrypt everything                                       |
+| Unprivileged agent/network compromise    | Only HPKE ciphertext crosses the spool-free relay; the X25519 private key stays in protected executor state                                                    | Root executor or kernel compromise reads delivered material                                |
+| Malicious enrolled device                | Seal per device generation key; AAD binds deployment, device, generation, action, resource and secret version; no secret-fetch RPC exists                      | A device legitimately assigned a secret can disclose it; rotate after suspected disclosure |
+| Replay or rebinding of a sealed secret   | Executor recomputes the binding from the signed intent and its own identity, checks the signed ciphertext digest and refuses any mismatch before use           | Exact replay of the same action is idempotent, never a second authority                    |
+| Profile editor exfiltrating a secret     | Minting requires the assigning actor to hold fresh `secrets.manage` for the device, purpose must match the referencing field, subject binding must match       | A holder of `secrets.manage` plus device root can read what they deliver                   |
+| Phished administrator revealing material | `secrets.reveal`, reason, recent step-up, optional exact two-person approval, audit committed before release, LAPS rotation after reveal                       | Colluding authorized administrators                                                        |
+| Logs, journal, errors and caches         | Typed redacted carriers; plaintext never journaled, logged, returned in errors, spooled, put in argv/env or cached by the console                              | Swap/core dumps on an unhardened host (executor unit disables both)                        |
+
+Key hierarchy:
+
+- **Escrow KEK** (`escrow.wrapping_key_file`, 32 bytes, existing custody): wraps a
+  fresh random AES-256-GCM data key per stored secret version and per escrowed
+  local-admin password. Storage AAD is SHA-256 of a purpose-separated domain
+  (`lindm-secret-storage-v1`, `lindm-local-admin-storage-v1`) and the canonical
+  binding protobuf persisted beside the ciphertext, never rebuilt from mutable
+  state. Records carry the KEK identifier; a different KEK is a custody incident,
+  not an empty record. Managed secrets store no plaintext digest.
+- **Escrow transport key** (`escrow.transport_key_file`, RSA-OAEP-SHA256): the
+  device-to-server direction for local-admin passwords, with the OAEP label
+  derived from domain `lindm-local-admin-transport-v1` and the canonical
+  `LocalAdminPasswordBinding`. The signed action carries the public key and ID.
+- **Device encryption key**: HPKE base mode, DHKEM(X25519, HKDF-SHA256),
+  HKDF-SHA256, ChaCha20-Poly1305 (`0x0020/0x0001/0x0003`, Go `crypto/hpke`). The
+  root executor generates it together with every identity key (bootstrap and
+  renewal) and keeps it in protected journal state beside that key. The
+  current identity key signs `DeviceEncryptionKeyAttestation` (deployment,
+  device, generation, identity SPKI SHA-256, KEM, public key) with DSSE type
+  `application/vnd.lindm.device-encryption-key.v1+protobuf`. The transport
+  registers it over the device session (`RegisterEncryptionKey`); the server
+  verifies the signature with the mTLS-presented certificate key, requires the
+  SPKI digest to equal that certificate's, and stores it per generation. Only a
+  key attested by an active or overlapping certificate of the device's live
+  (pending or active, never held or revoked) generation
+  can receive deliveries. The previous key is retained with the prior identity
+  credential so in-flight deliveries still open during renewal overlap.
+- **Delivery**: HPKE info `lindm-secret-delivery-v1`; AAD is the deterministic
+  `SecretDeliveryBinding` (deployment, device, generation, action, resource
+  reference, secret ID, version, purpose, subject binding, recipient key SHA-256).
+  The plan-signed resource intent carries each binding and the SHA-256 of its
+  sealed bytes, so the relay cannot substitute ciphertext.
+
+Server store: `secrets.manage` creates a secret with an immutable purpose and a
+server-generated `subject_binding_id`, and rotates it by appending a new version
+with an expected-version check. Material is a typed oneof validated by CEL per
+purpose: a crypt(3) yescrypt, SHA-512 or bcrypt hash for `PASSWORD_HASH`, a
+WPA-PSK for `WIFI_PSK`, bounded bytes otherwise. Secrets are deployment-global, so
+create, rotate and reveal require an unrestricted principal. Listing returns
+metadata only. Reveal requires `secrets.reveal`, a reason, recent step-up, and an
+exact approval when `escrow.reveal_approval_required` or the authorization
+policy requires `secrets.reveal` approval; the audit row commits before
+decryption, every attempt is audited and the response is `no-store`.
+Profiles pin explicit versions: rotation never silently re-delivers; a new
+profile revision referencing the new version is the delivery decision.
+
+Delivery: when `GetResourceWork` mints an intent whose desired state contains a
+`SecretRef`, the server resolves the version in the same transaction, requires
+matching purpose and subject binding, the referencing field's allowed purpose,
+an algorithm-consistent hash for `HashedPasswordPolicy` and fresh
+`secrets.manage` authority of the assigning actor; otherwise the head is blocked
+with a visible reason (`secret_unavailable`, `secret_binding_mismatch`,
+`secret_delivery_unauthorized`) instead of delivering without the secret.
+A device that has not yet registered its encryption key is transient: the
+resource stays pending with `device_encryption_key_unavailable`, nothing is
+minted, and the first poll after registration mints normally. At most eight
+references per resource are collected in field-number order. Release intents
+carry no secret; release restores the sealed baseline from the ownership
+ledger. The sealed bytes are stored with the action, replayed byte-exact and
+audited as `secret.delivered` with the action ID, secret ID and version only.
+`AuthorizeResourceStart` refuses the grant if the actor lost `secrets.manage`.
+
+Executor use: `PrepareResourceExecution` receives sealed bytes next to the
+intent, verifies digest and binding, opens them to prove decryptability, and
+journals only the sealed bytes. Providers obtain plaintext through a scoped
+accessor during Plan, Apply and Verify, and the executor zeroizes it after each
+use. The local-user provider compares the desired hash with the observed shadow
+field in constant time, and the root helper re-validates the hash and sets it
+with `chpasswd --encrypted` reading `name:hash` on stdin (never argv or
+environment), then verifies by observation. Shadow tools do not validate every
+hash format, so lindm checks shape and algorithm itself. Public plans and
+attestations contain only the password dimension and changed/converged status.
+
+Managed local-admin password: a per-device policy (`secrets.manage`) names one
+account that the root-owned executor configuration also allowlists, a rotation
+interval (1–365 days) and a post-reveal rotation delay (0–24 hours). The server
+mints the `local_admin_password_rotate` device action during device action
+polling when the policy is due, after reveal or on explicit request, authorized
+freshly as the policy actor; a changed or denied authorization blocks the
+policy visibly (`policy_authority_changed`, or `escrow_unconfigured`). Minting
+moves the due time one hour ahead, so failed or expired attempts retry at most
+hourly; success sets it to the settlement time plus the interval. Policy-minted
+actions need no per-action approval: the authority is the freshly re-authorized
+policy actor. Administrators cannot create this action directly
+(`local_admin_policy_required`). The executor generates 26 base32 characters
+(the `crypto/rand.Text` construction, ≥128 bits) in locked memory, seals them to
+the signed escrow key, keeps only a private-custody envelope locally and reports
+`AWAITING_ESCROW` with no native effect. The server stores the password
+`ESCROWED`, signs the existing escrow receipt and only then does the executor set
+it with `chpasswd` (system hashing) on stdin and verify that the shadow field
+changed and is usable. Success marks it `CURRENT` (the predecessor `SUPERSEDED`).
+An interrupted set, or an executor restart before the receipt, is
+`OUTCOME_UNKNOWN` and the row `UNKNOWN`; it stays revealable as a candidate and
+is never reminted automatically. `RequestLocalAdminPasswordRotation` closes such
+an unknown action and mints a new one. Reveal (`secrets.reveal`, device scope,
+reason, step-up, optional approval) schedules a rotation after the configured
+delay. Policy changes themselves have no approval kind.
+
+Rotation summary: secret material rotates by version and profile revision;
+device encryption keys rotate with identity renewal; LAPS passwords rotate on
+schedule, after reveal and on request. The KEK and transport key do not rotate
+online: replacing them strands existing records, as for recovery escrow.
+
+Audit actions: `secret.created`, `secret.rotated`, `secret.reveal`,
+`secret.delivered`, `device_encryption_key.registered`,
+`local_admin.policy_set`, `local_admin.rotation_requested`,
+`local_admin.escrow_store`, `local_admin.reveal`. Audit rows contain identifiers
+and reasons, never material or ciphertext.
+
 ### Implemented connected service dispatch (G3)
 
 The pull-based dispatch path now carries generic resources. Native admission is
@@ -1224,6 +1356,18 @@ delivery is retried from the outbox with receiver-visible idempotency IDs. LISTE
 may reduce latency but is never a durable queue. A dead-lettered delivery remains
 visible and replayable under authorization.
 
+Every `lindmd serve` process runs the complete background-job inventory in
+`internal/server/jobs.go` under `internal/jobs`. Exclusive jobs (snapshot cleanup,
+advisory maintenance, advisory evaluation and compliance deadlines) run on one
+replica at a time under a PostgreSQL session advisory lock held by a dedicated,
+non-pooled coordination session; replicated jobs (integration deliveries and
+reports) run everywhere and fence their own row leases. Leadership is exclusivity,
+not the only correctness fence: each job's writes remain row-locked and idempotent
+because a former leader can overlap its successor for at most one heartbeat plus
+one bounded probe. Job failures release leadership and retry with backoff; they
+never terminate the serving process. Request handlers own no background
+goroutines. Operation and qualification are in security-and-operations §4 and §6.
+
 Local and remote artifact storage implement the same content-addressed contract:
 stream upload into a staging object, enforce size/hash and scan/approval policy,
 atomically publish the immutable digest, then reference it transactionally. Never
@@ -1275,8 +1419,10 @@ checked/expiry times and immutable normalized revision. Snapshot signing time ca
 freshness: fetching an old signed archive today cannot renew its age. Atomic refresh
 failure retains the last revision without extending freshness. Offline import
 requires an operator-supplied byte pin and records no unverified signature claim;
-it contributes findings but never current complete coverage. This is not a signed,
-replay-fenced air-gap bundle protocol.
+it contributes findings but never current complete coverage. Signed offline
+bundles are the replay-fenced alternative: their feed snapshots carry a signed
+acquisition time from which freshness is measured, keep parser coverage, and pass
+through the bundle sequence ledger (`internal/offlinebundle`).
 
 Matching selects the enrollment generation's latest **published** package
 snapshot, not an in-progress upload or last successful heartbeat. Dpkg source
@@ -1307,11 +1453,12 @@ identities as separate index lookups on `(feed, generation, kind, name, id)`, ne
 a scan of a multi-million-record generation. Candidates are read in 500-record
 keyset pages over `(package position, record id)`: one installed Ubuntu kernel
 binary alone matches about 10,000 OSV records. The per-device admission bound is
-100,000 findings; the stock Ubuntu 24.04 cloud image with one kernel already
-exceeds 10,000 because thousands of open kernel CVEs apply to each installed
-binary of the kernel source. Against the 2026-10-10 Ubuntu export (2,157,314
-records) that 665-package inventory evaluates in about 1.5 s. Deterministic record or capacity
-failures persist an UNKNOWN evaluation instead of retrying unchanged evidence.
+100,000 findings: thousands of open kernel CVEs apply to each installed binary of
+the kernel source, so the stock 665-package Ubuntu 24.04 cloud image with one
+kernel has 28,821 findings against the 2026-10-10 Ubuntu export (2,157,314
+records), evaluated in about 1.5 s, with device reads under 5 ms. Deterministic
+record or capacity failures persist an UNKNOWN evaluation instead of retrying
+unchanged evidence.
 RPM imported signing keys (`gpg-pubkey` rows without an architecture) are keyring
 entries, not packages: they neither match records nor make architecture coverage
 UNKNOWN; any other architecture-less package still does.

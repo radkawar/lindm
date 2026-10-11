@@ -106,6 +106,7 @@ func deviceActionCapabilities() ([]string, error) {
 		{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{}}},
 		{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}},
 		{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}},
+		{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{}}},
 	}
 	capabilities := make([]string, 0, len(specs))
 	for _, spec := range specs {

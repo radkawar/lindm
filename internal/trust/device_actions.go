@@ -40,6 +40,8 @@ func DeviceActionCapability(spec *agentv1.DeviceActionSpec) (string, error) {
 		return "device.shutdown.v1", nil
 	case *agentv1.DeviceActionSpec_RefreshInventory:
 		return "device.refresh-inventory.v1", nil
+	case *agentv1.DeviceActionSpec_LocalAdminPasswordRotate:
+		return "device.local-admin-rotate.v1", nil
 	default:
 		return "", errors.New("unsupported device action capability")
 	}
@@ -171,6 +173,13 @@ func (v *ExecutionVerifier) verifyDeviceActionGrant(root *agentv1.ExecutionRoot,
 			return nil, errors.New("device action recovery slot is already occupied")
 		}
 	}
+	if rotate := intent.GetSpec().GetLocalAdminPasswordRotate(); rotate != nil {
+		if !localAdminBindingMatches(plan.GetLocalAdminBinding(), intent) {
+			return nil, errors.New("device action local-admin binding rejected")
+		}
+	} else if plan.GetLocalAdminBinding() != nil {
+		return nil, errors.New("device action local-admin binding rejected")
+	}
 	erase, sanitize := intent.GetSpec().GetCryptoErase(), intent.GetSpec().GetSanitize()
 	destructive := erase != nil || sanitize != nil
 	liveRoot := erase.GetMode() == agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER
@@ -215,14 +224,20 @@ func (v *ExecutionVerifier) verifyDeviceActionGrant(root *agentv1.ExecutionRoot,
 }
 
 // VerifyDeviceActionEscrowReceipt permits only completing the original staged
-// rotation. It is not new destructive authority and may outlive intent expiry.
-// Current trust still governs the receipt; exact consumed receipts are recovered
-// from the journal rather than interpreted as permission to repeat retirement.
+// rotation (LUKS slot retirement or local-admin password set). It is not new
+// destructive authority and may outlive intent expiry. Current trust still
+// governs the receipt; exact consumed receipts are recovered from the journal
+// rather than interpreted as permission to repeat the second phase.
 func (v *ExecutionVerifier) VerifyDeviceActionEscrowReceipt(ctx context.Context, root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, envelope []byte, record *agentv1.DeviceActionRecord, now time.Time) (*agentv1.DeviceActionEscrowReceipt, error) {
-	if record == nil || record.GetIntent().GetSpec().GetEscrowRotate() == nil || record.GetVerification().GetEscrow() == nil || record.GetStartedAt() == nil {
+	spec := record.GetIntent().GetSpec()
+	if record == nil || (spec.GetEscrowRotate() == nil && spec.GetLocalAdminPasswordRotate() == nil) || record.GetVerification().GetEscrow() == nil || record.GetStartedAt() == nil {
 		return nil, errors.New("missing staged device action escrow")
 	}
-	keys, err := v.capabilityKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, "device.escrow-rotate.v1", now)
+	capability, err := DeviceActionCapability(spec)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := v.capabilityKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, capability, now)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +253,16 @@ func (v *ExecutionVerifier) VerifyDeviceActionEscrowReceipt(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if receipt.GetDeploymentId() != v.deploymentID || receipt.GetDeploymentId() != intent.GetDeploymentId() || receipt.GetDeviceId() != intent.GetDeviceId() || receipt.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || receipt.GetActionId() != intent.GetActionId() || !bytes.Equal(receipt.GetIntentSha256(), record.GetIntentSha256()) || !bytes.Equal(receipt.GetEscrowSha256(), digest[:]) || !bytes.Equal(receipt.GetRecoveryKeySha256(), escrow.GetRecoveryKeySha256()) || receipt.GetNewKeyslot() != escrow.GetNewKeyslot() || receipt.GetLuksUuid() != escrow.GetLuksUuid() || receipt.GetEscrowKeyId() != escrow.GetEscrowKeyId() || receipt.GetRootVersion() != root.GetVersion() || receipt.GetDelegationVersion() != delegation.GetVersion() {
+	if receipt.GetDeploymentId() != v.deploymentID || receipt.GetDeploymentId() != intent.GetDeploymentId() || receipt.GetDeviceId() != intent.GetDeviceId() || receipt.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || receipt.GetActionId() != intent.GetActionId() || !bytes.Equal(receipt.GetIntentSha256(), record.GetIntentSha256()) || !bytes.Equal(receipt.GetEscrowSha256(), digest[:]) || !bytes.Equal(receipt.GetRecoveryKeySha256(), escrow.GetRecoveryKeySha256()) || receipt.GetNewKeyslot() != escrow.GetNewKeyslot() || receipt.GetLuksUuid() != escrow.GetLuksUuid() || receipt.GetEscrowKeyId() != escrow.GetEscrowKeyId() || receipt.GetRootVersion() != root.GetVersion() || receipt.GetDelegationVersion() != delegation.GetVersion() || !proto.Equal(receipt.GetLocalAdmin(), escrow.GetLocalAdmin()) {
+		return nil, errors.New("device action escrow receipt binding rejected")
+	}
+	// The receipt kind must be the signed action's kind: a recovery receipt can
+	// never authorize a password set, nor a local-admin receipt a slot retirement.
+	if spec.GetLocalAdminPasswordRotate() != nil {
+		if !localAdminBindingMatches(escrow.GetLocalAdmin(), intent) || escrow.GetEscrowKeyId() != spec.GetLocalAdminPasswordRotate().GetEscrowKeyId() {
+			return nil, errors.New("device action escrow receipt binding rejected")
+		}
+	} else if escrow.GetLocalAdmin() != nil || escrow.GetLuksUuid() != spec.GetEscrowRotate().GetTarget().GetLuksUuid() {
 		return nil, errors.New("device action escrow receipt binding rejected")
 	}
 	// StoredAt records the original durable custody commit, not signature
@@ -248,6 +272,12 @@ func (v *ExecutionVerifier) VerifyDeviceActionEscrowReceipt(ctx context.Context,
 		return nil, errors.New("device action escrow receipt validity rejected")
 	}
 	return receipt, nil
+}
+
+// localAdminBindingMatches requires the root-planned binding to name the exact
+// signed device, generation, action and account, with a non-root UID.
+func localAdminBindingMatches(binding *agentv1.LocalAdminPasswordBinding, intent *agentv1.DeviceActionIntent) bool {
+	return binding != nil && binding.GetDeviceId() == intent.GetDeviceId() && binding.GetEnrollmentGeneration() == intent.GetEnrollmentGeneration() && binding.GetActionId() == intent.GetActionId() && binding.GetAccountName() == intent.GetSpec().GetLocalAdminPasswordRotate().GetAccountName() && binding.GetAccountName() != "root" && binding.GetAccountUid() != 0
 }
 
 func validateLiveRootScope(spec *agentv1.DeviceActionSpec, plan *agentv1.DeviceActionPlan) error {

@@ -51,6 +51,7 @@ func actionSandboxCommand(ctx context.Context, args []string, output io.Writer) 
 	// live journal. Retain the original qualification for the emitted sandbox.
 	discovery := proto.CloneOf(cfg)
 	discovery.AllowAccountLock = false
+	discovery.LocalAdminAccounts = nil
 	provider, err := nativeActionProvider(discovery, nil)
 	if err != nil {
 		return err
@@ -123,10 +124,11 @@ func actionSandboxText(cfg *agentv1.DeviceActionProviderConfig, devices []string
 	if actionMemoryRequired(cfg) {
 		text.WriteString("LimitMEMLOCK=infinity\n")
 	}
-	if cfg.GetAllowAccountLock() {
+	if cfg.GetAllowAccountLock() || len(cfg.GetLocalAdminAccounts()) != 0 {
 		// Shadow tools atomically rename files and create their native locks/
 		// backups in /etc; file-only writable bind mounts break that protocol.
-		// This exception is provisioned only by root's explicit account opt-in.
+		// This exception is provisioned only by root's explicit account opt-in
+		// or managed local-admin allowlist.
 		text.WriteString("ReadWritePaths=/etc\n")
 	}
 	devices = slices.Clone(devices)

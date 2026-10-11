@@ -5,6 +5,7 @@ package executor
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/actionprovider"
+	"lindm/internal/agent/journal"
 )
 
 // actionBoundary is a deterministic effect gate, not a native storage emulator.
@@ -31,6 +33,12 @@ type actionBoundary struct {
 	failAfterEffect   bool
 	requireCredential bool
 	occupiedKeyslots  []uint32
+	// Local-admin fixture: the fake seals through the executor's real journal
+	// custody so tests can prove only ciphertext reaches SQLite.
+	custody           *journal.Store
+	localAdminCanary  []byte
+	localAdminSets    atomic.Int32
+	failLocalAdminSet bool
 }
 
 func (n *actionBoundary) Observe(_ context.Context, spec *agentv1.DeviceActionSpec) (*agentv1.DeviceActionObservation, error) {
@@ -43,6 +51,9 @@ func (n *actionBoundary) Observe(_ context.Context, spec *agentv1.DeviceActionSp
 	}
 	if r := spec.GetCryptoErase(); r != nil {
 		o.Target, o.Encrypted = proto.CloneOf(r.GetTarget()), true
+	}
+	if r := spec.GetLocalAdminPasswordRotate(); r != nil {
+		o.LocalAdmin = &agentv1.LocalAdminAccountObservation{AccountName: r.GetAccountName(), AccountUid: 1001, PasswordUsable: true}
 	}
 	return o, nil
 }
@@ -60,6 +71,9 @@ func (n *actionBoundary) Plan(_ context.Context, spec *agentv1.DeviceActionSpec,
 			}
 		}
 		plan.RecoveryBinding = &agentv1.RecoveryKeyBinding{LuksUuid: rotate.GetTarget().GetLuksUuid(), NewKeyslot: slot}
+	}
+	if r := spec.GetLocalAdminPasswordRotate(); r != nil {
+		plan.LocalAdminBinding = &agentv1.LocalAdminPasswordBinding{AccountName: r.GetAccountName(), AccountUid: before.GetLocalAdmin().GetAccountUid()}
 	}
 	return plan, nil
 }
@@ -112,6 +126,43 @@ func (n *actionBoundary) ConfirmEscrow(ctx context.Context, _ *agentv1.DeviceAct
 	verified.Verified = true
 	return verified, nil
 }
+func (n *actionBoundary) StageLocalAdminPassword(ctx context.Context, plan *agentv1.DeviceActionPlan, gate func(context.Context) error) (*agentv1.DeviceActionVerification, *agentv1.PrivateCustodyEnvelope, error) {
+	if err := gate(ctx); err != nil {
+		return nil, nil, err
+	}
+	envelope, err := n.custody.SealLocalAdminPassword(plan.GetLocalAdminBinding(), n.localAdminCanary)
+	if err != nil {
+		return nil, nil, err
+	}
+	digest := sha256.Sum256(n.localAdminCanary)
+	escrow := &agentv1.DeviceActionEscrow{EscrowKeyId: plan.GetSpec().GetLocalAdminPasswordRotate().GetEscrowKeyId(), Ciphertext: []byte("server-sealed fixture, never plaintext"), RecoveryKeySha256: digest[:], LocalAdmin: proto.CloneOf(plan.GetLocalAdminBinding())}
+	return &agentv1.DeviceActionVerification{After: proto.CloneOf(plan.GetBefore()), Escrow: escrow}, envelope, nil
+}
+func (n *actionBoundary) SetLocalAdminPassword(ctx context.Context, plan *agentv1.DeviceActionPlan, stage *agentv1.DeviceActionVerification, sealed *agentv1.PrivateCustodyEnvelope, gate func(context.Context) error) (*agentv1.DeviceActionVerification, error) {
+	password, err := n.custody.OpenLocalAdminPassword(plan.GetLocalAdminBinding(), sealed)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(password)
+	if !bytes.Equal(password, n.localAdminCanary) {
+		return nil, errors.New("custody returned another password")
+	}
+	if err := gate(ctx); err != nil {
+		return nil, err
+	}
+	if n.checkGate != nil {
+		if err := n.checkGate(); err != nil {
+			return nil, err
+		}
+	}
+	n.localAdminSets.Add(1)
+	if n.failLocalAdminSet {
+		return nil, errors.Join(actionprovider.ErrOutcomeUnknown, errors.New("interrupted chpasswd"))
+	}
+	verified := proto.CloneOf(stage)
+	verified.Verified = true
+	return verified, nil
+}
 
 type deviceActionFixture struct {
 	*serviceFixture
@@ -120,15 +171,16 @@ type deviceActionFixture struct {
 
 func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 	t.Helper()
-	f := &deviceActionFixture{serviceFixture: newServiceFixture(t, false, true), actionNative: &actionBoundary{}}
+	f := &deviceActionFixture{serviceFixture: newServiceFixture(t, false, true), actionNative: &actionBoundary{localAdminCanary: []byte("LAPSCANARYPLAINTEXT2345672")}}
 	f.svc.actionProvider = f.actionNative
+	f.actionNative.custody = f.svc.store
 	f.actionDelegation(t, 1)
 	return f
 }
 func (f *deviceActionFixture) actionDelegation(t *testing.T, version uint64) {
 	t.Helper()
 	plan, start := delegate(t, f.planKey), delegate(t, f.startKey)
-	plan.Capabilities = []string{"device.lock-sessions.v1", "device.release-lock.v1", "device.escrow-rotate.v1", "device.crypto-erase.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1"}
+	plan.Capabilities = []string{"device.lock-sessions.v1", "device.release-lock.v1", "device.escrow-rotate.v1", "device.crypto-erase.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1", "device.local-admin-rotate.v1"}
 	start.Capabilities = append([]string(nil), plan.Capabilities...)
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
 	callTrust(t, f.svc, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: mustSign(t, f.svc.authority, delegationDocument(f.fix.deploy.String(), 1, version, 0, f.now, plan, start), f.fix.rootKey)})
@@ -209,6 +261,7 @@ func (f *deviceActionFixture) reopenActions(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.svc = svc
+	f.actionNative.custody = svc.store
 	t.Cleanup(func() { _ = svc.Close() })
 }
 

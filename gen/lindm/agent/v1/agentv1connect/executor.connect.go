@@ -60,6 +60,12 @@ const (
 	// ExecutorServiceCommitRenewalProcedure is the fully-qualified name of the ExecutorService's
 	// CommitRenewal RPC.
 	ExecutorServiceCommitRenewalProcedure = "/lindm.agent.v1.ExecutorService/CommitRenewal"
+	// ExecutorServicePrepareEncryptionKeyProcedure is the fully-qualified name of the ExecutorService's
+	// PrepareEncryptionKey RPC.
+	ExecutorServicePrepareEncryptionKeyProcedure = "/lindm.agent.v1.ExecutorService/PrepareEncryptionKey"
+	// ExecutorServiceAcknowledgeEncryptionKeyProcedure is the fully-qualified name of the
+	// ExecutorService's AcknowledgeEncryptionKey RPC.
+	ExecutorServiceAcknowledgeEncryptionKeyProcedure = "/lindm.agent.v1.ExecutorService/AcknowledgeEncryptionKey"
 	// ExecutorServiceUpdateExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
 	// UpdateExecutionTrust RPC.
 	ExecutorServiceUpdateExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/UpdateExecutionTrust"
@@ -156,6 +162,13 @@ type ExecutorServiceClient interface {
 	// CommitRenewal installs a certificate that matches the pending next key
 	// and pinned identity before acknowledgment.
 	CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error)
+	// PrepareEncryptionKey returns the identity-signed attestation of the current
+	// HPKE recipient key, generating the key once for pre-delivery journals. The
+	// private key is never returned.
+	PrepareEncryptionKey(context.Context, *connect.Request[v1.PrepareEncryptionKeyRequest]) (*connect.Response[v1.PrepareEncryptionKeyResponse], error)
+	// AcknowledgeEncryptionKey records that the server registered the exact key
+	// under the exact current certificate. It is only a re-registration hint.
+	AcknowledgeEncryptionKey(context.Context, *connect.Request[v1.AcknowledgeEncryptionKeyRequest]) (*connect.Response[v1.AcknowledgeEncryptionKeyResponse], error)
 	// UpdateExecutionTrust verifies both rotation quorums and root-signed online
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
@@ -258,6 +271,18 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			httpClient,
 			baseURL+ExecutorServiceCommitRenewalProcedure,
 			connect.WithSchema(executorServiceMethods.ByName("CommitRenewal")),
+			connect.WithClientOptions(opts...),
+		),
+		prepareEncryptionKey: connect.NewClient[v1.PrepareEncryptionKeyRequest, v1.PrepareEncryptionKeyResponse](
+			httpClient,
+			baseURL+ExecutorServicePrepareEncryptionKeyProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("PrepareEncryptionKey")),
+			connect.WithClientOptions(opts...),
+		),
+		acknowledgeEncryptionKey: connect.NewClient[v1.AcknowledgeEncryptionKeyRequest, v1.AcknowledgeEncryptionKeyResponse](
+			httpClient,
+			baseURL+ExecutorServiceAcknowledgeEncryptionKeyProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("AcknowledgeEncryptionKey")),
 			connect.WithClientOptions(opts...),
 		),
 		updateExecutionTrust: connect.NewClient[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse](
@@ -394,6 +419,8 @@ type executorServiceClient struct {
 	commitSession                *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
 	prepareRenewal               *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
 	commitRenewal                *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
+	prepareEncryptionKey         *connect.Client[v1.PrepareEncryptionKeyRequest, v1.PrepareEncryptionKeyResponse]
+	acknowledgeEncryptionKey     *connect.Client[v1.AcknowledgeEncryptionKeyRequest, v1.AcknowledgeEncryptionKeyResponse]
 	updateExecutionTrust         *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
 	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	getRecoveryReadiness         *connect.Client[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse]
@@ -459,6 +486,16 @@ func (c *executorServiceClient) PrepareRenewal(ctx context.Context, req *connect
 // CommitRenewal calls lindm.agent.v1.ExecutorService.CommitRenewal.
 func (c *executorServiceClient) CommitRenewal(ctx context.Context, req *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error) {
 	return c.commitRenewal.CallUnary(ctx, req)
+}
+
+// PrepareEncryptionKey calls lindm.agent.v1.ExecutorService.PrepareEncryptionKey.
+func (c *executorServiceClient) PrepareEncryptionKey(ctx context.Context, req *connect.Request[v1.PrepareEncryptionKeyRequest]) (*connect.Response[v1.PrepareEncryptionKeyResponse], error) {
+	return c.prepareEncryptionKey.CallUnary(ctx, req)
+}
+
+// AcknowledgeEncryptionKey calls lindm.agent.v1.ExecutorService.AcknowledgeEncryptionKey.
+func (c *executorServiceClient) AcknowledgeEncryptionKey(ctx context.Context, req *connect.Request[v1.AcknowledgeEncryptionKeyRequest]) (*connect.Response[v1.AcknowledgeEncryptionKeyResponse], error) {
+	return c.acknowledgeEncryptionKey.CallUnary(ctx, req)
 }
 
 // UpdateExecutionTrust calls lindm.agent.v1.ExecutorService.UpdateExecutionTrust.
@@ -596,6 +633,13 @@ type ExecutorServiceHandler interface {
 	// CommitRenewal installs a certificate that matches the pending next key
 	// and pinned identity before acknowledgment.
 	CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error)
+	// PrepareEncryptionKey returns the identity-signed attestation of the current
+	// HPKE recipient key, generating the key once for pre-delivery journals. The
+	// private key is never returned.
+	PrepareEncryptionKey(context.Context, *connect.Request[v1.PrepareEncryptionKeyRequest]) (*connect.Response[v1.PrepareEncryptionKeyResponse], error)
+	// AcknowledgeEncryptionKey records that the server registered the exact key
+	// under the exact current certificate. It is only a re-registration hint.
+	AcknowledgeEncryptionKey(context.Context, *connect.Request[v1.AcknowledgeEncryptionKeyRequest]) (*connect.Response[v1.AcknowledgeEncryptionKeyResponse], error)
 	// UpdateExecutionTrust verifies both rotation quorums and root-signed online
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
@@ -694,6 +738,18 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		ExecutorServiceCommitRenewalProcedure,
 		svc.CommitRenewal,
 		connect.WithSchema(executorServiceMethods.ByName("CommitRenewal")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServicePrepareEncryptionKeyHandler := connect.NewUnaryHandler(
+		ExecutorServicePrepareEncryptionKeyProcedure,
+		svc.PrepareEncryptionKey,
+		connect.WithSchema(executorServiceMethods.ByName("PrepareEncryptionKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceAcknowledgeEncryptionKeyHandler := connect.NewUnaryHandler(
+		ExecutorServiceAcknowledgeEncryptionKeyProcedure,
+		svc.AcknowledgeEncryptionKey,
+		connect.WithSchema(executorServiceMethods.ByName("AcknowledgeEncryptionKey")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServiceUpdateExecutionTrustHandler := connect.NewUnaryHandler(
@@ -836,6 +892,10 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServicePrepareRenewalHandler.ServeHTTP(w, r)
 		case ExecutorServiceCommitRenewalProcedure:
 			executorServiceCommitRenewalHandler.ServeHTTP(w, r)
+		case ExecutorServicePrepareEncryptionKeyProcedure:
+			executorServicePrepareEncryptionKeyHandler.ServeHTTP(w, r)
+		case ExecutorServiceAcknowledgeEncryptionKeyProcedure:
+			executorServiceAcknowledgeEncryptionKeyHandler.ServeHTTP(w, r)
 		case ExecutorServiceUpdateExecutionTrustProcedure:
 			executorServiceUpdateExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetExecutionTrustProcedure:
@@ -919,6 +979,14 @@ func (UnimplementedExecutorServiceHandler) PrepareRenewal(context.Context, *conn
 
 func (UnimplementedExecutorServiceHandler) CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.CommitRenewal is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) PrepareEncryptionKey(context.Context, *connect.Request[v1.PrepareEncryptionKeyRequest]) (*connect.Response[v1.PrepareEncryptionKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareEncryptionKey is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) AcknowledgeEncryptionKey(context.Context, *connect.Request[v1.AcknowledgeEncryptionKeyRequest]) (*connect.Response[v1.AcknowledgeEncryptionKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AcknowledgeEncryptionKey is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {

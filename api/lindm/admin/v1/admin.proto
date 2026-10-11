@@ -17,6 +17,7 @@ import "lindm/admin/v1/inventory_management.proto";
 import "lindm/admin/v1/offline_enrollment.proto";
 import "lindm/admin/v1/profiles.proto";
 import "lindm/admin/v1/provisioning.proto";
+import "lindm/admin/v1/secrets.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
@@ -77,6 +78,18 @@ service AdminService {
   rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);
   rpc ListDeviceStorageTargets(ListDeviceStorageTargetsRequest) returns (ListDeviceStorageTargetsResponse);
   rpc RevealRecoveryKey(RevealRecoveryKeyRequest) returns (RevealRecoveryKeyResponse);
+  // Deployment-global secret custody. Listing never returns material.
+  rpc CreateSecret(CreateSecretRequest) returns (CreateSecretResponse);
+  rpc RotateSecret(RotateSecretRequest) returns (RotateSecretResponse);
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+  rpc GetSecret(GetSecretRequest) returns (GetSecretResponse);
+  rpc RevealSecret(RevealSecretRequest) returns (RevealSecretResponse);
+  // Managed local-admin passwords escrowed by the device.
+  rpc SetLocalAdminPasswordPolicy(SetLocalAdminPasswordPolicyRequest) returns (SetLocalAdminPasswordPolicyResponse);
+  rpc RemoveLocalAdminPasswordPolicy(RemoveLocalAdminPasswordPolicyRequest) returns (RemoveLocalAdminPasswordPolicyResponse);
+  rpc RequestLocalAdminPasswordRotation(RequestLocalAdminPasswordRotationRequest) returns (RequestLocalAdminPasswordRotationResponse);
+  rpc GetLocalAdminPasswordStatus(GetLocalAdminPasswordStatusRequest) returns (GetLocalAdminPasswordStatusResponse);
+  rpc RevealLocalAdminPassword(RevealLocalAdminPasswordRequest) returns (RevealLocalAdminPasswordResponse);
   rpc ListDeviceGroups(ListDeviceGroupsRequest) returns (ListDeviceGroupsResponse);
   rpc SetDeviceGroup(SetDeviceGroupRequest) returns (SetDeviceGroupResponse);
   rpc DeleteDeviceGroup(DeleteDeviceGroupRequest) returns (DeleteDeviceGroupResponse);

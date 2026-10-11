@@ -15,6 +15,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/packaging"
 )
 
 const resourceFixtureRoot = "/var/lib/lindm-resource-lab"
@@ -215,11 +216,21 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 	}
 	config.PackageProvider = &agentv1.NativePackageProviderConfig{Sources: []*agentv1.NativePackageSource{source}}
 	config.FileProvider = &agentv1.NativeFileProviderConfig{AllowedRoots: []string{resourceFileRoot}}
-	if selected["accounts"] || selected["sysctl"] || selected["definitions"] {
+	if selected["accounts"] || selected["sysctl"] || selected["definitions"] || selected["secret-password"] {
 		if err := setupHostResourceFixtures(ctx, packages.vm); err != nil {
 			return err
 		}
 		provisionHostResourceRoots(config)
+	}
+	install := "install -o root -g root -m 0600 " + nativeGuestDir + "/resource-executor.json /etc/lindm/executor.json; "
+	if selected["local-admin"] {
+		if err := lifecycleCommand(ctx, packages.vm, "create managed local-admin account", localAdminFixtureScript); err != nil {
+			return err
+		}
+		// Root's local allowlist is the only native authority for rotation;
+		// the reviewed sandbox exception is generated from it before restart.
+		config.ActionProvider = &agentv1.DeviceActionProviderConfig{LocalAdminAccounts: []string{localAdminLabAccount}}
+		install += packaging.BinaryPath + " action-sandbox -install; systemctl daemon-reload; "
 	}
 	if err := protovalidate.Validate(config); err != nil {
 		return err
@@ -231,5 +242,5 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 	if err := packages.uploadBytes(ctx, nativeGuestDir+"/resource-executor.json", encoded); err != nil {
 		return err
 	}
-	return lifecycleCommand(ctx, packages.vm, "provision explicit native resource roots and signed source", "install -o root -g root -m 0600 "+nativeGuestDir+"/resource-executor.json /etc/lindm/executor.json; systemctl restart lindm-executor.service")
+	return lifecycleCommand(ctx, packages.vm, "provision explicit native resource roots and signed source", install+"systemctl restart lindm-executor.service")
 }

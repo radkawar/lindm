@@ -62,20 +62,21 @@ func nativeToolOptions(ctx context.Context, run nativeRun, commands []command) (
 			continue
 		}
 		switch cmd.tool {
-		case "/usr/sbin/groupadd", "/usr/sbin/groupmod", "/usr/sbin/groupdel", "/usr/sbin/useradd", "/usr/sbin/usermod", "/usr/sbin/userdel", "/usr/bin/chage":
+		case "/usr/sbin/groupadd", "/usr/sbin/groupmod", "/usr/sbin/groupdel", "/usr/sbin/useradd", "/usr/sbin/usermod", "/usr/sbin/userdel", "/usr/bin/chage", "/usr/sbin/chpasswd":
 		default:
 			return nil, ErrUnsafe
 		}
-		help, err := run(ctx, cmd.tool, "--help")
+		help, err := run(ctx, nil, cmd.tool, "--help")
 		if err != nil {
 			return nil, err
 		}
-		// Selection is read-only and complete before authority consumption. chage on
-		// Ubuntu 24.04 supports --root rather than --prefix; there is no failed-effect
-		// fallback. CAP_SYS_CHROOT belongs only to the fixed helper for this variant.
+		// Selection is read-only and complete before authority consumption. chage
+		// and chpasswd on Ubuntu 24.04 (shadow 4.13) support --root rather than
+		// --prefix; there is no failed-effect fallback. CAP_SYS_CHROOT belongs
+		// only to the fixed helper for this variant.
 		if strings.Contains(string(help), "--prefix") {
 			options[cmd.tool] = "--prefix"
-		} else if cmd.tool == "/usr/bin/chage" && strings.Contains(string(help), "--root") {
+		} else if (cmd.tool == "/usr/bin/chage" || cmd.tool == "/usr/sbin/chpasswd") && strings.Contains(string(help), "--root") {
 			options[cmd.tool] = "--root"
 		} else {
 			return nil, fmt.Errorf("%w: native account-root interface unavailable", ErrUnsupported)

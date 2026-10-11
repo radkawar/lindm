@@ -38,7 +38,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(args) == 0 {
-		return errors.New("usage: lindmd {serve|migrate|bootstrap-owner|check-config|advisories-refresh|advisories-import} -config FILE; lindmd version")
+		return errors.New("usage: lindmd {serve|migrate|bootstrap-owner|check-config|advisories-refresh|advisories-import|bundle-import} -config FILE; lindmd version")
 	}
 	command := args[0]
 	switch command {
@@ -50,6 +50,8 @@ func run(ctx context.Context, args []string) error {
 		return err
 	case "advisories-refresh", "advisories-import":
 		return runAdvisories(ctx, args)
+	case "bundle-import":
+		return runBundleImport(ctx, args)
 	case "serve", "migrate", "bootstrap-owner", "check-config":
 	default:
 		return fmt.Errorf("unknown command %q", command)

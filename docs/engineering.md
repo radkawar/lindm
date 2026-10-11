@@ -278,7 +278,11 @@ is synthetic lab data, not native machine evidence; reporting stops after seedin
 Interrupting the command cleans its owned process/database/material. Never point
 the generator at a production tenant or publish enrollment/browser credentials.
 The fixture also enables real integration/report RPCs with its own protected,
-random encryption key; no destinations or schedules are preconfigured.
+random encryption key; no destinations or schedules are preconfigured. It also
+generates its own protected escrow transport and wrapping keys so managed secrets
+and local-admin password custody work. Reveal approval is off so the single
+console owner can reveal; add `-reveal-approval` to require a second human (create
+and enroll another administrator from the console) before any reveal.
 
 For a historical inventory presentation check, add `-host-observation FILE` with
 a captured `lindm.inventory.v1.HostObservation` protobuf JSON document. The lab
@@ -476,7 +480,12 @@ Before its first native sample, inspection waits on
 `systemctl is-system-running --wait` and, when installed, `nm-online -s -q
 --timeout=30`. Commands and their output are bounded; the complete readiness
 operation has a one-minute deadline. Systemd `running` or `degraded` is a settled
-startup state—`degraded` does not certify service health. The record retains
+startup state—`degraded` does not certify service health. systemd before v240
+(EL8's 239) accepts `--wait` but ignores it for `is-system-running` and answers
+`starting` at once. Only after such a transient answer, and only when
+`systemctl --version` reports a release below 240, the gate polls once per second
+within the same deadline. A newer manager answering `starting` stays unsettled.
+The record retains
 system state, NetworkManager startup completion or native binary absence, and
 start/completion timestamps in `NativeReadiness`. SSH and cloud-init completion
 alone did not prevent a real RHEL9.8 IPv6 startup transition. Network and all other
@@ -1520,7 +1529,19 @@ bytes; bare repomd without its companion is not importable. A byte pin does not
 prove acquisition time: file imports contribute findings but cannot establish
 current complete coverage, even for a complete archive. This prevents an old file
 from becoming an apparently fresh clean result merely by reimporting it. Signed
-offline-bundle custody and replay protection remain a separate protocol.
+offline bundles (below) are the replay-fenced path that carries acquisition time.
+
+Offline-bundle snapshots use `advisory.Service.ImportSnapshot`: the configured
+`FeedSource` must be byte-identical (deterministic protobuf) to the bundle's, the
+signed `acquired_at` must not be in the future and freshness ends at
+`acquired_at + maxAgeSeconds` (`advisory_snapshot_stale` otherwise). The same
+parser runs; complete coverage is kept as parsed because acquisition time is
+authenticated by the bundle signature, and an older acquisition never replaces a
+newer publication. `feed.Client.Acquire` writes exactly the bytes `ParseStream`
+accepts (OSV ZIP/JSON, updateinfo — the RPM_REPOMD companion is verified against
+repomd — Debian tracker, Arch `all.json` without the dates companion, and signed
+SUSE CSAF with its signer and signed time). Red Hat CSAF/VEX formats return
+`feed: offline_snapshot_unsupported`.
 
 Online Red Hat/SUSE proofs use pinned vendor OpenPGP keys retained under
 `internal/advisory/feed/keys`; its provenance records the trust-bootstrap limits.
@@ -1529,8 +1550,8 @@ separately from last successful fetch. Composite feed status SHA-256 hashes the
 deterministically encoded protobuf `FeedManifest`; `expectedSha256` pins that
 manifest for Red Hat archives, and raw primary bytes for other formats. Offline
 individual CSAF imports still require externally authenticated operator pins and
-do not claim signature provenance; paired Red Hat archive import requires the
-separate replay-fenced bundle protocol.
+do not claim signature provenance; paired Red Hat archive bundles are not yet
+supported.
 
 Malformed OSV records are rejected individually, never repaired or interpreted as
 clean. Feed status exposes each rejected record's ID, reason and parseable package
@@ -1683,6 +1704,66 @@ binding/equivocation, target tampering, streaming cancellation, publication reco
 and mirrored/HTTP boundaries. Run `go test -race ./internal/releaseupdate` after
 all integration slices land; these library tests do not claim native package
 transaction or full platform qualification.
+
+### Offline bundles (G6/P20)
+
+`internal/offlinebundle` owns the signed bundle format, export, verification,
+staging, import and the read-only `/offline/` handler; operations are in the
+[security and operations runbook](security-and-operations.md#offline-bundle-operations-runbook).
+`lindmctl bundle export|verify|development-key` runs on the connected station;
+`lindmd bundle-import -config FILE -bundle DIR` runs on the site with the server's
+own configuration, database, online TUF custody and advisory service and performs
+no network request.
+
+`releaseupdate.ExportOffline` fully refreshes the station repository from an
+authenticated root (private temporary state) and writes the root chain, the
+snapshot-bound targets metadata, every top-level target and the verified channel
+catalogs for the requested rings. `releaseupdate.ImportOffline` holds the
+repository lock, starts from the site's root (or the execution-bootstrap release
+root for an empty repository), applies newer roots, verifies targets signatures,
+expiry and the rollout delegation against the site's online signers, rejects a
+lower targets version (`offline_targets_rollback`) or same-version different bytes,
+copies targets with hash checks and commits targets plus paused 0% channel
+proposals in one online-signed publication. Existing channels must stay valid
+against the new targets. An identical targets version is `Unchanged`.
+
+Migration `00017` adds `offline_bundle_imports`, the per-deployment replay ledger
+(sequence, bundle ID, manifest SHA-256, signer, validity, state). Admission and
+completion run under a session advisory lock for the whole import plus a
+transaction lock; completion inserts the `offline_bundle.imported` audit event.
+`Bundle.Open` authenticates the manifest and tree shape only; `Stage` copies into
+`offline_bundles.directory/.staging-*` while hashing, and only staged bytes are
+used. `repositories/` and `release/` are published with `RENAME_EXCHANGE`.
+`/offline/` serves only those trees: GET/HEAD, no query, no dot or link component,
+regular files only.
+
+`lab vm airgap` qualifies one guest per run. Without `-network-container` it creates
+an exact-owned Docker `--network none` holder and re-runs itself through
+`sudo -n nsenter --net=/proc/PID/ns/net -- setpriv --reuid --regid --init-groups`;
+sudo is used only to enter that namespace. Inside, the lane records interfaces,
+`/proc/net/route`/`ipv6_route` and failed public IPv4/IPv6/DNS probes and fails
+on any default route or success. The dedicated tmpfs PostgreSQL joins the holder's
+namespace (`--network container:ID`), lindmd and the QEMU guest run in it, and the
+restricted-slirp guest separately proves failed public DNS/TCP. The first bundle
+initializes the empty site before `serve`; the guest installs only from
+`/offline/repositories`, enrolls, sees the paused channel, then the lane records
+an identical resubmission no-op, optional expired and older-sequence rejections, a
+same-size repository byte change and an unsigned manifest edit, imports the second
+bundle, waits for device findings bound to each signed acquisition time and starts
+the audited rollout. The image must already be in the verified cache; the lane never
+downloads inside the namespace.
+
+```sh
+artifacts/bin/lab vm airgap -manifest lab/images/ubuntu-noble-amd64.json \
+  -repo . -work-dir /private/work -lindmd /private/lindmd \
+  -first-bundle /private/b1 -second-bundle /private/b3 \
+  -expired-bundle /private/b-expired -replay-bundle /private/b2 \
+  -bundle-public-key bundle.pub -bundle-key-id ID \
+  -release-public-key attestation.pub -release-key-id ID \
+  -release-root tuf-root.json -release-online-keys tuf-online \
+  -package-public-key package.asc -package-fingerprint FPR \
+  -advisories advisories.json -record /private/airgap-ubuntu.json
+```
 
 ### Clean release exports and custody (P20/L17)
 

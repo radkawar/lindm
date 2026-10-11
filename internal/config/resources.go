@@ -48,6 +48,10 @@ type Resources struct {
 	ReleaseRepositoryDirectory        string
 	ReleaseSigningDirectory           string
 	ReleaseVerificationStateDirectory string
+	// Offline bundle paths are resolved only when offline_bundles is configured.
+	OfflineBundleDirectory        string
+	OfflineBundleSigningPublicKey string
+	OfflineBundleReleasePublicKey string
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -151,6 +155,11 @@ func (d *Document) Resolve() (*Resources, error) {
 		if release.GetVerificationStateDirectory() != "" {
 			result.ReleaseVerificationStateDirectory = reference(base, release.GetVerificationStateDirectory())
 		}
+	}
+	if bundles := cfg.GetOfflineBundles(); bundles != nil {
+		result.OfflineBundleDirectory = reference(base, bundles.GetDirectory())
+		result.OfflineBundleSigningPublicKey = reference(base, bundles.GetSigningPublicKeyFile())
+		result.OfflineBundleReleasePublicKey = reference(base, bundles.GetReleaseAttestationPublicKeyFile())
 	}
 
 	if err := d.authenticationSecrets(result); err != nil {

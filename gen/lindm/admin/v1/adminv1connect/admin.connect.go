@@ -181,6 +181,35 @@ const (
 	// AdminServiceRevealRecoveryKeyProcedure is the fully-qualified name of the AdminService's
 	// RevealRecoveryKey RPC.
 	AdminServiceRevealRecoveryKeyProcedure = "/lindm.admin.v1.AdminService/RevealRecoveryKey"
+	// AdminServiceCreateSecretProcedure is the fully-qualified name of the AdminService's CreateSecret
+	// RPC.
+	AdminServiceCreateSecretProcedure = "/lindm.admin.v1.AdminService/CreateSecret"
+	// AdminServiceRotateSecretProcedure is the fully-qualified name of the AdminService's RotateSecret
+	// RPC.
+	AdminServiceRotateSecretProcedure = "/lindm.admin.v1.AdminService/RotateSecret"
+	// AdminServiceListSecretsProcedure is the fully-qualified name of the AdminService's ListSecrets
+	// RPC.
+	AdminServiceListSecretsProcedure = "/lindm.admin.v1.AdminService/ListSecrets"
+	// AdminServiceGetSecretProcedure is the fully-qualified name of the AdminService's GetSecret RPC.
+	AdminServiceGetSecretProcedure = "/lindm.admin.v1.AdminService/GetSecret"
+	// AdminServiceRevealSecretProcedure is the fully-qualified name of the AdminService's RevealSecret
+	// RPC.
+	AdminServiceRevealSecretProcedure = "/lindm.admin.v1.AdminService/RevealSecret"
+	// AdminServiceSetLocalAdminPasswordPolicyProcedure is the fully-qualified name of the
+	// AdminService's SetLocalAdminPasswordPolicy RPC.
+	AdminServiceSetLocalAdminPasswordPolicyProcedure = "/lindm.admin.v1.AdminService/SetLocalAdminPasswordPolicy"
+	// AdminServiceRemoveLocalAdminPasswordPolicyProcedure is the fully-qualified name of the
+	// AdminService's RemoveLocalAdminPasswordPolicy RPC.
+	AdminServiceRemoveLocalAdminPasswordPolicyProcedure = "/lindm.admin.v1.AdminService/RemoveLocalAdminPasswordPolicy"
+	// AdminServiceRequestLocalAdminPasswordRotationProcedure is the fully-qualified name of the
+	// AdminService's RequestLocalAdminPasswordRotation RPC.
+	AdminServiceRequestLocalAdminPasswordRotationProcedure = "/lindm.admin.v1.AdminService/RequestLocalAdminPasswordRotation"
+	// AdminServiceGetLocalAdminPasswordStatusProcedure is the fully-qualified name of the
+	// AdminService's GetLocalAdminPasswordStatus RPC.
+	AdminServiceGetLocalAdminPasswordStatusProcedure = "/lindm.admin.v1.AdminService/GetLocalAdminPasswordStatus"
+	// AdminServiceRevealLocalAdminPasswordProcedure is the fully-qualified name of the AdminService's
+	// RevealLocalAdminPassword RPC.
+	AdminServiceRevealLocalAdminPasswordProcedure = "/lindm.admin.v1.AdminService/RevealLocalAdminPassword"
 	// AdminServiceListDeviceGroupsProcedure is the fully-qualified name of the AdminService's
 	// ListDeviceGroups RPC.
 	AdminServiceListDeviceGroupsProcedure = "/lindm.admin.v1.AdminService/ListDeviceGroups"
@@ -256,6 +285,18 @@ type AdminServiceClient interface {
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
 	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
+	// Deployment-global secret custody. Listing never returns material.
+	CreateSecret(context.Context, *connect.Request[v1.CreateSecretRequest]) (*connect.Response[v1.CreateSecretResponse], error)
+	RotateSecret(context.Context, *connect.Request[v1.RotateSecretRequest]) (*connect.Response[v1.RotateSecretResponse], error)
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error)
+	// Managed local-admin passwords escrowed by the device.
+	SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error)
+	RemoveLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error)
+	RequestLocalAdminPasswordRotation(context.Context, *connect.Request[v1.RequestLocalAdminPasswordRotationRequest]) (*connect.Response[v1.RequestLocalAdminPasswordRotationResponse], error)
+	GetLocalAdminPasswordStatus(context.Context, *connect.Request[v1.GetLocalAdminPasswordStatusRequest]) (*connect.Response[v1.GetLocalAdminPasswordStatusResponse], error)
+	RevealLocalAdminPassword(context.Context, *connect.Request[v1.RevealLocalAdminPasswordRequest]) (*connect.Response[v1.RevealLocalAdminPasswordResponse], error)
 	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
 	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
@@ -576,6 +617,66 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("RevealRecoveryKey")),
 			connect.WithClientOptions(opts...),
 		),
+		createSecret: connect.NewClient[v1.CreateSecretRequest, v1.CreateSecretResponse](
+			httpClient,
+			baseURL+AdminServiceCreateSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		rotateSecret: connect.NewClient[v1.RotateSecretRequest, v1.RotateSecretResponse](
+			httpClient,
+			baseURL+AdminServiceRotateSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RotateSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		listSecrets: connect.NewClient[v1.ListSecretsRequest, v1.ListSecretsResponse](
+			httpClient,
+			baseURL+AdminServiceListSecretsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+			connect.WithClientOptions(opts...),
+		),
+		getSecret: connect.NewClient[v1.GetSecretRequest, v1.GetSecretResponse](
+			httpClient,
+			baseURL+AdminServiceGetSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		revealSecret: connect.NewClient[v1.RevealSecretRequest, v1.RevealSecretResponse](
+			httpClient,
+			baseURL+AdminServiceRevealSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RevealSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		setLocalAdminPasswordPolicy: connect.NewClient[v1.SetLocalAdminPasswordPolicyRequest, v1.SetLocalAdminPasswordPolicyResponse](
+			httpClient,
+			baseURL+AdminServiceSetLocalAdminPasswordPolicyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetLocalAdminPasswordPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		removeLocalAdminPasswordPolicy: connect.NewClient[v1.RemoveLocalAdminPasswordPolicyRequest, v1.RemoveLocalAdminPasswordPolicyResponse](
+			httpClient,
+			baseURL+AdminServiceRemoveLocalAdminPasswordPolicyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RemoveLocalAdminPasswordPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		requestLocalAdminPasswordRotation: connect.NewClient[v1.RequestLocalAdminPasswordRotationRequest, v1.RequestLocalAdminPasswordRotationResponse](
+			httpClient,
+			baseURL+AdminServiceRequestLocalAdminPasswordRotationProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RequestLocalAdminPasswordRotation")),
+			connect.WithClientOptions(opts...),
+		),
+		getLocalAdminPasswordStatus: connect.NewClient[v1.GetLocalAdminPasswordStatusRequest, v1.GetLocalAdminPasswordStatusResponse](
+			httpClient,
+			baseURL+AdminServiceGetLocalAdminPasswordStatusProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetLocalAdminPasswordStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		revealLocalAdminPassword: connect.NewClient[v1.RevealLocalAdminPasswordRequest, v1.RevealLocalAdminPasswordResponse](
+			httpClient,
+			baseURL+AdminServiceRevealLocalAdminPasswordProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RevealLocalAdminPassword")),
+			connect.WithClientOptions(opts...),
+		),
 		listDeviceGroups: connect.NewClient[v1.ListDeviceGroupsRequest, v1.ListDeviceGroupsResponse](
 			httpClient,
 			baseURL+AdminServiceListDeviceGroupsProcedure,
@@ -673,6 +774,16 @@ type adminServiceClient struct {
 	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
 	listDeviceStorageTargets             *connect.Client[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse]
 	revealRecoveryKey                    *connect.Client[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse]
+	createSecret                         *connect.Client[v1.CreateSecretRequest, v1.CreateSecretResponse]
+	rotateSecret                         *connect.Client[v1.RotateSecretRequest, v1.RotateSecretResponse]
+	listSecrets                          *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
+	getSecret                            *connect.Client[v1.GetSecretRequest, v1.GetSecretResponse]
+	revealSecret                         *connect.Client[v1.RevealSecretRequest, v1.RevealSecretResponse]
+	setLocalAdminPasswordPolicy          *connect.Client[v1.SetLocalAdminPasswordPolicyRequest, v1.SetLocalAdminPasswordPolicyResponse]
+	removeLocalAdminPasswordPolicy       *connect.Client[v1.RemoveLocalAdminPasswordPolicyRequest, v1.RemoveLocalAdminPasswordPolicyResponse]
+	requestLocalAdminPasswordRotation    *connect.Client[v1.RequestLocalAdminPasswordRotationRequest, v1.RequestLocalAdminPasswordRotationResponse]
+	getLocalAdminPasswordStatus          *connect.Client[v1.GetLocalAdminPasswordStatusRequest, v1.GetLocalAdminPasswordStatusResponse]
+	revealLocalAdminPassword             *connect.Client[v1.RevealLocalAdminPasswordRequest, v1.RevealLocalAdminPasswordResponse]
 	listDeviceGroups                     *connect.Client[v1.ListDeviceGroupsRequest, v1.ListDeviceGroupsResponse]
 	setDeviceGroup                       *connect.Client[v1.SetDeviceGroupRequest, v1.SetDeviceGroupResponse]
 	deleteDeviceGroup                    *connect.Client[v1.DeleteDeviceGroupRequest, v1.DeleteDeviceGroupResponse]
@@ -934,6 +1045,57 @@ func (c *adminServiceClient) RevealRecoveryKey(ctx context.Context, req *connect
 	return c.revealRecoveryKey.CallUnary(ctx, req)
 }
 
+// CreateSecret calls lindm.admin.v1.AdminService.CreateSecret.
+func (c *adminServiceClient) CreateSecret(ctx context.Context, req *connect.Request[v1.CreateSecretRequest]) (*connect.Response[v1.CreateSecretResponse], error) {
+	return c.createSecret.CallUnary(ctx, req)
+}
+
+// RotateSecret calls lindm.admin.v1.AdminService.RotateSecret.
+func (c *adminServiceClient) RotateSecret(ctx context.Context, req *connect.Request[v1.RotateSecretRequest]) (*connect.Response[v1.RotateSecretResponse], error) {
+	return c.rotateSecret.CallUnary(ctx, req)
+}
+
+// ListSecrets calls lindm.admin.v1.AdminService.ListSecrets.
+func (c *adminServiceClient) ListSecrets(ctx context.Context, req *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return c.listSecrets.CallUnary(ctx, req)
+}
+
+// GetSecret calls lindm.admin.v1.AdminService.GetSecret.
+func (c *adminServiceClient) GetSecret(ctx context.Context, req *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+	return c.getSecret.CallUnary(ctx, req)
+}
+
+// RevealSecret calls lindm.admin.v1.AdminService.RevealSecret.
+func (c *adminServiceClient) RevealSecret(ctx context.Context, req *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error) {
+	return c.revealSecret.CallUnary(ctx, req)
+}
+
+// SetLocalAdminPasswordPolicy calls lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy.
+func (c *adminServiceClient) SetLocalAdminPasswordPolicy(ctx context.Context, req *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error) {
+	return c.setLocalAdminPasswordPolicy.CallUnary(ctx, req)
+}
+
+// RemoveLocalAdminPasswordPolicy calls lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy.
+func (c *adminServiceClient) RemoveLocalAdminPasswordPolicy(ctx context.Context, req *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error) {
+	return c.removeLocalAdminPasswordPolicy.CallUnary(ctx, req)
+}
+
+// RequestLocalAdminPasswordRotation calls
+// lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation.
+func (c *adminServiceClient) RequestLocalAdminPasswordRotation(ctx context.Context, req *connect.Request[v1.RequestLocalAdminPasswordRotationRequest]) (*connect.Response[v1.RequestLocalAdminPasswordRotationResponse], error) {
+	return c.requestLocalAdminPasswordRotation.CallUnary(ctx, req)
+}
+
+// GetLocalAdminPasswordStatus calls lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus.
+func (c *adminServiceClient) GetLocalAdminPasswordStatus(ctx context.Context, req *connect.Request[v1.GetLocalAdminPasswordStatusRequest]) (*connect.Response[v1.GetLocalAdminPasswordStatusResponse], error) {
+	return c.getLocalAdminPasswordStatus.CallUnary(ctx, req)
+}
+
+// RevealLocalAdminPassword calls lindm.admin.v1.AdminService.RevealLocalAdminPassword.
+func (c *adminServiceClient) RevealLocalAdminPassword(ctx context.Context, req *connect.Request[v1.RevealLocalAdminPasswordRequest]) (*connect.Response[v1.RevealLocalAdminPasswordResponse], error) {
+	return c.revealLocalAdminPassword.CallUnary(ctx, req)
+}
+
 // ListDeviceGroups calls lindm.admin.v1.AdminService.ListDeviceGroups.
 func (c *adminServiceClient) ListDeviceGroups(ctx context.Context, req *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error) {
 	return c.listDeviceGroups.CallUnary(ctx, req)
@@ -1021,6 +1183,18 @@ type AdminServiceHandler interface {
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
 	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
+	// Deployment-global secret custody. Listing never returns material.
+	CreateSecret(context.Context, *connect.Request[v1.CreateSecretRequest]) (*connect.Response[v1.CreateSecretResponse], error)
+	RotateSecret(context.Context, *connect.Request[v1.RotateSecretRequest]) (*connect.Response[v1.RotateSecretResponse], error)
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error)
+	// Managed local-admin passwords escrowed by the device.
+	SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error)
+	RemoveLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error)
+	RequestLocalAdminPasswordRotation(context.Context, *connect.Request[v1.RequestLocalAdminPasswordRotationRequest]) (*connect.Response[v1.RequestLocalAdminPasswordRotationResponse], error)
+	GetLocalAdminPasswordStatus(context.Context, *connect.Request[v1.GetLocalAdminPasswordStatusRequest]) (*connect.Response[v1.GetLocalAdminPasswordStatusResponse], error)
+	RevealLocalAdminPassword(context.Context, *connect.Request[v1.RevealLocalAdminPasswordRequest]) (*connect.Response[v1.RevealLocalAdminPasswordResponse], error)
 	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
 	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
@@ -1337,6 +1511,66 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("RevealRecoveryKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceCreateSecretHandler := connect.NewUnaryHandler(
+		AdminServiceCreateSecretProcedure,
+		svc.CreateSecret,
+		connect.WithSchema(adminServiceMethods.ByName("CreateSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRotateSecretHandler := connect.NewUnaryHandler(
+		AdminServiceRotateSecretProcedure,
+		svc.RotateSecret,
+		connect.WithSchema(adminServiceMethods.ByName("RotateSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListSecretsHandler := connect.NewUnaryHandler(
+		AdminServiceListSecretsProcedure,
+		svc.ListSecrets,
+		connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetSecretHandler := connect.NewUnaryHandler(
+		AdminServiceGetSecretProcedure,
+		svc.GetSecret,
+		connect.WithSchema(adminServiceMethods.ByName("GetSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRevealSecretHandler := connect.NewUnaryHandler(
+		AdminServiceRevealSecretProcedure,
+		svc.RevealSecret,
+		connect.WithSchema(adminServiceMethods.ByName("RevealSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetLocalAdminPasswordPolicyHandler := connect.NewUnaryHandler(
+		AdminServiceSetLocalAdminPasswordPolicyProcedure,
+		svc.SetLocalAdminPasswordPolicy,
+		connect.WithSchema(adminServiceMethods.ByName("SetLocalAdminPasswordPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRemoveLocalAdminPasswordPolicyHandler := connect.NewUnaryHandler(
+		AdminServiceRemoveLocalAdminPasswordPolicyProcedure,
+		svc.RemoveLocalAdminPasswordPolicy,
+		connect.WithSchema(adminServiceMethods.ByName("RemoveLocalAdminPasswordPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRequestLocalAdminPasswordRotationHandler := connect.NewUnaryHandler(
+		AdminServiceRequestLocalAdminPasswordRotationProcedure,
+		svc.RequestLocalAdminPasswordRotation,
+		connect.WithSchema(adminServiceMethods.ByName("RequestLocalAdminPasswordRotation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetLocalAdminPasswordStatusHandler := connect.NewUnaryHandler(
+		AdminServiceGetLocalAdminPasswordStatusProcedure,
+		svc.GetLocalAdminPasswordStatus,
+		connect.WithSchema(adminServiceMethods.ByName("GetLocalAdminPasswordStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRevealLocalAdminPasswordHandler := connect.NewUnaryHandler(
+		AdminServiceRevealLocalAdminPasswordProcedure,
+		svc.RevealLocalAdminPassword,
+		connect.WithSchema(adminServiceMethods.ByName("RevealLocalAdminPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceListDeviceGroupsHandler := connect.NewUnaryHandler(
 		AdminServiceListDeviceGroupsProcedure,
 		svc.ListDeviceGroups,
@@ -1481,6 +1715,26 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceListDeviceStorageTargetsHandler.ServeHTTP(w, r)
 		case AdminServiceRevealRecoveryKeyProcedure:
 			adminServiceRevealRecoveryKeyHandler.ServeHTTP(w, r)
+		case AdminServiceCreateSecretProcedure:
+			adminServiceCreateSecretHandler.ServeHTTP(w, r)
+		case AdminServiceRotateSecretProcedure:
+			adminServiceRotateSecretHandler.ServeHTTP(w, r)
+		case AdminServiceListSecretsProcedure:
+			adminServiceListSecretsHandler.ServeHTTP(w, r)
+		case AdminServiceGetSecretProcedure:
+			adminServiceGetSecretHandler.ServeHTTP(w, r)
+		case AdminServiceRevealSecretProcedure:
+			adminServiceRevealSecretHandler.ServeHTTP(w, r)
+		case AdminServiceSetLocalAdminPasswordPolicyProcedure:
+			adminServiceSetLocalAdminPasswordPolicyHandler.ServeHTTP(w, r)
+		case AdminServiceRemoveLocalAdminPasswordPolicyProcedure:
+			adminServiceRemoveLocalAdminPasswordPolicyHandler.ServeHTTP(w, r)
+		case AdminServiceRequestLocalAdminPasswordRotationProcedure:
+			adminServiceRequestLocalAdminPasswordRotationHandler.ServeHTTP(w, r)
+		case AdminServiceGetLocalAdminPasswordStatusProcedure:
+			adminServiceGetLocalAdminPasswordStatusHandler.ServeHTTP(w, r)
+		case AdminServiceRevealLocalAdminPasswordProcedure:
+			adminServiceRevealLocalAdminPasswordHandler.ServeHTTP(w, r)
 		case AdminServiceListDeviceGroupsProcedure:
 			adminServiceListDeviceGroupsHandler.ServeHTTP(w, r)
 		case AdminServiceSetDeviceGroupProcedure:
@@ -1702,6 +1956,46 @@ func (UnimplementedAdminServiceHandler) ListDeviceStorageTargets(context.Context
 
 func (UnimplementedAdminServiceHandler) RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevealRecoveryKey is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CreateSecret(context.Context, *connect.Request[v1.CreateSecretRequest]) (*connect.Response[v1.CreateSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RotateSecret(context.Context, *connect.Request[v1.RotateSecretRequest]) (*connect.Response[v1.RotateSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RotateSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListSecrets is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevealSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RemoveLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RequestLocalAdminPasswordRotation(context.Context, *connect.Request[v1.RequestLocalAdminPasswordRotationRequest]) (*connect.Response[v1.RequestLocalAdminPasswordRotationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetLocalAdminPasswordStatus(context.Context, *connect.Request[v1.GetLocalAdminPasswordStatusRequest]) (*connect.Response[v1.GetLocalAdminPasswordStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RevealLocalAdminPassword(context.Context, *connect.Request[v1.RevealLocalAdminPasswordRequest]) (*connect.Response[v1.RevealLocalAdminPasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevealLocalAdminPassword is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error) {

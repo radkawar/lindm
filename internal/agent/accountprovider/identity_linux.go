@@ -43,7 +43,7 @@ func (p *Provider) verifyGroups(ctx context.Context, db *localDB, u *resourcev1.
 	if !primaryFound {
 		return nil, ErrUnsafe
 	}
-	out, err := p.run(ctx, "/usr/bin/getent", "initgroups", u.GetName())
+	out, err := p.run(ctx, nil, "/usr/bin/getent", "initgroups", u.GetName())
 	if err != nil {
 		return nil, err
 	}

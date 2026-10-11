@@ -23,6 +23,11 @@ type DeviceActionProvider interface {
 	Apply(context.Context, *agentv1.DeviceActionPlan, []byte, func(context.Context) error) (*agentv1.DeviceActionVerification, error)
 	Verify(context.Context, *agentv1.DeviceActionPlan, *agentv1.DeviceActionVerification) (*agentv1.DeviceActionVerification, error)
 	ConfirmEscrow(context.Context, *agentv1.DeviceActionPlan, *agentv1.DeviceActionVerification, []byte, func(context.Context) error) (*agentv1.DeviceActionVerification, error)
+	// StageLocalAdminPassword generates and escrow-seals a local-admin password
+	// after the gate, without native change. The envelope is the only local copy.
+	StageLocalAdminPassword(context.Context, *agentv1.DeviceActionPlan, func(context.Context) error) (*agentv1.DeviceActionVerification, *agentv1.PrivateCustodyEnvelope, error)
+	// SetLocalAdminPassword sets the staged password after a verified receipt.
+	SetLocalAdminPassword(context.Context, *agentv1.DeviceActionPlan, *agentv1.DeviceActionVerification, *agentv1.PrivateCustodyEnvelope, func(context.Context) error) (*agentv1.DeviceActionVerification, error)
 }
 
 // WithActionProvider installs the locally configured native provider. Absence

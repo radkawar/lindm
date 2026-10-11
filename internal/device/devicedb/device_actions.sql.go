@@ -386,7 +386,7 @@ func (q *Queries) InsertDeviceActionEscrow(ctx context.Context, arg InsertDevice
 const latestDeviceActionEscrow = `-- name: LatestDeviceActionEscrow :one
 SELECT a.id, a.device_id, a.generation_id, a.capability, a.luks_uuids, a.request_id, a.request_digest, a.request_document, a.actor_id, a.authorization_version, a.approval_id, a.intent_envelope, a.intent_document, a.issued_at, a.expires_at, a.challenge_proof, a.challenge_document, a.start_grant_envelope, a.start_authorized_at, a.outcome_unknown, a.closed_at, a.closed_reason, a.result_nonce, a.nonce_expires_at, a.action_revision, a.attestation_envelope, a.attestation_certificate, a.status_document, a.received_at, a.escrow_receipt_envelope, a.inventory_receipt_envelope, a.inventory_receipt_document, a.inventory_host_sequence, a.inventory_host_received_at, a.inventory_package_sequence FROM device_actions a JOIN device_action_escrow e ON e.action_id = a.id
 JOIN devices d ON d.id = a.device_id AND d.current_generation_id = a.generation_id
-WHERE a.device_id = $1 AND ($2::uuid IS NULL OR a.luks_uuids @> ARRAY[$2::uuid])
+WHERE a.device_id = $1 AND a.capability = 'device.escrow-rotate.v1' AND ($2::uuid IS NULL OR a.luks_uuids @> ARRAY[$2::uuid])
 ORDER BY e.committed_at DESC, a.id DESC LIMIT 1
 `
 

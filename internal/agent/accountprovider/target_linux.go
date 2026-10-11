@@ -4,7 +4,10 @@ package accountprovider
 
 import (
 	"bytes"
+	"context"
+	"crypto/subtle"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"time"
@@ -14,9 +17,11 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
+	"lindm/internal/secretseal"
 )
 
-func (p *Provider) target(d *resourcev1.ResourceDesiredState, op resourcev1.ResourceOperation, before *agentv1.ResourceOwnershipSnapshot, db *localDB, l *agentv1.ResourceOwnershipLedger) (*agentv1.ResourceOwnershipSnapshot, []*resourcev1.MemberEdgeChange, error) {
+func (p *Provider) target(ctx context.Context, d *resourcev1.ResourceDesiredState, op resourcev1.ResourceOperation, before *agentv1.ResourceOwnershipSnapshot, db *localDB, l *agentv1.ResourceOwnershipLedger) (*agentv1.ResourceOwnershipSnapshot, []*resourcev1.MemberEdgeChange, error) {
 	target := proto.CloneOf(before)
 	if op == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		return releaseTarget(before, l)
@@ -148,6 +153,21 @@ func (p *Provider) target(d *resourcev1.ResourceDesiredState, op resourcev1.Reso
 				o.PasswordLocked = proto.Bool(true)
 				target.AccountPrivate.PasswordToken = proto.String("!" + target.AccountPrivate.GetPasswordToken())
 			}
+			if hashed := u.GetPassword().GetHashed(); hashed != nil {
+				hash, err := p.passwordHash(ctx, hashed)
+				if err != nil {
+					return nil, nil, err
+				}
+				// The delivered hash is the whole shadow field: unlocked and
+				// exactly equal. Account lock/expiry stays the aging dimension.
+				if subtle.ConstantTimeCompare([]byte(target.AccountPrivate.GetPasswordToken()), hash) != 1 {
+					target.AccountPrivate.PasswordToken = proto.String(string(hash))
+				}
+				clear(hash)
+				algorithm := hashed.GetAlgorithm()
+				o.PasswordLocked = proto.Bool(false)
+				o.PasswordAlgorithm = &algorithm
+			}
 			if u.GetAging() != nil {
 				if o.Aging == nil {
 					o.Aging = &resourcev1.PasswordAging{}
@@ -163,6 +183,31 @@ func (p *Provider) target(d *resourcev1.ResourceDesiredState, op resourcev1.Reso
 		}
 	}
 	return target, edges, nil
+}
+
+// passwordHash opens the delivered hash for one target computation. It must
+// be a crypt(3) hash of the declared algorithm; the caller clears it.
+func (p *Provider) passwordHash(ctx context.Context, policy *resourcev1.HashedPasswordPolicy) ([]byte, error) {
+	if p.config.Secrets == nil {
+		return nil, fmt.Errorf("%w: purpose-bound credential delivery is required", ErrUnsupported)
+	}
+	material, err := p.config.Secrets(ctx, policy.GetHash())
+	if err != nil {
+		return nil, err
+	}
+	defer secretseal.Clear(material)
+	hash := bytes.Clone(material.GetPasswordHash())
+	shape := &agentv1.SecretMaterial{Material: &agentv1.SecretMaterial_PasswordHash{PasswordHash: hash}}
+	if len(hash) == 0 || validateMessage(shape) != nil || !resource.PasswordHashMatches(policy.GetAlgorithm(), hash) {
+		clear(hash)
+		return nil, fmt.Errorf("%w: delivered password hash does not match its policy", ErrUnsafe)
+	}
+	return hash, nil
+}
+
+// sameToken compares shadow password fields in constant time.
+func sameToken(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 func ownsObject(l *agentv1.ResourceOwnershipLedger) bool {
 	return slices.Contains(l.GetOwnedDimensions(), agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT) && !exists(l.GetBaseline().GetObservation())

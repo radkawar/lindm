@@ -33,6 +33,11 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil || hasNUL(req.Msg.GetReason()) {
 		return nil, invalid("invalid_device_action")
 	}
+	// Only the policy scheduler or RequestLocalAdminPasswordRotation mint this
+	// arm, authorized as the policy actor with the server's own escrow key.
+	if req.Msg.GetSpec().GetLocalAdminPasswordRotate() != nil {
+		return nil, rpcError(connect.CodeFailedPrecondition, "local_admin_policy_required")
+	}
 	if s.identity == nil || s.signing == nil || s.execution == nil {
 		return nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	}

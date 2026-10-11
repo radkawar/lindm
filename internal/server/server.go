@@ -23,6 +23,8 @@ import (
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/integrations"
+	"lindm/internal/jobs"
+	"lindm/internal/offlinebundle"
 	"lindm/internal/reports"
 	"lindm/web"
 )
@@ -152,26 +154,10 @@ func Run(ctx context.Context, resources *config.Resources) error {
 			return fmt.Errorf("initialize reports: %w", err)
 		}
 	}
-	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
-	cleanupDone := make(chan struct{})
-	go func() {
-		defer close(cleanupDone)
-		devices.RunSnapshotCleanup(cleanupCtx)
-	}()
-	defer func() {
-		cancelCleanup()
-		<-cleanupDone
-	}()
-	advisoryCtx, cancelAdvisories := context.WithCancel(ctx)
-	advisoryDone := make(chan struct{})
-	go func() {
-		defer close(advisoryDone)
-		advisories.Run(advisoryCtx)
-	}()
-	defer func() {
-		cancelAdvisories()
-		<-advisoryDone
-	}()
+	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, advisories, deliveries, reporting)})
+	if err != nil {
+		return fmt.Errorf("initialize background jobs: %w", err)
+	}
 	console, err := web.Handler()
 	if err != nil {
 		return err
@@ -190,6 +176,15 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	adminMux.Handle(path, auth.RequireSession(handler))
 	if releaseHandler != nil {
 		adminMux.Handle("/updates/", http.StripPrefix("/updates/", releaseHandler))
+	}
+	if resources.OfflineBundleDirectory != "" {
+		offlineHandler, err := offlinebundle.NewRepositoryHandler(resources.OfflineBundleDirectory)
+		if err != nil {
+			return fmt.Errorf("initialize offline repository handler: %w", err)
+		}
+		// Signed native repositories and release artifacts from verified
+		// imports; packages authenticate natively with client-pinned keys.
+		adminMux.Handle("/offline/", http.StripPrefix("/offline/", offlineHandler))
 	}
 	if deliveries != nil {
 		path, handler = deliveries.AdminHandler()
@@ -257,7 +252,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 
 	workerContext, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
-	stopped := make(chan error, 5)
+	stopped := make(chan error, 3)
 	go func() { stopped <- serve(admin, adminListener) }()
 	go func() { stopped <- serve(deviceServer, deviceListener) }()
 	slog.Info("control plane ready", "admin", admin.Addr, "device", deviceServer.Addr)
@@ -266,11 +261,17 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		remaining++
 		go func() { stopped <- profiling.run(workerContext) }()
 	}
-	if deliveries != nil {
-		remaining += 2
-		go func() { stopped <- deliveries.Run(workerContext) }()
-		go func() { stopped <- reporting.Run(workerContext) }()
-	}
+	// Background jobs never stop the process: the supervisor retries failures
+	// and is joined before the pool closes.
+	jobsDone := make(chan struct{})
+	go func() {
+		defer close(jobsDone)
+		supervisor.Run(workerContext)
+	}()
+	defer func() {
+		cancelWorkers()
+		<-jobsDone
+	}()
 	var serveErr error
 	select {
 	case <-ctx.Done():

@@ -112,3 +112,113 @@ func TestRecoveryCustodyRejectsWeakKeys(t *testing.T) {
 		t.Fatal("accepted invalid public key")
 	}
 }
+
+func testCustody(t *testing.T) (*Custody, []byte) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 3072)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kek := make([]byte, 32)
+	if _, err := rand.Read(kek); err != nil {
+		t.Fatal(err)
+	}
+	custody, err := New(key, kek)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return custody, kek
+}
+
+// A recovery-key transport must never be accepted as a local-admin password
+// (or vice versa), and durable records cannot be revealed in the other domain.
+func TestLocalAdminDomainSeparation(t *testing.T) {
+	custody, _ := testCustody(t)
+	binding := []byte("device/generation/action/account/uid")
+	password := []byte("JBSWY3DPEHPK3PXPJBSWY3DPEH")
+	recoveryKey := bytes.Repeat([]byte("a"), 64)
+	adminTransport, err := SealLocalAdminPassword(custody.PublicKey(), binding, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveryTransport, err := SealForServer(custody.PublicKey(), binding, recoveryKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := custody.OpenAndSeal(binding, adminTransport); err == nil {
+		t.Fatal("recovery custody accepted a local-admin transport")
+	}
+	if _, err := custody.OpenAndSealLocalAdminPassword(binding, recoveryTransport); err == nil {
+		t.Fatal("local-admin custody accepted a recovery transport")
+	}
+	if _, err := custody.OpenAndSealLocalAdminPassword([]byte("other-action"), adminTransport); err == nil {
+		t.Fatal("local-admin custody accepted a rebound transport")
+	}
+	record, err := custody.OpenAndSealLocalAdminPassword(binding, adminTransport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(record.Ciphertext, password) || bytes.Contains(record.WrappedKey, password) {
+		t.Fatal("plaintext in durable record")
+	}
+	if _, err := custody.Reveal(binding, record); err == nil {
+		t.Fatal("recovery reveal opened a local-admin record")
+	}
+	got, err := custody.RevealLocalAdminPassword(binding, record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, password) {
+		t.Fatal("password changed in custody")
+	}
+	clear(got)
+	if _, err := SealLocalAdminPassword(custody.PublicKey(), binding, []byte("short")); err == nil {
+		t.Fatal("accepted a password below the minimum size")
+	}
+}
+
+// Managed secret records store no digest, bind their exact version binding and
+// open only under the same KEK.
+func TestSecretRecordBindingAndCustody(t *testing.T) {
+	custody, kek := testCustody(t)
+	binding := []byte("secret/version/purpose/subject")
+	material := []byte("$6$saltsalt$hash")
+	record, err := custody.SealSecret(binding, material)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(record.Ciphertext, material) || bytes.Contains(record.WrappedKey, material) {
+		t.Fatal("plaintext in durable record")
+	}
+	if record.KeyID != custody.WrappingKeyID() {
+		t.Fatal("record does not name its KEK")
+	}
+	if _, err := custody.OpenSecret([]byte("secret/version+1/purpose/subject"), record); err == nil {
+		t.Fatal("accepted a record under another version binding")
+	}
+	tampered := &SecretRecord{KeyID: record.KeyID, WrappedKey: bytes.Clone(record.WrappedKey), Ciphertext: bytes.Clone(record.Ciphertext)}
+	tampered.Ciphertext[len(tampered.Ciphertext)-1] ^= 1
+	if _, err := custody.OpenSecret(binding, tampered); err == nil {
+		t.Fatal("accepted tampered ciphertext")
+	}
+	otherKEK := bytes.Clone(kek)
+	otherKEK[0] ^= 1
+	other, err := New(custody.transport, otherKEK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := other.OpenSecret(binding, record); err == nil {
+		t.Fatal("wrong wrapping key disclosed secret")
+	}
+	got, err := custody.OpenSecret(binding, record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, material) {
+		t.Fatal("material changed in custody")
+	}
+	clear(got)
+	if _, err := custody.SealSecret(binding, nil); err == nil {
+		t.Fatal("accepted empty material")
+	}
+}

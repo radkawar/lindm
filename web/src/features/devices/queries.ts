@@ -36,6 +36,24 @@ export function deviceQueryOptions(lifetime: AuthLifetime, deviceId: string) {
   });
 }
 
+// Status and escrow metadata only. Revealed passwords never enter a query.
+export function localAdminPasswordQueryOptions(lifetime: AuthLifetime, deviceId: string) {
+  return queryOptions({
+    queryKey: ["local-admin-password", lifetime.generation, deviceId] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    staleTime: 0,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.getLocalAdminPasswordStatus(
+        { deviceId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}
+
 export function devicePackagesQueryOptions(
   lifetime: AuthLifetime,
   deviceId: string,

@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package lindm.bundle.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/advisory/v1/feed.proto";
+
+option go_package = "lindm/gen/lindm/bundle/v1;bundlev1";
+
+// OfflineBundleManifest is the exact DSSE payload of bundle.json. The fixed
+// layout is release/, repositories/, updates/ and advisories/. Every regular
+// file below the bundle root except bundle.json and bundle.json.dsse is listed
+// exactly once; links, devices and unlisted files make the bundle invalid.
+// Sequence is a monotonic per-authority counter: an offline server admits only
+// a strictly newer sequence (or resumes the identical interrupted manifest).
+message OfflineBundleManifest {
+  option (buf.validate.message).cel = {
+    id: "bundle.validity"
+    message: "a bundle must expire after creation and within 30 days"
+    expression: "this.expires_at > this.created_at && this.expires_at - this.created_at <= duration('2592000s')"
+  };
+  string bundle_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 sequence = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  google.protobuf.Timestamp created_at = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+  // SHA-256 of the bundle-signing Ed25519 SubjectPublicKeyInfo DER.
+  string signing_key_id = 5 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string custody = 6 [(buf.validate.field).string = {
+    in: [
+      "development",
+      "production"
+    ]
+  }];
+  BundleRelease release = 7 [(buf.validate.field).required = true];
+  repeated NativeRepository repositories = 8 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  BundleUpdates updates = 9 [(buf.validate.field).required = true];
+  repeated AdvisorySnapshot advisories = 10 [(buf.validate.field).repeated.max_items = 32];
+  repeated BundleFile files = 11 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 65536
+  }];
+}
+
+message BundleFile {
+  string path = 1 [(buf.validate.field).string = {
+    max_len: 512
+    pattern: "^(release|repositories|updates|advisories)(/[A-Za-z0-9_][A-Za-z0-9._+~-]*)+$"
+  }];
+  string sha256 = 2 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  int64 size = 3 [(buf.validate.field).int64 = {
+    gte: 0
+    lte: 8589934592
+  }];
+}
+
+// The complete release export below release/, verified at export and again on
+// import with the independently pinned release-attestation public key.
+message BundleRelease {
+  string version = 1 [(buf.validate.field).string.pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"];
+  string manifest_sha256 = 2 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string attestation_key_id = 3 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  int32 artifact_count = 4 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 64
+  }];
+}
+
+// A signed native repository below repositories/<architecture>/apt or
+// repositories/<architecture>/rpm, built from the release export's packages.
+message NativeRepository {
+  string format = 1 [(buf.validate.field).string = {
+    in: [
+      "deb",
+      "rpm"
+    ]
+  }];
+  string architecture = 2 [(buf.validate.field).string = {
+    in: [
+      "amd64",
+      "arm64"
+    ]
+  }];
+  // Full uppercase OpenPGP v4 or v6 primary fingerprint of the repository and
+  // package signer. Clients pin this out of band; the bundle does not create trust.
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  repeated string packages = 4 [
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 8
+    },
+    (buf.validate.field).repeated.items.string = {
+      max_len: 256
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._+~-]*$"
+    }
+  ];
+}
+
+// Offline-signed TUF material below updates/: the root chain from the bundle's
+// first root through root_version, metadata/<targets_version>.targets.json and
+// every top-level target it lists. Station snapshot/timestamp/rollout roles are
+// not imported; the offline server signs its own online roles.
+message BundleUpdates {
+  int64 first_root_version = 1 [(buf.validate.field).int64.gte = 1];
+  int64 root_version = 2 [(buf.validate.field).int64.gte = 1];
+  int64 targets_version = 3 [(buf.validate.field).int64.gte = 1];
+  // Proposed rings copied from the station's verified rollout catalogs. Import
+  // publishes them paused; an audited SetRollout starts every rollout.
+  repeated string channels = 4 [
+    (buf.validate.field).repeated.max_items = 16,
+    (buf.validate.field).repeated.items.string = {
+      max_len: 64
+      pattern: "^[a-z0-9][a-z0-9-]*$"
+    }
+  ];
+}
+
+// One vendor feed snapshot below advisories/<source.id>. acquired_at is the
+// signed start of the authenticated HTTPS acquisition; freshness is measured
+// from it, never from import time.
+message AdvisorySnapshot {
+  lindm.advisory.v1.FeedSource source = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp acquired_at = 2 [(buf.validate.field).required = true];
+  repeated lindm.advisory.v1.FeedArtifact artifacts = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  // Vendor-signed snapshot time when the source format provides one.
+  google.protobuf.Timestamp snapshot_at = 4;
+}

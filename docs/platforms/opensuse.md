@@ -226,14 +226,16 @@ TPM/desktop, user egress, isolated local password/WebAuthn authority). Source is
 change). The signed 0.7.0/0.7.1 x86_64 RPMs are `ebafbefb…`/`f2c8da50…`. Records are
 under `~/.cache/lindm-mutabledistros5-20261010/`:
 
-| Lane      | Observed result                                                                                                                                                                                                   | Record / SHA-256                                                                                          |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Inspect   | 378 native RPM identities and independent detail comparison, UEFI                                                                                                                                                 | `leap16-x86_64-local-inspect.json` / `dadb6bc9d37fd93dcaa6eecefc31913c37467738c1c68523904e2f567b2ea2cc`   |
-| Lifecycle | Signed zypper 0.7.0→0.7.1 automatic trust: five 380-package publications, denied attempt 6 kept snapshot 5, epoch 1→3, revocation and hold                                                                        | `leap16-x86_64-local-lifecycle.json` / `06c36ca389fc455a92f09f8fd87f2010252e508303061d1c0dd7570d2ef8e752` |
-| Dispatch  | Nine native scenarios with real periodic intervals and revoked denial; supersession integration-only. Ran before dispatch observed SELinux, so its `not applicable` is the old lab assumption, not an observation | `leap16-x86_64-local-dispatch.json` / `4c0b3341432f59e0e4ab110579f0a37c0873c7ca635395948b1bdb91a320599b`  |
+| Lane      | Observed result                                                                                                                                 | Record / SHA-256                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Inspect   | 378 native RPM identities and independent detail comparison, UEFI                                                                               | `leap16-x86_64-local-inspect.json` / `dadb6bc9d37fd93dcaa6eecefc31913c37467738c1c68523904e2f567b2ea2cc`     |
+| Lifecycle | Signed zypper 0.7.0→0.7.1 automatic trust: five 380-package publications, denied attempt 6 kept snapshot 5, epoch 1→3, revocation and hold      | `leap16-x86_64-local-lifecycle.json` / `06c36ca389fc455a92f09f8fd87f2010252e508303061d1c0dd7570d2ef8e752`   |
+| Dispatch  | Nine native scenarios with real periodic intervals and revoked denial; SELinux Enforcing (kernel-observed rerun); supersession integration-only | `leap16-x86_64-local-dispatch-v3.json` / `d30cd1220e1573cbc0a5437ee76d5ea1a1c470309323a0c261fe71d2db3ebb55` |
 
-A Leap 16.0 aarch64 dispatch rerun with the kernel SELinux observation recorded
-**SELinux Enforcing** and passed the same nine scenarios on `dgx20`
+The first x86_64 dispatch (`leap16-x86_64-local-dispatch.json`,
+`4c0b3341432f59e0e4ab110579f0a37c0873c7ca635395948b1bdb91a320599b`) also passed,
+but its `not applicable` label predates the SELinux observation. A Leap 16.0 aarch64
+dispatch rerun likewise recorded **SELinux Enforcing** on `dgx20`
 (`leap16-arm64-dgx20-dispatch-v3.json`,
 `17289eba4f96fdb1605c590578c572ad3cd037cbceaa3b925e7867fa2be9ba43`, same directory).
 

@@ -40,3 +40,21 @@ func TestActionSandboxRetainsIsolationAndExactDevices(t *testing.T) {
 		t.Fatal("quarantine requires netlink but must not enable executor outbound IP")
 	}
 }
+
+func TestActionSandboxLocalAdminGrantsOnlyShadowWritesAndLockedMemory(t *testing.T) {
+	text, err := actionSandboxText(&agentv1.DeviceActionProviderConfig{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(text, "ReadWritePaths=/etc") || strings.Contains(text, "CAP_IPC_LOCK") {
+		t.Fatal("unconfigured executor may write shadow files")
+	}
+	text, err = actionSandboxText(&agentv1.DeviceActionProviderConfig{LocalAdminAccounts: []string{"lapsadmin"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// chpasswd atomically replaces /etc/shadow; the password stays in locked memory.
+	if !strings.Contains(text, "ReadWritePaths=/etc\n") || !strings.Contains(text, "CAP_IPC_LOCK") || !strings.Contains(text, "LimitMEMLOCK=infinity\n") || strings.Contains(text, "CAP_NET_ADMIN") {
+		t.Fatal("local-admin allowlist did not grant exactly shadow writes and locked memory")
+	}
+}

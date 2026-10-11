@@ -145,6 +145,28 @@ fresh authenticated inventory/session and signed downgrade refusal:
 This is one-source, differently stamped package qualification, not historical release
 compatibility, arbitrary dependency management or physical power-loss evidence.
 
+### Air-gapped offline bundles
+
+Offline sites install from the bundle's per-architecture APT archive served by the
+site server at `https://SITE/offline/repositories/<amd64|arm64>/apt/` (suite
+`stable`, component `main`). Pin the station package key with `Signed-By` (an
+ASCII-armored `.asc` is accepted by Ubuntu 24.04's APT 2.7) and the site CA with
+`Acquire::https::CAInfo`; the lane uses isolated `Dir::Etc::sourceparts`, lists and
+archives so no vendor source is consulted. Agent updates still stage through the
+protected transaction cache above, from TUF targets the site imported. The bundle's
+advisory snapshot for this release is the Ubuntu OSV `all.zip` (≈778 MB on
+2026-10-11), acquired by the station without a whole-request client timeout.
+
+`lab vm airgap` passed on Ubuntu 24.04 amd64 inside a no-route namespace:
+`$HOME/.cache/lindm-airgap-20261011/records/ubuntu-24.04-r2.json`, SHA-256
+`14773263f4ea519b5cc74d2c3eff6a78e530998a7c010c35d8041f126e8523a1`
+([verification L16](../verification.md#3-acceptance-scenario-families)). It covers
+the restricted-slirp guest (public DNS/TCP failed; the slirp IPv6 router advertisement
+still installs a default route), install, enrollment, rejected expired/corrupt/forged/
+replayed bundles, paused staging and the audited update to 0.30.1. Ubuntu device
+findings reached the lane's 20,000-row read bound; counts are lower bounds. arm64
+repositories are built into bundles but not exercised.
+
 ## Encryption and recovery
 
 Ubuntu's stock encrypted installer uses `cryptsetup-initramfs`, `CRYPTSETUP=y` and
@@ -199,6 +221,19 @@ pin; password policy uses owned `pam-auth-update` profiles and requires the
 owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
+
+Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
+reading `name:hash` on stdin. Ubuntu 24.04 shadow 4.13
+(`passwd 1:4.13+dfsg1-4ubuntu3.2`) has no `chpasswd --prefix`, so the root
+helper uses `--root` (a chroot, needing `CAP_SYS_CHROOT`, already granted for
+`chage`). Shadow 4.13 does not validate hash formats with `-e`, so lindm
+validates shape and algorithm itself. Managed local-admin rotation runs
+`/usr/sbin/chpasswd` in `/` with system PAM hashing (yescrypt by default) and
+needs the `action-sandbox` exception described in
+[security and operations](../security-and-operations.md#managed-secrets-and-local-admin-passwords).
+`chpasswd` updates the shadow last-change field; lindm does not own it. Both
+paths are qualified on Ubuntu 24.04 aarch64 with SSH password logins
+([secret delivery and local-admin records](../verification.md#secret-delivered-password-hash-and-managed-local-admin-password)).
 
 Firewall zones are a dedicated `inet lindm_z_<zone>` nftables table written over
 netlink at priority 10 (the agent does not run the `nft` CLI). Native records for
@@ -378,8 +413,9 @@ authenticator failure still fails the gate.
 
 ## Gaps
 
-- Desktop GNOME/KDE, aarch64, physical hardware and air-gap gates remain independent;
-  do not extrapolate from the cited x86_64 cloud/installer records.
+- Desktop GNOME/KDE, aarch64, physical hardware and air-gap gates beyond the amd64
+  offline-bundle lane (site DNS/NTP/IdP, server installation and restore from a
+  bundle) remain independent; do not extrapolate from the cited x86_64 records.
 - The encrypted read-only transient prerequisite is not yet a published 0.1.2 inventory
   or selectable-target proof at this handoff.
 - Agent self-update and systemd service lanes do not qualify the new generic native

@@ -13,16 +13,18 @@ import (
 	"lindm/internal/integrations/integrationdb"
 )
 
-// Run owns four bounded workers and a compliance deadline scanner. Leases are
-// fenced by random token, monotonically increasing generation and database time.
-// A webhook receiver must deduplicate the signed body's event_id per destination,
-// not the informational unsigned delivery/replay headers. A crash after send/before
-// commit, or a process pause beyond a lease, may cause a duplicate network effect.
-func (s *Service) Run(ctx context.Context) error {
+// RunDeliveries is a replicated job: every instance owns four bounded workers.
+// Leases are fenced by random token, monotonically increasing generation and
+// database time. A webhook receiver must deduplicate the signed body's event_id
+// per destination, not the informational unsigned delivery/replay headers. A
+// crash after send/before commit, or a process pause beyond a lease, may cause a
+// duplicate network effect. Store failure returns to the job supervisor, which
+// restarts the workers after backoff.
+func (s *Service) RunDeliveries(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var workers sync.WaitGroup
-	failures := make(chan error, 5)
+	failures := make(chan error, 4)
 	for range 4 {
 		workers.Go(func() {
 			sender := &deliverySender{service: s}
@@ -49,30 +51,34 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 		})
 	}
-	workers.Go(func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			scanCtx, stop := context.WithTimeout(ctx, 15*time.Second)
-			err := integrationdb.New(s.pool).RefreshComplianceEvents(scanCtx)
-			stop()
-			if err != nil {
-				if ctx.Err() == nil {
-					failures <- errors.New("integrations: compliance event store unavailable")
-					cancel()
-				}
-				return
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	})
 	workers.Wait()
 	close(failures)
 	return <-failures
+}
+
+// RunComplianceDeadlines is an exclusive job that turns expired verification
+// deadlines into compliance events. Each pass row-locks assignments with SKIP
+// LOCKED and records only state transitions, so a briefly overlapping former
+// leader cannot emit duplicate events.
+func (s *Service) RunComplianceDeadlines(ctx context.Context) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		scanCtx, stop := context.WithTimeout(ctx, 15*time.Second)
+		err := integrationdb.New(s.pool).RefreshComplianceEvents(scanCtx)
+		stop()
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return errors.New("integrations: compliance event store unavailable")
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
 }
 
 func (s *Service) workOne(ctx context.Context, sender *deliverySender) (bool, error) {

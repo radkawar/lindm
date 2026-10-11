@@ -23,7 +23,7 @@ func TestRestartActionConfirmsChangedBootWithoutReplay(t *testing.T) {
 				t.Fatal(err)
 			}
 			if completedCall {
-				f.svc.finishDeviceAction(i.GetActionId(), &agentv1.DeviceActionVerification{Verified: true, After: r.GetNativePlan().GetBefore(), PowerRequestAccepted: true}, nil, false)
+				f.svc.finishDeviceAction(i.GetActionId(), &agentv1.DeviceActionVerification{Verified: true, After: r.GetNativePlan().GetBefore(), PowerRequestAccepted: true}, nil, nil, false)
 				awaitDeviceAction(t, f.svc, i.GetActionId(), agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN)
 			}
 			// Executor restart in the SAME boot is not device restart success.
@@ -55,7 +55,7 @@ func TestShutdownActionNeverClaimsPowerOffFromContact(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Even a faulty native provider cannot turn request acceptance into success.
-	f.svc.finishDeviceAction(i.GetActionId(), &agentv1.DeviceActionVerification{Verified: true, After: r.GetNativePlan().GetBefore(), PowerRequestAccepted: true, Evidence: "outcome_unknown_until_contact"}, nil, false)
+	f.svc.finishDeviceAction(i.GetActionId(), &agentv1.DeviceActionVerification{Verified: true, After: r.GetNativePlan().GetBefore(), PowerRequestAccepted: true, Evidence: "outcome_unknown_until_contact"}, nil, nil, false)
 	status := awaitDeviceAction(t, f.svc, i.GetActionId(), agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN)
 	if status.GetVerification().GetVerified() || !status.GetVerification().GetPowerRequestAccepted() {
 		t.Fatalf("shutdown lost honest acceptance: %v", status)

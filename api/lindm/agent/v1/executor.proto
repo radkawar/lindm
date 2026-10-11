@@ -61,6 +61,13 @@ service ExecutorService {
   // CommitRenewal installs a certificate that matches the pending next key
   // and pinned identity before acknowledgment.
   rpc CommitRenewal(CommitRenewalRequest) returns (CommitRenewalResponse);
+  // PrepareEncryptionKey returns the identity-signed attestation of the current
+  // HPKE recipient key, generating the key once for pre-delivery journals. The
+  // private key is never returned.
+  rpc PrepareEncryptionKey(PrepareEncryptionKeyRequest) returns (PrepareEncryptionKeyResponse);
+  // AcknowledgeEncryptionKey records that the server registered the exact key
+  // under the exact current certificate. It is only a re-registration hint.
+  rpc AcknowledgeEncryptionKey(AcknowledgeEncryptionKeyRequest) returns (AcknowledgeEncryptionKeyResponse);
   // UpdateExecutionTrust verifies both rotation quorums and root-signed online
   // delegation, then durably commits rollback fences before acknowledgment.
   // This never starts work or accepts caller-selected verification keys.
@@ -318,6 +325,24 @@ message CommitRenewalResponse {
   google.protobuf.Timestamp prior_retain_until = 5;
   bool replayed = 6;
 }
+
+message PrepareEncryptionKeyRequest {}
+
+message PrepareEncryptionKeyResponse {
+  // DSSE DeviceEncryptionKeyAttestation signed by the current identity key.
+  bytes attestation_envelope = 1;
+  bytes public_key_sha256 = 2;
+  bytes certificate_sha256 = 3;
+  // True when the server already acknowledged this key and certificate.
+  bool acknowledged = 4;
+}
+
+message AcknowledgeEncryptionKeyRequest {
+  bytes public_key_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes certificate_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+message AcknowledgeEncryptionKeyResponse {}
 
 message StatusRequest {}
 

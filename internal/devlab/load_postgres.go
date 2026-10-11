@@ -32,6 +32,10 @@ type LoadAuthorityOptions struct {
 	DatabaseStorage string
 	PostgresCPUs    string
 	ServerCPUs      string
+	// networkContainer joins dedicated PostgreSQL to that exact container's
+	// network namespace (shared by the caller) instead of publishing a port.
+	networkContainer string
+	airgap           *AirgapAuthorityOptions
 }
 
 // LoadExperimentEnvironment is safe to persist: it contains no URLs or secrets.
@@ -95,6 +99,9 @@ func (o LoadAuthorityOptions) validate() error {
 	default:
 		return errors.New("database storage must be shared, nvme or tmpfs")
 	}
+	if o.networkContainer != "" && (o.DatabaseStorage != "tmpfs" || !loadContainerIDPattern.MatchString(o.networkContainer)) {
+		return errors.New("shared network namespace requires dedicated tmpfs PostgreSQL and an exact container ID")
+	}
 	return errors.Join(validateLoadCPUList(o.PostgresCPUs), validateLoadCPUList(o.ServerCPUs))
 }
 
@@ -127,7 +134,12 @@ func loadDocker(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func loadPostgresArgs(repository, shared, directory string, options LoadAuthorityOptions, storage *loadPostgresStorage) []string {
-	args := []string{"create", "--cidfile", filepath.Join(directory, "container-id"), "--label", "lindm.load.owned=" + filepath.Base(directory), "--publish", "127.0.0.1::5432", "--env", "POSTGRES_DB=lindm", "--env", "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256", "--security-opt", "no-new-privileges:true"}
+	network := []string{"--publish", "127.0.0.1::5432"}
+	if options.networkContainer != "" {
+		network = []string{"--network", "container:" + options.networkContainer}
+	}
+	args := append([]string{"create", "--cidfile", filepath.Join(directory, "container-id"), "--label", "lindm.load.owned=" + filepath.Base(directory)}, network...)
+	args = append(args, "--env", "POSTGRES_DB=lindm", "--env", "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256", "--security-opt", "no-new-privileges:true")
 	if options.PostgresCPUs != "" {
 		args = append(args, "--cpuset-cpus", options.PostgresCPUs)
 	}
@@ -198,24 +210,27 @@ func openLoadPostgres(ctx context.Context, repository, shared string, options Lo
 	if _, err := loadDocker(ctx, "start", cluster.containerID); err != nil {
 		return nil, err
 	}
-	output, err = loadDocker(ctx, "inspect", "--format", "{{json .NetworkSettings.Ports}}", cluster.containerID)
-	if err != nil {
-		return nil, err
-	}
-	var ports map[string][]struct {
-		HostIP   string
-		HostPort string
-	}
-	if err := json.Unmarshal(output, &ports); err != nil {
-		return nil, errors.New("invalid dedicated PostgreSQL port mapping")
-	}
-	bindings := ports["5432/tcp"]
-	if len(bindings) != 1 || bindings[0].HostIP != "127.0.0.1" {
-		return nil, errors.New("dedicated PostgreSQL requires exactly one loopback port")
-	}
-	port, err := strconv.Atoi(bindings[0].HostPort)
-	if err != nil || port < 1 || port > 65535 {
-		return nil, errors.New("invalid dedicated PostgreSQL loopback port")
+	port := 5432
+	if options.networkContainer == "" {
+		output, err = loadDocker(ctx, "inspect", "--format", "{{json .NetworkSettings.Ports}}", cluster.containerID)
+		if err != nil {
+			return nil, err
+		}
+		var ports map[string][]struct {
+			HostIP   string
+			HostPort string
+		}
+		if err := json.Unmarshal(output, &ports); err != nil {
+			return nil, errors.New("invalid dedicated PostgreSQL port mapping")
+		}
+		bindings := ports["5432/tcp"]
+		if len(bindings) != 1 || bindings[0].HostIP != "127.0.0.1" {
+			return nil, errors.New("dedicated PostgreSQL requires exactly one loopback port")
+		}
+		port, err = strconv.Atoi(bindings[0].HostPort)
+		if err != nil || port < 1 || port > 65535 {
+			return nil, errors.New("invalid dedicated PostgreSQL loopback port")
+		}
 	}
 	migrationURL := url.URL{Scheme: "postgresql", User: url.UserPassword("lindm_migrator", secrets["migrator-password"]), Host: net.JoinHostPort("localhost", strconv.Itoa(port)), Path: "/lindm"}
 	migrationURL.RawQuery = url.Values{"sslmode": {"verify-full"}, "sslrootcert": {filepath.Join(shared, "transport-ca.crt")}}.Encode()

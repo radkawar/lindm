@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -186,9 +187,19 @@ func resourceFileDesired(name, content string) *resourcev1.ResourceDesiredState 
 }
 
 func resourceOracle(ctx context.Context, vm *guestVM, name, command string) (VMResourceNativeRecord, error) {
+	return resourceOracleInput(ctx, vm, name, command, nil)
+}
+
+// resourceOracleInput feeds private expectations, such as a password hash to
+// compare in the guest, on stdin so they never enter argv or the record.
+func resourceOracleInput(ctx context.Context, vm *guestVM, name, command string, input []byte) (VMResourceNativeRecord, error) {
+	var stdin io.Reader
+	if input != nil {
+		stdin = bytes.NewReader(input)
+	}
 	// Native tools (gpgv, dpkg, systemctl) report on stderr; it is part of the
 	// recorded evidence, while the exit status remains the oracle verdict.
-	result, err := vm.runResult(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(command)+" 2>&1", nil, 256<<10, time.Minute)
+	result, err := vm.runResult(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(command)+" 2>&1", stdin, 256<<10, time.Minute)
 	if err != nil {
 		return VMResourceNativeRecord{}, fmt.Errorf("independent %s oracle: %w", name, err)
 	}
@@ -282,6 +293,19 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 	}
 	if selected["password"] {
 		if err := exerciseResourcePassword(ctx, packages, r, &kinds[8]); err != nil {
+			return err
+		}
+	}
+	if selected["secret-password"] {
+		r.fresh()
+		result.Resources.SecretPassword = new(VMSecretPasswordEvidence)
+		if err := exerciseResourceSecretPassword(ctx, r, result.Resources.SecretPassword, &kinds[9]); err != nil {
+			return err
+		}
+	}
+	if selected["local-admin"] {
+		result.Resources.LocalAdmin = &VMLocalAdminEvidence{Account: localAdminLabAccount, Unproven: []string{"managed local-admin rotation, reveal and post-reveal supersession not completed"}}
+		if err := exerciseLocalAdminPassword(ctx, vm, control, result.DeviceID, result.Resources.LocalAdmin); err != nil {
 			return err
 		}
 	}

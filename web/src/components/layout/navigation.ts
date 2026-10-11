@@ -5,6 +5,7 @@ import {
   KeyRoundIcon,
   LayoutDashboardIcon,
   LayersIcon,
+  LockKeyholeIcon,
   MonitorIcon,
   RocketIcon,
   ShieldAlertIcon,
@@ -55,6 +56,13 @@ export const navigation = [
     label: "Advisories",
     icon: ShieldAlertIcon,
     permission: "fleet.read",
+    group: "Security",
+  },
+  {
+    to: "/secrets",
+    label: "Secrets",
+    icon: LockKeyholeIcon,
+    permission: "secrets.manage",
     group: "Security",
   },
   {
@@ -112,6 +120,7 @@ export function visibleNavigation(principal: SessionPrincipal) {
           "recovery_keys.read",
           "remote_execution.run",
           "scripts.run",
+          "secrets.reveal",
         ].some((permission) => canPermission(principal, permission))),
   );
 }

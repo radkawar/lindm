@@ -20,6 +20,18 @@ import (
 	"lindm/internal/advisory/feed"
 )
 
+// candidatePage bounds one candidate query: at most 500 records of at most
+// 64 KiB each are held while matching.
+const candidatePage = 500
+
+// maxFindings is the per-device admission bound. Ubuntu's OSV export lists
+// thousands of open kernel CVEs against the source package, and each installed
+// binary of that source is a separate finding: the stock 24.04 cloud image with
+// one kernel (6.8.0-142) has 28,821 findings against the 2026-10-10 export, and
+// desktops keep several kernels. Exceeding the bound is UNKNOWN, never a
+// truncated result.
+const maxFindings = 100000
+
 // Evaluate publishes one bounded, repeatable-read evaluation of the device's
 // current immutable snapshot. Publication of a new snapshot or feed immediately
 // makes the previous evaluation UNKNOWN through the shared SQL view.
@@ -136,7 +148,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 		previous.EvaluatedAt = dbNow
 		return previous, nil
 	}
-	findings := make(map[uuid.UUID]advisorydb.InsertAdvisoryFindingParams)
+	findings := make(map[uuid.UUID]advisorydb.InsertAdvisoryFindingsParams)
 	if selected != nil && d.CurrentSnapshotID != nil {
 		missing, err := q.AdvisorySourceMappingMissing(ctx, *d.CurrentSnapshotID)
 		if err != nil {
@@ -156,15 +168,14 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 		}
 		// Deterministic record/capacity failures persist an UNKNOWN evaluation
 		// instead of failing the background job forever on unchanged evidence.
+		// Candidates arrive in bounded keyset pages; memory never holds more
+		// than one page of record bytes plus the admitted findings.
+		afterPosition, afterRecord := int32(-1), uuid.Nil
 	matching:
-		for start := int32(0); start < d.PackageCount.Int32; start += 500 {
-			rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, Generation: selected.Revision, SnapshotID: *d.CurrentSnapshotID, FirstPosition: start, EndPosition: start + 500})
+		for {
+			rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, Generation: selected.Revision, SnapshotID: *d.CurrentSnapshotID, AfterPosition: afterPosition, AfterRecord: afterRecord, RowLimit: candidatePage})
 			if err != nil {
 				return advisorydb.AdvisoryEvaluation{}, err
-			}
-			if len(rows) > 10000 {
-				unknown("matching_capacity_exceeded")
-				break
 			}
 			for _, row := range rows {
 				var record advisoryv1.Advisory
@@ -202,7 +213,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 					unknown("vendor_assessment_unknown")
 				}
 				id := findingID(deviceID, selected.ID, record.GetId(), row.Name, row.Version, row.Architecture)
-				f := advisorydb.InsertAdvisoryFindingParams{ID: id, DeviceID: deviceID, AdvisoryID: record.GetId(), PackageName: row.Name, InstalledVersion: row.Version, FixedVersion: record.GetFixedVersion(), Architecture: row.Architecture, Severity: record.GetSeverity(), Cves: record.GetCves(), FeedID: selected.ID, SourceUrl: record.GetSourceUrl()}
+				f := advisorydb.InsertAdvisoryFindingsParams{ID: id, DeviceID: deviceID, AdvisoryID: record.GetId(), PackageName: row.Name, InstalledVersion: row.Version, FixedVersion: record.GetFixedVersion(), Architecture: row.Architecture, Severity: record.GetSeverity(), Cves: record.GetCves(), FeedID: selected.ID, SourceUrl: record.GetSourceUrl()}
 				if f.Cves == nil {
 					f.Cves = []string{}
 				}
@@ -241,12 +252,16 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 						f.SourceUrl = previous.SourceUrl
 					}
 				}
-				if _, exists := findings[id]; !exists && len(findings) == 10000 {
+				if _, exists := findings[id]; !exists && len(findings) == maxFindings {
 					unknown("matching_capacity_exceeded")
 					break matching
 				}
 				findings[id] = f
 			}
+			if len(rows) < candidatePage {
+				break
+			}
+			afterPosition, afterRecord = rows[len(rows)-1].Position, rows[len(rows)-1].RecordID
 		}
 	}
 	ids := make([]uuid.UUID, 0, len(findings))
@@ -270,10 +285,12 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 	if err := q.DeleteAdvisoryFindings(ctx, deviceID); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
+	ordered := make([]advisorydb.InsertAdvisoryFindingsParams, 0, len(ids))
 	for _, id := range ids {
-		if err := q.InsertAdvisoryFinding(ctx, findings[id]); err != nil {
-			return advisorydb.AdvisoryEvaluation{}, err
-		}
+		ordered = append(ordered, findings[id])
+	}
+	if _, err := q.InsertAdvisoryFindings(ctx, ordered); err != nil {
+		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	if err := q.StoreAdvisoryEvaluation(ctx, e); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err

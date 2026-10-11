@@ -86,6 +86,19 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ListAdvisorySummary":                  {identity.PermissionReadFleet, readers, false},
 		"ListAdvisoryFeeds":                    {identity.PermissionReadFleet, readers, true},
 		"AcceptAdvisoryFinding":                {identity.PermissionManageAdvisoryExceptions, admins, false},
+		// Secrets are deployment-global: mutations require an unrestricted grant at
+		// entry; reveal re-checks unrestricted authority inside its fenced transaction.
+		"CreateSecret": {identity.PermissionManageSecrets, admins, true},
+		"RotateSecret": {identity.PermissionManageSecrets, admins, true},
+		"ListSecrets":  {identity.PermissionManageSecrets, admins, false},
+		"GetSecret":    {identity.PermissionManageSecrets, admins, false},
+		"RevealSecret": {identity.PermissionRevealSecrets, admins, false},
+		// Local-admin passwords are device-scoped; status is fleet-visible metadata.
+		"SetLocalAdminPasswordPolicy":       {identity.PermissionManageSecrets, admins, false},
+		"RemoveLocalAdminPasswordPolicy":    {identity.PermissionManageSecrets, admins, false},
+		"RequestLocalAdminPasswordRotation": {identity.PermissionManageSecrets, admins, false},
+		"GetLocalAdminPasswordStatus":       {identity.PermissionReadFleet, readers, false},
+		"RevealLocalAdminPassword":          {identity.PermissionRevealSecrets, admins, false},
 	}
 }
 

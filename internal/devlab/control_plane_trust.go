@@ -49,6 +49,7 @@ type AuthorityFixture struct {
 	closed           bool
 	local            *localAuthority
 	releasePublisher *releaseupdate.Publisher
+	ha               *haTopology
 }
 
 type authorityFixtureMode uint8
@@ -60,6 +61,8 @@ const (
 	authorityLocalConsole
 	authorityDeviceActions
 	authorityReleaseUpdates
+	authorityHA
+	authorityAirgap
 )
 
 func OpenAuthorityFixture(ctx context.Context, repository, binary string) (_ *AuthorityFixture, resultErr error) {
@@ -77,7 +80,7 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, mode a
 }
 
 func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary string, mode authorityFixtureMode, options LoadAuthorityOptions) (_ *AuthorityFixture, resultErr error) {
-	local := mode == authorityLocal || mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityReleaseUpdates
+	local := mode == authorityLocal || mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityReleaseUpdates || mode == authorityHA || mode == authorityAirgap
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return nil, err
@@ -121,20 +124,30 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		databaseResources = f.cluster.directory
 		f.environment = f.cluster.environment
 	}
+	if mode == authorityHA {
+		f.ha, err = openHATopology(ctx, shared)
+		if err != nil {
+			return nil, err
+		}
+		databaseResources = f.ha.directory
+	}
 	document, err := authorityDocument(ctx, f.configPath(), shared, material)
 	if err != nil {
 		return nil, err
 	}
 	// Override only generated configuration, never read the shared server.json.
 	document.Proto.Database.MigrationUrlFile = proto.String(filepath.Join(databaseResources, "migration-database-url"))
-	dsnBytes, err := os.ReadFile(filepath.Join(databaseResources, "migration-database-url"))
-	if err != nil {
-		return nil, err
-	}
-	defer clear(dsnBytes)
-	dsn, err := url.Parse(strings.TrimSpace(string(dsnBytes)))
-	if err != nil || dsn.Scheme != "postgresql" {
-		return nil, errors.New("invalid development migration database URL")
+	var dsn *url.URL
+	if f.ha == nil {
+		dsnBytes, err := os.ReadFile(filepath.Join(databaseResources, "migration-database-url"))
+		if err != nil {
+			return nil, err
+		}
+		dsn, err = url.Parse(strings.TrimSpace(string(dsnBytes)))
+		clear(dsnBytes)
+		if err != nil || dsn.Scheme != "postgresql" {
+			return nil, errors.New("invalid development migration database URL")
+		}
 	}
 	setup, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	f.database, err = newAuthorityDatabase(setup, document, databaseResources)
@@ -143,9 +156,15 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		return nil, err
 	}
 	f.DatabaseName = f.database.name
-	dsn.Path, dsn.RawPath = "/"+f.DatabaseName, ""
+	var runtimeURL string
+	if f.ha != nil {
+		runtimeURL = f.ha.databaseURL(f.DatabaseName)
+	} else {
+		dsn.Path, dsn.RawPath = "/"+f.DatabaseName, ""
+		runtimeURL = dsn.String()
+	}
 	for name, data := range map[string][]byte{
-		"database-url": []byte(dsn.String()), "execution-root.json": material.ExecutionRootJSON,
+		"database-url": []byte(runtimeURL), "execution-root.json": material.ExecutionRootJSON,
 		"bootstrap.dsse.json": material.BootstrapEnvelope,
 	} {
 		if err := os.WriteFile(filepath.Join(f.directory, name), data, 0600); err != nil {
@@ -184,10 +203,10 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	cfg.AdminListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(adminAddress.Port)}
 	cfg.DeviceListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(deviceAddress.Port)}
 	deviceOrigin := "https://localhost:18445"
-	if mode == authorityLocalConsole || mode == authorityDeviceActions {
+	if mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityHA {
 		f.ConsoleOrigin = fmt.Sprintf("https://localhost:%d", adminAddress.Port)
 		cfg.PublicUrl = f.ConsoleOrigin
-		if mode == authorityDeviceActions {
+		if mode == authorityDeviceActions || mode == authorityHA {
 			deviceOrigin = fmt.Sprintf("https://localhost:%d", deviceAddress.Port)
 		}
 		material, err = f.originAgentFixture(ctx, material, deviceOrigin)
@@ -218,13 +237,23 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	cfg.TrustedCaFile = filepath.Join(shared, "transport-ca.crt")
 	cfg.DevicePublicUrl = proto.String(deviceOrigin)
 	cfg.ExecutionBootstrap = &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"}
-	if mode == authorityLocalConsole {
+	if mode == authorityLocalConsole || mode == authorityHA {
 		if err := f.configureConsoleIntegrations(cfg); err != nil {
+			return nil, err
+		}
+	}
+	if mode == authorityLocalConsole {
+		if err := f.configureConsoleEscrow(cfg); err != nil {
 			return nil, err
 		}
 	}
 	if mode == authorityReleaseUpdates || mode == authorityDeviceActions {
 		if err := f.configureReleaseRepository(ctx, cfg, material); err != nil {
+			return nil, err
+		}
+	}
+	if mode == authorityAirgap {
+		if err := f.configureAirgap(ctx, cfg, material, options.airgap); err != nil {
 			return nil, err
 		}
 	}
@@ -234,6 +263,12 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	}
 	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
 		return nil, err
+	}
+	if f.ha != nil {
+		f.ha.lbAdmin, f.ha.lbDevice = adminAddress.Port, deviceAddress.Port
+		if err := f.ha.writeInstanceConfigs(cfg, f.directory); err != nil {
+			return nil, err
+		}
 	}
 	privateDocument, err := config.Load(f.configPath())
 	if err != nil {
@@ -266,6 +301,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		stop()
 		if err != nil {
 			return nil, errors.New("bootstrap owner in isolated authority database failed")
+		}
+	}
+	if options.airgap != nil {
+		if err := options.airgap.BeforeStart(ctx, f.runServerCommand); err != nil {
+			return nil, fmt.Errorf("air-gap pre-start import: %w", err)
 		}
 	}
 	err = errors.Join(admin.Close(), device.Close())
@@ -302,6 +342,9 @@ func (f *AuthorityFixture) OpenOwnerSession(ctx context.Context) (*OwnerSession,
 func (f *AuthorityFixture) start(ctx context.Context) error {
 	if f.closed || f.process != nil {
 		return errors.New("isolated authority process lifecycle conflict")
+	}
+	if f.ha != nil {
+		return f.startHA(ctx)
 	}
 	cmd, err := newServerCommand(f.binary, f.configPath(), f.serverCPUs)
 	if err != nil {
@@ -354,6 +397,9 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 }
 
 func (f *AuthorityFixture) stop() error {
+	if f.ha != nil {
+		return f.ha.stopInstances()
+	}
 	if f.process == nil {
 		return nil
 	}
@@ -392,12 +438,12 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 }
 
 func (f *AuthorityFixture) Close() error {
-	if f.closed && f.process == nil && f.cluster == nil {
+	if f.closed && f.process == nil && f.cluster == nil && f.ha == nil {
 		return nil
 	}
 	f.closed = true
 	err := f.stop()
-	if f.process != nil {
+	if f.process != nil || f.ha != nil && f.ha.running() {
 		// Never drop a database or unlink credentials still used by a live child.
 		return errors.Join(err, fmt.Errorf("isolated lindmd has not exited; owned database %s and resources %s retained", f.DatabaseName, f.directory))
 	}
@@ -412,6 +458,12 @@ func (f *AuthorityFixture) Close() error {
 			return errors.Join(err, cleanupErr)
 		}
 		f.cluster = nil
+	}
+	if f.ha != nil {
+		if cleanupErr := f.ha.close(); cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
+		f.ha = nil
 	}
 	if f.log != nil {
 		err = errors.Join(err, f.log.Close())

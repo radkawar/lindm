@@ -35,7 +35,7 @@ func newDeviceActionAuthorityFixture(t *testing.T, destructive bool) deviceActio
 		t.Fatal(err)
 	}
 	for _, d := range f.delegation.Delegates {
-		d.Capabilities = []string{capability, "device.escrow-rotate.v1"}
+		d.Capabilities = []string{capability, "device.escrow-rotate.v1", "device.local-admin-rotate.v1"}
 	}
 	f.delegation, err = f.verifier.VerifyDelegation(t.Context(), f.root, executionSign(t, f.authority, f.delegation, f.keys...), 0, 0, f.now)
 	if err != nil {
@@ -322,6 +322,7 @@ func TestDeviceActionCapabilityIsClosedAndActionSpecific(t *testing.T) {
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{}}}, "device.restart.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}}, "device.shutdown.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}, "device.refresh-inventory.v1"},
+		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{}}}, "device.local-admin-rotate.v1"},
 	} {
 		got, err := DeviceActionCapability(tc.spec)
 		if err != nil || got != tc.want {

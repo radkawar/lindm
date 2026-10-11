@@ -22,6 +22,7 @@ import { CollectionStatusBadge, Fact, ObservedTime, ObservedValue } from "./obse
 import { DeviceMetadataCard } from "./metadata";
 import { DeviceNativeDetails, NumberValue } from "./native-details";
 import { DeviceEncryptionPanel } from "./encryption";
+import { DeviceLocalAdminPanel } from "./local-admin";
 import { DeviceActionsPanel, DeviceLockRestriction } from "./actions";
 import { DeviceActionMenu } from "./action-menu";
 import { DeviceAgentUpdate } from "./agent-update";
@@ -41,6 +42,7 @@ const detailTabs = [
   { id: "inventory", label: "Inventory" },
   { id: "resources", label: "Services" },
   { id: "encryption", label: "Encryption" },
+  { id: "local-admin", label: "Local admin" },
   { id: "actions", label: "Actions" },
   { id: "findings", label: "Findings" },
   { id: "history", label: "History" },
@@ -636,6 +638,18 @@ export function DeviceDetailView({
           >
             {activeTab === "encryption" ? (
               <DeviceEncryptionPanel key={`encryption:${deviceId}`} deviceId={deviceId} />
+            ) : null}
+          </section>
+          <section
+            role="tabpanel"
+            id={`${tabId}-local-admin-panel`}
+            aria-labelledby={`${tabId}-local-admin-tab`}
+            tabIndex={0}
+            hidden={activeTab !== "local-admin"}
+            className="space-y-4"
+          >
+            {activeTab === "local-admin" ? (
+              <DeviceLocalAdminPanel key={`local-admin:${deviceId}`} deviceId={deviceId} />
             ) : null}
           </section>
           <section

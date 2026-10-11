@@ -40,8 +40,11 @@ type ResourceWork struct {
 	// Stop only this intent's ungranted preparation and attest its terminal result.
 	// The server keeps the action open until owned staging cleanup is acknowledged.
 	CancelPreparation bool `protobuf:"varint,6,opt,name=cancel_preparation,json=cancelPreparation,proto3" json:"cancel_preparation,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// HPKE deliveries sealed once at mint to this generation's attested key, in
+	// signed intent order. Opaque to the network process; replayed byte-exact.
+	SealedSecrets [][]byte `protobuf:"bytes,7,rep,name=sealed_secrets,json=sealedSecrets,proto3" json:"sealed_secrets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResourceWork) Reset() {
@@ -114,6 +117,13 @@ func (x *ResourceWork) GetCancelPreparation() bool {
 		return x.CancelPreparation
 	}
 	return false
+}
+
+func (x *ResourceWork) GetSealedSecrets() [][]byte {
+	if x != nil {
+		return x.SealedSecrets
+	}
+	return nil
 }
 
 type GetResourceWorkRequest struct {
@@ -491,14 +501,15 @@ var File_lindm_device_v1_service_dispatch_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_service_dispatch_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/device/v1/service_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x04\n" +
+	"&lindm/device/v1/service_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbc\x04\n" +
 	"\fResourceWork\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x124\n" +
 	"\x0fintent_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x12;\n" +
 	"\x14start_grant_envelope\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x12startGrantEnvelope\x12*\n" +
 	"\fresult_nonce\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\vresultNonce\x12Y\n" +
 	"\x17result_nonce_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x14resultNonceExpiresAt\x12-\n" +
-	"\x12cancel_preparation\x18\x06 \x01(\bR\x11cancelPreparation:\xa1\x01\xbaH\x9d\x01\x1a\x9a\x01\n" +
+	"\x12cancel_preparation\x18\x06 \x01(\bR\x11cancelPreparation\x128\n" +
+	"\x0esealed_secrets\x18\a \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets:\xa1\x01\xbaH\x9d\x01\x1a\x9a\x01\n" +
 	"\x1eresource_work.cancel_ungranted\x125preparation cancellation cannot carry start authority\x1aA!this.cancel_preparation || this.start_grant_envelope.size() == 0\"P\n" +
 	"\x16GetResourceWorkRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"L\n" +

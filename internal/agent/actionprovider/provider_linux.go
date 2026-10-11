@@ -39,11 +39,15 @@ var (
 
 type Options struct {
 	Config *agentv1.DeviceActionProviderConfig
-	// AccountJournal is the executor's protected ownership ledger.
+	// AccountJournal is the executor's protected ownership ledger and the
+	// installation private custody for a generated local-admin password.
 	AccountJournal *journal.Store
 	// SealRecovery must seal exact ASCII recovery bytes with the supplied binding
 	// to the signed spec's escrow key. It must never retain plaintext.
 	SealRecovery func(context.Context, *agentv1.RecoveryKeyBinding, *agentv1.DeviceActionSpec, []byte) ([]byte, error)
+	// SealLocalAdmin seals one generated local-admin password with its exact
+	// binding to the signed spec's escrow key. It must never retain plaintext.
+	SealLocalAdmin func(context.Context, *agentv1.LocalAdminPasswordBinding, *agentv1.DeviceActionSpec, []byte) ([]byte, error)
 	// TrustedRecoveryCustody authenticates the exact signed sanitize recovery
 	// spec against durable TPM custody. Only the root recovery-run composition
 	// supplies this callback; configuration alone never permits a RAM journal.
@@ -55,6 +59,7 @@ type Provider struct {
 	validate        protovalidate.Validator
 	seal            func(context.Context, *agentv1.RecoveryKeyBinding, *agentv1.DeviceActionSpec, []byte) ([]byte, error)
 	recoveryCustody func(context.Context, *agentv1.DeviceActionSpec) error
+	localAdmin      *localAdminNative
 	run             nativeRunner
 	sessionNative   func(context.Context, string) ([]graphicalSession, error)
 	openPower       func(context.Context) (powerBus, func() error, error)
@@ -111,6 +116,9 @@ func New(options Options) (*Provider, error) {
 			}
 		}
 	}
+	if len(config.GetLocalAdminAccounts()) != 0 && (options.AccountJournal == nil || options.SealLocalAdmin == nil) {
+		return nil, fmt.Errorf("%w: escrow_custody_required", ErrUnsupported)
+	}
 	p := &Provider{config: proto.CloneOf(config), validate: validator, seal: options.SealRecovery, recoveryCustody: options.TrustedRecoveryCustody, run: runNative, gate: make(chan struct{}, 1), clock: time.Now}
 	p.sessionNative = logindSessions
 	p.openPower = openLogindPower
@@ -120,6 +128,9 @@ func New(options Options) (*Provider, error) {
 		return nil, err
 	}
 	p.resolve = p.openTarget
+	if len(config.GetLocalAdminAccounts()) != 0 {
+		p.localAdmin = &localAdminNative{seal: options.SealLocalAdmin, custody: options.AccountJournal, accounts: p.accounts.readAccounts, root: p.accounts.root}
+	}
 	p.flushHeader = flushBlockHeader
 	return p, nil
 }
@@ -293,6 +304,8 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 		return observation, nil
 	}
 	switch spec.GetAction().(type) {
+	case *agentv1.DeviceActionSpec_LocalAdminPasswordRotate:
+		return p.observeLocalAdmin(ctx, spec, observation)
 	case *agentv1.DeviceActionSpec_LockSessions:
 		if !p.config.GetAllowSessionLock() {
 			return unsupported("session_lock_not_qualified")
@@ -372,6 +385,15 @@ func (p *Provider) Plan(ctx context.Context, spec *agentv1.DeviceActionSpec, bef
 			plan.CryptoEraseTargets = append(plan.CryptoEraseTargets, proto.CloneOf(target))
 		}
 	}
+	if spec.GetLocalAdminPasswordRotate() != nil {
+		account := before.GetLocalAdmin()
+		if account == nil || account.GetAccountName() != spec.GetLocalAdminPasswordRotate().GetAccountName() || account.GetAccountUid() == 0 {
+			return nil, ErrConflict
+		}
+		// Runtime fills device/generation/action identity; the account and UID
+		// observed here are frozen into the signed plan and the OAEP label.
+		plan.LocalAdminBinding = &agentv1.LocalAdminPasswordBinding{AccountName: account.GetAccountName(), AccountUid: account.GetAccountUid()}
+	}
 	if action := spec.GetEscrowRotate(); action != nil {
 		slot := uint32(0)
 		for ; slot < 32 && slices.Contains(before.GetOccupiedKeyslots(), slot); slot++ {
@@ -411,6 +433,10 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.DeviceActionPlan, cr
 	}
 	if LiveRootHeaderErase(plan.GetSpec()) {
 		return p.applyLiveRoot(ctx, plan, gate)
+	}
+	if plan.GetSpec().GetLocalAdminPasswordRotate() != nil {
+		// The two escrow-before-effect phases have dedicated entry points.
+		return nil, ErrUnsupported
 	}
 	fresh, err := p.observe(ctx, plan.GetSpec())
 	if err != nil {

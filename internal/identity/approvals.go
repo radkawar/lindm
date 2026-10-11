@@ -105,7 +105,8 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		b.action = "execution_trust.manage"
 		payload = copy
 	case *adminv1.CreateDeviceActionRequest:
-		if request == nil || request.GetSpec() == nil {
+		// Local-admin rotation is server-minted from a policy, never approved by hand.
+		if request == nil || request.GetSpec() == nil || request.GetSpec().GetLocalAdminPasswordRotate() != nil {
 			return b, ErrApprovalInvalid
 		}
 		copy := proto.CloneOf(request)
@@ -124,6 +125,28 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
 		b.action, b.mutation = "recovery_key.reveal", copy.GetRequestId()
+		id, err := uuid.Parse(copy.GetDeviceId())
+		if err != nil || id == uuid.Nil {
+			return b, ErrApprovalInvalid
+		}
+		b.target = id
+		payload = copy
+	case *adminv1.RevealSecretRequest:
+		if request == nil {
+			return b, ErrApprovalInvalid
+		}
+		// Secrets are deployment-global: no device target means unrestricted scope.
+		copy := proto.CloneOf(request)
+		copy.ApprovalId = ""
+		b.action, b.mutation = "secret.reveal", copy.GetRequestId()
+		payload = copy
+	case *adminv1.RevealLocalAdminPasswordRequest:
+		if request == nil {
+			return b, ErrApprovalInvalid
+		}
+		copy := proto.CloneOf(request)
+		copy.ApprovalId = ""
+		b.action, b.mutation = "local_admin.reveal", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -163,6 +186,10 @@ func approvalPayload(request *adminv1.CreateApprovalRequest) proto.Message {
 		return request.GetCreateDeviceAction()
 	case *adminv1.CreateApprovalRequest_RevealRecoveryKey:
 		return request.GetRevealRecoveryKey()
+	case *adminv1.CreateApprovalRequest_RevealSecret:
+		return request.GetRevealSecret()
+	case *adminv1.CreateApprovalRequest_RevealLocalAdminPassword:
+		return request.GetRevealLocalAdminPassword()
 	default:
 		return nil
 	}
@@ -534,6 +561,14 @@ func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Ap
 		request := &adminv1.RevealRecoveryKeyRequest{}
 		payload = request
 		out.Payload = &adminv1.Approval_RevealRecoveryKey{RevealRecoveryKey: request}
+	case "secret.reveal":
+		request := &adminv1.RevealSecretRequest{}
+		payload = request
+		out.Payload = &adminv1.Approval_RevealSecret{RevealSecret: request}
+	case "local_admin.reveal":
+		request := &adminv1.RevealLocalAdminPasswordRequest{}
+		payload = request
+		out.Payload = &adminv1.Approval_RevealLocalAdminPassword{RevealLocalAdminPassword: request}
 	default:
 		return nil, ErrApprovalInvalid
 	}

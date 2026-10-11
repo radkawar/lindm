@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/connectivity_guard.proto";
 import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/secret_delivery.proto";
 import "lindm/agent/v1/trust.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/identity.proto";
@@ -44,6 +45,14 @@ message ResourceExecutionIntent {
   }];
   ResourceOwnershipBinding ownership = 16 [(buf.validate.field).required = true];
   ResourceExecutionPreparation preparation = 17;
+  // One entry per SecretRef in desired state. Ciphertext travels outside the
+  // signature, in the same order, and is authenticated by sealed_sha256.
+  repeated ResourceSecretDelivery secrets = 18 [(buf.validate.field).repeated.max_items = 8];
+  option (buf.validate.message).cel = {
+    id: "resource_intent.secret_binding"
+    message: "secret deliveries must bind this exact device, action and resource"
+    expression: "this.secrets.all(s, s.binding.deployment_id == this.deployment_id && s.binding.device_id == this.device_id && s.binding.enrollment_generation == this.enrollment_generation && s.binding.action_id == this.action_id && s.binding.resource == this.desired.ref)"
+  };
   option (buf.validate.message).cel = {
     id: "resource_intent.preparation"
     message: "only native packages require immutable bounded staging"
@@ -219,6 +228,23 @@ message ResourceExecutionRecord {
   // Full signed packet/native verdict proof stays in root custody. Attestations
   // expose its digest through the verification receipts, not private endpoints.
   ConnectivityVerificationEvidence firewall_evidence = 24;
+  // Exact HPKE deliveries from preparation, in intent order. Only the executor
+  // recipient key opens them; plaintext is never journaled. Cleared when the
+  // record becomes terminal.
+  repeated bytes sealed_secrets = 25 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      bytes: {
+        min_len: 1
+        max_len: 8192
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "resource_record.sealed_secrets"
+    message: "journaled sealed secrets must match the signed delivery manifest until terminal cleanup"
+    expression: "this.sealed_secrets.size() == 0 || this.sealed_secrets.size() == this.intent.secrets.size()"
+  };
   option (buf.validate.message).cel = {
     id: "resource_record.firewall_evidence"
     message: "retained packet proof requires the exact terminal firewall verification"
@@ -270,6 +296,15 @@ message PrepareResourceExecutionRequest {
   bytes intent_envelope = 1 [(buf.validate.field).bytes = {
     min_len: 1
     max_len: 131072
+  }];
+  repeated bytes sealed_secrets = 2 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      bytes: {
+        min_len: 1
+        max_len: 8192
+      }
+    }
   }];
 }
 

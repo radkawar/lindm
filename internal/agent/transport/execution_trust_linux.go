@@ -28,6 +28,9 @@ type managementLoop struct {
 	cache            connectionCache
 	gate             authorityGate
 	refreshInventory func(context.Context, *agentv1.DeviceActionStatus) error
+	// encryptionKeyCertificate is the certificate digest whose recipient key
+	// the root reported acknowledged; owned by the loop goroutine.
+	encryptionKeyCertificate []byte
 }
 
 func (m *managementLoop) start(parent context.Context) func() {
@@ -82,7 +85,10 @@ func (m *managementLoop) cycle(ctx context.Context) error {
 	if connection.GetDeviceActionReportOnly() {
 		return actionErr
 	}
-	return errors.Join(actionErr, m.dispatchServices(ctx))
+	// Register before service dispatch, which seals secrets to this key. A
+	// failure is reported, not a reason to withhold unrelated service work.
+	keyErr := m.registerEncryptionKey(ctx, connection)
+	return errors.Join(actionErr, keyErr, m.dispatchServices(ctx))
 }
 
 func synchronizeExecutionTrust(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache, gate authorityGate) error {

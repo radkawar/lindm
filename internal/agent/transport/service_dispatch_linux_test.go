@@ -38,6 +38,20 @@ func TestServiceDispatchNoDrift(t *testing.T) {
 	}
 }
 
+// Sealed deliveries are opaque to the relay: the executor must receive the
+// server's exact ciphertext, in order, or the signed digests cannot match.
+func TestServiceDispatchRelaysExactSealedSecrets(t *testing.T) {
+	f := newDispatchFixture(t)
+	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
+	f.work.SealedSecrets = [][]byte{[]byte(" first sealed\n"), []byte(" second sealed\n")}
+	if err := f.loop.dispatchServices(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.preparedSecrets) != 2 || !bytes.Equal(f.preparedSecrets[0], []byte(" first sealed\n")) || !bytes.Equal(f.preparedSecrets[1], []byte(" second sealed\n")) {
+		t.Fatal("relay changed, reordered or dropped sealed deliveries")
+	}
+}
+
 func TestResourceReadOnlyOutcomesNeverRequestEffectAuthority(t *testing.T) {
 	for _, disposition := range []resourcev1.VerificationDisposition{
 		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED,
@@ -411,6 +425,7 @@ type dispatchFixture struct {
 	readyAtPrepare           int
 	readyPollStates          []agentv1.ResourceExecutionState
 	prepareSnapshots         []prepareSnapshot
+	preparedSecrets          [][]byte
 	intent, challenge, grant []byte
 	attestation, certificate []byte
 	initialNonce, lastNonce  []byte
@@ -577,6 +592,7 @@ func (e *dispatchExecutor) PrepareResourceExecution(ctx context.Context, req *co
 	if f.readyAtPrepare != 0 && f.prepares == f.readyAtPrepare {
 		f.state, f.pollStates = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED, f.readyPollStates
 	}
+	f.preparedSecrets = req.Msg.GetSealedSecrets()
 	if !bytes.Equal(req.Msg.GetIntentEnvelope(), f.intent) {
 		f.t.Fatal("executor did not receive the exact server intent")
 	}

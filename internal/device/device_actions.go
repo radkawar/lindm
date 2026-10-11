@@ -28,6 +28,12 @@ func deviceActionPermission(spec *agentv1.DeviceActionSpec) identity.Permission 
 func destructiveDeviceAction(spec *agentv1.DeviceActionSpec) bool {
 	return spec.GetCryptoErase() != nil || spec.GetSanitize() != nil
 }
+
+// A policy-minted rotation has no human request to approve: its authority is
+// the policy actor's, freshly re-authorized at minting and again at start.
+func policyMintedAction(spec *agentv1.DeviceActionSpec) bool {
+	return spec.GetLocalAdminPasswordRotate() != nil
+}
 func actionDigest(message proto.Message) ([]byte, error) {
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(message)
 	if err != nil {
@@ -85,7 +91,9 @@ func actionMessage(row devicedb.DeviceAction) (*adminv1.DeviceAction, error) {
 // authority. Root-owned signed preflight independently qualifies native effects.
 func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation uuid.UUID, spec *agentv1.DeviceActionSpec, now time.Time) error {
 	// Refresh repairs missing or stale inventory; its signed start is still online.
-	if spec.GetRefreshInventory() != nil {
+	// Local-admin rotation selects no inventory object: the root executor
+	// observes the allowlisted account itself before each phase.
+	if spec.GetRefreshInventory() != nil || spec.GetLocalAdminPasswordRotate() != nil {
 		return nil
 	}
 	host, err := q.GetHostObservation(ctx, generation)

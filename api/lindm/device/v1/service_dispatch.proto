@@ -26,6 +26,17 @@ message ResourceWork {
   // Stop only this intent's ungranted preparation and attest its terminal result.
   // The server keeps the action open until owned staging cleanup is acknowledged.
   bool cancel_preparation = 6;
+  // HPKE deliveries sealed once at mint to this generation's attested key, in
+  // signed intent order. Opaque to the network process; replayed byte-exact.
+  repeated bytes sealed_secrets = 7 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      bytes: {
+        min_len: 1
+        max_len: 8192
+      }
+    }
+  }];
   option (buf.validate.message).cel = {
     id: "resource_work.cancel_ungranted"
     message: "preparation cancellation cannot carry start authority"

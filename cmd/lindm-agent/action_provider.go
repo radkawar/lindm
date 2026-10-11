@@ -16,7 +16,7 @@ import (
 )
 
 func nativeActionProvider(cfg *agentv1.DeviceActionProviderConfig, store *journal.Store) (*actionprovider.Provider, error) {
-	provider, err := actionprovider.New(actionprovider.Options{Config: cfg, AccountJournal: store, SealRecovery: sealActionRecovery})
+	provider, err := actionprovider.New(actionprovider.Options{Config: cfg, AccountJournal: store, SealRecovery: sealActionRecovery, SealLocalAdmin: sealLocalAdminPassword})
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +44,21 @@ func sealActionRecovery(ctx context.Context, binding *agentv1.RecoveryKeyBinding
 	return escrow.SealForServer(spec.GetEscrowRotate().GetEscrowPublicKey(), encoded, secret)
 }
 
+func sealLocalAdminPassword(ctx context.Context, binding *agentv1.LocalAdminPasswordBinding, spec *agentv1.DeviceActionSpec, password []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	rotate := spec.GetLocalAdminPasswordRotate()
+	if binding == nil || rotate == nil || binding.GetAccountName() != rotate.GetAccountName() {
+		return nil, errors.New("local-admin binding does not match rotation account")
+	}
+	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(binding)
+	if err != nil {
+		return nil, err
+	}
+	return escrow.SealLocalAdminPassword(rotate.GetEscrowPublicKey(), encoded, password)
+}
+
 func recoveryBootConfig(cfg *agentv1.RecoveryBootConfig) *executor.RecoveryBootConfig {
 	if cfg == nil {
 		return nil
@@ -57,7 +72,7 @@ func recoveryBootConfig(cfg *agentv1.RecoveryBootConfig) *executor.RecoveryBootC
 }
 
 func actionMemoryRequired(cfg *agentv1.DeviceActionProviderConfig) bool {
-	if cfg.GetAllowAccountLock() || cfg.GetAllowLiveRootCryptoErase() || cfg.GetAllowRecoveryHandoff() {
+	if cfg.GetAllowAccountLock() || cfg.GetAllowLiveRootCryptoErase() || cfg.GetAllowRecoveryHandoff() || len(cfg.GetLocalAdminAccounts()) != 0 {
 		return true
 	}
 	for _, target := range cfg.GetTargets() {

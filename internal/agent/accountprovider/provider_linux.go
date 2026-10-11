@@ -47,6 +47,9 @@ type Config struct {
 	NativeTransaction                                                           func(context.Context, *agentv1.NativeResourceTransactionRequest, func(context.Context) error) error
 	NativeObserve                                                               func(context.Context, *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error)
 	NativeDigest                                                                func(string, []byte) ([]byte, error)
+	// Secrets opens one delivered SecretRef for a single use; the provider
+	// clears the returned material. Plaintext never enters plans, errors or logs.
+	Secrets func(context.Context, *resourcev1.SecretRef) (*agentv1.SecretMaterial, error)
 }
 type Provider struct {
 	config  Config
@@ -59,7 +62,7 @@ type Provider struct {
 }
 
 func Open(ctx context.Context, c Config) (*Provider, error) {
-	if ctx == nil || c.Journal == nil || c.Ownership == nil || c.Platform == nil || c.Native == nil || c.NativeTransaction == nil || c.NativeObserve == nil || c.NativeDigest == nil || os.Geteuid() != 0 {
+	if ctx == nil || c.Journal == nil || c.Ownership == nil || c.Platform == nil || c.Native == nil || c.NativeTransaction == nil || c.NativeObserve == nil || c.NativeDigest == nil || c.Secrets == nil || os.Geteuid() != 0 {
 		return nil, ErrUnsupported
 	}
 	for _, id := range []string{c.ExecutorIncarnation, c.ActionID, c.DeploymentID, c.DeviceID, c.EnrollmentGeneration} {
@@ -114,9 +117,6 @@ func (p *Provider) validateDesired(d *resourcev1.ResourceDesiredState) error {
 	u := d.GetLocalUser()
 	if u.Uid != nil && (u.GetUid() < p.config.Native.GetMinUid() || u.GetUid() > p.config.Native.GetMaxUid()) {
 		return ErrUnsafe
-	}
-	if u.GetPassword().GetHashed() != nil {
-		return fmt.Errorf("%w: purpose-bound credential delivery is required", ErrUnsupported)
 	}
 	if u.GetSupplementaryGroups().GetMode() == resourcev1.SetMode_SET_MODE_EXACT && !p.config.Ownership.GetPolicy().GetCompleteMembershipDimension() {
 		return ErrUnsafe
@@ -215,7 +215,7 @@ func (p *Provider) plan(ctx context.Context, d *resourcev1.ResourceDesiredState,
 	if p.isAdministrator(db, d.GetRef().GetCanonicalKey()) {
 		return nil, ErrUnsafe
 	}
-	target, edges, err := p.target(d, op, before, db, l)
+	target, edges, err := p.target(ctx, d, op, before, db, l)
 	if err != nil {
 		return nil, err
 	}

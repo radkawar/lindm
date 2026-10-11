@@ -111,14 +111,14 @@ func TestProtectedAccountsAndNumericCollisionsRefused(t *testing.T) {
 	db := fixtureDB()
 	d := groupDesired(nil)
 	d.GetLocalGroup().Gid = proto.Uint32(2003)
-	_, _, err := p.target(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(true), db, nil)
+	_, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(true), db, nil)
 	requireError(t, err)
 	u := userDesired()
 	u.GetLocalUser().Uid = proto.Uint32(2002)
-	_, _, err = p.target(u, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(false), db, nil)
+	_, _, err = p.target(context.Background(), u, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(false), db, nil)
 	requireError(t, err)
 	d = groupDesired(&resourcev1.MemberSet{Mode: resourcev1.SetMode_SET_MODE_ADDITIVE, LocalUserNames: []string{"root"}})
-	_, _, err = p.target(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(true), db, nil)
+	_, _, err = p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(true), db, nil)
 	requireError(t, err)
 }
 func TestAbsentDoesNotDeleteAdoptedObject(t *testing.T) {
@@ -127,7 +127,7 @@ func TestAbsentDoesNotDeleteAdoptedObject(t *testing.T) {
 	d := userDesired()
 	d.GetLocalUser().Presence = resourcev1.Presence_PRESENCE_ABSENT
 	ledger := appliedLedger(before, before, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_SHELL)
-	_, _, err := p.target(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), ledger)
+	_, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), ledger)
 	requireError(t, err)
 }
 func TestChangedDimensionsDoNotAcquireSatisfiedFields(t *testing.T) {
@@ -165,7 +165,7 @@ func TestNewUsersLockedWithoutHomeCopy(t *testing.T) {
 	user.HomeDirectory = proto.String(filepath.Join(t.TempDir(), "preserved"))
 	user.Shell = &resourcev1.LoginShell{InstalledShell: "/bin/sh"}
 	before.AccountPrivate.DesiredHome = &resourcev1.HomeMetadata{Path: user.GetHomeDirectory()}
-	target, _, err := p.target(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, db, nil)
+	target, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, db, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestNewUsersLockedWithoutHomeCopy(t *testing.T) {
 func TestNSSMismatchAndDirectoryObjectsRefused(t *testing.T) {
 	local := strings.Split("alice:x:2001:2000::/home/alice:/bin/sh", ":")
 	p := testProvider()
-	p.run = func(context.Context, string, ...string) ([]byte, error) {
+	p.run = func(context.Context, []byte, string, ...string) ([]byte, error) {
 		return []byte("alice:x:9999:2000::/home/alice:/bin/sh\n"), nil
 	}
 	_, err := p.nss(context.Background(), "passwd", "alice", local)
@@ -199,7 +199,7 @@ func TestNSSMismatchAndDirectoryObjectsRefused(t *testing.T) {
 	_, err = p.nss(context.Background(), "passwd", "alice", nil)
 	requireError(t, err)
 	calls := 0
-	p.run = func(context.Context, string, ...string) ([]byte, error) {
+	p.run = func(context.Context, []byte, string, ...string) ([]byte, error) {
 		calls++
 		if calls == 1 {
 			return []byte(strings.Join(local, ":") + "\n"), nil
@@ -233,7 +233,7 @@ func TestNativeSignedGateAndUnknownNeverRetry(t *testing.T) {
 				}
 				return nil
 			}
-			run := func(context.Context, string, ...string) ([]byte, error) {
+			run := func(context.Context, []byte, string, ...string) ([]byte, error) {
 				if gates != 1 {
 					t.Fatal("native effect before signed authority")
 				}
@@ -285,7 +285,7 @@ func TestActiveUserUIDChangeRefusedBeforeNativeEffect(t *testing.T) {
 	before.Observation.GetLocalUser().HasProcesses = true
 	d := userDesired()
 	d.GetLocalUser().Uid = proto.Uint32(2999)
-	_, _, err := p.target(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), nil)
+	_, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), nil)
 	if !errors.Is(err, ErrConflict) {
 		t.Fatalf("active UID change = %v", err)
 	}

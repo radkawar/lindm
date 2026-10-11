@@ -23,6 +23,9 @@ service DeviceService {
   rpc PutPackageBatch(PutPackageBatchRequest) returns (PutPackageBatchResponse);
   rpc CommitPackageSnapshot(CommitPackageSnapshotRequest) returns (CommitPackageSnapshotResponse);
   rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
+  // Registers the identity-signed HPKE recipient key of the presented
+  // certificate. Idempotent; the key only receives sealed secret deliveries.
+  rpc RegisterEncryptionKey(RegisterEncryptionKeyRequest) returns (RegisterEncryptionKeyResponse);
   // Returns the current server-owned service action, minting it only when no
   // open action exists. Never implies the device is compliant.
   rpc GetResourceWork(GetResourceWorkRequest) returns (GetResourceWorkResponse);
@@ -247,4 +250,19 @@ message RenewIdentityRequest {
 message RenewIdentityResponse {
   bytes certificate_pem = 1;
   google.protobuf.Timestamp expires_at = 2;
+}
+message RegisterEncryptionKeyRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  // DSSE lindm.agent.v1.DeviceEncryptionKeyAttestation signed by the mTLS identity key.
+  bytes attestation_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message RegisterEncryptionKeyResponse {
+  bytes public_key_sha256 = 1;
+  bytes certificate_sha256 = 2;
 }

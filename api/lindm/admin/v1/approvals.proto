@@ -8,6 +8,7 @@ import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/device_actions.proto";
 import "lindm/admin/v1/enrollment_recovery.proto";
 import "lindm/admin/v1/provisioning.proto";
+import "lindm/admin/v1/secrets.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -63,6 +64,8 @@ message Approval {
     ApprovePendingEnrollmentRequest approve_pending_enrollment = 17;
     CreateRecoveryEnrollmentGrantRequest recover_device = 18;
     ActivateTargetPreviewRequest activate_target_preview = 19;
+    RevealSecretRequest reveal_secret = 23;
+    RevealLocalAdminPasswordRequest reveal_local_admin_password = 24;
   }
   // Current labels projected only for authorized approval responses.
   string requester_display_name = 20;
@@ -85,6 +88,8 @@ message CreateApprovalRequest {
     ApprovePendingEnrollmentRequest approve_pending_enrollment = 7;
     CreateRecoveryEnrollmentGrantRequest recover_device = 8;
     ActivateTargetPreviewRequest activate_target_preview = 9;
+    RevealSecretRequest reveal_secret = 10;
+    RevealLocalAdminPasswordRequest reveal_local_admin_password = 11;
   }
 }
 message CreateApprovalResponse {

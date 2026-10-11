@@ -46,7 +46,9 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			f := newServiceFixture(t, false)
 			native := &admissionRefusingNative{nativeResource: f.native, refusal: tc.cause}
-			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) { return native, nil }
+			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
+				return native, nil
+			}
 			intent := f.intent(t, 1)
 			intent.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
 			prepared, envelope := f.prepare(t, intent)
@@ -111,7 +113,9 @@ func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *tes
 			case "baseline-on-reconcile":
 				native.refusal = serviceprovider.ErrBaselineUnknown
 			}
-			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) { return native, nil }
+			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
+				return native, nil
+			}
 			intent := f.intent(t, 1)
 			envelope := mustSign(t, f.svc.authority, intent, f.planKey)
 			if _, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope})); err == nil {
@@ -126,7 +130,7 @@ func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *tes
 
 func TestResourceProviderOpenRefusalIsNotNativeObservation(t *testing.T) {
 	f := newServiceFixture(t, false)
-	f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) {
+	f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
 		return nil, serviceprovider.ErrUnsupported
 	}
 	prepared, _ := f.prepare(t, f.intent(t, 1))

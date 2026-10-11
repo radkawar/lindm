@@ -19,6 +19,7 @@ import (
 	"lindm/internal/agent/buildinfo"
 	"lindm/internal/agent/journal"
 	"lindm/internal/pki"
+	"lindm/internal/secretseal"
 	"lindm/internal/trust"
 )
 
@@ -92,6 +93,10 @@ func (s *Service) createBootstrap(ctx context.Context, req *agentv1.PrepareBoots
 	if err != nil {
 		return nil, err
 	}
+	encryption, err := secretseal.GenerateKey(s.entropy)
+	if err != nil {
+		return nil, err
+	}
 	installation, err := newID()
 	if err != nil {
 		return nil, err
@@ -106,6 +111,7 @@ func (s *Service) createBootstrap(ctx context.Context, req *agentv1.PrepareBoots
 		BootstrapVerifiedAt: protoTimestamp(now), EnrollmentTransactionId: transaction,
 		IdentityPrivateKey: bytes.Clone(key), EnrollmentCsrPem: csr, PendingGrant: req.GetPendingGrant(),
 		ProvisioningToken: req.GetProvisioningToken(), OfflineAuthorization: proto.CloneOf(req.GetOfflineAuthorization()),
+		EncryptionPrivateKey: encryption,
 	}
 	store, err := journal.InitializeLocked(ctx, s.directory, s.stateLock, state)
 	if err != nil {
@@ -400,6 +406,10 @@ func (s *Service) prepareRenewal(ctx context.Context, req *agentv1.PrepareRenewa
 	if err != nil {
 		return nil, err
 	}
+	encryption, err := secretseal.GenerateKey(s.entropy)
+	if err != nil {
+		return nil, err
+	}
 	issuance, err := newID()
 	if err != nil {
 		return nil, err
@@ -425,6 +435,7 @@ func (s *Service) prepareRenewal(ctx context.Context, req *agentv1.PrepareRenewa
 	next.PendingRenewal = &agentv1.PendingIdentityRenewal{
 		IssuanceRequestId: issuance, PrivateKey: bytes.Clone(key), CsrPem: csr,
 		AuthorityProof: authorityProof, RetrievalProof: retrievalProof, SessionEpoch: loaded.state.GetSessionEpoch(),
+		EncryptionPrivateKey: encryption,
 	}
 	if err := s.commit(ctx, loaded.revision, next); err != nil {
 		return nil, err
@@ -512,11 +523,20 @@ func (s *Service) installRenewal(ctx context.Context, loaded *bound, pemBytes []
 	next := cloneState(loaded.state)
 	next.PriorCredential = nil
 	if now.Before(retain) {
-		next.PriorCredential = &agentv1.PriorIdentityCredential{PrivateKey: bytes.Clone(loaded.identityKey), CertificatePem: bytes.Clone(loaded.state.GetCertificatePem()), RetainUntil: protoTimestamp(retain)}
+		// The prior recipient scalar shares the prior identity's retention so
+		// deliveries sealed before the new key registers still open.
+		next.PriorCredential = &agentv1.PriorIdentityCredential{
+			PrivateKey: bytes.Clone(loaded.identityKey), CertificatePem: bytes.Clone(loaded.state.GetCertificatePem()), RetainUntil: protoTimestamp(retain),
+			EncryptionPrivateKey: bytes.Clone(loaded.state.GetEncryptionPrivateKey()),
+		}
 	}
 	next.IdentityPrivateKey = bytes.Clone(loaded.renewal.key)
 	next.EnrollmentCsrPem = bytes.Clone(loaded.renewal.csr)
 	next.CertificatePem = bytes.Clone(pemBytes)
+	// A renewal staged before secret delivery has no scalar; PrepareEncryptionKey
+	// then generates one. Either way the new certificate must register anew.
+	next.EncryptionPrivateKey = bytes.Clone(loaded.state.GetPendingRenewal().GetEncryptionPrivateKey())
+	next.EncryptionKeyAcknowledgedSha256 = nil
 	next.PendingRenewal = nil
 	next.RenewAfter = protoTimestamp(renewAt)
 	next.RenewalReceipt = &agentv1.RenewalCommitReceipt{IssuanceRequestId: issuance, CertificateSha256: fingerprint(cert)}

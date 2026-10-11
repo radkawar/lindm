@@ -71,32 +71,37 @@ const advisoryCandidates = `-- name: AdvisoryCandidates :many
 (SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
-JOIN advisory_record_generations r ON r.feed_id=$1 AND r.generation=$2
+JOIN advisory_record_generations r ON r.feed_id=$2 AND r.generation=$3
  AND NOT r.source_package AND r.package_name=p.name
  AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
-WHERE p.snapshot_id=$3 AND p.position>=$4
- AND p.position<$5
- AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+WHERE p.snapshot_id=$4 AND p.position>=$5
+ AND (p.position>$5 OR r.id>$6)
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture='')
+ORDER BY p.position,r.id
+LIMIT $1)
 UNION ALL
 (SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
-JOIN advisory_record_generations r ON r.feed_id=$1 AND r.generation=$2
+JOIN advisory_record_generations r ON r.feed_id=$2 AND r.generation=$3
  AND r.source_package AND r.package_name=p.source_name
  AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
-WHERE p.snapshot_id=$3 AND p.position>=$4
- AND p.position<$5 AND p.source_name<>''
- AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+WHERE p.snapshot_id=$4 AND p.position>=$5
+ AND (p.position>$5 OR r.id>$6) AND p.source_name<>''
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture='')
+ORDER BY p.position,r.id
+LIMIT $1)
 ORDER BY position,record_id
-LIMIT 10001
+LIMIT $1
 `
 
 type AdvisoryCandidatesParams struct {
+	RowLimit      int32
 	FeedID        string
 	Generation    uuid.UUID
 	SnapshotID    uuid.UUID
-	FirstPosition int32
-	EndPosition   int32
+	AfterPosition int32
+	AfterRecord   uuid.UUID
 }
 
 type AdvisoryCandidatesRow struct {
@@ -120,15 +125,20 @@ type AdvisoryCandidatesRow struct {
 // advisory_record_generations_identity_idx by exact key; an OR join scans the
 // whole generation. The caller passes the feed revision read in the same
 // repeatable-read transaction, which is exactly the advisory_records view's
-// generation filter. RPM imported signing keys (gpg-pubkey without an
-// architecture) are keyring entries, not installable packages, and never match.
+// generation filter. Pages are keyset-bounded by (position, record id): one
+// installed kernel binary alone has ~10,000 Ubuntu records, so a fixed package
+// window cannot bound rows. The identity index ends in id, so each package's
+// records arrive in page order without sorting the remainder of the snapshot.
+// RPM imported signing keys (gpg-pubkey without an architecture) are keyring
+// entries, not installable packages, and never match.
 func (q *Queries) AdvisoryCandidates(ctx context.Context, arg AdvisoryCandidatesParams) ([]AdvisoryCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, advisoryCandidates,
+		arg.RowLimit,
 		arg.FeedID,
 		arg.Generation,
 		arg.SnapshotID,
-		arg.FirstPosition,
-		arg.EndPosition,
+		arg.AfterPosition,
+		arg.AfterRecord,
 	)
 	if err != nil {
 		return nil, err
@@ -569,13 +579,7 @@ func (q *Queries) InsertAdvisoryExceptionRequest(ctx context.Context, arg Insert
 	return err
 }
 
-const insertAdvisoryFinding = `-- name: InsertAdvisoryFinding :exec
-INSERT INTO advisory_findings(id,device_id,advisory_id,package_name,installed_version,fixed_version,architecture,severity,published_at,cves,feed_id,source_url)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-ON CONFLICT(id) DO NOTHING
-`
-
-type InsertAdvisoryFindingParams struct {
+type InsertAdvisoryFindingsParams struct {
 	ID               uuid.UUID
 	DeviceID         uuid.UUID
 	AdvisoryID       string
@@ -588,24 +592,6 @@ type InsertAdvisoryFindingParams struct {
 	Cves             []string
 	FeedID           string
 	SourceUrl        string
-}
-
-func (q *Queries) InsertAdvisoryFinding(ctx context.Context, arg InsertAdvisoryFindingParams) error {
-	_, err := q.db.Exec(ctx, insertAdvisoryFinding,
-		arg.ID,
-		arg.DeviceID,
-		arg.AdvisoryID,
-		arg.PackageName,
-		arg.InstalledVersion,
-		arg.FixedVersion,
-		arg.Architecture,
-		arg.Severity,
-		arg.PublishedAt,
-		arg.Cves,
-		arg.FeedID,
-		arg.SourceUrl,
-	)
-	return err
 }
 
 type InsertAdvisoryPublicationBatchParams struct {

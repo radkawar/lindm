@@ -118,7 +118,7 @@ type Service struct {
 	workerWake            chan struct{}
 	incarnation           string
 	boottime              func() (uint64, error)
-	openResource          func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error)
+	openResource          func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error)
 	cancelPreparation     func(context.Context, *agentv1.ResourceExecutionIntent) error
 	resourcePreparations  map[string]struct{}
 	actionProvider        DeviceActionProvider
@@ -190,6 +190,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.GetConnectionRequest{}, &agentv1.SignTLSClientMessageRequest{},
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
+		&agentv1.PrepareEncryptionKeyRequest{}, &agentv1.AcknowledgeEncryptionKeyRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
 		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
 		&agentv1.PrepareResourceExecutionRequest{}, &agentv1.StartResourceExecutionRequest{},
@@ -560,8 +561,10 @@ func mapError(err error) error {
 		code, reason = connect.CodeInvalidArgument, reasonOf(err)
 	case errors.Is(err, errExecutionTrustRejected):
 		code, reason = connect.CodePermissionDenied, "execution_trust_rejected"
-	case errors.Is(err, errIdentityExpired), errors.Is(err, errRenewalNotDue), errors.Is(err, errRenewalPending), errors.Is(err, errSessionPending), errors.Is(err, errSessionRequired), errors.Is(err, errEpochRejected), errors.Is(err, errNotPending):
+	case errors.Is(err, errIdentityExpired), errors.Is(err, errRenewalNotDue), errors.Is(err, errRenewalPending), errors.Is(err, errSessionPending), errors.Is(err, errSessionRequired), errors.Is(err, errEpochRejected), errors.Is(err, errNotPending), errors.Is(err, errEncryptionKeyStale), errors.Is(err, errEncryptionKeyUnavailable):
 		code, reason = connect.CodeFailedPrecondition, reasonOf(err)
+	case errors.Is(err, errSecretDeliveryRejected):
+		code, reason = connect.CodePermissionDenied, "secret_delivery_rejected"
 	case errors.Is(err, errSigningRejected):
 		code, reason = connect.CodePermissionDenied, "signing_rejected"
 	case errors.Is(err, errIdempotencyConflict):
@@ -600,6 +603,10 @@ func reasonOf(err error) string {
 		return "epoch_rejected"
 	case errors.Is(err, errNotPending):
 		return "not_pending"
+	case errors.Is(err, errEncryptionKeyStale):
+		return "encryption_key_stale"
+	case errors.Is(err, errEncryptionKeyUnavailable):
+		return "encryption_key_unavailable"
 	default:
 		return "invalid_request"
 	}

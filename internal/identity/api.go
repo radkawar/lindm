@@ -81,6 +81,8 @@ const (
 	PermissionLockDevice               Permission = "actions.lock"
 	PermissionReleaseLockDevice        Permission = "actions.release-lock"
 	PermissionQuarantineDevice         Permission = "actions.quarantine"
+	PermissionManageSecrets            Permission = "secrets.manage"
+	PermissionRevealSecrets            Permission = "secrets.reveal"
 
 	RoleOwner    = "owner"
 	RoleAdmin    = "admin"

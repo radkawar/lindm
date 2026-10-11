@@ -114,6 +114,19 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 		binding.EnrollmentGeneration = intent.GetEnrollmentGeneration()
 		binding.ActionId = intent.GetActionId()
 	}
+	if rotate := intent.GetSpec().GetLocalAdminPasswordRotate(); rotate != nil {
+		binding := plan.GetLocalAdminBinding()
+		if binding == nil || binding.GetAccountName() != rotate.GetAccountName() || binding.GetAccountUid() == 0 {
+			return nil, errResourceRejected
+		}
+		// The provider freezes the observed account and UID; only root-owned
+		// identity fields of the OAEP label and custody binding are filled here.
+		binding.DeviceId = intent.GetDeviceId()
+		binding.EnrollmentGeneration = intent.GetEnrollmentGeneration()
+		binding.ActionId = intent.GetActionId()
+	} else if plan.GetLocalAdminBinding() != nil {
+		return nil, errResourceRejected
+	}
 	if err := s.admit(plan); err != nil {
 		return nil, errInternal
 	}

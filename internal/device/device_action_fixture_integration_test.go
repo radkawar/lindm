@@ -39,7 +39,7 @@ type deviceActionFixture struct {
 // Native effects are never invoked by this server contract fixture.
 func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 	t.Helper()
-	return newDeviceActionFixtureCapabilities(t, []string{"systemd.service.v1", "device.escrow-rotate.v1", "device.tpm2-bind.v1", "device.lock-sessions.v1", "device.release-lock.v1", "device.quarantine.v1", "device.release-quarantine.v1", "device.crypto-erase.v1", "device.sanitize.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1"})
+	return newDeviceActionFixtureCapabilities(t, []string{"systemd.service.v1", "device.escrow-rotate.v1", "device.tpm2-bind.v1", "device.lock-sessions.v1", "device.release-lock.v1", "device.quarantine.v1", "device.release-quarantine.v1", "device.crypto-erase.v1", "device.sanitize.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1", "device.local-admin-rotate.v1"})
 }
 
 func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *deviceActionFixture {
@@ -169,6 +169,10 @@ func (f *deviceActionFixture) challenge(t *testing.T, work *devicev1.DeviceActio
 		plan.Before.Target = rotate.GetTarget()
 		plan.Before.Encrypted = true
 		plan.RecoveryBinding = &agentv1.RecoveryKeyBinding{DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), ActionId: intent.GetActionId(), LuksUuid: rotate.GetTarget().GetLuksUuid(), NewKeyslot: 1}
+	}
+	if rotate := intent.GetSpec().GetLocalAdminPasswordRotate(); rotate != nil {
+		plan.Before.LocalAdmin = &agentv1.LocalAdminAccountObservation{AccountName: rotate.GetAccountName(), AccountUid: 1001, PasswordUsable: true}
+		plan.LocalAdminBinding = &agentv1.LocalAdminPasswordBinding{DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), ActionId: intent.GetActionId(), AccountName: rotate.GetAccountName(), AccountUid: 1001}
 	}
 	if liveRootAction(intent.GetSpec()) {
 		plan.Before.Encrypted = true

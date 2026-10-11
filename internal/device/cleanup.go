@@ -10,7 +10,10 @@ import (
 	"lindm/internal/device/devicedb"
 )
 
-func (s *Service) RunSnapshotCleanup(ctx context.Context) {
+// RunSnapshotCleanup is an exclusive job and returns only on cancellation. Each
+// device is cleaned under its own row lock, so a briefly overlapping former
+// leader cannot release the same reservation twice.
+func (s *Service) RunSnapshotCleanup(ctx context.Context) error {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
 	for {
@@ -19,7 +22,7 @@ func (s *Service) RunSnapshotCleanup(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 		}
 	}

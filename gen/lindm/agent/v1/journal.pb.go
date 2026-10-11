@@ -108,8 +108,14 @@ type ExecutorJournalState struct {
 	SessionReceipt          *SessionCommitReceipt               `protobuf:"bytes,21,opt,name=session_receipt,json=sessionReceipt,proto3" json:"session_receipt,omitempty"`
 	ProvisioningToken       bool                                `protobuf:"varint,22,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
 	OfflineAuthorization    *OfflineEnrollmentAuthorizationFile `protobuf:"bytes,23,opt,name=offline_authorization,json=offlineAuthorization,proto3" json:"offline_authorization,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// Raw X25519 HPKE recipient scalar generated with the identity key. Empty only
+	// for journals created before secret delivery; the executor fills it lazily.
+	EncryptionPrivateKey []byte `protobuf:"bytes,24,opt,name=encryption_private_key,json=encryptionPrivateKey,proto3" json:"encryption_private_key,omitempty"`
+	// SHA-256 of the public key the server acknowledged under the current
+	// certificate. A hint to stop re-registering, never delivery authority.
+	EncryptionKeyAcknowledgedSha256 []byte `protobuf:"bytes,25,opt,name=encryption_key_acknowledged_sha256,json=encryptionKeyAcknowledgedSha256,proto3" json:"encryption_key_acknowledged_sha256,omitempty"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *ExecutorJournalState) Reset() {
@@ -303,16 +309,31 @@ func (x *ExecutorJournalState) GetOfflineAuthorization() *OfflineEnrollmentAutho
 	return nil
 }
 
+func (x *ExecutorJournalState) GetEncryptionPrivateKey() []byte {
+	if x != nil {
+		return x.EncryptionPrivateKey
+	}
+	return nil
+}
+
+func (x *ExecutorJournalState) GetEncryptionKeyAcknowledgedSha256() []byte {
+	if x != nil {
+		return x.EncryptionKeyAcknowledgedSha256
+	}
+	return nil
+}
+
 type PendingIdentityRenewal struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	IssuanceRequestId string                 `protobuf:"bytes,1,opt,name=issuance_request_id,json=issuanceRequestId,proto3" json:"issuance_request_id,omitempty"`
-	PrivateKey        []byte                 `protobuf:"bytes,2,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
-	CsrPem            []byte                 `protobuf:"bytes,3,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
-	AuthorityProof    []byte                 `protobuf:"bytes,4,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
-	RetrievalProof    []byte                 `protobuf:"bytes,5,opt,name=retrieval_proof,json=retrievalProof,proto3" json:"retrieval_proof,omitempty"`
-	SessionEpoch      uint64                 `protobuf:"varint,6,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	IssuanceRequestId    string                 `protobuf:"bytes,1,opt,name=issuance_request_id,json=issuanceRequestId,proto3" json:"issuance_request_id,omitempty"`
+	PrivateKey           []byte                 `protobuf:"bytes,2,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	CsrPem               []byte                 `protobuf:"bytes,3,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
+	AuthorityProof       []byte                 `protobuf:"bytes,4,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
+	RetrievalProof       []byte                 `protobuf:"bytes,5,opt,name=retrieval_proof,json=retrievalProof,proto3" json:"retrieval_proof,omitempty"`
+	SessionEpoch         uint64                 `protobuf:"varint,6,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	EncryptionPrivateKey []byte                 `protobuf:"bytes,7,opt,name=encryption_private_key,json=encryptionPrivateKey,proto3" json:"encryption_private_key,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PendingIdentityRenewal) Reset() {
@@ -387,13 +408,22 @@ func (x *PendingIdentityRenewal) GetSessionEpoch() uint64 {
 	return 0
 }
 
+func (x *PendingIdentityRenewal) GetEncryptionPrivateKey() []byte {
+	if x != nil {
+		return x.EncryptionPrivateKey
+	}
+	return nil
+}
+
 type PriorIdentityCredential struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	PrivateKey     []byte                 `protobuf:"bytes,1,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	CertificatePem []byte                 `protobuf:"bytes,2,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
 	RetainUntil    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=retain_until,json=retainUntil,proto3" json:"retain_until,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Retained so deliveries sealed to the pre-renewal key still open.
+	EncryptionPrivateKey []byte `protobuf:"bytes,4,opt,name=encryption_private_key,json=encryptionPrivateKey,proto3" json:"encryption_private_key,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PriorIdentityCredential) Reset() {
@@ -443,6 +473,13 @@ func (x *PriorIdentityCredential) GetCertificatePem() []byte {
 func (x *PriorIdentityCredential) GetRetainUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.RetainUntil
+	}
+	return nil
+}
+
+func (x *PriorIdentityCredential) GetEncryptionPrivateKey() []byte {
+	if x != nil {
+		return x.EncryptionPrivateKey
 	}
 	return nil
 }
@@ -767,7 +804,7 @@ var File_lindm_agent_v1_journal_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a\x1alindm/agent/v1/trust.proto\"\xad\x18\n" +
+	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a\x1alindm/agent/v1/trust.proto\"\xc8\x19\n" +
 	"\x14ExecutorJournalState\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12;\n" +
@@ -794,7 +831,11 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\x0frenewal_receipt\x18\x14 \x01(\v2$.lindm.agent.v1.RenewalCommitReceiptR\x0erenewalReceipt\x12M\n" +
 	"\x0fsession_receipt\x18\x15 \x01(\v2$.lindm.agent.v1.SessionCommitReceiptR\x0esessionReceipt\x12-\n" +
 	"\x12provisioning_token\x18\x16 \x01(\bR\x11provisioningToken\x12g\n" +
-	"\x15offline_authorization\x18\x17 \x01(\v22.lindm.agent.v1.OfflineEnrollmentAuthorizationFileR\x14offlineAuthorization:\x84\f\xbaH\x80\f\x1a\xb4\x05\n" +
+	"\x15offline_authorization\x18\x17 \x01(\v22.lindm.agent.v1.OfflineEnrollmentAuthorizationFileR\x14offlineAuthorization\x12@\n" +
+	"\x16encryption_private_key\x18\x18 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x14encryptionPrivateKey\x12W\n" +
+	"\"encryption_key_acknowledged_sha256\x18\x19 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x1fencryptionKeyAcknowledgedSha256:\x84\f\xbaH\x80\f\x1a\xb4\x05\n" +
 	"!executor_journal.enrollment_shape\x12epending enrollment retains its grant; installed identity pins device/generation and removes the grant\x1a\xa7\x04(this.certificate_pem.size() == 0 && (this.pending_grant.size() >= 32 || has(this.offline_authorization)) && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))\x1a\xc2\x01\n" +
 	"\"executor_journal.offline_authority\x12@offline authorization is separate from online bearer credentials\x1aZ!has(this.offline_authorization) || (!this.provisioning_token && this.pending_grant == '')\x1a\x8a\x03\n" +
 	"\x1eexecutor_journal.session_shape\x12caccepted sessions have a boot identity and pending acquisition remains at the protected predecessor\x1a\x82\x02(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))\x1a\xf4\x01\n" +
@@ -802,7 +843,7 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\n" +
 	"_device_idB\x18\n" +
 	"\x16_enrollment_generationB\x12\n" +
-	"\x10_session_boot_id\"\xc6\x02\n" +
+	"\x10_session_boot_id\"\x88\x03\n" +
 	"\x16PendingIdentityRenewal\x128\n" +
 	"\x13issuance_request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\x12(\n" +
 	"\vprivate_key\x18\x02 \x01(\fB\a\xbaH\x04z\x02h@R\n" +
@@ -810,12 +851,16 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\acsr_pem\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\x124\n" +
 	"\x0fauthority_proof\x18\x04 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\x124\n" +
 	"\x0fretrieval_proof\x18\x05 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eretrievalProof\x126\n" +
-	"\rsession_epoch\x18\x06 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"\xc0\x01\n" +
+	"\rsession_epoch\x18\x06 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12@\n" +
+	"\x16encryption_private_key\x18\a \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x14encryptionPrivateKey\"\x82\x02\n" +
 	"\x17PriorIdentityCredential\x12(\n" +
 	"\vprivate_key\x18\x01 \x01(\fB\a\xbaH\x04z\x02h@R\n" +
 	"privateKey\x124\n" +
 	"\x0fcertificate_pem\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x0ecertificatePem\x12E\n" +
-	"\fretain_until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vretainUntil\"\x88\x01\n" +
+	"\fretain_until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vretainUntil\x12@\n" +
+	"\x16encryption_private_key\x18\x04 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x14encryptionPrivateKey\"\x88\x01\n" +
 	"\x14RenewalCommitReceipt\x128\n" +
 	"\x13issuance_request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\x126\n" +
 	"\x12certificate_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\"\xe9\x01\n" +

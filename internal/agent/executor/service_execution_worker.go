@@ -147,7 +147,7 @@ func (s *Service) nextResourceWork(ctx context.Context, cursor string) (*agentv1
 }
 
 func (s *Service) runResourceAction(record *agentv1.ResourceExecutionRecord) {
-	provider, err := s.openResource(s.workerContext, record.GetIntent())
+	provider, err := s.openResource(s.workerContext, record.GetIntent(), s.resourceSecrets(record.GetIntent(), record.GetSealedSecrets()))
 	if err != nil {
 		s.finishResourceAction(record.GetIntent().GetActionId(), nil, err, false, nil)
 		return
@@ -209,7 +209,7 @@ func (s *Service) consumeResourceStart(ctx context.Context, expected *agentv1.Re
 // Previously RUNNING work is NEVER replayed. Verify only observes the original
 // signed desired state and native definition/boot fences; uncertainty survives.
 func (s *Service) reconcileResourceAction(record *agentv1.ResourceExecutionRecord) {
-	provider, err := s.openResource(s.workerContext, record.GetIntent())
+	provider, err := s.openResource(s.workerContext, record.GetIntent(), s.resourceSecrets(record.GetIntent(), record.GetSealedSecrets()))
 	if err != nil {
 		s.finishResourceAction(record.GetIntent().GetActionId(), nil, err, true, nil)
 		return

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
@@ -327,6 +328,7 @@ func TestInspectReadinessRequiresNativeSettledSignals(t *testing.T) {
 		{"running", "running\n", "complete\n", 0, 0, false},
 		{"degraded", "degraded\n", "complete\n", 1, 0, false},
 		{"non-NetworkManager", "running\n", "not-installed\n", 0, 0, false},
+		// systemd >= 240 honours --wait, so a transient answer is unsettled.
 		{"starting", "starting\n", "complete\n", 1, 0, true},
 		{"inconsistent-system-exit", "degraded\n", "complete\n", 0, 0, true},
 		{"network-timeout", "running\n", "", 0, 1, true},
@@ -337,13 +339,15 @@ func TestInspectReadinessRequiresNativeSettledSignals(t *testing.T) {
 			calls := 0
 			proof, err := collectInspectReadiness(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
 				calls++
-				if _, bounded := ctx.Deadline(); !bounded || input != nil || limit != 1024 || timeout > 35*time.Second {
+				if _, bounded := ctx.Deadline(); !bounded || input != nil || limit > 4096 || timeout > 35*time.Second {
 					t.Fatal("readiness probe lost its subprocess bounds")
 				}
-				if calls == 1 && command == inspectSystemReadinessCommand {
+				switch {
+				case calls == 1 && command == inspectSystemReadinessCommand:
 					return guestCommandResult{Stdout: []byte(test.system), ExitCode: test.systemExit}, nil
-				}
-				if calls == 2 && command == inspectNetworkReadinessCommand {
+				case calls == 2 && command == inspectSystemdVersionCommand:
+					return guestCommandResult{Stdout: []byte("systemd 257 (257.13+suse.131.g575b4807b7)\n+PAM +AUDIT\n")}, nil
+				case calls == 2 && command == inspectNetworkReadinessCommand:
 					return guestCommandResult{Stdout: []byte(test.network), ExitCode: test.networkExit}, nil
 				}
 				t.Fatal("unexpected readiness probe")
@@ -366,6 +370,61 @@ func TestInspectReadinessPreservesNativeFailures(t *testing.T) {
 		})
 		if proof != nil || !errors.Is(err, nativeError) {
 			t.Fatalf("native readiness failure hidden: %v", err)
+		}
+	}
+}
+
+// AlmaLinux 8.10 x86_64 inspection failed "native system startup is not
+// settled": systemd 239 ignores is-system-running --wait (added in v240) and
+// answered "starting" while boot jobs still ran. Only that manager is polled.
+func TestInspectReadinessPollsSystemdWithoutWait(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var commands []string
+		states := []string{"starting\n", "starting\n", "degraded\n"}
+		proof, err := collectInspectReadiness(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+			commands = append(commands, command)
+			switch command {
+			case inspectSystemReadinessCommand:
+				state := states[0]
+				states = states[1:]
+				return guestCommandResult{Stdout: []byte(state), ExitCode: 1}, nil
+			case inspectSystemdVersionCommand:
+				return guestCommandResult{Stdout: []byte("systemd 239 (239-82.el8_10.13)\n+PAM +AUDIT\n")}, nil
+			case inspectNetworkReadinessCommand:
+				return guestCommandResult{Stdout: []byte("complete\n")}, nil
+			}
+			t.Fatalf("unexpected readiness probe %q", command)
+			return guestCommandResult{}, nil
+		})
+		if err != nil || proof.SystemState != "degraded" {
+			t.Fatalf("legacy readiness = %+v, %v", proof, err)
+		}
+		want := []string{inspectSystemReadinessCommand, inspectSystemdVersionCommand, inspectSystemReadinessCommand, inspectSystemReadinessCommand, inspectNetworkReadinessCommand}
+		if strings.Join(commands, "|") != strings.Join(want, "|") {
+			t.Fatalf("probe order = %q", commands)
+		}
+	})
+	// A legacy manager that never settles still fails at the readiness deadline.
+	synctest.Test(t, func(t *testing.T) {
+		_, err := collectInspectReadiness(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+			if command == inspectSystemdVersionCommand {
+				return guestCommandResult{Stdout: []byte("systemd 239 (239-82.el8_10.13)\n")}, nil
+			}
+			return guestCommandResult{Stdout: []byte("starting\n"), ExitCode: 1}, nil
+		})
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("unsettled legacy boot = %v", err)
+		}
+	})
+	for _, version := range []string{"", "not systemd 239\n", "systemd x\n"} {
+		_, err := collectInspectReadiness(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+			if command == inspectSystemdVersionCommand {
+				return guestCommandResult{Stdout: []byte(version)}, nil
+			}
+			return guestCommandResult{Stdout: []byte("starting\n"), ExitCode: 1}, nil
+		})
+		if err == nil {
+			t.Fatalf("accepted invalid systemd version %q", version)
 		}
 	}
 }

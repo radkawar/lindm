@@ -177,6 +177,11 @@ func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendin
 	if err != nil {
 		return err
 	}
+	if r.effects != nil {
+		if err := r.effects(d.id, p.intent.GetActionId(), p.intent.GetResourceSequence()); err != nil {
+			return err
+		}
+	}
 	after := proto.CloneOf(p.status.GetBefore())
 	after.GetSystemdService().ActiveState = "active"
 	after.Metadata.ObservedAt = stamp()

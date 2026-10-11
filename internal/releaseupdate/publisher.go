@@ -567,6 +567,15 @@ func (p *Publisher) Channel(ctx context.Context, ring string) (channel *updatev1
 }
 
 func (p *Publisher) publish(ctx context.Context, root *metadata.Metadata[metadata.RootType], current *publication, channel *updatev1.AgentUpdateChannel, files map[string]string, offline bool) error {
+	if err := p.stageChannel(ctx, current, channel, files, offline); err != nil {
+		return err
+	}
+	return p.commit(ctx, root, current, offline)
+}
+
+// stageChannel writes the catalog target and binds it into the uncommitted
+// publication. Clients observe nothing until commit replaces the timestamp.
+func (p *Publisher) stageChannel(ctx context.Context, current *publication, channel *updatev1.AgentUpdateChannel, files map[string]string, offline bool) error {
 	if err := validateChannel(p.validator, channel, p.cfg.Now()); err != nil {
 		return err
 	}
@@ -646,7 +655,7 @@ func (p *Publisher) publish(ctx context.Context, root *metadata.Metadata[metadat
 		return err
 	}
 	current.rollout.Signed.Targets[name] = info
-	return p.commit(ctx, root, current, offline)
+	return nil
 }
 func (p *Publisher) Publish(ctx context.Context, channel *updatev1.AgentUpdateChannel, files map[string]string) (err error) {
 	p.mu.Lock()

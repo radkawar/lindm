@@ -346,8 +346,11 @@ type DeviceActionProviderConfig struct {
 	ProtectedAccounts []string `protobuf:"bytes,12,rep,name=protected_accounts,json=protectedAccounts,proto3" json:"protected_accounts,omitempty"`
 	// Explicit native logind restart/shutdown opt-in; not remote authority.
 	AllowPowerActions bool `protobuf:"varint,13,opt,name=allow_power_actions,json=allowPowerActions,proto3" json:"allow_power_actions,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Root-owned allowlist of existing non-root local accounts whose password the
+	// signed local-admin rotation may replace. Empty disables the action.
+	LocalAdminAccounts []string `protobuf:"bytes,14,rep,name=local_admin_accounts,json=localAdminAccounts,proto3" json:"local_admin_accounts,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *DeviceActionProviderConfig) Reset() {
@@ -469,6 +472,13 @@ func (x *DeviceActionProviderConfig) GetAllowPowerActions() bool {
 		return x.AllowPowerActions
 	}
 	return false
+}
+
+func (x *DeviceActionProviderConfig) GetLocalAdminAccounts() []string {
+	if x != nil {
+		return x.LocalAdminAccounts
+	}
+	return nil
 }
 
 type QualifiedActionTarget struct {
@@ -847,7 +857,7 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x12signing_key_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x10signingKeySha256\x12d\n" +
 	"\x1brpm_signing_key_fingerprint\x18\x04 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x18rpmSigningKeyFingerprint:\xa2\x05\xbaH\x9e\x05\x1a\xea\x01\n" +
 	"\x1enative_package_source.approved\x12Gnative package sources must be present approved APT or RPM repositories\x1a\x7fthis.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm))\x1a\xae\x03\n" +
-	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\x91\x06\n" +
+	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\xfa\x06\n" +
 	"\x1aDeviceActionProviderConfig\x12I\n" +
 	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
 	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +
@@ -863,7 +873,8 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	" \x01(\bR\x14allowRecoveryHandoff\x12,\n" +
 	"\x12allow_account_lock\x18\v \x01(\bR\x10allowAccountLock\x12_\n" +
 	"\x12protected_accounts\x18\f \x03(\tB0\xbaH-\x92\x01*\x10\x80\x01\x18\x01\"#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\x11protectedAccounts\x12.\n" +
-	"\x13allow_power_actions\x18\r \x01(\bR\x11allowPowerActions\"\x9f\x04\n" +
+	"\x13allow_power_actions\x18\r \x01(\bR\x11allowPowerActions\x12g\n" +
+	"\x14local_admin_accounts\x18\x0e \x03(\tB5\xbaH2\x92\x01/\x10\b\x18\x01\")r'2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$Z\x04rootR\x12localAdminAccounts\"\x9f\x04\n" +
 	"\x15QualifiedActionTarget\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
 	"\x16owner_recovery_keyslot\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\x14ownerRecoveryKeyslot\x126\n" +

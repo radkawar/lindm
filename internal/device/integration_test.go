@@ -367,8 +367,6 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 			{name: "after expiry", offset: time.Microsecond},
 		} {
 			t.Run(status+"/"+boundary.name, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-				defer cancel()
 				pool, conn := testdb.Open(t)
 				start := time.Now().UTC().Truncate(time.Second)
 				ca, signer := testCA(t, start.Add(90*24*time.Hour))
@@ -379,6 +377,10 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				var clock atomic.Int64
 				clock.Store(start.UnixMicro())
 				svc.clock = func() time.Time { return time.UnixMicro(clock.Load()) }
+				// The deadline bounds the renewal exchange, not disposable schema
+				// creation, which can take seconds under full-suite load.
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+				defer cancel()
 				owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
 				ownerCtx := identity.WithPrincipal(ctx, owner)
 				key := ed25519Key(t)

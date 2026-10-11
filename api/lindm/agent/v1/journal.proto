@@ -44,6 +44,18 @@ message ExecutorJournalState {
   SessionCommitReceipt session_receipt = 21;
   bool provisioning_token = 22;
   OfflineEnrollmentAuthorizationFile offline_authorization = 23;
+  // Raw X25519 HPKE recipient scalar generated with the identity key. Empty only
+  // for journals created before secret delivery; the executor fills it lazily.
+  bytes encryption_private_key = 24 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  // SHA-256 of the public key the server acknowledged under the current
+  // certificate. A hint to stop re-registering, never delivery authority.
+  bytes encryption_key_acknowledged_sha256 = 25 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
 
   option (buf.validate.message).cel = {
     id: "executor_journal.enrollment_shape"
@@ -86,6 +98,10 @@ message PendingIdentityRenewal {
     gt: 0
     lte: 9223372036854775807
   }];
+  bytes encryption_private_key = 7 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
 }
 
 message PriorIdentityCredential {
@@ -95,6 +111,11 @@ message PriorIdentityCredential {
     max_len: 16384
   }];
   google.protobuf.Timestamp retain_until = 3 [(buf.validate.field).required = true];
+  // Retained so deliveries sealed to the pre-renewal key still open.
+  bytes encryption_private_key = 4 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
 }
 
 // Atomically replaces the preceding receipt with the installed credential.

@@ -282,6 +282,29 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if snapshot == nil || snapshot.Delegation == nil {
 		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
+	operation := resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE
+	if release != nil {
+		operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+	}
+	// Secrets resolve before the sequence advances: a blocked or waiting head
+	// consumes no sequence and never mints work that lacks its sealed material.
+	id := uuid.New()
+	secrets, reason, err := s.sealResourceSecrets(ctx, q, approval, principal, id, candidate.GetDesired(), operation)
+	if err != nil {
+		return nil, nil, err
+	}
+	if reason == secretWaitDeviceKey {
+		if err := waitServiceResource(ctx, q, head.ID, resources, candidate, reason); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, tx.Commit(ctx)
+	}
+	if reason != "" {
+		if err := q.BlockServiceAssignment(ctx, devicedb.BlockServiceAssignmentParams{ID: head.ID, BlockedReason: reason}); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, tx.Commit(ctx)
+	}
 	capacity, err := q.ServiceDispatchCapacity(ctx, principal.GenerationID)
 	if err != nil {
 		return nil, nil, err
@@ -304,15 +327,14 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if !expires.After(notBefore) || !expires.After(now) {
 		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_window_empty")
 	}
-	id := uuid.New()
 	ownership, err := s.resourceOwnership(ctx, tx, source, candidate)
 	if err != nil {
 		return nil, nil, err
 	}
 	ownership.AssignmentId = head.ID.String()
-	intent := &agentv1.ResourceExecutionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), DesiredRevision: head.ID.String(), ActorId: head.ActorID.String(), ResourceSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: approval.Version(), NotBefore: timestamppb.New(notBefore), ExpiresAt: timestamppb.New(expires), Desired: candidate.GetDesired(), Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, Ownership: ownership}
-	if release != nil {
-		intent.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+	intent := &agentv1.ResourceExecutionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), DesiredRevision: head.ID.String(), ActorId: head.ActorID.String(), ResourceSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: approval.Version(), NotBefore: timestamppb.New(notBefore), ExpiresAt: timestamppb.New(expires), Desired: candidate.GetDesired(), Operation: operation, Ownership: ownership}
+	for _, delivery := range secrets {
+		intent.Secrets = append(intent.Secrets, delivery.manifest)
 	}
 	if intent.GetDesired().GetNativePackage() != nil {
 		intent.Preparation = &agentv1.ResourceExecutionPreparation{
@@ -339,6 +361,9 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 			return nil, nil, err
 		}
 	} else if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: head.ID, ResourceID: resourceID, Disposition: 2}); err != nil {
+		return nil, nil, err
+	}
+	if err := storeResourceSecrets(ctx, q, &head.ActorID, id, secrets); err != nil {
 		return nil, nil, err
 	}
 	if err := dispatchAudit(ctx, q, &head.ActorID, "service_action.mint", id, "service_assignment"); err != nil {
@@ -438,6 +463,11 @@ func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, actio
 }
 
 func issueServiceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, now time.Time) (*devicev1.ResourceWork, error) {
+	// Replays carry the exact stored ciphertext; the signed manifest binds it.
+	sealed, err := resourceActionSecrets(ctx, q, action)
+	if err != nil {
+		return nil, err
+	}
 	var nonce [32]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return nil, err
@@ -446,7 +476,7 @@ func issueServiceNonce(ctx context.Context, q *devicedb.Queries, action devicedb
 	if err := q.SetServiceNonce(ctx, devicedb.SetServiceNonceParams{ID: action.ID, ResultNonce: nonce[:], NonceExpiresAt: timestamptz(expires)}); err != nil {
 		return nil, err
 	}
-	return &devicev1.ResourceWork{ActionId: action.ID.String(), IntentEnvelope: action.IntentEnvelope, StartGrantEnvelope: action.StartGrantEnvelope, ResultNonce: nonce[:], ResultNonceExpiresAt: timestamppb.New(expires), CancelPreparation: !action.ClosedAt.Valid && action.ClosedReason != ""}, nil
+	return &devicev1.ResourceWork{ActionId: action.ID.String(), IntentEnvelope: action.IntentEnvelope, StartGrantEnvelope: action.StartGrantEnvelope, ResultNonce: nonce[:], ResultNonceExpiresAt: timestamppb.New(expires), CancelPreparation: !action.ClosedAt.Valid && action.ClosedReason != "", SealedSecrets: sealed}, nil
 }
 
 func dispatchClock(ctx context.Context, q *devicedb.Queries) (time.Time, error) {

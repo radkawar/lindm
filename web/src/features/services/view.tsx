@@ -35,7 +35,7 @@ import {
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
-import { toRpcFailure } from "@/lib/errors";
+import { blockedReasonLabel, toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import { ResourceAssignmentForm } from "./assignment-form";
 import { resourceStateQueryOptions } from "./queries";
@@ -215,7 +215,9 @@ export function DeviceResources({
                           {enumLabel(ResourceDisposition[resource.disposition])}
                         </StatusBadge>
                         <p className="mt-2 whitespace-normal break-words">
-                          {resource.reason || "No reason reported"}
+                          {resource.reason
+                            ? blockedReasonLabel(resource.reason)
+                            : "No reason reported"}
                         </p>
                         {resource.disposition === ResourceDisposition.ATTENTION ? (
                           <p className="mt-2 whitespace-normal">

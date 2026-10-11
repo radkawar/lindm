@@ -22,6 +22,8 @@ export const permissionLabels: Record<string, string> = {
   "actions.lock": "Lock devices",
   "actions.release-lock": "Release device locks",
   "actions.quarantine": "Quarantine devices",
+  "secrets.manage": "Manage secrets",
+  "secrets.reveal": "Reveal secrets",
 };
 
 // The server supplies effective permissions, including emergency-policy intersections.

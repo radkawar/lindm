@@ -234,6 +234,8 @@ type Approval struct {
 	//	*Approval_ApprovePendingEnrollment
 	//	*Approval_RecoverDevice
 	//	*Approval_ActivateTargetPreview
+	//	*Approval_RevealSecret
+	//	*Approval_RevealLocalAdminPassword
 	Payload isApproval_Payload `protobuf_oneof:"payload"`
 	// Current labels projected only for authorized approval responses.
 	RequesterDisplayName string `protobuf:"bytes,20,opt,name=requester_display_name,json=requesterDisplayName,proto3" json:"requester_display_name,omitempty"`
@@ -429,6 +431,24 @@ func (x *Approval) GetActivateTargetPreview() *ActivateTargetPreviewRequest {
 	return nil
 }
 
+func (x *Approval) GetRevealSecret() *RevealSecretRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*Approval_RevealSecret); ok {
+			return x.RevealSecret
+		}
+	}
+	return nil
+}
+
+func (x *Approval) GetRevealLocalAdminPassword() *RevealLocalAdminPasswordRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*Approval_RevealLocalAdminPassword); ok {
+			return x.RevealLocalAdminPassword
+		}
+	}
+	return nil
+}
+
 func (x *Approval) GetRequesterDisplayName() string {
 	if x != nil {
 		return x.RequesterDisplayName
@@ -486,6 +506,14 @@ type Approval_ActivateTargetPreview struct {
 	ActivateTargetPreview *ActivateTargetPreviewRequest `protobuf:"bytes,19,opt,name=activate_target_preview,json=activateTargetPreview,proto3,oneof"`
 }
 
+type Approval_RevealSecret struct {
+	RevealSecret *RevealSecretRequest `protobuf:"bytes,23,opt,name=reveal_secret,json=revealSecret,proto3,oneof"`
+}
+
+type Approval_RevealLocalAdminPassword struct {
+	RevealLocalAdminPassword *RevealLocalAdminPasswordRequest `protobuf:"bytes,24,opt,name=reveal_local_admin_password,json=revealLocalAdminPassword,proto3,oneof"`
+}
+
 func (*Approval_RevokeDevice) isApproval_Payload() {}
 
 func (*Approval_SetResourceAssignment) isApproval_Payload() {}
@@ -502,6 +530,10 @@ func (*Approval_RecoverDevice) isApproval_Payload() {}
 
 func (*Approval_ActivateTargetPreview) isApproval_Payload() {}
 
+func (*Approval_RevealSecret) isApproval_Payload() {}
+
+func (*Approval_RevealLocalAdminPassword) isApproval_Payload() {}
+
 type CreateApprovalRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	LifetimeSeconds uint32                 `protobuf:"varint,1,opt,name=lifetime_seconds,json=lifetimeSeconds,proto3" json:"lifetime_seconds,omitempty"`
@@ -515,6 +547,8 @@ type CreateApprovalRequest struct {
 	//	*CreateApprovalRequest_ApprovePendingEnrollment
 	//	*CreateApprovalRequest_RecoverDevice
 	//	*CreateApprovalRequest_ActivateTargetPreview
+	//	*CreateApprovalRequest_RevealSecret
+	//	*CreateApprovalRequest_RevealLocalAdminPassword
 	Payload       isCreateApprovalRequest_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -636,6 +670,24 @@ func (x *CreateApprovalRequest) GetActivateTargetPreview() *ActivateTargetPrevie
 	return nil
 }
 
+func (x *CreateApprovalRequest) GetRevealSecret() *RevealSecretRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*CreateApprovalRequest_RevealSecret); ok {
+			return x.RevealSecret
+		}
+	}
+	return nil
+}
+
+func (x *CreateApprovalRequest) GetRevealLocalAdminPassword() *RevealLocalAdminPasswordRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*CreateApprovalRequest_RevealLocalAdminPassword); ok {
+			return x.RevealLocalAdminPassword
+		}
+	}
+	return nil
+}
+
 type isCreateApprovalRequest_Payload interface {
 	isCreateApprovalRequest_Payload()
 }
@@ -672,6 +724,14 @@ type CreateApprovalRequest_ActivateTargetPreview struct {
 	ActivateTargetPreview *ActivateTargetPreviewRequest `protobuf:"bytes,9,opt,name=activate_target_preview,json=activateTargetPreview,proto3,oneof"`
 }
 
+type CreateApprovalRequest_RevealSecret struct {
+	RevealSecret *RevealSecretRequest `protobuf:"bytes,10,opt,name=reveal_secret,json=revealSecret,proto3,oneof"`
+}
+
+type CreateApprovalRequest_RevealLocalAdminPassword struct {
+	RevealLocalAdminPassword *RevealLocalAdminPasswordRequest `protobuf:"bytes,11,opt,name=reveal_local_admin_password,json=revealLocalAdminPassword,proto3,oneof"`
+}
+
 func (*CreateApprovalRequest_RevokeDevice) isCreateApprovalRequest_Payload() {}
 
 func (*CreateApprovalRequest_SetResourceAssignment) isCreateApprovalRequest_Payload() {}
@@ -687,6 +747,10 @@ func (*CreateApprovalRequest_ApprovePendingEnrollment) isCreateApprovalRequest_P
 func (*CreateApprovalRequest_RecoverDevice) isCreateApprovalRequest_Payload() {}
 
 func (*CreateApprovalRequest_ActivateTargetPreview) isCreateApprovalRequest_Payload() {}
+
+func (*CreateApprovalRequest_RevealSecret) isCreateApprovalRequest_Payload() {}
+
+func (*CreateApprovalRequest_RevealLocalAdminPassword) isCreateApprovalRequest_Payload() {}
 
 type CreateApprovalResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1032,7 +1096,7 @@ var File_lindm_admin_v1_approvals_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\n" +
-	"\x1elindm/admin/v1/approvals.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a lindm/admin/v1/assignments.proto\x1a#lindm/admin/v1/device_actions.proto\x1a(lindm/admin/v1/enrollment_recovery.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/validation/v1/string_rules.proto\"\xb6\x01\n" +
+	"\x1elindm/admin/v1/approvals.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a lindm/admin/v1/assignments.proto\x1a#lindm/admin/v1/device_actions.proto\x1a(lindm/admin/v1/enrollment_recovery.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1clindm/admin/v1/secrets.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/validation/v1/string_rules.proto\"\xb6\x01\n" +
 	"\x13RevokeDeviceRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
@@ -1044,8 +1108,7 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x06update\x18\x01 \x01(\v2+.lindm.agent.v1.UpdateExecutionTrustRequestB\x06\xbaH\x03\xc8\x01\x01R\x06update\x12!\n" +
 	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12,\n" +
 	"\vapproval_id\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\n" +
-	"approvalId\"\xe4\n" +
-	"\n" +
+	"approvalId\"\xa2\f\n" +
 	"\bApproval\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12\x1f\n" +
@@ -1071,11 +1134,13 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x13reveal_recovery_key\x18\x10 \x01(\v2(.lindm.admin.v1.RevealRecoveryKeyRequestH\x00R\x11revealRecoveryKey\x12o\n" +
 	"\x1aapprove_pending_enrollment\x18\x11 \x01(\v2/.lindm.admin.v1.ApprovePendingEnrollmentRequestH\x00R\x18approvePendingEnrollment\x12]\n" +
 	"\x0erecover_device\x18\x12 \x01(\v24.lindm.admin.v1.CreateRecoveryEnrollmentGrantRequestH\x00R\rrecoverDevice\x12f\n" +
-	"\x17activate_target_preview\x18\x13 \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreview\x124\n" +
+	"\x17activate_target_preview\x18\x13 \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreview\x12J\n" +
+	"\rreveal_secret\x18\x17 \x01(\v2#.lindm.admin.v1.RevealSecretRequestH\x00R\frevealSecret\x12p\n" +
+	"\x1breveal_local_admin_password\x18\x18 \x01(\v2/.lindm.admin.v1.RevealLocalAdminPasswordRequestH\x00R\x18revealLocalAdminPassword\x124\n" +
 	"\x16requester_display_name\x18\x14 \x01(\tR\x14requesterDisplayName\x122\n" +
 	"\x15approver_display_name\x18\x15 \x01(\tR\x13approverDisplayName\x12'\n" +
 	"\x0fdevice_hostname\x18\x16 \x01(\tR\x0edeviceHostnameB\t\n" +
-	"\apayload\"\xf8\x06\n" +
+	"\apayload\"\xb6\b\n" +
 	"\x15CreateApprovalRequest\x125\n" +
 	"\x10lifetime_seconds\x18\x01 \x01(\rB\n" +
 	"\xbaH\a*\x05\x18\x90\x1c(<R\x0flifetimeSeconds\x12J\n" +
@@ -1086,7 +1151,10 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x13reveal_recovery_key\x18\x06 \x01(\v2(.lindm.admin.v1.RevealRecoveryKeyRequestH\x00R\x11revealRecoveryKey\x12o\n" +
 	"\x1aapprove_pending_enrollment\x18\a \x01(\v2/.lindm.admin.v1.ApprovePendingEnrollmentRequestH\x00R\x18approvePendingEnrollment\x12]\n" +
 	"\x0erecover_device\x18\b \x01(\v24.lindm.admin.v1.CreateRecoveryEnrollmentGrantRequestH\x00R\rrecoverDevice\x12f\n" +
-	"\x17activate_target_preview\x18\t \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreviewB\x10\n" +
+	"\x17activate_target_preview\x18\t \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreview\x12J\n" +
+	"\rreveal_secret\x18\n" +
+	" \x01(\v2#.lindm.admin.v1.RevealSecretRequestH\x00R\frevealSecret\x12p\n" +
+	"\x1breveal_local_admin_password\x18\v \x01(\v2/.lindm.admin.v1.RevealLocalAdminPasswordRequestH\x00R\x18revealLocalAdminPasswordB\x10\n" +
 	"\apayload\x12\x05\xbaH\x02\b\x01\"N\n" +
 	"\x16CreateApprovalResponse\x124\n" +
 	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval\"f\n" +
@@ -1152,6 +1220,8 @@ var file_lindm_admin_v1_approvals_proto_goTypes = []any{
 	(*ApprovePendingEnrollmentRequest)(nil),      // 17: lindm.admin.v1.ApprovePendingEnrollmentRequest
 	(*CreateRecoveryEnrollmentGrantRequest)(nil), // 18: lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
 	(*ActivateTargetPreviewRequest)(nil),         // 19: lindm.admin.v1.ActivateTargetPreviewRequest
+	(*RevealSecretRequest)(nil),                  // 20: lindm.admin.v1.RevealSecretRequest
+	(*RevealLocalAdminPasswordRequest)(nil),      // 21: lindm.admin.v1.RevealLocalAdminPasswordRequest
 }
 var file_lindm_admin_v1_approvals_proto_depIdxs = []int32{
 	12, // 0: lindm.admin.v1.UpdateExecutionAuthorityRequest.update:type_name -> lindm.agent.v1.UpdateExecutionTrustRequest
@@ -1166,23 +1236,27 @@ var file_lindm_admin_v1_approvals_proto_depIdxs = []int32{
 	17, // 9: lindm.admin.v1.Approval.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
 	18, // 10: lindm.admin.v1.Approval.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
 	19, // 11: lindm.admin.v1.Approval.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
-	1,  // 12: lindm.admin.v1.CreateApprovalRequest.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
-	14, // 13: lindm.admin.v1.CreateApprovalRequest.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
-	2,  // 14: lindm.admin.v1.CreateApprovalRequest.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
-	15, // 15: lindm.admin.v1.CreateApprovalRequest.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
-	16, // 16: lindm.admin.v1.CreateApprovalRequest.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
-	17, // 17: lindm.admin.v1.CreateApprovalRequest.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
-	18, // 18: lindm.admin.v1.CreateApprovalRequest.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
-	19, // 19: lindm.admin.v1.CreateApprovalRequest.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
-	3,  // 20: lindm.admin.v1.CreateApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	3,  // 21: lindm.admin.v1.ListApprovalsResponse.approvals:type_name -> lindm.admin.v1.Approval
-	3,  // 22: lindm.admin.v1.ApproveApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	3,  // 23: lindm.admin.v1.RejectApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	20, // 12: lindm.admin.v1.Approval.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
+	21, // 13: lindm.admin.v1.Approval.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
+	1,  // 14: lindm.admin.v1.CreateApprovalRequest.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
+	14, // 15: lindm.admin.v1.CreateApprovalRequest.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
+	2,  // 16: lindm.admin.v1.CreateApprovalRequest.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
+	15, // 17: lindm.admin.v1.CreateApprovalRequest.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
+	16, // 18: lindm.admin.v1.CreateApprovalRequest.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
+	17, // 19: lindm.admin.v1.CreateApprovalRequest.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
+	18, // 20: lindm.admin.v1.CreateApprovalRequest.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
+	19, // 21: lindm.admin.v1.CreateApprovalRequest.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
+	20, // 22: lindm.admin.v1.CreateApprovalRequest.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
+	21, // 23: lindm.admin.v1.CreateApprovalRequest.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
+	3,  // 24: lindm.admin.v1.CreateApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	3,  // 25: lindm.admin.v1.ListApprovalsResponse.approvals:type_name -> lindm.admin.v1.Approval
+	3,  // 26: lindm.admin.v1.ApproveApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	3,  // 27: lindm.admin.v1.RejectApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_approvals_proto_init() }
@@ -1194,6 +1268,7 @@ func file_lindm_admin_v1_approvals_proto_init() {
 	file_lindm_admin_v1_device_actions_proto_init()
 	file_lindm_admin_v1_enrollment_recovery_proto_init()
 	file_lindm_admin_v1_provisioning_proto_init()
+	file_lindm_admin_v1_secrets_proto_init()
 	file_lindm_admin_v1_targeting_proto_init()
 	file_lindm_admin_v1_approvals_proto_msgTypes[2].OneofWrappers = []any{
 		(*Approval_RevokeDevice)(nil),
@@ -1204,6 +1279,8 @@ func file_lindm_admin_v1_approvals_proto_init() {
 		(*Approval_ApprovePendingEnrollment)(nil),
 		(*Approval_RecoverDevice)(nil),
 		(*Approval_ActivateTargetPreview)(nil),
+		(*Approval_RevealSecret)(nil),
+		(*Approval_RevealLocalAdminPassword)(nil),
 	}
 	file_lindm_admin_v1_approvals_proto_msgTypes[3].OneofWrappers = []any{
 		(*CreateApprovalRequest_RevokeDevice)(nil),
@@ -1214,6 +1291,8 @@ func file_lindm_admin_v1_approvals_proto_init() {
 		(*CreateApprovalRequest_ApprovePendingEnrollment)(nil),
 		(*CreateApprovalRequest_RecoverDevice)(nil),
 		(*CreateApprovalRequest_ActivateTargetPreview)(nil),
+		(*CreateApprovalRequest_RevealSecret)(nil),
+		(*CreateApprovalRequest_RevealLocalAdminPassword)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

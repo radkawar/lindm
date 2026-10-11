@@ -24,10 +24,12 @@ import (
 var errReportLimit = errors.New("reports: artifact size or row limit exceeded")
 var errLeaseLost = errors.New("reports: artifact lease lost")
 
-// Run reconciles durable schedules, work and retention until cancellation. Every
-// attempt has a 20-second generation bound inside a 60-second database lease.
-// Generation uses one repeatable-read snapshot and atomically publishes chunks;
-// crashes roll back chunks and another replica can reclaim an expired lease.
+// Run is a replicated job that reconciles durable schedules, work and retention
+// until cancellation. Schedules, artifacts and retention are claimed with SKIP
+// LOCKED row leases. Every attempt has a 20-second generation bound inside a
+// 60-second database lease. Generation uses one repeatable-read snapshot and
+// atomically publishes chunks; crashes roll back chunks and another replica can
+// reclaim an expired lease. Store failure returns to the job supervisor.
 func (s *Service) Run(ctx context.Context) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()

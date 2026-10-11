@@ -167,21 +167,22 @@ also reserves deployment-local keys such as the server TLS leaf.
 
 Select only the capabilities the owner approves, independently for each role:
 
-| Operation          | Exact capability               |
-| ------------------ | ------------------------------ |
-| Rotate escrow      | `device.escrow-rotate.v1`      |
-| Bind TPM2          | `device.tpm2-bind.v1`          |
-| Lock sessions      | `device.lock-sessions.v1`      |
-| Release lock       | `device.release-lock.v1`       |
-| Quarantine         | `device.quarantine.v1`         |
-| Release quarantine | `device.release-quarantine.v1` |
-| Crypto erase       | `device.crypto-erase.v1`       |
-| Sanitize           | `device.sanitize.v1`           |
-| Restart            | `device.restart.v1`            |
-| Shut down          | `device.shutdown.v1`           |
-| Refresh inventory  | `device.refresh-inventory.v1`  |
-| Systemd services   | `systemd.service.v1`           |
-| Offline enrollment | `enrollment.offline.v1`        |
+| Operation                    | Exact capability               |
+| ---------------------------- | ------------------------------ |
+| Rotate escrow                | `device.escrow-rotate.v1`      |
+| Bind TPM2                    | `device.tpm2-bind.v1`          |
+| Lock sessions                | `device.lock-sessions.v1`      |
+| Release lock                 | `device.release-lock.v1`       |
+| Quarantine                   | `device.quarantine.v1`         |
+| Release quarantine           | `device.release-quarantine.v1` |
+| Crypto erase                 | `device.crypto-erase.v1`       |
+| Sanitize                     | `device.sanitize.v1`           |
+| Restart                      | `device.restart.v1`            |
+| Shut down                    | `device.shutdown.v1`           |
+| Refresh inventory            | `device.refresh-inventory.v1`  |
+| Managed local-admin password | `device.local-admin-rotate.v1` |
+| Systemd services             | `systemd.service.v1`           |
+| Offline enrollment           | `enrollment.offline.v1`        |
 
 For example, selecting only `["device.refresh-inventory.v1"]` on both plan and
 start delegates permits that protocol without granting restart or shutdown.
@@ -329,6 +330,58 @@ handling, including backup/header-copy disposition. Deleting an escrow database
 row cannot revoke a key copied from a backup. Do not claim crypto erase when a
 retained header plus retained key can still recover the data.
 
+### Managed secrets and local-admin passwords
+
+Managed secrets and local-admin passwords reuse the recovery escrow custody
+above: without `escrow.transport_key_file` and `escrow.wrapping_key_file` every
+secret and local-admin RPC fails with `escrow_unconfigured`, and nothing is stored
+unencrypted. Losing the wrapping key loses every managed secret version and
+escrowed password, exactly as for recovery keys; back it up with the same custody.
+
+`secrets.manage` (owner, admin) creates and rotates deployment-global secrets and
+sets per-device local-admin policies; `secrets.reveal` (owner, admin) reveals
+them. Secret create, rotate and reveal need an unrestricted principal because a
+secret is not device-scoped. Reveal additionally needs a reason and a local
+browser session younger than five minutes (password plus passkey); OIDC and CLI
+sessions never satisfy step-up. A second human must approve the exact reveal
+request when `escrow.reveal_approval_required` is set or when the authorization
+policy lists `secrets.reveal` in `approval_required_permissions`. Every attempt is
+audited before any plaintext leaves the server, and responses are `no-store`.
+
+Enter a password-hash secret as a crypt(3) string, never the password: for
+example `mkpasswd -m yescrypt` (Debian/Ubuntu `whois`) or
+`openssl passwd -6` on an offline workstation, without placing the password in
+shell history. A profile's `HashedPasswordPolicy` must name the secret's exact
+`secret_id`, `version`, purpose and `subject_binding_id`, and the algorithm must
+match the hash prefix. Rotating a secret appends a version; publish a new profile
+revision that references it to deliver it. Delivery also requires the assigning
+administrator to still hold `secrets.manage` and the device to have registered
+its encryption key; otherwise the assignment shows the blocking reason.
+
+Local-admin rotation requires the device's root-owned
+`action_provider.local_admin_accounts` to list the exact existing, non-root
+account; a remote policy cannot add accounts. Delegate
+`device.local-admin-rotate.v1` to both plan and start keys. After changing the
+list, rerun `lindm-agent action-sandbox -install`, reload systemd and restart the
+executor: a nonempty list adds `ReadWritePaths=/etc` (chpasswd atomically
+replaces `/etc/shadow`), `CAP_IPC_LOCK` and `LimitMEMLOCK=infinity`, because the
+generated password is held only in locked memory. The executor generates a 26-character
+base32 password (at least 128 random bits), escrows it, and sets it with
+`chpasswd` only after the server acknowledges durable storage. A rotation that is
+interrupted while setting the password is `UNKNOWN`: reveal it and the previous
+`CURRENT` password, test them, then request a new rotation. Never retry by hand
+with another tool. After a reveal the policy schedules a rotation after its
+post-reveal delay, so a revealed password stays valid only that long. Rotation
+changes only the local password: it does not end existing sessions, change SSH keys,
+sudo rules or directory accounts.
+
+Suspected disclosure of a managed secret requires a new version, a profile revision
+delivering it and, where the secret authenticates elsewhere (Wi-Fi, VPN,
+repository), rotation at that service. Suspected disclosure of a local-admin
+password requires `RequestLocalAdminPasswordRotation`. Devices that received a
+secret keep its native effect (for example a shadow hash) until a later
+revision or release changes it.
+
 ## 3. Dangerous actions
 
 Destructive plans freeze exact device identities/generations, media identities,
@@ -455,6 +508,9 @@ scalable workers from the same binary, supported PostgreSQL HA and shared S3-com
 storage. No in-memory session/job ownership or local artifact assumptions. Kubernetes
 packaging may use this topology, but is not the definition of scalability. A single
 physical host is an availability single point of failure; never market it as HA.
+The implemented and laboratory-qualified subset (replicas, balancer, synchronous
+PostgreSQL standby and single-leader jobs) is specified in "Replicated topology
+and HA operation" below; shared artifacts and worker-only processes remain open.
 
 Configuration is typed, validated and documented. Secrets may come from protected
 files or approved secret managers, not command-line flags. Startup refuses ambiguous
@@ -673,6 +729,103 @@ topology using a uniquely named disposable project, short-lived LOCAL fixture
 keys and dynamically allocated loopback ports. It is a container boot/migration
 and isolation proof, not native-host, backup/restore, image-signing or HA evidence.
 
+### Replicated topology and HA operation
+
+The qualified replicated shape is two or more `lindmd serve` replicas behind a
+layer-4 TLS-passthrough load balancer, one PostgreSQL primary and one synchronous
+streaming-replication standby. TLS terminates at `lindmd`: device mTLS requires
+the replica to see the client certificate, so the balancer must not terminate or
+re-encrypt either listener. Shared S3-compatible artifact storage and separately
+scaled worker-only processes are not implemented; the hosted update repository and
+release publisher remain per-replica configuration and are not covered here.
+
+Every replica uses identical configuration except its listener ports: deployment
+UUID, public and device origins, server TLS certificate/key, device CA
+certificate/key, execution bootstrap and online signing keys, integrations key,
+advisory configuration and database URL. A differing value is unsupported.
+Sessions, login ceremonies, enrollment, device sessions, challenges, nonces, start
+grants and reports are all in PostgreSQL, so no balancer stickiness is required.
+
+Balancer requirements, as qualified with HAProxy 3.2 (`mode tcp`):
+
+- Health-check each replica with TLS `GET /readyz` on its **admin** listener,
+  expecting 204, and verify the server certificate. Check the device backend
+  against the same replica's admin port (`check port`); the device listener
+  demands a client certificate and has no readiness route.
+- Enable connection retries with redispatch (`retries 3`, `option redispatch 1`)
+  so a connection refused by a draining or crashed replica goes to a peer.
+- Keep idle timeouts at least 120 seconds and do not enable
+  `on-marked-down shutdown-sessions`: graceful shutdown drains in-flight requests
+  for up to 20 seconds and sends HTTP/2 GOAWAY itself.
+- `/readyz` pings PostgreSQL. During a database failover every replica is briefly
+  unready, and the balancer may have no healthy backend; clients retry.
+
+PostgreSQL requirements:
+
+- `synchronous_commit = on` with `synchronous_standby_names` naming the standby.
+  An acknowledged mutation or device report is then durable on the standby before
+  `lindmd` answers. Asynchronous replication can lose acknowledged work on
+  promotion and does not meet the no-lost-accepted-work contract.
+- List every node in the runtime URL with `target_session_attrs=read-write`, e.g.
+  `postgresql://lindm_runtime@db1:5432,db2:5432/lindm?sslmode=verify-full&target_session_attrs=read-write`.
+  Each node's certificate must match the host name used for it.
+- The HA manager (Patroni, pg_auto_failover or an operator runbook) must fence the
+  old primary before promotion. With synchronous replication an unfenced, isolated
+  old primary cannot acknowledge commits because its standby is gone, but `lindmd`
+  does not fence it. The laboratory crashes the old primary instead.
+- After promotion the cluster has no synchronous replica. Re-clone or `pg_rewind`
+  the old primary as the new standby and restore `synchronous_standby_names` before
+  declaring HA restored; until then a second failure loses availability.
+- Set server TCP keepalives (`tcp_keepalives_idle = 10`, `interval = 5`,
+  `count = 3`) so a partitioned replica's coordination session and its advisory
+  locks are released within about 25 seconds instead of the operating-system default.
+- Size `max_connections` for each replica's `database.max_connections` pool plus
+  one coordination session per replica, plus migration and administration sessions.
+
+Background jobs (inventory in `internal/server/jobs.go`):
+
+| Job                      | Distribution                                 | Correctness fence under overlap or retry                                                                   |
+| ------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `snapshot-cleanup`       | Exclusive, advisory key `0x6c696e646d000001` | Per-device row lock; staging/receipt reservations released once                                            |
+| `advisory-maintenance`   | Exclusive, key `0x6c696e646d000002`          | Refresh schedule from durable per-feed `attempted_at`; leased publication generations; SKIP LOCKED cleanup |
+| `advisory-evaluation`    | Exclusive, key `0x6c696e646d000003`          | Per-device lock; a repeated evaluation replaces the stored result                                          |
+| `compliance-deadlines`   | Exclusive, key `0x6c696e646d000004`          | SKIP LOCKED assignment lock; events emitted only on state transitions                                      |
+| `integration-deliveries` | Replicated (four workers per replica)        | Random token + generation leases; receivers deduplicate the signed `event_id`                              |
+| `reports`                | Replicated                                   | SKIP LOCKED schedule and artifact leases with token and database time                                      |
+
+Each replica opens one dedicated coordination session (never from the pool),
+refuses it if it reached a standby (`pg_is_in_recovery()`), and polls
+`pg_try_advisory_lock` for idle exclusive jobs every 5 seconds ±20%. A 2-second
+heartbeat proves the session is alive and still holds each lock (`pg_locks`); on
+loss every led job is cancelled and joined before reconnecting. A job that returns
+or fails releases its lock and backs off 1–60 seconds with jitter; replicated jobs
+restart under the same backoff. Graceful shutdown unlocks explicitly; a crash
+releases locks when PostgreSQL closes the session. Overlap after session loss is
+bounded by one heartbeat plus one 5-second probe, which is why every job above
+keeps its own row fence. Advisory keys are a compatibility contract between
+concurrently running releases. Find the current holder with:
+
+```sql
+SELECT to_hex((l.classid::bigint << 32) | l.objid::bigint), a.application_name
+FROM pg_locks l JOIN pg_stat_activity a USING (pid)
+WHERE l.locktype = 'advisory' AND l.objsubid = 1 AND l.granted;
+```
+
+The holder is named `lindmd jobs HOST pid PID`; replica logs record
+`background job leadership acquired` and `released`. Job failures and database
+failover never stop the serving process.
+
+Rolling upgrade applies only to releases whose exact schema check accepts the
+running database (same-schema releases). A schema-changing release uses the fenced
+single-host upgrade above. For each replica in turn: `systemctl stop lindmd`
+(SIGTERM closes listeners, drains in-flight requests and releases job leadership),
+install and start the new package, then wait until **both** balancer backends report
+that replica UP and the public `/readyz` returns 204 before stopping the next one.
+Mixed N/N+1 replicas share the database, advisory keys and protocol during the roll.
+Devices reconnect through the balancer on connection loss; protocol state lives in
+PostgreSQL, an exact start-authorization retry returns the same grant and an exact
+result-report replay is accepted, so a lost reply never repeats an effect.
+
 ### Air-gap distribution contract
 
 - Ship a complete manifest-addressed bundle: server/agent binaries and OCI images,
@@ -697,6 +850,109 @@ and isolation proof, not native-host, backup/restore, image-signing or HA eviden
   software/advisory import, updates, backup/restore and audit export inside the site.
 - Distinguish an air-gapped site with internal networking from a device disconnected
   from that site. The latter cannot receive fresh policies or destructive authority.
+
+### Offline bundle operations runbook
+
+An offline bundle moves one release and its update/advisory authority from a
+connected **station** into an isolated **site**. The station holds the offline TUF
+root/targets custody, the package signer, the release-attestation key and a
+dedicated Ed25519 bundle-signing key. The site server holds only the online TUF
+roles (rollout, snapshot, timestamp) and independently pinned public keys. Nothing
+inside a bundle can add or replace trust at the site.
+
+Layout: `release/` (verified `lab release build` export with per-artifact
+CycloneDX SBOM, DSSE in-toto provenance and artifact statements),
+`repositories/<amd64|arm64>/{apt,rpm}/` (signed APT and RPM repositories built from
+those exact packages; agent, `lindmd` and `lindmctl`), `updates/` (the offline-signed
+TUF root chain, targets metadata, every top-level target and paused channel
+proposals), `advisories/<feed-id>` (authenticated vendor snapshots) and
+`bundle.json` + `bundle.json.dsse`. The strict `lindm.bundle.v1.OfflineBundleManifest`
+lists every file's SHA-256 and size, the monotonic sequence, validity (at most 30
+days), the release manifest digest and each feed's signed acquisition time.
+Every channel artifact must be byte-identical to an attested release agent package.
+Arch Linux packages, Red Hat CSAF/VEX archives and other vendor formats without a
+single re-parseable snapshot are not carried; those sites still need the separate
+connected refresh or a future bundle format.
+
+#### Station (connected)
+
+1. Build and verify the release: `lab release build` then `lab release verify` with
+   the independently pinned attestation key.
+2. Publish the agent packages with offline custody into the station TUF repository
+   (`lab release repository publish -repository TUF -keys OFFLINE_KEYS -channel CHANNEL.json -target packages/lindm-agent/<arch>/<file>=PATH ...`).
+3. Export, with a sequence strictly greater than every earlier bundle for this
+   bundle key:
+
+   ```sh
+   lindmctl bundle export -output /transfer/lindm-bundle-0042 -sequence 42 \
+     -validity 336h -release /private/release-export \
+     -release-public-key /pinned/attestation.pub -release-key-id ATTESTATION_SPKI_SHA256 \
+     -signer-home /private/package-signing -fingerprint PACKAGE_FINGERPRINT \
+     -updates /private/station-tuf -updates-root /pinned/tuf-root.json -ring stable \
+     -advisories /private/site-advisories.json \
+     -key /private/bundle.pem -key-id BUNDLE_SPKI_SHA256
+   lindmctl bundle verify -bundle /transfer/lindm-bundle-0042 \
+     -public-key /pinned/bundle.pub -key-id BUNDLE_SPKI_SHA256
+   ```
+
+   `-advisories` is the site's exact `AdvisoryConfig` protobuf JSON; the site refuses
+   a snapshot whose `FeedSource` differs from its configuration. `-development-key`
+   is required for development package and bundle custody and is recorded as
+   `development` in the signed manifest. Production custody uses an
+   operator-provisioned mode-0600 key with a `production-offline-bundle-signing`
+   purpose sidecar; `lindmctl bundle development-key` never creates production keys.
+
+4. Transfer the directory by approved media. Integrity comes from the signature, not
+   the medium.
+
+#### Site (no external egress)
+
+Configure `offline_bundles` in the server protobuf JSON:
+`signing_public_key_file`/`signing_key_id` (bundle key), the release-attestation
+`release_attestation_public_key_file`/`release_attestation_key_id`, and a private
+server-owned `directory`. A signing `release_repository` (online custody only) and
+`execution_bootstrap` are required; the TUF root comes from the authenticated
+execution bootstrap. Configure `advisories.feeds` identically to the station and leave
+`refreshEnabled` false.
+
+```sh
+lindmd bundle-import -config /etc/lindm/server.json -bundle /media/lindm-bundle-0042
+```
+
+The command prints a JSON result. Import order: verify the DSSE signature with the
+pinned key, the manifest schema, creation (5-minute skew) and expiry; require the
+tree to contain exactly the listed regular files; admit the sequence in the
+PostgreSQL ledger; copy every file into private staging while hashing it; re-verify
+release SBOM/provenance/artifact signatures with the pinned release key; verify the
+TUF root chain and offline targets from the deployment root, require a newer targets
+version and sign new online metadata; publish advisory snapshots with freshness
+measured from the signed acquisition time; atomically exchange `repositories/` and
+`release/`; then record completion and an `offline_bundle.imported` audit event.
+The first import may run before `serve` and initializes an empty release
+repository; `serve` requires that repository to exist once configured.
+
+- An identical resubmission of an imported bundle is a no-op. An interrupted import
+  resumes only with the identical signed manifest.
+- A lower never-imported sequence is `offline_bundle_replayed`; a different manifest
+  at an admitted sequence is `offline_bundle_equivocation`; an expired bundle is
+  `offline_bundle_expired`; any byte difference is `offline_bundle_corrupt`. A
+  failure leaves previously published repositories, TUF metadata and advisories
+  serving.
+- Imported channels are staged **paused at 0%**. Start each rollout explicitly with
+  the audited `SetRollout` (console or API); import never upgrades devices.
+- Agents install and update only from the site: native repositories are served
+  read-only at `https://SITE/offline/repositories/<arch>/apt/` and `.../rpm/`, and
+  release artifacts at `https://SITE/offline/release/`. Clients pin the package
+  signing key and the site CA out of band (for example through
+  `enrollment_instructions`); the server does not vouch for package keys.
+- Offline targets expire seven days after station signing and imported advisories
+  `maxAgeSeconds` after acquisition. Import a fresh bundle before either window
+  closes; an expired window fails closed for new updates and reports advisory
+  coverage as unknown rather than extending it. Recovery after a missed window is a
+  newer station bundle, never a clock change or a disabled check.
+- Retain the import JSON, `bundle.json` SHA-256 and the audit event with change
+  records. Bundle directories may be deleted after import; the served copy is the
+  server's own staged copy.
 
 ## 5. Release, update and recovery
 
@@ -1018,6 +1274,99 @@ Incident runbooks are release artifacts: credential/release-key compromise, mali
 package/policy, lost recovery key, mass lockout, failed migration, ransomware/restore,
 expired offline trust, package-manager failure and overloaded reconnect storms. Each
 has detection, blast-radius containment, break-glass, recovery and evidence preservation.
+
+### Replicated failover laboratory
+
+`lab ha -repo FIXTURE -lindmd RELEASE_N -upgrade-lindmd RELEASE_N1 -record NEW_FILE`
+is the maintained HA lane. It owns every resource it starts: two pinned
+PostgreSQL 18.6 containers (primary plus a `pg_basebackup` standby with
+synchronous commit, verify-full TLS replication, durable Docker volumes), a pinned
+HAProxy 3.2.25 LTS container configured exactly as in §4, two `lindmd` replicas
+with LOCAL password/WebAuthn authority, integrations and reports enabled, and a
+fresh multi-host database. Everything binds dynamic loopback ports; development
+trust in `FIXTURE` is read-only, and no endpoint or credential override exists.
+`-devices` (4–256, default 24), `-phase-duration` (20 s–30 min, default 1 min) and
+`-seed` bound the run. The two releases must differ in digest and version.
+
+Devices are the capacity lane's real-protocol simulated agents: enrolled with
+one-use grants and Ed25519 mTLS identities, verifying real intent/start
+signatures and signing challenges and attestations through the balancer. Effects
+are a journal, not host changes: each device records a restart or service
+execution **before** reporting it and never repeats a journaled action, as the
+protected executor does. Throughout every phase the administrator stream issues
+one restart per second to an idle device and spreads each device's first service
+assignment across the run; ambiguous mutation outcomes are retried with the exact
+same request ID until the server answers definitively.
+
+Phases, in order: steady load; **crash** — wait until restarts are executing but
+unreported, SIGSTOP replica `a` for three seconds so requests routed to it are in
+flight, then SIGKILL it; restart `a` on release N; **database failover** — wait for
+in-flight restarts, SIGKILL the primary container and `pg_ctl promote` the standby;
+**rolling upgrade** — SIGTERM, start N+1 and wait for both balancer backends to
+report the replica UP, first `a`, then `b`; quiesce until every accepted restart
+finishes. A run passes only if all checks hold:
+
+- the crash interrupted device RPCs while restarts were executing;
+- the standby was a streaming synchronous replica before the primary failed;
+- both replicas finish on N+1 and neither exited without a laboratory signal;
+- no restart or service action executed twice and the server lists no action no
+  request accepted;
+- every accepted restart is server-verified SUCCEEDED with the device's new boot
+  ID and every accepted assignment is the device's head with a converged resource
+  whose every authorized start the device executed exactly once;
+- no protocol violation and no definitive administrator rejection;
+- exclusive-job leadership, reconstructed from replica logs and orchestration
+  events, never overlaps outside the database-failover window or longer than
+  10 seconds, every exclusive job is held at the end and the 1 Hz `pg_locks`
+  samples show no unheld gap above 2 minutes.
+
+Records include binary/generator SHA-256 and versions, image digests and HAProxy
+version, every event, per-phase RPC counts/codes/latency, the failover timeline,
+leadership intervals, timestamped HAProxy health transitions and, on failure,
+bounded ERROR messages of replicas that exited.
+
+#### Observed result, 2026-10-11
+
+Source: checkpoint `a98feef` plus private-worktree patch SHA-256
+`7aee9b016e272f7defb9fb65adc7f47308dab880332ce4eb28a41497b7c61f1d`. Static
+`lindmd` 0.1.0 SHA-256
+`b7b92115ec6a3320b22600a98997860c7fce117f5eb40a7dfdd13dac39687949`, 0.1.1
+`b86e36de0d2c63911191cdb9df557f2f0300ac128d21764579ce3fc4c9a70d57`, `lab`
+`2059ce3377453f9d52fcec5c8294882a05b0735adbfef2f2384003e8aa359144`. Host:
+i7-13700K (24 logical CPUs), 62 GiB, Linux 7.0.0-34, Docker 29.5.0, shared with
+other laboratory work; all components co-located on loopback. The patch and all
+five executables (including the negative-control pair) are retained under
+`artifacts/ha-20261011/`.
+
+`artifacts/ha-failover-20261011.json`, SHA-256
+`2e08c0ca74a23d7e7bc77a403b7b03cd68868d507bcab5e1df4b4d80d818390d`, **passed** all
+eleven checks with 24 devices and one-minute phases (9,744 device/admin RPCs after enrollment):
+
+| Fault                         | Observed                                                                                                                                                                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Replica crash during dispatch | 3 restarts executing at SIGSTOP; 12 device RPCs (`unavailable`) interrupted by SIGKILL and retried through `b`; `b` took all four exclusive jobs 1.5 s after the kill; 63 restarts accepted and finished in that phase            |
+| PostgreSQL failover           | Synchronous standby promoted and writable 384 ms after the primary SIGKILL; 22 RPCs failed `internal` and were retried; both replicas kept serving; exclusive jobs re-led 0.7–2.6 s after session loss; 60 accepted / 62 finished |
+| Rolling upgrade 0.1.0→0.1.1   | Zero RPC errors in both steps; leadership handed over by explicit unlock; both replicas on 0.1.1 at the end                                                                                                                       |
+| Totals                        | 279/279 accepted restarts server-verified SUCCEEDED with exactly one device execution; 24/24 assignments converged exactly once; 303 admin requests, 0 rejections; 0 duplicate effects; longest unheld job gap 4 s                |
+
+Negative control: the same `lab` against checkpoint `a98feef` without this
+change (0.1.0 `a024e7a6dff2bcfb105a25ba8b73b86a39843f0a9420cdfc44c1bbb27e584c2d`,
+0.1.1 `5311a174b203f0d03c333153389e85539d04d744a7d8d5e438ea5fba19fc4d64`),
+`artifacts/ha-failover-baseline-a98feef-20261011.json`, SHA-256
+`faf1ccf116a3d2a5f976fc5a7688a1eedd54dbc1e6a6a5450b44136fc7e6afd8`, **failed**:
+both replicas exited with `integrations: delivery store unavailable` when the
+primary died, every RPC in the failover phase failed and the rolling upgrade
+could not start. That was the defect: background-job store errors terminated the
+process, and every replica ran every background job. Superseded tuning records
+are retained under `artifacts/ha-superseded-20261011/`.
+
+This is laboratory evidence for the replica, balancer, synchronous-standby and
+job-leadership contract, not a capacity, soak or 100,000-device result. It does
+not cover network partitions or an unfenced old primary, re-attaching a standby
+after failover, shared artifact storage, worker-only processes, schema-changing
+rolling upgrades, native agents (devices are simulated), separate hosts or the
+dedicated reference hardware. Recovery here is seconds against the five-minute
+target; a production claim still needs the replicated L18 load/failover gate.
 
 ## 7. Hosted agent updates and release compatibility
 
