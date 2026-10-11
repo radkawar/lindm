@@ -367,7 +367,7 @@ var laneInputs = map[string][]string{
 	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
 	"resources":           {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
 	"encrypted":           {"record"},
-	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "recovery-manifest", "record"},
+	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "record"},
 	"updates":             {"repo", "build-repo", "lab", "record"},
 	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
 	"enroll-from-console": {"console-browser", "record"},

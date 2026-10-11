@@ -3,7 +3,7 @@
   "distribution": "rhel",
   "version": "10.2",
   "architecture": "x86_64",
-  "edition": "Binary DVD",
+  "edition": "dvd-encrypted-lab",
   "release": "2026-05-12T15:08:48Z",
   "imageFilename": "rhel-10.2-x86_64-dvd.iso",
   "imageUrl": "https://api.access.redhat.com/management/v1/images/e15cb333529c332e76e4b1b946efe3515c99f996546675aec18e8effdf2540a5/download",

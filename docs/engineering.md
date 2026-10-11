@@ -1618,7 +1618,8 @@ Version selection is explicit, not a mutable "latest" pin. `images redhat fetch
 -version MINOR [-edition kvm|dvd] -token-file FILE -manifest NEW_FILE [-cache DIR]`
 obtains the authorized download (`kvm`, the default, is the KVM guest qcow2;
 `dvd` is the self-contained Binary DVD installer ISO used by the encrypted
-kickstart lane, never the network-dependent Boot ISO), verifies its
+kickstart lane, never the network-dependent Boot ISO; its manifest carries the
+matrix's encrypted-installer edition `dvd-encrypted-lab`), verifies its
 published SHA-256 and exact CDN Content-Length, and imports it into the same
 digest-addressed cache used by VM lanes. The default cache is `.cache/lab/images`;
 the manifest parent must already exist. The token file must be a current-user-owned
@@ -2297,10 +2298,13 @@ package backend, `-redhat-token-file` from the row's lab entitlement, resource
 recovery image from the same release's cloud manifest. `architectureArgs` holds
 execution-host arguments every hardware-selecting lane receives for a guest
 architecture (the Sparks' pinned AAVMF firmware for aarch64). A cell whose
-capability the registry gates is `gated`; a cell without a maintained lane, or
-whose lane has no recipe in the row's `Lab.Lanes`, is `no lane`; a release
-without a pinned image for that architecture is `no image`; and a runnable cell
-without a ledger entry is `not run`. None of these is a pass.
+capability the registry gates is `gated`, and so is a cell whose lane the row's
+`Lab.LaneGates` gates on that architecture: a concrete product or vendor reason
+the lane cannot qualify the release there, never "not yet run" (the lane itself
+refuses it too). A cell without a maintained lane, or whose lane has no recipe in
+the row's `Lab.Lanes`, is `no lane`; a release without a pinned image for that
+architecture is `no image`; and a runnable cell without a ledger entry is
+`not run`. None of these is a pass.
 
 ```sh
 artifacts/bin/lab matrix plan [-platform ubuntu-24.04] [-cells lifecycle,dispatch]

@@ -57,9 +57,11 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	kind := redhatimages.ImageKind(*edition)
 	// The Binary DVD is roughly ten times a KVM image; both transfers stay bounded.
+	// It is only the encrypted kickstart lane's installer, so its manifest carries
+	// the matrix's encrypted-installer edition suffix.
 	timeout, manifestEdition := 45*time.Minute, "KVM Guest Image"
 	if kind == redhatimages.BinaryDVD {
-		timeout, manifestEdition = 4*time.Hour, "Binary DVD"
+		timeout, manifestEdition = 4*time.Hour, "dvd-encrypted-lab"
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

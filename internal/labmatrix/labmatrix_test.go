@@ -139,6 +139,25 @@ func TestDebianNetinstServesEncryptedCells(t *testing.T) {
 	}
 }
 
+// A registry lane gate makes the cell gated with its reason on exactly the
+// gated architecture, even though the lane and an image exist there.
+func TestPlanHonoursLaneGates(t *testing.T) {
+	debian := *release(t, "debian-12")
+	debian.Lab.LaneGates = map[platform.LabLane]platform.LaneGate{platform.LaneUpdates: {Reason: "vendor cannot boot it", Architectures: []string{"aarch64"}}}
+	cloud := labv1.MatrixImage_MATRIX_IMAGE_CLOUD
+	updates := &labv1.MatrixCell{Name: "self-update", Title: "Self-update", Capabilities: []string{"self-update"}, Image: cloud, Lane: "updates"}
+	in := &Inputs{
+		Manifests: []*Manifest{{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "server-cloudimg"}, Release: &debian, Architecture: "aarch64"}},
+		Ledger:    &labv1.MatrixLedger{},
+	}
+	cells := in.Plan([]*platform.Release{&debian}, []*labv1.MatrixCell{updates})
+	for _, c := range cells {
+		if c.Architecture == "aarch64" && (c.State != Gated || c.Reason != "vendor cannot boot it" || c.Runnable()) {
+			t.Fatalf("gated lane cell = %q %q runnable=%t", c.State, c.Reason, c.Runnable())
+		}
+	}
+}
+
 // Appends accumulate and the ledger stays strict protobuf JSON.
 func TestAppendKeepsEntries(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ledger.json")

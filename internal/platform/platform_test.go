@@ -3,6 +3,7 @@ package platform
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -329,5 +330,42 @@ func TestUpdateLaneArchitectures(t *testing.T) {
 		if err := r.LabLaneOn(LaneResources, architecture); err != nil {
 			t.Errorf("unrestricted resources lane on %s: %v", architecture, err)
 		}
+	}
+}
+
+// A gated lane states a concrete reason, names only the release's own
+// architectures, and is refused exactly where it applies; a lane gated on every
+// architecture is never also a maintained recipe.
+func TestLaneGates(t *testing.T) {
+	for _, r := range Releases() {
+		for lane, gate := range r.Lab.LaneGates {
+			if strings.TrimSpace(gate.Reason) == "" {
+				t.Errorf("%s %s lane gate has no reason", r.Key, lane)
+			}
+			for _, architecture := range gate.Architectures {
+				if !slices.Contains(r.Architectures, architecture) {
+					t.Errorf("%s %s lane gate names foreign architecture %q", r.Key, lane, architecture)
+				}
+			}
+			if len(gate.Architectures) == 0 && slices.Contains(r.Lab.Lanes, lane) {
+				t.Errorf("%s %s lane is both maintained and gated on every architecture", r.Key, lane)
+			}
+		}
+	}
+	r := &Release{Name: "Example", Architectures: []string{"x86_64", "aarch64"}, Lab: Lab{
+		Lanes:     []LabLane{LaneUpdates},
+		LaneGates: map[LabLane]LaneGate{LaneUpdates: {Reason: "vendor kernel unsigned", Architectures: []string{"aarch64"}}, "inspect": {Reason: "no observer"}},
+	}}
+	if err := r.LabLaneOn(LaneUpdates, "amd64"); err != nil {
+		t.Fatalf("ungated architecture refused: %v", err)
+	}
+	if err := r.LabLaneOn(LaneUpdates, "arm64"); err == nil || !strings.Contains(err.Error(), "vendor kernel unsigned") {
+		t.Fatalf("gated architecture admitted or reason lost: %v", err)
+	}
+	if got := r.LaneGateOn("inspect", "x86_64"); got != "no observer" {
+		t.Fatalf("all-architecture gate = %q", got)
+	}
+	if got := r.LaneGateOn(LaneUpdates, "x86_64"); got != "" {
+		t.Fatalf("gate leaked to ungated architecture: %q", got)
 	}
 }

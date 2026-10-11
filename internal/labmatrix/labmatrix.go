@@ -313,9 +313,11 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch)
 	}
 	c.Entry = in.latest(c)
-	switch {
+	switch laneGate := r.LaneGateOn(platform.LabLane(spec.GetLane()), arch); {
 	case gated:
 		c.State, c.Reason = Gated, strings.Join(reasons, "; ")
+	case laneGate != "":
+		c.State, c.Reason = Gated, laneGate
 	case spec.GetLane() == "":
 		c.State, c.Reason = NoLane, spec.GetNoLane()
 	case slices.Contains(platform.LabLanes, platform.LabLane(spec.GetLane())) && r.LabLaneOn(platform.LabLane(spec.GetLane()), arch) != nil:

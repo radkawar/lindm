@@ -13,6 +13,10 @@ type Lab struct {
 	// (x86_64, aarch64) on which it was natively qualified. A lane absent here
 	// runs on every Release.Architectures entry.
 	LaneArchitectures map[LabLane][]string
+	// LaneGates records lanes the release genuinely cannot qualify, with the
+	// concrete product or vendor reason (never "not yet run"). A lane gated
+	// on an architecture is refused there and its matrix cells are gated.
+	LaneGates map[LabLane]LaneGate
 	// Entitlement: the guest's vendor repositories need a subscription token.
 	Entitlement bool
 	// Installer is the vendor installer the lab's encrypted and installed-image
@@ -49,6 +53,13 @@ type Lab struct {
 	OwnedBootUnavailable string
 }
 
+// LaneGate is why a lab lane cannot qualify a release. Architectures lists the
+// guest architectures (x86_64, aarch64) it applies to; empty means all.
+type LaneGate struct {
+	Reason        string
+	Architectures []string
+}
+
 // LabLane is a vmlab qualification lane with per-release recipes.
 type LabLane string
 
@@ -82,14 +93,12 @@ func (r *Release) LabLane(l LabLane) error {
 // LabLaneOn is LabLane for one guest architecture; it accepts the Debian
 // (amd64, arm64) and kernel (x86_64, aarch64) architecture spellings.
 func (r *Release) LabLaneOn(l LabLane, architecture string) error {
+	architecture = kernelArchitecture(architecture)
+	if reason := r.LaneGateOn(l, architecture); reason != "" {
+		return fmt.Errorf("platform: vm %s lane gated for %s on %s: %s", l, r.Name, architecture, reason)
+	}
 	if err := r.LabLane(l); err != nil {
 		return err
-	}
-	switch architecture {
-	case "amd64":
-		architecture = "x86_64"
-	case "arm64":
-		architecture = "aarch64"
 	}
 	allowed, restricted := r.Lab.LaneArchitectures[l]
 	if !restricted {
@@ -99,6 +108,26 @@ func (r *Release) LabLaneOn(l LabLane, architecture string) error {
 		return nil
 	}
 	return fmt.Errorf("platform: no maintained vm %s lane for %s on %s", l, r.Name, architecture)
+}
+
+// LaneGateOn returns the registry's reason the lane cannot qualify the release
+// on the architecture (either spelling), or "" when it is not gated there.
+func (r *Release) LaneGateOn(l LabLane, architecture string) string {
+	gate, ok := r.Lab.LaneGates[l]
+	if !ok || (len(gate.Architectures) != 0 && !slices.Contains(gate.Architectures, kernelArchitecture(architecture))) {
+		return ""
+	}
+	return gate.Reason
+}
+
+func kernelArchitecture(architecture string) string {
+	switch architecture {
+	case "amd64":
+		return "x86_64"
+	case "arm64":
+		return "aarch64"
+	}
+	return architecture
 }
 
 // DNF reports whether the backend is a DNF generation.
