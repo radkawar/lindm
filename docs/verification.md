@@ -5927,6 +5927,15 @@ not change the real browser origin, Referrer-Policy or server CSRF enforcement.
 Raw browser results and generated customer commands contain secrets and must not
 be copied into the public report. `lab acceptance` performs that separation.
 
+Journey selectors follow visible roles and labels rather than incidental punctuation:
+storage identities are read from their definition-list terms with an optional trailing
+colon. Empty support identifiers are omitted, so the no-WWN assertion requires the
+WWN term to be absent rather than expecting placeholder copy.
+The assignment dialog intentionally retains its accepted receipt and
+next-check-in explanation; the journey reviews that status and uses its Close control
+before signing out. Acceptance does not change product copy or treat an accepted
+assignment as proof of native execution.
+
 Both modes publish real signed amd64 APT and RPM agent repositories from the
 checkout under test into the disposable server fixture. This satisfies the console's
 install-command readiness prerequisite without weakening it or fabricating commands;
@@ -5968,9 +5977,23 @@ and paired Red Hat CSAF archives through the production parser/publication path.
 Fedora updateinfo is not mislabeled as CSAF. The digest-addressed cache revalidates
 with the live vendor before reuse and rehashes cached bytes; offline bytes alone
 never establish current coverage. Defaults are a 2 GiB aggregate input budget and
-15-minute refresh budget, in addition to production per-source limits. Malformed
-upstream records remain explicit rejections, never cleaned fixtures. A device
-whose exposure remains unknown fails the known-exposure assertion.
+30-minute aggregate refresh budget, in addition to unchanged production per-source
+limits and timeouts. Malformed upstream records remain explicit rejections, never
+cleaned fixtures. A device whose exposure remains unknown fails the known-exposure
+assertion.
+
+The 2026-10-11 interleaved feed bisect found no Capacity10k refresh regression:
+complete refresh wall times were 1079/1106 s at `3579b8d` (before the advisory
+changes), 928/761 s at `8a073f4`, 815/769 s at `54ad941`, and 854/846 s at the
+measured main snapshot `41bd57a0`, with byte-identical parse output. These were
+interleaved, signed, frozen-cache benchmarks on the shared host, not fresh-feed
+release qualification; the detailed record is
+`~/.cache/lindm-feedbisect-20261011/summary.json`. The earlier 900 s
+aggregate acceptance deadline was below both baseline runs and left little
+headroom on main under shared-host contention. The 30-minute acceptance budget
+allows the complete vendor-sized refresh without skipping feeds, reducing the
+input budget or changing production timeouts. Feed-parse throughput remains a
+separate Capacity10k performance item.
 
 `acceptance.json` and engine/native screenshots are written in a new private
 evidence directory on success and failure. Browser credentials, enrollment

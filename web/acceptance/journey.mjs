@@ -227,7 +227,10 @@ export async function assignProfile(ui, config) {
     "Release acceptance verify native profile application",
   );
   await ui.click({ role: "button", text: "Save assignment" });
-  await ui.wait({ role: "status", contains: "Assignment saved." });
+  await ui.wait({ role: "status", contains: "Assignment saved", dialog: true });
+  // The dialog retains the accepted assignment and its next-check-in explanation.
+  // Finish reviewing that receipt before interacting with the page behind it.
+  await ui.click({ role: "button", text: "Close", dialog: true });
   return {
     deviceId: config.deviceId,
     profileRevisionId: config.profileRevisionId,
@@ -259,7 +262,7 @@ export async function storageSelection(ui, config, kind) {
     const section = document.querySelector('[aria-label="Observed storage target"]');
     return Object.fromEntries(
       [...section.querySelectorAll("dt")].map((node) => [
-        node.textContent.trim(),
+        node.textContent.trim().replace(/:\s*$/, ""),
         node.nextElementSibling?.textContent.trim(),
       ]),
     );
@@ -271,7 +274,8 @@ export async function storageSelection(ui, config, kind) {
     !/^[0-9a-f-]{36}$/i.test(identity["LUKS UUID"] ?? "")
   )
     throw new Error("storage_luks_identity_missing");
-  if (config.requireNoWWN && identity.WWN !== "Not reported")
+  // TechnicalDetails omits empty identifiers; an absent WWN is not placeholder copy.
+  if (config.requireNoWWN && Object.hasOwn(identity, "WWN"))
     throw new Error("unexpected_storage_wwn");
   // Selection only. Never submit an encryption, recovery or destructive action.
   return { kind, selectable: true, label: optionText.trim(), identity, submitted: false };
