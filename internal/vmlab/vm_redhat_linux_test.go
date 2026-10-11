@@ -181,4 +181,8 @@ func TestRHELOwnedBootPackagesRequireRegistration(t *testing.T) {
 	if err := validateVMRedHatToken(platform.ForManifest("ubuntu", "24.04"), "/token"); err == nil {
 		t.Fatal("Red Hat token accepted for a non-RHEL device-action lane")
 	}
+	// Unentitled releases never staged a probe, so release touches no guest.
+	if err := releaseRHELOwnedBoot(context.Background(), nil, nil); err != nil {
+		t.Fatalf("release without registration touched the guest: %v", err)
+	}
 }

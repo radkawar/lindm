@@ -231,15 +231,32 @@ type actionOwnedBootEntitlement struct {
 // registerRHELOwnedBoot registers the disposable vendor guest only for the
 // owned-boot package transaction; the caller unregisters and deletes the
 // activation key before any boot conversion or device action. RPM signatures
-// are verified against the vendor keys configured by the image.
+// are verified against the vendor keys configured by the image. The probe is
+// staged in the native guest directory, which the later package installation
+// requires to be absent; releaseRHELOwnedBoot removes it again.
 func registerRHELOwnedBoot(ctx context.Context, vm *guestVM, entitlement actionOwnedBootEntitlement, evidence *VMRedHatEvidence) (*vmRedHatRegistration, error) {
 	if entitlement.RedHatTokenFile == "" {
 		return nil, errors.New("entitled original recovery requires -redhat-token-file: the vendor image has no repository for systemd-boot/ukify")
+	}
+	if err := lifecycleCommand(ctx, vm, "stage registration probe directory", "test ! -e "+nativeGuestDir+"; install -d -m 0755 "+nativeGuestDir); err != nil {
+		return nil, err
 	}
 	if err := uploadLifecycleProbe(ctx, vm, entitlement.LabBinary); err != nil {
 		return nil, err
 	}
 	return registerVMRedHat(ctx, vm, entitlement.RedHatTokenFile, evidence)
+}
+
+// releaseRHELOwnedBoot unregisters (deleting the activation key) and then
+// removes only the staged probe directory.
+func releaseRHELOwnedBoot(ctx context.Context, vm *guestVM, registration *vmRedHatRegistration) error {
+	if registration == nil {
+		return nil
+	}
+	if err := registration.Close(); err != nil {
+		return err
+	}
+	return lifecycleCommand(ctx, vm, "remove registration probe directory", "rm -f -- "+guestLifecycleProbe+"; rmdir -- "+nativeGuestDir)
 }
 
 // Conversion touches only this disposable guest's ESP, fstab and private NVRAM.
@@ -267,7 +284,7 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if err == nil && installed.ExitCode != 0 {
 		err = fmt.Errorf("install owned boot prerequisites: guest exit %d: %s", installed.ExitCode, installed.Stderr)
 	}
-	if err = errors.Join(err, registration.Close()); err != nil {
+	if err = errors.Join(err, releaseRHELOwnedBoot(ctx, vm, registration)); err != nil {
 		return evidence, err
 	}
 	initial, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id; uname -r", nil, 4096, 10*time.Second)
