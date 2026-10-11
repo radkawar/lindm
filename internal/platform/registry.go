@@ -112,6 +112,13 @@ var (
 		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
+	// resolute's dracut 110 + systemd 259 cryptsetup reports a rejected
+	// recovery key only in the journal (noble's 255 printed it), so the lab
+	// routes its diagnostics to the console like Debian 13 and Fedora/EL.
+	ubuntuResoluteGuest = LabGuest{
+		Initrd: ubuntuGuest.Initrd, CryptsetupConsole: true,
+		Actions: ubuntuGuest.Actions, OwnedBoot: ubuntuGuest.OwnedBoot, MeasuredBoot: ubuntuGuest.MeasuredBoot,
+	}
 	fedoraGraphical = []string{"base-graphical", "desktop-accessibility", "fonts", "guest-desktop-agents", "hardware-support", "input-methods", "networkmanager-submodules"}
 	fedoraSession   = LabSession{
 		Desktops:  map[string][]string{"gnome": slices.Concat(fedoraGraphical, []string{"gnome-desktop"}), "kde": slices.Concat(fedoraGraphical, []string{"kde-desktop"})},
@@ -237,7 +244,7 @@ var registry = []*Release{
 		// TSS2 libraries, but not tpm2-tools, whose tpm2 binary dracut's
 		// tpm2-tss module requires.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
-			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
+			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
 		// Measured natively (recovery-nvme-01): the owned-boot UKI holds the
 		// vendor kernel plus the non-hostonly dracut initrd (72 MB; 24.04's

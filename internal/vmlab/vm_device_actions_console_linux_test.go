@@ -28,9 +28,12 @@ func TestCryptsetupConsoleRebuildsRegistryInitrd(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// ubuntu2604-amd64-local-encryption-03: resolute's systemd 259 left the
+	// retired-key boot silent on the serial console, like trixie's 257.
 	for _, test := range []struct{ release, want string }{
 		{"debian-13", "/boot/initrd.img-6.12.107+deb13-arm64"},
 		{"fedora-44", "/boot/initramfs-6.12.107+deb13-arm64.img"},
+		{"ubuntu-26.04", "/boot/initrd.img-6.12.107+deb13-arm64"},
 	} {
 		release, ok := platform.Lookup(test.release)
 		if !ok || !release.Lab.Guest.CryptsetupConsole {
@@ -51,8 +54,10 @@ func TestCryptsetupConsoleRebuildsRegistryInitrd(t *testing.T) {
 			t.Fatalf("%s dracut arguments = %q", test.release, got)
 		}
 	}
-	if release, _ := platform.Lookup("debian-12"); release.Lab.Guest.CryptsetupConsole {
-		t.Fatal("bookworm prints the rejection itself; it needs no initrd rebuild")
+	for _, key := range []string{"debian-12", "ubuntu-24.04"} {
+		if release, _ := platform.Lookup(key); release.Lab.Guest.CryptsetupConsole {
+			t.Fatalf("%s prints the rejection itself; it needs no initrd rebuild", key)
+		}
 	}
 }
 
