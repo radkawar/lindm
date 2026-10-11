@@ -71,6 +71,9 @@ func (s *Service) ListDeviceStorageTargets(ctx context.Context, req *connect.Req
 					return nil, mapErr(errInternalState)
 				}
 				response.Targets, response.UnavailableReason = observedStorageTargets(details, req.Msg.GetActionKind())
+				if req.Msg.GetActionKind() == "tpm2_bind" && response.UnavailableReason == "" && !tpm2BindSupported(host) {
+					response.Targets, response.UnavailableReason = nil, "device_action_tpm2_binding_unsupported"
+				}
 			}
 			if !response.Fresh {
 				response.UnavailableReason = "device_action_inventory_stale"

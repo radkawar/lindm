@@ -204,3 +204,20 @@ func TestNativelyQualifiedHostResourceReleases(t *testing.T) {
 		t.Error("Rocky Linux 8 host providers admitted")
 	}
 }
+
+// Ubuntu 22.04 ships systemd 249, whose systemd-cryptenroll has no
+// --unlock-key-file; binding there ended OUTCOME_UNKNOWN after authorization.
+func TestTPM2BindFollowsShippedSystemd(t *testing.T) {
+	for key, want := range map[string]bool{"ubuntu-22.04": false, "ubuntu-24.04": true, "debian-12": true, "debian-13": true, "rhel-9": true, "rhel-8": false} {
+		release, ok := Lookup(key)
+		if !ok {
+			t.Fatalf("registry lacks %s", key)
+		}
+		if got := release.TPM2BindSupported(); got != want {
+			t.Errorf("%s (systemd %d) TPM2BindSupported = %t, want %t", key, release.Systemd, got, want)
+		}
+	}
+	if !Identify(OSRelease{ID: "unknown-os", VersionID: "1"}).TPM2BindSupported() {
+		t.Fatal("a release without a recorded systemd must defer to the native probe")
+	}
+}

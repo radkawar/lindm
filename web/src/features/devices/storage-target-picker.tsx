@@ -29,6 +29,8 @@ const unavailableMessages: Record<string, string> = {
   device_action_storage_identity_unavailable:
     "No disk can be used for this action yet. Refresh inventory.",
   device_action_tpm2_unavailable: "No TPM 2.0 reported. Refresh inventory.",
+  device_action_tpm2_binding_unsupported:
+    "This OS release cannot bind the disk to the TPM (systemd 252 or newer is required).",
 };
 
 export function observedStorageSelections(

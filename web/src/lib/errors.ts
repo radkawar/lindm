@@ -170,6 +170,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "The device has not reported the capability required for this action.",
           action: "Review its inventory and action requirements before continuing.",
         };
+      case "device_action_tpm2_binding_unsupported":
+        return {
+          tone: "neutral",
+          title: "TPM binding not supported",
+          message:
+            "This OS release's systemd cannot bind the disk to the TPM (systemd 252 or newer is required).",
+          action: "Keep using the recovery key, or upgrade the OS release before binding.",
+        };
       case "device_action_inventory_unavailable":
         return {
           tone: "neutral",

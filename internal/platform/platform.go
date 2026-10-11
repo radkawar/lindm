@@ -249,6 +249,20 @@ func (r *Release) Known() bool { return r.Key != "" }
 // Supported reports whether the capability is implemented for the release.
 func (r *Release) Supported(c Capability) bool { return slices.Contains(r.Supports, c) }
 
+// TPM2BindSystemdFloor is the oldest systemd whose systemd-cryptenroll reads
+// the owner unlock secret from a descriptor (--unlock-key-file, 252) — the
+// action provider never passes secrets through argv or the environment — and
+// whose libcryptsetup TPM2 token plugin (250) verifies the enrolled token.
+const TPM2BindSystemdFloor = 252
+
+// TPM2BindSupported reports whether the release's shipped systemd can perform
+// the managed TPM2 binding. A release without a recorded systemd version is
+// left to the root provider's native probe.
+func (r *Release) TPM2BindSupported() bool {
+	systemd := r.Native().Systemd
+	return systemd == 0 || systemd >= TPM2BindSystemdFloor
+}
+
 // Gate returns nil when the capability is implemented for the release, and
 // otherwise a *GateError carrying the explicit reason.
 func (r *Release) Gate(c Capability) error {

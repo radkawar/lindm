@@ -228,8 +228,12 @@ from the multiarch directory) plus `tpm_tis`/`tpm_crb`, with the pre-t64
 `lindm-lab` only on first boot, so late commands must not chown to it; the pinned
 login key arrives through autoinstall `ssh.authorized-keys` instead. systemd 249's
 `systemd-cryptenroll` has no `--unlock-key-file` (252+), and the product never
-passes a secret by argv or environment, so TPM2 binding is unsupported on 22.04;
-the native run reports an unknown outcome rather than a bind. The owned-boot recovery fixture needs
+passes a secret by argv or environment, so TPM2 binding is unsupported on 22.04:
+the server refuses it before signing with `device_action_tpm2_binding_unsupported`
+(registry systemd 249 below `platform.TPM2BindSystemdFloor`), the storage-target
+listing reports the same reason, and the root provider's native
+`systemd-cryptenroll --version` probe refuses it as
+`systemd_cryptenroll_tpm2_binding_unsupported`. The owned-boot recovery fixture needs
 `systemd-ukify` (253+), so recovery-sanitize stays gated on 22.04.
 
 Ubuntu 24.04.5 amd64 encrypted UEFI installation, Secure Boot with enrolled keys,

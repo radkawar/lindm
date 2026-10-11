@@ -91,6 +91,7 @@ type VMDeviceActionsResult struct {
 	TPMInventory            *actionEncryptionEvidence      `json:"tpm_inventory"`
 	TPMBoot                 *UnlockOutcome                 `json:"tpm_unattended_boot"`
 	TPMAbsentDenial         *actionDenialEvidence          `json:"tpm_absent_denial,omitempty"`
+	TPMBindingDenial        *actionDenialEvidence          `json:"tpm_binding_unsupported_denial,omitempty"`
 	TPMPolicyBind           *actionDispatchEvidence        `json:"tpm_policy_mismatch_bind,omitempty"`
 	TPMPolicyRejectedBoot   *UnlockOutcome                 `json:"tpm_policy_rejected_boot,omitempty"`
 	TPMPolicyRecoveryBoot   *UnlockOutcome                 `json:"tpm_policy_revealed_key_recovery,omitempty"`
@@ -263,7 +264,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		"Recovery keys remain memory-only and are typed as literal lowercase hexadecimal, never decoded to raw random bytes.",
 		"Approval negatives exercise real escrow reveal and real destructive mTLS start authorization after root preflight; destructive positive starts require two distinct local WebAuthn humans.",
 		"Independent off-target recovery enrollment is an external operator workflow, not production automatic recovery credential handoff.",
-		"TPM-present runs prove unattended cold boot and a deliberately mismatched emulated PCR7 policy with owner recovery; TPM-absent runs require explicit native inventory and server bind denial instead.",
+		"TPM-present runs prove unattended cold boot and a deliberately mismatched emulated PCR7 policy with owner recovery; TPM-absent runs, and releases whose systemd-cryptenroll predates descriptor unlock, require an explicit server bind denial instead.",
 	}}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
@@ -689,6 +690,20 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 			return errors.New("TPM-absent variant failed a different prerequisite")
 		}
 		result.TPMAbsentDenial = &denial
+		return nil
+	}
+	if !machine.release.TPM2BindSupported() {
+		// The shipped systemd-cryptenroll cannot take the owner secret from a
+		// descriptor; the real server must refuse before signing any intent.
+		_, rejected := control.session.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
+		denial, err := actionDenial("tpm_binding_unsupported", rejected, connect.CodeFailedPrecondition)
+		if err != nil {
+			return err
+		}
+		if denial.Reason != "device_action_tpm2_binding_unsupported" {
+			return fmt.Errorf("TPM binding on %s failed a different prerequisite: %s", machine.release.Name, denial.Reason)
+		}
+		result.TPMBindingDenial = &denial
 		return nil
 	}
 	credential := []byte(machine.vm.InitialUnlockSecret())

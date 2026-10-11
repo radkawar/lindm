@@ -378,6 +378,26 @@ func TestSlotNumbersAreCanonicalAndBounded(t *testing.T) {
 	}
 }
 
+// Inputs follow systemd's `--version` first-line format, "systemd N (pkg)".
+func TestTPMBindingRequiresDescriptorUnlockAndTokenPlugin(t *testing.T) {
+	for output, want := range map[string]bool{
+		"systemd 249 (249.11-0ubuntu3.16)\n+PAM +AUDIT +SELINUX": false,
+		"systemd 251 (251.4-1)\n":                                false,
+		"systemd 252 (252.39-1~deb12u1)\n+PAM":                   true,
+		"systemd 255 (255.4-1ubuntu8.12)\n":                      true,
+		"systemd 257 (257.9-1~deb13u1)\n":                        true,
+		"systemd 258.1\n":                                        true,
+		"systemd\n":                                              false,
+		"cryptenroll 999\n":                                      false,
+		"systemd v999\n":                                         false,
+		"":                                                       false,
+	} {
+		if got := cryptenrollBindsTPM2([]byte(output)); got != want {
+			t.Errorf("cryptenrollBindsTPM2(%q) = %t, want %t", output, got, want)
+		}
+	}
+}
+
 func TestLockWaitsForAcknowledgementWithoutRepeatingEffect(t *testing.T) {
 	validator, err := protovalidate.New()
 	if err != nil {

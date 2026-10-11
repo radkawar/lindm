@@ -276,8 +276,12 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 				if _, e := os.Stat("/dev/tpmrm0"); e != nil {
 					return unsupported("tpm2_resource_manager_unavailable")
 				}
-				if _, e := p.run(ctx, nativeRequest{command: cryptenroll, args: []string{"--version"}}); e != nil {
+				version, e := p.run(ctx, nativeRequest{command: cryptenroll, args: []string{"--version"}})
+				if e != nil {
 					return unsupported("systemd_cryptenroll_unavailable")
+				}
+				if !cryptenrollBindsTPM2(version) {
+					return unsupported("systemd_cryptenroll_tpm2_binding_unsupported")
 				}
 			}
 		} else {

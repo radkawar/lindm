@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 type luksToken struct {
@@ -318,6 +319,25 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 		return errors.Join(ErrOutcomeUnknown, err)
 	}
 	return nil
+}
+
+// cryptenrollBindsTPM2 is the native probe behind the server's registry gate:
+// the installed systemd-cryptenroll must be at least platform's
+// TPM2BindSystemdFloor (descriptor unlock and the TPM2 token plugin). Without
+// it binding would fail only after authorization, as an unknown outcome.
+// Unparseable output is not a capability.
+func cryptenrollBindsTPM2(version []byte) bool {
+	line, _, _ := strings.Cut(string(version), "\n")
+	fields := strings.Fields(line)
+	if len(fields) < 2 || fields[0] != "systemd" {
+		return false
+	}
+	major := fields[1]
+	if end := strings.IndexFunc(major, func(r rune) bool { return r < '0' || r > '9' }); end >= 0 {
+		major = major[:end]
+	}
+	release, err := strconv.Atoi(major)
+	return err == nil && release >= platform.TPM2BindSystemdFloor
 }
 
 // ConfirmEscrow trusts only the executor's receipt-authentication gate. The gate

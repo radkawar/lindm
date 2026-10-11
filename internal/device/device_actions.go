@@ -20,6 +20,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/platform"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
@@ -115,6 +116,9 @@ func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	if spec.GetTpm2Bind() != nil && !tpm2Available(details.GetTpm()) {
 		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_tpm2_unavailable")
+	}
+	if spec.GetTpm2Bind() != nil && !tpm2BindSupported(host) {
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_tpm2_binding_unsupported")
 	}
 	if err := requireObservedStorageTargets(details, spec); err != nil {
 		return err
@@ -225,6 +229,17 @@ func tpm2Available(tpm *inventoryv1.TpmDetails) bool {
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	return tpm.GetPresent().GetStatus() == success && tpm.GetPresent().GetValue() &&
 		tpm.GetVersion().GetStatus() == success && tpm.GetVersion().GetValue() == "2"
+}
+
+// tpm2BindSupported refuses releases whose shipped systemd cannot take the
+// owner secret from a descriptor (registry fact). An unobserved OS identity
+// defers to the root provider's native probe; it is not a refusal reason.
+func tpm2BindSupported(host devicedb.GetHostObservationRow) bool {
+	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
+	if host.OsIDStatus != success || host.OsVersionStatus != success {
+		return true
+	}
+	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2BindSupported()
 }
 
 type refreshInventoryAdmission struct {
