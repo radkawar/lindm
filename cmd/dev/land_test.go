@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -34,5 +36,43 @@ func TestDependentsIncludeTransitiveAndTestImporters(t *testing.T) {
 	}
 	if want := []string{"./a", "./b", "./c", "./e"}; !slices.Equal(got, want) {
 		t.Fatalf("dependents = %v, want %v", got, want)
+	}
+}
+
+func TestMigrationsAheadRefusesStaleVersions(t *testing.T) {
+	root := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.email=d@example.invalid", "-c", "user.name=d"}, args...)...)
+		cmd.Dir = root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	write := func(name string) {
+		t.Helper()
+		path := filepath.Join(root, "db", "migrations", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("-- +goose Up\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "--quiet")
+	write("00001_base.sql")
+	write("00003_later.sql")
+	git("add", ".")
+	git("commit", "--quiet", "-m", "main")
+	write("00002_late.sql")
+	write("00003_later.sql") // an edit of a migration main already has
+	write("00004_next.sql")
+	files := []string{"db/migrations/00002_late.sql", "db/migrations/00003_later.sql", "db/migrations/00004_next.sql"}
+	err := migrationsAhead(t.Context(), root, files)
+	if err == nil || !strings.Contains(err.Error(), "rename to db/migrations/00005_late.sql") || strings.Contains(err.Error(), "00004_next") || strings.Contains(err.Error(), "00003_later") {
+		t.Fatalf("stale migration verdict: %v", err)
+	}
+	if err := migrationsAhead(t.Context(), root, files[1:]); err != nil {
+		t.Fatalf("ordered additions refused: %v", err)
 	}
 }
