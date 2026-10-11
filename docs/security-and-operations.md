@@ -596,12 +596,22 @@ fabricated and no unrelated finding is accepted.
 - Remote assistance has one permission for view and control, not separate grants.
 - Advisory exceptions have reason/expiry but no two-human approval workflow.
 - SSH banner configuration is not dispatchable; the managed MOTD is not an SSH banner.
-- Static group rename cannot safely preserve concurrent membership changes through
-  the existing replacement API. Apply reports name drift as unsupported.
-- Deleted static-group IDs with retained creation receipts cannot be recreated by
-  replaying the old declarative creation. Apply detects the absent live object and
-  returns a conflict; use a new stable group ID and migrate its references.
-- Rollout specifications cannot be edited in place; use a new stable rollout ID.
+- **Gate: membership-safe static group rename.** The existing replacement API
+  rewrites membership without compare-and-swap. Automatically repairing name drift
+  could restore revoked RBAC access, so apply reports it as unsupported. Closing
+  this gate requires a rename-only or revision-checked mutation and a concurrent
+  membership-change regression test; do not replay a stale membership snapshot.
+- **Gate: deleted static-group identity reuse.** Retained creation receipts make
+  replay of the original creation distinguishable from creating a new object.
+  Apply returns a conflict when that receipt outlives the live group. Use a new
+  stable group ID and migrate its references. Reusing the deleted ID remains
+  gated on an explicit new-incarnation API and tests that prevent old receipts or
+  authorization references from reviving deleted authority.
+- **Gate: in-place rollout specification changes.** Rollout specifications are
+  immutable; changing one under the same ID would change the meaning of existing
+  deployment history. Use a new stable rollout ID and update its assignments.
+  In-place changes remain gated on a versioned rollout contract that preserves
+  historical specifications and verifies concurrent deployment behavior.
 - Account mutation requires a console session, and its API has no compare-and-swap
   or replay receipt. Server authorization configuration is outside AdminService.
 
