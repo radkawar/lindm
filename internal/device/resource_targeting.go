@@ -105,7 +105,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if resourceAdoptionRequired(resources) && adoptionApprovalID == "" {
 		return rpcError(connect.CodePermissionDenied, "approval_required")
 	}
-	ordered, err := orderedServiceResources(resources)
+	ordered, err := orderedResources(resources)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	}
 	action, err := q.GetOpenServiceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
-		if err := closeUnstartedServiceAction(ctx, q, &action, "assignment_changed", now); err != nil {
+		if err := closeUnstartedResourceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return err
 		}
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {

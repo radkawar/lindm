@@ -44,7 +44,7 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 		{"precondition", serviceprovider.ErrConflict, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := newServiceFixture(t, false)
+			f := newResourceFixture(t, false)
 			native := &admissionRefusingNative{nativeResource: f.native, refusal: tc.cause}
 			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
 				return native, nil
@@ -60,11 +60,11 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 			if prepared.GetNativePlan() != nil || len(prepared.GetChallengeProof()) != 0 || status.GetBefore() != nil || status.GetVerification() != nil || status.GetStartedAt() != nil || status.GetReadOnly() || status.GetPreparationOutcome() != nil || status.GetCompletedAt() == nil {
 				t.Fatal("refusal fabricated native evidence, success, or effect authority")
 			}
-			_, attested := attestService(t, f, status)
+			_, attested := attestResource(t, f, status)
 			if !proto.Equal(attested.GetStatus(), status) {
 				t.Fatal("signed history lost refusal")
 			}
-			record, revision := serviceRow(t, f.svc, intent.GetActionId())
+			record, revision := resourceRow(t, f.svc, intent.GetActionId())
 			if record.GetChallenge() != nil || len(record.GetStartGrantEnvelope()) != 0 {
 				t.Fatal("refusal retained effect authority")
 			}
@@ -87,7 +87,7 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = f.svc.Close() })
-			after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+			after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 			if revision != afterRevision || !proto.Equal(record, after) {
 				t.Fatal("restart changed terminal refusal")
 			}
@@ -101,7 +101,7 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *testing.T) {
 	for _, scenario := range []string{"expired-during-plan", "unclassified-error", "canceled", "baseline-on-reconcile"} {
 		t.Run(scenario, func(t *testing.T) {
-			f := newServiceFixture(t, false)
+			f := newResourceFixture(t, false)
 			native := &admissionRefusingNative{nativeResource: f.native, refusal: serviceprovider.ErrUnsupported}
 			switch scenario {
 			case "expired-during-plan":
@@ -129,7 +129,7 @@ func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *tes
 }
 
 func TestResourceProviderOpenRefusalIsNotNativeObservation(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
 		return nil, serviceprovider.ErrUnsupported
 	}

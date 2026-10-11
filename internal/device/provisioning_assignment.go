@@ -58,7 +58,7 @@ func (s *Service) activateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	if err != nil {
 		return profileError(err)
 	}
-	resources, err := orderedServiceResources(retained.GetSpec().GetResources())
+	resources, err := orderedResources(retained.GetSpec().GetResources())
 	if err != nil {
 		return err
 	}

@@ -29,11 +29,11 @@ func TestServiceComplianceFreshnessBoundary(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			row := devicedb.ResourceAssignmentResource{LastVerifiedAt: timestamptz(now.Add(-test.age)), DriftRemediated: test.remediated}
 			state := &adminv1.ResourceState{Disposition: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS}
-			if got := serviceResourceCompliance(row, state, head, now); got != test.want {
+			if got := resourceCompliance(row, state, head, now); got != test.want {
 				t.Fatalf("compliance=%s want=%s", got, test.want)
 			}
 			state.LatestAction = &adminv1.ServiceActionSummary{StartAuthorizedAt: timestamppb.New(now)}
-			if got := serviceResourceCompliance(row, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION {
+			if got := resourceCompliance(row, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION {
 				t.Fatalf("known drift masked by previous evidence: %s", got)
 			}
 		})
@@ -49,11 +49,11 @@ func TestResourcePreparationDoesNotInventCompliance(t *testing.T) {
 			State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING,
 		}},
 	}
-	if got := serviceResourceCompliance(devicedb.ResourceAssignmentResource{}, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_UNKNOWN {
+	if got := resourceCompliance(devicedb.ResourceAssignmentResource{}, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_UNKNOWN {
 		t.Fatalf("pending preparation invented native verification: %s", got)
 	}
 	row := devicedb.ResourceAssignmentResource{LastVerifiedAt: timestamptz(now.Add(-10 * time.Minute))}
-	if got := serviceResourceCompliance(row, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_STALE {
+	if got := resourceCompliance(row, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_STALE {
 		t.Fatalf("pending preparation refreshed old native evidence: %s", got)
 	}
 }

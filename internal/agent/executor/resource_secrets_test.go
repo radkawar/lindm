@@ -121,14 +121,14 @@ func (n *secretNative) Apply(ctx context.Context, plan *resourcev1.ResourcePlan,
 }
 
 type secretFixture struct {
-	*serviceFixture
+	*resourceFixture
 	native    *secretNative
 	recipient []byte
 }
 
 func newSecretFixture(t *testing.T) *secretFixture {
 	t.Helper()
-	f := &secretFixture{serviceFixture: newServiceFixture(t, false, true)}
+	f := &secretFixture{resourceFixture: newResourceFixture(t, false, true)}
 	plan, start := delegate(t, f.planKey), delegate(t, f.startKey)
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
 	plan.Capabilities = append(plan.Capabilities, "local.user.v1")
@@ -215,7 +215,7 @@ func TestResourceSecretDeliveryAcceptedJournaledAndCleared(t *testing.T) {
 	if prepared.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || len(f.native.uses) != 1 || !bytes.Equal(f.native.uses[0], deliveredHash) {
 		t.Fatal("exact delivery did not reach the provider's planning use")
 	}
-	record, _ := serviceRow(t, f.svc, intent.GetActionId())
+	record, _ := resourceRow(t, f.svc, intent.GetActionId())
 	if len(record.GetSealedSecrets()) != 1 || !bytes.Equal(record.GetSealedSecrets()[0], sealed[0]) {
 		t.Fatal("pending record did not retain the exact sealed bytes")
 	}
@@ -236,12 +236,12 @@ func TestResourceSecretDeliveryAcceptedJournaledAndCleared(t *testing.T) {
 		t.Fatalf("replay with different ciphertext accepted: %v", err)
 	}
 
-	startService(t, f.svc, intent.GetActionId(), f.grant(t, intent))
-	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
+	startResource(t, f.svc, intent.GetActionId(), f.grant(t, intent))
+	terminal := awaitResourceTerminal(t, f.svc, intent.GetActionId())
 	if terminal.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || f.native.effects != 1 || len(f.native.uses) != 2 || !bytes.Equal(f.native.uses[1], deliveredHash) {
 		t.Fatalf("apply did not reopen the journaled delivery: %v %v", terminal.GetState(), f.native.openError)
 	}
-	record, _ = serviceRow(t, f.svc, intent.GetActionId())
+	record, _ = resourceRow(t, f.svc, intent.GetActionId())
 	if len(record.GetSealedSecrets()) != 0 {
 		t.Fatal("terminal record retained sealed secrets")
 	}

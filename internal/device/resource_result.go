@@ -125,7 +125,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, rpcError(connect.CodePermissionDenied, "service_result_rejected")
 	}
-	previous, err := serviceActionRevision(action)
+	previous, err := resourceActionRevision(action)
 	if err != nil {
 		return nil, mapErr(err)
 	}

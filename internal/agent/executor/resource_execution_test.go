@@ -161,7 +161,7 @@ func setBoundaryFingerprint(observation *resourcev1.SystemdServiceObservation) {
 	observation.FingerprintSha256, _ = digestMessage(copy)
 }
 
-type serviceFixture struct {
+type resourceFixture struct {
 	svc               *Service
 	fix               fixture
 	native            *boundaryNative
@@ -174,9 +174,9 @@ type serviceFixture struct {
 	openNative func(*Service, secretAccessor) (nativeResource, error)
 }
 
-func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *serviceFixture {
+func newResourceFixture(t *testing.T, active bool, withoutDelegation ...bool) *resourceFixture {
 	t.Helper()
-	f := &serviceFixture{now: time.Date(2031, 9, 1, 0, 0, 0, 0, time.UTC), boot: uuid.NewString(), planKey: testKey(t), startKey: testKey(t)}
+	f := &resourceFixture{now: time.Date(2031, 9, 1, 0, 0, 0, 0, time.UTC), boot: uuid.NewString(), planKey: testKey(t), startKey: testKey(t)}
 	f.wall.Store(f.now.UnixNano())
 	f.bootClock.Store(uint64(time.Hour))
 	f.fix = newFixture(t, f.now)
@@ -203,7 +203,7 @@ func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *se
 	return f
 }
 
-func (f *serviceFixture) options() []Option {
+func (f *resourceFixture) options() []Option {
 	return []Option{WithClock(func() time.Time { return time.Unix(0, f.wall.Load()).UTC() }), WithBootID(func() (string, error) { return f.boot, nil }), func(s *Service) {
 		s.boottime = func() (uint64, error) { return f.bootClock.Load(), nil }
 		s.openResource = func(_ context.Context, _ *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
@@ -217,14 +217,14 @@ func (f *serviceFixture) options() []Option {
 		}
 	}}
 }
-func (f *serviceFixture) installDelegation(t *testing.T, version, floor uint64) {
+func (f *resourceFixture) installDelegation(t *testing.T, version, floor uint64) {
 	t.Helper()
 	start := delegate(t, f.startKey)
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
 	doc := delegationDocument(f.fix.deploy.String(), 1, version, floor, f.now, delegate(t, f.planKey), start)
 	callTrust(t, f.svc, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: mustSign(t, f.svc.authority, doc, f.fix.rootKey)})
 }
-func (f *serviceFixture) intent(t *testing.T, sequence uint64) *agentv1.ResourceExecutionIntent {
+func (f *resourceFixture) intent(t *testing.T, sequence uint64) *agentv1.ResourceExecutionIntent {
 	t.Helper()
 	state := durable(t, f.svc)
 	return &agentv1.ResourceExecutionIntent{
@@ -234,7 +234,7 @@ func (f *serviceFixture) intent(t *testing.T, sequence uint64) *agentv1.Resource
 		Desired:   &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "example.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "example.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}},
 	}
 }
-func (f *serviceFixture) prepare(t *testing.T, intent *agentv1.ResourceExecutionIntent) (*agentv1.PrepareResourceExecutionResponse, []byte) {
+func (f *resourceFixture) prepare(t *testing.T, intent *agentv1.ResourceExecutionIntent) (*agentv1.PrepareResourceExecutionResponse, []byte) {
 	t.Helper()
 	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
 	response, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
@@ -243,7 +243,7 @@ func (f *serviceFixture) prepare(t *testing.T, intent *agentv1.ResourceExecution
 	}
 	return response.Msg, envelope
 }
-func serviceRow(t *testing.T, svc *Service, action string) (*agentv1.ResourceExecutionRecord, int64) {
+func resourceRow(t *testing.T, svc *Service, action string) (*agentv1.ResourceExecutionRecord, int64) {
 	t.Helper()
 	svc.mu.Lock()
 	defer svc.mu.Unlock()
@@ -253,12 +253,12 @@ func serviceRow(t *testing.T, svc *Service, action string) (*agentv1.ResourceExe
 	}
 	return record, revision
 }
-func (f *serviceFixture) grant(t *testing.T, intent *agentv1.ResourceExecutionIntent) []byte {
+func (f *resourceFixture) grant(t *testing.T, intent *agentv1.ResourceExecutionIntent) []byte {
 	t.Helper()
-	record, _ := serviceRow(t, f.svc, intent.GetActionId())
+	record, _ := resourceRow(t, f.svc, intent.GetActionId())
 	return mustSign(t, f.svc.authority, &agentv1.ResourceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}, f.startKey)
 }
-func startService(t *testing.T, svc *Service, action string, grant []byte) *agentv1.StartResourceExecutionResponse {
+func startResource(t *testing.T, svc *Service, action string, grant []byte) *agentv1.StartResourceExecutionResponse {
 	t.Helper()
 	response, err := svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: action, StartGrantEnvelope: grant}))
 	if err != nil {
@@ -274,7 +274,7 @@ func waitBoundary(t *testing.T, event <-chan struct{}) {
 		t.Fatal("worker boundary was not reached")
 	}
 }
-func awaitServiceTerminal(t *testing.T, svc *Service, action string) *agentv1.ResourceExecutionStatus {
+func awaitResourceTerminal(t *testing.T, svc *Service, action string) *agentv1.ResourceExecutionStatus {
 	t.Helper()
 	deadline := time.NewTimer(5 * time.Second)
 	defer deadline.Stop()
@@ -299,7 +299,7 @@ func awaitServiceTerminal(t *testing.T, svc *Service, action string) *agentv1.Re
 func TestServiceSignedPrepareReplayConflictAndNoDrift(t *testing.T) {
 	for _, active := range []bool{false, true} {
 		t.Run(map[bool]string{false: "drift", true: "no-drift"}[active], func(t *testing.T) {
-			f := newServiceFixture(t, active)
+			f := newResourceFixture(t, active)
 			intent := f.intent(t, 1)
 			prepared, envelope := f.prepare(t, intent)
 			if active {
@@ -307,19 +307,19 @@ func TestServiceSignedPrepareReplayConflictAndNoDrift(t *testing.T) {
 					t.Fatal("no-drift work lacked durable read-only completion")
 				}
 			} else {
-				record, _ := serviceRow(t, f.svc, intent.GetActionId())
+				record, _ := resourceRow(t, f.svc, intent.GetActionId())
 				challenge := new(agentv1.ResourceExecutionChallenge)
 				if err := f.svc.authority.Verify(t.Context(), prepared.GetChallengeProof(), challenge, 1, publicOf(durable(t, f.svc).GetIdentityPrivateKey())); err != nil || !proto.Equal(challenge, record.GetChallenge()) {
 					t.Fatalf("protected challenge proof mismatch: %v", err)
 				}
 			}
-			_, revision := serviceRow(t, f.svc, intent.GetActionId())
+			_, revision := resourceRow(t, f.svc, intent.GetActionId())
 			f.wall.Store(f.now.Add(6 * time.Minute).UnixNano())
 			retry, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 			if err != nil || !proto.Equal(prepared, retry.Msg) {
 				t.Fatalf("expired prepare retry changed historical evidence: %v", err)
 			}
-			_, after := serviceRow(t, f.svc, intent.GetActionId())
+			_, after := resourceRow(t, f.svc, intent.GetActionId())
 			if after != revision || f.native.plans.Load() != 1 || f.native.effects.Load() != 0 {
 				t.Fatal("prepare retry replanned, committed or executed")
 			}
@@ -333,7 +333,7 @@ func TestServiceSignedPrepareReplayConflictAndNoDrift(t *testing.T) {
 }
 
 func TestResourceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	f.native.beforeGate, f.native.releaseGate = make(chan struct{}), make(chan struct{})
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
@@ -358,16 +358,16 @@ func TestResourceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
 	cancel()
 	waitBoundary(t, f.native.beforeGate)
 	close(f.native.releaseGate)
-	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
+	terminal := awaitResourceTerminal(t, f.svc, intent.GetActionId())
 	if terminal.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || f.native.effects.Load() != 1 {
 		t.Fatal("RPC cancellation killed owned work or missing durable completion")
 	}
-	_, revision := serviceRow(t, f.svc, intent.GetActionId())
+	_, revision := resourceRow(t, f.svc, intent.GetActionId())
 	f.wall.Store(f.now.Add(6 * time.Minute).UnixNano())
-	if retry := startService(t, f.svc, intent.GetActionId(), grant); !proto.Equal(retry.GetStatus(), terminal) {
+	if retry := startResource(t, f.svc, intent.GetActionId(), grant); !proto.Equal(retry.GetStatus(), terminal) {
 		t.Fatal("expired grant retry changed result")
 	}
-	_, after := serviceRow(t, f.svc, intent.GetActionId())
+	_, after := resourceRow(t, f.svc, intent.GetActionId())
 	if after != revision || f.native.effects.Load() != 1 || f.native.applies.Load() != 1 {
 		t.Fatal("accepted grant replayed effect")
 	}
@@ -381,11 +381,11 @@ func TestResourceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
 func TestServiceEffectGateRevalidatesExpiryTrustAndFloor(t *testing.T) {
 	for _, cause := range []string{"boottime", "wall", "rotation", "superseded", "boot", "session"} {
 		t.Run(cause, func(t *testing.T) {
-			f := newServiceFixture(t, false)
+			f := newResourceFixture(t, false)
 			f.native.beforeGate, f.native.releaseGate = make(chan struct{}), make(chan struct{})
 			intent := f.intent(t, 1)
 			f.prepare(t, intent)
-			startService(t, f.svc, intent.GetActionId(), f.grant(t, intent))
+			startResource(t, f.svc, intent.GetActionId(), f.grant(t, intent))
 			waitBoundary(t, f.native.beforeGate)
 			switch cause {
 			case "boottime":
@@ -415,7 +415,7 @@ func TestServiceEffectGateRevalidatesExpiryTrustAndFloor(t *testing.T) {
 			}
 			close(f.native.releaseGate)
 			waitBoundary(t, f.native.finished)
-			terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
+			terminal := awaitResourceTerminal(t, f.svc, intent.GetActionId())
 			if terminal.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || terminal.GetStartedAt() != nil || f.native.effects.Load() != 0 {
 				t.Fatal("stale queued authority reached effect")
 			}
@@ -426,7 +426,7 @@ func TestServiceEffectGateRevalidatesExpiryTrustAndFloor(t *testing.T) {
 func TestServiceRejectsWrongAuthorityBeforeNativePreflight(t *testing.T) {
 	for _, cause := range []string{"wrong-role", "wrong-device", "wrong-generation", "unsigned", "no-delegation", "revoked-delegation", "expired-identity", "no-session"} {
 		t.Run(cause, func(t *testing.T) {
-			f := newServiceFixture(t, false, cause == "no-delegation")
+			f := newResourceFixture(t, false, cause == "no-delegation")
 			intent := f.intent(t, 1)
 			key := f.planKey
 			switch cause {
@@ -467,12 +467,12 @@ func TestServiceRejectsWrongAuthorityBeforeNativePreflight(t *testing.T) {
 }
 
 func TestServiceCloseJoinsWorkerAndBlocksAdmission(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	f.native.afterGate, f.native.releaseEffect = make(chan struct{}), make(chan struct{})
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
 	grant := f.grant(t, intent)
-	startService(t, f.svc, intent.GetActionId(), grant)
+	startResource(t, f.svc, intent.GetActionId(), grant)
 	waitBoundary(t, f.native.afterGate)
 	done := make(chan error, 1)
 	go func() { done <- f.svc.Close() }()
@@ -495,7 +495,7 @@ func TestServiceCloseJoinsWorkerAndBlocksAdmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = next.Close() })
-	result := startService(t, next, intent.GetActionId(), grant).GetStatus()
+	result := startResource(t, next, intent.GetActionId(), grant).GetStatus()
 	if result.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN || result.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_INTERRUPTED {
 		t.Fatal("Close did not persist uncertainty after RUNNING")
 	}
@@ -504,7 +504,7 @@ func TestServiceCloseJoinsWorkerAndBlocksAdmission(t *testing.T) {
 // Stop only the consumer before assembling an on-disk crash point with the real
 // RPC/CAS transitions. The replacement lifetime permits preflight, but no worker
 // can consume the staged row or clean it up on Close. New must recover it.
-func pauseServiceConsumer(t *testing.T, svc *Service) {
+func pauseResourceConsumer(t *testing.T, svc *Service) {
 	t.Helper()
 	svc.workerCancel()
 	svc.worker.Wait()
@@ -516,15 +516,15 @@ func pauseServiceConsumer(t *testing.T, svc *Service) {
 func TestServiceRestartInvalidatesUnconsumedAndNeverReplaysRunning(t *testing.T) {
 	for _, state := range []string{"prepared", "queued", "running-converged", "running-diverged", "running-other-boot"} {
 		t.Run(state, func(t *testing.T) {
-			f := newServiceFixture(t, false)
-			pauseServiceConsumer(t, f.svc)
+			f := newResourceFixture(t, false)
+			pauseResourceConsumer(t, f.svc)
 			intent := f.intent(t, 1)
 			f.prepare(t, intent)
 			if state != "prepared" {
-				startService(t, f.svc, intent.GetActionId(), f.grant(t, intent))
+				startResource(t, f.svc, intent.GetActionId(), f.grant(t, intent))
 			}
 			if state != "prepared" && state != "queued" {
-				record, _ := serviceRow(t, f.svc, intent.GetActionId())
+				record, _ := resourceRow(t, f.svc, intent.GetActionId())
 				if err := f.svc.consumeResourceStart(t.Context(), record); err != nil {
 					t.Fatal(err)
 				}
@@ -550,7 +550,7 @@ func TestServiceRestartInvalidatesUnconsumedAndNeverReplaysRunning(t *testing.T)
 			if next.incarnation == oldIncarnation {
 				t.Fatal("same-boot restart retained incarnation")
 			}
-			result := awaitServiceTerminal(t, next, intent.GetActionId())
+			result := awaitResourceTerminal(t, next, intent.GetActionId())
 			want := agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN
 			if state == "prepared" || state == "queued" {
 				want = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
@@ -566,10 +566,10 @@ func TestServiceRestartInvalidatesUnconsumedAndNeverReplaysRunning(t *testing.T)
 }
 
 func TestServiceHistoricalEvidenceChecksCryptographyAndRetainedCertificate(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
-	record, _ := serviceRow(t, f.svc, intent.GetActionId())
+	record, _ := resourceRow(t, f.svc, intent.GetActionId())
 	f.svc.mu.Lock()
 	loaded, err := f.svc.load(t.Context())
 	f.svc.mu.Unlock()
@@ -604,10 +604,10 @@ func TestServiceHistoricalEvidenceChecksCryptographyAndRetainedCertificate(t *te
 }
 
 func TestServiceDamagedStoredSignatureEntersRecoveryHold(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
-	record, _ := serviceRow(t, f.svc, intent.GetActionId())
+	record, _ := resourceRow(t, f.svc, intent.GetActionId())
 	// Model protected-storage damage that passes structural journal checks.
 	// Cryptographic verification belongs to the executor, not SQLite.
 	record.Intent.ActionId = uuid.NewString()
@@ -649,10 +649,10 @@ func TestServiceDamagedStoredSignatureEntersRecoveryHold(t *testing.T) {
 }
 
 func TestResourceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
-	record, revision := serviceRow(t, f.svc, intent.GetActionId())
+	record, revision := resourceRow(t, f.svc, intent.GetActionId())
 	valid := &agentv1.ResourceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}
 	for _, cause := range []string{"plan-role", "actor", "authorization-version", "nonce", "action", "root", "delegation"} {
 		grant := proto.CloneOf(valid)
@@ -677,7 +677,7 @@ func TestResourceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
 		if _, err := f.svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: envelope})); connect.CodeOf(err) != connect.CodePermissionDenied {
 			t.Fatalf("%s grant was accepted: %v", cause, err)
 		}
-		current, after := serviceRow(t, f.svc, intent.GetActionId())
+		current, after := resourceRow(t, f.svc, intent.GetActionId())
 		if after != revision || !proto.Equal(current, record) || f.native.applies.Load() != 0 {
 			t.Fatalf("%s rejection changed authority", cause)
 		}
@@ -685,7 +685,7 @@ func TestResourceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
 }
 
 func TestServiceCloseCancelsPreflightBeforeReleasingStorage(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	f.native.planEntered, f.native.releasePlan = make(chan struct{}), make(chan struct{})
 	intent := f.intent(t, 1)
 	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
@@ -719,12 +719,12 @@ func TestServiceCloseCancelsPreflightBeforeReleasingStorage(t *testing.T) {
 }
 
 func TestServiceHistoricalCompletionSurvivesRotationAndRestart(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	_, envelope := f.prepare(t, intent)
 	grant := f.grant(t, intent)
-	startService(t, f.svc, intent.GetActionId(), grant)
-	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
+	startResource(t, f.svc, intent.GetActionId(), grant)
+	terminal := awaitResourceTerminal(t, f.svc, intent.GetActionId())
 	f.installDelegation(t, 2, 3)
 	if err := f.svc.Close(); err != nil {
 		t.Fatal(err)
@@ -735,7 +735,7 @@ func TestServiceHistoricalCompletionSurvivesRotationAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = next.Close() })
-	if got := startService(t, next, intent.GetActionId(), grant); !proto.Equal(got.GetStatus(), terminal) {
+	if got := startResource(t, next, intent.GetActionId(), grant); !proto.Equal(got.GetStatus(), terminal) {
 		t.Fatal("revocation/restart invalidated historical grant evidence")
 	}
 	prepared, err := next.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
@@ -745,7 +745,7 @@ func TestServiceHistoricalCompletionSurvivesRotationAndRestart(t *testing.T) {
 }
 
 func TestServiceExpiryRetainsActualRollbackWallTime(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
 	rolledBack := f.now.Add(-time.Second)
@@ -765,14 +765,14 @@ func TestServiceExpiryRetainsActualRollbackWallTime(t *testing.T) {
 }
 
 func TestServiceEffectGateChecksDeadlineAgainAfterDurableCommit(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	f.native.beforeGate, f.native.releaseGate = make(chan struct{}), make(chan struct{})
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
 	grant := f.grant(t, intent)
-	startService(t, f.svc, intent.GetActionId(), grant)
+	startResource(t, f.svc, intent.GetActionId(), grant)
 	waitBoundary(t, f.native.beforeGate)
-	record, _ := serviceRow(t, f.svc, intent.GetActionId())
+	record, _ := resourceRow(t, f.svc, intent.GetActionId())
 	var reads atomic.Int32
 	f.svc.mu.Lock()
 	f.svc.boottime = func() (uint64, error) {
@@ -784,11 +784,11 @@ func TestServiceEffectGateChecksDeadlineAgainAfterDurableCommit(t *testing.T) {
 	f.svc.mu.Unlock()
 	close(f.native.releaseGate)
 	waitBoundary(t, f.native.finished)
-	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
+	terminal := awaitResourceTerminal(t, f.svc, intent.GetActionId())
 	if terminal.GetStartedAt() == nil || terminal.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN || f.native.effects.Load() != 0 {
 		t.Fatal("durable commit extended the native start deadline")
 	}
-	if retry := startService(t, f.svc, intent.GetActionId(), grant); !proto.Equal(retry.GetStatus(), terminal) || f.native.applies.Load() != 1 {
+	if retry := startResource(t, f.svc, intent.GetActionId(), grant); !proto.Equal(retry.GetStatus(), terminal) || f.native.applies.Load() != 1 {
 		t.Fatal("consumed postcommit rejection was reexecuted")
 	}
 }
@@ -806,7 +806,7 @@ func (n *boundaryNative) envelope(observation *resourcev1.SystemdServiceObservat
 }
 
 func TestResourceIntentCannotBorrowSystemdCapability(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	intent.Desired = &resourcev1.ResourceDesiredState{
 		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "operators"},
@@ -824,10 +824,10 @@ func TestResourceIntentCannotBorrowSystemdCapability(t *testing.T) {
 func TestResourceGrantBindsKindAndOperation(t *testing.T) {
 	for _, change := range []string{"kind", "operation"} {
 		t.Run(change, func(t *testing.T) {
-			f := newServiceFixture(t, false)
+			f := newResourceFixture(t, false)
 			intent := f.intent(t, 1)
 			f.prepare(t, intent)
-			record, _ := serviceRow(t, f.svc, intent.GetActionId())
+			record, _ := resourceRow(t, f.svc, intent.GetActionId())
 			challenge := proto.CloneOf(record.GetChallenge())
 			if change == "kind" {
 				challenge.Ref = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "operators"}

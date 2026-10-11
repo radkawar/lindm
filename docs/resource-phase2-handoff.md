@@ -38,7 +38,7 @@ qualification are visible unsupported states; they cannot fall through to system
 - `internal/device/resource_targeting.go`: generic resolution projection and
   atomic activation of exact preview bytes. Effective snapshot resource UUIDs
   are deterministically derived from canonical resource-ref digests.
-- `internal/device/service_dispatch.go`, `service_start.go`, `service_result.go`:
+- `internal/device/resource_dispatch.go`, `resource_start.go`, `resource_result.go`:
   retained service-wire dispatch over generic rows. Preserve the one-open-effect
   rule, exact grant replay and fresh native compliance when replacing this wire.
 
@@ -127,7 +127,7 @@ Late preparation cannot bypass that tombstone. Queued or running effects cannot 
 canceled through this preparation-only API, and `RUNNING` recovery is read-only.
 
 The wire contract is in `api/lindm/agent/v1/service_execution.proto`; executor
-admission/polling is in `internal/agent/executor/service_preparation.go`; durable
+admission/polling is in `internal/agent/executor/resource_preparation.go`; durable
 fences and reservations are in `internal/agent/journal/resource_actions_linux.go`
 and `resource_preparation_linux.go`. Their deterministic regression tests cover
 restart, cancellation, expiry, evidence shape and digest corruption. These tests

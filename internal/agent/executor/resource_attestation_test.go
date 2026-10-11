@@ -15,7 +15,7 @@ import (
 	"lindm/internal/trust"
 )
 
-func attestService(t *testing.T, f *serviceFixture, status *agentv1.ResourceExecutionStatus) (*agentv1.AttestResourceExecutionResponse, *agentv1.ResourceExecutionAttestation) {
+func attestResource(t *testing.T, f *resourceFixture, status *agentv1.ResourceExecutionStatus) (*agentv1.AttestResourceExecutionResponse, *agentv1.ResourceExecutionAttestation) {
 	t.Helper()
 	nonce := [32]byte{1, 2, 3}
 	response, err := f.svc.AttestResourceExecution(t.Context(), connect.NewRequest(&agentv1.AttestResourceExecutionRequest{ActionId: status.GetActionId(), Nonce: nonce[:]}))
@@ -37,10 +37,10 @@ func attestService(t *testing.T, f *serviceFixture, status *agentv1.ResourceExec
 }
 
 func TestResourceAttestationPreservesHistoryAfterRevocationAndClockRollback(t *testing.T) {
-	f := newServiceFixture(t, true)
+	f := newResourceFixture(t, true)
 	intent := f.intent(t, 1)
 	prepared, _ := f.prepare(t, intent)
-	before, revision := serviceRow(t, f.svc, intent.GetActionId())
+	before, revision := resourceRow(t, f.svc, intent.GetActionId())
 	plans, verifies := f.native.plans.Load(), f.native.verifies.Load()
 	// Revoke execution authority and introduce real fixture drift. Attestation
 	// must describe retained evidence, not invoke a provider or authorize work.
@@ -51,29 +51,29 @@ func TestResourceAttestationPreservesHistoryAfterRevocationAndClockRollback(t *t
 	setBoundaryFingerprint(f.native.observation)
 	f.native.mu.Unlock()
 	f.wall.Store(f.now.Add(-10 * time.Second).UnixNano())
-	_, attestation := attestService(t, f, prepared.GetStatus())
+	_, attestation := attestResource(t, f, prepared.GetStatus())
 	if !proto.Equal(attestation.GetStatus(), prepared.GetStatus()) || attestation.GetActionRevision() != uint64(revision) {
 		t.Fatal("attestation replaced historical evidence or revision")
 	}
 	if !attestation.GetIssuedAt().AsTime().Before(attestation.GetStatus().GetCompletedAt().AsTime()) {
 		t.Fatal("attestation rewrote observed timestamps after clock rollback")
 	}
-	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+	after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 	if !proto.Equal(before, after) || afterRevision != revision || f.native.plans.Load() != plans || f.native.verifies.Load() != verifies || f.native.effects.Load() != 0 {
 		t.Fatal("attestation mutated history or touched the native provider")
 	}
 }
 
 func TestResourceAttestationDoesNotConsumeOrExpirePreparedWork(t *testing.T) {
-	f := newServiceFixture(t, false)
-	pauseServiceConsumer(t, f.svc)
+	f := newResourceFixture(t, false)
+	pauseResourceConsumer(t, f.svc)
 	intent := f.intent(t, 1)
 	prepared, _ := f.prepare(t, intent)
-	before, revision := serviceRow(t, f.svc, intent.GetActionId())
+	before, revision := resourceRow(t, f.svc, intent.GetActionId())
 	f.wall.Store(f.now.Add(time.Minute).UnixNano())
 	f.bootClock.Add(uint64(time.Minute))
-	_, attestation := attestService(t, f, prepared.GetStatus())
-	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+	_, attestation := attestResource(t, f, prepared.GetStatus())
+	after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 	if attestation.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || !proto.Equal(before, after) || afterRevision != revision || f.native.applies.Load() != 0 {
 		t.Fatal("history attestation acted as a work transition or effect authorization")
 	}
@@ -82,8 +82,8 @@ func TestResourceAttestationDoesNotConsumeOrExpirePreparedWork(t *testing.T) {
 func TestResourceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
 	for _, fence := range []string{"expired-certificate", "pending-renewal", "pending-session", "other-boot"} {
 		t.Run(fence, func(t *testing.T) {
-			f := newServiceFixture(t, true)
-			pauseServiceConsumer(t, f.svc)
+			f := newResourceFixture(t, true)
+			pauseResourceConsumer(t, f.svc)
 			intent := f.intent(t, 1)
 			prepared, _ := f.prepare(t, intent)
 			switch fence {
@@ -113,22 +113,22 @@ func TestResourceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
 }
 
 func TestResourceAttestationClipsLifetimeToActiveCertificate(t *testing.T) {
-	f := newServiceFixture(t, true)
+	f := newResourceFixture(t, true)
 	prepared, _ := f.prepare(t, f.intent(t, 1))
 	f.wall.Store(f.now.Add(24*time.Hour - 5*time.Second).UnixNano())
-	_, attestation := attestService(t, f, prepared.GetStatus())
+	_, attestation := attestResource(t, f, prepared.GetStatus())
 	if !attestation.GetExpiresAt().AsTime().Equal(f.now.Add(24*time.Hour)) || attestation.GetExpiresAt().AsTime().Sub(attestation.GetIssuedAt().AsTime()) != 5*time.Second {
 		t.Fatal("attestation extended authority past the active certificate")
 	}
 }
 
 func TestResourceAttestationUsesRenewedKeyForOriginalExecutionHistory(t *testing.T) {
-	f := newServiceFixture(t, false)
+	f := newResourceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
-	startService(t, f.svc, intent.GetActionId(), f.grant(t, intent))
-	status := awaitServiceTerminal(t, f.svc, intent.GetActionId())
-	original, _ := serviceRow(t, f.svc, intent.GetActionId())
+	startResource(t, f.svc, intent.GetActionId(), f.grant(t, intent))
+	status := awaitResourceTerminal(t, f.svc, intent.GetActionId())
+	original, _ := resourceRow(t, f.svc, intent.GetActionId())
 	state := durable(t, f.svc)
 	renewAt := state.GetRenewAfter().AsTime()
 	f.wall.Store(renewAt.UnixNano())
@@ -143,7 +143,7 @@ func TestResourceAttestationUsesRenewedKeyForOriginalExecutionHistory(t *testing
 	// The original leaf and execution delegation are now expired. Historical
 	// challenge verification must use acceptance time; new proofs use the new key.
 	f.wall.Store(f.now.Add(25 * time.Hour).UnixNano())
-	response, attestation := attestService(t, f, status)
+	response, attestation := attestResource(t, f, status)
 	if !bytes.Equal(response.GetCertificatePem(), nextCertificate) || bytes.Equal(response.GetCertificatePem(), original.GetChallengeCertificatePem()) || !proto.Equal(attestation.GetStatus(), status) {
 		t.Fatal("renewal replaced history or retained the old attestation certificate")
 	}

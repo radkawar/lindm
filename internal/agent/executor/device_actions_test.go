@@ -165,13 +165,13 @@ func (n *actionBoundary) SetLocalAdminPassword(ctx context.Context, plan *agentv
 }
 
 type deviceActionFixture struct {
-	*serviceFixture
+	*resourceFixture
 	actionNative *actionBoundary
 }
 
 func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 	t.Helper()
-	f := &deviceActionFixture{serviceFixture: newServiceFixture(t, false, true), actionNative: &actionBoundary{localAdminCanary: []byte("LAPSCANARYPLAINTEXT2345672")}}
+	f := &deviceActionFixture{resourceFixture: newResourceFixture(t, false, true), actionNative: &actionBoundary{localAdminCanary: []byte("LAPSCANARYPLAINTEXT2345672")}}
 	f.svc.actionProvider = f.actionNative
 	f.actionNative.custody = f.svc.store
 	f.actionDelegation(t, 1)

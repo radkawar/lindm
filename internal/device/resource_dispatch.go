@@ -34,14 +34,14 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_service_work_request")
 	}
-	idle, err := s.serviceWorkIdle(ctx, principal, req.Msg.GetSessionEpoch())
+	idle, err := s.resourceWorkIdle(ctx, principal, req.Msg.GetSessionEpoch())
 	if err != nil {
 		return nil, executionError(err)
 	}
 	if idle {
 		return noStore(&devicev1.GetResourceWorkResponse{}), nil
 	}
-	work, choice, err := s.getServiceWork(ctx, principal, req.Msg.GetSessionEpoch(), nil, nil, nil)
+	work, choice, err := s.getResourceWork(ctx, principal, req.Msg.GetSessionEpoch(), nil, nil, nil)
 	if err != nil {
 		return nil, executionError(err)
 	}
@@ -53,7 +53,7 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 		if authorizationErr != nil && !assignmentAuthorizationDenied(authorizationErr) {
 			return nil, executionError(authorizationErr)
 		}
-		work, _, err = s.getServiceWork(ctx, principal, req.Msg.GetSessionEpoch(), choice, approval, authorizationErr)
+		work, _, err = s.getResourceWork(ctx, principal, req.Msg.GetSessionEpoch(), choice, approval, authorizationErr)
 		if err != nil {
 			return nil, executionError(err)
 		}
@@ -65,7 +65,7 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 // observed by the next poll; nothing is leased, signed or acknowledged here.
 // Any head/open action falls back to the complete locked path below, which
 // rechecks device authority and the assigning actor before minting work.
-func (s *Service) serviceWorkIdle(ctx context.Context, principal devicePrincipal, epoch uint64) (bool, error) {
+func (s *Service) resourceWorkIdle(ctx context.Context, principal devicePrincipal, epoch uint64) (bool, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return false, err
@@ -111,7 +111,7 @@ func (s *Service) serviceWorkIdle(ctx context.Context, principal devicePrincipal
 // The first transaction either replays work or captures the exact mint choice.
 // Only after it ends is the directory consulted. The second transaction fences
 // that approval before authority/device/head/action locks and rechecks the choice.
-func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal, epoch uint64, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
+func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal, epoch uint64, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, nil, err
@@ -207,7 +207,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 			}
 		}
 		if reason != "" {
-			if err := closeUnstartedServiceAction(ctx, q, &action, reason, now); err != nil {
+			if err := closeUnstartedResourceAction(ctx, q, &action, reason, now); err != nil {
 				return nil, nil, err
 			}
 			if action.ClosedAt.Valid {
@@ -221,7 +221,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 		if action.GenerationID != principal.GenerationID {
 			return nil, nil, rpcError(connect.CodeFailedPrecondition, "service_action_generation_pending")
 		}
-		work, err := issueServiceNonce(ctx, q, action, now)
+		work, err := issueResourceNonce(ctx, q, action, now)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -253,7 +253,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	}
 	if release == nil {
 		source = head
-		candidate, err = eligibleServiceResource(resources, now, time.Duration(head.ReconcileIntervalSeconds)*time.Second)
+		candidate, err = eligibleResource(resources, now, time.Duration(head.ReconcileIntervalSeconds)*time.Second)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -294,7 +294,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 		return nil, nil, err
 	}
 	if reason == secretWaitDeviceKey {
-		if err := waitServiceResource(ctx, q, head.ID, resources, candidate, reason); err != nil {
+		if err := waitResource(ctx, q, head.ID, resources, candidate, reason); err != nil {
 			return nil, nil, err
 		}
 		return nil, nil, tx.Commit(ctx)
@@ -373,7 +373,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if err != nil {
 		return nil, nil, err
 	}
-	work, err := issueServiceNonce(ctx, q, action, now)
+	work, err := issueResourceNonce(ctx, q, action, now)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -386,7 +386,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	return work, nil, nil
 }
 
-func eligibleServiceResource(rows []devicedb.ResourceAssignmentResource, now time.Time, interval time.Duration) (*policyv1.ProfileResource, error) {
+func eligibleResource(rows []devicedb.ResourceAssignmentResource, now time.Time, interval time.Duration) (*policyv1.ProfileResource, error) {
 	dispositions := make(map[string]int16, len(rows))
 	desired := make(map[string]*policyv1.ProfileResource, len(rows))
 	for _, row := range rows {
@@ -433,7 +433,7 @@ func eligibleServiceResource(rows []devicedb.ResourceAssignmentResource, now tim
 // Asynchronous preflight has owned durable work even before a grant. Retain its
 // action fence until the executor acknowledges cleanup; immediate providers keep
 // their existing unstarted closure behavior.
-func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, action *devicedb.ResourceAction, reason string, now time.Time) error {
+func closeUnstartedResourceAction(ctx context.Context, q *devicedb.Queries, action *devicedb.ResourceAction, reason string, now time.Time) error {
 	if len(action.StartGrantEnvelope) != 0 {
 		return errInternalState
 	}
@@ -462,7 +462,7 @@ func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, actio
 	return q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason})
 }
 
-func issueServiceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, now time.Time) (*devicev1.ResourceWork, error) {
+func issueResourceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, now time.Time) (*devicev1.ResourceWork, error) {
 	// Replays carry the exact stored ciphertext; the signed manifest binds it.
 	sealed, err := resourceActionSecrets(ctx, q, action)
 	if err != nil {
@@ -499,7 +499,7 @@ func assignmentAuthorizationDenied(err error) bool {
 	return errors.Is(err, identity.ErrAuthorizationDenied) || errors.Is(err, identity.ErrAuthorizationChanged) || errors.Is(err, identity.ErrSubjectUnqualified)
 }
 
-func serviceActionRevision(action devicedb.ResourceAction) (uint64, error) {
+func resourceActionRevision(action devicedb.ResourceAction) (uint64, error) {
 	n := action.ActionRevision
 	if !n.Valid || n.NaN || n.Int == nil || n.Exp != 0 || !n.Int.IsUint64() {
 		return 0, errInternalState

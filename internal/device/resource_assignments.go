@@ -143,7 +143,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		}
 		assignment.ProfileId, assignment.RevisionId, assignment.RevisionNumber, assignment.ProfileName = retained.GetProfileId(), retained.GetRevisionId(), retained.GetRevisionNumber(), retained.GetSpec().GetName()
 		revisionID = &revision
-		resources, err = orderedServiceResources(retained.GetSpec().GetResources())
+		resources, err = orderedResources(retained.GetSpec().GetResources())
 		if err != nil {
 			return nil, mapErr(err)
 		}
@@ -184,7 +184,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	}
 	action, err := q.GetOpenServiceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
-		if err := closeUnstartedServiceAction(ctx, q, &action, "assignment_changed", now); err != nil {
+		if err := closeUnstartedResourceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return nil, mapErr(err)
 		}
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -284,14 +284,14 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 					return nil, mapErr(err)
 				}
 				if err == nil {
-					state.LatestAction, err = serviceActionSummary(latest)
+					state.LatestAction, err = resourceActionSummary(latest)
 					if err != nil {
 						return nil, mapErr(err)
 					}
 				}
 				state.LastVerifiedAt = protoTime(row.LastVerifiedAt)
 				state.ObservedAt = protoTime(row.ObservedAt)
-				state.Compliance = serviceResourceCompliance(row, state, head, now)
+				state.Compliance = resourceCompliance(row, state, head, now)
 				response.Resources = append(response.Resources, state)
 			}
 		}
@@ -300,7 +300,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			return nil, mapErr(err)
 		}
 		for _, action := range recent {
-			summary, err := serviceActionSummary(action)
+			summary, err := resourceActionSummary(action)
 			if err != nil {
 				return nil, mapErr(err)
 			}
@@ -336,7 +336,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 }
 
 // Kahn ordering chooses the lexically first currently eligible unit at each step.
-func orderedServiceResources(resources []*policyv1.ProfileResource) ([]*policyv1.ProfileResource, error) {
+func orderedResources(resources []*policyv1.ProfileResource) ([]*policyv1.ProfileResource, error) {
 	pending := append([]*policyv1.ProfileResource(nil), resources...)
 	sort.Slice(pending, func(i, j int) bool {
 		return resourceRefKey(pending[i].GetDesired().GetRef()) < resourceRefKey(pending[j].GetDesired().GetRef())
@@ -369,7 +369,7 @@ func orderedServiceResources(resources []*policyv1.ProfileResource) ([]*policyv1
 	return ordered, nil
 }
 
-func serviceResourceCompliance(row devicedb.ResourceAssignmentResource, state *adminv1.ResourceState, head devicedb.ResourceAssignment, now time.Time) adminv1.ResourceCompliance {
+func resourceCompliance(row devicedb.ResourceAssignmentResource, state *adminv1.ResourceState, head devicedb.ResourceAssignment, now time.Time) adminv1.ResourceCompliance {
 	if head.BlockedReason != "" || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED {
 		return adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION
 	}
@@ -393,8 +393,8 @@ func serviceResourceCompliance(row devicedb.ResourceAssignmentResource, state *a
 	return adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_COMPLIANT
 }
 
-func serviceActionSummary(action devicedb.ResourceAction) (*adminv1.ServiceActionSummary, error) {
-	revision, err := serviceActionRevision(action)
+func resourceActionSummary(action devicedb.ResourceAction) (*adminv1.ServiceActionSummary, error) {
+	revision, err := resourceActionRevision(action)
 	if err != nil {
 		return nil, err
 	}

@@ -76,10 +76,10 @@ func (s *Service) sealResourceSecrets(ctx context.Context, q *devicedb.Queries, 
 	return deliveries, "", nil
 }
 
-// waitServiceResource records a visible, non-terminal reason on a candidate
+// waitResource records a visible, non-terminal reason on a candidate
 // without changing its disposition. It writes only on change, so repeated
 // polls are free. Minting later sets the dispatched disposition and clears it.
-func waitServiceResource(ctx context.Context, q *devicedb.Queries, assignment uuid.UUID, rows []devicedb.ResourceAssignmentResource, candidate *policyv1.ProfileResource, reason string) error {
+func waitResource(ctx context.Context, q *devicedb.Queries, assignment uuid.UUID, rows []devicedb.ResourceAssignmentResource, candidate *policyv1.ProfileResource, reason string) error {
 	id, err := parseUUID(candidate.GetResourceId())
 	if err != nil {
 		return errInternalState

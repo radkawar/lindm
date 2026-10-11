@@ -22,7 +22,7 @@ import (
 // This seam exercises signed executor/journal boundaries, not native downloads.
 // The native staging unit and actual transaction are separately qualified.
 type preparingNative struct {
-	fixture  *serviceFixture
+	fixture  *resourceFixture
 	service  *Service
 	action   string
 	artifact string
@@ -96,9 +96,9 @@ func (n *preparingNative) option() Option {
 		s.cancelPreparation = func(context.Context, *agentv1.ResourceExecutionIntent) error { n.cancels.Add(1); return nil }
 	}
 }
-func newPreparationFixture(t *testing.T) (*serviceFixture, *preparingNative, *agentv1.ResourceExecutionIntent) {
+func newPreparationFixture(t *testing.T) (*resourceFixture, *preparingNative, *agentv1.ResourceExecutionIntent) {
 	t.Helper()
-	f := newServiceFixture(t, false, true)
+	f := newResourceFixture(t, false, true)
 	plan, start := delegate(t, f.planKey), delegate(t, f.startKey)
 	plan.Capabilities, start.Capabilities = []string{"package.native.v1"}, []string{"package.native.v1"}
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
@@ -124,14 +124,14 @@ func TestResourcePreparationDurablePollRestartAndFreshChallenge(t *testing.T) {
 	f, n, intent := newPreparationFixture(t)
 	pending, envelope := f.prepare(t, intent)
 	assertPreparing(t, pending)
-	accepted, revision := serviceRow(t, f.svc, intent.GetActionId())
+	accepted, revision := resourceRow(t, f.svc, intent.GetActionId())
 	f.wall.Store(f.now.Add(time.Minute).UnixNano())
 	retry, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertPreparing(t, retry.Msg)
-	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+	after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 	if revision != afterRevision || !proto.Equal(accepted, after) || n.applies.Load() != 0 {
 		t.Fatal("poll rewrote acceptance or issued native effects")
 	}
@@ -156,7 +156,7 @@ func TestResourcePreparationDurablePollRestartAndFreshChallenge(t *testing.T) {
 	if ready.Msg.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
 		t.Fatal("ready exact plan did not become prepared")
 	}
-	record, readyRevision := serviceRow(t, next, intent.GetActionId())
+	record, readyRevision := resourceRow(t, next, intent.GetActionId())
 	if readyRevision != revision+1 || !proto.Equal(record.GetAcceptedAt(), accepted.GetAcceptedAt()) || !proto.Equal(record.GetIntent(), accepted.GetIntent()) || !record.GetChallenge().GetIssuedAt().AsTime().Equal(next.now()) || record.GetChallenge().GetExpiresAt().AsTime().Sub(next.now()) != 30*time.Second {
 		t.Fatal("readiness extended acceptance or failed to create a fresh thirty-second challenge")
 	}
@@ -215,7 +215,7 @@ func TestResourcePreparationExpiryCancelTrustAndCorruptDigest(t *testing.T) {
 			if status.GetCompletedAt() == nil || status.GetPreparationOutcome() == nil || status.GetBefore() != nil || status.GetStartedAt() != nil || status.GetVerification() != nil || n.cancels.Load() != 1 || n.applies.Load() != 0 {
 				t.Fatal("staging ended without exact cleanup-only evidence")
 			}
-			record, _ := serviceRow(t, f.svc, intent.GetActionId())
+			record, _ := resourceRow(t, f.svc, intent.GetActionId())
 			if record.GetChallenge() != nil || record.GetNativePlan() != nil || !proto.Equal(record.GetPreparationOutcome().GetPreparation(), intent.GetPreparation()) {
 				t.Fatal("terminated preparation invented native authority")
 			}
@@ -248,7 +248,7 @@ func TestResourcePreparationCancelBeforeDeliveryFencesLatePrepare(t *testing.T) 
 func TestResourcePreparationDuplicateActionCannotRebindIntent(t *testing.T) {
 	f, n, intent := newPreparationFixture(t)
 	_, envelope := f.prepare(t, intent)
-	before, revision := serviceRow(t, f.svc, intent.GetActionId())
+	before, revision := resourceRow(t, f.svc, intent.GetActionId())
 	changed := proto.CloneOf(intent)
 	changed.Preparation.MaxCacheBytes++
 	conflict := mustSign(t, f.svc.authority, changed, f.planKey)
@@ -258,7 +258,7 @@ func TestResourcePreparationDuplicateActionCannotRebindIntent(t *testing.T) {
 	if _, err := f.svc.CancelResourcePreparation(t.Context(), connect.NewRequest(&agentv1.CancelResourcePreparationRequest{ActionId: intent.GetActionId(), IntentSha256: digestBytes(conflict)})); connect.CodeOf(err) != connect.CodeAlreadyExists {
 		t.Fatalf("foreign digest canceled owned staging: %v", err)
 	}
-	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+	after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 	if revision != afterRevision || !proto.Equal(before, after) || n.polls.Load() != 1 || n.cancels.Load() != 0 || !bytes.Equal(after.GetIntentSha256(), digestBytes(envelope)) {
 		t.Fatal("conflicting retry changed staging ownership, native work or acceptance")
 	}

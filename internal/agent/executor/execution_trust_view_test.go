@@ -105,11 +105,11 @@ func TestExecutionTrustViewReportsAcceptedRotationAfterExpiryAndRestart(t *testi
 }
 
 func TestExecutionTrustViewDoesNotObserveOrTransitionPreparedWork(t *testing.T) {
-	f := newServiceFixture(t, false)
-	pauseServiceConsumer(t, f.svc)
+	f := newResourceFixture(t, false)
+	pauseResourceConsumer(t, f.svc)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
-	before, revision := serviceRow(t, f.svc, intent.GetActionId())
+	before, revision := resourceRow(t, f.svc, intent.GetActionId())
 	plans, verifies := f.native.plans.Load(), f.native.verifies.Load()
 	// Accept revocation, then expire the root. Neither updates nor inspection
 	// may turn retained prepared work into a native effect or fresh observation.
@@ -122,7 +122,7 @@ func TestExecutionTrustViewDoesNotObserveOrTransitionPreparedWork(t *testing.T) 
 	if !proto.Equal(view, readTrustView(t, f.svc)) {
 		t.Fatal("historical read changed revocation counters or expiry")
 	}
-	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
+	after, afterRevision := resourceRow(t, f.svc, intent.GetActionId())
 	identityAfter, identityAfterRevision := identityRow(t, f.svc)
 	trustAfter, trustAfterRevision := trustRow(t, f.svc)
 	if !proto.Equal(before, after) || revision != afterRevision || !proto.Equal(identity, identityAfter) || identityRevision != identityAfterRevision || !proto.Equal(trustState, trustAfter) || trustRevision != trustAfterRevision {
@@ -136,7 +136,7 @@ func TestExecutionTrustViewDoesNotObserveOrTransitionPreparedWork(t *testing.T) 
 func TestExecutionTrustViewDoesNotRetireExpiredPriorCredential(t *testing.T) {
 	now := time.Date(2031, 8, 7, 0, 0, 0, 0, time.UTC)
 	svc, fix, pending := pendingRenewalFixture(t, now)
-	pauseServiceConsumer(t, svc)
+	pauseResourceConsumer(t, svc)
 	state := durable(t, svc)
 	certificate := fix.leaf(t, publicOf(state.GetPendingRenewal().GetPrivateKey()), uuid.MustParse(state.GetDeviceId()), uuid.MustParse(state.GetEnrollmentGeneration()), now.Add(-time.Minute), now.Add(30*24*time.Hour))
 	if _, err := svc.CommitRenewal(t.Context(), connect.NewRequest(&agentv1.CommitRenewalRequest{IssuanceRequestId: pending.GetIssuanceRequestId(), CertificatePem: certificate})); err != nil {

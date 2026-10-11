@@ -80,7 +80,7 @@ func newReadOnlyDispatchFixture(t *testing.T, release bool) (*dispatchFixture, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		work, err = issueServiceNonce(t.Context(), q, action, now)
+		work, err = issueResourceNonce(t.Context(), q, action, now)
 		if err != nil {
 			t.Fatal(err)
 		}

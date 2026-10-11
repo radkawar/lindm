@@ -23,7 +23,7 @@ import (
 // Synthetic native observations isolate the real signed executor and journal
 // lifecycle. These tests do not claim to inspect or change host encryption.
 type readOnlyNative struct {
-	fixture         *serviceFixture
+	fixture         *resourceFixture
 	service         *Service
 	disposition     resourcev1.VerificationDisposition
 	verificationErr error
@@ -93,9 +93,9 @@ func (n *readOnlyNative) option() Option {
 		}
 	}
 }
-func readOnlyFixture(t *testing.T, disposition resourcev1.VerificationDisposition) (*serviceFixture, *readOnlyNative, *agentv1.ResourceExecutionIntent) {
+func readOnlyFixture(t *testing.T, disposition resourcev1.VerificationDisposition) (*resourceFixture, *readOnlyNative, *agentv1.ResourceExecutionIntent) {
 	t.Helper()
-	f := newServiceFixture(t, false, true)
+	f := newResourceFixture(t, false, true)
 	plan, start := delegate(t, f.planKey), delegate(t, f.startKey)
 	plan.Capabilities, start.Capabilities = []string{"encryption.compliance.v1"}, []string{"encryption.compliance.v1"}
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
@@ -132,11 +132,11 @@ func TestReadOnlyResourceFindingsAreDurableWithoutEffectAuthority(t *testing.T) 
 			if !failed && status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 				t.Fatal("valid read-only success rejected")
 			}
-			_, attestation := attestService(t, f, status)
+			_, attestation := attestResource(t, f, status)
 			if !attestation.GetStatus().GetReadOnly() || !proto.Equal(attestation.GetStatus(), status) {
 				t.Fatal("device attestation lost read-only terminal semantics")
 			}
-			record, revision := serviceRow(t, f.svc, intent.GetActionId())
+			record, revision := resourceRow(t, f.svc, intent.GetActionId())
 			if record.GetChallenge() != nil || len(record.GetStartGrantEnvelope()) != 0 {
 				t.Fatal("read-only record retained unused effect grant")
 			}
@@ -153,7 +153,7 @@ func TestReadOnlyResourceFindingsAreDurableWithoutEffectAuthority(t *testing.T) 
 			if err != nil || !proto.Equal(status, retry.Msg.GetStatus()) {
 				t.Fatalf("restart lost read-only finding: %v", err)
 			}
-			_, afterRevision := serviceRow(t, next, intent.GetActionId())
+			_, afterRevision := resourceRow(t, next, intent.GetActionId())
 			if afterRevision != revision || n.applies.Load() != 0 {
 				t.Fatal("restart replayed a read-only terminal finding")
 			}

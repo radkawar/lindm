@@ -187,7 +187,7 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 		rejectReason = "authority_changed"
 	}
 	if rejectReason != "" {
-		if err := closeUnstartedServiceAction(ctx, q, &action, rejectReason, now); err != nil {
+		if err := closeUnstartedResourceAction(ctx, q, &action, rejectReason, now); err != nil {
 			return nil, mapErr(err)
 		}
 		if rejectReason == "authority_changed" && head.ID == actionHead {
