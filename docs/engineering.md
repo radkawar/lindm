@@ -1439,8 +1439,9 @@ files, renames and deletions; the worktree's own index is untouched) and applies
 it atomically with `git apply`: a conflict refuses with nothing applied. It then
 runs the quick gate on the touched files in the shared tree (build, golangci-lint
 run for both tags and fmt on touched packages, buf when protos changed,
-prettier/markdownlint on touched docs and web files, race tests of touched
-packages), commits exactly the touched files with MSG and pushes to `main`'s
+prettier/markdownlint on touched docs and web files, `generate-docs -check`
+always, and race tests of the touched packages plus every module package whose
+build or tests import them, directly or transitively), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
 restores the local branch and the checkout. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits any remaining change only

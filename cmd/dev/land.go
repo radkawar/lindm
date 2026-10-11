@@ -32,7 +32,9 @@ another landing or with a gated commit.
                touched files: go build ./..., golangci-lint run (default and
                integration tags) and fmt on touched packages, buf format/lint
                when protos changed, prettier and markdownlint on touched
-               docs/web files, and race tests of touched packages. Then commit
+               docs/web files, generate-docs -check, and race tests of the
+               touched packages and every module package whose build or
+               tests import them, directly or transitively. Then commit
                exactly those files with MESSAGE and push to main's upstream
                (hooks skipped: the gate just ran). Any failure rolls back.
   gate-commit  Run the full make check in the shared tree and, only if green,
@@ -157,7 +159,8 @@ func quickGate(ctx context.Context, root string, files []string) error {
 	}
 	docs, markdown = existing(docs), existing(markdown)
 	lint := filepath.Join(root, ".tools", "bin", "golangci-lint")
-	steps := [][]string{{"go", "build", "./..."}}
+	// Generated docs read state many landings change; check them every time.
+	steps := [][]string{{"go", "build", "./..."}, {"go", "run", "./cmd/dev", "generate-docs", "-check"}}
 	if len(packages) != 0 {
 		steps = append(steps,
 			append([]string{lint, "run", "--allow-parallel-runners"}, packages...),
@@ -183,9 +186,69 @@ func quickGate(ctx context.Context, root string, files []string) error {
 		if err := formatted(ctx, root, lint, goDirs); err != nil {
 			return err
 		}
-		return stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1"}, packages...)...)
+		affected, err := dependents(ctx, root, packages)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("land: race tests for %d touched and %d dependent packages\n", len(packages), len(affected)-len(packages))
+		return stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1"}, affected...)...)
 	}
 	return nil
+}
+
+// dependents returns the touched packages plus every module package whose
+// build or tests reach one of them (directly or transitively, through its own
+// imports or its test files' imports), so a change is tested where it is used.
+func dependents(ctx context.Context, root string, touched []string) ([]string, error) {
+	module, err := output(ctx, root, "go", "list", "-m")
+	if err != nil {
+		return nil, err
+	}
+	listing, err := output(ctx, root, "go", "list", "-e", "-f", "{{.ImportPath}}|{{join .Deps \" \"}}|{{join .TestImports \" \"}} {{join .XTestImports \" \"}}", "./...")
+	if err != nil {
+		return nil, err
+	}
+	deps := map[string]map[string]bool{}
+	tests := map[string][]string{}
+	for line := range strings.Lines(listing) {
+		fields := strings.SplitN(strings.TrimSpace(line), "|", 3)
+		if len(fields) != 3 {
+			continue
+		}
+		set := map[string]bool{fields[0]: true}
+		for _, dep := range strings.Fields(fields[1]) {
+			set[dep] = true
+		}
+		deps[fields[0]], tests[fields[0]] = set, strings.Fields(fields[2])
+	}
+	targets := map[string]bool{}
+	for _, pkg := range touched {
+		if dir := filepath.ToSlash(filepath.Clean(pkg)); dir == "." {
+			targets[module] = true
+		} else {
+			targets[module+"/"+dir] = true
+		}
+	}
+	reaches := func(pkg string) bool {
+		for target := range targets {
+			if deps[pkg][target] {
+				return true
+			}
+		}
+		return false
+	}
+	var affected []string
+	for pkg := range deps {
+		hit := reaches(pkg)
+		for _, imported := range tests[pkg] {
+			hit = hit || reaches(imported)
+		}
+		if hit {
+			affected = append(affected, "./"+strings.TrimPrefix(strings.TrimPrefix(pkg, module), "/"))
+		}
+	}
+	slices.Sort(affected)
+	return affected, nil
 }
 
 // formatted fails when golangci-lint fmt would change a touched package.

@@ -163,6 +163,7 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
   - `.tools/bin/golangci-lint run` on every touched package, for both default and `integration` build tags, and `golangci-lint fmt --diff`
   - `buf format --diff` and `buf lint` if protos changed
   - prettier and markdownlint on touched Markdown/web files
-  - the touched packages' race tests
+  - `go run ./cmd/dev generate-docs -check`, always
+  - race tests of the touched packages and of every module package whose build or tests import them, directly or transitively
 - `go run ./cmd/dev gate-commit -m MSG` is the post-hoc full gate: under the same lock it runs `make check` and commits any remaining change only if green. The parent runs it periodically and reverts or routes anything that breaks `make check`. After each commit, run `go run ./cmd/dev worktree audit` and route every PARTIAL/UNLANDED tree it lists to its owner.
 - A change that leaves `make check` red is not landed.
