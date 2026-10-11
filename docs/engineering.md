@@ -1399,18 +1399,23 @@ reason (slots held, available memory, swap-out during the sample). Suite deadlin
 are not raised to absorb an oversubscribed host.
 
 The shared main checkout changes only through `go run ./cmd/dev land -from
-WORKTREE [-paths a,b]` and is committed only through `go run ./cmd/dev gate-commit
--m MSG`. Both hold the exclusive flock `<main>/.git/lindm-landing.lock`, whose
-file names the holder while it is waited for. `land` computes the worktree's
-complete change against its merge base with `main` using a scratch index (commits,
-staged, unstaged and untracked non-ignored files, renames and deletions; the
-worktree's own index is untouched) and applies it atomically with `git apply`: a
-conflict refuses with nothing applied. It then runs the quick gate on the touched
-files in the shared tree (build, golangci-lint run for both tags and fmt on touched
-packages, buf when protos changed, prettier/markdownlint on touched docs and web
-files, race tests of touched packages) and reverses the patch if the gate fails.
-`gate-commit` runs `make check` under the lock and commits everything only when it
-is green, so no landing appears in the middle of a commit gate.
+WORKTREE -m MSG [-paths a,b]`. It and `go run ./cmd/dev gate-commit -m MSG` hold
+the exclusive flock `<main>/.git/lindm-landing.lock`, whose file names the holder
+while it is waited for. `land` refuses unless the shared checkout is on `main`,
+has no uncommitted change (it prints them) and contains its freshly fetched
+upstream; local commits ahead of it (an unpushed `gate-commit`) are pushed with
+the landing. It computes the worktree's complete change against its merge base with
+`main` using a scratch index (commits, staged, unstaged and untracked non-ignored
+files, renames and deletions; the worktree's own index is untouched) and applies
+it atomically with `git apply`: a conflict refuses with nothing applied. It then
+runs the quick gate on the touched files in the shared tree (build, golangci-lint
+run for both tags and fmt on touched packages, buf when protos changed,
+prettier/markdownlint on touched docs and web files, race tests of touched
+packages), commits exactly the touched files with MSG and pushes to `main`'s
+upstream without hooks, since the gate just ran. A gate, commit or push failure
+restores the local branch and the checkout. `gate-commit` is the post-hoc full
+gate: it runs `make check` under the lock and commits any remaining change only
+when green.
 
 `go run ./cmd/dev worktree audit [PATH...]` answers whether work is stranded,
 which ahead/dirty counts cannot because most work landed by copying. For every

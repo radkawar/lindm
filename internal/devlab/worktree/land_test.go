@@ -103,3 +103,88 @@ func TestLockIsExclusive(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLandCommitsPushesAndRollsBack(t *testing.T) {
+	repo := fixtureRepository(t)
+	ctx := context.Background()
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	gitT(t, repo.Main, "init", "--quiet", "--bare", remote)
+	gitT(t, repo.Main, "remote", "add", "lindm", remote)
+	gitT(t, repo.Main, "push", "--quiet", "--set-upstream", "lindm", Trunk)
+	path, err := repo.Add(ctx, "feature", "HEAD", io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "landed.txt"), []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	change, err := repo.Change(ctx, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := func([]string) error { return nil }
+	prior := gitT(t, repo.Main, "rev-parse", "HEAD")
+	clean := func() {
+		t.Helper()
+		if head := gitT(t, repo.Main, "rev-parse", "HEAD"); head != prior {
+			t.Fatalf("HEAD moved to %s after a failed landing", head)
+		}
+		if status := gitT(t, repo.Main, "status", "--porcelain"); status != "" {
+			t.Fatalf("failed landing left %q", status)
+		}
+	}
+
+	if err := repo.Land(ctx, change, "x", func([]string) error { return errors.New("red") }); err == nil || !strings.Contains(err.Error(), "rolled back") {
+		t.Fatalf("gate failure: %v", err)
+	}
+	clean()
+
+	// A user-level core.hooksPath would otherwise bypass the remote's hooks.
+	gitT(t, repo.Main, "--git-dir", remote, "config", "core.hooksPath", filepath.Join(remote, "hooks"))
+	hook := filepath.Join(remote, "hooks", "pre-receive")
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Land(ctx, change, "x", pass); err == nil || !strings.Contains(err.Error(), "push") {
+		t.Fatalf("push failure: %v", err)
+	}
+	clean()
+	if err := os.Remove(hook); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(repo.Main, "stray.txt"), []byte("other agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Land(ctx, change, "x", pass); err == nil || !strings.Contains(err.Error(), "stray.txt") {
+		t.Fatalf("dirty shared checkout accepted: %v", err)
+	}
+	if err := os.Remove(filepath.Join(repo.Main, "stray.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Another clone pushed: the shared checkout is behind its upstream.
+	other := filepath.Join(t.TempDir(), "other")
+	gitT(t, repo.Main, "clone", "--quiet", remote, other)
+	gitT(t, other, "-c", "user.email=o@example.invalid", "-c", "user.name=o", "commit", "--quiet", "--allow-empty", "-m", "elsewhere")
+	gitT(t, other, "push", "--quiet", "origin", "HEAD:"+Trunk)
+	if err := repo.Land(ctx, change, "x", pass); err == nil || !strings.Contains(err.Error(), "does not contain") {
+		t.Fatalf("stale shared checkout accepted: %v", err)
+	}
+	clean()
+	gitT(t, repo.Main, "merge", "--quiet", "--ff-only", "lindm/"+Trunk)
+	// A local gate-commit ahead of upstream is pushed with the landing.
+	gitT(t, repo.Main, "commit", "--quiet", "--allow-empty", "-m", "local gate-commit")
+	if err := repo.Land(ctx, change, "land the work", pass); err != nil {
+		t.Fatal(err)
+	}
+	if status := gitT(t, repo.Main, "status", "--porcelain"); status != "" {
+		t.Fatalf("landing left %q", status)
+	}
+	if pushed := gitT(t, repo.Main, "--git-dir", remote, "log", "-1", "--format=%s", Trunk); pushed != "land the work" {
+		t.Fatalf("remote tip %q", pushed)
+	}
+	if _, err := os.Stat(filepath.Join(repo.Main, "landed.txt")); err != nil {
+		t.Fatal(err)
+	}
+}

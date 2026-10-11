@@ -159,3 +159,80 @@ func (r *Repository) registered(ctx context.Context, path string) (Entry, bool, 
 	}
 	return Entry{}, false, nil
 }
+
+// Land commits change to the main checkout's Trunk and pushes it to Trunk's
+// upstream, holding nothing back for a later batch commit. Call it under the
+// landing lock. It refuses unless the main checkout is on Trunk, has no
+// uncommitted change and contains its freshly fetched upstream; local commits
+// ahead of upstream are pushed with the landing. It applies the
+// change atomically, runs gate on the touched files, commits exactly those
+// files with message, and pushes; any failure restores the checkout and the
+// local branch to their prior state.
+func (r *Repository) Land(ctx context.Context, change Change, message string, gate func(files []string) error) error {
+	if strings.TrimSpace(message) == "" {
+		return errors.New("land requires a commit message")
+	}
+	branch, err := git(ctx, r.Main, "symbolic-ref", "--quiet", "HEAD")
+	if err != nil || strings.TrimSpace(branch) != "refs/heads/"+Trunk {
+		return errors.Join(err, fmt.Errorf("%s is not on %s", r.Main, Trunk))
+	}
+	dirty, err := git(ctx, r.Main, "status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if dirty != "" {
+		return fmt.Errorf("refused: the shared checkout has uncommitted changes outside this landing; land or remove them first:\n%s", dirty)
+	}
+	upstream, err := git(ctx, r.Main, "rev-parse", "--abbrev-ref", Trunk+"@{upstream}")
+	if err != nil {
+		return err
+	}
+	remote, remoteBranch, ok := strings.Cut(strings.TrimSpace(upstream), "/")
+	if !ok {
+		return fmt.Errorf("unexpected upstream %q for %s", upstream, Trunk)
+	}
+	if _, err := git(ctx, r.Main, "fetch", "--quiet", remote, remoteBranch); err != nil {
+		return err
+	}
+	prior, err := git(ctx, r.Main, "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
+	prior = strings.TrimSpace(prior)
+	// Local commits ahead of upstream (a gate-commit not yet pushed) go out
+	// with this landing; a checkout behind or diverged from upstream would
+	// push over or beside work it has not gated.
+	if _, err := git(ctx, r.Main, "merge-base", "--is-ancestor", strings.TrimSpace(upstream), "HEAD"); err != nil {
+		return fmt.Errorf("refused: %s %s at %.12s does not contain %s; bring the shared checkout up to %s first", Trunk, r.Main, prior, strings.TrimSpace(upstream), strings.TrimSpace(upstream))
+	}
+	if err := r.Apply(ctx, change.Patch, false); err != nil {
+		return fmt.Errorf("refused, nothing applied (rebase the worktree onto %s): %w", Trunk, err)
+	}
+	// Restoration outlives an interrupted or expired landing.
+	restore := func(cause error) error {
+		cleanup, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		_, resetErr := git(cleanup, r.Main, "reset", "--quiet", "--soft", prior)
+		if resetErr == nil {
+			_, resetErr = git(cleanup, r.Main, "reset", "--quiet")
+		}
+		if err := errors.Join(resetErr, r.Apply(cleanup, change.Patch, true)); err != nil {
+			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds the change: %w", cause, err)
+		}
+		return fmt.Errorf("%w; rolled back", cause)
+	}
+	if err := gate(change.Files); err != nil {
+		return restore(fmt.Errorf("gate failed: %w", err))
+	}
+	if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, change.Files...)...); err != nil {
+		return restore(err)
+	}
+	// The gate has just run; hooks would only repeat it.
+	if _, err := git(ctx, r.Main, "commit", "--quiet", "--no-verify", "-m", message); err != nil {
+		return restore(err)
+	}
+	if _, err := git(ctx, r.Main, "push", "--quiet", "--no-verify", remote, "HEAD:refs/heads/"+remoteBranch); err != nil {
+		return restore(fmt.Errorf("push to %s failed: %w", strings.TrimSpace(upstream), err))
+	}
+	return nil
+}

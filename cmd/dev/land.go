@@ -16,24 +16,27 @@ import (
 	"lindm/internal/devlab/worktree"
 )
 
-const landUsage = `Usage: go run ./cmd/dev land -from WORKTREE [-paths a,b,...] [-timeout D]
+const landUsage = `Usage: go run ./cmd/dev land -from WORKTREE -m MESSAGE [-paths a,b,...] [-timeout D]
        go run ./cmd/dev gate-commit -m MESSAGE [-timeout D]
 
 The only way to change the shared main checkout. Both commands hold the
 exclusive lock <main>/.git/lindm-landing.lock, so no landing interleaves with
 another landing or with a gated commit.
 
-  land         Apply WORKTREE's complete change against main (commits since
-               its merge base, staged, unstaged and untracked files, renames
-               and deletions; -paths limits it) to the shared tree. A conflict
-               refuses with nothing applied. Then run the quick gate on the
-               touched files in the shared tree: go build ./..., golangci-lint
-               run (default and integration tags) and fmt on touched packages,
-               buf format/lint when protos changed, prettier and markdownlint on
-               touched docs/web files, and race tests of touched packages. On
-               any gate failure the change is reversed automatically.
-  gate-commit  Run make check in the shared tree and, only if green, commit
-               every change with MESSAGE.
+  land         Refuse unless the shared checkout is on main, clean and
+               contains its freshly fetched upstream (local commits ahead of
+               it are pushed too). Apply WORKTREE's complete change
+               against main (commits since its merge base, staged, unstaged and
+               untracked files, renames and deletions; -paths limits it). A
+               conflict refuses with nothing applied. Run the quick gate on the
+               touched files: go build ./..., golangci-lint run (default and
+               integration tags) and fmt on touched packages, buf format/lint
+               when protos changed, prettier and markdownlint on touched
+               docs/web files, and race tests of touched packages. Then commit
+               exactly those files with MESSAGE and push to main's upstream
+               (hooks skipped: the gate just ran). Any failure rolls back.
+  gate-commit  Run the full make check in the shared tree and, only if green,
+               commit every change with MESSAGE (post-hoc gate).
 `
 
 func lockedRepository(ctx context.Context) (*worktree.Repository, func() error, error) {
@@ -54,14 +57,15 @@ func runLand(args []string) (resultErr error) {
 	flags := flag.NewFlagSet("land", flag.ContinueOnError)
 	from := flags.String("from", "", "private worktree to land")
 	paths := flags.String("paths", "", "comma-separated paths limiting the change")
+	message := flags.String("m", "", "descriptive commit message for the landing")
 	timeout := flags.Duration("timeout", time.Hour, "overall deadline, including waiting for the lock")
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), landUsage) }
 	if err := flags.Parse(args); err != nil {
 		return errors.Join(err, usageErr)
 	}
-	if *from == "" || flags.NArg() != 0 || *timeout <= 0 {
-		return errors.New("land requires -from WORKTREE, no positional arguments and a positive timeout")
+	if *from == "" || strings.TrimSpace(*message) == "" || flags.NArg() != 0 || *timeout <= 0 {
+		return errors.New("land requires -from WORKTREE, -m MESSAGE, no positional arguments and a positive timeout")
 	}
 	var limit []string
 	if *paths != "" {
@@ -83,21 +87,16 @@ func runLand(args []string) (resultErr error) {
 	if len(change.Files) == 0 {
 		return fmt.Errorf("%s has no change against %s", *from, worktree.Trunk)
 	}
-	if err := repo.Apply(ctx, change.Patch, false); err != nil {
-		return fmt.Errorf("refused, nothing applied (rebase %s onto %s): %w", *from, worktree.Trunk, err)
+	fmt.Printf("land: %d files from %s (base %.12s); gating in %s\n", len(change.Files), *from, change.Base, repo.Main)
+	if err := repo.Land(ctx, change, *message, func(files []string) error { return quickGate(ctx, repo.Main, files) }); err != nil {
+		return err
 	}
-	fmt.Printf("land: applied %d files from %s (base %.12s); gating in %s\n", len(change.Files), *from, change.Base, repo.Main)
-	if err := quickGate(ctx, repo.Main, change.Files); err != nil {
-		// Rollback outlives an interrupted or expired gate.
-		rollback, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		if reverseErr := repo.Apply(rollback, change.Patch, true); reverseErr != nil {
-			return fmt.Errorf("gate failed: %w; ROLLBACK FAILED, the shared tree still holds the change: %w", err, reverseErr)
-		}
-		return fmt.Errorf("gate failed, change rolled back: %w", err)
+	head, err := output(ctx, repo.Main, "git", "log", "--oneline", "-1")
+	if err != nil {
+		return err
 	}
-	fmt.Printf("land: %d files landed from %s\n", len(change.Files), *from)
-	return nil
+	_, err = fmt.Printf("land: committed and pushed %s\n", head)
+	return err
 }
 
 func runGateCommit(args []string) (resultErr error) {
