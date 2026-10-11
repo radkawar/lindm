@@ -57,3 +57,15 @@ func TestGstArguments(t *testing.T) {
 		}
 	}
 }
+
+// debian12-arm64-dgx21-assistance-05 ended gst_element_missing:pipewiresrc with
+// gstreamer1.0-pipewire 0.3.65 installed: GStreamer 1.22's --exists alone also
+// demands plugin version >= 1.22. Every element is checked for existence only.
+func TestGstExistsIgnoresPluginVersion(t *testing.T) {
+	for _, element := range gstElements {
+		args := gstExistsArguments(element)
+		if !slices.Equal(args, []string{"--exists", "--atleast-version=0.0.0", element}) {
+			t.Fatalf("gst-inspect arguments for %s = %q", element, args)
+		}
+	}
+}

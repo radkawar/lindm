@@ -76,7 +76,8 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 			if err != nil {
 				return "", err
 			}
-			if err := sharePortal(ctx, screen, img, dialog, portalHasControlSwitch(img, dialog), clicks); err != nil {
+			_, control := portalControlSwitch(img, dialog)
+			if err := sharePortal(ctx, screen, img, dialog, control, clicks); err != nil {
 				return "", err
 			}
 		}
@@ -92,7 +93,7 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 			break
 		}
 		control := action == "share-control"
-		if control && !portalHasControlSwitch(img, dialog) {
+		if _, found := portalControlSwitch(img, dialog); control && !found {
 			return "", errors.New("the open dialog is a view-only screen share; it offers no remote interaction")
 		}
 		if err := sharePortal(ctx, screen, img, dialog, control, clicks); err != nil {
@@ -124,10 +125,14 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 // Interaction first when control is granted.
 func sharePortal(ctx context.Context, screen *assistanceScreen, img *image.RGBA, dialog image.Rectangle, control bool, clicks *assistanceScenarioEvidence) error {
 	if control {
-		if err := screen.click(ctx, img.Bounds(), portalControlSwitch(dialog), "allow-remote-interaction", clicks); err != nil {
+		toggle, found := portalControlSwitch(img, dialog)
+		if !found {
+			return errors.New("the open dialog is a view-only screen share; it offers no remote interaction")
+		}
+		if err := screen.click(ctx, img.Bounds(), toggle, "allow-remote-interaction", clicks); err != nil {
 			return err
 		}
-		if _, err := screen.waitSwitchOn(ctx, dialog, 10*time.Second); err != nil {
+		if _, err := screen.waitSwitchOn(ctx, toggle, 10*time.Second); err != nil {
 			return err
 		}
 	}

@@ -65,7 +65,7 @@ async function observeMedia(surface) {
     localCandidateURL: "",
     remoteCandidateType: "",
     controlButton: [...document.querySelectorAll("button")].some((node) =>
-      /^Control (on|off)$/.test(node.innerText.trim()),
+      /^(Take control|Release control)$/.test(node.innerText.trim()),
     ),
   };
   if (!record || record.pc.connectionState === "closed") return result;

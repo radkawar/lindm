@@ -151,14 +151,16 @@ func locatePortalDialog(img *image.RGBA) (image.Rectangle, bool) {
 		}
 	}
 	dialog := image.Rect(edges[0], slices.Min(rows), edges[1], slices.Max(rows)+1)
-	if dialog.Dx() < 450 || dialog.Dx() > 900 || dialog.Dy() < 300 || dialog.Dy() > 700 {
+	// GNOME 43's RemoteDesktop dialog is 500x300 and its ScreenCast dialog
+	// lacks the switch row, so the floor admits a one-monitor list dialog.
+	if dialog.Dx() < 450 || dialog.Dx() > 900 || dialog.Dy() < 200 || dialog.Dy() > 700 {
 		return image.Rectangle{}, false
 	}
 	return dialog, true
 }
 
-// Header buttons and the RemoteDesktop "Allow Remote Interaction" switch sit
-// at fixed offsets from the dialog edges on both GNOME 46 and GNOME 50.
+// Header buttons sit at fixed offsets from the dialog edges on GNOME 43, 46,
+// 48 and 50.
 func portalShareButton(dialog image.Rectangle) image.Point {
 	return image.Pt(dialog.Max.X-44, dialog.Min.Y+22)
 }
@@ -167,35 +169,31 @@ func portalCancelButton(dialog image.Rectangle) image.Point {
 	return image.Pt(dialog.Min.X+46, dialog.Min.Y+22)
 }
 
-func portalControlSwitch(dialog image.Rectangle) image.Point {
-	return image.Pt(dialog.Max.X-78, dialog.Min.Y+105)
+// portalSwitchCandidates are where a RemoteDesktop dialog's "Allow Remote
+// Interaction" switch sits: GNOME 46, 48 and 50 put it first, under the
+// header; GNOME 42 and 43 put it in the dialog's last row, after the monitor
+// list. The newer layout is tried first.
+func portalSwitchCandidates(dialog image.Rectangle) [2]image.Point {
+	return [2]image.Point{
+		image.Pt(dialog.Max.X-78, dialog.Min.Y+105),
+		image.Pt(dialog.Max.X-70, dialog.Max.Y-78),
+	}
 }
 
-// portalSwitchOn reports whether the switch track shows the theme accent
-// (orange on Yaru, blue on Adwaita); an off switch is neutral grey and white.
-func portalSwitchOn(img *image.RGBA, dialog image.Rectangle) bool {
-	centre := portalControlSwitch(dialog)
-	area := image.Rect(centre.X-18, centre.Y-8, centre.X+18, centre.Y+8).Intersect(img.Bounds())
-	if area.Empty() {
-		return false
-	}
-	saturated := 0
-	for y := area.Min.Y; y < area.Max.Y; y++ {
-		for x := area.Min.X; x < area.Max.X; x++ {
-			if pixelSaturation(img, x, y) >= 90 {
-				saturated++
-			}
+// portalControlSwitch locates the RemoteDesktop dialog a Control request
+// opens: the candidate whose area the switch track (grey off, accent on)
+// covers. In the ScreenCast dialog of a view-only request every candidate is
+// plain dialog, list or monitor background.
+func portalControlSwitch(img *image.RGBA, dialog image.Rectangle) (image.Point, bool) {
+	for _, centre := range portalSwitchCandidates(dialog) {
+		if portalSwitchTrack(img, dialog, centre) {
+			return centre, true
 		}
 	}
-	return saturated*10 >= area.Dx()*area.Dy()*3
+	return image.Point{}, false
 }
 
-// portalHasControlSwitch reports whether the dialog is the RemoteDesktop one a
-// Control request opens: its "Allow Remote Interaction" switch track (grey off,
-// accent on) covers the switch area. In the ScreenCast dialog of a view-only
-// request that area is plain dialog background.
-func portalHasControlSwitch(img *image.RGBA, dialog image.Rectangle) bool {
-	centre := portalControlSwitch(dialog)
+func portalSwitchTrack(img *image.RGBA, dialog image.Rectangle, centre image.Point) bool {
 	area := image.Rect(centre.X-18, centre.Y-8, centre.X+18, centre.Y+8).Intersect(img.Bounds())
 	if area.Empty() || !image.Pt(dialog.Min.X+16, centre.Y).In(img.Bounds()) {
 		return false
@@ -210,6 +208,25 @@ func portalHasControlSwitch(img *image.RGBA, dialog image.Rectangle) bool {
 		}
 	}
 	return marked*10 >= area.Dx()*area.Dy()*3
+}
+
+// portalSwitchOn reports whether the switch track at centre shows the theme
+// accent (orange on Yaru, blue on Adwaita); an off switch is neutral grey and
+// white.
+func portalSwitchOn(img *image.RGBA, centre image.Point) bool {
+	area := image.Rect(centre.X-18, centre.Y-8, centre.X+18, centre.Y+8).Intersect(img.Bounds())
+	if area.Empty() {
+		return false
+	}
+	saturated := 0
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			if pixelSaturation(img, x, y) >= 90 {
+				saturated++
+			}
+		}
+	}
+	return saturated*10 >= area.Dx()*area.Dy()*3
 }
 
 // centreChanged reports whether a window now covers the display centre, by

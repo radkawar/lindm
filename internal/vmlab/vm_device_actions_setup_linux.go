@@ -230,7 +230,11 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 	}
 	switch backend := release.Native().Packages.Backend; {
 	case backend == platform.BackendAPT:
-		return "export DEBIAN_FRONTEND=noninteractive; apt-get -q update; apt-get -q -y install " + strings.Join(packages, " "), nil
+		// GNOME Software's PackageKit refreshes APT lists right after login and
+		// holds the lists lock, which apt-get update cannot wait for (debian 13
+		// arm64 encryption-03). Runtime-mask it in this disposable guest; the
+		// mask lives in /run, and dpkg's frontend lock is waited for.
+		return "export DEBIAN_FRONTEND=noninteractive; if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
 	case backend.DNF():
 		return "dnf -y install " + strings.Join(packages, " "), nil
 	default:

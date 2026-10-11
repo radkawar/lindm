@@ -19,6 +19,14 @@ var gstElements = []string{
 	"vp8enc", "rtpvp8pay", "rtpstreampay", "fdsink",
 }
 
+// gstExistsArguments asks gst-inspect-1.0 whether element exists in any
+// version. Without --atleast-version, GStreamer 1.22 requires the element's
+// plugin version to reach the GStreamer core version, so it reports
+// PipeWire's pipewiresrc (plugin 0.3.65) missing on Debian 12.
+func gstExistsArguments(element string) []string {
+	return []string{"--exists", "--atleast-version=0.0.0", element}
+}
+
 // scaledSize returns the encoded size for a stream of logical width x
 // height: at most captureMaxWidth wide, the aspect ratio kept (rounded) and
 // both dimensions even and at least 2. ok is false for an unknown size.

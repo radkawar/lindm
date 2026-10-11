@@ -165,6 +165,12 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err != nil {
 		return result, errors.New("invalid guest clock observation")
 	}
+	// The agent package Recommends the capture stack; the lab installs it with
+	// --no-install-recommends, so install the release's capture packages from
+	// its signed archive first (Debian's GNOME task lacks gstreamer1.0-tools).
+	if err := installAssistanceCapture(ctx, vm.guest, release); err != nil {
+		return result, err
+	}
 	if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
 		return result, err
 	}

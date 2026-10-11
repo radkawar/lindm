@@ -97,6 +97,9 @@ func (s *assistanceScreen) waitBanner(ctx context.Context, timeout time.Duration
 		previous = banner
 		select {
 		case <-ctx.Done():
+			if _, saveErr := s.save(fmt.Sprintf("missing-banner-%d", time.Now().Unix()), img); saveErr != nil {
+				return img, image.Rectangle{}, errors.Join(saveErr, ctx.Err())
+			}
 			return img, image.Rectangle{}, fmt.Errorf("guest notification banner did not appear: %w", ctx.Err())
 		case <-time.After(screenPollInterval):
 		}
@@ -159,9 +162,9 @@ func (s *assistanceScreen) waitDialog(ctx context.Context, timeout time.Duration
 	}
 }
 
-// waitSwitchOn confirms the RemoteDesktop dialog's interaction switch shows
-// the accent colour after it was clicked.
-func (s *assistanceScreen) waitSwitchOn(ctx context.Context, dialog image.Rectangle, timeout time.Duration) (*image.RGBA, error) {
+// waitSwitchOn confirms the RemoteDesktop dialog's interaction switch at
+// toggle shows the accent colour after it was clicked.
+func (s *assistanceScreen) waitSwitchOn(ctx context.Context, toggle image.Point, timeout time.Duration) (*image.RGBA, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
@@ -169,7 +172,7 @@ func (s *assistanceScreen) waitSwitchOn(ctx context.Context, dialog image.Rectan
 		if err != nil {
 			return nil, err
 		}
-		if portalSwitchOn(img, dialog) {
+		if portalSwitchOn(img, toggle) {
 			return img, nil
 		}
 		select {

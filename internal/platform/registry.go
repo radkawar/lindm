@@ -155,7 +155,7 @@ var (
 	debianSession = LabSession{
 		Desktops:  map[string][]string{"gnome": {"desktop", "gnome-desktop"}, "kde": {"desktop", "kde-desktop"}},
 		GDMConfig: "/etc/gdm3/daemon.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
-		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell"},
+		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gstreamer1.0-tools", "gnome-shell"},
 	}
 	debianGuest = LabGuest{
 		Initrd:       "/boot/initrd.img-%s",

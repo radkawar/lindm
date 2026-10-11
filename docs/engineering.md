@@ -341,12 +341,14 @@ artifacts/bin/lab vm assistance -host local -hold \
 ```
 
 It provisions exactly like the lane: an encrypted GNOME (Wayland) clone with the
-signed agent and `lindm-session.service`, an isolated `lindmd` with the embedded
-TURN relay, and GDM autologin with locking off. Held demos also enable the
-platform's maintained online advisory feeds, complete an initial real refresh
-and wait for the enrolled device's current evaluation before printing "running"
-and the affected/accepted/unknown/clear finding counts. Missing feed coverage or
-an unknown evaluation is a gate, never an empty successful result.
+signed agent and `lindm-session.service`, the release's capture stack (the
+agent's recommended GStreamer and portal packages, from the release's signed
+archive; Debian's GNOME task lacks `gst-launch-1.0`), an isolated `lindmd` with
+the embedded TURN relay, and GDM autologin with locking off. Held demos also
+enable the platform's maintained online advisory feeds, complete an initial real
+refresh and wait for the enrolled device's current evaluation before printing
+"running" and the affected/accepted/unknown/clear finding counts. Missing feed
+coverage or an unknown evaluation is a gate, never an empty successful result.
 Feeds use a persistent revalidating HTTP cache under the configured controller
 lab work directory's `advisory-cache` (the lab host's directory in co-located
 mode), or the explicit `-advisory-cache DIRECTORY` override. An SSH-only host
@@ -375,7 +377,8 @@ qualification record. Stdout gets these nonsecret details:
   lane. `allow` completes consent in one step: **Allow** on the notification,
   then in the desktop's own dialog **Allow Remote Interaction** when the dialog
   offers it (a Control request's RemoteDesktop dialog; a view request's
-  ScreenCast dialog has no such switch) and **Share**. `decline` and `stop`
+  ScreenCast dialog has no such switch; GNOME 46 and later place it first,
+  GNOME 42 and 43 after the monitor list) and **Share**. `decline` and `stop`
   answer the consent and in-progress notifications, and `screenshot` only
   captures. `share`, `share-control` and `cancel` answer an already open dialog,
   for debugging. Each run saves a guest screenshot in `DIR`. `allow`, `decline`

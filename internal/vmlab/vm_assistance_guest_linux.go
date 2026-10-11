@@ -260,6 +260,23 @@ func lockAssistanceSession(ctx context.Context, vm *guestVM, sessionID string, l
 	return err
 }
 
+// installAssistanceCapture installs the release's capture stack (the agent
+// package's recommended screen-capture dependencies) from its signed archive.
+func installAssistanceCapture(ctx context.Context, vm *guestVM, release *platform.Release) error {
+	command, err := labInstallCommand(release, release.Lab.Session.Capture)
+	if err != nil {
+		return fmt.Errorf("assistance capture stack: %w", err)
+	}
+	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, 1<<20, 15*time.Minute)
+	if err != nil {
+		return fmt.Errorf("install assistance capture stack: %w", err)
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("install assistance capture stack: guest exit %d: %s", result.ExitCode, bytes.TrimSpace(result.Stderr))
+	}
+	return nil
+}
+
 // observeAssistancePackages records the guest's capture stack versions.
 func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platform.Release) ([]string, error) {
 	packages := strings.Join(append(slices.Clone(release.Lab.Session.Capture), packaging.PackageName), " ")

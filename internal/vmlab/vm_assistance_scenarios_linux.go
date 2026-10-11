@@ -182,10 +182,14 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		return r.finish(ctx, spec, scenario, false)
 	}
 	if control {
-		if err := r.screen.click(ctx, portal.Bounds(), portalControlSwitch(dialog), "portal-allow-remote-interaction", scenario); err != nil {
+		toggle, found := portalControlSwitch(portal, dialog)
+		if !found {
+			return errors.New("control request opened a portal dialog without a remote interaction switch")
+		}
+		if err := r.screen.click(ctx, portal.Bounds(), toggle, "portal-allow-remote-interaction", scenario); err != nil {
 			return err
 		}
-		enabled, err := r.screen.waitSwitchOn(ctx, dialog, 10*time.Second)
+		enabled, err := r.screen.waitSwitchOn(ctx, toggle, 10*time.Second)
 		if err != nil {
 			return err
 		}

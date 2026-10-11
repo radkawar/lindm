@@ -81,7 +81,7 @@ func checkGstElements(ctx context.Context) error {
 	for _, element := range gstElements {
 		_, err := nativeexec.Run(ctx, nativeexec.Command{
 			Path:        gstInspect,
-			Args:        []string{"--exists", element},
+			Args:        gstExistsArguments(element),
 			Timeout:     gstInspectTimeout,
 			StdoutLimit: gstInspectStdout,
 			StderrLimit: gstStderrTail,

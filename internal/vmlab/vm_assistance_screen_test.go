@@ -102,10 +102,40 @@ func TestLocateNotificationBannerIgnoresSmallChanges(t *testing.T) {
 	}
 }
 
+// syntheticPortalDialog draws a GNOME 46/50 share dialog: the RemoteDesktop
+// switch, when present, sits first under the header.
 func syntheticPortalDialog(wallpaper color.RGBA, dialog image.Rectangle, accent bool) *image.RGBA {
+	img := syntheticDialogFrame(wallpaper, dialog)
+	// Header text, the switch row border and the monitor preview's black bar.
+	fill(img, image.Rect(dialog.Min.X+260, dialog.Min.Y+15, dialog.Min.X+390, dialog.Min.Y+30), color.RGBA{40, 40, 40, 0xff})
+	fill(img, image.Rect(dialog.Min.X+42, dialog.Min.Y+78, dialog.Max.X-42, dialog.Min.Y+80), color.RGBA{233, 84, 32, 0xff})
+	fill(img, image.Rect(dialog.Min.X+222, dialog.Min.Y+264, dialog.Max.X-218, dialog.Min.Y+274), color.RGBA{0, 0, 0, 0xff})
+	syntheticSwitch(img, portalSwitchCandidates(dialog)[0], color.RGBA{250, 250, 250, 0xff}, color.RGBA{233, 84, 32, 0xff}, accent)
+	return img
+}
+
+// syntheticGNOME43Dialog draws xdg-desktop-portal-gnome 43's 500x300
+// RemoteDesktop dialog (debian12-arm64-dgx21-assistance-04): a selected
+// monitor row with a blue focus border, then the white "Allow remote
+// interaction" row whose grey switch track sits at the bottom candidate.
+// Without the switch it is the shorter ScreenCast dialog.
+func syntheticGNOME43Dialog(wallpaper color.RGBA, dialog image.Rectangle, withSwitch, accent bool) *image.RGBA {
+	img := syntheticDialogFrame(wallpaper, dialog)
+	monitor := image.Rect(dialog.Min.X+32, dialog.Min.Y+110, dialog.Max.X-32, dialog.Min.Y+162)
+	fill(img, monitor, color.RGBA{235, 235, 235, 0xff})
+	fill(img, image.Rect(monitor.Min.X, monitor.Min.Y, monitor.Max.X, monitor.Min.Y+2), color.RGBA{131, 173, 225, 0xff})
+	fill(img, image.Rect(monitor.Max.X-28, monitor.Min.Y+20, monitor.Max.X-16, monitor.Min.Y+30), color.RGBA{40, 40, 40, 0xff})
+	if withSwitch {
+		row := image.Rect(dialog.Min.X+32, dialog.Max.Y-105, dialog.Max.X-32, dialog.Max.Y-51)
+		fill(img, row, color.RGBA{255, 255, 255, 0xff})
+		syntheticSwitch(img, portalSwitchCandidates(dialog)[1], color.RGBA{255, 255, 255, 0xff}, color.RGBA{53, 132, 228, 0xff}, accent)
+	}
+	return img
+}
+
+func syntheticDialogFrame(wallpaper color.RGBA, dialog image.Rectangle) *image.RGBA {
 	img := syntheticWallpaper(wallpaper)
-	light := color.RGBA{250, 250, 250, 0xff}
-	fill(img, dialog, light)
+	fill(img, dialog, color.RGBA{250, 250, 250, 0xff})
 	// Rounded corners: the first and last rows are shorter on both sides.
 	for i := range 10 {
 		inset := 10 - i
@@ -114,18 +144,16 @@ func syntheticPortalDialog(wallpaper color.RGBA, dialog image.Rectangle, accent 
 		fill(img, image.Rect(dialog.Min.X, dialog.Max.Y-1-i, dialog.Min.X+inset, dialog.Max.Y-i), wallpaper)
 		fill(img, image.Rect(dialog.Max.X-inset, dialog.Max.Y-1-i, dialog.Max.X, dialog.Max.Y-i), wallpaper)
 	}
-	// Header text, the switch row border and the monitor preview's black bar.
-	fill(img, image.Rect(dialog.Min.X+260, dialog.Min.Y+15, dialog.Min.X+390, dialog.Min.Y+30), color.RGBA{40, 40, 40, 0xff})
-	fill(img, image.Rect(dialog.Min.X+42, dialog.Min.Y+78, dialog.Max.X-42, dialog.Min.Y+80), color.RGBA{233, 84, 32, 0xff})
-	fill(img, image.Rect(dialog.Min.X+222, dialog.Min.Y+264, dialog.Max.X-218, dialog.Min.Y+274), color.RGBA{0, 0, 0, 0xff})
-	track := color.RGBA{224, 224, 224, 0xff}
-	if accent {
-		track = color.RGBA{233, 84, 32, 0xff}
-	}
-	centre := portalControlSwitch(dialog)
-	fill(img, image.Rect(centre.X-22, centre.Y-12, centre.X+22, centre.Y+12), track)
-	fill(img, image.Rect(centre.X+4, centre.Y-9, centre.X+20, centre.Y+9), light)
 	return img
+}
+
+func syntheticSwitch(img *image.RGBA, centre image.Point, knob, accentTrack color.RGBA, accent bool) {
+	track := color.RGBA{225, 225, 225, 0xff}
+	if accent {
+		track = accentTrack
+	}
+	fill(img, image.Rect(centre.X-22, centre.Y-12, centre.X+22, centre.Y+12), track)
+	fill(img, image.Rect(centre.X+4, centre.Y-9, centre.X+20, centre.Y+9), knob)
 }
 
 func TestLocatePortalDialog(t *testing.T) {
@@ -135,12 +163,16 @@ func TestLocatePortalDialog(t *testing.T) {
 		dialog    image.Rectangle
 		share     image.Point
 		toggle    image.Point
+		draw      func(color.RGBA, image.Rectangle, bool) *image.RGBA
 	}{
-		{"ubuntu", color.RGBA{60, 20, 50, 0xff}, image.Rect(343, 166, 1003, 666), image.Pt(959, 188), image.Pt(925, 271)},
-		{"fedora", color.RGBA{0, 60, 200, 0xff}, image.Rect(310, 166, 970, 666), image.Pt(926, 188), image.Pt(892, 271)},
+		{"ubuntu", color.RGBA{60, 20, 50, 0xff}, image.Rect(343, 166, 1003, 666), image.Pt(959, 188), image.Pt(925, 271), syntheticPortalDialog},
+		{"fedora", color.RGBA{0, 60, 200, 0xff}, image.Rect(310, 166, 970, 666), image.Pt(926, 188), image.Pt(892, 271), syntheticPortalDialog},
+		{"gnome43", color.RGBA{0, 80, 90, 0xff}, image.Rect(390, 266, 890, 566), image.Pt(846, 288), image.Pt(820, 488), func(wallpaper color.RGBA, dialog image.Rectangle, accent bool) *image.RGBA {
+			return syntheticGNOME43Dialog(wallpaper, dialog, true, accent)
+		}},
 	} {
 		t.Run(theme.name, func(t *testing.T) {
-			img := syntheticPortalDialog(theme.wallpaper, theme.dialog, false)
+			img := theme.draw(theme.wallpaper, theme.dialog, false)
 			dialog, found := locatePortalDialog(img)
 			if !found || dialog.Min.X != theme.dialog.Min.X || dialog.Max.X != theme.dialog.Max.X || dialog.Min.Y < theme.dialog.Min.Y || dialog.Min.Y > theme.dialog.Min.Y+8 || dialog.Max.Y > theme.dialog.Max.Y || dialog.Max.Y < theme.dialog.Max.Y-8 {
 				t.Fatalf("dialog = %v %t, want ~%v", dialog, found, theme.dialog)
@@ -148,13 +180,14 @@ func TestLocatePortalDialog(t *testing.T) {
 			if got := portalShareButton(theme.dialog); got != theme.share {
 				t.Fatalf("share = %v, want %v", got, theme.share)
 			}
-			if got := portalControlSwitch(theme.dialog); got != theme.toggle {
-				t.Fatalf("switch = %v, want %v", got, theme.toggle)
+			toggle, found := portalControlSwitch(img, theme.dialog)
+			if !found || toggle != theme.toggle {
+				t.Fatalf("switch = %v %t, want %v", toggle, found, theme.toggle)
 			}
-			if portalSwitchOn(img, dialog) {
+			if portalSwitchOn(img, toggle) {
 				t.Fatal("neutral switch reported on")
 			}
-			if !portalSwitchOn(syntheticPortalDialog(theme.wallpaper, theme.dialog, true), dialog) {
+			if !portalSwitchOn(theme.draw(theme.wallpaper, theme.dialog, true), toggle) {
 				t.Fatal("accent switch reported off")
 			}
 		})
@@ -192,15 +225,37 @@ func TestPortalHasControlSwitchDistinguishesRequestMode(t *testing.T) {
 	for _, accent := range []bool{false, true} {
 		img := syntheticPortalDialog(wallpaper, bounds, accent)
 		dialog, found := locatePortalDialog(img)
-		if !found || !portalHasControlSwitch(img, dialog) {
+		if _, control := portalControlSwitch(img, dialog); !found || !control {
 			t.Fatalf("RemoteDesktop dialog (switch on=%t) not recognised: %v %t", accent, dialog, found)
 		}
 	}
 	view := syntheticPortalDialog(wallpaper, bounds, false)
-	centre := portalControlSwitch(bounds)
+	centre := portalSwitchCandidates(bounds)[0]
 	fill(view, image.Rect(centre.X-22, centre.Y-12, centre.X+22, centre.Y+12), color.RGBA{250, 250, 250, 0xff})
 	dialog, found := locatePortalDialog(view)
-	if !found || portalHasControlSwitch(view, dialog) {
-		t.Fatalf("ScreenCast dialog reported a remote interaction switch: %v %t", dialog, found)
+	if toggle, control := portalControlSwitch(view, dialog); !found || control {
+		t.Fatalf("ScreenCast dialog reported a remote interaction switch at %v: %v %t", toggle, dialog, found)
+	}
+}
+
+// debian12-arm64-dgx21-assistance-03/-04 clicked GNOME 46's switch offset on
+// GNOME 43, which landed on the selected monitor row, and timed out waiting
+// for the switch. GNOME 43 lists monitors first and its view-only ScreenCast
+// dialog is shorter than 300 pixels.
+func TestGNOME43PortalSwitchFollowsMonitorList(t *testing.T) {
+	wallpaper := color.RGBA{0, 80, 90, 0xff}
+	control := syntheticGNOME43Dialog(wallpaper, image.Rect(390, 266, 890, 566), true, false)
+	dialog, found := locatePortalDialog(control)
+	toggle, hasSwitch := portalControlSwitch(control, dialog)
+	if !found || !hasSwitch || toggle != image.Pt(820, 488) {
+		t.Fatalf("GNOME 43 RemoteDesktop switch = %v %t in %v %t, want (820,488)", toggle, hasSwitch, dialog, found)
+	}
+	view := syntheticGNOME43Dialog(wallpaper, image.Rect(390, 300, 890, 513), false, false)
+	dialog, found = locatePortalDialog(view)
+	if !found {
+		t.Fatal("GNOME 43 ScreenCast dialog not located")
+	}
+	if toggle, hasSwitch := portalControlSwitch(view, dialog); hasSwitch {
+		t.Fatalf("GNOME 43 ScreenCast dialog reported a switch at %v", toggle)
 	}
 }
