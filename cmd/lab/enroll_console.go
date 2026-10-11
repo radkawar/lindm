@@ -18,7 +18,7 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 	flags := flag.NewFlagSet("vm enroll-from-console", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMConsoleEnrollmentOptions
-	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04 or Fedora 44 cloud manifest")
+	manifestPath := flags.String("manifest", "", "signed cloud manifest with a registry-maintained console enrollment lane")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, written only after cleanup")
 	repository := flags.String("repo", ".", "checkout under test containing the maintained browser runner")
 	browserConfig := flags.String("browser-config", "", "required owned mode0600 Chromium owner config for clipboard capture and server-side enrollment confirmation")

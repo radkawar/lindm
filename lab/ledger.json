@@ -1903,6 +1903,30 @@
       "verified": true,
       "scope": "measured GRUB",
       "reference": "#ubuntu-26041-parity-records-2026-10-11"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "enroll-from-console",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-resolute-20260927-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-ubuntu2604/enroll-console/matrix-01/ubuntu-26.04/enroll-from-console-aarch64.json",
+      "sha256": "af48a8d6d4c453c634af3a26cc7920720ec5ff5740d6c07264631302d6ffae69",
+      "recorded": "2026-10-11T19:38:32.690936904Z",
+      "revision": "c3d336920ec8c3fbf7e2558da61c59e3fcbd967a",
+      "source": "MATRIX_SOURCE_RUN"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-20260927-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-ubuntu2604/enroll-console/matrix-01/ubuntu-26.04/enroll-from-console-x86_64.json",
+      "sha256": "e097fd74f3bf7e64b1506ac2655d3ed884c0a85346c50b574c275e04c98dcf02",
+      "recorded": "2026-10-11T20:14:12.152040953Z",
+      "revision": "c3d336920ec8c3fbf7e2558da61c59e3fcbd967a",
+      "source": "MATRIX_SOURCE_RUN"
     }
   ]
 }

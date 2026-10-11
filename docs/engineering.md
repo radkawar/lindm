@@ -2185,8 +2185,9 @@ browser signs in again and confirms the exact device's server-side **Enrolled**
 state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
-The `enroll-from-console` matrix cell targets Ubuntu 24.04 and Fedora 44, including
-native aarch64 on a configured Spark. Use the declared pinned AAVMF arguments and
+The `enroll-from-console` matrix cell targets Ubuntu 24.04, Ubuntu 26.04 and
+Fedora 44, including native aarch64 on a configured Spark. Use the declared pinned
+AAVMF arguments and
 normal host admission; never substitute an amd64 guest or pre-provision CA, agent
 packages or bootstrap trust into the machine under test. The copied command must
 perform those steps. Fixture loopback ports can be forwarded without changing
@@ -2194,8 +2195,9 @@ their signed HTTPS origins. Keep browser capture inputs and command files privat
 retain redacted light/dark desktop/mobile dialog screenshots separately, and link
 completed native records in [verification](verification.md).
 
-For `lab matrix run`, use `-console-browser-config-dir DIR` containing
-`ubuntu-24.04-aarch64.json` and `fedora-44-aarch64.json`, plus
+For `lab matrix run`, use `-console-browser-config-dir DIR` containing an owned
+mode-0600 `PLATFORM-ARCH.json` for each selected cell, for example
+`ubuntu-26.04-x86_64.json` and `ubuntu-26.04-aarch64.json`, plus
 `-console-admin-address 127.0.0.1:PORT` and
 `-console-device-address 127.0.0.1:PORT` for a loopback fixture.
 The remote runner preserves those HTTPS ports with explicit IPv4-loopback
