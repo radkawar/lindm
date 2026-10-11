@@ -40,43 +40,28 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
-	var response *adminv1.GetFleetSummaryResponse
-	if cached := s.FleetPopulation.Load(); unrestricted && cached != nil && s.Clock().Sub(cached.ObservedAt.AsTime()) <= FleetSummaryMaxAge {
-		response = proto.CloneOf(cached)
-	}
-	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return nil, core.MapErr(err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	q := devicedb.New(tx)
-	if response == nil {
-		response, err = s.readFleetPopulation(ctx, q, unrestricted, scopes)
-		if err != nil {
-			return nil, err
-		}
-	}
-	limit := int32(req.Msg.GetRecentActionLimit())
+	limit := int(req.Msg.GetRecentActionLimit())
 	if limit == 0 {
 		limit = 10
 	}
-	actions, err := q.FleetSummaryRecentActions(ctx, devicedb.FleetSummaryRecentActionsParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RowLimit: limit})
-	if err != nil {
-		return nil, core.MapErr(err)
+	var response *adminv1.GetFleetSummaryResponse
+	if cached := s.FleetPopulation.Load(); unrestricted && cached != nil && s.Clock().Sub(cached.ObservedAt.AsTime()) <= FleetSummaryMaxAge {
+		response = proto.CloneOf(cached)
+	} else {
+		tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		response, err = s.readFleetPopulation(ctx, devicedb.New(tx), unrestricted, scopes)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, core.MapErr(err)
+		}
 	}
-	response.RecentActions = make([]*adminv1.FleetRecentAction, 0, len(actions))
-	for _, row := range actions {
-		response.RecentActions = append(response.RecentActions, &adminv1.FleetRecentAction{
-			ActionId: row.ID.String(), DeviceId: row.DeviceID.String(), Capability: row.Capability,
-			CreatedAt: core.ProtoTime(row.IssuedAt), ExpiresAt: core.ProtoTime(row.ExpiresAt),
-			StartAuthorizedAt: core.ProtoTime(row.StartAuthorizedAt), ClosedAt: core.ProtoTime(row.ClosedAt),
-			ClosedReason: row.ClosedReason, OutcomeUnknown: row.OutcomeUnknown,
-			Kind: row.Kind, ResourceId: row.ResourceID, Unit: row.Unit,
-		})
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, core.MapErr(err)
-	}
+	response.RecentActions = response.RecentActions[:min(limit, len(response.RecentActions))]
 	if s.Identity != nil && !actor.ServiceAccount {
 		pending, err := s.Identity.CountPendingApprovals(ctx, actor.ID)
 		if err != nil && !errors.Is(err, identity.ErrAuthorizationDenied) {
@@ -160,8 +145,26 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 			UnknownDevices: uint64(devices.Total - devices.Evaluated - devices.Partial),
 		}
 	}
+	actions, err := q.FleetSummaryRecentActions(ctx, devicedb.FleetSummaryRecentActionsParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RowLimit: maxRecentActions})
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	response.RecentActions = make([]*adminv1.FleetRecentAction, 0, len(actions))
+	for _, row := range actions {
+		response.RecentActions = append(response.RecentActions, &adminv1.FleetRecentAction{
+			ActionId: row.ID.String(), DeviceId: row.DeviceID.String(), Capability: row.Capability,
+			CreatedAt: core.ProtoTime(row.IssuedAt), ExpiresAt: core.ProtoTime(row.ExpiresAt),
+			StartAuthorizedAt: core.ProtoTime(row.StartAuthorizedAt), ClosedAt: core.ProtoTime(row.ClosedAt),
+			ClosedReason: row.ClosedReason, OutcomeUnknown: row.OutcomeUnknown,
+			Kind: row.Kind, ResourceId: row.ResourceID, Unit: row.Unit,
+		})
+	}
 	return response, nil
 }
+
+// maxRecentActions is the request validation bound; the population keeps that
+// many so any requested limit is served from one snapshot.
+const maxRecentActions = 20
 
 // RunFleetSummary keeps this instance's unrestricted fleet population fresh so
 // console reads do not rescan every device under load. Scoped readers and a

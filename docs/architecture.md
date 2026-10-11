@@ -1756,12 +1756,14 @@ evaluations append to the serial audit chain, whose head row is updated
 `FOR UPDATE`. A pass continues past isolated device failures.
 
 `GetFleetSummary` serves unrestricted readers a population aggregate
-(lifecycle, contact, OS, compliance and advisory findings). A replicated
+(lifecycle, contact, OS, compliance, advisory findings and the 20 most recent
+actions, truncated to the requested limit), so a cached read needs no device
+database transaction while device traffic saturates the pool. A replicated
 read-only job on each instance recomputes it every 10 s in one repeatable-read
 snapshot. The response's `observed_at` is that snapshot's time, and a
 population older than 30 s is never served: the read falls back to a live
 computation. Scoped readers always compute live under their device scope.
-Recent actions and approval counts are always read live.
+Approval counts are always read live.
 
 Device-service RPC admission scales with the database pool: eight concurrent
 requests per configured connection, clamped to 64–512 (64 at the default pool
