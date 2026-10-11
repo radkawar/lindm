@@ -221,12 +221,19 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           action: "Choose Latest snapshot, or wait for the device to report.",
         };
       case "snapshot_expired":
-      case "page_expired":
         return {
           tone: "warning",
           title: "This page expired",
           message: "The package list changed since you opened this page.",
           action: "Start a new search or choose Latest snapshot.",
+        };
+      case "page_expired":
+        return {
+          tone: "warning",
+          title: "This page expired",
+          message:
+            "Result pages are kept for a limited time, and older ones are cleared when you start new searches.",
+          action: "Start a new search.",
         };
       case "device_action_inventory_stale":
         return {

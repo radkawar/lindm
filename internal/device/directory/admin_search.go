@@ -21,7 +21,6 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
-	"lindm/internal/rpcreason"
 )
 
 func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
@@ -77,6 +76,9 @@ type deviceSearchPage struct {
 	token   string
 	expires *timestamppb.Timestamp
 }
+
+// MaxDeviceSearchCursors bounds each actor's live search cursors.
+const MaxDeviceSearchCursors = 256
 
 // The opaque cursor binds the actor, filters, scope, purpose and fixed expiry.
 // Position is an immutable (enrolled_at,id) keyset, never an offset. Projections
@@ -137,7 +139,8 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 			}
 			cursor, err = q.GetDeviceSearchCursor(ctx, id)
 			if err == pgx.ErrNoRows {
-				return core.Invalid("page_token")
+				// Purged after expiry or evicted for a newer search of this actor.
+				return core.ErrPageExpired
 			}
 			if err != nil {
 				return err
@@ -218,8 +221,12 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 			if err != nil {
 				return err
 			}
-			if count >= 256 {
-				return rpcreason.Error(connect.CodeResourceExhausted, "search_cursor_capacity")
+			// Bounded per actor: a new search evicts the actor's oldest cursors, so
+			// ordinary browsing never locks the console out. Evicted pages read as expired.
+			if count >= MaxDeviceSearchCursors {
+				if err := q.DeleteOldestDeviceSearchCursors(ctx, devicedb.DeleteOldestDeviceSearchCursorsParams{ActorID: actor.ID, Excess: int32(count - MaxDeviceSearchCursors + 1)}); err != nil {
+					return err
+				}
 			}
 			cursor.ID = uuid.New()
 			if err := q.InsertDeviceSearchCursor(ctx, devicedb.InsertDeviceSearchCursorParams{ID: cursor.ID, ActorID: actor.ID, FilterDigest: digest, UpperEnrolledAt: cursor.UpperEnrolledAt, ExpiresAt: cursor.ExpiresAt}); err != nil {

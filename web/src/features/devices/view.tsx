@@ -257,7 +257,19 @@ export function DevicesView({
         }
       />
       <DeviceFilters search={search} onSearch={onSearch} />
-      {failure ? <RpcError failure={failure} title="Device list unavailable" /> : null}
+      {failure ? (
+        <RpcError failure={failure} title="Device list unavailable">
+          {failure.reason === "page_expired" ? (
+            <Button
+              variant="outline"
+              className="mt-2 w-fit"
+              onClick={() => onSearch({ ...search, pageToken: "" })}
+            >
+              Start a new search
+            </Button>
+          ) : null}
+        </RpcError>
+      ) : null}
       <div className="min-w-0 border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="text-sm">
@@ -452,8 +464,8 @@ export function DevicesView({
       </div>
       {data ? (
         <p className="text-xs text-muted-foreground">
-          This search expires <ObservedTime value={data.cursorExpiresAt} />. Start a new search to
-          see newly enrolled devices.
+          You can page through this search until <ObservedTime value={data.cursorExpiresAt} /> at
+          the latest. Start a new search to see newly enrolled devices.
         </p>
       ) : null}
       <details className="border bg-card">

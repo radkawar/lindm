@@ -265,6 +265,9 @@ no per-row RPC fanout occurs. Last verification is the oldest resource proof onl
 when every current resource has proof; no resources means unassigned, not compliant.
 The prefix participates in cursor filter binding. Sorting never changes server
 order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
+Each administrator keeps at most 256 live search cursors (15 minutes each); a new
+search evicts that administrator's oldest, so browsing never locks the list. A page
+of an expired or evicted search fails as `page_expired` with a Start a new search action.
 Revocation is a row action dialog retaining its existing approval/reason flow and
 ambiguous request identity after dismissal. The device header has one permission-aware
 Actions menu. Short actions open dialogs; storage, encryption and recovery actions

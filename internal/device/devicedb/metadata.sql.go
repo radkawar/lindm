@@ -69,6 +69,27 @@ func (q *Queries) DeleteExpiredDeviceSearchCursors(ctx context.Context, now pgty
 	return err
 }
 
+const deleteOldestDeviceSearchCursors = `-- name: DeleteOldestDeviceSearchCursors :exec
+DELETE FROM device_search_cursors
+WHERE id IN (
+    SELECT c.id FROM device_search_cursors c
+    WHERE c.actor_id = $1
+    ORDER BY c.expires_at, c.id
+    LIMIT $2::integer
+)
+`
+
+type DeleteOldestDeviceSearchCursorsParams struct {
+	ActorID uuid.UUID
+	Excess  int32
+}
+
+// Evicts an actor's soonest-expiring cursors to admit a new search within the cap.
+func (q *Queries) DeleteOldestDeviceSearchCursors(ctx context.Context, arg DeleteOldestDeviceSearchCursorsParams) error {
+	_, err := q.db.Exec(ctx, deleteOldestDeviceSearchCursors, arg.ActorID, arg.Excess)
+	return err
+}
+
 const getAttributeDefinition = `-- name: GetAttributeDefinition :one
 SELECT definition FROM inventory_attribute_definitions WHERE key = $1
 `

@@ -53,6 +53,16 @@ DELETE FROM device_search_cursors WHERE expires_at <= sqlc.arg('now')::timestamp
 -- name: CountDeviceSearchCursors :one
 SELECT count(*) FROM device_search_cursors WHERE actor_id = sqlc.arg('actor_id');
 
+-- name: DeleteOldestDeviceSearchCursors :exec
+-- Evicts an actor's soonest-expiring cursors to admit a new search within the cap.
+DELETE FROM device_search_cursors
+WHERE id IN (
+    SELECT c.id FROM device_search_cursors c
+    WHERE c.actor_id = sqlc.arg('actor_id')
+    ORDER BY c.expires_at, c.id
+    LIMIT sqlc.arg('excess')::integer
+);
+
 -- name: SearchDevices :many
 -- Restrict scope, filters and keyset before projecting bounded page resources.
 WITH page AS MATERIALIZED (

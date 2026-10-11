@@ -9,10 +9,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"lindm/internal/device/inventory"
 
 	"lindm/internal/device/core"
+	"lindm/internal/device/directory"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -23,6 +25,7 @@ import (
 	"lindm/gen/lindm/admin/v1/adminv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func inventoryAdminClient(t *testing.T, f *enrolledFixture, actor context.Context, json bool) adminv1connect.AdminServiceClient {
@@ -244,5 +247,39 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// Ordinary repeated searches must never lock an administrator out of the fleet
+// list: the per-actor cursor bound evicts the oldest search, whose pages then
+// read as expired rather than invalid.
+func TestListDevicesEvictsOldestSearchCursorAtCapacity(t *testing.T) {
+	f := newEnrolled(t, 0)
+	client := inventoryAdminClient(t, f, f.ownerCtx, false)
+	principal, ok := identity.PrincipalFromContext(f.ownerCtx)
+	if !ok {
+		t.Fatal("missing admin test principal")
+	}
+	var first string
+	for search := range directory.MaxDeviceSearchCursors + 3 {
+		f.now = f.now.Add(time.Millisecond) // distinct expiries order the searches
+		response, err := client.ListDevices(f.ctx, connect.NewRequest(&adminv1.ListDevicesRequest{PageSize: 1}))
+		if err != nil {
+			t.Fatalf("search %d was refused: %v", search, err)
+		}
+		if search == 0 {
+			first = response.Msg.GetPageToken()
+		}
+	}
+	var live int
+	if err := f.conn.QueryRow(f.ctx, `SELECT count(*) FROM device_search_cursors WHERE actor_id = $1`, principal.ID).Scan(&live); err != nil {
+		t.Fatal(err)
+	}
+	if live != directory.MaxDeviceSearchCursors {
+		t.Fatalf("actor holds %d search cursors, want the bound %d", live, directory.MaxDeviceSearchCursors)
+	}
+	_, err := client.ListDevices(f.ctx, connect.NewRequest(&adminv1.ListDevicesRequest{PageSize: 1, PageToken: first}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcreason.Get(err) != "page_expired" {
+		t.Fatalf("evicted search page = %v, want page_expired", err)
 	}
 }

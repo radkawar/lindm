@@ -114,6 +114,21 @@ export function installProbes(rules) {
     }
     return right - left > 1 && bottom - top > 1 ? { left, top, right, bottom } : null;
   };
+  // The nearest fixed or sticky layer. Content scrolled beneath a pinned header is
+  // occluded by design, not overlapping; at scroll 0 every pair is still judged.
+  const pinned = (node) => {
+    for (let cursor = node; cursor && cursor.nodeType === 1; cursor = cursor.parentElement) {
+      const position = getComputedStyle(cursor).position;
+      if (position === "fixed" || position === "sticky") return cursor;
+    }
+    return null;
+  };
+  const scrolled = () =>
+    scrollY > 0 ||
+    [...document.querySelectorAll("*")].some(
+      (node) => node.scrollTop > 0 && getComputedStyle(node).overflowY !== "visible",
+    );
+  const occluded = (a, b, moved) => moved && pinned(a) !== pinned(b);
   const intersection = (a, b) => ({
     width: Math.min(a.right, b.right) - Math.max(a.left, b.left),
     height: Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top),
@@ -206,6 +221,7 @@ export function installProbes(rules) {
           elements: offenders.slice(0, 5).map(describe),
         });
       }
+      const moved = scrolled();
       const interactive = [...document.querySelectorAll(interactiveSelector)]
         .filter((node) => rendered(node) && !srOnly(node))
         .map((node) => ({ node, box: clipped(node.getBoundingClientRect(), node) }))
@@ -215,6 +231,7 @@ export function installProbes(rules) {
           const a = interactive[i];
           const b = interactive[j];
           if (a.node.contains(b.node) || b.node.contains(a.node)) continue;
+          if (occluded(a.node, b.node, moved)) continue;
           const overlap = intersection(a.box, b.box);
           if (overlap.width > 2 && overlap.height > 2) {
             findings.push({
@@ -230,7 +247,7 @@ export function installProbes(rules) {
         for (let j = i + 1; j < runs.length && runs[j].box.top < runs[i].box.bottom; j += 1) {
           const a = runs[i];
           const b = runs[j];
-          if (a.text === b.text) continue;
+          if (a.text === b.text || occluded(a.parent, b.parent, moved)) continue;
           const overlap = intersection(a.box, b.box);
           const lineHeight = Math.min(a.box.bottom - a.box.top, b.box.bottom - b.box.top);
           if (overlap.width > 2 && overlap.height > lineHeight * 0.4) {
@@ -248,6 +265,7 @@ export function installProbes(rules) {
           continue;
         for (const run of runs) {
           if (control.node.contains(run.parent) || run.parent.contains(control.node)) continue;
+          if (occluded(control.node, run.parent, moved)) continue;
           const labelled = run.parent.closest("label");
           if (labelled && (labelled.control === control.node || labelled.contains(control.node)))
             continue;

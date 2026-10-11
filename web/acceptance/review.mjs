@@ -538,7 +538,11 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
     slug(
       `${route.path}${target.label ? `-${target.label}` : ""}${variant ? `-${variant}` : ""}-${theme}-${viewport.name}`,
     ) || "root";
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // Capture from scroll 0, including inner scroll containers.
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    for (const node of document.querySelectorAll("*")) if (node.scrollTop > 0) node.scrollTop = 0;
+  });
   await delay(100);
   entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
   entry.screenshots.full = await screenshot(page, `${prefix}-full.png`, true);

@@ -30,6 +30,7 @@ import (
 	"lindm/internal/devlab"
 	"lindm/internal/escrow"
 	"lindm/internal/platform"
+	"lindm/internal/rpcreason"
 )
 
 // DemoOptions selects optional inputs for the console demo dataset.
@@ -692,10 +693,14 @@ func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error 
 		findings, err := s.owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: d.id, PageSize: 50}))
 		if err == nil && len(findings.Msg.GetFindings()) > 0 {
 			_, err = s.owner.Admin.AcceptAdvisoryFinding(ctx, connect.NewRequest(&adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: d.id, FindingId: findings.Msg.GetFindings()[0].GetId(), ExpiresAt: timestamppb.New(time.Now().Add(30 * 24 * time.Hour)), Reason: "SSH is firewalled to the VPN until the maintenance window"}))
-			if err != nil {
-				return fmt.Errorf("accept demo finding: %w", err)
+			// Background evaluation can replace the finding between list and accept;
+			// that rejection is definitive, so accept the re-listed finding instead.
+			if rpcreason.Get(err) != "advisory_evidence_changed" {
+				if err != nil {
+					return fmt.Errorf("accept demo finding: %w", err)
+				}
+				return nil
 			}
-			return nil
 		}
 		select {
 		case <-ctx.Done():
