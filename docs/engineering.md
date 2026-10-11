@@ -380,6 +380,11 @@ The control scenario starts its terminal in the desktop user's home, not the
 SSH provisioning user's private directory. The terminal's own shell must
 receive the remotely typed nonce; a visible terminal window alone is not proof
 that its reader started.
+Local-seat clicks keep a 250 ms press and a 250 ms released interval before
+parking the pointer. A short QMP pulse can dismiss a correctly targeted
+notification without invoking its action; a QMP acknowledgment alone is not
+proof of consent. The lane still requires the product's explicit Allow/Decline
+result and the native portal response.
 Before starting either a co-located or split held `lindmd`, the fixture also
 publishes the current source build's signed APT/RPM agent packages for the guest
 architecture at its own HTTPS `/repo` endpoints. Subsequent **Enroll** commands

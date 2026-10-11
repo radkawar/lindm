@@ -50,18 +50,29 @@ func (v *guestVM) pointerClick(ctx context.Context, display image.Rectangle, poi
 	if err := v.pointerMove(ctx, display, point); err != nil {
 		return err
 	}
-	for _, down := range []bool{true, false} {
+	return localPointerClick(ctx, func(down bool) error {
 		if err := v.qmpCommand(ctx, map[string]any{"execute": "input-send-event", "id": "button", "arguments": map[string]any{"events": []map[string]any{
 			{"type": "btn", "data": map[string]any{"down": down, "button": button}},
 		}}}); err != nil {
 			return fmt.Errorf("guest pointer button: %w", err)
 		}
-		// GNOME Shell distinguishes press and release events by arrival; a
-		// short bounded gap mirrors a physical click without polling state.
+		return nil
+	})
+}
+
+// localPointerClick separates both press/release and release/pointer parking.
+// A 60 ms QMP pulse could dismiss a native notification without invoking its
+// correctly targeted action. Human-length phases preserve action handling;
+// the product still requires the desktop's explicit ActionInvoked signal.
+func localPointerClick(ctx context.Context, send func(down bool) error) error {
+	for _, down := range []bool{true, false} {
+		if err := send(down); err != nil {
+			return err
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(60 * time.Millisecond):
+		case <-time.After(250 * time.Millisecond):
 		}
 	}
 	return nil
