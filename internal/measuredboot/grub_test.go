@@ -210,6 +210,19 @@ func TestFinalGRUBBootAcceptsKernelStubEvents(t *testing.T) {
 			t.Fatalf("stub subset refused: %v", err)
 		}
 	}
+	// GRUB 2.12 (24.04) measures the load options without a terminating
+	// U+0000; GRUB 2.14 (Ubuntu 26.04.1 amd64, shim 15.8, kernel 7.0) with one.
+	data, err := os.ReadFile("testdata/ubuntu2604-amd64-stock.eventlog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolute, err := ParseEventLog(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded, err := FinalGRUBBoot(resolute); err != nil || loaded.KernelPath != "/vmlinuz-7.0.0-34-generic" {
+		t.Fatalf("Ubuntu 26.04 FinalGRUBBoot = %+v, %v", loaded, err)
+	}
 }
 
 func TestFinalGRUBBootRejectsForeignStubEvents(t *testing.T) {
@@ -217,6 +230,9 @@ func TestFinalGRUBBootRejectsForeignStubEvents(t *testing.T) {
 	options, initrd := events[ubuntuLoadOptionsIndex], events[ubuntuStubInitrdIndex]
 	otherInitrd := initrd
 	otherInitrd.SHA256 = bytes.Repeat([]byte{7}, sha256.Size)
+	// Options the kernel received differently from GRUB's kernel_cmdline.
+	otherOptions := options
+	otherOptions.SHA256 = stubLoadOptions(ubuntuFixtureKernelPath, "root=LABEL=cloudimg-rootfs ro init=/bin/sh")[0]
 	wrongPCR := initrd
 	wrongPCR.PCR = grubCommandPCR
 	unknownTag := initrd
@@ -228,6 +244,7 @@ func TestFinalGRUBBootRejectsForeignStubEvents(t *testing.T) {
 	ipl.Type = evIPL
 	for name, trailing := range map[string][]Event{
 		"different initrd digest": {options, otherInitrd},
+		"different load options":  {otherOptions, initrd},
 		"duplicate initrd":        {options, initrd, initrd},
 		"duplicate load options":  {options, options, initrd},
 		"options after initrd":    {initrd, options},

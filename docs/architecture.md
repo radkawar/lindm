@@ -1050,9 +1050,12 @@ Before signing a start grant, the server requires all of:
   the staged path and the PCR 9 measurement of the approved initramfs digest.
   The only later PCR 8/9 events accepted are the vendor kernel's own EFI stub
   `EV_EVENT_TAG` events in PCR 9, in the stub's order and at most once each:
-  `LOADED_IMAGE::LoadOptions` (the options GRUB already measured), then
+  `LOADED_IMAGE::LoadOptions`, whose digest must be SHA-256 of the UTF-16LE
+  `BOOT_IMAGE=<linux argument> <options>` of the measured `linux` command,
+  without (GRUB 2.12) or with (GRUB 2.14) a terminating U+0000; then
   `Linux initrd`, whose digest must equal the approved initramfs digest.
-  Ubuntu's arm64 6.8 kernel emits both; Fedora's x86_64 kernel emits neither.
+  Ubuntu 24.04 arm64 and 26.04 amd64 kernels emit both; Fedora 44's x86_64
+  boot emits neither.
 
 Any failure is `recovery_attestation_rejected` before approval consumption.
 

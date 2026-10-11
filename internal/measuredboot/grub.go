@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"slices"
 	"strings"
+	"unicode/utf16"
 )
 
 const (
@@ -159,7 +161,7 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStubEvents(trailing, initrdSHA256); err != nil {
+	if err := checkStubEvents(trailing, stubLoadOptions(kernelArgument, options), initrdSHA256); err != nil {
 		return nil, err
 	}
 	return &Loaded{
@@ -172,10 +174,10 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 }
 
 // checkStubEvents admits only the Linux EFI stub's tagged PCR 9 events, in the
-// stub's order and each at most once. Its initrd event must measure exactly the
-// initramfs GRUB measured; its load options are the same options GRUB already
-// measured in kernel_cmdline and are not separately trusted.
-func checkStubEvents(trailing []Event, initrdSHA256 []byte) error {
+// stub's order and each at most once. Its load-options event must measure the
+// command line GRUB passed for the measured linux command, and its initrd event
+// exactly the initramfs GRUB measured.
+func checkStubEvents(trailing []Event, loadOptions [][]byte, initrdSHA256 []byte) error {
 	next := 0
 	for _, event := range trailing {
 		if event.PCR != grubFilePCR || event.Type != evEventTag || len(event.SHA256) != sha256.Size {
@@ -183,7 +185,7 @@ func checkStubEvents(trailing []Event, initrdSHA256 []byte) error {
 		}
 		id, ok := taggedEvent(event.Data)
 		switch {
-		case ok && id == stubLoadOptionsTag && next == 0 && string(event.Data[8:]) == stubLoadOptionsText:
+		case ok && id == stubLoadOptionsTag && next == 0 && string(event.Data[8:]) == stubLoadOptionsText && slices.ContainsFunc(loadOptions, func(digest []byte) bool { return bytes.Equal(event.SHA256, digest) }):
 			next = 1
 		case ok && id == stubInitrdTag && next < 2 && string(event.Data[8:]) == stubInitrdText && bytes.Equal(event.SHA256, initrdSHA256):
 			next = 2
@@ -192,6 +194,23 @@ func checkStubEvents(trailing []Event, initrdSHA256 []byte) error {
 		}
 	}
 	return nil
+}
+
+// stubLoadOptions returns the digests of the UTF-16LE load options GRUB hands
+// the kernel for "linux <argument> <options>": "BOOT_IMAGE=<argument>" plus the
+// options, without (GRUB 2.12) or with (GRUB 2.14) a terminating U+0000.
+func stubLoadOptions(argument, options string) [][]byte {
+	text := "BOOT_IMAGE=" + argument
+	if options != "" {
+		text += " " + options
+	}
+	encoded := make([]byte, 0, 2*len(text)+2)
+	for _, unit := range utf16.Encode([]rune(text)) {
+		encoded = binary.LittleEndian.AppendUint16(encoded, unit)
+	}
+	bare := sha256.Sum256(encoded)
+	terminated := sha256.Sum256(append(encoded, 0, 0))
+	return [][]byte{bare[:], terminated[:]}
 }
 
 // taggedEvent returns the ID of a TCG_PCClientTaggedEvent whose declared data
