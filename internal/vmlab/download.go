@@ -77,7 +77,14 @@ func download(ctx context.Context, client *http.Client, root *os.Root, name, sou
 		n, done, err := downloadPart(ctx, client, root, name, source, limit, &file, written, &total)
 		written += n
 		if err == nil {
-			if !done {
+			// A body may end cleanly after the deadline (a server answering a
+			// cancelled request): an end of stream is success only while the
+			// transfer is still within its deadline and, when the length was
+			// declared, after exactly that many bytes.
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return fmt.Errorf("download %s: %w", source, ctxErr)
+			}
+			if !done || (total >= 0 && written != total) {
 				return errors.New("download body is truncated")
 			}
 			return file.Sync()

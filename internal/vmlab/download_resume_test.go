@@ -2,7 +2,9 @@ package vmlab
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -96,5 +98,48 @@ func TestDownloadResumesExactRangeAfterMirrorDrop(t *testing.T) {
 				t.Fatalf("resumed payload differs: %v %q", err, content)
 			}
 		})
+	}
+}
+
+// cancelAtEOF is a response body that cancels the transfer's context exactly
+// when it reports a clean end of stream, as a server answering a request the
+// client already abandoned does.
+type cancelAtEOF struct {
+	data   *strings.Reader
+	cancel context.CancelFunc
+}
+
+func (b *cancelAtEOF) Read(p []byte) (int, error) {
+	n, err := b.data.Read(p)
+	if err == io.EOF {
+		b.cancel()
+	}
+	return n, err
+}
+
+func (b *cancelAtEOF) Close() error { return nil }
+
+type cancelAtEOFTransport struct {
+	cancel        context.CancelFunc
+	contentLength int64
+}
+
+func (rt cancelAtEOFTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, ContentLength: rt.contentLength, Body: &cancelAtEOF{data: strings.NewReader("short"), cancel: rt.cancel}, Request: r}, nil
+}
+
+func TestDownloadRejectsCleanEndAfterDeadline(t *testing.T) {
+	for _, length := range []int64{-1, 5} {
+		ctx, cancel := context.WithCancel(context.Background())
+		client := (Fetcher{transport: cancelAtEOFTransport{cancel: cancel, contentLength: length}}).client()
+		root, err := os.OpenRoot(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = download(ctx, client, root, "staging", "https://mirror.invalid/image", 64, time.Hour)
+		_ = root.Close()
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("length %d: body ending after cancellation reported %v, want context.Canceled", length, err)
+		}
 	}
 }
