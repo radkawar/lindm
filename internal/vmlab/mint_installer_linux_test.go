@@ -253,11 +253,13 @@ func TestMintManifestsSelectOnlyTheirLane(t *testing.T) {
 // os-release switch; releases without a base keep their own identity, and an
 // unknown release is refused rather than guessed from ID_LIKE.
 func TestNativeScriptIdentitySelectsRegistryBase(t *testing.T) {
-	for _, test := range []struct{ id, version, want string }{
-		{"linuxmint", "22.3", "LINDM_NATIVE_ID='ubuntu'\nLINDM_NATIVE_VERSION='24.04'\n"},
-		{"pop", "24.04", "LINDM_NATIVE_ID='ubuntu'\nLINDM_NATIVE_VERSION='24.04'\n"},
-		{"ubuntu", "24.04", ""},
-		{"fedora", "44", ""},
+	for _, test := range []struct{ id, version, want, native string }{
+		{"linuxmint", "22.3", "LINDM_NATIVE_ID='ubuntu'\nLINDM_NATIVE_VERSION='24.04'\n", "ubuntu:24.04"},
+		{"pop", "24.04", "LINDM_NATIVE_ID='ubuntu'\nLINDM_NATIVE_VERSION='24.04'\n", "ubuntu:24.04"},
+		// Arch has no VERSION_ID: the derivative's own version must not leak.
+		{"omarchy", "4.0.4", "LINDM_NATIVE_ID='arch'\nLINDM_NATIVE_VERSION=''\n", "arch:"},
+		{"ubuntu", "24.04", "", "ubuntu:24.04"},
+		{"fedora", "44", "", "fedora:44"},
 	} {
 		identity, err := nativeScriptIdentity(platform.ForManifest(test.id, test.version))
 		if err != nil || identity != test.want {
@@ -269,11 +271,7 @@ func TestNativeScriptIdentitySelectsRegistryBase(t *testing.T) {
 		}
 		script := identity + strings.Replace(nativeOSRelease, "/etc/os-release", osRelease, 1) + "\nprintf '%s:%s' \"$ID\" \"$VERSION_ID\""
 		output, err := exec.Command("/bin/sh", "-eu", "-c", script).Output()
-		want := test.id + ":" + test.version
-		if test.want != "" {
-			want = "ubuntu:24.04"
-		}
-		if err != nil || string(output) != want {
+		if err != nil || string(output) != test.native {
 			t.Fatalf("%s %s script identity %q, %v", test.id, test.version, output, err)
 		}
 	}

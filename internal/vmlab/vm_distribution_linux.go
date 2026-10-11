@@ -29,8 +29,9 @@ func (v *guestVM) nativeScript(script string) (string, error) {
 }
 
 // nativeScriptIdentity is the shell assignment of the base identity for a
-// derivative and empty for a release without a base. Lab scripts never select
-// behavior from ID_LIKE.
+// derivative and empty for a release without a base. A rolling base without
+// VERSION_ID (Arch for Omarchy) assigns an empty, never invented, version.
+// Lab scripts never select behavior from ID_LIKE.
 func nativeScriptIdentity(release *platform.Release) (string, error) {
 	if release == nil || !release.Known() {
 		return "", errors.New("lab guest scripts require a registry release")
@@ -39,15 +40,21 @@ func nativeScriptIdentity(release *platform.Release) (string, error) {
 	if native == release {
 		return "", nil
 	}
-	if native.Version.Rule != platform.VersionExact {
+	version := ""
+	switch native.Version.Rule {
+	case platform.VersionExact:
+		version = native.Version.Value
+	case platform.VersionAbsent:
+	default:
 		return "", fmt.Errorf("%s base %s has no exact version identity", release.Name, native.Name)
 	}
-	return "LINDM_NATIVE_ID=" + nativeQuote(native.ID) + "\nLINDM_NATIVE_VERSION=" + nativeQuote(native.Version.Value) + "\n", nil
+	return "LINDM_NATIVE_ID=" + nativeQuote(native.ID) + "\nLINDM_NATIVE_VERSION=" + nativeQuote(version) + "\n", nil
 }
 
 // nativeOSRelease sources os-release and applies the lab's native identity.
+// A set but empty LINDM_NATIVE_VERSION is the base's absent VERSION_ID.
 const nativeOSRelease = `. /etc/os-release
-ID=${LINDM_NATIVE_ID:-$ID} VERSION_ID=${LINDM_NATIVE_VERSION:-${VERSION_ID-}}`
+ID=${LINDM_NATIVE_ID:-$ID} VERSION_ID=${LINDM_NATIVE_VERSION-${VERSION_ID-}}`
 
 // nativeBackend is the release's native package backend (its base's for a
 // derivative). Unknown and image-based releases have none and are rejected, so
