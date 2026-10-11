@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -99,7 +103,7 @@ func recoveryArtifactRepository(t *testing.T, payload, kernel []byte) (*releaseu
 func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
 	now := time.Now().UTC()
 	valid := recoveryObservationFixture(now)
-	host := devicedb.GetHostObservationRow{ReceivedAt: timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: valid.GetBootId()}
+	host := devicedb.GetHostObservationRow{ReceivedAt: core.Timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: valid.GetBootId()}
 	cases := []struct {
 		name   string
 		change func(*agentv1.RecoveryReadinessObservation, *devicedb.GetHostObservationRow)
@@ -119,7 +123,7 @@ func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
 			o.BootId = uuid.NewString()
 		}, "device_action_recovery_readiness_stale"},
 		{"stale_host", func(_ *agentv1.RecoveryReadinessObservation, h *devicedb.GetHostObservationRow) {
-			h.ReceivedAt = timestamptz(now.Add(-6 * time.Minute))
+			h.ReceivedAt = core.Timestamptz(now.Add(-6 * time.Minute))
 		}, "device_action_recovery_readiness_stale"},
 		{"unavailable", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.Available = false }, "device_action_recovery_readiness_unsupported"},
 		{"secure_boot_disabled", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.SecureBoot = false }, "device_action_recovery_readiness_unsupported"},
@@ -135,12 +139,12 @@ func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			observation, row := proto.CloneOf(valid), host
 			tc.change(observation, &row)
-			if got := recoveryObservationReason(row, observation, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != tc.reason {
+			if got := inventory.RecoveryObservationReason(row, observation, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != tc.reason {
 				t.Fatalf("reason=%q want %q", got, tc.reason)
 			}
 		})
 	}
-	if got := recoveryObservationReason(host, nil, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != "device_action_recovery_readiness_missing" {
+	if got := inventory.RecoveryObservationReason(host, nil, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != "device_action_recovery_readiness_missing" {
 		t.Fatalf("missing observation: %q", got)
 	}
 }
@@ -159,7 +163,7 @@ func TestRecoveryCapacityRounding(t *testing.T) {
 		{"zero_unit", 1, 0, 4096, 0, "device_action_recovery_readiness_unsupported"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := evaluateRecoveryCapacity(&adminv1.RecoveryReadiness{Observation: &agentv1.RecoveryReadinessObservation{AllocationUnitBytes: tc.unit}, ImageSize: tc.size, AvailableBytes: tc.available})
+			got := inventory.EvaluateRecoveryCapacity(&adminv1.RecoveryReadiness{Observation: &agentv1.RecoveryReadinessObservation{AllocationUnitBytes: tc.unit}, ImageSize: tc.size, AvailableBytes: tc.available})
 			if got.GetNeededBytes() != tc.needed || got.GetReason() != tc.reason || got.GetReady() != (tc.reason == "") {
 				t.Fatalf("capacity: %v", got)
 			}
@@ -173,20 +177,20 @@ func TestRecoveryReadinessIgnoresCallerImageSize(t *testing.T) {
 	observation := recoveryObservationFixture(now)
 	observation.ConfiguredImageSha256 = digest
 	observation.ConfiguredImageSize = proto.Uint64(1)
-	host := devicedb.GetHostObservationRow{ReceivedAt: timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
-	s := &Service{recoveryArtifacts: client}
+	host := devicedb.GetHostObservationRow{ReceivedAt: core.Timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
+	s := composed(&core.Service{RecoveryArtifacts: client})
 	details := &inventoryv1.NativeDetails{RecoveryReadiness: observation}
-	got, err := s.recoveryReadiness(t.Context(), host, details, digest, now)
+	got, err := s.RecoveryReadiness(t.Context(), host, details, digest, now)
 	if err != nil || got.GetReady() || got.GetImageSize() != 8193 || got.GetNeededBytes() != 12288 || got.GetReason() != "device_action_esp_insufficient" {
 		t.Fatalf("forged local size overrode signed size: %v %v", got, err)
 	}
 	observation.FreeBytes = 12288
-	got, err = s.recoveryReadiness(t.Context(), host, details, digest, now)
+	got, err = s.RecoveryReadiness(t.Context(), host, details, digest, now)
 	if err != nil || !got.GetReady() || !bytes.Equal(got.GetImageSha256(), digest) {
 		t.Fatalf("current exact signed artifact refused: %v %v", got, err)
 	}
 	unknown := sha256.Sum256([]byte("unregistered image"))
-	got, err = s.recoveryReadiness(t.Context(), host, details, unknown[:], now)
+	got, err = s.RecoveryReadiness(t.Context(), host, details, unknown[:], now)
 	if err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_artifact_unavailable" {
 		t.Fatalf("unregistered image admitted: %v %v", got, err)
 	}
@@ -197,26 +201,26 @@ func TestMeasuredRecoveryReadinessBindsSignedKernel(t *testing.T) {
 	client, digest, kernelDigest := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), kernel)
 	now := time.Now().UTC()
 	observation := measuredObservationFixture(now, kernelDigest)
-	host := devicedb.GetHostObservationRow{ReceivedAt: timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
-	s := &Service{recoveryArtifacts: client}
+	host := devicedb.GetHostObservationRow{ReceivedAt: core.Timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
+	s := composed(&core.Service{RecoveryArtifacts: client})
 	details := &inventoryv1.NativeDetails{RecoveryReadiness: observation}
-	got, err := s.recoveryReadiness(t.Context(), host, details, digest, now)
+	got, err := s.RecoveryReadiness(t.Context(), host, details, digest, now)
 	if err != nil || !got.GetReady() || got.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || got.GetImageSize() != 4097 || got.GetNeededBytes() != 8192 {
 		t.Fatalf("signed measured initramfs refused: %v %v", got, err)
 	}
 	other := sha256.Sum256([]byte("another vendor kernel"))
 	observation.MeasuredKernelSha256 = other[:]
-	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_kernel_mismatch" {
+	if got, err = s.RecoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_kernel_mismatch" {
 		t.Fatalf("unsigned kernel admitted: %v %v", got, err)
 	}
 	observation.MeasuredKernelSha256 = kernelDigest
 	observation.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
 	observation.UkiCapable, observation.EspUuid = true, "1234-ABCD"
-	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_boot_mode_mismatch" {
+	if got, err = s.RecoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_boot_mode_mismatch" {
 		t.Fatalf("UKI-capable device admitted an initramfs artifact: %v %v", got, err)
 	}
 	observation.BootMode, observation.Available, observation.Reason = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, false, "recovery_readiness_tpm_attestation_unavailable"
-	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_attestation_unavailable" {
+	if got, err = s.RecoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_attestation_unavailable" {
 		t.Fatalf("TPM-less device admitted measured recovery: %v %v", got, err)
 	}
 }

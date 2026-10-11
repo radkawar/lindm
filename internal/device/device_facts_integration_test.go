@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -41,15 +45,15 @@ func TestDeviceAgentVersionSignedProjectionAndScope(t *testing.T) {
 			}
 		}
 	}
-	initial, err := devicedb.New(f.svc.pool).GetDeviceReleaseReport(f.ctx, f.principal.GenerationID)
+	initial, err := devicedb.New(f.svc.Pool).GetDeviceReleaseReport(f.ctx, f.principal.GenerationID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	check("", 0, protoTime(initial.ReportedAt))
-	claim := &agentv1.SessionAcquisition{DeploymentId: f.svc.deploymentID.String(), DeviceId: f.deviceID, EnrollmentGeneration: f.generation, RequestId: uuid.NewString(), PredecessorEpoch: 1, Incarnation: uuid.NewString(), BootId: uuid.NewString(), InstallationId: f.deviceID, AgentRelease: "1.3.7", AgentProtocolVersion: 2}
+	check("", 0, core.ProtoTime(initial.ReportedAt))
+	claim := &agentv1.SessionAcquisition{DeploymentId: f.svc.DeploymentID.String(), DeviceId: f.deviceID, EnrollmentGeneration: f.generation, RequestId: uuid.NewString(), PredecessorEpoch: 1, Incarnation: uuid.NewString(), BootId: uuid.NewString(), InstallationId: f.deviceID, AgentRelease: "1.3.7", AgentProtocolVersion: 2}
 	sign := func() *devicev1.AcquireSessionRequest {
 		t.Helper()
-		proof, err := f.svc.authority.Sign(f.ctx, claim, f.key)
+		proof, err := f.svc.Authority.Sign(f.ctx, claim, f.key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,9 +97,9 @@ func TestDeviceAgentVersionSignedProjectionAndScope(t *testing.T) {
 		t.Fatal("release filter bypassed scope")
 	}
 	// Generation replacement must not borrow the retired generation's report.
-	q := devicedb.New(f.svc.pool)
+	q := devicedb.New(f.svc.Pool)
 	next := uuid.New()
-	if err := q.InsertEnrollmentGeneration(f.ctx, devicedb.InsertEnrollmentGenerationParams{ID: next, DeviceID: f.principal.DeviceID, CreatedAt: timestamptz(f.now)}); err != nil {
+	if err := q.InsertEnrollmentGeneration(f.ctx, devicedb.InsertEnrollmentGenerationParams{ID: next, DeviceID: f.principal.DeviceID, CreatedAt: core.Timestamptz(f.now)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := q.SetDeviceGeneration(f.ctx, devicedb.SetDeviceGenerationParams{ID: f.principal.DeviceID, CurrentGenerationID: &next}); err != nil {
@@ -140,7 +144,7 @@ func TestDeviceSessionAndRouteFactsInventoryScope(t *testing.T) {
 	if _, err := f.svc.GetDevice(identity.WithPrincipal(f.ctx, denied), connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: f.deviceID})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("personal data escaped fleet-read permission: %v", err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	report.Sequence = 2
 	details.Sessions.ActiveSessions = &inventoryv1.ActiveSessions{Status: missing}
 	details.Network.Interfaces[0].DefaultRouteIpv4 = &inventoryv1.ObservedBool{Status: missing}

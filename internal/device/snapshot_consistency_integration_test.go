@@ -13,6 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -32,7 +36,7 @@ func TestGetDeviceUsesOneDatabaseSnapshot(t *testing.T) {
 			if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(hostObservation(f.generation, 1, "original"))); err != nil {
 				t.Fatal(err)
 			}
-			f.now = f.now.Add(snapshotAttemptInterval)
+			f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 			var replacement *devicev1.PackageSnapshotManifest
 			if change == "publication" {
 				raw := packageBatch(t, &inventoryv1.Package{Name: "replacement", Version: "1", Manager: "apt"})
@@ -80,7 +84,7 @@ func TestGetDeviceUsesOneDatabaseSnapshot(t *testing.T) {
 			defer ticker.Stop()
 			for {
 				var waiting bool
-				if err := f.svc.pool.QueryRow(ctx, `SELECT EXISTS (
+				if err := f.svc.Pool.QueryRow(ctx, `SELECT EXISTS (
 					SELECT 1 FROM pg_stat_activity
 					WHERE $1::integer = ANY(pg_blocking_pids(pid))
 					AND query LIKE '-- name: GetHostObservation %'
@@ -147,13 +151,13 @@ func TestPutPackageBatchJSONAcceptsMaximumDecodedPayload(t *testing.T) {
 		packages[i] = &inventoryv1.Package{Name: "p", Manager: "m", Version: strings.Repeat("v", 2036)}
 	}
 	raw := packageBatch(t, packages...)
-	if len(raw) != maxBatchBytes {
-		t.Fatalf("boundary fixture has %d bytes, want %d", len(raw), maxBatchBytes)
+	if len(raw) != core.MaxBatchBytes {
+		t.Fatalf("boundary fixture has %d bytes, want %d", len(raw), core.MaxBatchBytes)
 	}
 	manifest := snapshotManifest(t, f.generation, 1, f.now, [][]byte{raw})
 	leaf := parseCertPEM(t, activeCertificatePEM(t, f.ctx, f.conn, f.principal.DeviceID))
 	roots := x509.NewCertPool()
-	roots.AddCert(f.svc.ca)
+	roots.AddCert(f.svc.CA)
 	path, handler := f.svc.DeviceHandler()
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
@@ -179,7 +183,7 @@ func TestPutPackageBatchJSONAcceptsMaximumDecodedPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(encoded) <= maxMessageBytes {
+	if len(encoded) <= core.MaxMessageBytes {
 		t.Fatalf("JSON fixture does not exercise the base64 envelope boundary: %d", len(encoded))
 	}
 	if _, err := client.PutPackageBatch(f.ctx, connect.NewRequest(request)); err != nil {

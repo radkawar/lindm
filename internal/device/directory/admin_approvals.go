@@ -1,0 +1,140 @@
+package directory
+
+import (
+	"context"
+	"encoding/base64"
+
+	"lindm/internal/device/core"
+
+	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+
+	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
+)
+
+func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[adminv1.CreateApprovalRequest]) (*connect.Response[adminv1.CreateApprovalResponse], error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	actor, ok := identity.PrincipalFromContext(ctx)
+	if !ok {
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	if actor.ServiceAccount {
+		return nil, core.ApprovalError(identity.ErrAuthorizationDenied)
+	}
+	if s.Identity == nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
+	}
+	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
+		return nil, core.Invalid("invalid_approval")
+	}
+	if err := s.Acquire(ctx); err != nil {
+		return nil, core.MapErr(err)
+	}
+	defer s.Release()
+	approval, err := s.Identity.CreateApproval(ctx, actor.ID, req.Msg, s.inventory.RecoveryReadinessApprovalScope(req.Msg.GetCreateDeviceAction()))
+	if err != nil {
+		return nil, core.ApprovalError(err)
+	}
+	return core.NoStore(&adminv1.CreateApprovalResponse{Approval: approval}), nil
+}
+
+func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv1.ListApprovalsRequest]) (*connect.Response[adminv1.ListApprovalsResponse], error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	actor, ok := identity.PrincipalFromContext(ctx)
+	if !ok {
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	if s.Identity == nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
+	}
+	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
+		return nil, core.Invalid("invalid_approval")
+	}
+	if err := s.Acquire(ctx); err != nil {
+		return nil, core.MapErr(err)
+	}
+	defer s.Release()
+	approvals, next, err := s.Identity.ListApprovals(ctx, actor.ID, req.Msg)
+	if err != nil {
+		return nil, core.ApprovalError(err)
+	}
+	var budget core.ResponsePageBudget
+	for i, item := range approvals {
+		fits, err := budget.Take(item)
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		if !fits {
+			if i == 0 {
+				return nil, core.MapErr(core.ErrInternalState)
+			}
+			last, err := core.ParseUUID(approvals[i-1].GetId())
+			if err != nil {
+				return nil, core.MapErr(core.ErrInternalState)
+			}
+			next = base64.RawURLEncoding.EncodeToString(last[:])
+			approvals = approvals[:i]
+			break
+		}
+	}
+	return core.NoStore(&adminv1.ListApprovalsResponse{Approvals: approvals, NextPageToken: next}), nil
+}
+
+func (s *Service) ApproveApproval(ctx context.Context, req *connect.Request[adminv1.ApproveApprovalRequest]) (*connect.Response[adminv1.ApproveApprovalResponse], error) {
+	approval, err := s.decideApproval(ctx, core.Message(req), true)
+	if err != nil {
+		return nil, err
+	}
+	return core.NoStore(&adminv1.ApproveApprovalResponse{Approval: approval}), nil
+}
+
+func (s *Service) RejectApproval(ctx context.Context, req *connect.Request[adminv1.RejectApprovalRequest]) (*connect.Response[adminv1.RejectApprovalResponse], error) {
+	approval, err := s.decideApproval(ctx, core.Message(req), false)
+	if err != nil {
+		return nil, err
+	}
+	return core.NoStore(&adminv1.RejectApprovalResponse{Approval: approval}), nil
+}
+
+type approvalDecision interface {
+	proto.Message
+	GetApprovalId() string
+	GetReason() string
+}
+
+// decideApproval records one human reviewer's decision; service accounts never
+// review.
+func (s *Service) decideApproval(ctx context.Context, msg approvalDecision, approve bool) (*adminv1.Approval, error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	actor, err := s.Require(ctx, identity.PermissionManageApprovals)
+	if err != nil {
+		return nil, err
+	}
+	if actor.ServiceAccount {
+		return nil, core.ApprovalError(identity.ErrAuthorizationDenied)
+	}
+	if s.Identity == nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
+	}
+	if !msg.ProtoReflect().IsValid() || s.Rules.Validate(msg) != nil {
+		return nil, core.Invalid("invalid_approval")
+	}
+	if err := s.Acquire(ctx); err != nil {
+		return nil, core.MapErr(err)
+	}
+	defer s.Release()
+	id, err := core.ParseUUID(msg.GetApprovalId())
+	if err != nil {
+		return nil, core.Invalid("invalid_id")
+	}
+	approval, err := s.Identity.DecideApproval(ctx, actor.ID, id, approve, msg.GetReason(), s.ApprovalScope)
+	if err != nil {
+		return nil, core.ApprovalError(err)
+	}
+	return approval, nil
+}

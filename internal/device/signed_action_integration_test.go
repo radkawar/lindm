@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -21,7 +23,7 @@ import (
 // so one characterization table covers resource and device-action authority.
 type signedServerHarness struct {
 	table     string
-	principal devicePrincipal
+	principal core.DevicePrincipal
 	service   *Service
 	actionID  func() string
 	// prepare issues work and a fresh result nonce for the device.
@@ -37,12 +39,12 @@ type signedServerHarness struct {
 }
 
 func (h *signedServerHarness) ctx(t *testing.T) context.Context {
-	return withDevicePrincipal(t.Context(), h.principal)
+	return core.WithDevicePrincipal(t.Context(), h.principal)
 }
 
 func (h *signedServerHarness) exec(t *testing.T, statement string, args ...any) {
 	t.Helper()
-	if _, err := h.service.pool.Exec(t.Context(), statement, args...); err != nil {
+	if _, err := h.service.Pool.Exec(t.Context(), statement, args...); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -50,7 +52,7 @@ func (h *signedServerHarness) exec(t *testing.T, statement string, args ...any) 
 func (h *signedServerHarness) granted(t *testing.T) bool {
 	t.Helper()
 	var length int
-	if err := h.service.pool.QueryRow(t.Context(), "SELECT octet_length(start_grant_envelope) FROM "+h.table+" WHERE id=$1", h.actionID()).Scan(&length); err != nil {
+	if err := h.service.Pool.QueryRow(t.Context(), "SELECT octet_length(start_grant_envelope) FROM "+h.table+" WHERE id=$1", h.actionID()).Scan(&length); err != nil {
 		t.Fatal(err)
 	}
 	return length != 0
@@ -61,7 +63,7 @@ func resourceServerHarness(t *testing.T) *signedServerHarness {
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	var work *devicev1.ResourceWork
-	start := ed25519.PublicKey(f.service.signing.StartKey[ed25519.SeedSize:])
+	start := ed25519.PublicKey(f.service.Signing.StartKey[ed25519.SeedSize:])
 	return &signedServerHarness{
 		table: "resource_actions", principal: f.principal, service: f.service,
 		actionID: func() string { return work.GetActionId() },
@@ -78,7 +80,7 @@ func resourceServerHarness(t *testing.T) *signedServerHarness {
 		},
 		window: func(t *testing.T, envelope []byte) time.Duration {
 			grant := new(agentv1.ResourceExecutionStartGrant)
-			if err := f.service.authority.Verify(t.Context(), envelope, grant, 1, start); err != nil {
+			if err := f.service.Authority.Verify(t.Context(), envelope, grant, 1, start); err != nil {
 				t.Fatal(err)
 			}
 			return grant.GetExpiresAt().AsTime().Sub(grant.GetNotBefore().AsTime())
@@ -105,7 +107,7 @@ func deviceActionServerHarness(t *testing.T) *signedServerHarness {
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{TerminateSessions: true, Usernames: []string{"alice"}}}}))
 	var work *devicev1.DeviceActionWork
-	start := ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])
+	start := ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])
 	return &signedServerHarness{
 		table: "device_actions", principal: f.principal, service: f.svc,
 		actionID: func() string { return work.GetActionId() },
@@ -122,7 +124,7 @@ func deviceActionServerHarness(t *testing.T) *signedServerHarness {
 		},
 		window: func(t *testing.T, envelope []byte) time.Duration {
 			grant := new(agentv1.DeviceActionStartGrant)
-			if err := f.svc.authority.Verify(t.Context(), envelope, grant, 1, start); err != nil {
+			if err := f.svc.Authority.Verify(t.Context(), envelope, grant, 1, start); err != nil {
 				t.Fatal(err)
 			}
 			return grant.GetExpiresAt().AsTime().Sub(grant.GetNotBefore().AsTime())

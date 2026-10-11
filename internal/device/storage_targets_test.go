@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -69,20 +71,20 @@ func fixtureVirtioStorage() (*agentv1.StorageTarget, *inventoryv1.NativeDetails)
 func TestObservedStorageTargetsVirtioFallback(t *testing.T) {
 	target, details := fixtureVirtioStorage()
 	for _, kind := range []string{"escrow_rotate", "tpm2_bind", "crypto_erase"} {
-		got, reason := observedStorageTargets(details, kind)
+		got, reason := inventory.ObservedStorageTargets(details, kind)
 		if reason != "" || len(got) != 1 || !proto.Equal(got[0].GetTarget(), target) || got[0].GetName() != "vda1" || !got[0].GetRootBacking() {
 			t.Fatalf("exact virtio LUKS selection for %s: %v %s", kind, got, reason)
 		}
 	}
-	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+	if got, _ := inventory.ObservedStorageTargets(details, "sanitize"); len(got) != 0 {
 		t.Fatal("LUKS-only fallback exposed for sanitize")
 	}
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{target}}}}
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatalf("unique serial counted inherited child identities: %v", err)
 	}
 	details.Storage.Devices = details.Storage.Devices[:1]
-	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+	if got, _ := inventory.ObservedStorageTargets(details, "sanitize"); len(got) != 0 {
 		t.Fatal("unencrypted no-WWN disk became a sanitize fallback")
 	}
 }
@@ -141,7 +143,7 @@ func TestObservedStorageTargetsRefuseIncompleteFallback(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, details := fixtureVirtioStorage()
 			test.change(details.Storage.Devices[0], details.Storage.Devices[1])
-			got, reason := observedStorageTargets(details, "crypto_erase")
+			got, reason := inventory.ObservedStorageTargets(details, "crypto_erase")
 			if len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
 				t.Fatalf("incomplete fallback selectable: %v %s", got, reason)
 			}
@@ -157,11 +159,11 @@ func TestObservedStorageTargetsFallbackRejectsDuplicatePhysicalSerial(t *testing
 			otherTarget.Wwn, otherTarget.LuksUuid, otherTarget.SizeBytes = wwn, "", target.GetDiskSizeBytes()
 			other := fixtureStorageDevice("vdb", otherTarget)
 			details.Storage.Devices = append(details.Storage.Devices, other)
-			if got, reason := observedStorageTargets(details, "crypto_erase"); len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
+			if got, reason := inventory.ObservedStorageTargets(details, "crypto_erase"); len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
 				t.Fatalf("duplicate physical serial selectable: %v %s", got, reason)
 			}
 			other.Identity.Serial.Value += "-distinct"
-			if got, reason := observedStorageTargets(details, "crypto_erase"); len(got) != 1 || reason != "" {
+			if got, reason := inventory.ObservedStorageTargets(details, "crypto_erase"); len(got) != 1 || reason != "" {
 				t.Fatalf("distinct physical disk blocked fallback: %v %s", got, reason)
 			}
 		})
@@ -171,7 +173,7 @@ func TestObservedStorageTargetsFallbackRejectsDuplicatePhysicalSerial(t *testing
 func TestObservedStorageFallbackExactTupleAndNoDowngrade(t *testing.T) {
 	target, details := fixtureVirtioStorage()
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: target}}}
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatal(err)
 	}
 	for name, change := range map[string]func(*agentv1.StorageTarget){
@@ -192,7 +194,7 @@ func TestObservedStorageFallbackExactTupleAndNoDowngrade(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			changed := proto.CloneOf(spec)
 			change(changed.GetCryptoErase().Target)
-			if err := requireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
+			if err := inventory.RequireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
 				t.Fatalf("changed signed fallback accepted: %v", err)
 			}
 		})
@@ -201,24 +203,24 @@ func TestObservedStorageFallbackExactTupleAndNoDowngrade(t *testing.T) {
 	for _, device := range details.Storage.Devices {
 		device.Identity.Wwn = observed(success, "native-wwn")
 	}
-	got, reason := observedStorageTargets(details, "crypto_erase")
+	got, reason := inventory.ObservedStorageTargets(details, "crypto_erase")
 	preferred := proto.CloneOf(target)
 	preferred.IdentityBasis, preferred.Wwn = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, "native-wwn"
 	preferred.GptDiskGuid, preferred.DiskSizeBytes = "", 0
 	if reason != "" || len(got) != 1 || !proto.Equal(got[0].GetTarget(), preferred) {
 		t.Fatalf("WWN did not take precedence or retained fallback-only fields: %v %s", got, reason)
 	}
-	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
 		t.Fatalf("fallback silently accepted in place of observed WWN: %v", err)
 	}
 	spec.GetCryptoErase().Target = preferred
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatal(err)
 	}
 	for _, device := range details.Storage.Devices {
 		device.Identity.Wwn = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, "")
 	}
-	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
 		t.Fatalf("WWN approval silently downgraded to fallback: %v", err)
 	}
 }
@@ -242,7 +244,7 @@ func TestObservedStorageTargetsRejectIncompleteIdentity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			device := fixtureStorageDevice("sda", target)
 			test.change(device)
-			got, reason := observedStorageTargets(fixtureStorageDetails(device), "crypto_erase")
+			got, reason := inventory.ObservedStorageTargets(fixtureStorageDetails(device), "crypto_erase")
 			if len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
 				t.Fatalf("incomplete identity selectable: %v %s", got, reason)
 			}
@@ -258,27 +260,27 @@ func TestObservedStorageTargetsKindsAndTopology(t *testing.T) {
 	disk := fixtureStorageDevice("sda", fixtureStorageTarget(""))
 	details := fixtureStorageDetails(disk, container)
 	for _, kind := range []string{"escrow_rotate", "crypto_erase"} {
-		got, reason := observedStorageTargets(details, kind)
+		got, reason := inventory.ObservedStorageTargets(details, kind)
 		if reason != "" || len(got) != 1 || !proto.Equal(got[0].GetTarget(), target) || !got[0].GetRootBacking() {
 			t.Fatalf("exact LUKS selection for %s: %v %s", kind, got, reason)
 		}
 	}
-	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+	if got, _ := inventory.ObservedStorageTargets(details, "sanitize"); len(got) != 0 {
 		t.Fatal("disk with encrypted descendant selectable")
 	}
-	if got, reason := observedStorageTargets(details, "tpm2_bind"); len(got) != 0 || reason != "device_action_tpm2_unavailable" {
+	if got, reason := inventory.ObservedStorageTargets(details, "tpm2_bind"); len(got) != 0 || reason != "device_action_tpm2_unavailable" {
 		t.Fatal("TPM2 absence ignored")
 	}
 	details.Tpm = &inventoryv1.TpmDetails{Present: &inventoryv1.ObservedBool{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: true}, Version: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "2")}
-	if got, reason := observedStorageTargets(details, "tpm2_bind"); len(got) != 1 || reason != "" {
+	if got, reason := inventory.ObservedStorageTargets(details, "tpm2_bind"); len(got) != 1 || reason != "" {
 		t.Fatal("available TPM2 did not expose LUKS container")
 	}
 	container.Encryption.Value, container.Filesystem.Value, container.Identity.LuksUuid.Value = "none", "ext4", ""
-	if got, reason := observedStorageTargets(details, "sanitize"); len(got) != 1 || reason != "" || got[0].GetName() != "sda" {
+	if got, reason := inventory.ObservedStorageTargets(details, "sanitize"); len(got) != 1 || reason != "" || got[0].GetName() != "sda" {
 		t.Fatal("sanitize did not restrict selection to whole disk")
 	}
 	container.Encryption.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
-	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+	if got, _ := inventory.ObservedStorageTargets(details, "sanitize"); len(got) != 0 {
 		t.Fatal("unknown descendant encryption treated as unencrypted")
 	}
 }
@@ -287,18 +289,18 @@ func TestObservedStorageTargetExactTupleAndLiveSet(t *testing.T) {
 	first, second := fixtureStorageTarget(uuid.NewString()), fixtureStorageTarget(uuid.NewString())
 	details := fixtureStorageDetails(fixtureStorageDevice("sda", first), fixtureStorageDevice("sdb", second))
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{first, second}}}}
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatal(err)
 	}
 	mapping := fixtureStorageDevice("crypt-root", fixtureStorageTarget(""))
 	mapping.Type.Value, mapping.Encryption.Value = "crypt", "dm-crypt"
 	mapping.Parent = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "sda")
 	details.Storage.Devices = append(details.Storage.Devices, mapping)
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatalf("covered encrypted mapping counted as another native container: %v", err)
 	}
 	mapping.Parent.Value = "unobserved-container"
-	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
 		t.Fatalf("uncovered encrypted mapping omitted from live set: %v", err)
 	}
 	details.Storage.Devices = details.Storage.Devices[:2]
@@ -318,16 +320,16 @@ func TestObservedStorageTargetExactTupleAndLiveSet(t *testing.T) {
 	} {
 		changed := proto.CloneOf(spec)
 		change(changed.GetCryptoErase().Targets[0])
-		if err := requireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
+		if err := inventory.RequireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
 			t.Fatalf("changed tuple accepted: %v", err)
 		}
 	}
 	spec.GetCryptoErase().Targets = spec.GetCryptoErase().Targets[:1]
-	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
 		t.Fatalf("partial live set accepted: %v", err)
 	}
 	details.Storage.Devices[1].Identity = nil
-	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
 		t.Fatalf("unidentifiable encrypted volume disappeared from live set: %v", err)
 	}
 }
@@ -343,7 +345,7 @@ func TestObservedNVMeIdentityRequiresExactBasisAndFields(t *testing.T) {
 	details := fixtureStorageDetails(device)
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE, NvmeScope: proto.CloneOf(device.Identity.Nvme.Scope)}}}
 	spec.GetSanitize().NvmeScope.ControllerWide = true
-	if err := requireObservedStorageTargets(details, spec); err != nil {
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
 		t.Fatalf("explicit effect scope changed identity: %v", err)
 	}
 	for _, test := range []struct {
@@ -366,7 +368,7 @@ func TestObservedNVMeIdentityRequiresExactBasisAndFields(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			changed := proto.CloneOf(spec)
 			test.change(changed.GetSanitize().NvmeScope)
-			if err := requireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
+			if err := inventory.RequireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
 				t.Fatalf("native identity mutation accepted: %v", err)
 			}
 		})
@@ -380,11 +382,11 @@ func TestActionInventoryFreshBoundary(t *testing.T) {
 		fresh bool
 	}{{0, true}, {5 * time.Minute, true}, {5*time.Minute + time.Nanosecond, false}, {-time.Nanosecond, false}} {
 		host := devicedb.GetHostObservationRow{ReceivedAt: pgtype.Timestamptz{Time: now.Add(-test.age), Valid: true}}
-		if actionInventoryFresh(host, now) != test.fresh {
+		if inventory.ActionInventoryFresh(host, now) != test.fresh {
 			t.Fatalf("receipt age %s freshness changed", test.age)
 		}
 	}
-	if actionInventoryFresh(devicedb.GetHostObservationRow{}, now) {
+	if inventory.ActionInventoryFresh(devicedb.GetHostObservationRow{}, now) {
 		t.Fatal("missing receipt is fresh")
 	}
 }

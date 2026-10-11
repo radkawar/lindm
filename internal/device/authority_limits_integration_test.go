@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -24,11 +26,11 @@ func TestSessionConcurrentReplayAndReceiptCapacity(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.clock = func() time.Time { return now }
+	svc.Clock = func() time.Time { return now }
 	ownerCtx := identity.WithPrincipal(ctx, insertPrincipal(t, ctx, conn, identity.RoleOwner))
 	key := ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
@@ -36,7 +38,7 @@ func TestSessionConcurrentReplayAndReceiptCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	request := signedSessionRequest(t, svc, principal, key, 0)
 	type outcome struct {
 		response *connect.Response[devicev1.AcquireSessionResponse]
@@ -82,19 +84,19 @@ func TestSessionConcurrentReplayAndReceiptCapacity(t *testing.T) {
 
 	// Seed the persisted counter immediately below its boundary without making
 	// tens of thousands of boots part of the developer feedback loop.
-	if _, err := conn.Exec(ctx, `UPDATE enrollment_generations SET session_epoch=$1 WHERE id=$2`, maxSessionReceipts-1, principal.GenerationID); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE enrollment_generations SET session_epoch=$1 WHERE id=$2`, core.MaxSessionReceipts-1, principal.GenerationID); err != nil {
 		t.Fatal(err)
 	}
-	lastRequest, lastReceipt := acquireTestSession(t, ctx, svc, principal, key, maxSessionReceipts-1)
-	if _, err := svc.AcquireSession(deviceCtx, connect.NewRequest(signedSessionRequest(t, svc, principal, key, maxSessionReceipts))); connect.CodeOf(err) != connect.CodeResourceExhausted {
+	lastRequest, lastReceipt := acquireTestSession(t, ctx, svc, principal, key, core.MaxSessionReceipts-1)
+	if _, err := svc.AcquireSession(deviceCtx, connect.NewRequest(signedSessionRequest(t, svc, principal, key, core.MaxSessionReceipts))); connect.CodeOf(err) != connect.CodeResourceExhausted {
 		t.Fatalf("receipt cap not enforced: %v", err)
 	}
 	replayed, err := svc.AcquireSession(deviceCtx, connect.NewRequest(lastRequest))
 	if err != nil || !proto.Equal(lastReceipt, replayed.Msg) {
 		t.Fatalf("capacity prevented original receipt recovery: %v", err)
 	}
-	state, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: maxSessionReceipts}))
-	if err != nil || state.Msg.SessionEpoch != maxSessionReceipts {
+	state, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: core.MaxSessionReceipts}))
+	if err != nil || state.Msg.SessionEpoch != core.MaxSessionReceipts {
 		t.Fatalf("capacity reset or disabled current session: %v", err)
 	}
 	if err := conn.QueryRow(ctx, `SELECT count(*) FROM device_session_receipts WHERE generation_id=$1`, principal.GenerationID).Scan(&receipts); err != nil {
@@ -110,11 +112,11 @@ func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.clock = func() time.Time { return now }
+	svc.Clock = func() time.Time { return now }
 	ownerCtx := identity.WithPrincipal(ctx, insertPrincipal(t, ctx, conn, identity.RoleOwner))
 	key := ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
@@ -122,7 +124,7 @@ func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	requests := []*devicev1.AcquireSessionRequest{signedSessionRequest(t, svc, principal, key, 0), signedSessionRequest(t, svc, principal, key, 0)}
 	results := make(chan error, len(requests))
 	var workers sync.WaitGroup
@@ -150,7 +152,7 @@ func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
 	}
 	var deviceState, generationState string
 	var epoch, audits int64
-	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT count(*) FROM audit_events WHERE action=$3 AND resource_id=$2) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID, principal.DeviceID.String(), actionDeviceRecoveryHold).Scan(&deviceState, &generationState, &epoch, &audits); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT count(*) FROM audit_events WHERE action=$3 AND resource_id=$2) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID, principal.DeviceID.String(), core.ActionDeviceRecoveryHold).Scan(&deviceState, &generationState, &epoch, &audits); err != nil {
 		t.Fatal(err)
 	}
 	if deviceState != "recovery_hold" || generationState != "recovery_hold" || epoch != 1 || audits != 1 {
@@ -163,11 +165,11 @@ func TestRenewalReceiptCapacityPreservesOriginalIssuance(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.clock = func() time.Time { return now }
+	svc.Clock = func() time.Time { return now }
 	ownerCtx := identity.WithPrincipal(ctx, insertPrincipal(t, ctx, conn, identity.RoleOwner))
 	key, nextKey := ed25519Key(t), ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
@@ -175,9 +177,9 @@ func TestRenewalReceiptCapacityPreservesOriginalIssuance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	acquireTestSession(t, ctx, svc, principal, key, 0)
-	if _, err := conn.Exec(ctx, `UPDATE enrollment_generations SET renewal_issuance_count=$1 WHERE id=$2`, maxRenewalReceipts-1, principal.GenerationID); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE enrollment_generations SET renewal_issuance_count=$1 WHERE id=$2`, core.MaxRenewalReceipts-1, principal.GenerationID); err != nil {
 		t.Fatal(err)
 	}
 	request := signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, nextKey, &x509.CertificateRequest{}))
@@ -194,14 +196,14 @@ func TestRenewalReceiptCapacityPreservesOriginalIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 	nextRequest := signedRenewalRequest(t, svc, nextPrincipal, nextKey, 1, mustCSR(t, ed25519Key(t), &x509.CertificateRequest{}))
-	if _, err := svc.RenewIdentity(withDevicePrincipal(ctx, nextPrincipal), connect.NewRequest(nextRequest)); connect.CodeOf(err) != connect.CodeResourceExhausted {
+	if _, err := svc.RenewIdentity(core.WithDevicePrincipal(ctx, nextPrincipal), connect.NewRequest(nextRequest)); connect.CodeOf(err) != connect.CodeResourceExhausted {
 		t.Fatalf("renewal receipt cap not enforced: %v", err)
 	}
 	var issuances, certificates int
 	if err := conn.QueryRow(ctx, `SELECT renewal_issuance_count,(SELECT count(*) FROM device_certificates WHERE device_id=$1) FROM enrollment_generations WHERE id=$2`, principal.DeviceID, principal.GenerationID).Scan(&issuances, &certificates); err != nil {
 		t.Fatal(err)
 	}
-	if issuances != maxRenewalReceipts || certificates != 2 {
+	if issuances != core.MaxRenewalReceipts || certificates != 2 {
 		t.Fatalf("capacity failure mutated issuance authority: count=%d certificates=%d", issuances, certificates)
 	}
 }

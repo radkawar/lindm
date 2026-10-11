@@ -273,7 +273,7 @@ The signed identity basis prefers `WWN_SERIAL`. An explicitly absent WWN may per
 `SERIAL_GPT_LUKS` only for an encrypted GPT partition with unique physical serial,
 exact GPT/LUKS UUIDs and both disk/target sizes. Failed or contradictory WWN evidence
 cannot downgrade. Paths are not authority, and the fallback does not qualify NVMe
-sanitize ([target construction](../../internal/device/storage_targets.go#L111),
+sanitize ([target construction](../../internal/device/inventory/storage_targets.go#L116),
 [native revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
 
 ## Resource providers

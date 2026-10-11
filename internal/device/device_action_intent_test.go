@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -27,7 +29,7 @@ func TestDeviceActionIntentNeverPrecedesDelegation(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			delegation := &agentv1.ExecutionDelegation{NotBefore: timestamppb.New(test.delegationNotBefore), ExpiresAt: timestamppb.New(now.Add(4 * time.Hour))}
-			got := deviceActionNotBefore(now, delegation)
+			got := core.DeviceActionNotBefore(now, delegation)
 			if !got.Equal(test.want) {
 				t.Fatalf("intent NotBefore = %v, want %v", got, test.want)
 			}

@@ -13,6 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,7 +44,7 @@ type dispatchFixture struct {
 	pool                *pgxpool.Pool
 	actor               identity.Principal
 	adminCtx, deviceCtx context.Context
-	principal           devicePrincipal
+	principal           core.DevicePrincipal
 	directory           *dispatchDirectory
 	key                 ed25519.PrivateKey
 	certificate         []byte
@@ -116,7 +120,7 @@ func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration, capabi
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	f.service, err = New(pool, Config{DeploymentID: deployment, CACertificate: ca, CAKey: caKey, Identity: identityService, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
+	f.service, err = New(pool, core.Config{DeploymentID: deployment, CACertificate: ca, CAKey: caKey, Identity: identityService, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +131,7 @@ func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration, capabi
 		t.Fatal(err)
 	}
 	acquireTestSession(t, t.Context(), f.service, f.principal, f.key, 0)
-	f.deviceCtx = withDevicePrincipal(t.Context(), f.principal)
+	f.deviceCtx = core.WithDevicePrincipal(t.Context(), f.principal)
 	firstID, secondID := uuid.NewString(), uuid.NewString()
 	published, err := f.service.PublishProfileRevision(f.adminCtx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "test dispatch revision", Spec: &policyv1.ResourceProfile{Name: "Dispatch integration", Resources: []*policyv1.ProfileResource{{ResourceId: secondID, Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "aaa-dependent.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "aaa-dependent.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}, DependsOn: []*policyv1.ResourceDependency{{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "zzz-first.service"}, Condition: policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_ACTIVE}}}, {ResourceId: firstID, Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "zzz-first.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "zzz-first.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}}}}}))
 	if err != nil {
@@ -189,11 +193,11 @@ func (f *dispatchFixture) intent(t *testing.T, work *devicev1.ResourceWork) *age
 		t.Fatal("missing service work")
 	}
 	message := new(agentv1.ResourceExecutionIntent)
-	public, ok := f.service.signing.PlanKey.Public().(ed25519.PublicKey)
+	public, ok := f.service.Signing.PlanKey.Public().(ed25519.PublicKey)
 	if !ok {
 		t.Fatal("dispatch fixture requires an Ed25519 plan key")
 	}
-	if err := f.service.authority.Verify(t.Context(), work.GetIntentEnvelope(), message, 1, public); err != nil {
+	if err := f.service.Authority.Verify(t.Context(), work.GetIntentEnvelope(), message, 1, public); err != nil {
 		t.Fatal(err)
 	}
 	return message
@@ -207,7 +211,7 @@ func (f *dispatchFixture) challenge(t *testing.T, work *devicev1.ResourceWork) *
 }
 func (f *dispatchFixture) sign(t *testing.T, message proto.Message, key ed25519.PrivateKey) []byte {
 	t.Helper()
-	encoded, err := f.service.authority.Sign(t.Context(), message, key)
+	encoded, err := f.service.Authority.Sign(t.Context(), message, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +252,7 @@ func (f *dispatchFixture) result(t *testing.T, work *devicev1.ResourceWork, revi
 	if started {
 		status.StartedAt = stamp
 	}
-	if resourceExecutionTerminal(state) {
+	if dispatch.ResourceExecutionTerminal(state) {
 		status.CompletedAt = stamp
 	}
 	if state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
@@ -262,7 +266,7 @@ func (f *dispatchFixture) result(t *testing.T, work *devicev1.ResourceWork, revi
 			Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: native, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, JobCompleted: true, Converged: true}},
 		}
 	}
-	if resourceExecutionTerminal(state) && state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+	if dispatch.ResourceExecutionTerminal(state) && state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 		status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE
 	}
 	attestation := &agentv1.ResourceExecutionAttestation{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), SessionEpoch: 1, ActionRevision: revision, Nonce: work.GetResultNonce(), IssuedAt: stamp, ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: status}

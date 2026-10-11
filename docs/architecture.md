@@ -1290,7 +1290,7 @@ timestamps; `GetSyncState` supplies the durable jittered 60-second heartbeat.
   proof. Once a grant is issued, the action stays open until verified terminal
   evidence arrives: the effect may already have run.
 - Resource executions and device actions share one signed-action core on each
-  side (`internal/agent/executor/signed_action.go`, `internal/device/signed_action.go`),
+  side (`internal/agent/executor/signed_action.go`, `internal/device/dispatch/signed_action.go`),
   so every fence below applies identically to both kinds.
 - Start grants require a valid device challenge bound to the stored intent, a fresh
   re-authorization at the same version and the unchanged head. Exact retries return

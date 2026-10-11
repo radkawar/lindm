@@ -24,7 +24,7 @@ import (
 func (f *deviceActionFixture) observeRecoveryReadiness(t *testing.T, observation *agentv1.RecoveryReadinessObservation) {
 	t.Helper()
 	ageInventoryAdmissions(t, f)
-	host, err := devicedb.New(f.svc.pool).GetHostObservation(t.Context(), f.principal.GenerationID)
+	host, err := devicedb.New(f.svc.Pool).GetHostObservation(t.Context(), f.principal.GenerationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func recoveryAdmissionReason(t *testing.T, err error, reason string) {
 func TestRecoveryReadinessBlocksApprovalAndRechecksCreation(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	client, digest := recoveryArtifactFixture(t, bytes.Repeat([]byte{0x5a}, 8193))
-	f.svc.recoveryArtifacts = client
+	f.svc.RecoveryArtifacts = client
 	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "readiness-test-wwn", Serial: "readiness-test-serial", SizeBytes: 1 << 30}
 	f.observeStorageTargets(t, target)
 	media, err := trust.DeviceActionDigest(target)
@@ -90,7 +90,7 @@ func TestRecoveryReadinessBlocksApprovalAndRechecksCreation(t *testing.T) {
 			_, err := f.svc.CreateApproval(f.ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: request}}))
 			recoveryAdmissionReason(t, err, tc.reason)
 			var count int
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM approval_requests WHERE mutation_id=$1", request.GetRequestId()).Scan(&count); err != nil {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM approval_requests WHERE mutation_id=$1", request.GetRequestId()).Scan(&count); err != nil {
 				t.Fatal(err)
 			}
 			if count != 0 {

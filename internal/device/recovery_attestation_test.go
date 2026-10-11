@@ -7,6 +7,8 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"lindm/internal/device/core"
+
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -48,8 +50,8 @@ func measuredHandoffFixture(t *testing.T, initrd, kernel []byte) *agentv1.Device
 
 func TestMeasuredHandoffAdmissionBindsReleaseAndKey(t *testing.T) {
 	client, initrd, kernel := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), bytes.Repeat([]byte{0x4b}, 5000))
-	s := &Service{recoveryArtifacts: client}
-	if err := s.admitMeasuredHandoff(t.Context(), measuredHandoffFixture(t, initrd, kernel)); err != nil {
+	s := composed(&core.Service{RecoveryArtifacts: client})
+	if err := s.AdmitMeasuredHandoff(t.Context(), measuredHandoffFixture(t, initrd, kernel)); err != nil {
 		t.Fatalf("exact measured handoff refused: %v", err)
 	}
 	for name, change := range map[string]func(*agentv1.DeviceActionRecoveryHandoff){
@@ -67,45 +69,45 @@ func TestMeasuredHandoffAdmissionBindsReleaseAndKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			handoff := measuredHandoffFixture(t, initrd, kernel)
 			change(handoff)
-			if err := s.admitMeasuredHandoff(t.Context(), handoff); err == nil {
+			if err := s.AdmitMeasuredHandoff(t.Context(), handoff); err == nil {
 				t.Fatal("changed measured handoff admitted")
 			}
 		})
 	}
 	uki := measuredHandoffFixture(t, initrd, kernel)
 	uki.Intent.Spec.GetSanitize().Recovery.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
-	if err := s.admitMeasuredHandoff(t.Context(), uki); err == nil {
+	if err := s.AdmitMeasuredHandoff(t.Context(), uki); err == nil {
 		t.Fatal("UKI handoff carried a measured binding")
 	}
 }
 
 func TestRecoveryStartAttestationGate(t *testing.T) {
 	client, initrd, kernel := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), bytes.Repeat([]byte{0x4b}, 5000))
-	s := &Service{recoveryArtifacts: client}
+	s := composed(&core.Service{RecoveryArtifacts: client})
 	handoff := measuredHandoffFixture(t, initrd, kernel)
 	challenge := &agentv1.DeviceActionChallenge{ActionId: handoff.GetIntent().GetActionId(), Nonce: bytes.Repeat([]byte{3}, 32)}
 	receipt := []byte("server-signed BOOTED receipt")
-	if err := s.verifyRecoveryAttestation(t.Context(), handoff, receipt, challenge, nil); rpcreason.Get(err) != "recovery_attestation_required" {
+	if err := s.VerifyRecoveryAttestation(t.Context(), handoff, receipt, challenge, nil); rpcreason.Get(err) != "recovery_attestation_required" {
 		t.Fatalf("measured start without quote: %v", err)
 	}
 	forged := &recoveryv1.RecoveryAttestation{Quote: []byte{1}, Signature: []byte{2}, EventLog: []byte{3}}
-	if err := s.verifyRecoveryAttestation(t.Context(), handoff, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_rejected" {
+	if err := s.VerifyRecoveryAttestation(t.Context(), handoff, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_rejected" {
 		t.Fatalf("forged quote: %v", err)
 	}
-	if err := s.verifyRecoveryAttestation(t.Context(), handoff, nil, challenge, forged); rpcreason.Get(err) != "recovery_boot_checkpoint_required" {
+	if err := s.VerifyRecoveryAttestation(t.Context(), handoff, nil, challenge, forged); rpcreason.Get(err) != "recovery_boot_checkpoint_required" {
 		t.Fatalf("quote without BOOTED receipt: %v", err)
 	}
 	changed := proto.CloneOf(handoff)
 	changed.MeasuredBoot.KernelSha256 = bytes.Repeat([]byte{9}, 32)
-	if err := s.verifyRecoveryAttestation(t.Context(), changed, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_rejected" {
+	if err := s.VerifyRecoveryAttestation(t.Context(), changed, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_rejected" {
 		t.Fatalf("unreleased kernel: %v", err)
 	}
 	uki := proto.CloneOf(handoff)
 	uki.MeasuredBoot = nil
-	if err := s.verifyRecoveryAttestation(t.Context(), uki, receipt, challenge, nil); err != nil {
+	if err := s.VerifyRecoveryAttestation(t.Context(), uki, receipt, challenge, nil); err != nil {
 		t.Fatalf("UKI start required a quote: %v", err)
 	}
-	if err := s.verifyRecoveryAttestation(t.Context(), uki, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_unexpected" {
+	if err := s.VerifyRecoveryAttestation(t.Context(), uki, receipt, challenge, forged); rpcreason.Get(err) != "recovery_attestation_unexpected" {
 		t.Fatalf("UKI start accepted a quote: %v", err)
 	}
 }

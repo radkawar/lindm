@@ -30,7 +30,7 @@ flowchart LR
 ```
 
 - `cmd/*` packages only compose and start things. The composition root is `internal/server/server.go`. It sets up the pgxpool, calls `db.Check`, and builds the identity, executionauthority and device services. It also creates two muxes, admin and device, with TLS 1.3, a 256-slot in-flight guard and a 30s request timeout.
-- Domains: `internal/identity` (OIDC PKCE admin sessions), `internal/device` (Admin/Enrollment/Device handlers), `internal/executionauthority` (quorum-signed trust store) and `internal/policy` (service profiles). Each domain owns its own sqlc package: `identitydb`, `devicedb`, `authoritydb`, `profiledb`.
+- Domains: `internal/identity` (OIDC PKCE admin sessions), `internal/device` (composes the Admin/Enrollment/Device handlers from `device/{core,dispatch,secrets,inventory,directory,assistance}`), `internal/executionauthority` (quorum-signed trust store) and `internal/policy` (service profiles). Each domain owns its own sqlc package: `identitydb`, `devicedb`, `authoritydb`, `profiledb`.
 - On the agent, the root executor holds the identity keys, trust and journal. The unprivileged process does only transport.
 - Migrations run only through `lindmd migrate`, which takes an advisory lock. `serve` never runs DDL; `db.Check` requires that exactly the expected set of migrations has been applied.
 - Protobuf is the only schema for both APIs and config. Config files are strict protobuf JSON (unknown fields are rejected), loaded by `internal/config` (`Document.Resolve()` → `Resources`).

@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,7 +32,7 @@ type enrolledFixture struct {
 	ctx        context.Context
 	svc        *Service
 	conn       *pgx.Conn
-	principal  devicePrincipal
+	principal  core.DevicePrincipal
 	key        ed25519.PrivateKey
 	generation string
 	deviceID   string
@@ -42,11 +46,11 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 	pool, conn := testdb.Open(t)
 	f.conn = conn
 	ca, caKey := testCA(t, f.now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.clock = func() time.Time { return f.now }
+	svc.Clock = func() time.Time { return f.now }
 	f.svc = svc
 	f.ownerCtx = identity.WithPrincipal(f.ctx, insertPrincipal(t, f.ctx, conn, identity.RoleOwner))
 	f.key = ed25519Key(t)
@@ -64,7 +68,7 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 }
 
 func (f *enrolledFixture) deviceCtx() context.Context {
-	return withDevicePrincipal(f.ctx, f.principal)
+	return core.WithDevicePrincipal(f.ctx, f.principal)
 }
 
 func TestSnapshotResumeAcrossSessionEpoch(t *testing.T) {
@@ -143,7 +147,7 @@ func TestPackageFailurePreservesEmptySnapshot(t *testing.T) {
 	if err != nil || committed.GetState() != inventoryv1.SnapshotState_SNAPSHOT_STATE_COMMITTED {
 		t.Fatal(err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	if _, err := f.svc.ReportPackageAttempt(f.deviceCtx(), connect.NewRequest(&devicev1.ReportPackageAttemptRequest{
 		EnrollmentGeneration: f.generation, SessionEpoch: 1, Sequence: 4,
 		StartedAt: timestamppb.New(f.now), FinishedAt: timestamppb.New(f.now),
@@ -172,7 +176,7 @@ func TestUnavailableHostFieldDoesNotClearProjection(t *testing.T) {
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(first)); err != nil {
 		t.Fatal(err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	second := hostObservation(f.generation, 2, "ignored")
 	second.Observation.Hostname = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, "")
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(second)); err != nil {
@@ -209,7 +213,7 @@ func TestPackagePageTokenFreezesSnapshot(t *testing.T) {
 		t.Fatalf("first page cursor: %+v", page.Msg)
 	}
 	expires := page.Msg.GetCursorExpiresAt().AsTime()
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	f.publishPackages(t, 2, "other")
 	revisited, err := f.svc.ListDevicePackages(f.ownerCtx, connect.NewRequest(&adminv1.ListDevicePackagesRequest{DeviceId: f.deviceID, PageSize: 1, PageToken: page.Msg.GetPageToken()}))
 	if err != nil {
@@ -235,7 +239,7 @@ func TestCleanupRetainsPinnedAndCurrentSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	f.publishPackages(t, 2, "current")
 	f.now = f.now.Add(time.Minute)
 	if err := f.svc.CleanupSnapshots(f.ctx); err != nil {
@@ -261,7 +265,7 @@ func TestReceiptExpiryRefusesWithoutRepublish(t *testing.T) {
 		t.Fatal(err)
 	}
 	var seconds int64
-	if err := f.conn.QueryRow(f.ctx, `SELECT EXTRACT(EPOCH FROM (receipt_expires_at - accepted_at))::bigint FROM package_snapshots WHERE id = $1`, manifest.GetSnapshotId()).Scan(&seconds); err != nil || time.Duration(seconds)*time.Second != snapshotReceiptTTL {
+	if err := f.conn.QueryRow(f.ctx, `SELECT EXTRACT(EPOCH FROM (receipt_expires_at - accepted_at))::bigint FROM package_snapshots WHERE id = $1`, manifest.GetSnapshotId()).Scan(&seconds); err != nil || time.Duration(seconds)*time.Second != inventory.SnapshotReceiptTTL {
 		t.Fatalf("receipt lifetime = %s (%v)", time.Duration(seconds)*time.Second, err)
 	}
 	if _, err := f.conn.Exec(f.ctx, `UPDATE package_snapshots SET accepted_at = accepted_at - interval '2160 hours', open_until = open_until - interval '2160 hours', receipt_expires_at = receipt_expires_at - interval '2160 hours' WHERE id = $1`, manifest.GetSnapshotId()); err != nil {
@@ -276,8 +280,8 @@ func TestReceiptExpiryRefusesWithoutRepublish(t *testing.T) {
 }
 
 func TestInventoryBudgetAndOpenUpload(t *testing.T) {
-	f := newEnrolled(t, minInventoryBudget)
-	if _, err := f.begin(t, declaredManifest(t, f.generation, 1, f.now, 80, maxBatchBytes), 1); err != nil {
+	f := newEnrolled(t, core.MinInventoryBudget)
+	if _, err := f.begin(t, declaredManifest(t, f.generation, 1, f.now, 80, core.MaxBatchBytes), 1); err != nil {
 		t.Fatal(err)
 	}
 	secondKey := ed25519Key(t)
@@ -288,14 +292,14 @@ func TestInventoryBudgetAndOpenUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	acquireTestSession(t, f.ctx, f.svc, principal, secondKey, 0)
-	otherCtx := withDevicePrincipal(f.ctx, principal)
+	otherCtx := core.WithDevicePrincipal(f.ctx, principal)
 	if _, err := f.svc.BeginPackageSnapshot(otherCtx, connect.NewRequest(&devicev1.BeginPackageSnapshotRequest{
 		EnrollmentGeneration: enrolled.Msg.GetEnrollmentGeneration(), SessionEpoch: 1,
-		Manifest: declaredManifest(t, enrolled.Msg.GetEnrollmentGeneration(), 1, f.now, 8, maxBatchBytes),
+		Manifest: declaredManifest(t, enrolled.Msg.GetEnrollmentGeneration(), 1, f.now, 8, core.MaxBatchBytes),
 	})); connect.CodeOf(err) != connect.CodeResourceExhausted {
 		t.Fatalf("second device ignored deployment budget: %v", err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	if _, err := f.begin(t, snapshotManifest(t, f.generation, 2, f.now, nil), 1); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "open_upload" {
 		t.Fatalf("second open upload: %v", err)
 	}

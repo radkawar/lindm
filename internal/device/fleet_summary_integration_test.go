@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/directory"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -268,7 +270,7 @@ func TestFleetSummaryFindingsUseCanonicalSeverityAndFreshness(t *testing.T) {
 	hidden := fleetSummaryEnroll(t, f)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	var err error
-	f.svc.advisories, err = advisory.New(f.ctx, f.svc.pool, nil, &http.Client{Timeout: time.Second})
+	f.svc.Advisories, err = advisory.New(f.ctx, f.svc.Pool, nil, &http.Client{Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +434,7 @@ func TestFleetSummaryAuthorizationAndOmittedSections(t *testing.T) {
 	if got.GetFindings() != nil || got.GetApprovals() != nil || got.GetLifecycle() == nil || got.GetContact() == nil || got.GetOperatingSystems() == nil || got.GetResourceCompliance() == nil {
 		t.Fatalf("unavailable/denied sections were fabricated as zero or required sections omitted: %v", got)
 	}
-	f.svc.identity = nil
+	f.svc.Identity = nil
 	if got := fleetSummary(t, f.svc, f.ownerCtx, 0); got.GetApprovals() != nil {
 		t.Fatalf("missing identity service fabricated inbox totals: %v", got.GetApprovals())
 	}
@@ -581,7 +583,7 @@ SELECT $1,$2,$3,$4,resource_id,$5,intent_envelope,intent_document,$6,$7,$6,'expi
 func TestFleetSummaryBackgroundPopulationIsFreshUnrestrictedOnly(t *testing.T) {
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
-	if err := f.svc.refreshFleetPopulation(f.ctx); err != nil {
+	if err := f.svc.RefreshFleetPopulation(f.ctx); err != nil {
 		t.Fatal(err)
 	}
 	before := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices()
@@ -593,12 +595,12 @@ func TestFleetSummaryBackgroundPopulationIsFreshUnrestrictedOnly(t *testing.T) {
 	if got := fleetSummary(t, f.svc, scoped, 0).GetLifecycle().GetTotalDevices(); got != 1 {
 		t.Fatalf("scoped reader used the unrestricted population: %d", got)
 	}
-	f.svc.clock = func() time.Time { return time.Now().Add(fleetSummaryMaxAge + time.Minute) }
+	f.svc.Clock = func() time.Time { return time.Now().Add(directory.FleetSummaryMaxAge + time.Minute) }
 	if live := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices(); live != before+1 {
 		t.Fatalf("expired population served: %d want live %d", live, before+1)
 	}
-	f.svc.clock = time.Now
-	if err := f.svc.refreshFleetPopulation(f.ctx); err != nil {
+	f.svc.Clock = time.Now
+	if err := f.svc.RefreshFleetPopulation(f.ctx); err != nil {
 		t.Fatal(err)
 	}
 	if refreshed := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices(); refreshed != before+1 {

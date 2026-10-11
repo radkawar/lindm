@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -85,7 +89,7 @@ func TestRefreshAdmissionSurvivesPostgrantRoutineBacklog(t *testing.T) {
 			}
 			assertRefreshAdmissionSlots(t, f, action.GetActionId(), 4, 4)
 			assertRefreshReservations(t, f)
-			q := devicedb.New(f.svc.pool)
+			q := devicedb.New(f.svc.Pool)
 			history, err := q.GetPackageSnapshot(t.Context(), uuid.MustParse(committedID))
 			if err != nil || history.State != "committed" || !history.BulkRetained {
 				t.Fatalf("begin discarded committed inventory history: %+v %v", history, err)
@@ -96,7 +100,7 @@ func TestRefreshAdmissionSurvivesPostgrantRoutineBacklog(t *testing.T) {
 					t.Fatalf("old staging did not release bulk and retain receipt: %+v %v", row, err)
 				}
 				var packages, batches int
-				if err := f.svc.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM snapshot_packages WHERE snapshot_id=$1), (SELECT count(*) FROM snapshot_batches WHERE snapshot_id=$1)", old.GetSnapshotId()).Scan(&packages, &batches); err != nil || packages != 0 || batches != 1 {
+				if err := f.svc.Pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM snapshot_packages WHERE snapshot_id=$1), (SELECT count(*) FROM snapshot_batches WHERE snapshot_id=$1)", old.GetSnapshotId()).Scan(&packages, &batches); err != nil || packages != 0 || batches != 1 {
 					t.Fatalf("staging cleanup lost receipt or retained bulk: packages=%d batches=%d %v", packages, batches, err)
 				}
 				replayed, err := f.begin(t, old, 1)
@@ -206,20 +210,20 @@ func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
 				}
 			}
 			if mode == "closed" {
-				if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_actions SET closed_at=clock_timestamp(), closed_reason='test_closed' WHERE id=$1", action.GetActionId()); err != nil {
+				if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_actions SET closed_at=clock_timestamp(), closed_reason='test_closed' WHERE id=$1", action.GetActionId()); err != nil {
 					t.Fatal(err)
 				}
 			}
-			q := devicedb.New(f.svc.pool)
+			q := devicedb.New(f.svc.Pool)
 			before, err := q.GetPackageSnapshot(t.Context(), uuid.MustParse(old.GetSnapshotId()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			budget := f.svc.inventoryBudget
+			budget := f.svc.InventoryBudget
 			if mode == "quota" {
 				// Retaining the old receipt alone fills the budget: even after
 				// tentative bulk release, fresh admission must roll everything back.
-				f.svc.inventoryBudget = before.MetadataBytes
+				f.svc.InventoryBudget = before.MetadataBytes
 			}
 			fresh := snapshotManifest(t, f.generation, 2, time.Now().UTC(), nil)
 			epoch := uint64(1)
@@ -239,7 +243,7 @@ func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
 			if _, err := f.begin(t, fresh, epoch); rpcReason(err) != expected {
 				t.Fatalf("rejected %s admission: got %v, want %s", mode, err, expected)
 			}
-			f.svc.inventoryBudget = budget
+			f.svc.InventoryBudget = budget
 			assertRefreshAdmissionSlots(t, f, action.GetActionId(), 0, 0)
 			after, err := q.GetPackageSnapshot(t.Context(), uuid.MustParse(old.GetSnapshotId()))
 			if err != nil || after.State != "staging" || !after.BulkRetained || after.ReservedBytes != before.ReservedBytes || after.SupersededAt.Valid {
@@ -247,11 +251,11 @@ func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
 			}
 			var sequence int64
 			var open uuid.UUID
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT g.package_sequence, d.open_snapshot_id FROM enrollment_generations g JOIN devices d ON d.id=g.device_id WHERE g.id=$1", f.principal.GenerationID).Scan(&sequence, &open); err != nil || sequence != 1 || open.String() != old.GetSnapshotId() {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT g.package_sequence, d.open_snapshot_id FROM enrollment_generations g JOIN devices d ON d.id=g.device_id WHERE g.id=$1", f.principal.GenerationID).Scan(&sequence, &open); err != nil || sequence != 1 || open.String() != old.GetSnapshotId() {
 				t.Fatalf("failed admission changed sequence/open upload: %d %s %v", sequence, open, err)
 			}
 			var packages int
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM snapshot_packages WHERE snapshot_id=$1", old.GetSnapshotId()).Scan(&packages); err != nil || packages != 1 {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM snapshot_packages WHERE snapshot_id=$1", old.GetSnapshotId()).Scan(&packages); err != nil || packages != 1 {
 				t.Fatalf("failed admission discarded staging packages: %d %v", packages, err)
 			}
 			assertRefreshReservations(t, f)
@@ -268,13 +272,13 @@ func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
 
 func TestRefreshStagingSupersessionReusesDeviceAndGlobalQuota(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	f.svc.inventoryBudget = maxDeviceInventoryBytes
+	f.svc.InventoryBudget = inventory.MaxDeviceInventoryBytes
 	oldAt := time.Now().UTC().Add(-10 * time.Second)
 	// Three superseded receipts still retain bulk under the ordinary retention
 	// policy. The fourth staging upload brings both budgets close to capacity.
 	for sequence := uint64(1); sequence <= 7; sequence += 2 {
 		ageInventoryAdmissions(t, f)
-		if _, err := f.begin(t, declaredManifest(t, f.generation, sequence, oldAt, 80, maxBatchBytes), 1); err != nil {
+		if _, err := f.begin(t, declaredManifest(t, f.generation, sequence, oldAt, 80, core.MaxBatchBytes), 1); err != nil {
 			t.Fatal(err)
 		}
 		if sequence < 7 {
@@ -289,14 +293,14 @@ func TestRefreshStagingSupersessionReusesDeviceAndGlobalQuota(t *testing.T) {
 	if _, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start)); err != nil {
 		t.Fatal(err)
 	}
-	fresh := declaredManifest(t, f.generation, 8, time.Now().UTC(), 80, maxBatchBytes)
+	fresh := declaredManifest(t, f.generation, 8, time.Now().UTC(), 80, core.MaxBatchBytes)
 	if _, err := f.begin(t, fresh, 1); err != nil {
 		t.Fatalf("refresh could not reuse obsolete staging reservation: %v", err)
 	}
 	assertRefreshAdmissionSlots(t, f, start.GetActionId(), 0, 8)
 	assertRefreshReservations(t, f)
 	var retained int
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM package_snapshots WHERE generation_id=$1 AND sequence < 7 AND bulk_retained", f.principal.GenerationID).Scan(&retained); err != nil || retained != 3 {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM package_snapshots WHERE generation_id=$1 AND sequence < 7 AND bulk_retained", f.principal.GenerationID).Scan(&retained); err != nil || retained != 3 {
 		t.Fatalf("refresh reclaimed unrelated retained history: %d %v", retained, err)
 	}
 }
@@ -319,7 +323,7 @@ func TestRefreshSupersedesPregrantStagingAcrossCollectorClockWindow(t *testing.T
 		t.Fatalf("pregrant staging blocked fresh action through clock overlap: %v", err)
 	}
 	assertRefreshAdmissionSlots(t, f, start.GetActionId(), 0, 2)
-	row, err := devicedb.New(f.svc.pool).GetPackageSnapshot(t.Context(), uuid.MustParse(old.GetSnapshotId()))
+	row, err := devicedb.New(f.svc.Pool).GetPackageSnapshot(t.Context(), uuid.MustParse(old.GetSnapshotId()))
 	if err != nil || row.State != "superseded" || row.CommittedAt.Valid || row.BulkRetained {
 		t.Fatalf("pregrant staging was not safely closed: %+v %v", row, err)
 	}
@@ -353,7 +357,7 @@ func TestRefreshPublicationRecoversBoundInventoryAfterRoutineOverwrite(t *testin
 	if _, err := f.commit(t, bound, 1); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := devicedb.New(f.svc.pool).GetPackageSnapshot(t.Context(), uuid.MustParse(bound.GetSnapshotId()))
+	snapshot, err := devicedb.New(f.svc.Pool).GetPackageSnapshot(t.Context(), uuid.MustParse(bound.GetSnapshotId()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +380,7 @@ func TestRefreshPublicationRecoversBoundInventoryAfterRoutineOverwrite(t *testin
 		t.Fatalf("action-only confirmation could not recover durable publication: %v", err)
 	}
 	receipt := new(agentv1.DeviceActionInventoryReceipt)
-	if err := f.svc.authority.Verify(t.Context(), confirmed.Msg.GetReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), confirmed.Msg.GetReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if receipt.GetHostSequence() != 2 || receipt.GetPackageSequence() != 1 || receipt.GetSnapshotId() != bound.GetSnapshotId() || !receipt.GetPublishedAt().AsTime().Equal(snapshot.CommittedAt.Time) {
@@ -396,7 +400,7 @@ func refreshFailedAttempt(f *deviceActionFixture, sequence uint64, when time.Tim
 func assertRefreshAdmissionSlots(t *testing.T, f *deviceActionFixture, actionID string, host, packages int64) {
 	t.Helper()
 	var gotHost, gotPackages int64
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT inventory_host_sequence, inventory_package_sequence FROM device_actions WHERE id=$1", actionID).Scan(&gotHost, &gotPackages); err != nil || gotHost != host || gotPackages != packages {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT inventory_host_sequence, inventory_package_sequence FROM device_actions WHERE id=$1", actionID).Scan(&gotHost, &gotPackages); err != nil || gotHost != host || gotPackages != packages {
 		t.Fatalf("refresh slots = (%d,%d), want (%d,%d): %v", gotHost, gotPackages, host, packages, err)
 	}
 }
@@ -404,7 +408,7 @@ func assertRefreshAdmissionSlots(t *testing.T, f *deviceActionFixture, actionID 
 func assertRefreshReservations(t *testing.T, f *deviceActionFixture) {
 	t.Helper()
 	var device, snapshots, global, allSnapshots int64
-	err := f.svc.pool.QueryRow(t.Context(), `SELECT d.reserved_inventory_bytes,
+	err := f.svc.Pool.QueryRow(t.Context(), `SELECT d.reserved_inventory_bytes,
 		(SELECT coalesce(sum(reserved_bytes),0)::bigint FROM package_snapshots WHERE device_id=d.id),
 		(SELECT reserved_bytes FROM inventory_reservation WHERE singleton),
 		(SELECT coalesce(sum(reserved_bytes),0)::bigint FROM package_snapshots)

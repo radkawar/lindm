@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -25,7 +29,7 @@ import (
 
 func imperativePolicy(t *testing.T, f *deviceActionFixture, policy *authv1.AuthorizationPolicy) {
 	t.Helper()
-	authority, err := identity.New(t.Context(), f.svc.pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: policy})
+	authority, err := identity.New(t.Context(), f.svc.Pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: policy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,13 +38,13 @@ func imperativePolicy(t *testing.T, f *deviceActionFixture, policy *authv1.Autho
 			t.Error(err)
 		}
 	})
-	f.svc.identity = authority
+	f.svc.Identity = authority
 }
 
 func setImperativeScope(t *testing.T, f *deviceActionFixture, actor identity.Principal, id string) {
 	t.Helper()
 	scope := []byte(`{"scopes":[{"deviceIds":["` + id + `"]}]}`)
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, scope); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, scope); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -61,13 +65,13 @@ func TestImperativeActionsFreshScopeOfflineAndReplay(t *testing.T) {
 				t.Fatalf("fresh create scope bypassed: %v", err)
 			}
 			setImperativeScope(t, f, actor, f.deviceID)
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", f.principal.DeviceID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", f.principal.DeviceID); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.svc.CreateDeviceAction(actorCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 				t.Fatalf("offline imperative queued: %v", err)
 			}
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp() WHERE id=$1", f.principal.DeviceID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp() WHERE id=$1", f.principal.DeviceID); err != nil {
 				t.Fatal(err)
 			}
 			created, err := f.svc.CreateDeviceAction(actorCtx, connect.NewRequest(request))
@@ -105,7 +109,7 @@ func TestRefreshRequiresFreshReadAndInventoryManagement(t *testing.T) {
 			actor.Role = identity.RoleOwner
 			ctx := identity.WithPrincipal(t.Context(), actor)
 			request := f.request(refreshActionSpec())
-			if _, err := f.svc.pool.Exec(t.Context(), "DELETE FROM host_observations WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "DELETE FROM host_observations WHERE generation_id=$1", f.principal.GenerationID); err != nil {
 				t.Fatal(err)
 			}
 			_, err := f.svc.CreateDeviceAction(ctx, connect.NewRequest(request))
@@ -133,7 +137,7 @@ func TestImperativeActionsConfiguredApprovalAndReviewerScope(t *testing.T) {
 	for name, spec := range map[string]*agentv1.DeviceActionSpec{"restart": restartActionSpec(), "shutdown": shutdownActionSpec(), "refresh": refreshActionSpec()} {
 		t.Run(name, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
-			imperativePolicy(t, f, &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(deviceActionPermission(spec))}})
+			imperativePolicy(t, f, &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(dispatch.DeviceActionPermission(spec))}})
 			request := f.request(spec)
 			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
 				t.Fatalf("configured approval bypassed: %v", err)
@@ -165,14 +169,14 @@ func TestImperativeActionsConfiguredApprovalAndReviewerScope(t *testing.T) {
 				t.Fatal(err)
 			}
 			grant := new(agentv1.DeviceActionStartGrant)
-			if err := f.svc.authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+			if err := f.svc.Authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 				t.Fatal(err)
 			}
 			if len(grant.GetApprovals()) != 2 || grant.GetApprovals()[0].GetActorId() == grant.GetApprovals()[1].GetActorId() {
 				t.Fatal("grant lost independent approval authorities")
 			}
 			var state string
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "consumed" {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "consumed" {
 				t.Fatalf("approval not consumed with grant: %s %v", state, err)
 			}
 			replay, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start))
@@ -216,7 +220,7 @@ func TestRestartSignedResultBootTransitionAndReplay(t *testing.T) {
 		t.Fatalf("accepted boot evidence lost: %v", err)
 	}
 	var audits int
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action IN ('device_action.create','device_action.start','device_action.result')", action.GetActionId()).Scan(&audits); err != nil || audits != 4 {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action IN ('device_action.create','device_action.start','device_action.result')", action.GetActionId()).Scan(&audits); err != nil || audits != 4 {
 		t.Fatalf("action audit trail or replay deduplication incorrect: %d %v", audits, err)
 	}
 }
@@ -311,7 +315,7 @@ func TestRefreshSignedResultRequiresPublishedFullInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	acquireTestSession(t, f.ctx, f.svc, other, otherKey, 0)
-	if _, err := f.svc.ConfirmRefreshInventoryPublication(withDevicePrincipal(f.ctx, other), connect.NewRequest(confirmation)); connect.CodeOf(err) != connect.CodePermissionDenied {
+	if _, err := f.svc.ConfirmRefreshInventoryPublication(core.WithDevicePrincipal(f.ctx, other), connect.NewRequest(confirmation)); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("other device obtained publication receipt: %v", err)
 	}
 	confirmed, err := f.svc.ConfirmRefreshInventoryPublication(f.deviceCtx(), connect.NewRequest(confirmation))
@@ -319,7 +323,7 @@ func TestRefreshSignedResultRequiresPublishedFullInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	receipt := new(agentv1.DeviceActionInventoryReceipt)
-	if err := f.svc.authority.Verify(t.Context(), confirmed.Msg.GetReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), confirmed.Msg.GetReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	intentDigest := sha256.Sum256(work.GetIntentEnvelope())
@@ -393,7 +397,7 @@ func TestImperativeApprovalReviewerRevocationBeforeStart(t *testing.T) {
 				t.Fatalf("start consumed stale approver authority: %v", err)
 			}
 			var state string
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "approved" {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "approved" {
 				t.Fatalf("failed start consumed approval: %s %v", state, err)
 			}
 		})
@@ -404,7 +408,7 @@ func TestImperativeApprovalReviewerRevocationBeforeStart(t *testing.T) {
 // Keep collection/commit clocks real for the signed receipt's freshness checks.
 func ageInventoryAdmissions(t *testing.T, f *deviceActionFixture) {
 	t.Helper()
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE enrollment_generations SET last_host_admission_at=clock_timestamp()-interval '5 minutes', last_package_admission_at=clock_timestamp()-interval '5 minutes' WHERE id=$1", f.principal.GenerationID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE enrollment_generations SET last_host_admission_at=clock_timestamp()-interval '5 minutes', last_package_admission_at=clock_timestamp()-interval '5 minutes' WHERE id=$1", f.principal.GenerationID); err != nil {
 		t.Fatal(err)
 	}
 }

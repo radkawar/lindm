@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -24,10 +26,10 @@ import (
 	"lindm/internal/testdb"
 )
 
-func signedSessionRequest(t *testing.T, svc *Service, principal devicePrincipal, key ed25519.PrivateKey, predecessor uint64) *devicev1.AcquireSessionRequest {
+func signedSessionRequest(t *testing.T, svc *Service, principal core.DevicePrincipal, key ed25519.PrivateKey, predecessor uint64) *devicev1.AcquireSessionRequest {
 	t.Helper()
-	proof, err := svc.authority.Sign(t.Context(), &agentv1.SessionAcquisition{
-		DeploymentId: svc.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
+	proof, err := svc.Authority.Sign(t.Context(), &agentv1.SessionAcquisition{
+		DeploymentId: svc.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
 		RequestId: uuid.NewString(), PredecessorEpoch: predecessor, Incarnation: uuid.NewString(), BootId: uuid.NewString(),
 		InstallationId: principal.DeviceID.String(),
 	}, key)
@@ -37,10 +39,10 @@ func signedSessionRequest(t *testing.T, svc *Service, principal devicePrincipal,
 	return &devicev1.AcquireSessionRequest{AuthorityProof: proof}
 }
 
-func acquireTestSession(t *testing.T, ctx context.Context, svc *Service, principal devicePrincipal, key ed25519.PrivateKey, predecessor uint64) (*devicev1.AcquireSessionRequest, *devicev1.AcquireSessionResponse) {
+func acquireTestSession(t *testing.T, ctx context.Context, svc *Service, principal core.DevicePrincipal, key ed25519.PrivateKey, predecessor uint64) (*devicev1.AcquireSessionRequest, *devicev1.AcquireSessionResponse) {
 	t.Helper()
 	request := signedSessionRequest(t, svc, principal, key, predecessor)
-	response, err := svc.AcquireSession(withDevicePrincipal(ctx, principal), connect.NewRequest(request))
+	response, err := svc.AcquireSession(core.WithDevicePrincipal(ctx, principal), connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,11 +52,11 @@ func acquireTestSession(t *testing.T, ctx context.Context, svc *Service, princip
 	return request, response.Msg
 }
 
-func signedRenewalRequest(t *testing.T, svc *Service, principal devicePrincipal, key ed25519.PrivateKey, epoch uint64, csr []byte) *devicev1.RenewIdentityRequest {
+func signedRenewalRequest(t *testing.T, svc *Service, principal core.DevicePrincipal, key ed25519.PrivateKey, epoch uint64, csr []byte) *devicev1.RenewIdentityRequest {
 	t.Helper()
 	digest := sha256.Sum256(csr)
-	proof, err := svc.authority.Sign(t.Context(), &agentv1.RenewalIntent{
-		DeploymentId: svc.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
+	proof, err := svc.Authority.Sign(t.Context(), &agentv1.RenewalIntent{
+		DeploymentId: svc.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
 		IssuanceRequestId: uuid.NewString(), PresentedCertificateSha256: principal.Fingerprint, CsrSha256: digest[:], SessionEpoch: epoch,
 	}, key)
 	if err != nil {
@@ -67,7 +69,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	first, firstReceipt := acquireTestSession(t, ctx, svc, principal, key, 0)
 	second, secondReceipt := acquireTestSession(t, ctx, svc, principal, key, 1)
 	for _, expected := range []struct {
@@ -112,10 +114,10 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	if err := conn.QueryRow(ctx, `SELECT d.state, g.state, g.session_epoch FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID).Scan(&state, &generationState, &epoch); err != nil {
 		t.Fatal(err)
 	}
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action=$1 AND resource_id=$2`, actionDeviceRecoveryHold, principal.DeviceID.String()).Scan(&holds); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action=$1 AND resource_id=$2`, core.ActionDeviceRecoveryHold, principal.DeviceID.String()).Scan(&holds); err != nil {
 		t.Fatal(err)
 	}
-	if state != stateRecoveryHold || generationState != stateRecoveryHold || epoch != 2 || holds != 1 {
+	if state != core.StateRecoveryHold || generationState != core.StateRecoveryHold || epoch != 2 || holds != 1 {
 		t.Fatalf("hold was not durably committed: %q %q epoch=%d audits=%d", state, generationState, epoch, holds)
 	}
 	if _, err := svc.AcquireSession(deviceCtx, connect.NewRequest(second)); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -137,7 +139,7 @@ func TestSessionEnvelopeReencodingCannotCreateCloneHold(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +158,7 @@ func TestSessionEnvelopeReencodingCannotCreateCloneHold(t *testing.T) {
 	if bytes.Equal(reencoded.Bytes(), request.AuthorityProof) {
 		t.Fatal("fixture did not change unsigned envelope encoding")
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	_, err = svc.AcquireSession(deviceCtx, connect.NewRequest(&devicev1.AcquireSessionRequest{AuthorityProof: reencoded.Bytes()}))
 	if connect.CodeOf(err) != connect.CodeAlreadyExists {
 		t.Fatalf("changed wire request must conflict without creating a clone hold: %v", err)

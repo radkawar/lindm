@@ -23,7 +23,7 @@ import (
 
 func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 	f := newDispatchFixture(t)
-	state, err := f.service.execution.Get(t.Context())
+	state, err := f.service.Execution.Get(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,8 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 	// The service holds admission counters and must not be copied; poll
 	// through it with the read-only pool, then restore the writable pool.
 	reader := f.service
-	writable := reader.pool
-	reader.pool = pool
+	writable := reader.Pool
+	reader.Pool = pool
 	var before time.Time
 	if err := f.pool.QueryRow(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1 RETURNING last_seen_at", f.principal.DeviceID).Scan(&before); err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 	if err := lock.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	reader.pool = writable
+	reader.Pool = writable
 	var after time.Time
 	if err := f.pool.QueryRow(t.Context(), "SELECT last_seen_at FROM devices WHERE id=$1", f.principal.DeviceID).Scan(&after); err != nil || !after.Equal(before) {
 		t.Fatalf("read-only polling changed durable last seen: %v %v", after, err)
@@ -132,7 +132,7 @@ func TestPollingAuthorityFences(t *testing.T) {
 			// Cast all bindings in the same statement so pgx can encode unused
 			// numbered parameters consistently across these mutation fixtures.
 			statement := "WITH binding AS (SELECT $1::uuid, $2::uuid, $3::uuid) " + change.statement
-			if _, err := f.svc.pool.Exec(f.ctx, statement, f.principal.DeviceID, f.principal.GenerationID, f.principal.CertificateID); err != nil {
+			if _, err := f.svc.Pool.Exec(f.ctx, statement, f.principal.DeviceID, f.principal.GenerationID, f.principal.CertificateID); err != nil {
 				t.Fatal(err)
 			}
 			for _, method := range []string{"trust", "work"} {
@@ -176,7 +176,7 @@ func TestPollingCoherentAuthoritySnapshotWithoutWriteXID(t *testing.T) {
 			defer cancel()
 			result := make(chan error, 1)
 			go func() { result <- pollingCall(f.svc, ctx, method) }()
-			waitPollingQuery(t, ctx, f.svc.pool, f.conn.PgConn().PID(), "GetGenerationAuthority", true, result)
+			waitPollingQuery(t, ctx, f.svc.Pool, f.conn.PgConn().PID(), "GetGenerationAuthority", true, result)
 			if _, err := lock.Exec(ctx, "UPDATE devices SET state='recovery_hold' WHERE id=$1", f.principal.DeviceID); err != nil {
 				t.Fatal(err)
 			}

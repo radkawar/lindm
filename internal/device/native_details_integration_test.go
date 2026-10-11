@@ -6,6 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
@@ -65,7 +69,7 @@ func TestNativeDetailsLatestStatusAndReplay(t *testing.T) {
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("changed replay accepted: %v", err)
 	}
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	report.Sequence = 2
 	report.Observation.Details.Cpu.LogicalCores = &inventoryv1.ObservedUint64{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED}
 	report.Observation.Details.Platform.Repositories = &inventoryv1.RepositoryObservation{
@@ -225,7 +229,7 @@ func TestNativeDetailsJSONExpansionReservesDetailEnvelope(t *testing.T) {
 		users.Users = append(users.Users, &inventoryv1.LocalUser{Name: "account", Shell: strings.Repeat("\x01", 4096)})
 	}
 	report.Observation.Details.LocalUsers = users
-	if proto.Size(report.Observation) >= maxMessageBytes/2 {
+	if proto.Size(report.Observation) >= core.MaxMessageBytes/2 {
 		t.Fatal("fixture must fit binary budget to exercise JSON expansion")
 	}
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); connect.CodeOf(err) != connect.CodeInvalidArgument || rpcReason(err) != "observation_capacity" {

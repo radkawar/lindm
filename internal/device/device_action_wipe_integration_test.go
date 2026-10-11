@@ -6,6 +6,8 @@ import (
 	"crypto/ed25519"
 	"testing"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -30,7 +32,7 @@ func TestDeviceActionLiveRootAggregateRequiresVolatileExactProof(t *testing.T) {
 	omitted := proto.CloneOf(challenge)
 	omitted.NativePlan.CryptoEraseTargets = omitted.NativePlan.CryptoEraseTargets[:1]
 	var err error
-	omitted.NativePlanSha256, err = actionDigest(omitted.NativePlan)
+	omitted.NativePlanSha256, err = core.ActionDigest(omitted.NativePlan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +52,7 @@ func TestDeviceActionLiveRootAggregateRequiresVolatileExactProof(t *testing.T) {
 	}
 	result := f.result(t, work, 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED, verification)
 	attestation := new(agentv1.DeviceActionAttestation)
-	if err := f.svc.authority.Verify(t.Context(), result.GetAttestationEnvelope(), attestation, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), result.GetAttestationEnvelope(), attestation, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(result)); connect.CodeOf(err) != connect.CodePermissionDenied {

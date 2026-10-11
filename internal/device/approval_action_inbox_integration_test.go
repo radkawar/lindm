@@ -29,7 +29,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 	specs["quarantine"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}}
 	specs["release_quarantine"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{QuarantineActionId: uuid.NewString()}}}
 	specs["restart"], specs["shutdown"], specs["refresh_inventory"] = restartActionSpec(), shutdownActionSpec(), refreshActionSpec()
-	specs["local_admin_password_rotate"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: "lapsadmin", EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}}
+	specs["local_admin_password_rotate"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: "lapsadmin", EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}}}
 	specs["patch_now"] = &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_PatchNow{PatchNow: &agentv1.PatchNowAction{Selection: resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY, RebootPolicy: &resourcev1.OSUpdateRebootPolicy{Mode: resourcev1.OSUpdateRebootMode_OS_UPDATE_REBOOT_MODE_NEVER}}}}
 	fields := new(agentv1.DeviceActionSpec).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
 	if len(specs) != fields.Len() {
@@ -45,7 +45,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 			// Exercise real binding, authorization, scope, persistence and inbox SQL.
 			// Native recovery-readiness preflight belongs to CreateDeviceAction, not
 			// this identity inbox visibility regression.
-			created, err := f.svc.identity.CreateApproval(t.Context(), owner.ID, &adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: f.request(spec)}}, f.svc.approvalScope)
+			created, err := f.svc.Identity.CreateApproval(t.Context(), owner.ID, &adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: f.request(spec)}}, f.svc.ApprovalScope)
 			if spec.GetLocalAdminPasswordRotate() != nil {
 				// Only a local-admin policy mints this arm; nothing exists to approve.
 				if !errors.Is(err, identity.ErrApprovalInvalid) {
@@ -64,7 +64,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 				if len(page.Msg.GetApprovals()) != 1 || page.Msg.GetApprovals()[0].GetId() != created.GetId() {
 					t.Fatalf("eligible %s cannot see %s approval", actor.ID, field.Name())
 				}
-				count, err := f.svc.identity.CountPendingApprovals(t.Context(), actor.ID)
+				count, err := f.svc.Identity.CountPendingApprovals(t.Context(), actor.ID)
 				if err != nil || count != 1 {
 					t.Fatalf("pending count=%d err=%v", count, err)
 				}
@@ -73,13 +73,13 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, actor := range []identity.Principal{owner, reviewer} {
-				count, err := f.svc.identity.CountPendingApprovals(t.Context(), actor.ID)
+				count, err := f.svc.Identity.CountPendingApprovals(t.Context(), actor.ID)
 				if err != nil || count != 0 {
 					t.Fatalf("decided approval count=%d err=%v", count, err)
 				}
 			}
 			// Retain decisions normally; isolate each arm's list/count assertion.
-			if _, err := f.svc.pool.Exec(t.Context(), "DELETE FROM approval_requests WHERE id=$1", created.GetId()); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "DELETE FROM approval_requests WHERE id=$1", created.GetId()); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -99,7 +99,7 @@ func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
 	if err != nil || len(page.Msg.GetApprovals()) != 0 {
 		t.Fatalf("missing fleet-read leaked approval projections: %v %v", page, err)
 	}
-	count, err := f.svc.identity.CountPendingApprovals(t.Context(), reviewer.ID)
+	count, err := f.svc.Identity.CountPendingApprovals(t.Context(), reviewer.ID)
 	if err != nil || count != 0 {
 		t.Fatalf("missing fleet-read count=%d err=%v", count, err)
 	}
@@ -107,7 +107,7 @@ func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
 	// Exercise the identical real SQL filters with independently scoped read
 	// grants. Local accounts bind one common role scope; OIDC group grants can
 	// bind these dimensions separately, as the identity unit regression proves.
-	q := identitydb.New(f.svc.pool)
+	q := identitydb.New(f.svc.Pool)
 	for _, test := range []struct {
 		target  string
 		visible bool

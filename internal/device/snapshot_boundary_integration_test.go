@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -63,13 +67,13 @@ func TestPackageCursorExpiryWhileWaitingForCursorLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cursorID, _, err := decodePackagePage(first.Msg.NextPageToken)
+	cursorID, _, err := inventory.DecodePackagePage(first.Msg.NextPageToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var clock atomic.Int64
 	clock.Store(first.Msg.CursorExpiresAt.AsTime().Add(-time.Microsecond).UnixMicro())
-	f.svc.clock = func() time.Time { return time.UnixMicro(clock.Load()).UTC() }
+	f.svc.Clock = func() time.Time { return time.UnixMicro(clock.Load()).UTC() }
 	lock, err := f.conn.Begin(f.ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +100,7 @@ func TestPackageCursorExpiryWhileWaitingForCursorLock(t *testing.T) {
 	defer ticker.Stop()
 	for {
 		var waiting bool
-		if err := f.svc.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::integer = ANY(pg_blocking_pids(pid)))`, int32(f.conn.PgConn().PID())).Scan(&waiting); err != nil {
+		if err := f.svc.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::integer = ANY(pg_blocking_pids(pid)))`, int32(f.conn.PgConn().PID())).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 		if waiting {
@@ -125,7 +129,7 @@ func TestPackageCursorExpiryWhileWaitingForCursorLock(t *testing.T) {
 }
 
 func TestConcurrentSnapshotAdmissionPreservesBudgetAndLoserSequence(t *testing.T) {
-	f := newEnrolled(t, minInventoryBudget)
+	f := newEnrolled(t, core.MinInventoryBudget)
 	otherKey := ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, f.ctx, f.svc, f.ownerCtx, otherKey)
 	principal, err := f.svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), parseCertPEM(t, enrolled.Msg.CertificatePem))
@@ -133,11 +137,11 @@ func TestConcurrentSnapshotAdmissionPreservesBudgetAndLoserSequence(t *testing.T
 		t.Fatal(err)
 	}
 	acquireTestSession(t, f.ctx, f.svc, principal, otherKey, 0)
-	contexts := []context.Context{f.deviceCtx(), withDevicePrincipal(f.ctx, principal)}
+	contexts := []context.Context{f.deviceCtx(), core.WithDevicePrincipal(f.ctx, principal)}
 	generations := []string{f.generation, enrolled.Msg.EnrollmentGeneration}
 	manifests := make([]*devicev1.PackageSnapshotManifest, len(contexts))
 	for i := range manifests {
-		manifests[i] = declaredManifest(t, generations[i], 1, f.now, 64, maxBatchBytes)
+		manifests[i] = declaredManifest(t, generations[i], 1, f.now, 64, core.MaxBatchBytes)
 	}
 	type admission struct {
 		index int
@@ -183,7 +187,7 @@ func TestConcurrentSnapshotAdmissionPreservesBudgetAndLoserSequence(t *testing.T
 	if err := f.conn.QueryRow(f.ctx, `SELECT reserved_bytes, (SELECT sum(reserved_bytes) FROM package_snapshots), (SELECT sum(reserved_inventory_bytes) FROM devices) FROM inventory_reservation`).Scan(&global, &snapshots, &devices); err != nil {
 		t.Fatal(err)
 	}
-	if global <= 0 || global > minInventoryBudget || global != snapshots || global != devices {
+	if global <= 0 || global > core.MinInventoryBudget || global != snapshots || global != devices {
 		t.Fatalf("reservation accounting diverged: global=%d snapshots=%d devices=%d", global, snapshots, devices)
 	}
 	if _, err := f.svc.BeginPackageSnapshot(contexts[winner], connect.NewRequest(&devicev1.BeginPackageSnapshotRequest{EnrollmentGeneration: generations[winner], SessionEpoch: 1, Manifest: manifests[winner]})); err != nil {

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -27,7 +29,7 @@ import (
 const lapsAccount = "lapsadmin"
 
 func localAdminActionSpec(f *deviceActionFixture) *agentv1.DeviceActionSpec {
-	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: lapsAccount, EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}}
+	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LocalAdminPasswordRotate{LocalAdminPasswordRotate: &agentv1.LocalAdminPasswordRotateAction{AccountName: lapsAccount, EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}}}
 }
 
 type lapsFixture struct {
@@ -40,7 +42,7 @@ type lapsFixture struct {
 func newLAPSFixture(t *testing.T, revealApproval bool) *lapsFixture {
 	t.Helper()
 	f := &lapsFixture{deviceActionFixture: newDeviceActionFixture(t)}
-	authority, err := identity.New(t.Context(), f.svc.pool, identity.Config{Local: true, PublicURL: secretTestOrigin})
+	authority, err := identity.New(t.Context(), f.svc.Pool, identity.Config{Local: true, PublicURL: secretTestOrigin})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,14 +52,14 @@ func newLAPSFixture(t *testing.T, revealApproval bool) *lapsFixture {
 		}
 	})
 	f.stepUp = localStepUp(t, authority)
-	f.svc = f.rebuild(t, authority, f.svc.escrow, revealApproval)
+	f.svc = f.rebuild(t, authority, f.svc.Escrow, revealApproval)
 	return f
 }
 
 func (f *lapsFixture) rebuild(t *testing.T, authority *identity.Service, custody *escrow.Custody, revealApproval bool) *Service {
 	t.Helper()
 	s := f.svc
-	svc, err := New(s.pool, Config{DeploymentID: s.deploymentID.String(), CACertificate: s.ca, CAKey: s.caKey, Identity: authority, ExecutionAuthority: s.execution, ExecutionSigning: s.signing, Escrow: custody, EscrowRevealApprovalRequired: revealApproval})
+	svc, err := New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: authority, ExecutionAuthority: s.Execution, ExecutionSigning: s.Signing, Escrow: custody, EscrowRevealApprovalRequired: revealApproval})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +99,7 @@ func (f *lapsFixture) pollEmpty(t *testing.T) {
 func (f *lapsFixture) count(t *testing.T, query string, args ...any) int {
 	t.Helper()
 	var count int
-	if err := f.svc.pool.QueryRow(t.Context(), query, args...).Scan(&count); err != nil {
+	if err := f.svc.Pool.QueryRow(t.Context(), query, args...).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	return count
@@ -116,7 +118,7 @@ func lapsBinding(t *testing.T, challenge *agentv1.DeviceActionChallenge) (*agent
 func (f *lapsFixture) escrowResult(t *testing.T, work *devicev1.DeviceActionWork, binding *agentv1.LocalAdminPasswordBinding, ciphertext, password []byte) *agentv1.DeviceActionVerification {
 	t.Helper()
 	digest := sha256Sum(password)
-	return &agentv1.DeviceActionVerification{After: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.Now(), Supported: true}, Escrow: &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.escrow.KeyID(), Ciphertext: ciphertext, RecoveryKeySha256: digest, LocalAdmin: proto.CloneOf(binding)}}
+	return &agentv1.DeviceActionVerification{After: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.Now(), Supported: true}, Escrow: &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.Escrow.KeyID(), Ciphertext: ciphertext, RecoveryKeySha256: digest, LocalAdmin: proto.CloneOf(binding)}}
 }
 
 // rotate drives one minted rotation through escrow, receipt and verified set.
@@ -128,7 +130,7 @@ func (f *lapsFixture) rotate(t *testing.T, password []byte) uuid.UUID {
 		t.Fatal(err)
 	}
 	binding, canonical := lapsBinding(t, challenge)
-	sealed, err := escrow.SealLocalAdminPassword(f.svc.escrow.PublicKey(), canonical, password)
+	sealed, err := escrow.SealLocalAdminPassword(f.svc.Escrow.PublicKey(), canonical, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +140,7 @@ func (f *lapsFixture) rotate(t *testing.T, password []byte) uuid.UUID {
 		t.Fatal(err)
 	}
 	receipt := new(agentv1.DeviceActionEscrowReceipt)
-	if err := f.svc.authority.Verify(t.Context(), staged.Msg.GetEscrowReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), staged.Msg.GetEscrowReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if !proto.Equal(receipt.GetLocalAdmin(), binding) || receipt.GetLuksUuid() != "" {
@@ -170,7 +172,7 @@ func TestLocalAdminPolicyLifecycleAndAuthorization(t *testing.T) {
 	}
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	status := response.Msg.GetStatus()
-	if !proto.Equal(status.GetPolicy(), lapsPolicy()) || status.GetPolicyActorId() != owner.ID.String() || status.GetEscrowKeyId() != f.svc.escrow.KeyID() || status.GetBlockedReason() != "" || time.Since(status.GetRotationDueAt().AsTime()) < 0 {
+	if !proto.Equal(status.GetPolicy(), lapsPolicy()) || status.GetPolicyActorId() != owner.ID.String() || status.GetEscrowKeyId() != f.svc.Escrow.KeyID() || status.GetBlockedReason() != "" || time.Since(status.GetRotationDueAt().AsTime()) < 0 {
 		t.Fatalf("policy status: %v", status)
 	}
 	if replay, err := f.svc.SetLocalAdminPasswordPolicy(f.ownerCtx, connect.NewRequest(set)); err != nil || !proto.Equal(replay.Msg.GetStatus().GetPolicy(), status.GetPolicy()) {
@@ -224,7 +226,7 @@ func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
 	}
 	binding, canonical := lapsBinding(t, challenge)
 	password := []byte("LAPSPLAINTEXTFIXTURE234567")
-	sealed, err := escrow.SealLocalAdminPassword(f.svc.escrow.PublicKey(), canonical, password)
+	sealed, err := escrow.SealLocalAdminPassword(f.svc.Escrow.PublicKey(), canonical, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +238,7 @@ func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
 			e.LocalAdmin, e.LuksUuid, e.MetadataSha256 = nil, uuid.NewString(), make([]byte, 32)
 		},
 		"recovery seal": func(e *agentv1.DeviceActionEscrow) {
-			e.Ciphertext = mustSealRecovery(t, f.svc.escrow.PublicKey(), canonical, password)
+			e.Ciphertext = mustSealRecovery(t, f.svc.Escrow.PublicKey(), canonical, password)
 		},
 		"password swap": func(e *agentv1.DeviceActionEscrow) {
 			e.RecoveryKeySha256 = sha256Sum([]byte("LAPSOTHERPASSWORD234567AB"))
@@ -265,7 +267,7 @@ func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
 	// Success before the receipt-bound set is not accepted as settlement.
 	verification.Verified = true
 	fresh := f.work(t)
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_actions SET escrow_receipt_envelope='' WHERE id=$1", work.GetActionId()); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_actions SET escrow_receipt_envelope='' WHERE id=$1", work.GetActionId()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(f.result(t, fresh, 2, agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED, verification))); rpcReason(err) != "device_action_escrow_receipt_required" {
@@ -292,7 +294,7 @@ func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
 	}
 	for _, table := range []string{"local_admin_passwords", "local_admin_password_policies", "device_action_escrow", "device_actions", "audit_events", "device_admin_requests"} {
 		var text string
-		if err := f.svc.pool.QueryRow(t.Context(), "SELECT coalesce(string_agg(t::text, ''), '') FROM "+table+" t").Scan(&text); err != nil {
+		if err := f.svc.Pool.QueryRow(t.Context(), "SELECT coalesce(string_agg(t::text, ''), '') FROM "+table+" t").Scan(&text); err != nil {
 			t.Fatal(err)
 		}
 		for _, secret := range [][]byte{password, second} {
@@ -310,7 +312,7 @@ func TestLocalAdminAuthorityChangeAndMissingEscrowBlock(t *testing.T) {
 	f := newLAPSFixture(t, false)
 	adminPrincipal := insertPrincipal(t, t.Context(), f.conn, identity.RoleAdmin)
 	f.setPolicy(t, identity.WithPrincipal(t.Context(), adminPrincipal))
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", adminPrincipal.ID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", adminPrincipal.ID); err != nil {
 		t.Fatal(err)
 	}
 	f.pollEmpty(t)
@@ -328,7 +330,7 @@ func TestLocalAdminAuthorityChangeAndMissingEscrowBlock(t *testing.T) {
 
 	g := newLAPSFixture(t, false)
 	g.setPolicy(t, g.ownerCtx)
-	g.svc = g.rebuild(t, g.svc.identity, nil, false)
+	g.svc = g.rebuild(t, g.svc.Identity, nil, false)
 	g.pollEmpty(t)
 	if status := g.status(t); status.GetBlockedReason() != "escrow_unconfigured" || status.GetEscrowKeyId() != "" {
 		t.Fatalf("missing escrow not visible: %v", status)
@@ -363,7 +365,7 @@ func TestLocalAdminRevealStepUpAuditApprovalAndRotation(t *testing.T) {
 		t.Fatal("reveal time not recorded")
 	}
 	// Audit admission precedes release: a custody failure is still audited.
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_action_escrow SET ciphertext = ciphertext || '\\x00'::bytea WHERE action_id=$1", id); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_action_escrow SET ciphertext = ciphertext || '\\x00'::bytea WHERE action_id=$1", id); err != nil {
 		t.Fatal(err)
 	}
 	failed := proto.CloneOf(reveal)

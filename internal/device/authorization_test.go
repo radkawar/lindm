@@ -6,6 +6,13 @@ import (
 	"slices"
 	"testing"
 
+	"lindm/internal/device/assistance"
+	"lindm/internal/device/core"
+	"lindm/internal/device/directory"
+	"lindm/internal/device/dispatch"
+	"lindm/internal/device/inventory"
+	"lindm/internal/device/secrets"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
@@ -115,7 +122,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 // dispatcher. A zero service must be safe because denial precedes dependencies.
 func invokeDeniedAdminRPC(t *testing.T, name string, ctx context.Context) error {
 	t.Helper()
-	method := reflect.ValueOf(&Service{}).MethodByName(name)
+	method := reflect.ValueOf(composed(&core.Service{})).MethodByName(name)
 	if !method.IsValid() {
 		t.Fatalf("missing admin handler %s", name)
 	}
@@ -131,6 +138,13 @@ func invokeDeniedAdminRPC(t *testing.T, name string, ctx context.Context) error 
 		t.Fatalf("admin handler %s returned a non-error result", name)
 	}
 	return err
+}
+
+// composed wires the domain services over c exactly as New does, without
+// constructing dependencies; a zero core serves denial-first tests.
+func composed(c *core.Service) *Service {
+	facts, custody := inventory.New(c), secrets.New(c)
+	return &Service{Service: c, assistanceService: assistance.New(c), directoryService: directory.New(c, facts), dispatchService: dispatch.New(c, custody, facts), inventoryService: facts, secretsService: custody}
 }
 
 func TestAdminRPCDenialMatrix(t *testing.T) {

@@ -34,7 +34,7 @@ func TestDeviceActionServiceOnlyDelegationIsTypedPrerequisite(t *testing.T) {
 				t.Fatalf("missing typed signer reason: %v", err)
 			}
 			var count int
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM device_actions").Scan(&count); err != nil || count != 0 {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM device_actions").Scan(&count); err != nil || count != 0 {
 				t.Fatalf("undelegated action committed: count=%d err=%v", count, err)
 			}
 		})
@@ -43,7 +43,7 @@ func TestDeviceActionServiceOnlyDelegationIsTypedPrerequisite(t *testing.T) {
 
 func TestDeviceActionConfiguredStartKeyMustBeDelegatedBeforeCreate(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	f.svc.signing.StartKey = ed25519Key(t)
+	f.svc.Signing.StartKey = ed25519Key(t)
 	_, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}})))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("undelegated start signer admitted doomed action: %v", err)
@@ -57,7 +57,7 @@ func TestDeviceActionStartSignerChangeIsTypedPrerequisite(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(refreshActionSpec()))
 	request, _ := f.startRequest(t, f.work(t))
-	f.svc.signing.StartKey = ed25519Key(t)
+	f.svc.Signing.StartKey = ed25519Key(t)
 	_, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(request))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("undelegated start key returned an unexpected error: %v", err)

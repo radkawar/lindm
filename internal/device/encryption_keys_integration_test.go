@@ -14,6 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/secrets"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,26 +46,26 @@ func recipientKey(t *testing.T) []byte {
 	return public
 }
 
-func encryptionKeyClaim(t *testing.T, svc *Service, principal devicePrincipal, recipient []byte) *agentv1.DeviceEncryptionKeyAttestation {
+func encryptionKeyClaim(t *testing.T, svc *Service, principal core.DevicePrincipal, recipient []byte) *agentv1.DeviceEncryptionKeyAttestation {
 	t.Helper()
-	identity, err := publicKeyFingerprint(principal.PublicKey)
+	identity, err := core.PublicKeyFingerprint(principal.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return &agentv1.DeviceEncryptionKeyAttestation{
-		DeploymentId: svc.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
+		DeploymentId: svc.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
 		IdentityPublicKeySha256: identity, KemId: secretseal.KEMID, KdfId: secretseal.KDFID, AeadId: secretseal.AEADID,
 		PublicKey: recipient, CreatedAt: timestamppb.Now(),
 	}
 }
 
-func registerKey(t *testing.T, svc *Service, principal devicePrincipal, claim *agentv1.DeviceEncryptionKeyAttestation, signer ed25519.PrivateKey, epoch uint64) (*devicev1.RegisterEncryptionKeyResponse, error) {
+func registerKey(t *testing.T, svc *Service, principal core.DevicePrincipal, claim *agentv1.DeviceEncryptionKeyAttestation, signer ed25519.PrivateKey, epoch uint64) (*devicev1.RegisterEncryptionKeyResponse, error) {
 	t.Helper()
-	envelope, err := svc.authority.Sign(t.Context(), claim, signer)
+	envelope, err := svc.Authority.Sign(t.Context(), claim, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, err := svc.RegisterEncryptionKey(withDevicePrincipal(t.Context(), principal), connect.NewRequest(&devicev1.RegisterEncryptionKeyRequest{SessionEpoch: epoch, AttestationEnvelope: envelope}))
+	response, err := svc.RegisterEncryptionKey(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(&devicev1.RegisterEncryptionKeyRequest{SessionEpoch: epoch, AttestationEnvelope: envelope}))
 	if err != nil {
 		return nil, err
 	}
@@ -70,14 +74,14 @@ func registerKey(t *testing.T, svc *Service, principal devicePrincipal, claim *a
 
 func currentKey(t *testing.T, ctx context.Context, conn *pgx.Conn, generation uuid.UUID) ([]byte, error) {
 	t.Helper()
-	return currentDeviceEncryptionKey(ctx, devicedb.New(conn), generation)
+	return secrets.CurrentDeviceEncryptionKey(ctx, devicedb.New(conn), generation)
 }
 
 func TestRegisterEncryptionKeyBindsPresentedIdentity(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,13 +93,13 @@ func TestRegisterEncryptionKeyBindsPresentedIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	acquireTestSession(t, ctx, svc, principal, key, 0)
-	if _, err := currentKey(t, ctx, conn, principal.GenerationID); !errors.Is(err, errDeviceEncryptionKeyUnavailable) {
+	if _, err := currentKey(t, ctx, conn, principal.GenerationID); !errors.Is(err, secrets.ErrDeviceEncryptionKeyUnavailable) {
 		t.Fatalf("unregistered generation has a delivery key: %v", err)
 	}
 
 	recipient := recipientKey(t)
 	valid := encryptionKeyClaim(t, svc, principal, recipient)
-	otherIdentity, err := publicKeyFingerprint(ed25519Key(t).Public())
+	otherIdentity, err := core.PublicKeyFingerprint(ed25519Key(t).Public())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +165,7 @@ func TestRegisterEncryptionKeyBindsPresentedIdentity(t *testing.T) {
 	// Renewal: the old certificate overlaps, so its key stays current until the
 	// successor identity registers its own key under the same session.
 	nextKey := ed25519Key(t)
-	renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, nextKey, &x509.CertificateRequest{}))))
+	renewed, err := svc.RenewIdentity(core.WithDevicePrincipal(ctx, principal), connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, nextKey, &x509.CertificateRequest{}))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +194,7 @@ func TestRegisterEncryptionKeyBindsPresentedIdentity(t *testing.T) {
 	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire device key"})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := currentKey(t, ctx, conn, principal.GenerationID); !errors.Is(err, errDeviceEncryptionKeyUnavailable) {
+	if _, err := currentKey(t, ctx, conn, principal.GenerationID); !errors.Is(err, secrets.ErrDeviceEncryptionKeyUnavailable) {
 		t.Fatalf("revoked generation still receives deliveries: %v", err)
 	}
 	if _, err := registerKey(t, svc, next, encryptionKeyClaim(t, svc, next, successor), nextKey, 1); connect.CodeOf(err) != connect.CodePermissionDenied {

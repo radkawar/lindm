@@ -199,7 +199,7 @@ not a device path. Shared target construction prefers WWN+serial; the explicitly
 absent-WWN encrypted GPT fallback requires a unique serial, disk/target sizes,
 GPT disk GUID and LUKS UUID. The ordinary unencrypted Debian virtio fixture cannot
 acquire this fallback just because its disk lacks a WWN
-([construction](../../internal/device/storage_targets.go#L111),
+([construction](../../internal/device/inventory/storage_targets.go#L116),
 [revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
 Recovery media capacity, independent cold boots, escrow/rotation and destructive
 wipe remain separately gated by [verification](../verification.md).

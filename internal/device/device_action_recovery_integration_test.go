@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -39,7 +43,7 @@ func newActionRecoveryFixture(t *testing.T) *actionRecoveryFixture {
 	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "isolated-original-root-wwn", Serial: "isolated-original-root", SizeBytes: 1 << 30}
 	f.observeStorageTargets(t, target)
 	client, imageDigest := recoveryArtifactFixture(t, []byte("signed recovery admission fixture"))
-	f.svc.recoveryArtifacts = client
+	f.svc.RecoveryArtifacts = client
 	f.observeRecoveryReadiness(t, recoveryObservationFixture(time.Now()))
 	media, err := trust.DeviceActionDigest(target)
 	if err != nil {
@@ -54,7 +58,7 @@ func newActionRecoveryFixture(t *testing.T) *actionRecoveryFixture {
 	original.NativePlan.Before.Target = target
 	original.NativePlan.Before.RecoveryEnvironment = false
 	original.NativePlan.Before.OffTargetJournal = false
-	original.NativePlanSha256, err = actionDigest(original.NativePlan)
+	original.NativePlanSha256, err = core.ActionDigest(original.NativePlan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,10 +73,10 @@ func newActionRecoveryFixture(t *testing.T) *actionRecoveryFixture {
 		t.Fatal(err)
 	}
 	credential := new(agentv1.DeviceActionRecoveryCredential)
-	if err := f.svc.authority.Verify(t.Context(), registered.Msg.GetCredentialEnvelope(), credential, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), registered.Msg.GetCredentialEnvelope(), credential, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := f.svc.execution.Get(t.Context())
+	snapshot, err := f.svc.Execution.Get(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +97,7 @@ func (f *actionRecoveryFixture) proof(t *testing.T, operation agentv1.RecoveryOp
 	}
 	now := time.Now().Add(-time.Millisecond)
 	proof := &agentv1.RecoveryRequestProof{CredentialId: f.credential.GetCredentialId(), CredentialSha256: credentialDigest[:], RequestId: uuid.NewString(), BootId: f.boot, ExecutorIncarnation: f.incarnation, Nonce: nonce, Operation: operation, PayloadSha256: digest[:], IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second))}
-	envelope, err := f.svc.authority.Sign(t.Context(), proof, f.key)
+	envelope, err := f.svc.Authority.Sign(t.Context(), proof, f.key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +106,7 @@ func (f *actionRecoveryFixture) proof(t *testing.T, operation agentv1.RecoveryOp
 func (f *actionRecoveryFixture) acquire(t *testing.T) *recoveryv1.AcquireRecoveryWorkResponse {
 	t.Helper()
 	request := &recoveryv1.AcquireRecoveryWorkRequest{CredentialEnvelope: f.envelope}
-	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, recoveryAcquirePayload(request))
+	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, dispatch.RecoveryAcquirePayload(request))
 	response, err := f.svc.AcquireRecoveryWork(t.Context(), connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +119,7 @@ func (f *actionRecoveryFixture) checkpointRequest(t *testing.T, phase agentv1.Re
 	var previousSHA []byte
 	var err error
 	if previous != nil {
-		previousSHA, err = actionDigest(previous)
+		previousSHA, err = core.ActionDigest(previous)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +132,7 @@ func (f *actionRecoveryFixture) checkpointRequest(t *testing.T, phase agentv1.Re
 	f.journal.Checkpoint = checkpoint
 	f.journal.CheckpointReceiptEnvelope = nil
 	request := &recoveryv1.CheckpointRecoveryActionRequest{CredentialEnvelope: f.envelope, Checkpoint: checkpoint, Journal: proto.CloneOf(f.journal)}
-	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_CHECKPOINT, recoveryCheckpointPayload(request))
+	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_CHECKPOINT, dispatch.RecoveryCheckpointPayload(request))
 	return request
 }
 func (f *actionRecoveryFixture) checkpoint(t *testing.T, phase agentv1.RecoveryPhase) *recoveryv1.CheckpointRecoveryActionResponse {
@@ -152,12 +156,12 @@ func (f *actionRecoveryFixture) startRequest(t *testing.T) *recoveryv1.Authorize
 	challenge.NativePlan.Before.OffTargetJournal = true
 	challenge.NativePlan.Before.ObservedAt = challenge.IssuedAt
 	var err error
-	challenge.NativePlanSha256, err = actionDigest(challenge.NativePlan)
+	challenge.NativePlanSha256, err = core.ActionDigest(challenge.NativePlan)
 	if err != nil {
 		t.Fatal(err)
 	}
 	request := &recoveryv1.AuthorizeRecoveryStartRequest{CredentialEnvelope: f.envelope, Challenge: challenge, RecoveryImageSha256: f.credential.GetHandoff().GetRecoveryImageSha256()}
-	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_AUTHORIZE_START, recoveryStartPayload(request))
+	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_AUTHORIZE_START, dispatch.RecoveryStartPayload(request))
 	return request
 }
 func (f *actionRecoveryFixture) start(t *testing.T) *recoveryv1.AuthorizeRecoveryStartRequest {
@@ -189,7 +193,7 @@ func (f *actionRecoveryFixture) resultRequest(t *testing.T, state agentv1.Device
 		status.Before = f.journal.GetChallenge().GetNativePlan().GetBefore()
 	}
 	request := &recoveryv1.ReportRecoveryResultRequest{CredentialEnvelope: f.envelope, ResultNonce: work.GetResultNonce(), Status: status}
-	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_REPORT_RESULT, recoveryResultPayload(request))
+	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_REPORT_RESULT, dispatch.RecoveryResultPayload(request))
 	return request
 }
 func TestDeviceActionRecoveryWorkCarriesUnchangedCurrentTrust(t *testing.T) {
@@ -215,7 +219,7 @@ func TestDeviceActionRecoveryDurableCheckpointReplayAndTerminal(t *testing.T) {
 	}
 	effect := f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED)
 	id, _ := uuid.Parse(f.work.GetActionId())
-	row, err := devicedb.New(f.svc.pool).GetDeviceActionRecovery(t.Context(), id)
+	row, err := devicedb.New(f.svc.Pool).GetDeviceActionRecovery(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +254,7 @@ func TestDeviceActionRecoveryExpiryUnknownAndSessionFence(t *testing.T) {
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)
 	f.start(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED)
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_action_recovery SET expires_at=clock_timestamp()-interval '1 second' WHERE credential_id=$1", f.credential.GetCredentialId()); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_action_recovery SET expires_at=clock_timestamp()-interval '1 second' WHERE credential_id=$1", f.credential.GetCredentialId()); err != nil {
 		t.Fatal(err)
 	}
 	f.boot = uuid.NewString()
@@ -267,11 +271,11 @@ func TestDeviceActionRecoveryExpiryUnknownAndSessionFence(t *testing.T) {
 	if _, err := f.svc.AuthorizeRecoveryStart(t.Context(), connect.NewRequest(f.startRequest(t))); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("expired authority renewed: %v", err)
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE enrollment_generations SET session_epoch=session_epoch+1 WHERE id=$1", f.generation); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE enrollment_generations SET session_epoch=session_epoch+1 WHERE id=$1", f.generation); err != nil {
 		t.Fatal(err)
 	}
 	acquire := &recoveryv1.AcquireRecoveryWorkRequest{CredentialEnvelope: f.envelope}
-	acquire.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, recoveryAcquirePayload(acquire))
+	acquire.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, dispatch.RecoveryAcquirePayload(acquire))
 	if _, err := f.svc.AcquireRecoveryWork(t.Context(), connect.NewRequest(acquire)); err == nil {
 		t.Fatal("recovery session fence ignored")
 	}
@@ -280,7 +284,7 @@ func TestDeviceActionRecoveryScopeProofRevocationAndMissingResult(t *testing.T) 
 	f := newActionRecoveryFixture(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)
 	acquire := &recoveryv1.AcquireRecoveryWorkRequest{CredentialEnvelope: f.envelope}
-	acquire.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, recoveryAcquirePayload(acquire))
+	acquire.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, dispatch.RecoveryAcquirePayload(acquire))
 	first, err := f.svc.AcquireRecoveryWork(t.Context(), connect.NewRequest(acquire))
 	if err != nil {
 		t.Fatal(err)
@@ -291,11 +295,11 @@ func TestDeviceActionRecoveryScopeProofRevocationAndMissingResult(t *testing.T) 
 	}
 	reused := proto.CloneOf(acquire)
 	proof := new(agentv1.RecoveryRequestProof)
-	if err := f.svc.authority.Verify(t.Context(), acquire.GetRequestProof(), proof, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), acquire.GetRequestProof(), proof, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	proof.RequestId = uuid.NewString()
-	reused.RequestProof, err = f.svc.authority.Sign(t.Context(), proof, f.key)
+	reused.RequestProof, err = f.svc.Authority.Sign(t.Context(), proof, f.key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,18 +313,18 @@ func TestDeviceActionRecoveryScopeProofRevocationAndMissingResult(t *testing.T) 
 	}
 	request = f.startRequest(t)
 	request.Challenge.NativePlan.Before.Target.Serial = "substituted-media"
-	request.Challenge.NativePlanSha256, _ = actionDigest(request.Challenge.NativePlan)
-	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_AUTHORIZE_START, recoveryStartPayload(request))
+	request.Challenge.NativePlanSha256, _ = core.ActionDigest(request.Challenge.NativePlan)
+	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_AUTHORIZE_START, dispatch.RecoveryStartPayload(request))
 	if _, err := f.svc.AuthorizeRecoveryStart(t.Context(), connect.NewRequest(request)); err == nil {
 		t.Fatal("changed recovery media accepted")
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE approval_requests SET created_at=clock_timestamp()-interval '10 minutes', expires_at=clock_timestamp()-interval '1 second' WHERE id=(SELECT approval_id FROM device_actions WHERE id=$1)", f.work.GetActionId()); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE approval_requests SET created_at=clock_timestamp()-interval '10 minutes', expires_at=clock_timestamp()-interval '1 second' WHERE id=(SELECT approval_id FROM device_actions WHERE id=$1)", f.work.GetActionId()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.AuthorizeRecoveryStart(t.Context(), connect.NewRequest(f.startRequest(t))); err == nil {
 		t.Fatal("stale two-human approval accepted after boot")
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_actions SET issued_at=clock_timestamp()-interval '2 minutes', expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", f.work.GetActionId()); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_actions SET issued_at=clock_timestamp()-interval '2 minutes', expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", f.work.GetActionId()); err != nil {
 		t.Fatal(err)
 	}
 	if !f.deviceActionFixture.work(t).GetRecoveryHandoff() {

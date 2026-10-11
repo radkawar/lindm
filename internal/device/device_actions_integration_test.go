@@ -55,7 +55,7 @@ func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	grant := new(agentv1.DeviceActionStartGrant)
-	if err := f.svc.authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if grant.GetExpiresAt().AsTime().Sub(grant.GetNotBefore().AsTime()) > 30*time.Second {
@@ -105,7 +105,7 @@ func TestDeviceActionDestructiveApprovalConsumedAtStart(t *testing.T) {
 	f.approval(t, request)
 	f.create(t, request)
 	var state string
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "approved" {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "approved" {
 		t.Fatalf("approval consumed before start: %s %v", state, err)
 	}
 	start, _ := f.startRequest(t, f.work(t))
@@ -113,11 +113,11 @@ func TestDeviceActionDestructiveApprovalConsumedAtStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "consumed" {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", request.GetApprovalId()).Scan(&state); err != nil || state != "consumed" {
 		t.Fatalf("approval not consumed atomically: %s %v", state, err)
 	}
 	grant := new(agentv1.DeviceActionStartGrant)
-	if err := f.svc.authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if len(grant.GetApprovals()) != 2 || grant.GetApprovals()[0].GetActorId() == grant.GetApprovals()[1].GetActorId() {
@@ -139,12 +139,12 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 			start, _ := f.startRequest(t, f.work(t))
 			if variant == "revoked" {
 				principal, _ := identity.PrincipalFromContext(reviewer)
-				if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", principal.ID); err != nil {
+				if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", principal.ID); err != nil {
 					t.Fatal(err)
 				}
 			}
 			if variant == "expired" {
-				if _, err := f.svc.pool.Exec(t.Context(), "UPDATE approval_requests SET created_at=clock_timestamp()-interval '20 minutes',expires_at=clock_timestamp()-interval '10 minutes' WHERE id=$1", request.GetApprovalId()); err != nil {
+				if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE approval_requests SET created_at=clock_timestamp()-interval '20 minutes',expires_at=clock_timestamp()-interval '10 minutes' WHERE id=$1", request.GetApprovalId()); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -152,7 +152,7 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 				t.Fatal("invalid fresh approval admitted")
 			}
 			var grant []byte
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", start.GetActionId()).Scan(&grant); err != nil {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", start.GetActionId()).Scan(&grant); err != nil {
 				t.Fatal(err)
 			}
 			if len(grant) != 0 {
@@ -164,7 +164,7 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 
 func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	rotate := &agentv1.EscrowRotateAction{Target: fixtureStorageTarget(uuid.NewString()), EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
+	rotate := &agentv1.EscrowRotateAction{Target: fixtureStorageTarget(uuid.NewString()), EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}
 	f.observeStorageTargets(t, rotate.GetTarget())
 	action := f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: rotate}}))
 	work := f.work(t)
@@ -178,12 +178,12 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	}
 	secret := []byte("memory-only-high-entropy-fixture-recovery-key-93237a58409841a0")
 	defer clear(secret)
-	encrypted, err := escrow.SealForServer(f.svc.escrow.PublicKey(), binding, secret)
+	encrypted, err := escrow.SealForServer(f.svc.Escrow.PublicKey(), binding, secret)
 	if err != nil {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(secret)
-	recovery := &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.escrow.KeyID(), Ciphertext: encrypted, RecoveryKeySha256: digest[:], NewKeyslot: 1, LuksUuid: rotate.GetTarget().GetLuksUuid(), MetadataSha256: make([]byte, 32)}
+	recovery := &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.Escrow.KeyID(), Ciphertext: encrypted, RecoveryKeySha256: digest[:], NewKeyslot: 1, LuksUuid: rotate.GetTarget().GetLuksUuid(), MetadataSha256: make([]byte, 32)}
 	verification := &agentv1.DeviceActionVerification{After: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.Now(), Supported: true, Encrypted: true, Target: rotate.GetTarget()}, Escrow: recovery}
 	badVerification := proto.CloneOf(verification)
 	badVerification.Escrow.RecoveryKeySha256[0] ^= 1
@@ -191,7 +191,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 		t.Fatalf("bad secret digest admitted: %v", err)
 	}
 	var count int
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM device_action_escrow").Scan(&count); err != nil || count != 0 {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM device_action_escrow").Scan(&count); err != nil || count != 0 {
 		t.Fatalf("rejected custody committed: %d %v", count, err)
 	}
 	result := f.result(t, work, 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW, verification)
@@ -203,11 +203,11 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 		t.Fatal("missing committed custody receipt")
 	}
 	id, _ := uuid.Parse(action.GetActionId())
-	stored, err := devicedb.New(f.svc.pool).GetDeviceActionEscrow(t.Context(), id)
+	stored, err := devicedb.New(f.svc.Pool).GetDeviceActionEscrow(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	plaintext, err := f.svc.escrow.Reveal(stored.BindingDocument, &escrow.Record{KeyID: stored.KeyID, WrappedKey: stored.WrappedKey, Ciphertext: stored.Ciphertext, SecretSHA256: stored.SecretSha256})
+	plaintext, err := f.svc.Escrow.Reveal(stored.BindingDocument, &escrow.Record{KeyID: stored.KeyID, WrappedKey: stored.WrappedKey, Ciphertext: stored.Ciphertext, SecretSHA256: stored.SecretSha256})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	}
 	clear(plaintext)
 	receipt := new(agentv1.DeviceActionEscrowReceipt)
-	if err := f.svc.authority.Verify(t.Context(), response.Msg.GetEscrowReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), response.Msg.GetEscrowReceiptEnvelope(), receipt, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	if receipt.GetActionId() != action.GetActionId() || !bytes.Equal(receipt.GetRecoveryKeySha256(), digest[:]) || receipt.GetNewKeyslot() != 1 || !receipt.GetStoredAt().AsTime().Equal(stored.CommittedAt.Time) {
@@ -227,7 +227,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 		t.Fatalf("lost receipt response changed: %v", err)
 	}
 	// Simulate a process loss after custody commit but before receipt persistence.
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_actions SET escrow_receipt_envelope='' WHERE id=$1", id); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_actions SET escrow_receipt_envelope='' WHERE id=$1", id); err != nil {
 		t.Fatal(err)
 	}
 	resumed := f.work(t)
@@ -243,7 +243,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 		t.Fatal(err)
 	}
 	var audit string
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT string_agg(action || reason || details::text,' ') FROM audit_events").Scan(&audit); err != nil {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT string_agg(action || reason || details::text,' ') FROM audit_events").Scan(&audit); err != nil {
 		t.Fatal(err)
 	}
 	for _, payload := range [][]byte{encoded, stored.Ciphertext, stored.WrappedKey, result.GetAttestationEnvelope(), resumed.GetEscrowReceiptEnvelope(), []byte(audit)} {
@@ -292,13 +292,13 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 func TestDeviceActionScopeOfflineAndQuarantineRestrictions(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	request := f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}})
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", f.principal.DeviceID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", f.principal.DeviceID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("offline destructive queue admitted: %v", err)
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp() WHERE id=$1", f.principal.DeviceID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp() WHERE id=$1", f.principal.DeviceID); err != nil {
 		t.Fatal(err)
 	}
 	action := f.create(t, request)
@@ -328,14 +328,14 @@ func TestDeviceActionScopeOfflineAndQuarantineRestrictions(t *testing.T) {
 	if _, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("quarantine service authority admitted: %v", err)
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_action_restrictions SET quarantine_until=clock_timestamp()-interval '1 second' WHERE device_id=$1", f.principal.DeviceID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_action_restrictions SET quarantine_until=clock_timestamp()-interval '1 second' WHERE device_id=$1", f.principal.DeviceID); err != nil {
 		t.Fatal(err)
 	}
 	if work, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1})); err != nil || work.Msg.GetWork() != nil {
 		t.Fatalf("expired quarantine prevented an empty service poll: %v", err)
 	}
 	var quarantined bool
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT quarantined FROM device_action_restrictions WHERE device_id=$1", f.principal.DeviceID).Scan(&quarantined); err != nil || quarantined {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT quarantined FROM device_action_restrictions WHERE device_id=$1", f.principal.DeviceID).Scan(&quarantined); err != nil || quarantined {
 		t.Fatalf("service poll did not durably expire quarantine: quarantined=%v err=%v", quarantined, err)
 	}
 	response, err = f.svc.GetDeviceActions(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionsRequest{DeviceId: f.deviceID}))
@@ -348,7 +348,7 @@ func TestDeviceActionFreshMutationScopeAndDeviceRevocation(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	actor := insertPrincipal(t, t.Context(), f.conn, identity.RoleAdmin)
 	outside := []byte(`{"scopes":[{"deviceIds":["` + uuid.NewString() + `"]}]}`)
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, outside); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, outside); err != nil {
 		t.Fatal(err)
 	}
 	actorCtx := identity.WithPrincipal(t.Context(), actor)
@@ -357,7 +357,7 @@ func TestDeviceActionFreshMutationScopeAndDeviceRevocation(t *testing.T) {
 		t.Fatalf("fresh out-of-scope mutation admitted: %v", err)
 	}
 	inside := []byte(`{"scopes":[{"deviceIds":["` + f.deviceID + `"]}]}`)
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, inside); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET scope_binding=$2::jsonb WHERE id=$1", actor.ID, inside); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.CreateDeviceAction(actorCtx, connect.NewRequest(request)); err != nil {
@@ -392,7 +392,7 @@ func TestDeviceActionResultNonceAndIntentFences(t *testing.T) {
 	}
 	result := f.result(t, fresh, 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, nil)
 	proof := new(agentv1.DeviceActionAttestation)
-	if err := f.svc.authority.Verify(t.Context(), result.GetAttestationEnvelope(), proof, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), result.GetAttestationEnvelope(), proof, 1, ed25519.PublicKey(f.key[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	proof.Status.IntentSha256[0] ^= 1
@@ -412,7 +412,7 @@ func TestDeviceActionEncryptionExactVolumeSelection(t *testing.T) {
 	targets := []*agentv1.StorageTarget{fixtureStorageTarget(volumes[0]), fixtureStorageTarget(volumes[1])}
 	f.observeStorageTargets(t, targets...)
 	for i, volume := range volumes {
-		rotate := &agentv1.EscrowRotateAction{Target: targets[i], EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
+		rotate := &agentv1.EscrowRotateAction{Target: targets[i], EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}
 		action := f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: rotate}}))
 		actions[i] = action.GetActionId()
 		work := f.work(t)
@@ -426,14 +426,14 @@ func TestDeviceActionEncryptionExactVolumeSelection(t *testing.T) {
 		}
 		secret := []byte("volume-specific-recovery-" + uuid.NewString())
 		digest := sha256.Sum256(secret)
-		ciphertext, err := escrow.SealForServer(f.svc.escrow.PublicKey(), binding, secret)
+		ciphertext, err := escrow.SealForServer(f.svc.Escrow.PublicKey(), binding, secret)
 		clear(secret)
 		if err != nil {
 			t.Fatal(err)
 		}
 		verification := &agentv1.DeviceActionVerification{
 			After:  &agentv1.DeviceActionObservation{ObservedAt: timestamppb.Now(), Supported: true, Encrypted: true, Target: rotate.GetTarget()},
-			Escrow: &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.escrow.KeyID(), Ciphertext: ciphertext, RecoveryKeySha256: digest[:], NewKeyslot: 1, LuksUuid: volume, MetadataSha256: make([]byte, 32)},
+			Escrow: &agentv1.DeviceActionEscrow{EscrowKeyId: f.svc.Escrow.KeyID(), Ciphertext: ciphertext, RecoveryKeySha256: digest[:], NewKeyslot: 1, LuksUuid: volume, MetadataSha256: make([]byte, 32)},
 		}
 		if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(f.result(t, work, 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW, verification))); err != nil {
 			t.Fatal(err)

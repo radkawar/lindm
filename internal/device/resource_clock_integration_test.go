@@ -28,7 +28,7 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			snapshot, verifier, err := f.service.execution.CurrentInTransaction(t.Context(), tx)
+			snapshot, verifier, err := f.service.Execution.CurrentInTransaction(t.Context(), tx)
 			if err != nil {
 				_ = tx.Rollback(t.Context())
 				t.Fatal(err)
@@ -63,7 +63,7 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 			}
 			result := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED, false)
 			attestation := new(agentv1.ResourceExecutionAttestation)
-			if err := f.service.authority.Verify(t.Context(), result.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
+			if err := f.service.Authority.Verify(t.Context(), result.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
 				t.Fatal(err)
 			}
 			attestation.IssuedAt = timestamppb.New(deviceNow)

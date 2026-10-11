@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -24,7 +26,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))
-	service, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	service, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +64,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, publishErr := service.profiles.Publish(ctx, tx, request, owner.ID)
+		_, publishErr := service.Profiles.Publish(ctx, tx, request, owner.ID)
 		if publishErr != nil {
 			_ = tx.Rollback(ctx)
 			t.Fatal(publishErr)
@@ -84,7 +86,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(encoded) > maxMessageBytes {
+		if len(encoded) > core.MaxMessageBytes {
 			t.Fatalf("JSON page exceeds Connect bound: %d", len(encoded))
 		}
 		for _, profile := range response.Msg.GetProfiles() {

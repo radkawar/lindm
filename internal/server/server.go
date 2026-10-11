@@ -21,6 +21,8 @@ import (
 	"lindm/internal/assistrelay"
 	"lindm/internal/config"
 	"lindm/internal/device"
+	devicecore "lindm/internal/device/core"
+	"lindm/internal/device/dispatch"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/integrations"
@@ -218,7 +220,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 			return nil, fmt.Errorf("initialize assistance relay: %w", err)
 		}
 	}
-	devices, err := device.New(pool, device.Config{
+	devices, err := device.New(pool, devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
 		CAKey:                        resources.DeviceCAKey,
@@ -354,7 +356,7 @@ func (p *controlPlane) deviceMux(resources *config.Resources) (*http.ServeMux, e
 		if err != nil {
 			return nil, fmt.Errorf("configure native connectivity confirmation: %w", err)
 		}
-		mux.Handle(device.ConnectivityConfirmationPath, confirmation)
+		mux.Handle(dispatch.ConnectivityConfirmationPath, confirmation)
 	}
 	return mux, nil
 }

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -49,13 +51,13 @@ func newOfflineFixture(t *testing.T) *offlineFixture {
 	}
 	sign := func(message proto.Message, key ed25519.PrivateKey) []byte {
 		t.Helper()
-		value, err := f.service.authority.Sign(t.Context(), message, key)
+		value, err := f.service.Authority.Sign(t.Context(), message, key)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return value
 	}
-	f.root = &agentv1.ExecutionRoot{DeploymentId: f.service.deploymentID.String(), Version: 1, Threshold: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour)), Keys: []*agentv1.ExecutionKey{public(f.rootKey)}}
+	f.root = &agentv1.ExecutionRoot{DeploymentId: f.service.DeploymentID.String(), Version: 1, Threshold: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour)), Keys: []*agentv1.ExecutionKey{public(f.rootKey)}}
 	var err error
 	f.rootJSON, err = protojson.Marshal(f.root)
 	if err != nil {
@@ -63,15 +65,15 @@ func newOfflineFixture(t *testing.T) *offlineFixture {
 	}
 	digest := sha256.Sum256(f.rootJSON)
 	transportCA, _ := testCA(t, now.Add(48*time.Hour))
-	bootstrap := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: f.service.deploymentID.String(), EnrollmentOrigin: "https://offline-admin.example", DeviceOrigin: "https://offline-device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transportCA.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.service.ca.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
+	bootstrap := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: f.service.DeploymentID.String(), EnrollmentOrigin: "https://offline-admin.example", DeviceOrigin: "https://offline-device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transportCA.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.service.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
 	f.bootstrap = sign(bootstrap, f.rootKey)
-	store, err := executionauthority.New(t.Context(), f.service.pool, executionauthority.Config{RootJSON: f.rootJSON, BootstrapEnvelope: f.bootstrap, TLSPublicKey: ed25519Key(t).Public()})
+	store, err := executionauthority.New(t.Context(), f.service.Pool, executionauthority.Config{RootJSON: f.rootJSON, BootstrapEnvelope: f.bootstrap, TLSPublicKey: ed25519Key(t).Public()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	plan, start := ed25519Key(t), ed25519Key(t)
-	delegation := &agentv1.ExecutionDelegation{DeploymentId: f.service.deploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(2 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: []string{trust.OfflineEnrollmentCapability}}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: []string{trust.OfflineEnrollmentCapability}}}}
-	tx, err := f.service.pool.Begin(t.Context())
+	delegation := &agentv1.ExecutionDelegation{DeploymentId: f.service.DeploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(2 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: []string{trust.OfflineEnrollmentCapability}}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: []string{trust.OfflineEnrollmentCapability}}}}
+	tx, err := f.service.Pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +85,7 @@ func newOfflineFixture(t *testing.T) *offlineFixture {
 		t.Fatal(err)
 	}
 	old := f.service
-	f.service, err = New(old.pool, Config{DeploymentID: old.deploymentID.String(), CACertificate: old.ca, CAKey: old.caKey, Identity: old.identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
+	f.service, err = New(old.Pool, core.Config{DeploymentID: old.DeploymentID.String(), CACertificate: old.CA, CAKey: old.CAKey, Identity: old.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +264,7 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 			token := f.mint(t, 1, false)
 			authorization := f.authorization(t, token)
 			_, file, _ := f.pendingExecutor(t, authorization)
-			csr, err := parseDeviceCSR(file.GetCsrPem())
+			csr, err := core.ParseDeviceCSR(file.GetCsrPem())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -271,11 +273,11 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 				t.Fatal("fixture requires Ed25519")
 			}
 			proof := new(agentv1.OfflineEnrollmentRequestProof)
-			if err := f.service.authority.Verify(t.Context(), file.GetRequestProof(), proof, 1, public); err != nil {
+			if err := f.service.Authority.Verify(t.Context(), file.GetRequestProof(), proof, 1, public); err != nil {
 				t.Fatal(err)
 			}
 			request := &enrollmentv1.ProvisionRequest{TransactionId: proof.GetTransactionId(), InstallationId: proof.GetInstallationId(), CsrPem: file.GetCsrPem()}
-			importer, err := f.service.identity.AuthorizeFresh(t.Context(), f.owner.ID, identity.PermissionManageEnrollment)
+			importer, err := f.service.Identity.AuthorizeFresh(t.Context(), f.owner.ID, identity.PermissionManageEnrollment)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -285,11 +287,11 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "delegation_revoked":
-				tx, err := f.service.pool.Begin(t.Context())
+				tx, err := f.service.Pool.Begin(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
-				snapshot, _, err := f.service.execution.CurrentInTransaction(t.Context(), tx)
+				snapshot, _, err := f.service.Execution.CurrentInTransaction(t.Context(), tx)
 				if err != nil {
 					_ = tx.Rollback(t.Context())
 					t.Fatal(err)
@@ -297,12 +299,12 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 				next := proto.CloneOf(snapshot.Delegation)
 				next.Version++
 				next.Delegates = nil
-				envelope, err := f.service.authority.Sign(t.Context(), next, f.rootKey)
+				envelope, err := f.service.Authority.Sign(t.Context(), next, f.rootKey)
 				if err != nil {
 					_ = tx.Rollback(t.Context())
 					t.Fatal(err)
 				}
-				if _, err := f.service.execution.Apply(t.Context(), tx, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: envelope}, f.owner.ID, "revoke offline enrollment signers"); err != nil {
+				if _, err := f.service.Execution.Apply(t.Context(), tx, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: envelope}, f.owner.ID, "revoke offline enrollment signers"); err != nil {
 					_ = tx.Rollback(t.Context())
 					t.Fatal(err)
 				}
@@ -316,7 +318,7 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.service.provisionOfflineToken(t.Context(), tokenID, request, importer, file); err == nil {
+			if _, err := f.service.ProvisionOfflineToken(t.Context(), tokenID, request, importer, file); err == nil {
 				t.Fatal("stale or substituted offline authority crossed the common reservation transaction")
 			}
 			var used, devices int
@@ -342,7 +344,7 @@ func TestOfflineEnrollmentMissingSignerCapabilityIsActionable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.service.signing.PlanKey = ed25519Key(t)
+	f.service.Signing.PlanKey = ed25519Key(t)
 	_, err = f.service.CreateOfflineEnrollmentAuthorization(f.ownerCtx, connect.NewRequest(&adminv1.CreateOfflineEnrollmentAuthorizationRequest{
 		RequestId: uuid.NewString(), ProvisioningToken: f.mint(t, 1, false).GetSecret(), LifetimeSeconds: 120,
 		Reason: "verify missing offline signing delegation", BootstrapRootVersion: 1, BootstrapRootSha256: digest[:],
@@ -350,7 +352,7 @@ func TestOfflineEnrollmentMissingSignerCapabilityIsActionable(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("missing PLAN authority was not actionable: %v", err)
 	}
-	f.service.signing.StartKey = ed25519Key(t)
+	f.service.Signing.StartKey = ed25519Key(t)
 	_, err = f.service.ExportOfflineEnrollmentResponse(f.ownerCtx, connect.NewRequest(&adminv1.ExportOfflineEnrollmentResponseRequest{Request: request, Reason: "verify missing offline response signer"}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("missing START authority was not actionable: %v", err)

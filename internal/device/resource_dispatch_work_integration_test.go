@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -123,13 +125,13 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 		}
 	}
 	assertNoResourceWork(t, f)
-	saved := f.service.signing
-	f.service.signing = nil
+	saved := f.service.Signing
+	f.service.Signing = nil
 	clearedID := cleared.Msg.GetAssignment().GetAssignmentId()
 	f.assign(t, &clearedID)
 	_, err = f.service.GetResourceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	dispatchError(t, err, connect.CodeFailedPrecondition, "execution_signing_unconfigured")
-	f.service.signing = saved
+	f.service.Signing = saved
 	if f.work(t) == nil {
 		t.Fatal("configured signer did not resume pending assignment")
 	}
@@ -240,7 +242,7 @@ func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
 	// Removing then restoring the role changes its version even when the next
 	// fetch observes the original role. Reauthorization never revives that head.
 	f.directory.membership(t, false)
-	if _, err := f.service.identity.AuthorizeFresh(t.Context(), f.actor.ID, identity.PermissionAssignResources); err == nil {
+	if _, err := f.service.Identity.AuthorizeFresh(t.Context(), f.actor.ID, identity.PermissionAssignResources); err == nil {
 		t.Fatal("removed membership still authorized")
 	}
 	f.directory.membership(t, true)
@@ -262,13 +264,13 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	f.assign(t, nil)
 	work := f.work(t)
 	unknownKey := ed25519Key(t)
-	unknown, err := issueCertificate(f.service.ca, f.service.caKey, unknownKey.Public(), f.service.deploymentID, f.principal.DeviceID, f.principal.GenerationID, time.Now())
+	unknown, err := core.IssueCertificate(f.service.CA, f.service.CAKey, unknownKey.Public(), f.service.DeploymentID, f.principal.DeviceID, f.principal.GenerationID, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 	request := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false)
 	message := new(agentv1.ResourceExecutionAttestation)
-	if err := f.service.authority.Verify(t.Context(), request.GetAttestationEnvelope(), message, 1, f.principal.PublicKey); err != nil {
+	if err := f.service.Authority.Verify(t.Context(), request.GetAttestationEnvelope(), message, 1, f.principal.PublicKey); err != nil {
 		t.Fatal(err)
 	}
 	request.CertificatePem = unknown.PEM
@@ -285,7 +287,7 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.deviceCtx = withDevicePrincipal(t.Context(), newPrincipal)
+	f.deviceCtx = core.WithDevicePrincipal(t.Context(), newPrincipal)
 	request = f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false)
 	// An overlapping registered certificate is accepted, not just the TLS key.
 	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
@@ -355,7 +357,7 @@ func TestResourceResultBindsExactDesiredEvidence(t *testing.T) {
 		},
 	} {
 		attestation := new(agentv1.ResourceExecutionAttestation)
-		if err := f.service.authority.Verify(t.Context(), valid.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
+		if err := f.service.Authority.Verify(t.Context(), valid.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
 			t.Fatal(err)
 		}
 		change(attestation.Status)

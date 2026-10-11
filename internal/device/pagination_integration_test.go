@@ -10,6 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -47,8 +51,8 @@ func assertInventoryPageFits(t *testing.T, message proto.Message) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binarySize := proto.Size(message); binarySize > maxMessageBytes || len(encoded) > maxMessageBytes {
-		t.Fatalf("response exceeds handler limit: protobuf=%d JSON=%d limit=%d", binarySize, len(encoded), maxMessageBytes)
+	if binarySize := proto.Size(message); binarySize > core.MaxMessageBytes || len(encoded) > core.MaxMessageBytes {
+		t.Fatalf("response exceeds handler limit: protobuf=%d JSON=%d limit=%d", binarySize, len(encoded), core.MaxMessageBytes)
 	}
 }
 
@@ -113,7 +117,7 @@ func TestListDevicePackagesHandlerBoundsEncodedPages(t *testing.T) {
 						if page.NextPageToken == "" {
 							t.Fatal("oversized logical page has no continuation")
 						}
-						f.now = f.now.Add(snapshotAttemptInterval)
+						f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 						f.publishPackages(t, 2, "replacement")
 					}
 					if !proto.Equal(page.CursorExpiresAt, first.CursorExpiresAt) {
@@ -128,7 +132,7 @@ func TestListDevicePackagesHandlerBoundsEncodedPages(t *testing.T) {
 					if page.NextPageToken == "" {
 						break
 					}
-					_, position, err := decodePackagePage(page.NextPageToken)
+					_, position, err := inventory.DecodePackagePage(page.NextPageToken)
 					if err != nil || position != page.Packages[len(page.Packages)-1].Position+1 {
 						t.Fatalf("continuation did not follow last returned position: %d (%v)", position, err)
 					}
@@ -163,7 +167,7 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 				report.Observation.OsId.Value = shape.value
 				report.Observation.OsVersion.Value = shape.value
 				report.Observation.Architecture.Value = shape.value
-				if err := f.svc.rules.Validate(report); err != nil {
+				if err := f.svc.Rules.Validate(report); err != nil {
 					t.Fatalf("host fixture is not admitted by the schema: %v", err)
 				}
 				if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); err != nil {
@@ -215,7 +219,7 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 					} else if !proto.Equal(page.GetCursorExpiresAt(), first.GetCursorExpiresAt()) {
 						t.Fatal("fleet continuation extended the cursor lifetime")
 					}
-					if len(page.Devices) == 0 || int32(len(page.Devices)) > pageLimit(shape.pageSize) {
+					if len(page.Devices) == 0 || int32(len(page.Devices)) > core.PageLimit(shape.pageSize) {
 						t.Fatalf("invalid fleet page length %d", len(page.Devices))
 					}
 					for _, item := range page.Devices {

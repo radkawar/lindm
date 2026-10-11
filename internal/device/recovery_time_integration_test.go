@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -36,12 +38,12 @@ type recoveryTimeHandlerFixture struct {
 func newRecoveryTimeHandlerFixture(t *testing.T) *recoveryTimeHandlerFixture {
 	t.Helper()
 	f := &recoveryTimeHandlerFixture{deviceActionFixture: newDeviceActionFixtureCapabilities(t, []string{"device.sanitize.v1"})}
-	tx, err := f.svc.pool.Begin(t.Context())
+	tx, err := f.svc.Pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(t.Context()) }()
-	f.snapshot, f.verifier, err = f.svc.execution.CurrentInTransaction(t.Context(), tx)
+	f.snapshot, f.verifier, err = f.svc.Execution.CurrentInTransaction(t.Context(), tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +73,7 @@ func newRecoveryTimeHandlerFixture(t *testing.T) *recoveryTimeHandlerFixture {
 func (f *recoveryTimeHandlerFixture) authorityState(t *testing.T) string {
 	t.Helper()
 	var state string
-	if err := f.svc.pool.QueryRow(t.Context(), `SELECT jsonb_build_object(
+	if err := f.svc.Pool.QueryRow(t.Context(), `SELECT jsonb_build_object(
 		'principals', (SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM principals p),
 		'devices', (SELECT jsonb_agg(to_jsonb(d) ORDER BY id) FROM devices d),
 		'generations', (SELECT jsonb_agg(to_jsonb(g) ORDER BY id) FROM enrollment_generations g),
@@ -93,8 +95,8 @@ func TestRecoveryTimePublicHandlerUsesDatabaseTimeWithoutAuthorityMutation(t *te
 	f := newRecoveryTimeHandlerFixture(t)
 	before := f.authorityState(t)
 	// An unusable process wall clock cannot be the source of signed time.
-	f.svc.clock = func() time.Time { return time.Unix(0, 0) }
-	lower, err := dispatchClock(t.Context(), devicedb.New(f.svc.pool))
+	f.svc.Clock = func() time.Time { return time.Unix(0, 0) }
+	lower, err := core.DispatchClock(t.Context(), devicedb.New(f.svc.Pool))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +104,7 @@ func TestRecoveryTimePublicHandlerUsesDatabaseTimeWithoutAuthorityMutation(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	upper, err := dispatchClock(t.Context(), devicedb.New(f.svc.pool))
+	upper, err := core.DispatchClock(t.Context(), devicedb.New(f.svc.Pool))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,12 +173,12 @@ func TestRecoveryTimeHandlerUsesCurrentSignerAndBoundedDelegationExpiry(t *testi
 	f := newRecoveryTimeHandlerFixture(t)
 	delegation := proto.CloneOf(f.snapshot.Delegation)
 	delegation.Version++
-	now, err := dispatchClock(t.Context(), devicedb.New(f.svc.pool))
+	now, err := core.DispatchClock(t.Context(), devicedb.New(f.svc.Pool))
 	if err != nil {
 		t.Fatal(err)
 	}
 	delegation.ExpiresAt = timestamppb.New(now.Add(20 * time.Second))
-	envelope, err := f.svc.authority.Sign(t.Context(), delegation, f.rootKeys...)
+	envelope, err := f.svc.Authority.Sign(t.Context(), delegation, f.rootKeys...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,12 +186,12 @@ func TestRecoveryTimeHandlerUsesCurrentSignerAndBoundedDelegationExpiry(t *testi
 	if !ok {
 		t.Fatal("missing fixture authority owner")
 	}
-	tx, err := f.svc.pool.Begin(t.Context())
+	tx, err := f.svc.Pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(t.Context()) }()
-	if _, err := f.svc.execution.Apply(t.Context(), tx, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: envelope}, actor.ID, "bound recovery time signer expiry"); err != nil {
+	if _, err := f.svc.Execution.Apply(t.Context(), tx, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: envelope}, actor.ID, "bound recovery time signer expiry"); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(t.Context()); err != nil {
@@ -206,7 +208,7 @@ func TestRecoveryTimeHandlerUsesCurrentSignerAndBoundedDelegationExpiry(t *testi
 	}
 	// A configured key is not authority: self-verification must reject a signer
 	// that is absent from the current START device.sanitize.v1 delegation.
-	f.svc.signing.StartKey = ed25519Key(t)
+	f.svc.Signing.StartKey = ed25519Key(t)
 	if _, err := f.client.GetRecoveryTime(t.Context(), connect.NewRequest(f.request)); err == nil {
 		t.Fatal("server returned a time statement from an undelegated signer")
 	}
@@ -219,7 +221,7 @@ func TestRecoveryTimeHandlerDeliversRootTransitionWithCurrentTimeSignature(t *te
 	f := newRecoveryTimeHandlerFixture(t)
 	root := proto.CloneOf(f.snapshot.Root)
 	root.Version++
-	now, err := dispatchClock(t.Context(), devicedb.New(f.svc.pool))
+	now, err := core.DispatchClock(t.Context(), devicedb.New(f.svc.Pool))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,11 +230,11 @@ func TestRecoveryTimeHandlerDeliversRootTransitionWithCurrentTimeSignature(t *te
 	delegation.RootVersion = root.GetVersion()
 	delegation.Version++
 	delegation.ExpiresAt = root.ExpiresAt
-	rootEnvelope, err := f.svc.authority.Sign(t.Context(), root, f.rootKeys...)
+	rootEnvelope, err := f.svc.Authority.Sign(t.Context(), root, f.rootKeys...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	delegationEnvelope, err := f.svc.authority.Sign(t.Context(), delegation, f.rootKeys...)
+	delegationEnvelope, err := f.svc.Authority.Sign(t.Context(), delegation, f.rootKeys...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +242,7 @@ func TestRecoveryTimeHandlerDeliversRootTransitionWithCurrentTimeSignature(t *te
 	if !ok {
 		t.Fatal("missing fixture authority owner")
 	}
-	tx, err := f.svc.pool.Begin(t.Context())
+	tx, err := f.svc.Pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +251,7 @@ func TestRecoveryTimeHandlerDeliversRootTransitionWithCurrentTimeSignature(t *te
 		RootTransitions:    []*agentv1.ExecutionRootTransition{{PreviousQuorumEnvelope: rootEnvelope, NextQuorumEnvelope: rootEnvelope}},
 		DelegationEnvelope: delegationEnvelope,
 	}
-	if _, err := f.svc.execution.Apply(t.Context(), tx, update, actor.ID, "advance recovery time root"); err != nil {
+	if _, err := f.svc.Execution.Apply(t.Context(), tx, update, actor.ID, "advance recovery time root"); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(t.Context()); err != nil {

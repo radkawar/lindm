@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -31,7 +33,7 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 		}
 	})
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +46,7 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	acquireTestSession(t, ctx, svc, principal, deviceKey, 0)
-	if _, err := svc.ReportHostObservation(withDevicePrincipal(ctx, principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "preview-device"))); err != nil {
+	if _, err := svc.ReportHostObservation(core.WithDevicePrincipal(ctx, principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "preview-device"))); err != nil {
 		t.Fatal(err)
 	}
 	preview, err := svc.PreviewTargetAssignments(ownerCtx, connect.NewRequest(&adminv1.PreviewTargetAssignmentsRequest{DeviceId: enrolled.Msg.GetDeviceId()}))

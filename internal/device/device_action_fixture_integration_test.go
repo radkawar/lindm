@@ -12,6 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -56,7 +60,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 		return &agentv1.ExecutionKey{KeyId: id, PublicKey: p}
 	}
 	sign := func(message proto.Message, keys ...ed25519.PrivateKey) []byte {
-		data, err := s.authority.Sign(t.Context(), message, keys...)
+		data, err := s.Authority.Sign(t.Context(), message, keys...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,22 +68,22 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	}
 	roots := []ed25519.PrivateKey{ed25519Key(t), ed25519Key(t)}
 	f.rootKeys = roots
-	root := &agentv1.ExecutionRoot{DeploymentId: s.deploymentID.String(), Version: 1, Threshold: 2, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour)), Keys: []*agentv1.ExecutionKey{public(roots[0]), public(roots[1])}}
+	root := &agentv1.ExecutionRoot{DeploymentId: s.DeploymentID.String(), Version: 1, Threshold: 2, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour)), Keys: []*agentv1.ExecutionKey{public(roots[0]), public(roots[1])}}
 	rootJSON, err := protojson.Marshal(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rootDigest := sha256.Sum256(rootJSON)
 	transport, _ := testCA(t, now.Add(48*time.Hour))
-	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: s.deploymentID.String(), EnrollmentOrigin: "https://admin.example", DeviceOrigin: "https://device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transport.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.ca.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: rootDigest[:], NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
-	store, err := executionauthority.New(t.Context(), s.pool, executionauthority.Config{RootJSON: rootJSON, BootstrapEnvelope: sign(bundle, roots...), TLSPublicKey: ed25519Key(t).Public()})
+	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: s.DeploymentID.String(), EnrollmentOrigin: "https://admin.example", DeviceOrigin: "https://device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transport.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: rootDigest[:], NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
+	store, err := executionauthority.New(t.Context(), s.Pool, executionauthority.Config{RootJSON: rootJSON, BootstrapEnvelope: sign(bundle, roots...), TLSPublicKey: ed25519Key(t).Public()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	plan, start := ed25519Key(t), ed25519Key(t)
-	delegation := &agentv1.ExecutionDelegation{DeploymentId: s.deploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: capabilities}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: capabilities}}}
+	delegation := &agentv1.ExecutionDelegation{DeploymentId: s.DeploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: capabilities}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: capabilities}}}
 	actor, _ := identity.PrincipalFromContext(f.ownerCtx)
-	tx, err := s.pool.Begin(t.Context())
+	tx, err := s.Pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,11 +107,11 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.svc, err = New(s.pool, Config{DeploymentID: s.deploymentID.String(), CACertificate: s.ca, CAKey: s.caKey, Identity: s.identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}, Escrow: custody})
+	f.svc, err = New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: s.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}, Escrow: custody})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.pool.QueryRow(t.Context(), "SELECT pem FROM device_certificates WHERE id=$1", f.principal.CertificateID).Scan(&f.certificate); err != nil {
+	if err := s.Pool.QueryRow(t.Context(), "SELECT pem FROM device_certificates WHERE id=$1", f.principal.CertificateID).Scan(&f.certificate); err != nil {
 		t.Fatal(err)
 	}
 	report := hostObservation(f.generation, 1, "device-action-fixture")
@@ -145,7 +149,7 @@ func (f *deviceActionFixture) work(t *testing.T) *devicev1.DeviceActionWork {
 }
 func (f *deviceActionFixture) sign(t *testing.T, message proto.Message) []byte {
 	t.Helper()
-	encoded, err := f.svc.authority.Sign(t.Context(), message, f.key)
+	encoded, err := f.svc.Authority.Sign(t.Context(), message, f.key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +158,7 @@ func (f *deviceActionFixture) sign(t *testing.T, message proto.Message) []byte {
 func (f *deviceActionFixture) intent(t *testing.T, work *devicev1.DeviceActionWork) *agentv1.DeviceActionIntent {
 	t.Helper()
 	intent := new(agentv1.DeviceActionIntent)
-	if err := f.svc.authority.Verify(t.Context(), work.GetIntentEnvelope(), intent, 1, ed25519.PublicKey(f.svc.signing.PlanKey[ed25519.SeedSize:])); err != nil {
+	if err := f.svc.Authority.Verify(t.Context(), work.GetIntentEnvelope(), intent, 1, ed25519.PublicKey(f.svc.Signing.PlanKey[ed25519.SeedSize:])); err != nil {
 		t.Fatal(err)
 	}
 	return intent
@@ -174,7 +178,7 @@ func (f *deviceActionFixture) challenge(t *testing.T, work *devicev1.DeviceActio
 		plan.Before.LocalAdmin = &agentv1.LocalAdminAccountObservation{AccountName: rotate.GetAccountName(), AccountUid: 1001, PasswordUsable: true}
 		plan.LocalAdminBinding = &agentv1.LocalAdminPasswordBinding{DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), ActionId: intent.GetActionId(), AccountName: rotate.GetAccountName(), AccountUid: 1001}
 	}
-	if liveRootAction(intent.GetSpec()) {
+	if core.LiveRootAction(intent.GetSpec()) {
 		plan.Before.Encrypted = true
 		plan.Before.RecoveryEnvironment = false
 		plan.Before.OffTargetJournal = false
@@ -183,7 +187,7 @@ func (f *deviceActionFixture) challenge(t *testing.T, work *devicev1.DeviceActio
 		}
 		plan.Before.CryptoEraseTargets = plan.CryptoEraseTargets
 	}
-	planDigest, err := actionDigest(plan)
+	planDigest, err := core.ActionDigest(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +218,7 @@ func (f *deviceActionFixture) result(t *testing.T, work *devicev1.DeviceActionWo
 	digest := sha256.Sum256(work.GetIntentEnvelope())
 	stamp := timestamppb.New(now)
 	status := &agentv1.DeviceActionStatus{ActionId: work.GetActionId(), IntentSha256: digest[:], State: state, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: stamp, StartedAt: stamp, Before: &agentv1.DeviceActionObservation{ObservedAt: stamp, Supported: true}, Verification: verification}
-	if actionTerminal(state) || state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
+	if dispatch.ActionTerminal(state) || state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
 		status.CompletedAt = stamp
 	}
 	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {

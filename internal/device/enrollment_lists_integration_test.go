@@ -11,6 +11,8 @@ import (
 	"slices"
 	"testing"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -33,7 +35,7 @@ func assertEnrollmentListHasNoCredential(t *testing.T, message proto.Message, se
 		t.Fatal(err)
 	}
 	for _, secret := range secrets {
-		hash := hashGrant(secret)
+		hash := core.HashGrant(secret)
 		for _, forbidden := range [][]byte{[]byte(secret), hash, []byte(hex.EncodeToString(hash)), []byte(base64.StdEncoding.EncodeToString(hash))} {
 			if bytes.Contains(wire, forbidden) || bytes.Contains(jsonWire, forbidden) {
 				t.Fatal("enrollment metadata response leaked a credential or its hash")
@@ -223,7 +225,7 @@ func TestEnrollmentListsRequireFreshUnrestrictedAuthority(t *testing.T) {
 
 func TestEnrollmentInstructionsReturnsIsolatedPublicMetadata(t *testing.T) {
 	f := newProvisioningFixture(t)
-	f.service.enrollmentInstructions = &adminv1.GetEnrollmentInstructionsResponse{
+	f.service.EnrollmentInstructions = &adminv1.GetEnrollmentInstructionsResponse{
 		EnrollmentOrigin:   "https://enroll.example.test",
 		DeviceOrigin:       proto.String("https://devices.example.test"),
 		ExecutionRootUrl:   proto.String("https://enroll.example.test/bootstrap/execution-root.json"),
@@ -233,11 +235,11 @@ func TestEnrollmentInstructionsReturnsIsolatedPublicMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !proto.Equal(response.Msg, f.service.enrollmentInstructions) || response.Header().Get("Cache-Control") != "no-store" {
+	if !proto.Equal(response.Msg, f.service.EnrollmentInstructions) || response.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("instructions changed configured public metadata or allowed caching")
 	}
 	response.Msg.EnrollmentOrigin = "https://untrusted.example.test"
-	if f.service.enrollmentInstructions.GetEnrollmentOrigin() != "https://enroll.example.test" {
+	if f.service.EnrollmentInstructions.GetEnrollmentOrigin() != "https://enroll.example.test" {
 		t.Fatal("response mutation changed deployment instructions")
 	}
 }

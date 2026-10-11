@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
 
@@ -32,13 +34,13 @@ func TestNativeBusyHoldRetriesAfterInterval(t *testing.T) {
 		rows     []devicedb.ResourceAssignmentResource
 		eligible bool
 	}{
-		{"held within interval", row(resourceReasonNativeBusy, now.Add(-interval+time.Second)), false},
-		{"held for interval", row(resourceReasonNativeBusy, now.Add(-interval)), true},
+		{"held within interval", row(dispatch.ResourceReasonNativeBusy, now.Add(-interval+time.Second)), false},
+		{"held for interval", row(dispatch.ResourceReasonNativeBusy, now.Add(-interval)), true},
 		{"other block", row("admission_precondition", now.Add(-time.Hour)), false},
-		{"hold without observation", []devicedb.ResourceAssignmentResource{{ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Document: document, Disposition: 5, Reason: resourceReasonNativeBusy}}, false},
+		{"hold without observation", []devicedb.ResourceAssignmentResource{{ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Document: document, Disposition: 5, Reason: dispatch.ResourceReasonNativeBusy}}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			candidate, err := eligibleResource(tc.rows, now, interval)
+			candidate, err := dispatch.EligibleResource(tc.rows, now, interval)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -51,8 +53,8 @@ func TestNativeBusyHoldRetriesAfterInterval(t *testing.T) {
 
 // A native-busy release refusal names its reason instead of a generic failure.
 func TestNativeBusyReleaseReason(t *testing.T) {
-	state, reason := releaseResultState(&agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY})
-	if state != "release_conflict" || reason != resourceReasonNativeBusy {
+	state, reason := dispatch.ReleaseResultState(&agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY})
+	if state != "release_conflict" || reason != dispatch.ResourceReasonNativeBusy {
 		t.Fatalf("release busy = %s/%s", state, reason)
 	}
 }

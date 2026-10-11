@@ -14,6 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/secrets"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -70,7 +74,7 @@ func newSecretFixture(t *testing.T) *secretFixture {
 		t.Fatal(err)
 	}
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: authority, Escrow: custody})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: authority, Escrow: custody})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +326,7 @@ func TestSecretStoreLifecycleAndIdempotency(t *testing.T) {
 
 func TestSecretRevealApprovalRequired(t *testing.T) {
 	f := newSecretFixture(t)
-	f.svc.revealApproval = true
+	f.svc.RevealApproval = true
 	summary := f.create(t, &adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_DIRECTORY_JOIN, DisplayName: "domain join", Material: opaqueMaterial("domain-join-credential"), Reason: "provision join account"})
 	request := &adminv1.RevealSecretRequest{RequestId: uuid.NewString(), SecretId: summary.GetSecretId(), Version: 1, Reason: "two person reveal"}
 	if _, err := f.svc.RevealSecret(f.stepUp, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -368,7 +372,7 @@ func TestOpenManagedSecretBindingRefusals(t *testing.T) {
 	summary := f.create(t, &adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, DisplayName: "local user", Material: &agentv1.SecretMaterial{Material: &agentv1.SecretMaterial_PasswordHash{PasswordHash: []byte(hash)}}, Reason: "provision local user"})
 	q := devicedb.New(f.pool)
 	ref := &resourcev1.SecretRef{SecretId: summary.GetSecretId(), Version: 1, Purpose: summary.GetPurpose(), SubjectBindingId: summary.GetSubjectBindingId()}
-	material, err := f.svc.openManagedSecret(t.Context(), q, ref)
+	material, err := f.svc.OpenManagedSecret(t.Context(), q, ref)
 	if err != nil || string(material.GetPasswordHash()) != hash {
 		t.Fatalf("open exact reference: %v", err)
 	}
@@ -376,30 +380,30 @@ func TestOpenManagedSecretBindingRefusals(t *testing.T) {
 		mutate func(*resourcev1.SecretRef)
 		want   error
 	}{
-		"purpose": {func(r *resourcev1.SecretRef) { r.Purpose = resourcev1.SecretPurpose_SECRET_PURPOSE_WIFI_PSK }, errSecretBindingMismatch},
-		"subject": {func(r *resourcev1.SecretRef) { r.SubjectBindingId = uuid.NewString() }, errSecretBindingMismatch},
-		"version": {func(r *resourcev1.SecretRef) { r.Version = 2 }, errSecretUnavailable},
-		"secret":  {func(r *resourcev1.SecretRef) { r.SecretId = uuid.NewString() }, errSecretUnavailable},
-		"zero":    {func(r *resourcev1.SecretRef) { r.Version = 0 }, errSecretUnavailable},
-		"malform": {func(r *resourcev1.SecretRef) { r.SecretId = "x" }, errSecretUnavailable},
+		"purpose": {func(r *resourcev1.SecretRef) { r.Purpose = resourcev1.SecretPurpose_SECRET_PURPOSE_WIFI_PSK }, secrets.ErrSecretBindingMismatch},
+		"subject": {func(r *resourcev1.SecretRef) { r.SubjectBindingId = uuid.NewString() }, secrets.ErrSecretBindingMismatch},
+		"version": {func(r *resourcev1.SecretRef) { r.Version = 2 }, secrets.ErrSecretUnavailable},
+		"secret":  {func(r *resourcev1.SecretRef) { r.SecretId = uuid.NewString() }, secrets.ErrSecretUnavailable},
+		"zero":    {func(r *resourcev1.SecretRef) { r.Version = 0 }, secrets.ErrSecretUnavailable},
+		"malform": {func(r *resourcev1.SecretRef) { r.SecretId = "x" }, secrets.ErrSecretUnavailable},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := proto.CloneOf(ref)
 			test.mutate(changed)
-			if _, err := f.svc.openManagedSecret(t.Context(), q, changed); err != test.want {
+			if _, err := f.svc.OpenManagedSecret(t.Context(), q, changed); err != test.want {
 				t.Fatalf("got %v want %v", err, test.want)
 			}
 		})
 	}
-	custody := f.svc.escrow
-	f.svc.escrow = nil
-	if _, err := f.svc.openManagedSecret(t.Context(), q, ref); err != errSecretUnavailable {
+	custody := f.svc.Escrow
+	f.svc.Escrow = nil
+	if _, err := f.svc.OpenManagedSecret(t.Context(), q, ref); err != secrets.ErrSecretUnavailable {
 		t.Fatalf("unconfigured escrow: %v", err)
 	}
 	if _, err := f.svc.CreateSecret(f.ownerCtx, connect.NewRequest(&adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_DIRECTORY_JOIN, DisplayName: "no custody", Material: opaqueMaterial("never stored"), Reason: "no custody"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("create without escrow: %v", err)
 	}
-	f.svc.escrow = custody
+	f.svc.Escrow = custody
 }
 
 func TestSecretRevealApprovalConstraints(t *testing.T) {

@@ -11,7 +11,7 @@ The exact resolved resource bytes and provenance are part of the retained previe
 
 Phase 1 intentionally retains the existing signed service intent, challenge, start
 grant, attestation and protected agent journal. It does not change executor,
-journal or service-provider behavior. `internal/device/resource_rows.go` contains
+journal or service-provider behavior. `internal/device/dispatch/resource_rows.go` contains
 the explicit service-only execution translation. Other kinds, unsupported
 verification requests, adoption/restoration operations and missing capability
 qualification are visible unsupported states; they cannot fall through to systemd.
@@ -35,10 +35,10 @@ qualification are visible unsupported states; they cannot fall through to system
 - `db/migrations/00010_targeting.sql`, `internal/targeting`: dynamic typed AST,
   pinned membership/preview snapshots, target assignments and ring cohorts.
   Static groups/labels remain the existing RBAC-owned concepts.
-- `internal/device/resource_targeting.go`: generic resolution projection and
+- `internal/device/dispatch/resource_targeting.go`: generic resolution projection and
   atomic activation of exact preview bytes. Effective snapshot resource UUIDs
   are deterministically derived from canonical resource-ref digests.
-- `internal/device/resource_dispatch.go`, `resource_start.go`, `resource_result.go`:
+- `internal/device/dispatch/resource_dispatch.go`, `resource_start.go`, `resource_result.go`:
   retained service-wire dispatch over generic rows. Preserve the one-open-effect
   rule, exact grant replay and fresh native compliance when replacing this wire.
 

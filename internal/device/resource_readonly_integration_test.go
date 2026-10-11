@@ -7,6 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -64,13 +68,13 @@ func newReadOnlyDispatchFixture(t *testing.T, release bool) (*dispatchFixture, *
 		intent.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
 		intent.DesiredRevision = cleared.Msg.GetAssignment().GetAssignmentId()
 		intent.Ownership.AssignmentId = intent.GetDesiredRevision()
-		envelope := f.sign(t, intent, f.service.signing.PlanKey)
+		envelope := f.sign(t, intent, f.service.Signing.PlanKey)
 		document, err := proto.Marshal(intent)
 		if err != nil {
 			t.Fatal(err)
 		}
 		now := time.Now().UTC()
-		if err := q.InsertResourceAction(t.Context(), devicedb.InsertResourceActionParams{ID: actionID, DeviceID: f.principal.DeviceID, GenerationID: f.principal.GenerationID, AssignmentID: uuid.MustParse(head.GetAssignmentId()), ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(intent.GetExpiresAt().AsTime())}); err != nil {
+		if err := q.InsertResourceAction(t.Context(), devicedb.InsertResourceActionParams{ID: actionID, DeviceID: f.principal.DeviceID, GenerationID: f.principal.GenerationID, AssignmentID: uuid.MustParse(head.GetAssignmentId()), ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: core.Timestamptz(now), ExpiresAt: core.Timestamptz(intent.GetExpiresAt().AsTime())}); err != nil {
 			t.Fatal(err)
 		}
 		if err := q.BindResourceReleaseAction(t.Context(), devicedb.BindResourceReleaseActionParams{ID: actionID, ReleaseID: &releaseID}); err != nil {
@@ -80,7 +84,7 @@ func newReadOnlyDispatchFixture(t *testing.T, release bool) (*dispatchFixture, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		work, err = issueResourceNonce(t.Context(), q, action, now)
+		work, err = dispatch.IssueResourceNonce(t.Context(), q, action, now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,7 +253,7 @@ func TestReadOnlyNativeHealthDistinguishesUnknownFromDrift(t *testing.T) {
 			}
 			health, err := targetingdb.New(f.pool).CurrentExecutionHealth(t.Context(), targetingdb.CurrentExecutionHealthParams{
 				AssignmentID: assignment, DeviceID: f.principal.DeviceID, GenerationID: f.principal.GenerationID,
-				FreshAfter: timestamptz(time.Now().Add(-time.Hour)),
+				FreshAfter: core.Timestamptz(time.Now().Add(-time.Hour)),
 			})
 			if err != nil || health.Health != int16(test.want) {
 				t.Fatalf("native uncertainty/drift classified as %d, want %s: %v", health.Health, test.want, err)

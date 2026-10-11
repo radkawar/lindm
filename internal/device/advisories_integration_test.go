@@ -35,14 +35,14 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 	}
 	digest := sha256.Sum256(raw)
 	source := &advisoryv1.FeedSource{Id: "noble", Distro: "ubuntu", Release: "24.04", Url: "https://api.osv.dev/v1/vulns/USN-6859-1", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, MaxAgeSeconds: 86400, ExpectedSha256: digest[:]}
-	store, err := advisory.New(f.ctx, f.svc.pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
+	store, err := advisory.New(f.ctx, f.svc.Pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Import(f.ctx, source.Id, bytes.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
-	f.svc.advisories = store
+	f.svc.Advisories = store
 	host := hostObservation(f.generation, 1, "advisory-acceptance")
 	host.Observation.StartedAt = timestamppb.New(f.now)
 	host.Observation.FinishedAt = timestamppb.New(f.now)
@@ -83,8 +83,8 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 		t.Fatalf("expected real vendor finding: %v", findings.Msg)
 	}
 	request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, FindingId: findings.Msg.Findings[0].Id, Reason: "Authorized expiring risk acceptance", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}
-	restricted, actor, _ := dispatchIdentity(t, f.svc.pool, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}})
-	f.svc.identity = restricted
+	restricted, actor, _ := dispatchIdentity(t, f.svc.Pool, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}})
+	f.svc.Identity = restricted
 	if _, err := f.svc.AcceptAdvisoryFinding(identity.WithPrincipal(f.ctx, actor), connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("fresh out-of-scope authority accepted: %v", err)
 	}
@@ -95,8 +95,8 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 	if count != 0 {
 		t.Fatal("denied acceptance committed an exception")
 	}
-	allowed, allowedActor, directory := dispatchIdentity(t, f.svc.pool, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
-	f.svc.identity = allowed
+	allowed, allowedActor, directory := dispatchIdentity(t, f.svc.Pool, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
+	f.svc.Identity = allowed
 	allowedCtx := identity.WithPrincipal(f.ctx, allowedActor)
 	accepted, err := f.svc.AcceptAdvisoryFinding(allowedCtx, connect.NewRequest(request))
 	if err != nil {
@@ -181,14 +181,14 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 			if test.manager == "rpm" {
 				source.Architecture = "x86_64"
 			}
-			store, err := advisory.New(f.ctx, f.svc.pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
+			store, err := advisory.New(f.ctx, f.svc.Pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if err := store.Import(f.ctx, source.Id, bytes.NewReader(raw)); err != nil {
 				t.Fatal(err)
 			}
-			f.svc.advisories = store
+			f.svc.Advisories = store
 			recorded, err := os.ReadFile("../advisory/testdata/" + test.packages)
 			if err != nil {
 				t.Fatal(err)

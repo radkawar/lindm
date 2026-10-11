@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
@@ -43,7 +45,7 @@ type assistanceFixture struct {
 func newAssistanceFixture(t *testing.T, maxSessions uint32) *assistanceFixture {
 	t.Helper()
 	f := &assistanceFixture{enrolledFixture: newEnrolled(t, 0)}
-	f.svc.clock = func() time.Time { return f.now }
+	f.svc.Clock = func() time.Time { return f.now }
 	relay, err := assistrelay.New(&configv1.AssistanceConfig{MaxConcurrentSessions: maxSessions, Relay: &configv1.AssistanceRelayConfig{
 		Listener: &configv1.ListenerConfig{Address: assistanceRelayIP, Port: 3478}, RelayAddress: assistanceRelayIP,
 		RelayPortMin: 40000, RelayPortMax: 40100, Urls: []string{"turn:relay.example:3478?transport=udp"}, Realm: "relay.example",
@@ -52,7 +54,7 @@ func newAssistanceFixture(t *testing.T, maxSessions uint32) *assistanceFixture {
 		t.Fatal(err)
 	}
 	f.relay = relay
-	f.svc.assistance = relay
+	f.svc.Assistance = relay
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(hostObservation(f.generation, 1, "assist"))); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +143,7 @@ func newEnrolledOn(t *testing.T, f *assistanceFixture) string {
 		t.Fatal(err)
 	}
 	acquireTestSession(t, f.ctx, f.svc, principal, key, 0)
-	if _, err := f.svc.ReportHostObservation(withDevicePrincipal(f.ctx, principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "second"))); err != nil {
+	if _, err := f.svc.ReportHostObservation(core.WithDevicePrincipal(f.ctx, principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "second"))); err != nil {
 		t.Fatal(err)
 	}
 	return enrolled.Msg.GetDeviceId()
@@ -324,10 +326,10 @@ func TestAssistanceLifecycleHappyPath(t *testing.T) {
 
 func TestAssistanceAdmission(t *testing.T) {
 	f := newAssistanceFixture(t, 1)
-	f.svc.assistance = nil
+	f.svc.Assistance = nil
 	_, err := f.svc.CreateAssistanceSession(f.creatorCtx, connect.NewRequest(f.createRequest(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, "")))
 	wantReason(t, err, connect.CodeFailedPrecondition, "assistance_unconfigured")
-	f.svc.assistance = f.relay
+	f.svc.Assistance = f.relay
 	helpdesk := identity.WithPrincipal(f.ctx, insertPrincipal(t, f.ctx, f.conn, identity.RoleHelpdesk))
 	if _, err := f.svc.CreateAssistanceSession(helpdesk, connect.NewRequest(f.createRequest(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, ""))); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("helpdesk create: %v", err)

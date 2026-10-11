@@ -1269,7 +1269,7 @@ SHA-256 `3ac9d2ae57b887ff7e583364af4c35cd7b45b2f4f6aee1d6bc1e2d2219a53ab6`
 This is not x86_64, desktop or physical evidence.
 
 Each nonservice kind is dispatched only when the server's per-kind qualification
-table ([`qualifiedResourceKinds`](../internal/device/resource_rows.go)) lists it
+table ([`QualifiedResourceKinds`](../internal/device/dispatch/resource_rows.go)) lists it
 with the ownership operations its native Ubuntu 24.04 and Fedora 44 records
 exercised; any other kind, adoption or release behavior remains a visible
 unsupported disposition. Per-kind records follow.

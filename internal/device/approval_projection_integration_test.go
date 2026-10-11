@@ -49,7 +49,7 @@ func TestApprovalProjectionLifecycle(t *testing.T) {
 				{owner.ID, test.requesterLabel},
 				{reviewer.ID, test.approverLabel},
 			} {
-				if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", actor.id, actor.username); err != nil {
+				if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", actor.id, actor.username); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -116,28 +116,28 @@ func TestApprovalProjectionLifecycle(t *testing.T) {
 			assertList(reviewerCtx, test.requesterLabel, test.approverLabel, "device-action-fixture")
 
 			// Labels are current read projections, not immutable approval payloads.
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE principals SET display_name=$2 WHERE id=$1", owner.ID, "Renamed Requester"); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE principals SET display_name=$2 WHERE id=$1", owner.ID, "Renamed Requester"); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE principals SET display_name=$2 WHERE id=$1", reviewer.ID, "Renamed Reviewer"); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE principals SET display_name=$2 WHERE id=$1", reviewer.ID, "Renamed Reviewer"); err != nil {
 				t.Fatal(err)
 			}
 			// Seed the changed hostname projection directly; a second immediate
 			// host upload would legitimately hit the production inventory gate.
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE devices SET hostname=$2 WHERE id=$1", f.principal.DeviceID, "renamed-approval-host"); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET hostname=$2 WHERE id=$1", f.principal.DeviceID, "renamed-approval-host"); err != nil {
 				t.Fatal(err)
 			}
 			// Read as a third eligible reviewer: refreshing a local actor replaces
 			// its principal display name with its username.
 			assertList(observerCtx, "Renamed Requester", "Renamed Reviewer", "renamed-approval-host")
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE principals SET display_name='' WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE principals SET display_name='' WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
 				t.Fatal(err)
 			}
 			assertList(observerCtx, test.requesterLabel, test.approverLabel, "renamed-approval-host")
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", owner.ID, "renamed-requester"); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", owner.ID, "renamed-requester"); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", reviewer.ID, "renamed-reviewer"); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", reviewer.ID, "renamed-reviewer"); err != nil {
 				t.Fatal(err)
 			}
 			// There is no GetApproval RPC: exact Create and decision retries exercise
@@ -148,10 +148,10 @@ func TestApprovalProjectionLifecycle(t *testing.T) {
 			// Retained principal IDs need not have either a display name or a
 			// local-account fallback. Missing labels must not hide the approval
 			// or invent a name from its UUID.
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE principals SET display_name='' WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE principals SET display_name='' WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.svc.pool.Exec(t.Context(), "DELETE FROM local_accounts WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "DELETE FROM local_accounts WHERE id IN ($1,$2)", owner.ID, reviewer.ID); err != nil {
 				t.Fatal(err)
 			}
 			assertList(observerCtx, "", "", "renamed-approval-host")
@@ -177,16 +177,16 @@ func TestApprovalProjectionScopedVisibility(t *testing.T) {
 		{reviewer.ID, f.deviceID, "scoped-reviewer"},
 		{outside.ID, otherID, "outside-reviewer"},
 	} {
-		if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", actor.id, actor.name); err != nil {
+		if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET username=$2 WHERE id=$1", actor.id, actor.name); err != nil {
 			t.Fatal(err)
 		}
 		if actor.target == "" {
 			continue
 		}
-		if _, err := f.svc.pool.Exec(t.Context(), `UPDATE local_accounts SET scope_binding=jsonb_build_object('scopes',jsonb_build_array(jsonb_build_object('deviceIds',jsonb_build_array($2::text)))) WHERE id=$1`, actor.id, actor.target); err != nil {
+		if _, err := f.svc.Pool.Exec(t.Context(), `UPDATE local_accounts SET scope_binding=jsonb_build_object('scopes',jsonb_build_array(jsonb_build_object('deviceIds',jsonb_build_array($2::text)))) WHERE id=$1`, actor.id, actor.target); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.svc.identity.AuthorizeFresh(t.Context(), actor.id, identity.PermissionManageAccounts); !errors.Is(err, identity.ErrAuthorizationDenied) {
+		if _, err := f.svc.Identity.AuthorizeFresh(t.Context(), actor.id, identity.PermissionManageAccounts); !errors.Is(err, identity.ErrAuthorizationDenied) {
 			t.Fatalf("reviewer unexpectedly has account management authority: %v", err)
 		}
 	}

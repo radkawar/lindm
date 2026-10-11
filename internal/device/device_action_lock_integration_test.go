@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -113,13 +115,13 @@ func TestDeviceActionLockReleaseVerifiedOwnershipAndAudit(t *testing.T) {
 	}
 	assertLockRestriction(t, f, newer)
 	oldID, _ := uuid.Parse(original)
-	if err := devicedb.New(f.svc.pool).ReleaseDeviceActionLock(t.Context(), devicedb.ReleaseDeviceActionLockParams{DeviceID: f.principal.DeviceID, LockActionID: &oldID, UpdatedAt: timestamptz(time.Now())}); err != nil {
+	if err := devicedb.New(f.svc.Pool).ReleaseDeviceActionLock(t.Context(), devicedb.ReleaseDeviceActionLockParams{DeviceID: f.principal.DeviceID, LockActionID: &oldID, UpdatedAt: core.Timestamptz(time.Now())}); err != nil {
 		t.Fatal(err)
 	}
 	assertLockRestriction(t, f, newer)
 	for _, event := range []string{"device_action.create", "device_action.start", "device_action.result"} {
 		var count int
-		if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action=$2", release.GetActionId(), event).Scan(&count); err != nil {
+		if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action=$2", release.GetActionId(), event).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
 		want := 1
@@ -166,7 +168,7 @@ func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
 			if permission == identity.PermissionReleaseLockDevice {
 				spec = releaseLockSpec(startCompletedLock(t, f))
 			}
-			authority, err := identity.New(t.Context(), f.svc.pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(permission)}}})
+			authority, err := identity.New(t.Context(), f.svc.Pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(permission)}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -175,7 +177,7 @@ func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
 					t.Error(err)
 				}
 			})
-			f.svc.identity = authority
+			f.svc.Identity = authority
 			request := f.request(spec)
 			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
 				t.Fatalf("configured independent approval bypassed: %v", err)
@@ -196,7 +198,7 @@ func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
 			request.ApprovalId = approvalID
 			f.create(t, request)
 			var state string
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", approvalID).Scan(&state); err != nil || state != "approved" {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", approvalID).Scan(&state); err != nil || state != "approved" {
 				t.Fatalf("approval consumed before native start: %s %v", state, err)
 			}
 			start, _ := f.startRequest(t, f.work(t))
@@ -205,13 +207,13 @@ func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
 				t.Fatal(err)
 			}
 			grant := new(agentv1.DeviceActionStartGrant)
-			if err := f.svc.authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.signing.StartKey[ed25519.SeedSize:])); err != nil {
+			if err := f.svc.Authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, ed25519.PublicKey(f.svc.Signing.StartKey[ed25519.SeedSize:])); err != nil {
 				t.Fatal(err)
 			}
 			if len(grant.GetApprovals()) != 2 || grant.GetApprovals()[0].GetActorId() == grant.GetApprovals()[1].GetActorId() {
 				t.Fatal("configured policy lost the two independent human authorities")
 			}
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", approvalID).Scan(&state); err != nil || state != "consumed" {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT state FROM approval_requests WHERE id=$1", approvalID).Scan(&state); err != nil || state != "consumed" {
 				t.Fatalf("approval not consumed atomically: %s %v", state, err)
 			}
 		})
@@ -269,14 +271,14 @@ func TestDeviceActionReleaseLockFreshOwnershipFence(t *testing.T) {
 	work := f.work(t)
 	start, _ := f.startRequest(t, work)
 	id, _ := uuid.Parse(original)
-	if err := devicedb.New(f.svc.pool).ReleaseDeviceActionLock(t.Context(), devicedb.ReleaseDeviceActionLockParams{DeviceID: f.principal.DeviceID, LockActionID: &id, UpdatedAt: timestamptz(time.Now())}); err != nil {
+	if err := devicedb.New(f.svc.Pool).ReleaseDeviceActionLock(t.Context(), devicedb.ReleaseDeviceActionLockParams{DeviceID: f.principal.DeviceID, LockActionID: &id, UpdatedAt: core.Timestamptz(time.Now())}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("release used stale create-time ownership: %v", err)
 	}
 	var grant []byte
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil {
 		t.Fatal(err)
 	}
 	if len(grant) != 0 {
@@ -300,7 +302,7 @@ func TestDeviceActionLockApprovalRejectsChangedSelectionAndRevocation(t *testing
 				request.Spec.GetLockSessions().AllHumanAccounts = true
 			case "approver_revoked":
 				principal, _ := identity.PrincipalFromContext(reviewer)
-				if _, err := f.svc.pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", principal.ID); err != nil {
+				if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE local_accounts SET enabled=false WHERE id=$1", principal.ID); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -310,7 +312,7 @@ func TestDeviceActionLockApprovalRejectsChangedSelectionAndRevocation(t *testing
 				t.Fatal("changed lock selection or revoked approver authorized effects")
 			}
 			var grant []byte
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil {
 				t.Fatal(err)
 			}
 			if len(grant) != 0 {

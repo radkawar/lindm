@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +21,7 @@ import (
 
 func approvalReviewer(t *testing.T, svc *Service, ctx context.Context) context.Context {
 	t.Helper()
-	conn, err := svc.pool.Acquire(ctx)
+	conn, err := svc.Pool.Acquire(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +49,7 @@ func TestApprovalRevokeLifecycle(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +128,7 @@ func TestApprovalRejectExpiryAndVersions(t *testing.T) {
 			ctx := t.Context()
 			pool, conn := testdb.Open(t)
 			ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-			svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+			svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -169,7 +171,7 @@ func TestApprovalRejectExpiryAndVersions(t *testing.T) {
 			if err := conn.QueryRow(ctx, "SELECT state FROM devices WHERE id=$1", request.DeviceId).Scan(&state); err != nil {
 				t.Fatal(err)
 			}
-			if state == stateRevoked {
+			if state == core.StateRevoked {
 				t.Fatal("denied approval mutated device")
 			}
 		})
@@ -180,7 +182,7 @@ func TestApprovalScopeInboxAndCreation(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +250,7 @@ func TestConfiguredAssignmentApproval(t *testing.T) {
 		}
 	})
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority})
 	if err != nil {
 		t.Fatal(err)
 	}

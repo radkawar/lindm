@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
@@ -43,7 +45,7 @@ func TestRecoveryEnrollmentReplacesOnlyApprovedGeneration(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +74,7 @@ func TestRecoveryEnrollmentReplacesOnlyApprovedGeneration(t *testing.T) {
 	if _, err := svc.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{GrantSecret: grant.Msg.GetSecret(), TransactionId: uuid.NewString(), CsrPem: originalCSR})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("compromised identity key reused: %v", err)
 	}
-	if _, err := svc.GetSyncState(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 1})); err != nil {
+	if _, err := svc.GetSyncState(core.WithDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 1})); err != nil {
 		t.Fatalf("failed recovery retired original identity: %v", err)
 	}
 	newKey := ed25519Key(t)
@@ -88,7 +90,7 @@ func TestRecoveryEnrollmentReplacesOnlyApprovedGeneration(t *testing.T) {
 	if err != nil || !bytes.Equal(replayed.Msg.GetCertificatePem(), recovered.Msg.GetCertificatePem()) {
 		t.Fatalf("interrupted recovery did not resume exact issuance: %v", err)
 	}
-	if _, err := svc.GetSyncState(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 1})); err == nil {
+	if _, err := svc.GetSyncState(core.WithDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 1})); err == nil {
 		t.Fatal("old generation retained authority after recovery")
 	}
 	if _, err := svc.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{GrantSecret: other.Msg.GetSecret(), TransactionId: uuid.NewString(), CsrPem: mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
@@ -116,7 +118,7 @@ func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,11 +132,11 @@ func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
 	acquireTestSession(t, ctx, svc, principal, key, 0)
 	// Normal next-boot acquisition keeps the installation and advances the epoch.
 	acquireTestSession(t, ctx, svc, principal, key, 1)
-	proof, err := svc.authority.Sign(ctx, &agentv1.SessionAcquisition{DeploymentId: svc.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), RequestId: uuid.NewString(), PredecessorEpoch: 2, Incarnation: uuid.NewString(), BootId: uuid.NewString(), InstallationId: uuid.NewString()}, key)
+	proof, err := svc.Authority.Sign(ctx, &agentv1.SessionAcquisition{DeploymentId: svc.DeploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), RequestId: uuid.NewString(), PredecessorEpoch: 2, Incarnation: uuid.NewString(), BootId: uuid.NewString(), InstallationId: uuid.NewString()}, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	if _, err := svc.AcquireSession(deviceCtx, connect.NewRequest(&devicev1.AcquireSessionRequest{AuthorityProof: proof})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("different signed installation accepted at current predecessor: %v", err)
 	}
@@ -143,7 +145,7 @@ func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
 	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT details->>'cause' FROM audit_events WHERE action='device.recovery_hold' AND reason='' AND resource_id=d.id::text) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID).Scan(&state, &generationState, &epoch, &reason); err != nil {
 		t.Fatal(err)
 	}
-	if state != stateRecoveryHold || generationState != stateRecoveryHold || epoch != 2 || reason != "conflicting_installation_identity" {
+	if state != core.StateRecoveryHold || generationState != core.StateRecoveryHold || epoch != 2 || reason != "conflicting_installation_identity" {
 		t.Fatalf("clone fence state=%s generation=%s epoch=%d reason=%s", state, generationState, epoch, reason)
 	}
 	if _, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 2})); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -155,7 +157,7 @@ func TestRecoveryEnrollmentDoesNotOverrideLaterRevocation(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +186,7 @@ func TestRecoveryEnrollmentDoesNotOverrideLaterRevocation(t *testing.T) {
 	if err := conn.QueryRow(ctx, "SELECT state FROM devices WHERE id=$1", original.Msg.GetDeviceId()).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
-	if state != stateRevoked {
+	if state != core.StateRevoked {
 		t.Fatal("denied recovery lost the revocation fence")
 	}
 	fresh, err := svc.CreateRecoveryEnrollmentGrant(ownerCtx, approvedRecovery(t, svc, ownerCtx, request(true)))

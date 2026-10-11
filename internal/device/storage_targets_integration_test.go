@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"lindm/internal/device/dispatch"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +21,7 @@ import (
 // Publish through the real inventory RPC, not a request-derived action fallback.
 func (f *deviceActionFixture) observeStorageTargets(t *testing.T, targets ...*agentv1.StorageTarget) {
 	t.Helper()
-	host, err := devicedb.New(f.svc.pool).GetHostObservation(t.Context(), f.principal.GenerationID)
+	host, err := devicedb.New(f.svc.Pool).GetHostObservation(t.Context(), f.principal.GenerationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +39,7 @@ func (f *deviceActionFixture) observeStorageTargets(t *testing.T, targets ...*ag
 func (f *deviceActionFixture) observeStorageDetails(t *testing.T, details *inventoryv1.NativeDetails) {
 	t.Helper()
 	ageInventoryAdmissions(t, f)
-	host, err := devicedb.New(f.svc.pool).GetHostObservation(t.Context(), f.principal.GenerationID)
+	host, err := devicedb.New(f.svc.Pool).GetHostObservation(t.Context(), f.principal.GenerationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +67,7 @@ func TestListDeviceStorageTargetsPublishedFreshnessAndHistoricalIdentity(t *test
 	if got.GetEnrollmentGeneration() != f.generation || got.GetHostSequence() != 2 || !got.GetFresh() || got.GetReceivedAt() == nil || got.GetObservedAt() == nil || got.GetUnavailableReason() != "" || len(got.GetTargets()) != 1 || !proto.Equal(got.GetTargets()[0].GetTarget(), target) {
 		t.Fatalf("published exact target/freshness missing: %v", got)
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
 		t.Fatal(err)
 	}
 	got = f.storageTargets(t, "crypto_erase")
@@ -80,7 +82,7 @@ func TestListDeviceStorageTargetsPublishedFreshnessAndHistoricalIdentity(t *test
 	if !got.GetFresh() || len(got.GetTargets()) != 0 || got.GetUnavailableReason() != "device_action_storage_identity_unavailable" {
 		t.Fatalf("historical row invented selectable identity: %v", got)
 	}
-	if _, err := f.svc.pool.Exec(t.Context(), "DELETE FROM host_observations WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+	if _, err := f.svc.Pool.Exec(t.Context(), "DELETE FROM host_observations WHERE generation_id=$1", f.principal.GenerationID); err != nil {
 		t.Fatal(err)
 	}
 	got = f.storageTargets(t, "crypto_erase")
@@ -154,7 +156,7 @@ func TestStorageActionFallbackBasisChangesRejectedAtCreateAndStart(t *testing.T)
 				t.Fatalf("start silently changed signed identity basis: %v", err)
 			}
 			var grant []byte
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil || len(grant) != 0 {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil || len(grant) != 0 {
 				t.Fatalf("basis mismatch signed start authority: %v", err)
 			}
 			observeBasis(downgrade)
@@ -167,7 +169,7 @@ func TestStorageActionFallbackBasisChangesRejectedAtCreateAndStart(t *testing.T)
 
 func storageActionSpecs(f *deviceActionFixture, target *agentv1.StorageTarget) map[string]*agentv1.DeviceActionSpec {
 	return map[string]*agentv1.DeviceActionSpec{
-		"escrow_rotate": {Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: target, EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}},
+		"escrow_rotate": {Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: target, EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}}},
 		"tpm2_bind":     {Action: &agentv1.DeviceActionSpec_Tpm2Bind{Tpm2Bind: &agentv1.TPM2BindAction{Target: target, Pcrs: []uint32{7}}}},
 		"crypto_erase":  {Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Target: target, Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE}}},
 		"sanitize":      {Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: target.GetWwn(), Serial: target.GetSerial(), SizeBytes: target.GetSizeBytes()}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE}}},
@@ -189,13 +191,13 @@ func TestStorageActionCreateRejectsUnobservedTupleEveryKind(t *testing.T) {
 			details.Tpm = &inventoryv1.TpmDetails{Present: &inventoryv1.ObservedBool{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: true}, Version: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "2")}
 			f.observeStorageDetails(t, details)
 			request := f.request(spec)
-			if destructiveDeviceAction(spec) {
+			if dispatch.DestructiveDeviceAction(spec) {
 				f.approval(t, request)
 			}
 			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); rpcReason(err) != "device_action_storage_target_mismatch" {
 				t.Fatalf("unobserved exact tuple accepted: %v", err)
 			}
-			if _, err := f.svc.pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); rpcReason(err) != "device_action_inventory_stale" {
@@ -204,7 +206,7 @@ func TestStorageActionCreateRejectsUnobservedTupleEveryKind(t *testing.T) {
 		})
 	}
 	var count int
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT count(*) FROM device_actions WHERE device_id=$1", f.principal.DeviceID).Scan(&count); err != nil || count != 0 {
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM device_actions WHERE device_id=$1", f.principal.DeviceID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("rejected selection persisted signed intent: count=%d err=%v", count, err)
 	}
 }
@@ -222,7 +224,7 @@ func TestStorageActionStartRechecksLatestInventoryAndCreateReplayIsDurable(t *te
 				replacement := proto.CloneOf(target)
 				replacement.Wwn += "-replacement"
 				f.observeStorageTargets(t, replacement)
-			} else if _, err := f.svc.pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+			} else if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '6 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
 				t.Fatal(err)
 			}
 			if replay := f.create(t, request); replay.GetActionId() != action.GetActionId() {
@@ -236,7 +238,7 @@ func TestStorageActionStartRechecksLatestInventoryAndCreateReplayIsDurable(t *te
 				t.Fatalf("start ignored latest inventory: %v", err)
 			}
 			var grant []byte
-			if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil || len(grant) != 0 {
+			if err := f.svc.Pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil || len(grant) != 0 {
 				t.Fatalf("rejected selection signed start authority: %v", err)
 			}
 			f.observeStorageTargets(t, target)

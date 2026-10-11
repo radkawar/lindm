@@ -17,6 +17,10 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
+	"lindm/internal/device/core"
+
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -27,11 +31,11 @@ import (
 
 func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
 	t.Parallel()
-	if _, err := parseDeviceCSR(mustCSR(t, p256Key(t), &x509.CertificateRequest{})); !errors.Is(err, errCSRAlgorithm) {
+	if _, err := core.ParseDeviceCSR(mustCSR(t, p256Key(t), &x509.CertificateRequest{})); !errors.Is(err, core.ErrCSRAlgorithm) {
 		t.Fatalf("P-256 identity CSR: %v", err)
 	}
 	ed := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{SignatureAlgorithm: x509.PureEd25519})
-	if _, err := parseDeviceCSR(ed); err != nil {
+	if _, err := core.ParseDeviceCSR(ed); err != nil {
 		t.Fatalf("valid Ed25519 CSR: %v", err)
 	}
 
@@ -40,30 +44,30 @@ func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	withSAN := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{URIs: []*url.URL{uri}})
-	if _, err := parseDeviceCSR(withSAN); !errors.Is(err, errCSRIdentity) {
+	if _, err := core.ParseDeviceCSR(withSAN); !errors.Is(err, core.ErrCSRIdentity) {
 		t.Fatalf("SAN CSR error = %v", err)
 	}
 	withSubject := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{Subject: pkix.Name{CommonName: "chosen-by-client"}})
-	if _, err := parseDeviceCSR(withSubject); !errors.Is(err, errCSRIdentity) {
+	if _, err := core.ParseDeviceCSR(withSubject); !errors.Is(err, core.ErrCSRIdentity) {
 		t.Fatalf("subject CSR error = %v", err)
 	}
 	p384, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseDeviceCSR(mustCSR(t, p384, &x509.CertificateRequest{SignatureAlgorithm: x509.ECDSAWithSHA384})); !errors.Is(err, errCSRAlgorithm) {
+	if _, err := core.ParseDeviceCSR(mustCSR(t, p384, &x509.CertificateRequest{SignatureAlgorithm: x509.ECDSAWithSHA384})); !errors.Is(err, core.ErrCSRAlgorithm) {
 		t.Fatalf("P-384 CSR error = %v", err)
 	}
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseDeviceCSR(mustCSR(t, rsaKey, &x509.CertificateRequest{SignatureAlgorithm: x509.SHA256WithRSA})); !errors.Is(err, errCSRAlgorithm) {
+	if _, err := core.ParseDeviceCSR(mustCSR(t, rsaKey, &x509.CertificateRequest{SignatureAlgorithm: x509.SHA256WithRSA})); !errors.Is(err, core.ErrCSRAlgorithm) {
 		t.Fatalf("RSA CSR error = %v", err)
 	}
 	valid := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})
 	valid[len(valid)-2] ^= 0xff
-	if _, err := parseDeviceCSR(valid); err == nil {
+	if _, err := core.ParseDeviceCSR(valid); err == nil {
 		t.Fatal("tampered CSR was accepted")
 	}
 }
@@ -78,10 +82,10 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseDeviceCSR(mustCSR(t, deviceKey, &x509.CertificateRequest{URIs: []*url.URL{uri}, Subject: pkix.Name{CommonName: "client"}})); err == nil {
+	if _, err := core.ParseDeviceCSR(mustCSR(t, deviceKey, &x509.CertificateRequest{URIs: []*url.URL{uri}, Subject: pkix.Name{CommonName: "client"}})); err == nil {
 		t.Fatal("authority-bearing CSR must not reach issuance")
 	}
-	issued, err := issueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
+	issued, err := core.IssueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,13 +99,13 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 	if cert.Subject.CommonName == "client" || len(cert.URIs) != 1 || cert.URIs[0].String() == uri.String() {
 		t.Fatalf("client identity leaked into certificate: %s", cert.URIs)
 	}
-	if !cert.NotAfter.After(now.Add(29*24*time.Hour)) || cert.NotAfter.After(now.Add(certLifetime+time.Second)) {
+	if !cert.NotAfter.After(now.Add(29*24*time.Hour)) || cert.NotAfter.After(now.Add(core.CertLifetime+time.Second)) {
 		t.Fatalf("lifetime = %s", cert.NotAfter.Sub(now))
 	}
 	if cert.SerialNumber.Sign() <= 0 || cert.SerialNumber.BitLen() > 128 {
 		t.Fatalf("serial = %s", cert.SerialNumber)
 	}
-	second, err := issueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
+	second, err := core.IssueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +120,7 @@ func TestCertificateLifetimeHonorsCAExpiry(t *testing.T) {
 	caEnd := now.Add(10 * 24 * time.Hour)
 	ca, signer := testCA(t, caEnd)
 	deviceKey := ed25519Key(t)
-	issued, err := issueCertificate(ca, signer, deviceKey.Public(), uuid.New(), uuid.New(), uuid.New(), now)
+	issued, err := core.IssueCertificate(ca, signer, deviceKey.Public(), uuid.New(), uuid.New(), uuid.New(), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,11 +135,11 @@ func TestCertificateLifetimeHonorsCAExpiry(t *testing.T) {
 func TestOverlapIsBounded(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
-	if got := overlapUntil(now, now.Add(30*24*time.Hour)); !got.Equal(now.Add(renewalOverlap)) {
+	if got := core.OverlapUntil(now, now.Add(30*24*time.Hour)); !got.Equal(now.Add(core.RenewalOverlap)) {
 		t.Fatalf("overlap = %s", got.Sub(now))
 	}
 	soon := now.Add(5 * time.Minute)
-	if got := overlapUntil(now, soon); !got.Equal(soon) {
+	if got := core.OverlapUntil(now, soon); !got.Equal(soon) {
 		t.Fatalf("short cert overlap = %s", got)
 	}
 }
@@ -159,15 +163,15 @@ func TestHostDigestDetectsChangedContent(t *testing.T) {
 	changed := proto.CloneOf(base)
 	changed.Hostname = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "other")
 	generation := uuid.NewString()
-	baseDigest, err := hostDigest(generation, 2, base)
+	baseDigest, err := inventory.HostDigest(generation, 2, base)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sameDigest, err := hostDigest(generation, 2, same)
+	sameDigest, err := inventory.HostDigest(generation, 2, same)
 	if err != nil {
 		t.Fatal(err)
 	}
-	changedDigest, err := hostDigest(generation, 2, changed)
+	changedDigest, err := inventory.HostDigest(generation, 2, changed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +185,7 @@ func TestHostDigestDetectsChangedContent(t *testing.T) {
 
 func TestGrantHashIsNotTheSecret(t *testing.T) {
 	t.Parallel()
-	secret, hash, err := newGrantSecret()
+	secret, hash, err := core.NewGrantSecret()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,15 +198,15 @@ func TestCursorRejectsGarbage(t *testing.T) {
 	t.Parallel()
 	when := time.Date(2026, 10, 8, 1, 2, 3, 4000, time.UTC)
 	id := uuid.New()
-	token, err := encodeCursor(when, id)
+	token, err := core.EncodeCursor(when, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotWhen, gotID, err := decodeCursor(token)
+	gotWhen, gotID, err := core.DecodeCursor(token)
 	if err != nil || !gotWhen.Equal(when.Truncate(time.Microsecond)) || gotID != id {
 		t.Fatalf("round trip %s %s %v", gotWhen, gotID, err)
 	}
-	if _, _, err := decodeCursor("not-a-cursor"); err == nil {
+	if _, _, err := core.DecodeCursor("not-a-cursor"); err == nil {
 		t.Fatal("garbage cursor accepted")
 	}
 }

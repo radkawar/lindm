@@ -51,7 +51,7 @@ func newDeliveryFixture(t *testing.T) *deliveryFixture {
 	if _, err := rand.Read(kek); err != nil {
 		t.Fatal(err)
 	}
-	f.service.escrow, err = escrow.New(key, kek)
+	f.service.Escrow, err = escrow.New(key, kek)
 	clear(kek)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +82,7 @@ func (f *deliveryFixture) storeSecret(t *testing.T, purpose resourcev1.SecretPur
 	if err != nil {
 		t.Fatal(err)
 	}
-	binding, record, err := f.service.sealSecretVersion(id, 1, purpose, subject, plaintext)
+	binding, record, err := f.service.SealSecretVersion(id, 1, purpose, subject, plaintext)
 	clear(plaintext)
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestServiceSecretDeliverySealsBoundMaterial(t *testing.T) {
 	}
 	delivery := intent.GetSecrets()[0]
 	digest := sha256.Sum256(work.GetSealedSecrets()[0])
-	expected := &agentv1.SecretDeliveryBinding{DeploymentId: f.service.deploymentID.String(), DeviceId: f.principal.DeviceID.String(), EnrollmentGeneration: f.principal.GenerationID.String(), ActionId: intent.GetActionId(), Resource: desired.GetRef(), Secret: ref, RecipientKeySha256: secretseal.KeyID(f.recipient)}
+	expected := &agentv1.SecretDeliveryBinding{DeploymentId: f.service.DeploymentID.String(), DeviceId: f.principal.DeviceID.String(), EnrollmentGeneration: f.principal.GenerationID.String(), ActionId: intent.GetActionId(), Resource: desired.GetRef(), Secret: ref, RecipientKeySha256: secretseal.KeyID(f.recipient)}
 	if !bytes.Equal(digest[:], delivery.GetSealedSha256()) || !proto.Equal(delivery.GetBinding(), expected) {
 		t.Fatal("signed manifest does not bind the delivered ciphertext")
 	}
@@ -188,7 +188,7 @@ func TestServiceSecretDeliverySealsBoundMaterial(t *testing.T) {
 	}
 
 	// Losing secrets.manage after mint is an authority change: no start grant.
-	f.service.identity = operatorIdentity(t, f)
+	f.service.Identity = operatorIdentity(t, f)
 	request := &devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}
 	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
 	dispatchError(t, err, connect.CodePermissionDenied, "authority_changed")
@@ -257,7 +257,7 @@ func TestServiceSecretDeliveryBlocksWithoutPrerequisites(t *testing.T) {
 		}},
 		{"actor", "secret_delivery_unauthorized", func(t *testing.T, f *deliveryFixture) (*resourcev1.SecretRef, resourcev1.PasswordHashAlgorithm) {
 			f.registerRecipient(t)
-			f.service.identity = operatorIdentity(t, f)
+			f.service.Identity = operatorIdentity(t, f)
 			return f.storeSecret(t, resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, passwordHashMaterial(deliveredSHA512)), resourcev1.PasswordHashAlgorithm_PASSWORD_HASH_ALGORITHM_SHA512_CRYPT
 		}},
 	} {

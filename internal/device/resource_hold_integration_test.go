@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -36,7 +38,7 @@ func TestNativeBusyPreparationIsAnExplicitRetriedHold(t *testing.T) {
 		t.Fatalf("native-busy result was not a terminal report: %v", err)
 	}
 	state := complianceState(t, f).GetResources()[0]
-	if state.GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || state.GetReason() != resourceReasonNativeBusy || state.GetObservedAt() == nil || state.GetLastVerifiedAt() != nil || state.GetLatestAction().GetStatus().GetFailure() != busy {
+	if state.GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || state.GetReason() != dispatch.ResourceReasonNativeBusy || state.GetObservedAt() == nil || state.GetLastVerifiedAt() != nil || state.GetLatestAction().GetStatus().GetFailure() != busy {
 		t.Fatalf("native-busy refusal was not an explicit hold: %v", state)
 	}
 	if next := f.work(t); next != nil {

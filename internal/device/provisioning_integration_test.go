@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -37,7 +39,7 @@ func newProvisioningFixture(t *testing.T) *provisioningFixture {
 	t.Helper()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +66,7 @@ func provisionIntent(t *testing.T, secret string) (*enrollmentv1.ProvisionReques
 func provisioningProof(t *testing.T, svc *Service, request *enrollmentv1.ProvisionRequest, key ed25519.PrivateKey) *enrollmentv1.RetrieveProvisioningIssuanceRequest {
 	t.Helper()
 	digest := sha256.Sum256(request.GetCsrPem())
-	proof, err := svc.authority.Sign(t.Context(), &enrollmentv1.ProvisioningRetrieval{DeploymentId: svc.deploymentID.String(), TransactionId: request.TransactionId, InstallationId: request.InstallationId, CsrSha256: digest[:]}, key)
+	proof, err := svc.Authority.Sign(t.Context(), &enrollmentv1.ProvisioningRetrieval{DeploymentId: svc.DeploymentID.String(), TransactionId: request.TransactionId, InstallationId: request.InstallationId, CsrSha256: digest[:]}, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +91,7 @@ func TestProvisioningTokenHashOnlyAndMintIdempotency(t *testing.T) {
 	if err := f.conn.QueryRow(t.Context(), "SELECT token_hash,assignment FROM provisioning_tokens WHERE id=$1", first.Msg.TokenId).Scan(&hash, &assignment); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(hash, hashGrant(first.Msg.Secret)) || bytes.Contains(assignment, []byte(first.Msg.Secret)) {
+	if !bytes.Equal(hash, core.HashGrant(first.Msg.Secret)) || bytes.Contains(assignment, []byte(first.Msg.Secret)) {
 		t.Fatal("token persistence is not hash-only")
 	}
 	listed, err := f.service.ListProvisioningTokens(f.ownerCtx, connect.NewRequest(&adminv1.ListProvisioningTokensRequest{}))

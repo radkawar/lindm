@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -46,7 +48,7 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 		t.Fatalf("report projection lost facts: %v", first.GetAgentUpdate())
 	}
 	// Read the database, not a service cache, and exercise a new service instance.
-	stored, err := devicedb.New(f.svc.pool).GetAgentUpdateReport(f.ctx, f.principal.GenerationID)
+	stored, err := devicedb.New(f.svc.Pool).GetAgentUpdateReport(f.ctx, f.principal.GenerationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,11 +56,11 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 	if err := proto.Unmarshal(stored.Status, persisted); err != nil || !proto.Equal(persisted, status) {
 		t.Fatalf("durable report changed: %v", err)
 	}
-	restarted, err := New(f.svc.pool, Config{DeploymentID: f.svc.deploymentID.String(), CACertificate: f.svc.ca, CAKey: f.svc.caKey, Identity: f.svc.identity})
+	restarted, err := New(f.svc.Pool, core.Config{DeploymentID: f.svc.DeploymentID.String(), CACertificate: f.svc.CA, CAKey: f.svc.CAKey, Identity: f.svc.Identity})
 	if err != nil {
 		t.Fatal(err)
 	}
-	restarted.clock = func() time.Time { return f.now }
+	restarted.Clock = func() time.Time { return f.now }
 	f.svc = restarted
 	for range 3 {
 		f.now = f.now.Add(time.Second)
@@ -126,9 +128,9 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 	if _, err := f.svc.GetDevice(hidden, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: f.deviceID})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("diagnostic escaped device scope: %v", err)
 	}
-	q := devicedb.New(f.svc.pool)
+	q := devicedb.New(f.svc.Pool)
 	next := uuid.New()
-	if err := q.InsertEnrollmentGeneration(f.ctx, devicedb.InsertEnrollmentGenerationParams{ID: next, DeviceID: f.principal.DeviceID, CreatedAt: timestamptz(f.now)}); err != nil {
+	if err := q.InsertEnrollmentGeneration(f.ctx, devicedb.InsertEnrollmentGenerationParams{ID: next, DeviceID: f.principal.DeviceID, CreatedAt: core.Timestamptz(f.now)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := q.SetDeviceGeneration(f.ctx, devicedb.SetDeviceGenerationParams{ID: f.principal.DeviceID, CurrentGenerationID: &next}); err != nil {

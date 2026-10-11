@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/dispatch"
+
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -49,7 +51,7 @@ func preparationResult(t *testing.T, f *dispatchFixture, work *devicev1.Resource
 	digest := sha256.Sum256(work.GetIntentEnvelope())
 	now := time.Now().UTC().Add(-time.Second)
 	status := &agentv1.ResourceExecutionStatus{ActionId: work.GetActionId(), IntentSha256: digest[:], State: state, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE, AcceptedAt: timestamppb.New(now)}
-	if resourceExecutionTerminal(state) {
+	if dispatch.ResourceExecutionTerminal(state) {
 		status.CompletedAt = timestamppb.New(now)
 		switch state {
 		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED:
@@ -77,7 +79,7 @@ func TestResourcePreparationRetainsLeaseWithoutCompliance(t *testing.T) {
 	}
 	pending := preparationResult(t, f, first, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING)
 	history := new(agentv1.ResourceExecutionAttestation)
-	if err := f.service.authority.Verify(t.Context(), pending.GetAttestationEnvelope(), history, 1, f.principal.PublicKey); err != nil {
+	if err := f.service.Authority.Verify(t.Context(), pending.GetAttestationEnvelope(), history, 1, f.principal.PublicKey); err != nil {
 		t.Fatal(err)
 	}
 	for cycle := range 3 {
@@ -116,7 +118,7 @@ func TestResourcePreparationResultBindsExactIntentAndLimits(t *testing.T) {
 	valid := preparationResult(t, f, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED)
 	for _, change := range []string{"intent", "limits"} {
 		attestation := new(agentv1.ResourceExecutionAttestation)
-		if err := f.service.authority.Verify(t.Context(), valid.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
+		if err := f.service.Authority.Verify(t.Context(), valid.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
 			t.Fatal(err)
 		}
 		reason := "resource_result_binding_rejected"
@@ -225,11 +227,11 @@ func TestResourcePreparationReadyGrantBindsExactDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	grant := new(agentv1.ResourceExecutionStartGrant)
-	public, ok := f.service.signing.StartKey.Public().(ed25519.PublicKey)
+	public, ok := f.service.Signing.StartKey.Public().(ed25519.PublicKey)
 	if !ok {
 		t.Fatal("dispatch fixture requires an Ed25519 start key")
 	}
-	if err := f.service.authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, public); err != nil {
+	if err := f.service.Authority.Verify(t.Context(), response.Msg.GetStartGrantEnvelope(), grant, 1, public); err != nil {
 		t.Fatal(err)
 	}
 	if !proto.Equal(grant.GetChallenge(), challenge) || grant.GetExpiresAt().AsTime().Sub(grant.GetNotBefore().AsTime()) > 30*time.Second {

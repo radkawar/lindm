@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
@@ -31,7 +33,7 @@ func TestDeviceScopeReadMatrix(t *testing.T) {
 	f := newEnrolled(t, 0)
 	f.publishPackages(t, 1, "visible-package")
 	var err error
-	f.svc.advisories, err = advisory.New(f.ctx, f.svc.pool, nil, &http.Client{Timeout: time.Second})
+	f.svc.Advisories, err = advisory.New(f.ctx, f.svc.Pool, nil, &http.Client{Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,7 @@ func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 	if !slices.Equal(got, want) || token != "" {
 		t.Fatalf("scope keyset pagination: got=%v want=%v continuation=%q", got, want, token)
 	}
-	unrestricted, scopes, err := deviceScopeFilter(principal, identity.PermissionReadFleet)
+	unrestricted, scopes, err := core.DeviceScopeFilter(principal, identity.PermissionReadFleet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +161,7 @@ func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 	if err := f.conn.QueryRow(f.ctx, `SELECT count(*) FROM devices d WHERE device_scope_matches(d.id,$1,$2::jsonb)`, unrestricted, scopes).Scan(&count); err != nil || count != len(want) {
 		t.Fatalf("scope count leaked rows: count=%d want=%d error=%v", count, len(want), err)
 	}
-	f.svc.advisories, err = advisory.New(f.ctx, f.svc.pool, nil, &http.Client{Timeout: time.Second})
+	f.svc.Advisories, err = advisory.New(f.ctx, f.svc.Pool, nil, &http.Client{Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,12 +183,12 @@ func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 	}
 	// A scope containing an explicit ID is ORed with the conjunctive scope.
 	principal.Bindings[0].Scopes = append(principal.Bindings[0].Scopes, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
-	if err := requireDeviceScope(f.ctx, devicedb.New(f.svc.pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); err != nil {
+	if err := core.RequireDeviceScope(f.ctx, devicedb.New(f.svc.Pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); err != nil {
 		t.Fatalf("alternative scope was not ORed: %v", err)
 	}
 	// Nil scopes cannot turn malformed authority into a match-all grant.
 	principal.Bindings[0].Scopes = []*authv1.DeviceScope{nil}
-	if err := requireDeviceScope(f.ctx, devicedb.New(f.svc.pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
+	if err := core.RequireDeviceScope(f.ctx, devicedb.New(f.svc.Pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("nil scope admitted device: %v", err)
 	}
 }
@@ -224,12 +226,12 @@ func TestDeviceGroupMembershipFencesScopeAndReplay(t *testing.T) {
 	}
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	principal := scopedReader(owner, &authv1.DeviceScope{GroupIds: []string{groupID}})
-	tx, err := f.svc.pool.Begin(f.ctx)
+	tx, err := f.svc.Pool.Begin(f.ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(f.ctx) }()
-	if _, err := lockDeviceScope(f.ctx, devicedb.New(tx), principal, identity.PermissionReadFleet, f.principal.DeviceID); err != nil {
+	if _, err := core.LockDeviceScope(f.ctx, devicedb.New(tx), principal, identity.PermissionReadFleet, f.principal.DeviceID); err != nil {
 		t.Fatal(err)
 	}
 	remove := &adminv1.DeleteDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: groupID, Reason: "remove group scope"}
@@ -245,13 +247,13 @@ func TestDeviceGroupMembershipFencesScopeAndReplay(t *testing.T) {
 	if _, err := f.svc.DeleteDeviceGroup(f.ownerCtx, connect.NewRequest(remove)); err != nil {
 		t.Fatal(err)
 	}
-	if err := requireDeviceScope(f.ctx, devicedb.New(f.svc.pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
+	if err := core.RequireDeviceScope(f.ctx, devicedb.New(f.svc.Pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("deleted membership retained authority: %v", err)
 	}
 	if _, err := f.svc.SetDeviceGroup(f.ownerCtx, connect.NewRequest(request)); err != nil {
 		t.Fatalf("exact set replay failed: %v", err)
 	}
-	if err := requireDeviceScope(f.ctx, devicedb.New(f.svc.pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
+	if err := core.RequireDeviceScope(f.ctx, devicedb.New(f.svc.Pool), principal, identity.PermissionReadFleet, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("set replay recreated deleted authorization: %v", err)
 	}
 	request.Name = "changed replay"
@@ -268,8 +270,8 @@ func TestDeviceMutationUsesFreshCapturedScope(t *testing.T) {
 	}
 	// The request's cached admin display role is deliberately unrestricted.
 	// Only the newly fetched directory binding restricts this mutation.
-	authority, actor, directory := dispatchIdentity(t, f.svc.pool, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
-	f.svc.identity = authority
+	authority, actor, directory := dispatchIdentity(t, f.svc.Pool, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
+	f.svc.Identity = authority
 	ctx := identity.WithPrincipal(f.ctx, actor)
 	request := &adminv1.SetDeviceMetadataRequest{RequestId: uuid.NewString(), DeviceId: outside.String(), Metadata: &adminv1.DeviceMetadata{Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "restricted-write"}}, Reason: "fresh scoped write"}
 	if _, err := f.svc.SetDeviceMetadata(ctx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeNotFound {
@@ -325,12 +327,12 @@ func TestEveryAdminPermissionScopesTheTarget(t *testing.T) {
 				principal := owner
 				principal.Role = role
 				principal.Bindings = []*authv1.RoleBinding{{Permissions: []string{string(policy.permission)}, Scopes: []*authv1.DeviceScope{{DeviceIds: []string{f.deviceID}}}}}
-				q := devicedb.New(f.svc.pool)
-				if err := requireDeviceScope(f.ctx, q, principal, policy.permission, f.principal.DeviceID); err != nil {
+				q := devicedb.New(f.svc.Pool)
+				if err := core.RequireDeviceScope(f.ctx, q, principal, policy.permission, f.principal.DeviceID); err != nil {
 					t.Fatalf("in-scope permission: %v", err)
 				}
 				principal.Bindings[0].Scopes[0].DeviceIds = []string{uuid.NewString()}
-				if err := requireDeviceScope(f.ctx, q, principal, policy.permission, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
+				if err := core.RequireDeviceScope(f.ctx, q, principal, policy.permission, f.principal.DeviceID); connect.CodeOf(err) != connect.CodeNotFound {
 					t.Fatalf("out-of-scope permission: %v", err)
 				}
 			})

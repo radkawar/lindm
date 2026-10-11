@@ -1,24 +1,17 @@
-// Package device is, for now, most of the lindm server's device-facing and
-// admin-facing RPC surface on one shared Service. It covers:
-//   - device identity, enrollment (online, offline, grants, recovery) and
-//     certificate renewal;
-//   - inventory and observation snapshots, fleet summary, metadata, groups and
-//     search;
-//   - resource assignment, targeting, dispatch, signed start and result;
-//   - signed device actions, including wipe, recovery boot, readiness and
-//     escrow;
-//   - local-admin passwords (LAPS), encryption keys and the secret store;
-//   - assistance administration and sync, approvals, advisory reads, agent
-//     updates and release rollout.
+// Package device composes the lindm server's device-facing and admin-facing
+// RPC surfaces from the device domain packages:
+//   - core: device identity, enrollment, sessions, renewal, execution trust and
+//     the shared RPC foundation;
+//   - dispatch: profiles, targeting, resource assignment and dispatch, and
+//     device actions over one signed-action authority path;
+//   - secrets: secret store and delivery, encryption keys, escrow and LAPS;
+//   - inventory: observations, package snapshots, storage targets, readiness
+//     and advisory reads;
+//   - directory: approvals, groups, metadata, search and fleet summary;
+//   - assistance: consented remote assistance.
 //
-// This breadth is a known defect (audit 2026-10-11 #3). The package is
-// scheduled to split into device core and enrollment, dispatch for resources
-// and actions, secrets and LAPS, assistance and inventory. Each new package
-// will carry its own boundary doc. Until then, do not add new domains here.
-//
-// Boundaries that already hold: storage goes through devicedb (sqlc) and
-// errors leave as Connect codes with an rpcreason. Policy compilation,
-// targeting expressions, reports, integrations and execution authority live in
-// their own packages. Non-goals: device performs no native work and trusts no
-// agent claim it has not verified against a signed intent or a stored record.
+// Boundaries: this package only constructs the domain services, embeds them so
+// their RPC methods form the Connect handlers, and mounts those handlers. Its
+// tests exercise the composed surfaces end to end. Non-goals: no domain logic
+// lives here; add it to the owning domain package.
 package device

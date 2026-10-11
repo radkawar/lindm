@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/inventory"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -69,7 +71,7 @@ func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
 	fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at) VALUES($1,'active',CURRENT_TIMESTAMP)`, other)
 	expect := func(want *adminv1.FleetPatchSummary) {
 		t.Helper()
-		want.StaleAfterSeconds = patchStaleAfterSeconds
+		want.StaleAfterSeconds = inventory.PatchStaleAfterSeconds
 		got := fleetSummary(t, f.svc, f.ownerCtx, 0).GetPatchCompliance()
 		if !proto.Equal(got, want) {
 			t.Fatalf("patch compliance = %v, want %v", got, want)
@@ -88,7 +90,7 @@ func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
 	expect(&adminv1.FleetPatchSummary{StaleDevices: 1})
 
 	// Unavailable statuses keep no counts and are unknown.
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	unavailable := &agentv1.PatchStatusObservation{ObservedAt: timestamppb.New(f.now), BootId: boot, Reason: "executor_unavailable", PendingUpdates: 3, RebootRequired: true}
 	patchStatusReport(t, f, 2, unavailable)
 	row, err = q.GetHostPatchStatus(f.ctx, generation)
@@ -101,7 +103,7 @@ func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
 	expect(&adminv1.FleetPatchSummary{UnknownDevices: 1})
 
 	// Inventory without patch status removes the generation's projection.
-	f.now = f.now.Add(snapshotAttemptInterval)
+	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
 	patchStatusReport(t, f, 3, nil)
 	var rows int
 	if err := f.conn.QueryRow(f.ctx, "SELECT count(*) FROM host_patch_status WHERE generation_id=$1", generation).Scan(&rows); err != nil || rows != 0 {

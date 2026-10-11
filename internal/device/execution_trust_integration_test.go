@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/core"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
@@ -25,11 +27,11 @@ func TestUnprovisionedExecutionTrustStillFencesDeviceAuthority(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.clock = func() time.Time { return now }
+	svc.Clock = func() time.Time { return now }
 	ownerCtx := identity.WithPrincipal(ctx, insertPrincipal(t, ctx, conn, identity.RoleOwner))
 	key := ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
@@ -37,7 +39,7 @@ func TestUnprovisionedExecutionTrustStillFencesDeviceAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceCtx := withDevicePrincipal(ctx, principal)
+	deviceCtx := core.WithDevicePrincipal(ctx, principal)
 	request := func(epoch uint64) *connect.Request[devicev1.GetExecutionTrustRequest] {
 		return connect.NewRequest(&devicev1.GetExecutionTrustRequest{SessionEpoch: epoch, RootVersion: 1, RootSha256: make([]byte, sha256.Size)})
 	}
@@ -76,10 +78,10 @@ func TestUnprovisionedExecutionTrustStillFencesDeviceAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nextCtx := withDevicePrincipal(ctx, nextPrincipal)
+	nextCtx := core.WithDevicePrincipal(ctx, nextPrincipal)
 	allowed(deviceCtx, 2)
 	allowed(nextCtx, 2)
-	now = now.Add(renewalOverlap + time.Second)
+	now = now.Add(core.RenewalOverlap + time.Second)
 	denied(deviceCtx, 2, connect.CodePermissionDenied)
 	allowed(nextCtx, 2)
 
