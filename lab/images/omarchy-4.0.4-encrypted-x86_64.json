@@ -1,0 +1,19 @@
+{
+  "id": "omarchy-4.0.4-encrypted-x86-64",
+  "distribution": "omarchy",
+  "version": "4.0.4",
+  "architecture": "x86_64",
+  "edition": "hyprland-encrypted-lab",
+  "release": "4.0.4",
+  "imageFilename": "omarchy-4.0.4.iso",
+  "imageUrl": "https://iso.omarchy.org/omarchy-4.0.4.iso",
+  "checksumUrl": "https://iso.omarchy.org/omarchy-4.0.4.iso.sha256",
+  "signatureUrl": "https://iso.omarchy.org/omarchy-4.0.4.iso.sig",
+  "keyUrl": "https://keys.openpgp.org/vks/v1/by-fingerprint/40DFB630FF42BCFFB047046CF0134EE680CAC571",
+  "sha256": "ddeded2758c48318d201dfdac905ecb28f570441883f0c052ea3cd5d05acf92d",
+  "signerFingerprint": "40DFB630FF42BCFFB047046CF0134EE680CAC571",
+  "imageSizeBytes": "6185304064",
+  "checksumMode": "CHECKSUM_MODE_DETACHED_IMAGE",
+  "signerProvenanceUrl": "https://raw.githubusercontent.com/omacom/omarchy/c668141e9c42b13c80c9ca4ea108e11708c5e8a5/manual/48-security.md",
+  "releaseProvenanceUrl": "https://github.com/omacom/omarchy/releases/tag/v4.0.4"
+}

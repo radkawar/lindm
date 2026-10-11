@@ -69,6 +69,8 @@ message FleetFindingSummary {
   // Same current evaluation semantics as ListAdvisorySummary; active devices only.
   uint64 evaluated_devices = 6;
   uint64 unknown_devices = 7;
+  // Current evaluations that cover only part of the device's packages.
+  uint64 partial_devices = 8;
 }
 
 message FleetApprovalSummary {

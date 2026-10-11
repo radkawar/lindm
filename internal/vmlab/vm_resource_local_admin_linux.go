@@ -27,7 +27,7 @@ const localAdminLabAccount = "lindm-laps"
 const localAdminPostRevealDelay = 90 * time.Second
 
 const localAdminFixtureScript = `set -eu
-. /etc/os-release
+` + nativeOSRelease + `
 case "$ID" in
  ubuntu) admin=sudo ;;
  fedora) admin=wheel ;;

@@ -1,0 +1,19 @@
+{
+  "id": "pop-os-24.04-encrypted-amd64",
+  "distribution": "pop",
+  "version": "24.04",
+  "architecture": "amd64",
+  "edition": "cosmic-encrypted-lab",
+  "release": "generic-28",
+  "imageFilename": "pop-os_24.04_amd64_generic_28.iso",
+  "imageUrl": "https://iso.pop-os.org/24.04/amd64/generic/28/pop-os_24.04_amd64_generic_28.iso",
+  "checksumUrl": "https://iso.pop-os.org/24.04/amd64/generic/28/SHA256SUMS",
+  "signatureUrl": "https://iso.pop-os.org/24.04/amd64/generic/28/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x63C46DF0140D738961429F4E204DD8AEC33A7AFF",
+  "sha256": "8d78e500fc95da765a91cddcf2ab7ba71ce4e7997e4f008456d4d872ee8f8221",
+  "signerFingerprint": "63C46DF0140D738961429F4E204DD8AEC33A7AFF",
+  "imageSizeBytes": "3526164480",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://apt-origin.pop-os.org/",
+  "releaseProvenanceUrl": "https://api.pop-os.org/builds/24.04/generic"
+}

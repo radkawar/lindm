@@ -13,7 +13,7 @@ message ImageManifest {
   option (buf.validate.message).cel = {
     id: "image.signature_mode"
     message: "signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims"
-    expression: "this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))"
+    expression: "this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4 || this.checksum_mode == 5) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))"
   };
   option (buf.validate.message).cel = {
     id: "image.arch_repository_snapshot"
@@ -119,4 +119,10 @@ enum ChecksumMode {
   // Debian SHA512SUMS plus detached OpenPGP signature. Authenticate SHA-512
   // against signed metadata while retaining the required SHA-256 pin/cache key.
   CHECKSUM_MODE_DETACHED_SHA512 = 4;
+  // Detached OpenPGP signature over the exact image bytes (for example
+  // Omarchy's `.iso.sig`). gpgv verifies the streamed bytes while the same
+  // single pass checks the required SHA-256 pin; offline reuse repeats both.
+  // The checksum URL names the vendor's unsigned SHA-256 sidecar, which must
+  // agree with the pin but is never treated as authentication.
+  CHECKSUM_MODE_DETACHED_IMAGE = 5;
 }

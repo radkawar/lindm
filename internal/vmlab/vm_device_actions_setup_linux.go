@@ -26,6 +26,7 @@ type actionNativePackage struct {
 	work        string
 	artifact    packaging.Artifact
 	apt         *packaging.APTRepository
+	arch        []*packaging.ArchRepository
 	publicKey   string
 	fingerprint string
 }
@@ -55,8 +56,8 @@ func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest
 		return nil, err
 	}
 	format := packaging.Format(platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Native().Packages.Backend.PackageFormat())
-	if format != packaging.FormatDEB && format != packaging.FormatRPM {
-		return nil, errors.New("native action package requires a DEB or RPM guest")
+	if format != packaging.FormatDEB && format != packaging.FormatRPM && format != packaging.FormatArch {
+		return nil, errors.New("native action package requires a DEB, RPM or pacman guest")
 	}
 	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: repository, Revision: "encrypted-device-actions-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
 	if err != nil {
@@ -77,13 +78,24 @@ func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest
 		}
 		p.publicKey = p.apt.PublicKeyArmor
 	}
+	if format == packaging.FormatArch {
+		output := filepath.Join(work, "arch-repo")
+		if err := os.Mkdir(output, 0700); err != nil {
+			return nil, err
+		}
+		repo, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: []string{p.artifact.Path}, Signer: *signer})
+		if err != nil {
+			return nil, err
+		}
+		p.arch, p.publicKey = []*packaging.ArchRepository{repo}, repo.PublicKeyArmor
+	}
 	return p, nil
 }
 
 func (p *actionNativePackage) Close() error { return os.RemoveAll(p.work) }
 
 func (p *actionNativePackage) Install(ctx context.Context, vm *guestVM, labBinary string) (err error) {
-	packages, err := newNativeGuestPackages(ctx, vm, p.artifact, p.artifact, p.apt, p.publicKey, p.fingerprint)
+	packages, err := newNativeGuestPackages(ctx, vm, p.artifact, p.artifact, p.apt, p.publicKey, p.fingerprint, p.arch...)
 	if err != nil {
 		return err
 	}
@@ -237,6 +249,11 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 		return "export DEBIAN_FRONTEND=noninteractive; if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
 	case backend.DNF():
 		return "dnf -y install " + strings.Join(packages, " "), nil
+	case backend == platform.BackendPacman:
+		// A partial pacman -S against rolling mirrors is unsupported; the lab
+		// golden installed these from its authenticated installer media's
+		// signed offline repository, so the lane only proves their presence.
+		return "pacman -Q " + strings.Join(packages, " "), nil
 	default:
 		return "", fmt.Errorf("no lab package installer for %s", release.Name)
 	}

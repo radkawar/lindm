@@ -23,6 +23,7 @@ var nonDistroLiterals = map[string]map[string]string{
 	"cmd/lab/images_redhat.go":                    {"arch": "architecture flag name"},
 	"cmd/lab/lifecycle.go":                        {"arch": "pacman package-format flag name"},
 	"cmd/lab/packages.go":                         {"arch": "architecture flag name"},
+	"internal/vmlab/omarchy_installer_linux.go":   {"omarchy": "vendor configurator hostname and runtime package name in the Omarchy archinstall seed"},
 }
 
 // TestNoDistroIDLiteralsOutsideRegistry keeps distribution knowledge in the

@@ -9,16 +9,21 @@
 // pion WebRTC offer. Only the executor's directives authorize a session: a
 // session absent from the directives, a terminate directive, a SessionService
 // PermissionDenied, 30 s without a successful sync, the invitation's
-// ends_at, a closed portal session or the local stop action each end capture
-// and input immediately.
+// ends_at, a closed portal session, a logind Session.Lock or
+// PrepareForSleep for the bound logind session (SESSION_LOCKED) or the local
+// stop action each end capture and input immediately.
 //
 // Boundaries and non-goals:
 //   - The helper never runs as root, never touches privileged paths and never
 //     supplies local identity; the executor derives it from SO_PEERCRED and
 //     logind.
 //   - There is no X11 or other capture path that bypasses the portal dialog;
-//     missing portal interfaces, notification actions or GStreamer elements end
-//     the session UNAVAILABLE.
+//     missing notification actions, a missing ScreenCast (or, for CONTROL,
+//     RemoteDesktop) portal interface, or a desktop whose locks lindm cannot
+//     observe (XDG_CURRENT_DESKTOP outside the lock-observability table in
+//     lock.go) end the session UNAVAILABLE before the consent prompt;
+//     CONTROL is never downgraded to VIEW. Missing GStreamer elements end it
+//     UNAVAILABLE after consent.
 //   - The cursor is embedded into the stream when the portal offers the
 //     embedded cursor mode, otherwise the hidden mode is requested. The
 //     metadata mode is never used because the encoder pipeline does not

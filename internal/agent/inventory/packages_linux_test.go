@@ -141,6 +141,21 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 		})
 	}
 	for _, release := range []map[string]string{
+		{"ID": "linuxmint", "ID_LIKE": "ubuntu debian", "VERSION_ID": "22.3"},
+		{"ID": "pop", "ID_LIKE": "ubuntu debian", "VERSION_ID": "24.04"},
+	} {
+		if selected, status := selectBackend(release, fixtureStat(files)); status != success || selected.name != "dpkg" {
+			t.Fatalf("qualified derivative release=%v backend=%v status=%s", release, selected, status)
+		}
+	}
+	pacman := fixtureStat(fstest.MapFS{"var/lib/pacman/local/filesystem-1-1/desc": {Data: []byte("%NAME%\nfilesystem\n")}})
+	if selected, status := selectBackend(map[string]string{"ID": "omarchy", "ID_LIKE": "arch", "VERSION_ID": "4.0.4"}, pacman); status != success || selected.name != "pacman" {
+		t.Fatalf("qualified Omarchy backend=%v status=%s", selected, status)
+	}
+	if _, status := selectBackend(map[string]string{"ID": "omarchy", "ID_LIKE": "arch", "VERSION_ID": "4.0.3"}, pacman); status != unavailable {
+		t.Fatalf("unqualified Omarchy release status=%s", status)
+	}
+	for _, release := range []map[string]string{
 		{"ID": "arch", "ID_LIKE": "debian", "VERSION_ID": "42"},
 		{"ID": "nixos", "VERSION_ID": "42"},
 		{"ID": "unknown", "ID_LIKE": "rhel", "VERSION_ID": "42"},
@@ -150,6 +165,9 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 		{"ID": "fedora", "VERSION_ID": "42", "VARIANT_ID": "coreos"},
 		{"ID": "fedora", "VERSION_ID": "42", "VARIANT_ID": "future-atomic"},
 		{"ID": "opensuse-microos", "VERSION_ID": "42"},
+		// A listed derivative at an unqualified release is not widened by ID_LIKE.
+		{"ID": "linuxmint", "ID_LIKE": "ubuntu debian", "VERSION_ID": "22.2"},
+		{"ID": "elementary", "ID_LIKE": "ubuntu", "VERSION_ID": "8"},
 	} {
 		if _, status := selectBackend(release, fixtureStat(files)); status != unavailable {
 			t.Fatalf("release=%v status=%s", release, status)
@@ -172,7 +190,7 @@ func TestFailedCommandDiscardsParsedRows(t *testing.T) {
 		}
 		return commandFailure
 	}
-	result := collectPackages(context.Background(), map[string]string{"ID": "ubuntu", "VERSION_ID": "24.04"}, stat, run)
+	result := collectPackages(context.Background(), map[string]string{"ID": "ubuntu", "VERSION_ID": "24.04"}, stat, run, aptFixture(t, nil))
 	if result.Status != commandFailure || len(result.Packages) != 0 {
 		t.Fatalf("partial collection leaked: %v", result)
 	}
@@ -323,7 +341,7 @@ func TestCanceledCollectionDoesNotRunNativeTool(t *testing.T) {
 		t.Fatal("canceled collection ran a native tool")
 		return success
 	}
-	result := collectPackages(ctx, map[string]string{"ID": "ubuntu", "VERSION_ID": "24.04"}, stat, run)
+	result := collectPackages(ctx, map[string]string{"ID": "ubuntu", "VERSION_ID": "24.04"}, stat, run, aptFixture(t, nil))
 	if result.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_TIMEOUT || len(result.Packages) != 0 {
 		t.Fatalf("canceled collection=%v", result)
 	}

@@ -62,7 +62,7 @@ func vmTestObservation() (*vmTruth, *inventoryv1.NativeObservation) {
 	}
 	actual := &inventoryv1.NativeObservation{
 		Host:     &inventoryv1.HostObservation{OsId: observed(truth.host[0]), OsVersion: observed(truth.host[1]), Architecture: observed(truth.host[2]), KernelRelease: observed(truth.host[3]), Hostname: observed(truth.host[4]), BootId: observed(truth.host[5])},
-		Packages: &inventoryv1.PackageObservation{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Backend: "rpm", Packages: []*inventoryv1.Package{{Name: "kernel", Version: "0:6.19-1", Architecture: "x86_64", Manager: "rpm", Module: &inventoryv1.ModuleObservation{Status: truthSuccess}}}},
+		Packages: &inventoryv1.PackageObservation{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Backend: "rpm", Packages: []*inventoryv1.Package{{Name: "kernel", Version: "0:6.19-1", Architecture: "x86_64", Manager: "rpm", Module: &inventoryv1.ModuleObservation{Status: truthSuccess}, Origin: &inventoryv1.PackageOrigin{Status: truthUnavailable}}}},
 	}
 	return truth, actual
 }

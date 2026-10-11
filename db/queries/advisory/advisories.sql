@@ -134,6 +134,29 @@ LIMIT sqlc.arg('row_limit');
 SELECT EXISTS (SELECT 1 FROM snapshot_packages WHERE snapshot_id=$1 AND manager='dpkg'
  AND (source_name='' OR source_version=''))::boolean;
 
+-- name: ListAdvisoryUncoveredPackages :many
+-- Packages of one snapshot that a base release's feed does not cover on a
+-- derivative device, in bounded keyset pages by position. The arguments are
+-- the platform registry's archive and vendor facts; see advisory_origin_reason.
+SELECT p.position,p.name,p.version,p.architecture,r.reason::text AS reason
+FROM snapshot_packages p
+CROSS JOIN LATERAL (SELECT advisory_origin_reason(p.snapshot_id,p.position,p.origin_status,
+ sqlc.arg('origin')::text,sqlc.arg('codename')::text,sqlc.arg('suites')::text[],
+ sqlc.arg('signers')::text[],sqlc.arg('vendor_origins')::text[]) AS reason) r
+WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>sqlc.arg('after_position') AND r.reason<>''
+ORDER BY p.position LIMIT sqlc.arg('row_limit');
+
+-- name: AdvisoryOriginDigest :one
+-- Normalized origin evidence of one snapshot (status and every listing, in
+-- position and ordinal order), folded into a derivative's finding-set key.
+SELECT sha256(convert_to(coalesce(string_agg(
+ concat_ws(',', p.position, p.origin_status, coalesce(l.ordinal, -1), length(l.origin), l.origin,
+  length(l.label), l.label, length(l.suite), l.suite, length(l.codename), l.codename, l.signature, l.signer),
+ ';' ORDER BY p.position, l.ordinal), ''), 'UTF8'))::bytea AS digest
+FROM snapshot_packages p
+LEFT JOIN snapshot_package_listings l ON l.snapshot_id=p.snapshot_id AND l.position=p.position
+WHERE p.snapshot_id=$1;
+
 -- name: GetAdvisoryEvaluation :one
 SELECT * FROM advisory_evaluations WHERE device_id=$1;
 
@@ -147,12 +170,13 @@ SELECT id FROM devices WHERE id=$1 FOR UPDATE;
 SELECT id FROM devices WHERE id=$1 FOR UPDATE SKIP LOCKED;
 
 -- name: StoreAdvisoryEvaluation :exec
-INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id,uncovered_packages)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 ON CONFLICT(device_id) DO UPDATE SET id=EXCLUDED.id,snapshot_id=EXCLUDED.snapshot_id,
  feed_id=EXCLUDED.feed_id,feed_revision=EXCLUDED.feed_revision,evaluated_at=EXCLUDED.evaluated_at,
  inventory_at=EXCLUDED.inventory_at,host_received_at=EXCLUDED.host_received_at,expires_at=EXCLUDED.expires_at,state=EXCLUDED.state,
- reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id;
+ reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id,
+ uncovered_packages=EXCLUDED.uncovered_packages;
 
 -- name: TouchAdvisoryEvaluation :exec
 -- Records that unchanged feed-less evidence was rechecked against the current
@@ -177,8 +201,8 @@ SELECT * FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND pa
 -- A concurrent creator of the same content is a serialization conflict in the
 -- caller's repeatable-read transaction; the evaluation job retries next pass.
 INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,
- finding_count,critical_count,high_count,medium_count,low_count,other_count)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);
+ finding_count,critical_count,high_count,medium_count,low_count,other_count,uncovered_packages)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);
 
 -- name: InsertAdvisorySetFindings :copyfrom
 INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,published_at,cves,source_url)
@@ -248,10 +272,16 @@ SELECT t.advisory_id, t.severity,
 FROM totals t ORDER BY t.advisory_id, t.severity LIMIT sqlc.arg('row_limit');
 
 -- name: CountAdvisoryDevices :one
+-- A current evaluation is complete ('evaluated') or covers only verified
+-- base-archive packages ('partial'); every other active device is unknown.
 SELECT count(*) FILTER(WHERE e.state='evaluated' AND e.expires_at>CURRENT_TIMESTAMP
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
  AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS evaluated,
+ count(*) FILTER(WHERE e.state='partial' AND e.expires_at>CURRENT_TIMESTAMP
+ AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
+ AND e.host_received_at=d.host_received_at AND pa.status=1
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id

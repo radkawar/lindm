@@ -59,39 +59,66 @@ func NewDesktopPortal(bus *SessionBus, logger *slog.Logger) (*DesktopPortal, err
 	return &DesktopPortal{bus: bus, logger: logger}, nil
 }
 
-// Open creates, configures and starts a portal session. VIEW uses a
-// ScreenCast session; CONTROL uses a RemoteDesktop session with keyboard and
-// pointer plus ScreenCast sources on the same session.
-func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (_ Grant, err error) {
+// Check probes the portal frontend's advertised interfaces for mode without
+// creating a session, so no dialog is shown.
+func (p *DesktopPortal) Check(ctx context.Context, mode agentv1.AssistanceMode) error {
+	_, err := p.capabilities(ctx, mode)
+	return err
+}
+
+// capabilities returns the advertised cursor modes once mode is servable.
+// The frontend exports an interface only when a backend selected for this
+// desktop implements it: xdg-desktop-portal-xapp (Cinnamon) has no
+// ScreenCast, and xdg-desktop-portal-hyprland has ScreenCast but no
+// RemoteDesktop, so CONTROL there is refused rather than reduced to VIEW.
+func (p *DesktopPortal) capabilities(ctx context.Context, mode agentv1.AssistanceMode) (uint32, error) {
 	// The first call to the well-known name D-Bus-activates the portal;
 	// GetNameOwner alone would not.
 	sourceTypes, err := p.uint32Property(ctx, screenCastIface, "AvailableSourceTypes")
 	if err != nil {
-		return nil, unavailable("portal_screencast_unavailable", err)
+		return 0, unavailable("portal_screencast_unavailable", err)
 	}
 	if sourceTypes&sourceMonitor == 0 {
-		return nil, unavailable("portal_monitor_source_unavailable", nil)
+		return 0, unavailable("portal_monitor_source_unavailable", nil)
+	}
+	screenCastVersion, _ := p.uint32Property(ctx, screenCastIface, "version")
+	var deviceTypes, remoteDesktopVersion uint32
+	if mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
+		deviceTypes, err = p.uint32Property(ctx, remoteDesktopIface, "AvailableDeviceTypes")
+		if err != nil {
+			return 0, unavailable("portal_remote_desktop_unavailable", err)
+		}
+		if deviceTypes&(deviceKeyboard|devicePointer) != deviceKeyboard|devicePointer {
+			return 0, unavailable("portal_input_devices_unavailable", nil)
+		}
+		remoteDesktopVersion, _ = p.uint32Property(ctx, remoteDesktopIface, "version")
+	}
+	// Absent before ScreenCast version 2: no cursor mode is requested then.
+	cursorModes, err := p.uint32Property(ctx, screenCastIface, "AvailableCursorModes")
+	if err != nil {
+		cursorModes = 0
+	}
+	p.logger.Info("portal capabilities", "mode", mode.String(), "screencast_version", screenCastVersion, "source_types", sourceTypes,
+		"cursor_modes", cursorModes, "remote_desktop_version", remoteDesktopVersion, "device_types", deviceTypes)
+	return cursorModes, nil
+}
+
+// Open creates, configures and starts a portal session. VIEW uses a
+// ScreenCast session; CONTROL uses a RemoteDesktop session with keyboard and
+// pointer plus ScreenCast sources on the same session.
+func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (_ Grant, err error) {
+	cursorModes, err := p.capabilities(ctx, mode)
+	if err != nil {
+		return nil, err
 	}
 	owner, err := p.bus.nameOwner(ctx, portalName)
 	if err != nil {
 		return nil, unavailable("portal_unavailable", err)
 	}
-	// Absent before ScreenCast version 2: no cursor mode is requested then.
-	cursorModes, cursorErr := p.uint32Property(ctx, screenCastIface, "AvailableCursorModes")
-	if cursorErr != nil {
-		cursorModes = 0
-	}
 	control := mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
 	createIface := screenCastIface
 	if control {
 		createIface = remoteDesktopIface
-		deviceTypes, err := p.uint32Property(ctx, remoteDesktopIface, "AvailableDeviceTypes")
-		if err != nil {
-			return nil, unavailable("portal_remote_desktop_unavailable", err)
-		}
-		if deviceTypes&(deviceKeyboard|devicePointer) != deviceKeyboard|devicePointer {
-			return nil, unavailable("portal_input_devices_unavailable", nil)
-		}
 	}
 	names := p.bus.conn.Names()
 	if len(names) == 0 {

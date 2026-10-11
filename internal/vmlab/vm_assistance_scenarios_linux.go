@@ -30,6 +30,7 @@ type assistanceRun struct {
 	evidence *assistanceEvidence
 	result   *VMAssistanceResult
 	release  *platform.Release
+	desktop  *labDesktop
 	deviceID string
 	// turnTCP requires the console's selected relay candidate to use TURN
 	// over TCP, as a remote browser behind an SSH forward must.
@@ -130,7 +131,7 @@ func ended(session *adminv1.AssistanceSession) bool {
 // scenario's end path, and device-side capture shutdown.
 func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpec) error {
 	control := spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
-	scenario := &assistanceScenarioEvidence{Name: spec.name, Mode: map[bool]string{true: "control", false: "view"}[control], ExpectedCause: assistanceCauseText(spec.cause)}
+	scenario := &assistanceScenarioEvidence{Name: spec.name, Mode: map[bool]string{true: "control", false: "view"}[control], ExpectedCause: assistanceCauseText(spec.cause), ExpectedDetail: spec.detail}
 	r.result.Scenarios = append(r.result.Scenarios, scenario)
 	if err := r.screen.waitNoBanner(ctx, 45*time.Second); err != nil {
 		return err
@@ -145,6 +146,9 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		return errors.New("console did not open a session viewer")
 	}
 	scenario.SessionID = created.SessionID
+	if spec.detail != "" {
+		return r.unavailable(ctx, spec, scenario)
+	}
 	if _, err := r.waitSession(ctx, scenario, 90*time.Second, "prompted", atLeast(adminv1.AssistanceState_ASSISTANCE_STATE_PROMPTED)); err != nil {
 		return err
 	}
@@ -259,6 +263,52 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	return r.finish(ctx, spec, scenario, true)
 }
 
+// unavailable requires the desktop's visible refusal: the session ends
+// UNAVAILABLE with the exact detail without ever reaching PROMPTED, and no
+// consent notification appears on the local seat.
+func (r *assistanceRun) unavailable(ctx context.Context, spec assistanceScenarioSpec, scenario *assistanceScenarioEvidence) error {
+	session, err := r.waitSession(ctx, scenario, 90*time.Second, "ended", ended)
+	if err != nil {
+		return err
+	}
+	scenario.EndCause, scenario.EndDetail = assistanceCauseText(session.GetEndCause()), session.GetEndDetail()
+	if session.GetEndCause() != spec.cause || session.GetEndDetail() != spec.detail {
+		return fmt.Errorf("session ended %s (%s), want %s (%s)", scenario.EndCause, scenario.EndDetail, scenario.ExpectedCause, spec.detail)
+	}
+	for _, state := range scenario.States {
+		if state.State != assistanceStateText(adminv1.AssistanceState_ASSISTANCE_STATE_REQUESTED) && state.State != assistanceStateText(adminv1.AssistanceState_ASSISTANCE_STATE_ENDED) {
+			return fmt.Errorf("refused session passed through %s", state.State)
+		}
+	}
+	if session.GetConsentedAt() != nil || session.GetStartedAt() != nil || session.GetControlGranted() {
+		return errors.New("refused session records consent, start or control")
+	}
+	if err := r.screen.waitNoBanner(ctx, 10*time.Second); err != nil {
+		return fmt.Errorf("refused session showed a local notification: %w", err)
+	}
+	shot, err := r.vm.guest.screendump(ctx)
+	if err != nil {
+		return err
+	}
+	if err := r.guestScreenshot(scenario, "refused", shot); err != nil {
+		return err
+	}
+	var console struct {
+		Cause string `json:"cause"`
+	}
+	if err := r.browser.call(ctx, "ended", map[string]any{"timeoutMs": 30000}, &console, 45*time.Second); err != nil {
+		return err
+	}
+	scenario.ConsoleEndCause = console.Cause
+	if err := r.browserScreenshot(ctx, scenario, "ended"); err != nil {
+		return err
+	}
+	if err := waitAssistanceCaptureStopped(ctx, r.vm.guest); err != nil {
+		return err
+	}
+	return r.browser.call(ctx, "leave", map[string]any{"deviceId": r.deviceID}, nil, time.Minute)
+}
+
 // verifyBinding checks the server bound the consenting local session the lab
 // logged in through GDM, and that control was granted exactly when requested.
 func (r *assistanceRun) verifyBinding(scenario *assistanceScenarioEvidence, session *adminv1.AssistanceSession, control bool) error {
@@ -308,7 +358,7 @@ func (r *assistanceRun) typeNonce(ctx context.Context, scenario *assistanceScena
 		return err
 	}
 	scenario.Nonce = hex.EncodeToString(nonce[:])
-	terminal, err := openAssistanceTerminal(ctx, r.vm.guest, r.release, assistanceNoncePath)
+	terminal, err := openAssistanceTerminal(ctx, r.vm.guest, r.desktop, r.release, assistanceNoncePath)
 	if err != nil {
 		return err
 	}
@@ -383,7 +433,7 @@ func (r *assistanceRun) finish(ctx context.Context, spec assistanceScenarioSpec,
 		if err := lockAssistanceSession(ctx, r.vm.guest, r.result.Guest.Desktop.SessionID, false); err != nil {
 			return err
 		}
-		if _, err := waitActionDesktop(ctx, r.vm, false); err != nil {
+		if _, err := waitActionDesktop(ctx, r.vm, r.desktop, r.desktop.expectedLock(false)); err != nil {
 			return fmt.Errorf("unlock lab desktop after lock scenario: %w", err)
 		}
 	}
@@ -433,6 +483,11 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 		if scenario.ExpectedCause == assistanceCauseText(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED) {
 			if _, consented := actions["assistance.consent"]; consented {
 				return rows, fmt.Errorf("declined scenario %s was audited as consented", scenario.Name)
+			}
+		}
+		for _, action := range assistanceAuditForbidden[scenario.Name] {
+			if _, ok := actions[action]; ok {
+				return rows, fmt.Errorf("scenario %s was audited with %s", scenario.Name, action)
 			}
 		}
 	}

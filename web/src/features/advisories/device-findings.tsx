@@ -14,8 +14,15 @@ import { toRpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/time";
 import { AcceptanceForm } from "./acceptance-form";
-import { AdvisoryPaging, findingStateLabel, unexpired, useFreshnessClock } from "./display";
+import {
+  AdvisoryPaging,
+  advisoryReasonText,
+  findingStateLabel,
+  unexpired,
+  useFreshnessClock,
+} from "./display";
 import { deviceFindingsQueryOptions } from "./queries";
+import { UncoveredPackages } from "./uncovered-packages";
 
 export function DeviceFindings({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
@@ -30,6 +37,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
     unexpired(freshness.inventoryExpiresAt, now) &&
     unexpired(freshness.feedExpiresAt, now);
   const state = current ? findingStateLabel(freshness.state) : "Unknown";
+  const partial = current && freshness.state === AdvisoryFindingState.PARTIAL;
   return (
     <Card className="min-w-0" aria-busy={findings.isFetching}>
       <CardHeader>
@@ -51,7 +59,11 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           Status:{" "}
           <StatusBadge
             status={
-              state === "Affected" ? "destructive" : state === "Accepted" ? "warning" : "neutral"
+              state === "Affected"
+                ? "destructive"
+                : state === "Accepted" || state === "Partial"
+                  ? "warning"
+                  : "neutral"
             }
           >
             {state}
@@ -61,6 +73,17 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           <p className="border bg-muted/30 p-3 text-sm">
             Status unknown. The device inventory or advisory sources are out of date.
           </p>
+        ) : null}
+        {partial ? (
+          <div className="grid gap-4 border bg-muted/30 p-3 text-sm">
+            <p className="font-medium">Partly checked: {advisoryReasonText(freshness.reason)}.</p>
+            <p>
+              The base distribution&apos;s advisories are applied only to packages verified as
+              installed from its signed archive. The other {freshness.uncoveredPackages.toString()}{" "}
+              installed packages are not checked, so this device is never shown as unaffected.
+            </p>
+            <UncoveredPackages deviceId={deviceId} />
+          </div>
         ) : null}
         {findings.isPending ? (
           <div role="status" className="grid gap-3">

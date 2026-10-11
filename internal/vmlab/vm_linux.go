@@ -27,6 +27,7 @@ import (
 
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/labexec"
+	"lindm/internal/platform"
 )
 
 const labUser = "lindm-lab"
@@ -83,6 +84,9 @@ type guestVM struct {
 	// Only configured UEFI guests defer a requested no-reboot policy until SSH.
 	// Manually assembled encrypted guests retain their existing reboot policy.
 	stopRebootAfterConnect bool
+	// release is the registry row a verified manifest booted; nil for
+	// manually assembled guests.
+	release *platform.Release
 }
 
 // vmLog retains the last 8 KiB of process diagnostics, never guest serial

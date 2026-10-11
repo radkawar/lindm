@@ -202,6 +202,25 @@ func (q *Queries) AdvisoryDeviceVisible(ctx context.Context, arg AdvisoryDeviceV
 	return column_1, err
 }
 
+const advisoryOriginDigest = `-- name: AdvisoryOriginDigest :one
+SELECT sha256(convert_to(coalesce(string_agg(
+ concat_ws(',', p.position, p.origin_status, coalesce(l.ordinal, -1), length(l.origin), l.origin,
+  length(l.label), l.label, length(l.suite), l.suite, length(l.codename), l.codename, l.signature, l.signer),
+ ';' ORDER BY p.position, l.ordinal), ''), 'UTF8'))::bytea AS digest
+FROM snapshot_packages p
+LEFT JOIN snapshot_package_listings l ON l.snapshot_id=p.snapshot_id AND l.position=p.position
+WHERE p.snapshot_id=$1
+`
+
+// Normalized origin evidence of one snapshot (status and every listing, in
+// position and ordinal order), folded into a derivative's finding-set key.
+func (q *Queries) AdvisoryOriginDigest(ctx context.Context, snapshotID uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, advisoryOriginDigest, snapshotID)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
+}
+
 const advisoryPackageDigest = `-- name: AdvisoryPackageDigest :one
 SELECT sha256(convert_to(coalesce(string_agg(
  concat_ws(',', position, length(name), name, length(version), version, length(architecture), architecture,
@@ -278,6 +297,10 @@ SELECT count(*) FILTER(WHERE e.state='evaluated' AND e.expires_at>CURRENT_TIMEST
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
  AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS evaluated,
+ count(*) FILTER(WHERE e.state='partial' AND e.expires_at>CURRENT_TIMESTAMP
+ AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
+ AND e.host_received_at=d.host_received_at AND pa.status=1
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
@@ -294,13 +317,16 @@ type CountAdvisoryDevicesParams struct {
 
 type CountAdvisoryDevicesRow struct {
 	Evaluated int64
+	Partial   int64
 	Total     int64
 }
 
+// A current evaluation is complete ('evaluated') or covers only verified
+// base-archive packages ('partial'); every other active device is unknown.
 func (q *Queries) CountAdvisoryDevices(ctx context.Context, arg CountAdvisoryDevicesParams) (CountAdvisoryDevicesRow, error) {
 	row := q.db.QueryRow(ctx, countAdvisoryDevices, arg.ScopeUnrestricted, arg.Scopes)
 	var i CountAdvisoryDevicesRow
-	err := row.Scan(&i.Evaluated, &i.Total)
+	err := row.Scan(&i.Evaluated, &i.Partial, &i.Total)
 	return i, err
 }
 
@@ -441,7 +467,7 @@ func (q *Queries) GetAdvisoryDevice(ctx context.Context, id uuid.UUID) (GetAdvis
 }
 
 const getAdvisoryEvaluation = `-- name: GetAdvisoryEvaluation :one
-SELECT device_id, id, snapshot_id, feed_id, feed_revision, evaluated_at, inventory_at, host_received_at, expires_at, state, reason, finding_digest, finding_set_id FROM advisory_evaluations WHERE device_id=$1
+SELECT device_id, id, snapshot_id, feed_id, feed_revision, evaluated_at, inventory_at, host_received_at, expires_at, state, reason, finding_digest, finding_set_id, uncovered_packages FROM advisory_evaluations WHERE device_id=$1
 `
 
 func (q *Queries) GetAdvisoryEvaluation(ctx context.Context, deviceID uuid.UUID) (AdvisoryEvaluation, error) {
@@ -461,6 +487,7 @@ func (q *Queries) GetAdvisoryEvaluation(ctx context.Context, deviceID uuid.UUID)
 		&i.Reason,
 		&i.FindingDigest,
 		&i.FindingSetID,
+		&i.UncoveredPackages,
 	)
 	return i, err
 }
@@ -546,7 +573,7 @@ func (q *Queries) GetAdvisoryFinding(ctx context.Context, arg GetAdvisoryFinding
 }
 
 const getAdvisoryFindingSet = `-- name: GetAdvisoryFindingSet :one
-SELECT id, feed_id, feed_revision, package_digest, state, reason, finding_digest, finding_count, critical_count, high_count, medium_count, low_count, other_count, created_at FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND package_digest=$3
+SELECT id, feed_id, feed_revision, package_digest, state, reason, finding_digest, finding_count, critical_count, high_count, medium_count, low_count, other_count, created_at, uncovered_packages FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND package_digest=$3
 `
 
 type GetAdvisoryFindingSetParams struct {
@@ -573,6 +600,7 @@ func (q *Queries) GetAdvisoryFindingSet(ctx context.Context, arg GetAdvisoryFind
 		&i.LowCount,
 		&i.OtherCount,
 		&i.CreatedAt,
+		&i.UncoveredPackages,
 	)
 	return i, err
 }
@@ -627,24 +655,25 @@ func (q *Queries) InsertAdvisoryExceptionRequest(ctx context.Context, arg Insert
 
 const insertAdvisoryFindingSet = `-- name: InsertAdvisoryFindingSet :exec
 INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,
- finding_count,critical_count,high_count,medium_count,low_count,other_count)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+ finding_count,critical_count,high_count,medium_count,low_count,other_count,uncovered_packages)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 `
 
 type InsertAdvisoryFindingSetParams struct {
-	ID            uuid.UUID
-	FeedID        string
-	FeedRevision  uuid.UUID
-	PackageDigest []byte
-	State         string
-	Reason        string
-	FindingDigest []byte
-	FindingCount  int32
-	CriticalCount int32
-	HighCount     int32
-	MediumCount   int32
-	LowCount      int32
-	OtherCount    int32
+	ID                uuid.UUID
+	FeedID            string
+	FeedRevision      uuid.UUID
+	PackageDigest     []byte
+	State             string
+	Reason            string
+	FindingDigest     []byte
+	FindingCount      int32
+	CriticalCount     int32
+	HighCount         int32
+	MediumCount       int32
+	LowCount          int32
+	OtherCount        int32
+	UncoveredPackages int32
 }
 
 // A concurrent creator of the same content is a serialization conflict in the
@@ -664,6 +693,7 @@ func (q *Queries) InsertAdvisoryFindingSet(ctx context.Context, arg InsertAdviso
 		arg.MediumCount,
 		arg.LowCount,
 		arg.OtherCount,
+		arg.UncoveredPackages,
 	)
 	return err
 }
@@ -855,6 +885,73 @@ func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySumma
 			&i.AffectedDevices,
 			&i.AcceptedDevices,
 			&i.UnknownDevices,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdvisoryUncoveredPackages = `-- name: ListAdvisoryUncoveredPackages :many
+SELECT p.position,p.name,p.version,p.architecture,r.reason::text AS reason
+FROM snapshot_packages p
+CROSS JOIN LATERAL (SELECT advisory_origin_reason(p.snapshot_id,p.position,p.origin_status,
+ $1::text,$2::text,$3::text[],
+ $4::text[],$5::text[]) AS reason) r
+WHERE p.snapshot_id=$6 AND p.position>$7 AND r.reason<>''
+ORDER BY p.position LIMIT $8
+`
+
+type ListAdvisoryUncoveredPackagesParams struct {
+	Origin        string
+	Codename      string
+	Suites        []string
+	Signers       []string
+	VendorOrigins []string
+	SnapshotID    uuid.UUID
+	AfterPosition int32
+	RowLimit      int32
+}
+
+type ListAdvisoryUncoveredPackagesRow struct {
+	Position     int32
+	Name         string
+	Version      string
+	Architecture string
+	Reason       string
+}
+
+// Packages of one snapshot that a base release's feed does not cover on a
+// derivative device, in bounded keyset pages by position. The arguments are
+// the platform registry's archive and vendor facts; see advisory_origin_reason.
+func (q *Queries) ListAdvisoryUncoveredPackages(ctx context.Context, arg ListAdvisoryUncoveredPackagesParams) ([]ListAdvisoryUncoveredPackagesRow, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryUncoveredPackages,
+		arg.Origin,
+		arg.Codename,
+		arg.Suites,
+		arg.Signers,
+		arg.VendorOrigins,
+		arg.SnapshotID,
+		arg.AfterPosition,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdvisoryUncoveredPackagesRow{}
+	for rows.Next() {
+		var i ListAdvisoryUncoveredPackagesRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.Name,
+			&i.Version,
+			&i.Architecture,
+			&i.Reason,
 		); err != nil {
 			return nil, err
 		}
@@ -1162,28 +1259,30 @@ func (q *Queries) StartAdvisoryGeneration(ctx context.Context, arg StartAdvisory
 }
 
 const storeAdvisoryEvaluation = `-- name: StoreAdvisoryEvaluation :exec
-INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id,uncovered_packages)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 ON CONFLICT(device_id) DO UPDATE SET id=EXCLUDED.id,snapshot_id=EXCLUDED.snapshot_id,
  feed_id=EXCLUDED.feed_id,feed_revision=EXCLUDED.feed_revision,evaluated_at=EXCLUDED.evaluated_at,
  inventory_at=EXCLUDED.inventory_at,host_received_at=EXCLUDED.host_received_at,expires_at=EXCLUDED.expires_at,state=EXCLUDED.state,
- reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id
+ reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest,finding_set_id=EXCLUDED.finding_set_id,
+ uncovered_packages=EXCLUDED.uncovered_packages
 `
 
 type StoreAdvisoryEvaluationParams struct {
-	DeviceID       uuid.UUID
-	ID             uuid.UUID
-	SnapshotID     *uuid.UUID
-	FeedID         string
-	FeedRevision   *uuid.UUID
-	EvaluatedAt    pgtype.Timestamptz
-	InventoryAt    pgtype.Timestamptz
-	ExpiresAt      pgtype.Timestamptz
-	State          string
-	Reason         string
-	FindingDigest  []byte
-	HostReceivedAt pgtype.Timestamptz
-	FindingSetID   *uuid.UUID
+	DeviceID          uuid.UUID
+	ID                uuid.UUID
+	SnapshotID        *uuid.UUID
+	FeedID            string
+	FeedRevision      *uuid.UUID
+	EvaluatedAt       pgtype.Timestamptz
+	InventoryAt       pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	State             string
+	Reason            string
+	FindingDigest     []byte
+	HostReceivedAt    pgtype.Timestamptz
+	FindingSetID      *uuid.UUID
+	UncoveredPackages int32
 }
 
 func (q *Queries) StoreAdvisoryEvaluation(ctx context.Context, arg StoreAdvisoryEvaluationParams) error {
@@ -1201,6 +1300,7 @@ func (q *Queries) StoreAdvisoryEvaluation(ctx context.Context, arg StoreAdvisory
 		arg.FindingDigest,
 		arg.HostReceivedAt,
 		arg.FindingSetID,
+		arg.UncoveredPackages,
 	)
 	return err
 }

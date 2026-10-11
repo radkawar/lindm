@@ -82,11 +82,19 @@ export function AdvisoryFleet() {
           ) : null}
           {summary.data ? (
             <>
-              <dl className="grid gap-4 border bg-muted/30 p-4 sm:grid-cols-2">
+              <dl className="grid gap-4 border bg-muted/30 p-4 sm:grid-cols-3">
                 <div>
                   <dt className="text-xs text-muted-foreground">Devices checked</dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
                     {summary.data.evaluatedDevices.toString()}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    Devices partly checked (some packages not covered)
+                  </dt>
+                  <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                    {summary.data.partialDevices.toString()}
                   </dd>
                 </div>
                 <div>

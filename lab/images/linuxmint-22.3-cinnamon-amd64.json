@@ -1,0 +1,19 @@
+{
+  "id": "linuxmint-22.3-cinnamon-amd64",
+  "distribution": "linuxmint",
+  "version": "22.3",
+  "architecture": "amd64",
+  "edition": "cinnamon",
+  "release": "22.3",
+  "imageFilename": "linuxmint-22.3-cinnamon-64bit.iso",
+  "imageUrl": "https://pub.linuxmint.io/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+  "checksumUrl": "https://pub.linuxmint.io/stable/22.3/sha256sum.txt",
+  "signatureUrl": "https://pub.linuxmint.io/stable/22.3/sha256sum.txt.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x27DEB15644C6B3CF3BD7D291300F846BA25BAE09",
+  "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+  "signerFingerprint": "27DEB15644C6B3CF3BD7D291300F846BA25BAE09",
+  "imageSizeBytes": "3091660800",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://linuxmint.com/verify.php",
+  "releaseProvenanceUrl": "https://pub.linuxmint.io/stable/22.3/"
+}

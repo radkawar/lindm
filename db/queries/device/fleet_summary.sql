@@ -81,11 +81,15 @@ SELECT (t.critical - a.critical)::bigint AS critical_findings,
 FROM totals t CROSS JOIN accepted a;
 
 -- name: FleetSummaryAdvisoryDevices :one
--- Same evaluated/unknown population as advisory.CountAdvisoryDevices.
+-- Same evaluated/partial/unknown population as advisory.CountAdvisoryDevices.
 SELECT count(*) FILTER (WHERE e.state = 'evaluated' AND e.expires_at > CURRENT_TIMESTAMP
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
  AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS evaluated,
+ count(*) FILTER (WHERE e.state = 'partial' AND e.expires_at > CURRENT_TIMESTAMP
+ AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
+ AND e.host_received_at = d.host_received_at AND pa.status = 1
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id

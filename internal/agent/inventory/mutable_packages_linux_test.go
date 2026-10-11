@@ -32,9 +32,18 @@ func TestMutableDistributionPackageManagerIdentity(t *testing.T) {
 				}
 				return consume(strings.NewReader(tc.input))
 			}
-			got := collectPackages(t.Context(), map[string]string{"ID": tc.id, "VERSION_ID": tc.version}, stat, run)
+			got := collectPackages(t.Context(), map[string]string{"ID": tc.id, "VERSION_ID": tc.version}, stat, run, aptFixture(t, map[string][]byte{}))
 			if got.Status != success || got.Backend != tc.manager || len(got.Packages) != 1 || got.Packages[0].Manager != tc.manager {
 				t.Fatalf("lost native manager identity: %v", got)
+			}
+			// Only APT systems carry origin evidence; an empty lists
+			// directory lists nothing rather than inventing an origin.
+			want := unavailable
+			if tc.manager == "dpkg" {
+				want = success
+			}
+			if origin := got.Packages[0].GetOrigin(); origin.GetStatus() != want || len(origin.GetListings()) != 0 {
+				t.Fatalf("origin = %v, want status %s without listings", origin, want)
 			}
 		})
 	}

@@ -114,6 +114,12 @@ named `inspect-complete-oracle` pass; it did not change absent observations into
 success. [Verification](../verification.md) retains that history and the exact runner
 provenance.
 
+Dpkg packages also carry APT origin evidence (the lists indexes listing each exact
+installed version, see [architecture](../architecture.md#distro-advisory-findings)).
+The native oracle compares it with `apt-cache policy` and requires stock Debian
+sources to verify. The recorded Debian inspections predate this field and its
+oracle; they are not evidence for it.
+
 The maintained [unavailability rules](../../internal/vmlab/inventory_unavailable_linux.go#L7)
 are exact, capability-backed and accept only `UNAVAILABLE`, never permission denied,
 timeout, invalid output or native command failure:

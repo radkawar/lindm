@@ -9,7 +9,11 @@ import (
 
 // pacman -Q is the version oracle; pacman -Qi supplies architecture through
 // libalpm's native human-readable query, independently of the agent desc parser.
-const pacmanTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /bin/sh -eu -c '/usr/bin/pacman -Q; printf "\n--LINDM-ARCH-DETAILS--\n"; /usr/bin/pacman -Qi'`
+// Installed-package truth reads only the local database, so the query uses a
+// repository-free configuration: a freshly installed system without sync
+// databases (Omarchy's offline ISO install) otherwise warns on stderr for
+// every configured repository.
+const pacmanTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /bin/sh -eu -c '/usr/bin/pacman --config /dev/null -Q; printf "\n--LINDM-ARCH-DETAILS--\n"; /usr/bin/pacman --config /dev/null -Qi'`
 
 func parsePacmanTruth(data []byte) (map[nativePackage]int, error) {
 	list, detail, found := strings.Cut(string(data), "\n--LINDM-ARCH-DETAILS--\n")

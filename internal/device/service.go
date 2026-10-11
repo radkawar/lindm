@@ -218,6 +218,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.ControlRolloutRequest{},
 			&adminv1.ListRolloutsRequest{},
 			&adminv1.ListDeviceFindingsRequest{},
+			&adminv1.ListDeviceUncoveredPackagesRequest{},
 			&adminv1.ListAdvisorySummaryRequest{},
 			&adminv1.ListAdvisoryFeedsRequest{},
 			&adminv1.AcceptAdvisoryFindingRequest{},

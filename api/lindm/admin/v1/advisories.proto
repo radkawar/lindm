@@ -11,12 +11,15 @@ option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 // UNKNOWN means the inventory, source coverage or advisory feed cannot establish
 // current exposure. ACCEPTED is time-limited risk acceptance, never a fix.
+// PARTIAL is a device-level state only: exposure is known for the packages the
+// applied feed covers and every other package is listed as uncovered.
 enum AdvisoryFindingState {
   ADVISORY_FINDING_STATE_UNSPECIFIED = 0;
   ADVISORY_FINDING_STATE_AFFECTED = 1;
   ADVISORY_FINDING_STATE_ACCEPTED = 2;
   ADVISORY_FINDING_STATE_UNKNOWN = 3;
   ADVISORY_FINDING_STATE_CLEAR = 4;
+  ADVISORY_FINDING_STATE_PARTIAL = 5;
 }
 
 message AdvisoryException {
@@ -53,6 +56,8 @@ message AdvisoryFreshness {
   google.protobuf.Timestamp feed_expires_at = 7;
   string feed_id = 8;
   string source_sha256 = 9;
+  // Installed packages the applied feed does not cover (PARTIAL only).
+  uint64 uncovered_packages = 10;
 }
 
 message ListDeviceFindingsRequest {
@@ -62,6 +67,25 @@ message ListDeviceFindingsRequest {
 }
 message ListDeviceFindingsResponse {
   repeated AdvisoryFinding findings = 1;
+  string next_page_token = 2;
+  AdvisoryFreshness freshness = 3;
+}
+
+message ListDeviceUncoveredPackagesRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 3 [(buf.validate.field).string.max_len = 1024];
+}
+// UncoveredPackage is an installed package whose exposure is UNKNOWN because
+// the applied feed does not cover its verified origin; reason is a stable code.
+message UncoveredPackage {
+  string name = 1;
+  string version = 2;
+  string architecture = 3;
+  string reason = 4;
+}
+message ListDeviceUncoveredPackagesResponse {
+  repeated UncoveredPackage packages = 1;
   string next_page_token = 2;
   AdvisoryFreshness freshness = 3;
 }
@@ -83,6 +107,8 @@ message ListAdvisorySummaryResponse {
   string next_page_token = 2;
   uint64 unknown_devices = 3;
   uint64 evaluated_devices = 4;
+  // Devices whose current evaluation covers only part of their packages.
+  uint64 partial_devices = 5;
 }
 
 message ListAdvisoryFeedsRequest {}

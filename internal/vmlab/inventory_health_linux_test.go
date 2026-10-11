@@ -26,7 +26,7 @@ func healthyInventoryFixture() (*inventoryv1.HostObservation, *inventoryv1.Packa
 		KernelRelease: truthString("6.8.0"), Hostname: truthString("private-host"), BootId: truthString("private-boot"),
 		HardwareVendor: truthString("QEMU"), HardwareModel: truthString("Standard PC"), HardwareSerial: truthString(""), Details: details,
 	}
-	packages := &inventoryv1.PackageObservation{Status: truthSuccess, Backend: "dpkg", Packages: []*inventoryv1.Package{{Name: "example", Version: "1", Architecture: "amd64", Manager: "dpkg", Module: &inventoryv1.ModuleObservation{Status: truthUnavailable}}}}
+	packages := &inventoryv1.PackageObservation{Status: truthSuccess, Backend: "dpkg", Packages: []*inventoryv1.Package{{Name: "example", Version: "1", Architecture: "amd64", Manager: "dpkg", Module: &inventoryv1.ModuleObservation{Status: truthUnavailable}, Origin: &inventoryv1.PackageOrigin{Status: truthSuccess}}}}
 	return host, packages
 }
 

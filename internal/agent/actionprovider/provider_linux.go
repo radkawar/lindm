@@ -63,15 +63,17 @@ type Provider struct {
 	localAdmin      *localAdminNative
 	run             nativeRunner
 	sessionNative   func(context.Context, string) ([]graphicalSession, error)
-	openPower       func(context.Context) (powerBus, func() error, error)
-	openSystemd     func(context.Context) (systemdBus, func() error, error)
-	patchNowDir     string
-	bootID          func() (string, error)
-	accounts        *accountLocker
-	resolve         func(context.Context, *agentv1.DeviceActionSpec, bool) (*targetHandle, error)
-	flushHeader     func(*os.File) error
-	gate            chan struct{}
-	clock           func() time.Time
+	// lockWait overrides sessionLockAcknowledgement in tests.
+	lockWait    time.Duration
+	openPower   func(context.Context) (powerBus, func() error, error)
+	openSystemd func(context.Context) (systemdBus, func() error, error)
+	patchNowDir string
+	bootID      func() (string, error)
+	accounts    *accountLocker
+	resolve     func(context.Context, *agentv1.DeviceActionSpec, bool) (*targetHandle, error)
+	flushHeader func(*os.File) error
+	gate        chan struct{}
+	clock       func() time.Time
 }
 
 func New(options Options) (*Provider, error) {
@@ -607,6 +609,17 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 	case *agentv1.DeviceActionSpec_LockSessions:
 		if !after.GetSessionsLocked() {
 			after, err = p.awaitSessionLock(ctx, plan.GetSpec())
+			if errors.Is(err, errSessionLockUnreported) {
+				// A definite, visible observation: the request was delivered and
+				// the desktop did not report a lock. Never claim it, never retry.
+				verification.After = after
+				verification.Evidence = sessionLockUnreportedEvidence(p.lockWindow())
+				if err := p.verifyAccountLock(ctx, plan, verification); err != nil {
+					return nil, err
+				}
+				verification.Verified = false
+				return verification, nil
+			}
 			if err != nil {
 				return nil, err
 			}

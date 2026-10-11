@@ -47,6 +47,46 @@ func (q *Queries) InsertSnapshotBatches(ctx context.Context, arg []InsertSnapsho
 	return q.db.CopyFrom(ctx, []string{"snapshot_batches"}, []string{"snapshot_id", "batch_index", "digest", "record_count", "encoded_size", "first_position", "stored"}, &iteratorForInsertSnapshotBatches{rows: arg})
 }
 
+// iteratorForInsertSnapshotPackageListings implements pgx.CopyFromSource.
+type iteratorForInsertSnapshotPackageListings struct {
+	rows                 []InsertSnapshotPackageListingsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertSnapshotPackageListings) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertSnapshotPackageListings) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].SnapshotID,
+		r.rows[0].Position,
+		r.rows[0].Ordinal,
+		r.rows[0].Origin,
+		r.rows[0].Label,
+		r.rows[0].Suite,
+		r.rows[0].Codename,
+		r.rows[0].Signature,
+		r.rows[0].Signer,
+	}, nil
+}
+
+func (r iteratorForInsertSnapshotPackageListings) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertSnapshotPackageListings(ctx context.Context, arg []InsertSnapshotPackageListingsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"snapshot_package_listings"}, []string{"snapshot_id", "position", "ordinal", "origin", "label", "suite", "codename", "signature", "signer"}, &iteratorForInsertSnapshotPackageListings{rows: arg})
+}
+
 // iteratorForInsertSnapshotPackages implements pgx.CopyFromSource.
 type iteratorForInsertSnapshotPackages struct {
 	rows                 []InsertSnapshotPackagesParams
@@ -80,6 +120,7 @@ func (r iteratorForInsertSnapshotPackages) Values() ([]interface{}, error) {
 		r.rows[0].ModuleStream,
 		r.rows[0].ModuleVersion,
 		r.rows[0].ModuleContext,
+		r.rows[0].OriginStatus,
 	}, nil
 }
 
@@ -88,5 +129,5 @@ func (r iteratorForInsertSnapshotPackages) Err() error {
 }
 
 func (q *Queries) InsertSnapshotPackages(ctx context.Context, arg []InsertSnapshotPackagesParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"snapshot_packages"}, []string{"snapshot_id", "position", "name", "version", "architecture", "manager", "source_name", "source_version", "module_status", "module_name", "module_stream", "module_version", "module_context"}, &iteratorForInsertSnapshotPackages{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"snapshot_packages"}, []string{"snapshot_id", "position", "name", "version", "architecture", "manager", "source_name", "source_version", "module_status", "module_name", "module_stream", "module_version", "module_context", "origin_status"}, &iteratorForInsertSnapshotPackages{rows: arg})
 }

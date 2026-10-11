@@ -83,6 +83,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"SetDeviceGroup":                       {identity.PermissionManageAccounts, accounts, true},
 		"DeleteDeviceGroup":                    {identity.PermissionManageAccounts, accounts, true},
 		"ListDeviceFindings":                   {identity.PermissionReadFleet, readers, false},
+		"ListDeviceUncoveredPackages":          {identity.PermissionReadFleet, readers, false},
 		"ListAdvisorySummary":                  {identity.PermissionReadFleet, readers, false},
 		"ListAdvisoryFeeds":                    {identity.PermissionReadFleet, readers, true},
 		"AcceptAdvisoryFinding":                {identity.PermissionManageAdvisoryExceptions, admins, false},

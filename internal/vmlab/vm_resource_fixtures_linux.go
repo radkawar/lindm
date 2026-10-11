@@ -55,7 +55,7 @@ test ! -e /var/lib/lindm-resource-lab
 test ! -e /etc/lindm-resource-lab
 mkdir -m 0755 /var/lib/lindm-resource-lab /etc/lindm-resource-lab
 cd /var/lib/lindm-resource-lab
-. /etc/os-release
+` + nativeOSRelease + `
 case "$ID:$VERSION_ID" in
  ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debian:13)
   # The image's own OpenPGP verifiers before the lab's build tools (gnupg
@@ -224,7 +224,11 @@ fi
 `
 
 func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages, architecture string, selected map[string]bool) error {
-	if err := packages.uploadBytes(ctx, nativeGuestDir+"/resource-fixtures.sh", []byte(resourceFixtureScript)); err != nil {
+	script, err := packages.vm.nativeScript(resourceFixtureScript)
+	if err != nil {
+		return err
+	}
+	if err := packages.uploadBytes(ctx, nativeGuestDir+"/resource-fixtures.sh", []byte(script)); err != nil {
 		return err
 	}
 	// Native package tools report progress on stderr; the script's exit status
@@ -281,7 +285,11 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 	}
 	install := "install -o root -g root -m 0600 " + nativeGuestDir + "/resource-executor.json /etc/lindm/executor.json; "
 	if selected["local-admin"] {
-		if err := lifecycleCommand(ctx, packages.vm, "create managed local-admin account", localAdminFixtureScript); err != nil {
+		script, err := packages.vm.nativeScript(localAdminFixtureScript)
+		if err != nil {
+			return err
+		}
+		if err := lifecycleCommand(ctx, packages.vm, "create managed local-admin account", script); err != nil {
 			return err
 		}
 		// Root's local allowlist is the only native authority for rotation;

@@ -85,14 +85,28 @@ func (f Fetcher) Fetch(ctx context.Context, m *labv1.ImageManifest, cacheDir str
 	if err != nil {
 		return nil, err
 	}
-	metadata, err := verifyMetadata(ctx, m, checksum, signature, key)
-	if err != nil {
-		return nil, err
+	var result *VerifiedImage
+	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_IMAGE {
+		// The signature covers the image itself, so only the unsigned sidecar's
+		// agreement with the pin can be checked before the image download.
+		if _, err := selectedChecksum(checksum, m); err != nil {
+			return nil, fmt.Errorf("unsigned vendor SHA-256 sidecar: %w", err)
+		}
+		if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), ImageDownloadTimeout(m.ImageSizeBytes)); err != nil {
+			return nil, err
+		}
+		result, err = verifySignedImage(ctx, m, filepath.Join(root.Name(), partial, "image"), checksum, signature, key)
+	} else {
+		metadata, metadataErr := verifyMetadata(ctx, m, checksum, signature, key)
+		if metadataErr != nil {
+			return nil, metadataErr
+		}
+		if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), ImageDownloadTimeout(m.ImageSizeBytes)); err != nil {
+			return nil, err
+		}
+		result, err = verifyImage(ctx, m, filepath.Join(root.Name(), partial, "image"), metadata)
 	}
-	if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), ImageDownloadTimeout(m.ImageSizeBytes)); err != nil {
-		return nil, err
-	}
-	result, err := verifyImage(ctx, m, filepath.Join(root.Name(), partial, "image"), metadata)
+
 	if err != nil {
 		return nil, err
 	}

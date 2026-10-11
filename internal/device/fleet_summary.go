@@ -152,7 +152,8 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 		response.Findings = &adminv1.FleetFindingSummary{
 			CriticalFindings: uint64(findings.CriticalFindings), HighFindings: uint64(findings.HighFindings),
 			MediumFindings: uint64(findings.MediumFindings), LowFindings: uint64(findings.LowFindings), OtherFindings: uint64(findings.OtherFindings),
-			EvaluatedDevices: uint64(devices.Evaluated), UnknownDevices: uint64(devices.Total - devices.Evaluated),
+			EvaluatedDevices: uint64(devices.Evaluated), PartialDevices: uint64(devices.Partial),
+			UnknownDevices: uint64(devices.Total - devices.Evaluated - devices.Partial),
 		}
 	}
 	return response, nil

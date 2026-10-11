@@ -154,11 +154,18 @@ func supportTable() (string, error) {
 			if n.Systemd > 0 {
 				systemd = strconv.Itoa(n.Systemd)
 			}
-			feeds := make([]string, 0, len(r.Advisory.Feeds)+1)
-			for _, f := range r.Advisory.Feeds {
+			feedRow := r
+			if b := r.BaseCoverage(); b != nil {
+				feedRow = b
+			}
+			feeds := make([]string, 0, len(feedRow.Advisory.Feeds)+1)
+			for _, f := range feedRow.Advisory.Feeds {
 				feeds = append(feeds, string(f))
 			}
-			advisory := strings.TrimSpace(strings.Join(feeds, ", ") + " " + r.Advisory.Ecosystem)
+			advisory := strings.TrimSpace(strings.Join(feeds, ", ") + " " + feedRow.Advisory.Ecosystem)
+			if feedRow != r {
+				advisory += " (verified " + feedRow.Advisory.ArchiveOrigin + "-archive packages only)"
+			}
 			rows = append(rows, []string{
 				tier.String(), gendoc.Escape(r.Name), gendoc.Escape(match(r)), dash(strings.Join(r.Architectures, ", ")),
 				dash(packages), dash(systemd), dash(n.Firewall), dash(r.FDE), dash(desktop(r.Desktop)), dash(advisory),
@@ -201,6 +208,8 @@ func capabilityTable(page string) (string, error) {
 			cell := "implemented"
 			if reason := r.GateReason(c); reason != "" {
 				cell = "gated: " + gendoc.Escape(reason)
+			} else if c == Advisories && r.BaseCoverage() != nil {
+				cell = "partial: " + gendoc.Escape(r.Advisory.Partial)
 			}
 			row = append(row, cell)
 		}

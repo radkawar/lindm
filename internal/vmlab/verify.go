@@ -47,7 +47,7 @@ type verifiedMetadata struct {
 }
 
 func detachedChecksum(mode labv1.ChecksumMode) bool {
-	return mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED || mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512
+	return mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED || mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 || mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_IMAGE
 }
 
 // VerifyArtifacts checks pinned image bytes and the manifest's explicit trust
@@ -77,11 +77,88 @@ func VerifyArtifacts(ctx context.Context, m *labv1.ImageManifest, files Artifact
 			return nil, fmt.Errorf("read checksum signature: %w", err)
 		}
 	}
+	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_IMAGE {
+		return verifySignedImage(ctx, m, files.Image, checksum, signature, key)
+	}
 	metadata, err := verifyMetadata(ctx, m, checksum, signature, key)
 	if err != nil {
 		return nil, err
 	}
 	return verifyImage(ctx, m, files.Image, metadata)
+}
+
+// verifySignedImage authenticates a detached OpenPGP signature over the image
+// bytes themselves. One streaming read feeds both gpgv and the SHA-256 pin, so
+// the signed bytes and the pinned bytes are the same bytes. The vendor's
+// unsigned SHA-256 sidecar must agree with the pin; it is never trusted alone.
+func verifySignedImage(ctx context.Context, m *labv1.ImageManifest, imagePath string, checksum, signature, key []byte) (_ *VerifiedImage, err error) {
+	if _, err := selectedChecksum(checksum, m); err != nil {
+		return nil, fmt.Errorf("unsigned vendor SHA-256 sidecar: %w", err)
+	}
+	file, err := openRegular(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("open image: %w", err)
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() != int64(m.ImageSizeBytes) {
+		return nil, fmt.Errorf("image size %d does not match pinned %d bytes", info.Size(), m.ImageSizeBytes)
+	}
+	pinnedHash := sha256.New()
+	var count byteCounter
+	image := io.TeeReader(io.LimitReader(contextReader{ctx: ctx, reader: file}, int64(m.ImageSizeBytes)+1), io.MultiWriter(pinnedHash, &count))
+	signing, primary, err := verifyStreamSignature(ctx, m.SignerFingerprint, signature, key, image)
+	if err != nil {
+		return nil, err
+	}
+	actual := hex.EncodeToString(pinnedHash.Sum(nil))
+	if int64(count) != int64(m.ImageSizeBytes) || actual != m.Sha256 {
+		return nil, fmt.Errorf("image bytes do not match pinned SHA-256 %s and size", m.Sha256)
+	}
+	absolute, err := filepath.Abs(imagePath)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifiedImage{Path: absolute, SHA256: actual, Size: int64(count), SigningFingerprint: signing, PrimaryFingerprint: primary}, nil
+}
+
+type byteCounter int64
+
+func (c *byteCounter) Write(p []byte) (int, error) {
+	*c += byteCounter(len(p))
+	return len(p), nil
+}
+
+// verifyStreamSignature runs gpgv over data read from image on its stdin; the
+// caller hashes the same bytes as gpgv consumes them.
+func verifyStreamSignature(ctx context.Context, fingerprint string, signature, key []byte, image io.Reader) (signing, primary string, err error) {
+	keyring, err := publicKeyring(key)
+	if err != nil {
+		return "", "", fmt.Errorf("decode public key: %w", err)
+	}
+	dir, err := os.MkdirTemp("", "lindm-image-verify-")
+	if err != nil {
+		return "", "", err
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
+	for name, content := range map[string][]byte{"keyring.gpg": keyring, "signature": signature} {
+		if err := os.WriteFile(filepath.Join(dir, name), content, 0600); err != nil {
+			return "", "", err
+		}
+	}
+	stdout, stderr := nativeexec.NewBuffer(64<<10), nativeexec.NewBuffer(64<<10)
+	args := []string{"--homedir", dir, "--keyring", filepath.Join(dir, "keyring.gpg"), "--status-fd", "2", filepath.Join(dir, "signature"), "-"}
+	err = labexec.Run(ctx, labexec.Command{Path: "gpgv", Args: args, Env: []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GNUPGHOME=" + dir}, Stdin: image, Stdout: stdout, Stderr: stderr, Timeout: 30 * time.Minute})
+	if err == nil && (stdout.Truncated() || stderr.Truncated()) {
+		err = errors.New("gpgv output exceeds limit")
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("verify image signature with gpgv: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return validSigner(stderr.String(), fingerprint)
 }
 
 func verifyImage(ctx context.Context, m *labv1.ImageManifest, imagePath string, metadata verifiedMetadata) (*VerifiedImage, error) {

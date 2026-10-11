@@ -239,6 +239,31 @@ type Advisory struct {
 	// Partial says why even a complete vendor export cannot establish a clean
 	// result; empty when a complete export is authoritative.
 	Partial string
+	// ArchiveOrigin, ArchiveSuites and ArchiveSigners identify the release's
+	// own signed APT archive (with Codename): the Release Origin, the suites
+	// its feed assesses for security support, and the uppercase primary-key
+	// fingerprints that sign them. A derivative's packages are covered by this
+	// release's feed only when every APT index listing them matches.
+	ArchiveOrigin  string
+	ArchiveSuites  []string
+	ArchiveSigners []string
+	// VendorOrigins are a derivative vendor's own Release Origins. When set,
+	// the derivative is evaluated against its base's feed for verified
+	// base-archive packages only and is always partial (Partial says why).
+	VendorOrigins []string
+}
+
+// BaseCoverage returns the base release whose feed applies to this
+// derivative's verified base-archive packages, or nil when the release is not
+// such a derivative. The derivative itself never names a feed.
+func (r *Release) BaseCoverage() *Release {
+	if r.base == nil || len(r.Advisory.VendorOrigins) == 0 || r.Gate(Advisories) != nil {
+		return nil
+	}
+	if b := r.base; b.Advisory.ArchiveOrigin != "" && len(b.Advisory.ArchiveSuites) > 0 && len(b.Advisory.ArchiveSigners) > 0 && b.Gate(Advisories) == nil {
+		return b
+	}
+	return nil
 }
 
 // Release is one registry row.

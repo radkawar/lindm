@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	"lindm/internal/advisory/advisorydb"
+	"lindm/internal/platform"
 )
 
 // evaluationPending marks a stored evaluation that no longer binds the
@@ -138,7 +140,9 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		copy(token[32:], last[:])
 		response.NextPageToken = base64.RawURLEncoding.EncodeToString(token[:])
 	}
-	if fresh.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
+	// A partial evaluation stays PARTIAL with its vendor reason; only a
+	// complete evaluation is summarised as AFFECTED or CLEAR.
+	if fresh.State == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
 		if len(e.FindingDigest) == sha256.Size {
 			empty := sha256.Sum256(nil)
 			if bytes.Equal(e.FindingDigest, empty[:]) {
@@ -172,6 +176,11 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	unknown := func(reason string) {
 		f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN
 		f.Reason = reason
+		f.UncoveredPackages = 0
+	}
+	if e.State == "partial" {
+		f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL
+		f.UncoveredPackages = uint64(e.UncoveredPackages)
 	}
 	if e.State == "unknown" {
 		unknown(e.Reason)
@@ -259,7 +268,7 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 	if err != nil {
 		return nil, err
 	}
-	out := &adminv1.ListAdvisorySummaryResponse{UnknownDevices: uint64(counts.Total - counts.Evaluated), EvaluatedDevices: uint64(counts.Evaluated)}
+	out := &adminv1.ListAdvisorySummaryResponse{UnknownDevices: uint64(counts.Total - counts.Evaluated - counts.Partial), EvaluatedDevices: uint64(counts.Evaluated), PartialDevices: uint64(counts.Partial)}
 	if len(rows) > int(limit) {
 		last := rows[limit-1]
 		out.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte(last.AdvisoryID + "\x00" + last.Severity))
@@ -272,6 +281,96 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 		return nil, err
 	}
 	return out, nil
+}
+
+// ListUncovered pages the installed packages of a PARTIAL evaluation that the
+// applied base feed does not cover, each with its stable UNKNOWN reason. Any
+// other evaluation state lists nothing: UNKNOWN already covers every package
+// and a complete evaluation has none uncovered.
+func (s *Service) ListUncovered(ctx context.Context, req *adminv1.ListDeviceUncoveredPackagesRequest, unrestricted bool, scopes []byte) (*adminv1.ListDeviceUncoveredPackagesResponse, error) {
+	deviceID, err := uuid.Parse(req.GetDeviceId())
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := advisorydb.New(tx)
+	visible, err := q.AdvisoryDeviceVisible(ctx, advisorydb.AdvisoryDeviceVisibleParams{DeviceID: deviceID, ScopeUnrestricted: unrestricted, Scopes: scopes})
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, ErrNotFound
+	}
+	e, err := q.GetAdvisoryEvaluation(ctx, deviceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if req.GetPageToken() != "" {
+			return nil, ErrConflict
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return &adminv1.ListDeviceUncoveredPackagesResponse{Freshness: &adminv1.AdvisoryFreshness{State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN, Reason: evaluationPending}}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	after := int32(-1)
+	if req.GetPageToken() != "" {
+		data, err := base64.RawURLEncoding.Strict().DecodeString(req.GetPageToken())
+		if err != nil || len(data) != 36 {
+			return nil, ErrInvalid
+		}
+		if !bytes.Equal(data[:16], deviceID[:]) || !bytes.Equal(data[16:32], e.ID[:]) {
+			return nil, ErrConflict
+		}
+		after = int32(binary.BigEndian.Uint32(data[32:]))
+		if after < 0 || after >= maxSnapshotPositions {
+			return nil, ErrInvalid
+		}
+	}
+	fresh, err := s.freshness(ctx, q, e)
+	if err != nil {
+		return nil, err
+	}
+	response := &adminv1.ListDeviceUncoveredPackagesResponse{Freshness: fresh}
+	if fresh.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL && e.SnapshotID != nil {
+		d, err := q.GetAdvisoryDevice(ctx, deviceID)
+		if err != nil {
+			return nil, err
+		}
+		// The current host identity is the evaluated one: a changed host
+		// observation already makes the evaluation pending above.
+		coverage := derivativeCoverage(platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion}))
+		if coverage == nil || coverage.reason != e.Reason {
+			return nil, errors.New("advisory: partial evaluation without its origin policy")
+		}
+		limit := pageSize(req.GetPageSize())
+		rows, err := q.ListAdvisoryUncoveredPackages(ctx, coverage.uncoveredParams(*e.SnapshotID, after, limit+1))
+		if err != nil {
+			return nil, err
+		}
+		for i, row := range rows {
+			if i == int(limit) {
+				var token [36]byte
+				copy(token[:16], deviceID[:])
+				copy(token[16:32], e.ID[:])
+				binary.BigEndian.PutUint32(token[32:], uint32(rows[i-1].Position))
+				response.NextPageToken = base64.RawURLEncoding.EncodeToString(token[:])
+				break
+			}
+			response.Packages = append(response.Packages, &adminv1.UncoveredPackage{Name: row.Name, Version: row.Version, Architecture: row.Architecture, Reason: row.Reason})
+		}
+	} else if req.GetPageToken() != "" {
+		return nil, ErrConflict
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // Accept runs inside the caller's fresh-authorization and device-scope transaction.

@@ -34,11 +34,20 @@ type installerImage struct {
 	// Bump it when either changes: cached installs are never edited in place.
 	version   string
 	memoryMiB int
-	recipe    func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error)
+	// exitOnReboot ends the installer QEMU on a guest reboot request, for
+	// installers whose unattended mode can only reboot (Ubiquity's
+	// noninteractive frontend), so the vendor media never boots twice.
+	exitOnReboot bool
+	recipe       func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error)
 	// bindSources, when set, authenticates network installation sources
 	// outside the ISO. It runs before and after the installer under a phase
 	// label and must fail closed.
 	bindSources func(ctx context.Context, root *os.Root, staging, phase string) error
+	// install, when set, replaces recipe remastering and runImageInstaller for
+	// vendors with a documented unattended path on unmodified media (Omarchy's
+	// cidata drive). It borrows the verified ISO descriptor and must leave the
+	// installed and provisioned disk at <dir>/image.
+	install func(ctx context.Context, dir string, iso *os.File, sourceDigest string, hardware VMHardwareOptions) error
 	// probes run as root inside the first installed boot, after cloud-init
 	// consumed a fresh NoCloud seed.
 	probes []installedProbe
@@ -55,6 +64,15 @@ func installerImageFor(m *labv1.ImageManifest) (*installerImage, error) {
 		return debianInstallerImage(m)
 	case tumbleweedInstallerEdition:
 		return tumbleweedInstallerImage(m)
+	case popInstallerEdition, popEncryptedInstallerEdition:
+		// A live ISO is never a cloud disk: the encrypted-lane edition is
+		// rejected here rather than booted.
+		return popInstallerImage(m)
+	case mintInstallerEdition, mintEncryptedInstallerEdition:
+		return mintInstallerImage(m)
+	case omarchyInstallerEdition, omarchyEncryptedInstallerEdition:
+		// Installer-only media: the encrypted-lane edition is rejected here.
+		return omarchyInstallerImage(m)
 	default:
 		return nil, nil
 	}
@@ -117,18 +135,6 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			return nil, err
 		}
 	}
-	_, loginPublic, err := encryptedKey()
-	if err != nil {
-		return nil, err
-	}
-	hostPrivate, hostPublic, err := encryptedKey()
-	if err != nil {
-		return nil, err
-	}
-	recipe, err := spec.recipe(installerDisk(hardware.StorageBus), hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic)
-	if err != nil {
-		return nil, err
-	}
 	// Pin the exact verified descriptor during remastering. A pathname rename
 	// cannot switch media between the digest check and xorriso's inherited fd.
 	iso, err := openRegular(source.Path)
@@ -143,9 +149,24 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	if actual.SHA256 != source.SHA256 || actual.Size != source.Size {
 		return nil, fmt.Errorf("verified %s installer changed before remastering", spec.label)
 	}
-	installer, err := prepareInstallerFileForMachine(ctx, dir, iso, spec.installer, recipe, hardware.Architecture)
-	if err != nil {
-		return nil, err
+	installer := ""
+	if spec.install == nil {
+		_, loginPublic, err := encryptedKey()
+		if err != nil {
+			return nil, err
+		}
+		hostPrivate, hostPublic, err := encryptedKey()
+		if err != nil {
+			return nil, err
+		}
+		recipe, err := spec.recipe(installerDisk(hardware.StorageBus), hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic)
+		if err != nil {
+			return nil, err
+		}
+		installer, err = prepareInstallerFileForMachine(ctx, dir, iso, spec.installer, recipe, hardware.Architecture)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", "24G"); err != nil {
 		return nil, err
@@ -155,7 +176,12 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			return nil, err
 		}
 	}
-	if err := runImageInstaller(ctx, dir, installer, spec, hardware); err != nil {
+	if spec.install != nil {
+		err = spec.install(ctx, dir, iso, source.SHA256, hardware)
+	} else {
+		err = runImageInstaller(ctx, dir, installer, spec, hardware)
+	}
+	if err != nil {
 		return nil, err
 	}
 	if spec.bindSources != nil {
@@ -290,6 +316,9 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 		"-device", "virtio-scsi-pci,id=installer-scsi", "-device", "scsi-cd,bus=installer-scsi.0,drive=installer,bootindex=0"}
 	if hardware.Architecture == "x86_64" && hardware.Firmware.SecureBoot {
 		args = append(args, "-global", "driver=cfi.pflash01,property=secure,value=on")
+	}
+	if spec.exitOnReboot {
+		args = append(args, "-no-reboot")
 	}
 	args = append(args, vmStorageArguments(hardware, []string{"disk"}, 1)...)
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)

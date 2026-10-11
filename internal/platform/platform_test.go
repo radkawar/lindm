@@ -52,8 +52,20 @@ func TestDerivativeUsesBaseTooling(t *testing.T) {
 	if _, ok := mint.PasswordPins("22.3"); !ok {
 		t.Fatal("Mint lost its base's measured password pins")
 	}
-	if err := mint.Gate(Advisories); err == nil {
-		t.Fatal("derivative inherited its base's advisory feed")
+	// A derivative never names a feed itself: its advisories are the base's
+	// feed restricted to verified base-archive packages, always partial.
+	if len(mint.Advisory.Feeds) != 0 || mint.Advisory.Partial == "" || mint.BaseCoverage() != mint.Native() {
+		t.Fatalf("Mint advisory coverage = %+v", mint.Advisory)
+	}
+	if base := mint.Native(); base.BaseCoverage() != nil {
+		t.Fatal("a base release reported derivative coverage")
+	}
+	omarchy := Identify(OSRelease{ID: "omarchy", VersionID: "4.0.4"})
+	if omarchy.BaseCoverage() != nil || omarchy.Gate(Advisories) == nil {
+		t.Fatal("a derivative without vendor origins inherited its base's advisory feed")
+	}
+	if other := Identify(OSRelease{ID: "linuxmint", VersionID: "22.2"}); other.BaseCoverage() != nil {
+		t.Fatal("an unlisted derivative release gained base coverage")
 	}
 }
 
@@ -125,7 +137,7 @@ func TestRegistryConsistent(t *testing.T) {
 		if (r.Supported(Packages) || r.Supported(Inventory) || r.Supported(Lifecycle)) && n.Packages.Backend == BackendNone {
 			t.Errorf("%s: package capability without a backend", r.Key)
 		}
-		if r.Supported(Advisories) && (len(r.Advisory.Feeds) == 0 || r.Advisory.Ecosystem == "") {
+		if r.Supported(Advisories) && r.BaseCoverage() == nil && (len(r.Advisory.Feeds) == 0 || r.Advisory.Ecosystem == "") {
 			t.Errorf("%s: advisories without a feed", r.Key)
 		}
 		if r.Supported(ReleaseUpgrade) && r.UpgradeTo == "" {
@@ -135,6 +147,9 @@ func TestRegistryConsistent(t *testing.T) {
 			if target, ok := Lookup(r.UpgradeTo); !ok || target.ID != r.ID || len(target.Advisory.Feeds) == 0 || !slices.Equal(target.Advisory.Feeds, r.Advisory.Feeds) || target.Codename == "" {
 				t.Errorf("%s: upgrade target %q is not a same-distribution row with the same advisory feed and a codename", r.Key, r.UpgradeTo)
 			}
+		}
+		if len(r.Advisory.VendorOrigins) != 0 && (r.BaseCoverage() == nil || len(r.Advisory.Feeds) != 0 || r.Advisory.Partial == "") {
+			t.Errorf("%s: vendor origins without a covering base, with own feeds, or not partial", r.Key)
 		}
 		for c := range r.Gates {
 			if !slices.Contains(Capabilities, c) || r.Supported(c) {

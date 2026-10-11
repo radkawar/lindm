@@ -34,7 +34,10 @@ type Config struct {
 	Portal   Portal
 	Capturer Capturer
 	Peers    PeerFactory
-	Logger   *slog.Logger
+	Locks    LockMonitor
+	// CurrentDesktop is the session's XDG_CURRENT_DESKTOP.
+	CurrentDesktop string
+	Logger         *slog.Logger
 }
 
 // Helper is the session helper's executor sync loop and session registry.
@@ -43,7 +46,12 @@ type Helper struct {
 	client agentv1connect.SessionServiceClient
 	deps   *sessionDeps
 	logger *slog.Logger
-	uid    uint32
+	locks  LockMonitor
+	// lockWatch observes lock requests of lockSession, the bound logind
+	// session. Without it no new session starts.
+	lockWatch   LockSubscription
+	lockSession string
+	uid         uint32
 
 	idleInterval   time.Duration
 	activeInterval time.Duration
@@ -68,7 +76,7 @@ func New(config Config) (*Helper, error) {
 }
 
 func newHelper(config Config, uid uint32) (*Helper, error) {
-	if config.Client == nil || config.Notifier == nil || config.Portal == nil || config.Capturer == nil || config.Peers == nil || config.Logger == nil {
+	if config.Client == nil || config.Notifier == nil || config.Portal == nil || config.Capturer == nil || config.Peers == nil || config.Locks == nil || config.Logger == nil {
 		return nil, errors.New("desktop: missing helper dependency")
 	}
 	return &Helper{
@@ -80,6 +88,7 @@ func newHelper(config Config, uid uint32) (*Helper, error) {
 			peers:              config.Peers,
 			logger:             config.Logger,
 			clock:              time.Now,
+			lockReporting:      lockReporting(config.CurrentDesktop),
 			firstPacketTimeout: 10 * time.Second,
 			captureGrace:       time.Second,
 			repostInterval:     2 * time.Second,
@@ -88,6 +97,7 @@ func newHelper(config Config, uid uint32) (*Helper, error) {
 		},
 		logger:         config.Logger,
 		uid:            uid,
+		locks:          config.Locks,
 		idleInterval:   idleSyncInterval,
 		activeInterval: activeSyncInterval,
 		lossTimeout:    executorLossTimeout,
@@ -109,6 +119,9 @@ func (h *Helper) Run(ctx context.Context) error {
 			h.shutdown(base)
 			return nil
 		case <-timer.C:
+		case detail, ok := <-h.lockEvents():
+			// Report the lock at once rather than at the next interval.
+			h.lockObserved(detail, ok)
 		}
 		h.syncOnce(ctx, base)
 		timer.Reset(h.interval())
@@ -125,6 +138,7 @@ func (h *Helper) interval() time.Duration {
 func (h *Helper) shutdown(base context.Context) {
 	h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "helper_stopped")
 	h.group.Wait()
+	h.closeLockWatch()
 	if len(h.sessions) == 0 {
 		return
 	}
@@ -138,6 +152,7 @@ func (h *Helper) shutdown(base context.Context) {
 // syncOnce exchanges reports for directives once. sessionParent is the
 // parent of new session goroutines.
 func (h *Helper) syncOnce(ctx, sessionParent context.Context) {
+	h.drainLocks()
 	call, cancel := context.WithTimeout(ctx, syncCallTimeout)
 	response, err := h.client.SyncSession(call, connect.NewRequest(&agentv1.SyncSessionRequest{Reports: h.reports()}))
 	cancel()
@@ -187,6 +202,65 @@ func (h *Helper) endAll(cause agentv1.AssistanceEndCause, detail string) {
 	}
 }
 
+// lockEvents is the bound session's lock channel, nil without a watch.
+func (h *Helper) lockEvents() <-chan string {
+	if h.lockWatch == nil {
+		return nil
+	}
+	return h.lockWatch.Locked()
+}
+
+// lockObserved ends every session on a lock request; a lost watch ends them
+// too, because a later lock could no longer be observed.
+func (h *Helper) lockObserved(detail string, ok bool) {
+	if !ok {
+		h.logger.Warn("logind lock watch lost", "logind_session", h.lockSession)
+		h.closeLockWatch()
+		h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "lock_watch_lost")
+		return
+	}
+	h.logger.Info("session lock observed", "logind_session", h.lockSession, "detail", detail)
+	h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED, detail)
+}
+
+// drainLocks applies lock requests that arrived since the last sync.
+func (h *Helper) drainLocks() {
+	for h.lockWatch != nil {
+		select {
+		case detail, ok := <-h.lockWatch.Locked():
+			h.lockObserved(detail, ok)
+		default:
+			return
+		}
+	}
+}
+
+// watchLocks keeps one lock watch on the bound logind session.
+func (h *Helper) watchLocks(parent context.Context, sessionID string) {
+	if h.lockWatch != nil && h.lockSession == sessionID {
+		return
+	}
+	h.closeLockWatch()
+	ctx, cancel := context.WithTimeout(parent, syncCallTimeout)
+	defer cancel()
+	watch, err := h.locks.Subscribe(ctx, sessionID)
+	if err != nil {
+		h.logger.Warn("logind lock watch unavailable", "logind_session", sessionID, "err", err)
+		return
+	}
+	h.lockWatch, h.lockSession = watch, sessionID
+}
+
+func (h *Helper) closeLockWatch() {
+	if h.lockWatch == nil {
+		return
+	}
+	if err := h.lockWatch.Close(); err != nil {
+		h.logger.Warn("close logind lock watch", "err", err)
+	}
+	h.lockWatch, h.lockSession = nil, ""
+}
+
 // apply reconciles sessions with the executor's complete directive set.
 func (h *Helper) apply(parent context.Context, response *agentv1.SyncSessionResponse) {
 	local := response.GetLocalSession()
@@ -199,6 +273,7 @@ func (h *Helper) apply(parent context.Context, response *agentv1.SyncSessionResp
 		h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "local_session_changed")
 	}
 	h.boundLocal = local.GetLogindSessionId()
+	h.watchLocks(parent, h.boundLocal)
 
 	present := make(map[string]struct{}, len(response.GetDirectives()))
 	for _, directive := range response.GetDirectives() {
@@ -252,6 +327,11 @@ func (h *Helper) admit(parent context.Context, directive *agentv1.AssistanceDire
 	}
 	if live >= maxSessions || len(h.sessions) >= maxSessions {
 		h.logger.Warn("remote assistance invitation ignored: session limit", "session_id", id)
+		return
+	}
+	if h.lockWatch == nil {
+		// Without a lock watch a lock could go unobserved: never prompt.
+		h.sessions[id] = endedSession(invitation, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "lock_watch_unavailable")
 		return
 	}
 	h.logger.Info("remote assistance invitation received", "session_id", id, "mode", invitation.GetMode().String())

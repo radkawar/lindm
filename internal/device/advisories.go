@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/advisory"
@@ -16,16 +17,30 @@ import (
 )
 
 func (s *Service) ListDeviceFindings(ctx context.Context, req *connect.Request[adminv1.ListDeviceFindingsRequest]) (*connect.Response[adminv1.ListDeviceFindingsResponse], error) {
+	return deviceAdvisoryRead(ctx, s, req, s.advisories.ListDevice)
+}
+
+func (s *Service) ListDeviceUncoveredPackages(ctx context.Context, req *connect.Request[adminv1.ListDeviceUncoveredPackagesRequest]) (*connect.Response[adminv1.ListDeviceUncoveredPackagesResponse], error) {
+	return deviceAdvisoryRead(ctx, s, req, s.advisories.ListUncovered)
+}
+
+// deviceAdvisoryRead authorizes one device-scoped advisory read against the
+// device's fleet scope, then runs it in a bounded in-flight slot.
+func deviceAdvisoryRead[Req any, P interface {
+	*Req
+	proto.Message
+	GetDeviceId() string
+}, Resp any](ctx context.Context, s *Service, req *connect.Request[Req], read func(context.Context, P, bool, []byte) (*Resp, error)) (*connect.Response[Resp], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
 	actor, err := s.require(ctx, identity.PermissionReadFleet)
 	if err != nil {
 		return nil, err
 	}
-	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
+	if req == nil || req.Msg == nil || s.rules.Validate(P(req.Msg)) != nil {
 		return nil, invalid("invalid_advisory_request")
 	}
-	id, err := uuid.Parse(req.Msg.GetDeviceId())
+	id, err := uuid.Parse(P(req.Msg).GetDeviceId())
 	if err != nil {
 		return nil, invalid("invalid_id")
 	}
@@ -43,7 +58,7 @@ func (s *Service) ListDeviceFindings(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapErr(err)
 	}
-	out, err := s.advisories.ListDevice(ctx, req.Msg, unrestricted, scopes)
+	out, err := read(ctx, req.Msg, unrestricted, scopes)
 	if err != nil {
 		return nil, advisoryError(err)
 	}

@@ -17,6 +17,10 @@ SELECT count(*) FILTER (WHERE e.state = 'evaluated' AND e.expires_at > CURRENT_T
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
  AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS evaluated,
+ count(*) FILTER (WHERE e.state = 'partial' AND e.expires_at > CURRENT_TIMESTAMP
+ AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
+ AND e.host_received_at = d.host_received_at AND pa.status = 1
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
@@ -34,14 +38,15 @@ type FleetSummaryAdvisoryDevicesParams struct {
 
 type FleetSummaryAdvisoryDevicesRow struct {
 	Evaluated int64
+	Partial   int64
 	Total     int64
 }
 
-// Same evaluated/unknown population as advisory.CountAdvisoryDevices.
+// Same evaluated/partial/unknown population as advisory.CountAdvisoryDevices.
 func (q *Queries) FleetSummaryAdvisoryDevices(ctx context.Context, arg FleetSummaryAdvisoryDevicesParams) (FleetSummaryAdvisoryDevicesRow, error) {
 	row := q.db.QueryRow(ctx, fleetSummaryAdvisoryDevices, arg.ScopeUnrestricted, arg.Scopes)
 	var i FleetSummaryAdvisoryDevicesRow
-	err := row.Scan(&i.Evaluated, &i.Total)
+	err := row.Scan(&i.Evaluated, &i.Partial, &i.Total)
 	return i, err
 }
 

@@ -54,7 +54,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 	for attempt := 1; ; attempt++ {
 		evaluation, err := s.evaluateOnce(ctx, deviceID)
 		if missing, ok := errors.AsType[*missingFindingSet](err); ok && attempt < evaluationAttempts {
-			if err := s.buildFindingSet(ctx, missing.feedID, missing.snapshotID, missing.digest); err != nil {
+			if err := s.buildFindingSet(ctx, missing.feedID, missing.snapshotID, missing.digest, missing.coverage); err != nil {
 				return advisorydb.AdvisoryEvaluation{}, err
 			}
 			continue
@@ -107,6 +107,11 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	host := platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion})
+	// An exact derivative row selects its base release's feed, restricted to
+	// verified base-archive packages; every other release keeps its own
+	// identity and unrestricted matching.
+	coverage := derivativeCoverage(host)
+	feedOS, feedVersion := feedIdentity(coverage, d.OsID, d.OsVersion)
 	platformStream := ""
 	if host.Advisory.PlatformStreams {
 		platformStream, err = rhelStream(d.HostDetails, d.OsVersion, d.Architecture)
@@ -121,7 +126,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		if err := proto.Unmarshal(feeds[i].ConfigBytes, &source); err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
-		if feed.Applies(&source, d.OsID, d.OsVersion, d.Architecture) && (!host.Advisory.PlatformStreams || platformStream != "" && source.GetPlatformStream() == platformStream) {
+		if feed.Applies(&source, feedOS, feedVersion, d.Architecture) && (!host.Advisory.PlatformStreams || platformStream != "" && source.GetPlatformStream() == platformStream) {
 			selected = &feeds[i]
 			selectedSource = &source
 			break
@@ -206,7 +211,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
 		for _, arch := range architectures {
-			if arch == "" || (arch != "all" && arch != "noarch" && (host.Native().Packages.Backend.PackageDB() != platform.PackageDBPacman || arch != "any") && !feed.Applies(selectedSource, d.OsID, d.OsVersion, arch)) {
+			if arch == "" || (arch != "all" && arch != "noarch" && (host.Native().Packages.Backend.PackageDB() != platform.PackageDBPacman || arch != "any") && !feed.Applies(selectedSource, feedOS, feedVersion, arch)) {
 				unknown("package_architecture_uncovered")
 			}
 		}
@@ -216,12 +221,19 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		if err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
+		if coverage != nil {
+			origins, err := q.AdvisoryOriginDigest(ctx, *d.CurrentSnapshotID)
+			if err != nil {
+				return advisorydb.AdvisoryEvaluation{}, err
+			}
+			digest = coverage.setDigest(digest, origins)
+		}
 		set, err := q.GetAdvisoryFindingSet(ctx, advisorydb.GetAdvisoryFindingSetParams{FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: digest})
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Released before building: this transaction's snapshot cannot
 			// see the new set, and holding its connection and device row lock
 			// while waiting on a shared build would starve the pool.
-			return advisorydb.AdvisoryEvaluation{}, &missingFindingSet{feedID: selected.ID, snapshotID: *d.CurrentSnapshotID, digest: digest}
+			return advisorydb.AdvisoryEvaluation{}, &missingFindingSet{feedID: selected.ID, snapshotID: *d.CurrentSnapshotID, digest: digest, coverage: coverage}
 		}
 		if err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
@@ -229,13 +241,23 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		if set.State != "evaluated" {
 			unknown(set.Reason)
 		}
+		if coverage != nil {
+			// No verified base-archive package at all (historical snapshots,
+			// failed or empty APT lists) establishes no exposure.
+			if d.PackageCount.Valid && set.UncoveredPackages >= d.PackageCount.Int32 {
+				unknown("package_origin_unavailable")
+			}
+			if e.State == "evaluated" {
+				e.State, e.Reason, e.UncoveredPackages = "partial", coverage.reason, set.UncoveredPackages
+			}
+		}
 		e.FindingDigest = set.FindingDigest
 		e.FindingSetID = &set.ID
 	}
 	// Candidate-level uncertainty (including a rejected source record) is
 	// discovered after the fast path above. Reuse its evaluation identity when
 	// evidence is unchanged so pagination does not invalidate itself.
-	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt && bytes.Equal(previous.FindingDigest, e.FindingDigest) && sameID(previous.FindingSetID, e.FindingSetID) {
+	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt && previous.UncoveredPackages == e.UncoveredPackages && bytes.Equal(previous.FindingDigest, e.FindingDigest) && sameID(previous.FindingSetID, e.FindingSetID) {
 		return previous, nil
 	}
 	if err := q.StoreAdvisoryEvaluation(ctx, e); err != nil {
@@ -263,6 +285,9 @@ type missingFindingSet struct {
 	feedID     string
 	snapshotID uuid.UUID
 	digest     []byte
+	// coverage restricts a derivative's base feed to verified-origin
+	// packages; its policy is already bound into digest.
+	coverage *originCoverage
 }
 
 func (*missingFindingSet) Error() string { return "advisory finding set missing" }
@@ -274,7 +299,7 @@ const findingSetBuildTimeout = 2 * time.Minute
 // buildFindingSet matches and commits one missing finding set. Concurrent
 // workers needing the same (feed, generation, package digest) share a single
 // build instead of each matching identical content under row locks.
-func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID uuid.UUID, digest []byte) error {
+func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID uuid.UUID, digest []byte, coverage *originCoverage) error {
 	key := feedID + "\x00" + string(digest)
 	_, err, _ := s.setBuilds.Do(key, func() (any, error) {
 		build, cancel := context.WithTimeout(context.WithoutCancel(ctx), findingSetBuildTimeout)
@@ -298,7 +323,7 @@ func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID
 		if err := proto.Unmarshal(selected.ConfigBytes, &source); err != nil {
 			return nil, err
 		}
-		if _, err := matchFindingSet(build, q, &selected, &source, snapshotID, digest); err != nil {
+		if _, err := matchFindingSet(build, q, &selected, &source, snapshotID, digest, coverage); err != nil {
 			return nil, err
 		}
 		return nil, tx.Commit(build)
@@ -320,12 +345,21 @@ func emptyFindingDigest() []byte {
 // failures persist an UNKNOWN set instead of failing the background job forever
 // on unchanged evidence. Candidates arrive in bounded keyset pages; memory never
 // holds more than one page of record bytes plus the admitted findings.
-func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advisorydb.AdvisoryFeed, selectedSource *advisoryv1.FeedSource, snapshotID uuid.UUID, packageDigest []byte) (advisorydb.AdvisoryFindingSet, error) {
+func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advisorydb.AdvisoryFeed, selectedSource *advisoryv1.FeedSource, snapshotID uuid.UUID, packageDigest []byte, coverage *originCoverage) (advisorydb.AdvisoryFindingSet, error) {
 	set := advisorydb.AdvisoryFindingSet{ID: uuid.New(), FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: packageDigest, State: "evaluated"}
 	unknown := func(reason string) {
 		if set.State != "unknown" {
 			set.State = "unknown"
 			set.Reason = reason
+		}
+	}
+	// Uncovered packages are excluded from matching, so a vendor rebuild can
+	// never appear affected or clear by base advisories.
+	var uncovered []bool
+	if coverage != nil {
+		var err error
+		if uncovered, set.UncoveredPackages, err = coverage.uncovered(ctx, q, snapshotID); err != nil {
+			return set, err
 		}
 	}
 	findings := make(map[uuid.UUID]advisorydb.InsertAdvisorySetFindingsParams)
@@ -339,6 +373,9 @@ matching:
 			return set, err
 		}
 		for _, row := range rows {
+			if uncovered != nil && row.Position >= 0 && row.Position < maxSnapshotPositions && uncovered[row.Position] {
+				continue
+			}
 			var record advisoryv1.Advisory
 			if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
 				unknown("advisory_record_invalid")
@@ -454,7 +491,7 @@ matching:
 	}
 	set.FindingDigest = hash.Sum(nil)
 	set.FindingCount = int32(len(ordered))
-	if err := q.InsertAdvisoryFindingSet(ctx, advisorydb.InsertAdvisoryFindingSetParams{ID: set.ID, FeedID: set.FeedID, FeedRevision: set.FeedRevision, PackageDigest: set.PackageDigest, State: set.State, Reason: set.Reason, FindingDigest: set.FindingDigest, FindingCount: set.FindingCount, CriticalCount: set.CriticalCount, HighCount: set.HighCount, MediumCount: set.MediumCount, LowCount: set.LowCount, OtherCount: set.OtherCount}); err != nil {
+	if err := q.InsertAdvisoryFindingSet(ctx, advisorydb.InsertAdvisoryFindingSetParams{ID: set.ID, FeedID: set.FeedID, FeedRevision: set.FeedRevision, PackageDigest: set.PackageDigest, State: set.State, Reason: set.Reason, FindingDigest: set.FindingDigest, FindingCount: set.FindingCount, CriticalCount: set.CriticalCount, HighCount: set.HighCount, MediumCount: set.MediumCount, LowCount: set.LowCount, OtherCount: set.OtherCount, UncoveredPackages: set.UncoveredPackages}); err != nil {
 		return set, err
 	}
 	if _, err := q.InsertAdvisorySetFindings(ctx, ordered); err != nil {

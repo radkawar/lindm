@@ -148,7 +148,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 			return result, errors.New("DNF update lane requires SELinux Enforcing")
 		}
 	}
-	packages, err := newNativeGuestPackages(ctx, vm, built.first, built.second, built.apt, built.publicKey, built.fingerprint)
+	packages, err := newNativeGuestPackages(ctx, vm, built.first, built.second, built.apt, built.publicKey, built.fingerprint, built.arch...)
 	if err != nil {
 		return result, err
 	}
@@ -438,8 +438,12 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 func updateChannel(artifact packaging.Artifact, generation uint64, paused bool, percentage uint32) (*updatev1.AgentUpdateChannel, string) {
 	name := "packages/lindm-agent/" + artifact.Architecture.GOARCH + "/" + filepath.Base(artifact.Path)
 	native := artifact.Version
-	if artifact.Format == packaging.FormatRPM {
+	switch artifact.Format {
+	case packaging.FormatRPM:
 		native += "-" + packaging.RPMRelease
+	case packaging.FormatArch:
+		// pacman reports pkgver-pkgrel; lindm packages use pkgrel 1.
+		native += "-1"
 	}
 	now := time.Now().UTC()
 	return &updatev1.AgentUpdateChannel{Ring: "canary", Paused: paused, EligiblePercentage: percentage, Generation: generation, IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(time.Hour)), Artifacts: []*updatev1.AgentUpdateArtifact{{Version: artifact.Version, Architecture: artifact.Architecture.GOARCH, PackageFormat: string(artifact.Format), TargetPath: name, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1, NativeVersion: native}}}, name
@@ -473,8 +477,11 @@ func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestP
 		return err
 	}
 	manager := agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT
-	if packages.backend.DNF() {
+	switch {
+	case packages.backend.DNF():
 		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_DNF
+	case packages.backend == platform.BackendPacman:
+		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN
 	}
 	cfg.Updates = &agentv1.AgentUpdateConfig{RepositoryUrl: "https://localhost:18444/updates/", Ring: "canary", PollIntervalSeconds: 1, Manager: manager}
 	data, err = protojson.Marshal(cfg)
@@ -643,7 +650,7 @@ func saveUpdateFailure(ctx context.Context, vm *guestVM, directory string) error
 	var result guestCommandResult
 	if err == nil {
 		defer func() { _ = probe.client.Close() }()
-		command := "sudo -n sh -c " + nativeQuote("cat /proc/sys/kernel/random/boot_id /proc/uptime /proc/loadavg; free -m; ps -eo pid,ppid,stat,comm; if command -v dpkg-query >/dev/null; then dpkg-query -W apt dpkg systemd; else rpm -q dnf dnf5 rpm systemd; fi; "+packaging.BinaryPath+" update-status; systemctl show ssh.service sshd.service lindm-executor.service lindm-agent.service lindm-agent-update-recovery.service -p Id -p ActiveState -p SubState -p MainPID -p NRestarts -p ExecMainStartTimestamp -p ExecMainStatus; journalctl -b --no-pager -o short-monotonic -n 240 -u ssh.service -u sshd.service -u lindm-executor.service -u lindm-agent.service -u 'lindm-agent-update-*'; journalctl -b -k --no-pager -n 80")
+		command := "sudo -n sh -c " + nativeQuote("cat /proc/sys/kernel/random/boot_id /proc/uptime /proc/loadavg; free -m; ps -eo pid,ppid,stat,comm; if command -v dpkg-query >/dev/null; then dpkg-query -W apt dpkg systemd; elif command -v pacman >/dev/null; then pacman -Q pacman systemd; else rpm -q dnf dnf5 rpm systemd; fi; "+packaging.BinaryPath+" update-status; systemctl show ssh.service sshd.service lindm-executor.service lindm-agent.service lindm-agent-update-recovery.service -p Id -p ActiveState -p SubState -p MainPID -p NRestarts -p ExecMainStartTimestamp -p ExecMainStatus; journalctl -b --no-pager -o short-monotonic -n 240 -u ssh.service -u sshd.service -u lindm-executor.service -u lindm-agent.service -u 'lindm-agent-update-*'; journalctl -b -k --no-pager -n 80")
 		result, err = probe.runResult(ctx, command, nil, 512<<10, 30*time.Second)
 	}
 	failure := ""

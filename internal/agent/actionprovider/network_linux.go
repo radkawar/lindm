@@ -257,29 +257,69 @@ func (p *Provider) applyQuarantine(ctx context.Context, plan *agentv1.DeviceActi
 func sessionLockEvidence() string {
 	return "logind D-Bus LockSessions requested; all remaining graphical sessions acknowledge LockedHint. This is not boot lock or physical desktop visibility proof."
 }
+
+// sessionLockUnreportedEvidence is the visible result when logind accepted the
+// lock request but a graphical session never reported LockedHint. logind only
+// relays the request; the desktop's own locker must engage and report. Lockers
+// that never call SetLockedHint (for example cinnamon-screensaver on Cinnamon
+// 6.6, cosmic-greeter, or a Hyprland session without a logind Lock listener)
+// leave lindm unable to tell a locked screen from an unlocked one.
+func sessionLockUnreportedEvidence(window time.Duration) string {
+	return "session_lock_state_unreported: logind D-Bus LockSessions was accepted, but at least one graphical session did not report LockedHint within " + window.String() + ". The desktop's locker may or may not have engaged; this desktop does not report lock state to logind, so lindm cannot verify the session lock."
+}
+
 func quarantineEvidence(seconds uint32) string {
 	return "Native nft quarantine observed; kernel active-set automatic rollback after " + strconv.FormatUint(uint64(seconds), 10) + " seconds. Management reachability requires successful transport delivery; delivery loss remains unknown."
 }
 
+// sessionLockAcknowledgement bounds how long a desktop may take to report
+// LockedHint after logind relays LockSessions.
+const sessionLockAcknowledgement = 5 * time.Second
+
+// errSessionLockUnreported reports that the acknowledgement window elapsed
+// with the executor still running: a definite observation, not an interruption.
+var errSessionLockUnreported = errors.New("session_lock_state_unreported")
+
+func (p *Provider) lockWindow() time.Duration {
+	if p.lockWait > 0 {
+		return p.lockWait
+	}
+	return sessionLockAcknowledgement
+}
+
 // logind dispatches the lock request asynchronously to each graphical session.
 // Observe its acknowledgement with a deadline; never repeat the lock effect.
+// When the window elapses, the last observation is returned with
+// errSessionLockUnreported; cancellation of ctx remains an unknown outcome.
 func (p *Provider) awaitSessionLock(ctx context.Context, spec *agentv1.DeviceActionSpec) (*agentv1.DeviceActionObservation, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	window := p.lockWindow()
+	wait, cancel := context.WithTimeout(ctx, window)
 	defer cancel()
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
+	var last *agentv1.DeviceActionObservation
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, errors.Join(ErrOutcomeUnknown, ctx.Err())
+		case <-wait.Done():
+			if ctx.Err() != nil {
+				return nil, errors.Join(ErrOutcomeUnknown, ctx.Err())
+			}
+			if last == nil {
+				return nil, errors.Join(ErrOutcomeUnknown, errSessionLockUnreported)
+			}
+			return last, errSessionLockUnreported
 		case <-ticker.C:
-			observation, err := p.observe(ctx, spec)
+			observation, err := p.observe(wait, spec)
 			if err != nil {
+				if wait.Err() != nil && ctx.Err() == nil {
+					continue
+				}
 				return nil, errors.Join(ErrOutcomeUnknown, err)
 			}
 			if observation.GetSessionsLocked() {
 				return observation, nil
 			}
+			last = observation
 		}
 	}
 }

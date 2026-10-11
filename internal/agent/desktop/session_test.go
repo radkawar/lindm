@@ -201,6 +201,45 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 	})
 }
 
+// A desktop whose portal lacks the requested interface (Cinnamon's
+// xdg-desktop-portal-xapp has no ScreenCast; xdg-desktop-portal-hyprland has no
+// RemoteDesktop) ends the session UNAVAILABLE before any consent prompt, and a
+// CONTROL request is never downgraded to VIEW.
+func TestPortalCapabilityGateRefusesBeforeConsent(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mode   agentv1.AssistanceMode
+		detail string
+	}{
+		{"no_screencast", modeView, "portal_screencast_unavailable"},
+		{"no_remote_desktop", modeControl, "portal_remote_desktop_unavailable"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.portal.refuse = map[agentv1.AssistanceMode]error{test.mode: unavailable(test.detail, errors.New("org.freedesktop.DBus.Error.InvalidArgs"))}
+			h.sync(directiveFor(invitation(test.mode, time.Minute, 10*time.Minute)))
+			report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+			if report.GetEndDetail() != test.detail || report.GetControlGranted() {
+				t.Fatalf("detail = %q control=%v", report.GetEndDetail(), report.GetControlGranted())
+			}
+			select {
+			case notice := <-h.notifier.posted:
+				t.Fatalf("posted %q for a mode the portal cannot serve", notice.notification.Summary)
+			default:
+			}
+			if h.portal.openCount() != 0 {
+				t.Fatal("portal dialog opened for a refused mode")
+			}
+		})
+	}
+	t.Run("view_unaffected_by_missing_remote_desktop", func(t *testing.T) {
+		h := newHarness(t)
+		h.portal.refuse = map[agentv1.AssistanceMode]error{modeControl: unavailable("portal_remote_desktop_unavailable", nil)}
+		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
+		h.notifier.next(t, "Remote assistance request")
+	})
+}
+
 func TestPortalClosedEndsSession(t *testing.T) {
 	h := newHarness(t)
 	h.offered(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))

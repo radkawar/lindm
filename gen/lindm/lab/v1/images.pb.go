@@ -38,6 +38,12 @@ const (
 	// Debian SHA512SUMS plus detached OpenPGP signature. Authenticate SHA-512
 	// against signed metadata while retaining the required SHA-256 pin/cache key.
 	ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 ChecksumMode = 4
+	// Detached OpenPGP signature over the exact image bytes (for example
+	// Omarchy's `.iso.sig`). gpgv verifies the streamed bytes while the same
+	// single pass checks the required SHA-256 pin; offline reuse repeats both.
+	// The checksum URL names the vendor's unsigned SHA-256 sidecar, which must
+	// agree with the pin but is never treated as authentication.
+	ChecksumMode_CHECKSUM_MODE_DETACHED_IMAGE ChecksumMode = 5
 )
 
 // Enum value maps for ChecksumMode.
@@ -48,6 +54,7 @@ var (
 		2: "CHECKSUM_MODE_CLEARSIGNED",
 		3: "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
 		4: "CHECKSUM_MODE_DETACHED_SHA512",
+		5: "CHECKSUM_MODE_DETACHED_IMAGE",
 	}
 	ChecksumMode_value = map[string]int32{
 		"CHECKSUM_MODE_UNSPECIFIED":          0,
@@ -55,6 +62,7 @@ var (
 		"CHECKSUM_MODE_CLEARSIGNED":          2,
 		"CHECKSUM_MODE_VENDOR_AUTHENTICATED": 3,
 		"CHECKSUM_MODE_DETACHED_SHA512":      4,
+		"CHECKSUM_MODE_DETACHED_IMAGE":       5,
 	}
 )
 
@@ -280,7 +288,7 @@ var File_lindm_lab_v1_images_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc9\x10\n" +
+	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xe4\x10\n" +
 	"\rImageManifest\x120\n" +
 	"\x02id\x18\x01 \x01(\tB \xbaH\x1dr\x1b\x10\x01\x18d2\x15^[a-z0-9][a-z0-9.-]*$R\x02id\x12-\n" +
 	"\fdistribution\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\fdistribution\x12#\n" +
@@ -302,17 +310,18 @@ const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\fchecksumMode\x12C\n" +
 	"\x15signer_provenance_url\x18\x10 \x01(\tB\x0f\xbaH\f\xd8\x01\x01r\a\x88\xb5\x18\x01\x88\x01\x01R\x13signerProvenanceUrl\x12B\n" +
 	"\x16release_provenance_url\x18\x11 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x14releaseProvenanceUrl\x12y\n" +
-	"\x18repository_snapshot_date\x18\x12 \x01(\tB:\xbaH7r523^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$H\x01R\x16repositorySnapshotDate\x88\x01\x01:\xbe\a\xbaH\xba\a\x1a\x94\x06\n" +
-	"\x14image.signature_mode\x12|signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims\x1a\xfd\x04this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))\x1a\xa0\x01\n" +
+	"\x18repository_snapshot_date\x18\x12 \x01(\tB:\xbaH7r523^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$H\x01R\x16repositorySnapshotDate\x88\x01\x01:\xd9\a\xbaH\xd5\a\x1a\xaf\x06\n" +
+	"\x14image.signature_mode\x12|signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims\x1a\x98\x05this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4 || this.checksum_mode == 5) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))\x1a\xa0\x01\n" +
 	"\x1eimage.arch_repository_snapshot\x12;Arch Linux images require a pinned repository snapshot date\x1aAthis.distribution != 'arch' || has(this.repository_snapshot_date)B\x10\n" +
 	"\x0e_signature_urlB\x1b\n" +
-	"\x19_repository_snapshot_date*\xb3\x01\n" +
+	"\x19_repository_snapshot_date*\xd5\x01\n" +
 	"\fChecksumMode\x12\x1d\n" +
 	"\x19CHECKSUM_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16CHECKSUM_MODE_DETACHED\x10\x01\x12\x1d\n" +
 	"\x19CHECKSUM_MODE_CLEARSIGNED\x10\x02\x12&\n" +
 	"\"CHECKSUM_MODE_VENDOR_AUTHENTICATED\x10\x03\x12!\n" +
-	"\x1dCHECKSUM_MODE_DETACHED_SHA512\x10\x04B\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
+	"\x1dCHECKSUM_MODE_DETACHED_SHA512\x10\x04\x12 \n" +
+	"\x1cCHECKSUM_MODE_DETACHED_IMAGE\x10\x05B\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
 
 var (
 	file_lindm_lab_v1_images_proto_rawDescOnce sync.Once

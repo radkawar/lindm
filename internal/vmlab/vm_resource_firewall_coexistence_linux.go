@@ -31,7 +31,7 @@ import (
 // exists. UFW (iptables-nft) admits SSH and the oracle ports; Debian installs
 // its own archive's ufw, which no installer task selects. firewalld is
 // installed and enabled with its default zone, whose ports provisioning opens.
-const firewallNativeManagerScript = `. /etc/os-release
+const firewallNativeManagerScript = nativeOSRelease + `
 case "$ID" in
 ubuntu|debian)
  command -v ufw >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y ufw >/dev/null

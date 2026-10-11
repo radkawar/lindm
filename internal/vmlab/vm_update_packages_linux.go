@@ -28,6 +28,7 @@ type updatePackageFixture struct {
 	first        packaging.Artifact
 	second       packaging.Artifact
 	apt          *packaging.APTRepository
+	arch         []*packaging.ArchRepository
 	publicKey    string
 	fingerprint  string
 }
@@ -46,8 +47,8 @@ func buildUpdatePackages(ctx context.Context, repository, work string, release *
 	if err != nil {
 		return nil, err
 	}
-	if format != packaging.FormatDEB && format != packaging.FormatRPM {
-		return nil, errors.New("update lane requires DEB or RPM packages")
+	if format != packaging.FormatDEB && format != packaging.FormatRPM && format != packaging.FormatArch {
+		return nil, errors.New("update lane requires DEB, RPM or pacman packages")
 	}
 	fixture := new(updatePackageFixture)
 	source := filepath.Join(work, "source")
@@ -86,6 +87,20 @@ func buildUpdatePackages(ctx context.Context, repository, work string, release *
 			return nil, err
 		}
 		fixture.publicKey = fixture.apt.PublicKeyArmor
+	}
+	if format == packaging.FormatArch {
+		// A pacman repository holds one version per package name. Only the
+		// initial install uses it; the update arrives through the signed TUF
+		// catalog and the agent's own pacman transaction.
+		out := filepath.Join(work, "arch-repo")
+		if err := os.Mkdir(out, 0o700); err != nil {
+			return nil, err
+		}
+		repo, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: out, Packages: []string{fixture.first.Path}, Signer: *signer})
+		if err != nil {
+			return nil, err
+		}
+		fixture.arch, fixture.publicKey = []*packaging.ArchRepository{repo}, repo.PublicKeyArmor
 	}
 	serverOut := filepath.Join(work, "server")
 	if err := os.Mkdir(serverOut, 0o700); err != nil {

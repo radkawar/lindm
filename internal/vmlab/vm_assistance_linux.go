@@ -60,22 +60,27 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		return nil, err
 	}
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
-	if err := release.Gate(platform.Assistance); err != nil {
+	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
+	if err != nil {
 		return nil, err
 	}
-	if options.Encrypted.Desktop != "gnome" || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
-		return nil, errors.New("assistance lane requires the installer GNOME desktop, a lab display and signed-package egress")
+	if err := assistanceAdmission(release, desktop); err != nil {
+		return nil, err
+	}
+	if options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
+		return nil, errors.New("assistance lane requires an installer desktop, a lab display and signed-package egress")
 	}
 	evidence, err := newAssistanceEvidence(options.EvidenceDir)
 	if err != nil {
 		return nil, err
 	}
-	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: manifest.GetDistribution(), Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
+	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: manifest.GetDistribution(), DesktopProfile: desktop.name, Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
 		"One disposable QEMU guest (virtio-gpu, usb-tablet, virtual keyboard); local-user consent and stop clicks are QMP absolute-pointer input located from QMP screendumps, not a human at a physical display.",
 		"Relayed media stays on the lab host: guest UDP reaches the embedded TURN listener through QEMU user networking (10.0.2.2 to host loopback); NAT traversal, public relays and multi-host paths are not qualified.",
 		"The operator browser is headless Playwright Chromium on the lab host with a virtual WebAuthn authenticator; other browsers are not qualified by this lane.",
 		"Media and control proofs are the console's own WebRTC statistics and decoded frames plus a guest-side typed nonce; video quality, latency and bandwidth are not qualified.",
-		"GNOME idle blanking and automatic lock are disabled in the lab session; the lock scenario uses loginctl lock-session.",
+		"Idle blanking and automatic lock are disabled in the lab " + desktop.name + " session; the lock scenario uses loginctl lock-session.",
+		"Scenarios that must end UNAVAILABLE prove the visible refusal before consent on this desktop, not that the capability works.",
 	}}
 	if options.ControlPlane != nil {
 		options.ConsoleTURNTCP = true
@@ -101,7 +106,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	defer cancel(nil)
 	deadline := time.AfterFunc(2*time.Hour, func() { cancel(errors.New("assistance lane exceeded its 2h bound")) })
 	defer deadline.Stop()
-	scenarios, err := selectAssistanceScenarios(options.Scenarios)
+	scenarios, err := selectAssistanceScenarios(desktop.assistance, options.Scenarios)
 	if err != nil {
 		return result, err
 	}
@@ -196,13 +201,16 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := waitNativeActionPresence(ctx, control.session, result.DeviceID); err != nil {
 		return result, err
 	}
-	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, release); err != nil {
+	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, desktop, release); err != nil {
 		return result, err
 	}
-	if err := waitAssistanceSessionUnit(ctx, vm.guest, result.Guest); err != nil {
+	if err := waitAssistanceSessionUnit(ctx, vm.guest, desktop, result.Guest); err != nil {
 		return result, err
 	}
 	if result.Guest.Packages, err = observeAssistancePackages(ctx, vm.guest, release); err != nil {
+		return result, err
+	}
+	if result.Guest.Capabilities, err = observeAssistanceCapabilities(ctx, vm.guest, desktop); err != nil {
 		return result, err
 	}
 	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
@@ -212,7 +220,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Username: assistanceOperator}
 	var scenarioErr error
 	if len(scenarios) != 0 {
-		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, deviceID: result.DeviceID, turnTCP: options.ConsoleTURNTCP}, fixture, options, scenarios)
+		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, desktop: desktop, deviceID: result.DeviceID, turnTCP: options.ConsoleTURNTCP}, fixture, options, scenarios)
 	}
 	// Device journals are recorded for failures too: they are the product
 	// slices' diagnostic for a wrong end cause.
@@ -274,19 +282,22 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 	return nil
 }
 
-// selectAssistanceScenarios keeps lane order and rejects unknown names.
-func selectAssistanceScenarios(names []string) ([]assistanceScenarioSpec, error) {
+// selectAssistanceScenarios keeps the desktop's lane order and rejects
+// unknown names.
+func selectAssistanceScenarios(available []assistanceScenarioSpec, names []string) ([]assistanceScenarioSpec, error) {
 	if names == nil {
-		return assistanceScenarios, nil
+		return available, nil
 	}
 	selected := make([]assistanceScenarioSpec, 0, len(names))
-	for _, spec := range assistanceScenarios {
+	known := make([]string, 0, len(available))
+	for _, spec := range available {
+		known = append(known, spec.name)
 		if slices.Contains(names, spec.name) {
 			selected = append(selected, spec)
 		}
 	}
 	if len(selected) != len(names) {
-		return nil, errors.New("assistance scenarios must be distinct names from control, view, decline, portal-cancel, lock")
+		return nil, fmt.Errorf("assistance scenarios must be distinct names from %s", strings.Join(known, ", "))
 	}
 	return selected, nil
 }
@@ -317,6 +328,9 @@ type assistanceScenarioSpec struct {
 	// portalCancel accepts the product prompt, then cancels the desktop's own
 	// portal dialog instead (also DECLINED, without consent).
 	portalCancel bool
+	// detail is the exact UNAVAILABLE end detail of a session the desktop
+	// cannot serve; such a session must end before any consent prompt.
+	detail string
 }
 
 var assistanceScenarios = []assistanceScenarioSpec{
@@ -327,14 +341,30 @@ var assistanceScenarios = []assistanceScenarioSpec{
 	{name: "lock", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED},
 }
 
+// unavailableScenarios are a desktop's visible pre-consent refusals.
+func unavailableScenarios(view, control string) []assistanceScenarioSpec {
+	return []assistanceScenarioSpec{
+		{name: "view-unavailable", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, detail: view},
+		{name: "control-unavailable", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, detail: control},
+	}
+}
+
 // assistanceAuditExpectations are the audit actions each scenario must leave,
 // in addition to assistance.end carrying its cause.
 var assistanceAuditExpectations = map[string][]string{
-	"control":       {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.stop"},
-	"view":          {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
-	"lock":          {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
-	"decline":       {"assistance.request", "assistance.prompt"},
-	"portal-cancel": {"assistance.request", "assistance.prompt"},
+	"control":             {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.stop"},
+	"view":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"lock":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"decline":             {"assistance.request", "assistance.prompt"},
+	"portal-cancel":       {"assistance.request", "assistance.prompt"},
+	"view-unavailable":    {"assistance.request"},
+	"control-unavailable": {"assistance.request"},
+}
+
+// assistanceAuditForbidden are audit actions a scenario must never leave.
+var assistanceAuditForbidden = map[string][]string{
+	"view-unavailable":    {"assistance.prompt", "assistance.consent", "assistance.start"},
+	"control-unavailable": {"assistance.prompt", "assistance.consent", "assistance.start"},
 }
 
 func assistanceCauseText(cause agentv1.AssistanceEndCause) string {
@@ -343,4 +373,20 @@ func assistanceCauseText(cause agentv1.AssistanceEndCause) string {
 
 func assistanceStateText(state adminv1.AssistanceState) string {
 	return strings.ToLower(strings.TrimPrefix(state.String(), "ASSISTANCE_STATE_"))
+}
+
+// assistanceAdmission requires the registry and the desktop profile to agree:
+// a supported release runs the live scenarios, and a release whose registry
+// gates assistance runs only its desktop's pre-consent refusals, which prove
+// the gate's visible product behaviour rather than a capability.
+func assistanceAdmission(release *platform.Release, desktop *labDesktop) error {
+	refusalOnly := len(desktop.assistance) != 0 && !slices.ContainsFunc(desktop.assistance, func(spec assistanceScenarioSpec) bool { return spec.detail == "" })
+	gate := release.Gate(platform.Assistance)
+	switch {
+	case refusalOnly && gate == nil:
+		return fmt.Errorf("%s supports assistance in the registry, but the %s lab desktop refuses every session", release.Name, desktop.name)
+	case !refusalOnly && gate != nil:
+		return gate
+	}
+	return nil
 }

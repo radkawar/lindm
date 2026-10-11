@@ -21,7 +21,7 @@ func runVMEncrypted(ctx context.Context, args []string, stdout, stderr io.Writer
 	flags.StringVar(&hardware.StorageBus, "storage-bus", "virtio-blk", "virtio-blk, virtio-scsi, nvme or sata")
 	flags.IntVar(&hardware.ExtraDisks, "extra-disks", 0, "additional owned 1 GiB blank disks, zero to four")
 	flags.BoolVar(&hardware.TPM, "tpm", true, "attach per-machine swtpm TPM 2.0; false proves absence")
-	flags.StringVar(&options.Desktop, "desktop", "", "native installer desktop: gnome or kde; empty is headless; Ubuntu desktop media require gnome")
+	flags.StringVar(&options.Desktop, "desktop", "", "native installer desktop: gnome or kde; empty is headless; Ubuntu desktop media require gnome; Omarchy always installs its hyprland desktop (empty or hyprland)")
 	flags.BoolVar(&options.TPMBoot, "tpm-boot", false, "install systemd/dracut TPM-capable boot path without enrolling a token")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified official ISO cache")
 	flags.StringVar(&options.GoldenDir, "golden-cache", ".cache/lab/encrypted", "private immutable encrypted golden machine cache")

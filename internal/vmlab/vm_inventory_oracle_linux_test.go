@@ -5,6 +5,8 @@ package vmlab
 import (
 	"math"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -322,6 +324,31 @@ func TestNativeApplicationsCompareArchitectureAndVersion(t *testing.T) {
 	actual.Flatpak.Applications[0].Version.Value = "wrong"
 	if err := compareVMDetails(platform.ForManifest("ubuntu", "24.04"), "x86_64", before, after, actual); err == nil {
 		t.Fatal("accepted wrong application version")
+	}
+}
+
+// The root agent lists Flatpak applications through nativeexec's fixed clean
+// environment. The oracle must observe with the same privilege: on Linux Mint
+// 22.3 the lab user's listing failed natively while the root agent's succeeded.
+func TestNativeFlatpakTruthUsesAgentPrivilegeAndEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	sudo := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$0.args\"\nprintf 'org.example.App\\t1.0\\tx86_64\\n'\n"
+	if err := os.WriteFile(filepath.Join(dir, "sudo"), []byte(sudo), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("/bin/sh", "-c", flatpakTruthCommand)
+	cmd.Env = []string{"PATH=" + dir}
+	output, err := cmd.Output()
+	if err != nil || string(output) != "org.example.App\t1.0\tx86_64\n" {
+		t.Fatalf("root listing output was not passed through: %q %v", output, err)
+	}
+	args, err := os.ReadFile(filepath.Join(dir, "sudo.args"))
+	if err != nil {
+		t.Fatal("Flatpak truth did not run through noninteractive sudo")
+	}
+	want := "-n\nenv\n-i\nPATH=/usr/sbin:/usr/bin\nLANG=C\nLC_ALL=C\nHOME=/\nTZ=UTC\nflatpak\nlist\n--system\n--app\n--columns=application,version,arch\n"
+	if string(args) != want {
+		t.Fatalf("Flatpak truth privilege/environment differs from the root agent: %q", args)
 	}
 }
 

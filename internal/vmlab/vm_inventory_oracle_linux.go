@@ -1065,8 +1065,14 @@ func (o vmInventoryOracle) backends() (*inventoryv1.BackendDetails, error) {
 	return result, nil
 }
 
+// flatpakTruthCommand lists system applications with the root executor's
+// privilege and exact native environment. On Linux Mint 22.3 the same listing
+// as the unprivileged lab user was a native command failure while the root
+// agent's succeeded; privilege, not the installation, differed.
+const flatpakTruthCommand = "sudo -n env -i PATH=/usr/sbin:/usr/bin LANG=C LC_ALL=C HOME=/ TZ=UTC flatpak list --system --app --columns=application,version,arch"
+
 func (o vmInventoryOracle) applications(backend string) (*inventoryv1.ApplicationDetails, error) {
-	command := "flatpak list --system --app --columns=application,version,arch"
+	command := flatpakTruthCommand
 	if backend == "snap" {
 		// An installed daemon with no snaps reports only this informational
 		// stderr; that is an empty collection. Any other stderr still fails.

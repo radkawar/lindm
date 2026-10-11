@@ -170,9 +170,10 @@ func firewallTargets(public ed25519.PublicKey) []*agentv1.ConnectivityProbeTarge
 
 // firewallLinkScript assigns persistent static addresses to the NIC with the
 // exact permanent MAC and prints its kernel name once both are usable.
-// Ubuntu's netplan renders systemd-networkd; Debian installer images use
-// ifupdown, whose interfaces file sources interfaces.d; Fedora/EL use
-// NetworkManager.
+// An active NetworkManager (Fedora/EL and desktop installs such as Linux
+// Mint) owns the link; otherwise Ubuntu's netplan renders systemd-networkd and
+// Debian installer images use ifupdown, whose interfaces file sources
+// interfaces.d.
 const firewallLinkScript = `set -eu
 mac=$1; v4=$2; v6=$3
 ifname=
@@ -180,6 +181,30 @@ for path in /sys/class/net/*; do
  if test "$(cat "$path/address")" = "$mac" && test "$(cat "$path/addr_assign_type")" = 0; then ifname=${path##*/}; fi
 done
 test -n "$ifname"
+if systemctl is-active --quiet NetworkManager.service; then
+ cat > /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection <<EOF
+[connection]
+id=lindm-lab-peer-link
+type=ethernet
+autoconnect=true
+autoconnect-priority=100
+
+[ethernet]
+mac-address=$mac
+
+[ipv4]
+method=manual
+address1=$v4/24
+
+[ipv6]
+method=manual
+address1=$v6/64
+EOF
+ chmod 0600 /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection
+ if command -v restorecon >/dev/null 2>&1; then restorecon -F /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection; fi
+ nmcli connection reload
+ nmcli connection up lindm-lab-peer-link >/dev/null
+else
 . /etc/os-release
 case "$ID" in
 ubuntu)
@@ -222,32 +247,9 @@ EOF
  chmod 0644 /etc/network/interfaces.d/lindm-lab-peer-link
  ifup "$ifname"
  ;;
-fedora|rhel|almalinux|rocky)
- cat > /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection <<EOF
-[connection]
-id=lindm-lab-peer-link
-type=ethernet
-autoconnect=true
-autoconnect-priority=100
-
-[ethernet]
-mac-address=$mac
-
-[ipv4]
-method=manual
-address1=$v4/24
-
-[ipv6]
-method=manual
-address1=$v6/64
-EOF
- chmod 0600 /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection
- restorecon -F /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection
- nmcli connection reload
- nmcli connection up lindm-lab-peer-link >/dev/null
- ;;
 *) exit 1 ;;
 esac
+fi
 i=0
 until ip -4 -o addr show dev "$ifname" | grep -qF " $v4/24" && ip -6 -o addr show dev "$ifname" | grep -qF " $v6/64" && test -z "$(ip -6 -o addr show dev "$ifname" tentative)"; do
  i=$((i+1)); test "$i" -lt 120; sleep 0.5
@@ -551,6 +553,10 @@ systemctl enable --now lindm-lab-firewall-baseline.service lindm-lab-firewall-li
 i=0
 until test "$(ss -Hltn '( sport = :8080 or sport = :8081 or sport = :8083 )' | wc -l)" -ge 3; do i=$((i+1)); test "$i" -lt 60; sleep 0.5; done
 `
+	script, err = vm.nativeScript(script)
+	if err != nil {
+		return nil, err
+	}
 	if err := lifecycleCommand(ctx, vm, "activate native firewall manager and install lab baseline and oracle listener", script); err != nil {
 		return nil, err
 	}

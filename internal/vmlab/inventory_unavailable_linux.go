@@ -43,6 +43,9 @@ var inventoryUnavailableRules = []struct {
 	{nil, "host.details.platform.releasever", "An effective DNF releasever is inapplicable to a native non-RPM or zypper system.", inventoryNonDNFPlatform},
 	{[]platform.PackageDB{platform.PackageDBDpkg}, "packages.packages.module", "dpkg packages have no RPM MODULARITYLABEL.", func(c inventoryHealthContext) bool { return c.pkg.GetManager() == "dpkg" }},
 	{[]platform.PackageDB{platform.PackageDBPacman}, "packages.packages.module", "pacman packages have no RPM MODULARITYLABEL.", func(c inventoryHealthContext) bool { return c.pkg.GetManager() == "pacman" }},
+	{[]platform.PackageDB{platform.PackageDBRPM, platform.PackageDBPacman}, "packages.packages.origin", "RPM and pacman packages have no APT index origin evidence.", func(c inventoryHealthContext) bool {
+		return c.pkg.GetManager() == "rpm" || c.pkg.GetManager() == "pacman"
+	}},
 	{nil, "host.details.storage.devices.parent", "Whole disks and virtual devices without a parent have no parent name.", func(c inventoryHealthContext) bool { return c.block.GetType().GetValue() != "part" }},
 	{nil, "host.details.storage.devices.filesystem", "Unformatted media and partition-table containers have no filesystem type.", nil},
 	{nil, "host.details.storage.devices.mountpoint", "Unmounted media and backing devices are not mounted filesystems.", nil},

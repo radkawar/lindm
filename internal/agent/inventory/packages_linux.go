@@ -311,10 +311,13 @@ func parsePackages(ctx context.Context, input io.Reader, manager string, limits 
 
 type nativeRunner func(context.Context, backend, func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus
 
-func collectPackages(ctx context.Context, release map[string]string, stat func(string) (fs.FileInfo, error), run nativeRunner) *inventoryv1.PackageObservation {
+// collectPackages attaches APT origin evidence to dpkg packages and an
+// UNAVAILABLE origin to every other backend's packages. Origin reading has
+// its own deadline: slow lists degrade origin evidence, never package evidence.
+func collectPackages(parent context.Context, release map[string]string, stat func(string) (fs.FileInfo, error), run nativeRunner, apt aptSources) *inventoryv1.PackageObservation {
 	result := &inventoryv1.PackageObservation{StartedAt: timestamppb.Now()}
 	defer func() { result.FinishedAt = timestamppb.Now() }()
-	ctx, cancel := context.WithTimeout(ctx, commandTimeout)
+	ctx, cancel := context.WithTimeout(parent, commandTimeout)
 	defer cancel()
 	if ctx.Err() != nil {
 		result.Status = statusFor(ctx.Err())
@@ -328,24 +331,28 @@ func collectPackages(ctx context.Context, release map[string]string, stat func(s
 	var packages []*inventoryv1.Package
 	if selected.name == "pacman" {
 		packages, result.Status = collectPacman(ctx, selected.path, parseLimits{maxRecords, maxOutputBytes})
-		if ctx.Err() != nil {
-			result.Status = statusFor(ctx.Err())
-		}
-		if result.Status == success {
-			result.Packages = packages
-		}
-		return result
+	} else {
+		result.Status = run(ctx, selected, func(reader io.Reader) inventoryv1.CollectionStatus {
+			var parsed inventoryv1.CollectionStatus
+			packages, parsed = parsePackages(ctx, reader, selected.name, parseLimits{maxRecords, maxOutputBytes})
+			return parsed
+		})
 	}
-	result.Status = run(ctx, selected, func(reader io.Reader) inventoryv1.CollectionStatus {
-		var parsed inventoryv1.CollectionStatus
-		packages, parsed = parsePackages(ctx, reader, selected.name, parseLimits{maxRecords, maxOutputBytes})
-		return parsed
-	})
 	if ctx.Err() != nil {
 		result.Status = statusFor(ctx.Err())
 	}
-	if result.Status == success {
-		result.Packages = packages
+	if result.Status != success {
+		return result
 	}
+	if selected.name == "dpkg" {
+		originCtx, cancelOrigin := context.WithTimeout(parent, commandTimeout)
+		defer cancelOrigin()
+		attachAptOrigins(originCtx, packages, apt, maxOutputBytes)
+	} else {
+		for _, pkg := range packages {
+			pkg.Origin = &inventoryv1.PackageOrigin{Status: unavailable}
+		}
+	}
+	result.Packages = packages
 	return result
 }

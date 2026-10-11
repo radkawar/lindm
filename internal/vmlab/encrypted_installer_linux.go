@@ -82,6 +82,12 @@ func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginP
 		grubTerminal = "GRUB_TERMINAL=\"console\"\n"
 	}
 	lab := media.release.Lab
+	if lab.Installer == platform.Distinst {
+		return popEncryptedInstallerRecipe(media.release, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, tpmBoot, architecture)
+	}
+	if lab.Installer == platform.Ubiquity {
+		return mintEncryptedInstallerRecipe(media.release, passphrase, loginPublicKey, hostPrivateKey, hostPublicKey, desktop, tpmBoot, architecture)
+	}
 	if desktop != "" && desktop != "gnome" && desktop != "kde" {
 		return nil, errors.New("encrypted installer: unsupported desktop")
 	}
@@ -557,7 +563,7 @@ func encryptedInstallerGRUBForMachine(original []byte, installer platform.Instal
 		}
 		kept := fields[:2]
 		for _, field := range fields[2:] {
-			if field != "quiet" && field != "splash" && field != "rhgb" && field != "rd.live.check" && field != "---" && !strings.HasPrefix(field, "console=") {
+			if field != "quiet" && field != "splash" && field != "rhgb" && field != "rd.live.check" && field != "---" && (field != "--" || !layout.LiveSeparator) && !strings.HasPrefix(field, "console=") {
 				kept = append(kept, field)
 			}
 		}

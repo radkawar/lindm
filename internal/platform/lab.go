@@ -99,6 +99,16 @@ const (
 	Anaconda        Installer = "anaconda"         // kickstart
 	DebianInstaller Installer = "debian-installer" // preseed
 	AutoYaST        Installer = "autoyast"         // AutoYaST profile through linuxrc
+	// Distinst is Pop!_OS's libdistinst through its vendor CLI, run in the
+	// live system by systemd's kernel-command-line service.
+	Distinst Installer = "distinst"
+	// Ubiquity is the casper live installer (Linux Mint) driven by a debconf
+	// preseed through its noninteractive frontend.
+	Ubiquity Installer = "ubiquity"
+	// OmarchyCidata is the Omarchy ISO's own unattended mode: a second drive
+	// labeled cidata carries the configurator's archinstall files. Nothing is
+	// remastered, so it has no InstallerMedia.
+	OmarchyCidata Installer = "omarchy-cidata"
 )
 
 // InstallerMedia is the vendor ISO layout an installer recipe is remastered
@@ -119,6 +129,10 @@ type InstallerMedia struct {
 	// RedeclareEFI: xorriso cannot replay the vendor boot catalog, so the
 	// unchanged EFI image is re-declared as the only UEFI El Torito entry.
 	RedeclareEFI bool
+	// LiveSeparator: the vendor live entries end kernel arguments with "--";
+	// it is dropped so the installer and console arguments appended after it
+	// are parsed by the kernel rather than passed to init.
+	LiveSeparator bool
 }
 
 var installerMedia = map[Installer]InstallerMedia{
@@ -132,6 +146,15 @@ var installerMedia = map[Installer]InstallerMedia{
 	// fetch content outside both pins. openSUSE's ARM DVD catalogs its EFI
 	// image with platform 0 behind a hybrid MBR xorriso cannot replay.
 	AutoYaST: {GRUB: "/EFI/BOOT/grub.cfg", EFIImage: true, Seed: "autoinst.xml", Args: "autoyast=cd:/lindm-seed/autoinst.xml textmode=1 self_update=0 net.ifnames=0 ifcfg=eth0=dhcp", Entry: "'Installation'", RedeclareEFI: true},
+	// Pop has no unattended installer mode. systemd-run-generator boots the
+	// casper live system into kernel-command-line.service instead of
+	// graphical.target, so neither the greeter nor pop-installer starts; GRUB
+	// re-quotes the spaced argument as one kernel parameter.
+	Distinst: {GRUB: "/boot/grub/grub.cfg", Seed: "install.sh", Args: `"systemd.run=/bin/sh -eu /cdrom/lindm-seed/install.sh" systemd.run_success_action=poweroff systemd.run_failure_action=poweroff`, Entry: "0", Separator: true},
+	// casper loads the debconf seed and start-ubiquity-dm runs the
+	// noninteractive (automatic, X-less) frontend instead of the live session;
+	// noprompt skips casper's remove-the-medium wait at the final reboot.
+	Ubiquity: {GRUB: "/boot/grub/grub.cfg", Seed: "preseed.cfg", Args: "noninteractive noprompt file=/cdrom/lindm-seed/preseed.cfg", Entry: "0", LiveSeparator: true},
 }
 
 // Media returns the installer's remastering layout; ok is false for
@@ -156,6 +179,10 @@ type LabTPM struct {
 	// Unobservable lists architectures whose installed kernel cannot bind the
 	// TPM QEMU attaches there; their goldens are a separate TPM-absent tuple.
 	Unobservable []string
+	// Unsupported states why the release has no TPM2-unlocking boot path at
+	// all; the lab then records an observed passphrase prompt after a real
+	// TPM2 bind instead of an unattended boot.
+	Unsupported string
 }
 
 // LabSession is the autologin GNOME or KDE session of the encrypted golden.

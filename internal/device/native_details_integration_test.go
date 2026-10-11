@@ -170,6 +170,52 @@ func TestPackageModuleIdentitySurvivesSnapshot(t *testing.T) {
 	}
 }
 
+func TestPackageAptOriginSurvivesSnapshot(t *testing.T) {
+	f := newEnrolled(t, 0)
+	verified := inventoryv1.AptReleaseSignature_APT_RELEASE_SIGNATURE_VERIFIED
+	origins := []*inventoryv1.PackageOrigin{
+		nil,
+		{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS},
+		{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},
+		{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Listings: []*inventoryv1.AptListing{
+			{Origin: "Ubuntu", Label: "Ubuntu", Suite: "noble-security", Codename: "noble", Signature: verified, Signer: "F6ECB3762474EDA9D21B7022871920D1991BC93C"},
+			{Origin: "linuxmint", Label: "linuxmint", Suite: "zena", Codename: "zena", Signature: verified, Signer: strings.Repeat("A1", 32)},
+			{Origin: "Ubuntu", Label: "Ubuntu", Suite: "noble", Codename: "noble", Signature: inventoryv1.AptReleaseSignature_APT_RELEASE_SIGNATURE_UNSIGNED},
+		}},
+	}
+	packages := make([]*inventoryv1.Package, len(origins))
+	for i, origin := range origins {
+		packages[i] = &inventoryv1.Package{
+			Name: "package-" + string(rune('a'+i)), Version: "1.0-1ubuntu1", Architecture: "amd64", Manager: "dpkg",
+			SourceName: "package", SourceVersion: "1.0-1ubuntu1", Origin: origin,
+		}
+	}
+	batch := packageBatch(t, packages...)
+	manifest := snapshotManifest(t, f.generation, 1, f.now, [][]byte{batch})
+	manifest.Backend = "dpkg"
+	if _, err := f.begin(t, manifest, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.put(t, manifest.GetSnapshotId(), 0, batch, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.commit(t, manifest, 1); err != nil {
+		t.Fatal(err)
+	}
+	page, err := f.svc.ListDevicePackages(f.ownerCtx, connect.NewRequest(&adminv1.ListDevicePackagesRequest{DeviceId: f.deviceID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Msg.Packages) != len(origins) {
+		t.Fatalf("package count = %d, want %d", len(page.Msg.Packages), len(origins))
+	}
+	for i, item := range page.Msg.Packages {
+		if !proto.Equal(item.GetOrigin(), origins[i]) {
+			t.Errorf("package %d origin = %v, want %v", i, item.GetOrigin(), origins[i])
+		}
+	}
+}
+
 func TestNativeDetailsJSONExpansionReservesDetailEnvelope(t *testing.T) {
 	f := newEnrolled(t, 0)
 	report := hostObservation(f.generation, 1, "oversized-details")

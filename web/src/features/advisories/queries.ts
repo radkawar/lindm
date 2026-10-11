@@ -23,6 +23,27 @@ export function deviceFindingsQueryOptions(
   });
 }
 
+export function deviceUncoveredPackagesQueryOptions(
+  lifetime: AuthLifetime,
+  deviceId: string,
+  pageToken: string,
+) {
+  return queryOptions({
+    queryKey: ["advisory-uncovered", lifetime.generation, deviceId, pageToken] as const,
+    meta: { authGeneration: lifetime.generation },
+    staleTime: 0,
+    refetchInterval: 30_000,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listDeviceUncoveredPackages(
+        { deviceId, pageToken, pageSize: 50 },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}
+
 export function advisorySummaryQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   return queryOptions({
     queryKey: ["advisory-summary", lifetime.generation, pageToken] as const,

@@ -438,8 +438,10 @@ type FleetFindingSummary struct {
 	// Same current evaluation semantics as ListAdvisorySummary; active devices only.
 	EvaluatedDevices uint64 `protobuf:"varint,6,opt,name=evaluated_devices,json=evaluatedDevices,proto3" json:"evaluated_devices,omitempty"`
 	UnknownDevices   uint64 `protobuf:"varint,7,opt,name=unknown_devices,json=unknownDevices,proto3" json:"unknown_devices,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Current evaluations that cover only part of the device's packages.
+	PartialDevices uint64 `protobuf:"varint,8,opt,name=partial_devices,json=partialDevices,proto3" json:"partial_devices,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *FleetFindingSummary) Reset() {
@@ -517,6 +519,13 @@ func (x *FleetFindingSummary) GetEvaluatedDevices() uint64 {
 func (x *FleetFindingSummary) GetUnknownDevices() uint64 {
 	if x != nil {
 		return x.UnknownDevices
+	}
+	return 0
+}
+
+func (x *FleetFindingSummary) GetPartialDevices() uint64 {
+	if x != nil {
+		return x.PartialDevices
 	}
 	return 0
 }
@@ -964,7 +973,7 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\x13attention_resources\x18\x04 \x01(\x04R\x12attentionResources\x12'\n" +
 	"\x0fstale_resources\x18\x05 \x01(\x04R\x0estaleResources\x12+\n" +
 	"\x11unknown_resources\x18\x06 \x01(\x04R\x10unknownResources\x12-\n" +
-	"\x12unassigned_devices\x18\a \x01(\x04R\x11unassignedDevices\"\xb0\x02\n" +
+	"\x12unassigned_devices\x18\a \x01(\x04R\x11unassignedDevices\"\xd9\x02\n" +
 	"\x13FleetFindingSummary\x12+\n" +
 	"\x11critical_findings\x18\x01 \x01(\x04R\x10criticalFindings\x12#\n" +
 	"\rhigh_findings\x18\x02 \x01(\x04R\fhighFindings\x12'\n" +
@@ -972,7 +981,8 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\flow_findings\x18\x04 \x01(\x04R\vlowFindings\x12%\n" +
 	"\x0eother_findings\x18\x05 \x01(\x04R\rotherFindings\x12+\n" +
 	"\x11evaluated_devices\x18\x06 \x01(\x04R\x10evaluatedDevices\x12'\n" +
-	"\x0funknown_devices\x18\a \x01(\x04R\x0eunknownDevices\"C\n" +
+	"\x0funknown_devices\x18\a \x01(\x04R\x0eunknownDevices\x12'\n" +
+	"\x0fpartial_devices\x18\b \x01(\x04R\x0epartialDevices\"C\n" +
 	"\x14FleetApprovalSummary\x12+\n" +
 	"\x11pending_approvals\x18\x01 \x01(\x04R\x10pendingApprovals\"\x94\x03\n" +
 	"\x11FleetPatchSummary\x12'\n" +

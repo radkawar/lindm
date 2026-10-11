@@ -54,16 +54,18 @@ func sessionCommand(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	helper, err := desktop.New(desktop.Config{
-		Client:   client,
-		Notifier: notifier,
-		Portal:   portal,
-		Capturer: capturer,
-		Peers:    desktop.NewPionPeers(),
-		Logger:   logger,
+		Client:         client,
+		Notifier:       notifier,
+		Portal:         portal,
+		Capturer:       capturer,
+		Peers:          desktop.NewPionPeers(),
+		Locks:          desktop.LogindLockMonitor{},
+		CurrentDesktop: os.Getenv("XDG_CURRENT_DESKTOP"),
+		Logger:         logger,
 	})
 	if err != nil {
 		return err
 	}
-	logger.Info("session helper started", "socket", *socket, "uid", os.Getuid())
+	logger.Info("session helper started", "socket", *socket, "uid", os.Getuid(), "current_desktop", os.Getenv("XDG_CURRENT_DESKTOP"))
 	return helper.Run(ctx)
 }

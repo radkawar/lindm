@@ -21,6 +21,7 @@ type VMAssistanceResult struct {
 	ImageID           string                        `json:"image_id"`
 	ImageSHA256       string                        `json:"image_sha256"`
 	Distribution      string                        `json:"distribution"`
+	DesktopProfile    string                        `json:"desktop_profile"`
 	Architecture      string                        `json:"architecture"`
 	PackageSHA256     string                        `json:"package_sha256"`
 	SignerFingerprint string                        `json:"package_signer"`
@@ -75,6 +76,23 @@ type assistanceGuestEvidence struct {
 	GraphicalSessionTarget string                 `json:"graphical_session_target"`
 	Packages               []string               `json:"packages"`
 	Terminal               string                 `json:"terminal"`
+	// Capabilities is the native capability probe of the lab session: what
+	// the session helper's environment, portal frontend and notification
+	// server expose, observed before any scenario.
+	Capabilities *assistanceCapabilityEvidence `json:"capabilities"`
+}
+
+type assistanceCapabilityEvidence struct {
+	// CurrentDesktop is XDG_CURRENT_DESKTOP in the user manager environment
+	// the lindm-session.service helper inherits.
+	CurrentDesktop string `json:"xdg_current_desktop"`
+	// PortalInterfaces are the org.freedesktop.portal.* interfaces the portal
+	// frontend exports with their version properties.
+	PortalInterfaces []string `json:"portal_interfaces"`
+	// NotificationServer is GetServerInformation; NotificationCapabilities
+	// is GetCapabilities.
+	NotificationServer       string `json:"notification_server"`
+	NotificationCapabilities string `json:"notification_capabilities"`
 }
 
 type assistanceBrowserEvidence struct {
@@ -125,6 +143,7 @@ type assistanceScenarioEvidence struct {
 	ExpectedCause     string                       `json:"expected_end_cause"`
 	EndCause          string                       `json:"end_cause"`
 	EndDetail         string                       `json:"end_detail,omitempty"`
+	ExpectedDetail    string                       `json:"expected_end_detail,omitempty"`
 	ConsoleEndCause   string                       `json:"console_end_cause_text,omitempty"`
 	ControlGranted    bool                         `json:"control_granted"`
 	LocalSession      *assistanceLocalEvidence     `json:"local_session,omitempty"`

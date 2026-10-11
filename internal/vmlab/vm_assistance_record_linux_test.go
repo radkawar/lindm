@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 func newTestAssistanceEvidence(t *testing.T) (*assistanceEvidence, string) {
@@ -141,20 +144,20 @@ func TestAssistanceEvidenceRejectsUnsafeNames(t *testing.T) {
 }
 
 func TestSelectAssistanceScenariosKeepsLaneOrder(t *testing.T) {
-	all, err := selectAssistanceScenarios(nil)
+	all, err := selectAssistanceScenarios(assistanceScenarios, nil)
 	if err != nil || len(all) != len(assistanceScenarios) {
 		t.Fatalf("nil selection = %d scenarios, %v", len(all), err)
 	}
-	none, err := selectAssistanceScenarios([]string{})
+	none, err := selectAssistanceScenarios(assistanceScenarios, []string{})
 	if err != nil || len(none) != 0 {
 		t.Fatalf("empty selection = %d scenarios, %v", len(none), err)
 	}
-	picked, err := selectAssistanceScenarios([]string{"lock", "decline"})
+	picked, err := selectAssistanceScenarios(assistanceScenarios, []string{"lock", "decline"})
 	if err != nil || len(picked) != 2 || picked[0].name != "decline" || picked[1].name != "lock" {
 		t.Fatalf("subset = %+v, %v", picked, err)
 	}
 	for _, bad := range [][]string{{"decline", "decline"}, {"unknown"}, {""}} {
-		if _, err := selectAssistanceScenarios(bad); err == nil {
+		if _, err := selectAssistanceScenarios(assistanceScenarios, bad); err == nil {
 			t.Errorf("selection %q accepted", bad)
 		}
 	}
@@ -184,5 +187,42 @@ func TestVerifyAssistanceMediaRequiresTCPRelayWhenAsked(t *testing.T) {
 	media.LocalRelayProtocol = "tcp"
 	if err := verifyAssistanceMedia(media, false, true); err != nil {
 		t.Fatalf("TCP relay: %v", err)
+	}
+}
+
+// A desktop's own scenario list bounds selection: Cinnamon offers only its
+// pre-consent refusals, never the GNOME live paths.
+func TestSelectAssistanceScenariosUsesDesktopList(t *testing.T) {
+	refusals := unavailableScenarios("portal_screencast_unavailable", "portal_screencast_unavailable")
+	if _, err := selectAssistanceScenarios(refusals, []string{"view"}); err == nil {
+		t.Fatal("a live scenario was selectable on a refusal-only desktop")
+	}
+	picked, err := selectAssistanceScenarios(refusals, []string{"control-unavailable"})
+	if err != nil || len(picked) != 1 || picked[0].detail != "portal_screencast_unavailable" || picked[0].cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE {
+		t.Fatalf("refusal selection = %+v, %v", picked, err)
+	}
+}
+
+// The registry and the desktop profile must agree: a refusal-only desktop
+// runs only on a release whose registry gates assistance, and live scenarios
+// only where it is supported.
+func TestAssistanceAdmissionMatchesRegistryGate(t *testing.T) {
+	supported := &platform.Release{Name: "supported", Supports: []platform.Capability{platform.Assistance}}
+	gated := &platform.Release{Name: "gated", Gates: map[platform.Capability]string{platform.Assistance: "portal_screencast_unavailable"}}
+	live := &labDesktop{name: "live", assistance: assistanceScenarios}
+	refusing := &labDesktop{name: "refusing", assistance: unavailableScenarios("portal_screencast_unavailable", "portal_screencast_unavailable")}
+	for _, test := range []struct {
+		release *platform.Release
+		desktop *labDesktop
+		ok      bool
+	}{
+		{supported, live, true},
+		{gated, refusing, true},
+		{gated, live, false},
+		{supported, refusing, false},
+	} {
+		if err := assistanceAdmission(test.release, test.desktop); (err == nil) != test.ok {
+			t.Errorf("%s/%s admission error %v, want ok=%v", test.release.Name, test.desktop.name, err, test.ok)
+		}
 	}
 }

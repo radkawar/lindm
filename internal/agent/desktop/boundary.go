@@ -44,6 +44,12 @@ type Notice interface {
 
 // Portal is the xdg-desktop-portal boundary.
 type Portal interface {
+	// Check reports, without any dialog or user interaction, whether the
+	// desktop's portal can serve mode at all. It runs before the consent
+	// prompt so an impossible session ends UNAVAILABLE with an exact detail
+	// instead of asking for consent it cannot honour; a CONTROL request is
+	// never silently downgraded to VIEW.
+	Check(ctx context.Context, mode agentv1.AssistanceMode) error
 	// Open runs the portal dialog for mode and returns the grant. A user
 	// cancellation returns ErrPortalCancelled.
 	Open(ctx context.Context, mode agentv1.AssistanceMode) (Grant, error)

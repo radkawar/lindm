@@ -73,6 +73,9 @@ type VMDeviceActionsResult struct {
 	LockRelease             *actionDispatchEvidence        `json:"lock_release"`
 	AccountLocks            []*actionAccountLockEvidence   `json:"account_locks"`
 	DesktopInitialLogind    string                         `json:"desktop_initial_logind,omitempty"`
+	DesktopProfile          string                         `json:"desktop_profile"`
+	LockVerification        string                         `json:"lock_verification_evidence,omitempty"`
+	AccountsNoDesktop       bool                           `json:"account_locks_without_desktop,omitempty"`
 	DesktopBefore           *actionDesktopEvidence         `json:"desktop_before"`
 	DesktopAfter            *actionDesktopEvidence         `json:"desktop_after"`
 	DesktopAfterRelease     *actionDesktopEvidence         `json:"desktop_after_release"`
@@ -97,16 +100,19 @@ type VMDeviceActionsResult struct {
 	TPMBoot                 *UnlockOutcome                 `json:"tpm_unattended_boot"`
 	TPMAbsentDenial         *actionDenialEvidence          `json:"tpm_absent_denial,omitempty"`
 	TPMBindingDenial        *actionDenialEvidence          `json:"tpm_binding_unsupported_denial,omitempty"`
-	TPMPolicyBind           *actionDispatchEvidence        `json:"tpm_policy_mismatch_bind,omitempty"`
-	TPMPolicyRejectedBoot   *UnlockOutcome                 `json:"tpm_policy_rejected_boot,omitempty"`
-	TPMPolicyRecoveryBoot   *UnlockOutcome                 `json:"tpm_policy_revealed_key_recovery,omitempty"`
-	PCRBefore               string                         `json:"pcr7_before_extension,omitempty"`
-	PCRAfter                string                         `json:"pcr7_after_extension,omitempty"`
-	StartedAt               time.Time                      `json:"started_at"`
-	FinishedAt              time.Time                      `json:"finished_at"`
-	Passed                  bool                           `json:"passed"`
-	Failure                 string                         `json:"failure,omitempty"`
-	Boundaries              []string                       `json:"boundaries"`
+	// TPMBootUnsupported records the observed passphrase prompt after a real
+	// TPM2 bind on a release whose boot path cannot use TPM2 tokens.
+	TPMBootUnsupported    *actionUnsupportedEvidence `json:"tpm_unattended_boot_unsupported,omitempty"`
+	TPMPolicyBind         *actionDispatchEvidence    `json:"tpm_policy_mismatch_bind,omitempty"`
+	TPMPolicyRejectedBoot *UnlockOutcome             `json:"tpm_policy_rejected_boot,omitempty"`
+	TPMPolicyRecoveryBoot *UnlockOutcome             `json:"tpm_policy_revealed_key_recovery,omitempty"`
+	PCRBefore             string                     `json:"pcr7_before_extension,omitempty"`
+	PCRAfter              string                     `json:"pcr7_after_extension,omitempty"`
+	StartedAt             time.Time                  `json:"started_at"`
+	FinishedAt            time.Time                  `json:"finished_at"`
+	Passed                bool                       `json:"passed"`
+	Failure               string                     `json:"failure,omitempty"`
+	Boundaries            []string                   `json:"boundaries"`
 }
 
 type actionMachine struct {
@@ -117,6 +123,7 @@ type actionMachine struct {
 	deviceID, generation string
 	target               actionNativeTarget
 	boot                 UnlockOutcome
+	desktop              *labDesktop
 }
 
 func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, delegation *agentv1.UpdateExecutionTrustRequest) (_ *actionMachine, err error) {
@@ -124,7 +131,12 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if err != nil {
 		return nil, err
 	}
-	machine := &actionMachine{vm: vm, release: platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()), fixture: fixture}
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
+	if err != nil {
+		return nil, errors.Join(err, vm.Close())
+	}
+	machine := &actionMachine{vm: vm, fixture: fixture, desktop: desktop, release: release}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, machine.Close())
@@ -250,10 +262,10 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err := validateManifest(options.RecoveryManifest); err != nil {
 		return nil, err
 	}
-	if manifest.GetDistribution() != options.RecoveryManifest.GetDistribution() {
-		return nil, errors.New("recovery image and native package distribution must match")
-	}
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	if err := recoveryReleaseMatches(release, manifestRelease(options.RecoveryManifest)); err != nil {
+		return nil, err
+	}
 	for _, c := range deviceActionCapabilities(options.Scenario, options.WipePhase) {
 		if err := release.Gate(c); err != nil {
 			return nil, err
@@ -262,12 +274,26 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
 		return nil, err
 	}
-	if options.Encrypted.Desktop != "gnome" || !options.Encrypted.TPMBoot || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
-		return nil, errors.New("device actions require installer GNOME, unbound TPM-capable boot stack, explicit topology and signed-package egress")
+	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
+	if err != nil {
+		return nil, err
 	}
-	result = &VMDeviceActionsResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), StartedAt: time.Now().UTC(), Boundaries: []string{
+	// Only the lock/quarantine phase never boots through a TPM2 token, so a
+	// desktop whose vendor initramfs cannot unlock with TPM2 still qualifies it.
+	// Releases without any TPM early-boot variant (registry Lab.TPM.Unsupported)
+	// run every phase and record the unattended TPM boot as an observed
+	// unsupported outcome.
+	lockOnly := options.Scenario == "wipe" && options.WipePhase == "lock-quarantine"
+	noTPMBoot := noTPMBootReason(manifest)
+	if noTPMBoot != "" && options.Encrypted.TPMBoot {
+		return nil, errors.New(noTPMBoot)
+	}
+	if (!options.Encrypted.TPMBoot && !lockOnly && noTPMBoot == "") || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
+		return nil, errors.New("device actions require an installer desktop, unbound TPM-capable boot stack (except -wipe-phase lock-quarantine or a release without one), explicit topology and signed-package egress")
+	}
+	result = &VMDeviceActionsResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), DesktopProfile: desktop.name, StartedAt: time.Now().UTC(), Boundaries: []string{
 		"Shared QEMU emulated topology, software TPM2 and pinned firmware only; no physical TPM, firmware or media qualification.",
-		"Installer GNOME session lock is verified through logind and GNOME ScreenSaver, not a physical display observation or boot lock.",
+		"Installer " + desktop.name + " session lock is verified through logind LockedHint and the desktop's own locker oracle (" + desktop.locker + "), not a physical display observation or boot lock.",
 		"Quarantine probes a guest namespace peer, allowed QEMU-gateway host endpoint, blocked routed host endpoint and explicit DNS; management traverses pinned SSH-forwarding endpoints.",
 		"Recovery keys remain memory-only and are typed as literal lowercase hexadecimal, never decoded to raw random bytes.",
 		"Approval negatives exercise real escrow reveal and real destructive mTLS start authorization after root preflight; destructive positive starts require two distinct local WebAuthn humans.",
@@ -730,6 +756,17 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if err := compareActionEncryption(ctx, machine.vm, result.TPMInventory); err != nil {
 		return err
 	}
+	if !options.Encrypted.TPMBoot {
+		// No lab TPM early-boot variant exists for this vendor boot path, so the
+		// bound token is expected to be unusable: observe the prompt natively
+		// and report unattended unlock as unsupported rather than skipping it.
+		boot, err := machine.vm.ColdBoot(ctx, "")
+		if err == nil || !boot.PromptSeen || boot.Accepted {
+			return errors.Join(errors.New("vendor boot path did not request its passphrase after TPM2 bind"), err)
+		}
+		result.TPMBootUnsupported = &actionUnsupportedEvidence{Reason: noTPMBootReason(manifest), Boot: boot}
+		return nil
+	}
 	boot, err := machine.vm.ColdBoot(ctx, "")
 	if err != nil {
 		return fmt.Errorf("TPM unattended cold boot: %w", err)
@@ -763,4 +800,15 @@ func cryptsetupConsoleScript(initrd string) string {
 printf '[Service]\nStandardOutput=journal+console\nStandardError=journal+console\nEnvironment=SYSTEMD_LOG_TARGET=console\n' > /etc/systemd/system/systemd-cryptsetup@.service.d/lab-console.conf
 kernel=$(uname -r)
 dracut --quiet --force --include /etc/systemd/system/systemd-cryptsetup@.service.d /etc/systemd/system/systemd-cryptsetup@.service.d "$(printf ` + nativeQuote(initrd) + ` "$kernel")" "$kernel"`
+}
+
+// recoveryReleaseMatches requires the off-target recovery root to run the
+// target's native package base: the recovery operator installs the same
+// native agent package. A derivative (Linux Mint) recovers from its base
+// release's cloud image, never from an unrelated release.
+func recoveryReleaseMatches(target, recovery *platform.Release) error {
+	if !target.Known() || !recovery.Known() || target.Native().Key != recovery.Native().Key {
+		return fmt.Errorf("recovery image %s does not run the native package base of %s", recovery.Name, target.Name)
+	}
+	return nil
 }

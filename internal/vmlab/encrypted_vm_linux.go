@@ -73,9 +73,16 @@ type encryptedProcess struct {
 }
 
 func startEncryptedProcess(ctx context.Context, dir, name string, args ...string) (*encryptedProcess, error) {
+	return startEncryptedProcessFiles(ctx, dir, nil, name, args...)
+}
+
+// startEncryptedProcessFiles also passes files as descriptors 3 onward, for
+// media borrowed by a verified descriptor rather than by path.
+func startEncryptedProcessFiles(ctx context.Context, dir string, files []*os.File, name string, args ...string) (*encryptedProcess, error) {
 	// Not labexec: the Pdeathsig must be bound to a thread locked for the process's lifetime.
 	p := &encryptedProcess{cmd: exec.CommandContext(ctx, name, args...), done: make(chan struct{}), log: new(vmLog)}
 	p.cmd.Dir = dir
+	p.cmd.ExtraFiles = files
 	p.cmd.Stdout, p.cmd.Stderr = p.log, p.log
 	p.cmd.WaitDelay = 2 * time.Second
 	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
@@ -430,7 +437,15 @@ func (v *EncryptedVM) serial(ctx context.Context) (net.Conn, error) {
 
 func encryptedUnlockPrompt(text string) bool {
 	text = strings.ToLower(text)
-	return strings.Contains(text, "please unlock disk") || strings.Contains(text, "enter passphrase for") || strings.Contains(text, "please enter passphrase for disk")
+	if strings.Contains(text, "please unlock disk") || strings.Contains(text, "enter passphrase for") || strings.Contains(text, "please enter passphrase for disk") {
+		return true
+	}
+	// Arch mkinitcpio's encrypt hook (Omarchy) asks through plymouth with this
+	// sentence and then awaits input on the same line. Its plain-console
+	// fallback prints the sentence on its own line and then cryptsetup's own
+	// "Enter passphrase for" prompt, which must remain the single trigger.
+	i := strings.LastIndex(text, "a password is required to access the")
+	return i >= 0 && !strings.ContainsAny(text[i:], "\r\n") && strings.HasSuffix(strings.TrimRight(text[i:], " "), ":")
 }
 
 func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (bool, error) {

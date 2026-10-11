@@ -3,6 +3,7 @@
 package vmlab
 
 import (
+	"errors"
 	"fmt"
 
 	labv1 "lindm/gen/lindm/lab/v1"
@@ -14,6 +15,39 @@ import (
 func manifestRelease(manifest *labv1.ImageManifest) *platform.Release {
 	return platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
 }
+
+// nativeScript prefixes a lab guest script with the registry's native base
+// identity, so a derivative (its own os-release ID) runs the base release's
+// branch of the script's os-release switch. Scripts read the identity right
+// after sourcing os-release; a release without a base keeps its own.
+func (v *guestVM) nativeScript(script string) (string, error) {
+	identity, err := nativeScriptIdentity(v.release)
+	if err != nil {
+		return "", err
+	}
+	return identity + script, nil
+}
+
+// nativeScriptIdentity is the shell assignment of the base identity for a
+// derivative and empty for a release without a base. Lab scripts never select
+// behavior from ID_LIKE.
+func nativeScriptIdentity(release *platform.Release) (string, error) {
+	if release == nil || !release.Known() {
+		return "", errors.New("lab guest scripts require a registry release")
+	}
+	native := release.Native()
+	if native == release {
+		return "", nil
+	}
+	if native.Version.Rule != platform.VersionExact {
+		return "", fmt.Errorf("%s base %s has no exact version identity", release.Name, native.Name)
+	}
+	return "LINDM_NATIVE_ID=" + nativeQuote(native.ID) + "\nLINDM_NATIVE_VERSION=" + nativeQuote(native.Version.Value) + "\n", nil
+}
+
+// nativeOSRelease sources os-release and applies the lab's native identity.
+const nativeOSRelease = `. /etc/os-release
+ID=${LINDM_NATIVE_ID:-$ID} VERSION_ID=${LINDM_NATIVE_VERSION:-${VERSION_ID-}}`
 
 // nativeBackend is the release's native package backend (its base's for a
 // derivative). Unknown and image-based releases have none and are rejected, so

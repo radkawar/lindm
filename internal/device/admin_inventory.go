@@ -248,6 +248,31 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 		if err != nil {
 			return err
 		}
+		// Origin listings for the bounded page (≤16 per package) in one query.
+		positions := make([]int32, 0, len(rows))
+		for _, row := range rows {
+			if row.OriginStatus != 0 {
+				positions = append(positions, row.Position)
+			}
+		}
+		origins := map[int32]*inventoryv1.PackageOrigin{}
+		if len(positions) > 0 {
+			listed, err := q.ListSnapshotPackageListings(ctx, devicedb.ListSnapshotPackageListingsParams{SnapshotID: cursor.SnapshotID, Positions: positions})
+			if err != nil {
+				return err
+			}
+			for _, listing := range listed {
+				origin := origins[listing.Position]
+				if origin == nil {
+					origin = &inventoryv1.PackageOrigin{}
+					origins[listing.Position] = origin
+				}
+				origin.Listings = append(origin.Listings, &inventoryv1.AptListing{
+					Origin: listing.Origin, Label: listing.Label, Suite: listing.Suite, Codename: listing.Codename,
+					Signature: inventoryv1.AptReleaseSignature(listing.Signature), Signer: listing.Signer,
+				})
+			}
+		}
 		var budget responsePageBudget
 		packages := make([]*adminv1.DevicePackage, 0, min(len(rows), int(limit)))
 		for _, row := range rows {
@@ -266,6 +291,13 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 					Status: inventoryv1.CollectionStatus(row.ModuleStatus), Modular: row.ModuleName != "",
 					Name: row.ModuleName, Stream: row.ModuleStream, Version: row.ModuleVersion, Context: row.ModuleContext,
 				}
+			}
+			if row.OriginStatus != 0 {
+				item.Origin = origins[row.Position]
+				if item.Origin == nil {
+					item.Origin = &inventoryv1.PackageOrigin{}
+				}
+				item.Origin.Status = inventoryv1.CollectionStatus(row.OriginStatus)
 			}
 			fits, err := budget.take(item)
 			if err != nil {

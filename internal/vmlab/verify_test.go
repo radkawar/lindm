@@ -93,7 +93,7 @@ func testManifest(image []byte, fingerprint string, mode labv1.ChecksumMode) *la
 		Sha256: hex.EncodeToString(hash[:]), SignerFingerprint: fingerprint, ImageSizeBytes: uint64(len(image)), ChecksumMode: mode,
 		SignerProvenanceUrl: "https://example.invalid/security/", ReleaseProvenanceUrl: "https://example.invalid/releases/1.0/",
 	}
-	if mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED || mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 {
+	if detachedChecksum(mode) {
 		m.SignatureUrl = proto.String("https://example.invalid/signature")
 	}
 	return m

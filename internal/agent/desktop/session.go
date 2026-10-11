@@ -38,6 +38,9 @@ type sessionDeps struct {
 	peers    PeerFactory
 	logger   *slog.Logger
 	clock    func() time.Time
+	// lockReporting is nil when every lock of this desktop is observable
+	// (logind LockedHint or the LockMonitor's logind signals).
+	lockReporting error
 
 	firstPacketTimeout time.Duration
 	captureGrace       time.Duration
@@ -228,6 +231,17 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	}
 	if !slices.Contains(capabilities, "actions") {
 		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "notification_actions_unavailable"
+	}
+	// Never ask for consent the desktop cannot honour: a missing ScreenCast
+	// (or, for CONTROL, RemoteDesktop) portal ends the session before the prompt.
+	if err := deps.portal.Check(consentCtx, s.invitation.GetMode()); err != nil {
+		return s.failure(consentCtx, unavailable("portal_unavailable", err))
+	}
+	// A desktop whose locks lindm cannot observe would keep sharing a locked
+	// screen; such a session is refused before consent rather than started
+	// with a lock guarantee that does not hold.
+	if deps.lockReporting != nil {
+		return s.failure(consentCtx, deps.lockReporting)
 	}
 	r.markup = slices.Contains(capabilities, "body-markup")
 	prompt, err := deps.notifier.Notify(consentCtx, s.promptNotification(r.markup))

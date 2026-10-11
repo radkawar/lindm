@@ -29,6 +29,9 @@ message Package {
   string source_version = 6 [(buf.validate.field).string.max_len = 2048];
   // Absent only on historical package evidence.
   ModuleObservation module = 7;
+  // APT index evidence for the exact installed name, version and architecture.
+  // UNAVAILABLE for non-APT backends; absent only on historical evidence.
+  PackageOrigin origin = 8;
   option (buf.validate.message).cel = {
     id: "package.source_pair"
     message: "source name and version must be present together"
@@ -495,6 +498,71 @@ message ModuleObservation {
     id: "module.identity_shape"
     message: "only a successful modular observation carries a complete native identity"
     expression: "(this.status == 1 && this.modular) ? (this.name != '' && this.stream != '' && this.version != '' && this.context != '') : (!this.modular && this.name == '' && this.stream == '' && this.version == '' && this.context == '')"
+  };
+}
+
+// PackageOrigin lists every APT index in /var/lib/apt/lists that lists the
+// exact installed name, version and architecture. A successful observation
+// with no listings means the installed version is not listed by any index
+// (a local, superseded or removed version); no origin is ever inferred.
+message PackageOrigin {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [
+      0,
+      8
+    ]
+  }];
+  repeated AptListing listings = 2 [(buf.validate.field).repeated.max_items = 16];
+  option (buf.validate.message).cel = {
+    id: "origin.success_shape"
+    message: "only a successful origin observation carries listings"
+    expression: "this.status == 1 || this.listings.size() == 0"
+  };
+}
+
+// AptReleaseSignature is the agent's own OpenPGP verification of the Release
+// that lists a package, not a copy of APT's trust decision.
+enum AptReleaseSignature {
+  APT_RELEASE_SIGNATURE_UNSPECIFIED = 0;
+  // A signature over the Release verified with a public key from the native
+  // APT keyrings, and the index file matches the signed Release's SHA256.
+  APT_RELEASE_SIGNATURE_VERIFIED = 1;
+  // The Release has no InRelease signature and no Release.gpg.
+  APT_RELEASE_SIGNATURE_UNSIGNED = 2;
+  // A signature exists but no available key verified it, or the index file
+  // is not bound to the signed Release by its SHA256 entry.
+  APT_RELEASE_SIGNATURE_UNVERIFIED = 3;
+}
+
+// AptListing is the Release metadata of one index listing a package.
+message AptListing {
+  string origin = 1 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[^\\x00-\\x1F\\x7F]*$"
+  }];
+  string label = 2 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[^\\x00-\\x1F\\x7F]*$"
+  }];
+  string suite = 3 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[^\\x00-\\x1F\\x7F]*$"
+  }];
+  string codename = 4 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[^\\x00-\\x1F\\x7F]*$"
+  }];
+  AptReleaseSignature signature = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Uppercase hex fingerprint of the primary key whose signature verified.
+  string signer = 6 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})?$"];
+  option (buf.validate.message).cel = {
+    id: "listing.signer_shape"
+    message: "only a verified listing names its signer"
+    expression: "(this.signature == 1) == (this.signer != '')"
   };
 }
 

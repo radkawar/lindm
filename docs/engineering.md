@@ -629,6 +629,14 @@ a reproducible snapshot. Each normal run uses a fresh overlay and SSH credential
 These maintained paths are not passing Debian lifecycle or physical-validation
 claims until their native commands complete and evidence is recorded.
 
+`CHECKSUM_MODE_DETACHED_IMAGE` is for vendors that sign the image bytes
+themselves (Omarchy's `.iso.sig`). One streaming read feeds `gpgv` (data on
+stdin) and the required SHA-256 pin, so the signed and pinned bytes are the same
+bytes; offline cache reuse repeats both. The pinned full fingerprint and
+independent provenance are mandatory as in the other signed modes. The checksum
+URL names the vendor's unsigned SHA-256 sidecar, which must agree with the pin
+but is never treated as authentication.
+
 openSUSE Tumbleweed has no official ARM cloud/KVM image, so
 `lab/images/opensuse-tumbleweed-20261007-aarch64.json` pins the signed
 Snapshot20261007 **DVD** (manifest edition `dvd`; the openSUSE key signs the
@@ -667,6 +675,35 @@ zypper/rpm, sudo, the sshd ordering, `cloud-init-config-suse` and
 SELinux state from `/sys/fs/selinux/enforce` for non-DNF guests, because Leap 16
 and Tumbleweed enforce SELinux and Tumbleweed ships no `getenforce`. Only the DNF
 family additionally requires `Enforcing`.
+
+Omarchy 4.0.4 (`lab/images/omarchy-4.0.4-x86_64.json` and the
+`hyprland-encrypted-lab` edition) uses the vendor's documented unattended mode
+instead of a remaster (`omarchy_installer_linux.go`, registry installer
+`omarchy-cidata`). The authenticated ISO is attached unmodified by its verified
+descriptor, next to a FAT drive labeled `CIDATA` carrying the configurator's own
+archinstall files (full-disk Btrfs layout, Limine, `lindm-lab` user, its lab SSH
+key, and for the encrypted edition the `disk_encryption` block and
+`user_encrypt_installation.txt`). QEMU runs with `-no-reboot`, so the vendor
+dashboard's automatic reboot ends the install. Lab provisioning is then
+explicit and minimal: libguestfs writes only a pinned SSH host key, a NOPASSWD
+sudo rule for `lindm-lab` and the root-only source marker into the stopped root
+(subvolume `@`, opened with the LUKS passphrase on stdin); one provisioning boot
+with the ISO as a non-boot CD-ROM installs signed packages with `pacman
+-S --needed` from the ISO's own offline repository (package signatures
+required), never a partial upgrade from the rolling mirrors. The cloud golden
+gets cloud-init (NoCloud only, network rendering disabled) and the registry's
+device-action prerequisites, then removes the provisioning key, host keys and
+sudo rule. The encrypted golden keeps its credentials and adds the serial
+console and portable storage modules through the vendor's
+`/etc/limine-entry-tool.d` and `/etc/mkinitcpio.conf.d` drop-ins and
+`limine-update`; its single provisioning boot reaches that console because the
+lab first appends it to the LUKS entries' cmdline in the unencrypted ESP
+`limine.conf` (Limine hands it to the UKI stub, honoured with Secure Boot off),
+which `limine-update` then regenerates. The mkinitcpio `encrypt` hook prints
+"A password is required to access the root volume" through plymouth; the
+serial unlock answers only a completed prompt. Omarchy has no TPM early-boot
+variant (registry `Lab.TPM.Unsupported`): the device-action lane binds a real
+TPM2 token and records the observed passphrase prompt as unsupported.
 
 The additional `*-aarch64.json` Rocky 8.10/9.8/10.2, AlmaLinux 8.10/9.8/10.2 and
 openSUSE Leap 16.0 manifests independently pin official native cloud-image bytes,

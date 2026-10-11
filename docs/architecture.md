@@ -789,11 +789,21 @@ or other stage failure removes only its newly owned partial file and retains the
 native error; it never deletes an existing unrelated ESP file or extends a grant.
 
 Lock is a named Linux mechanism, not activation lock: the root executor calls
-logind `LockSessions` on the authenticated local system D-Bus and waits for
-graphical user-session `LockedHint` acknowledgments. Optional termination uses
-logind `TerminateSession` and verifies that no graphical user sessions remain.
-No shell or remotely selected executable participates. Neither acknowledgment
-proves visible desktop content, prevents boot, nor resists hostile root.
+logind `LockSessions` on the authenticated local system D-Bus and waits up to
+five seconds for graphical user-session `LockedHint` acknowledgments. Optional
+termination uses logind `TerminateSession` and verifies that no graphical user
+sessions remain. No shell or remotely selected executable participates. Neither
+acknowledgment proves visible desktop content, prevents boot, nor resists
+hostile root.
+
+logind only relays the request; the desktop's own locker must engage and call
+`SetLockedHint`. GNOME does; Cinnamon 6.6 (`cinnamon-screensaver`), COSMIC
+(`cosmic-greeter`) and Hyprland lockers do not, and a Hyprland session may have
+no logind `Lock` listener at all. When a session never reports `LockedHint`, the
+action ends `OUTCOME_UNKNOWN`/`OBSERVATION`, never verified and never
+`sessions_locked`, with the verification evidence
+`session_lock_state_unreported: ...`. It is neither retried nor reported as an
+interruption. The server's lock restriction still requires an explicit release.
 
 The lock specification can additionally select explicit local usernames or all
 non-system human accounts. Root and the root-owned protected break-glass/admin
@@ -1553,7 +1563,11 @@ version, including epochs, rather than inferring source identity from binary nam
 RPM snapshots additionally retain the exact native `MODULARITYLABEL` components
 and collection status. Successful non-modular packages, unavailable evidence and
 historical absence remain distinct; module identity is never inferred from an EL
-version suffix. Optional platform evidence carries the native `CPE_NAME`, an
+version suffix. Dpkg snapshots additionally carry per-package APT origin evidence:
+every `/var/lib/apt/lists` index listing the exact installed version, with its
+signed Release identity (see [Distro advisory findings](#distro-advisory-findings));
+an unlisted version is a successful empty observation, and other backends report
+it UNAVAILABLE. Optional platform evidence carries the native `CPE_NAME`, an
 explicit release-version lock from the native DNF configuration's effective
 variable directories, the separately detected effective releasever, and enabled
 repository IDs plus configured base URLs, metalink/mirrorlist, package-signature
@@ -1767,6 +1781,38 @@ pagination binds a device and evaluation and rejects a replaced evaluation rathe
 than silently switching evidence. Both fleet summaries and report projections
 apply device scopes; target reads recheck scope in the returned-data transaction.
 
+Derivative releases without a vendor feed are evaluated **partially**, never by
+name resemblance. Only `internal/platform` rows that name a base and their own
+vendor Release origins (`Advisory.VendorOrigins`; today Linux Mint 22.3 and
+Pop!\_OS 24.04 on Ubuntu 24.04) select their base row's feed, and only for packages
+of verified base origin. The agent reports, per installed dpkg package, every index
+in `/var/lib/apt/lists` that lists its exact name/version/architecture, with the
+Release `Origin`/`Label`/`Suite`/`Codename`, its own OpenPGP verification of that
+Release (keys from APT's keyring locations, read through `internal/custody`) and
+the index's binding to the Release's `SHA256` entry; non-APT backends report the
+origin UNAVAILABLE. Snapshot ingestion stores listings in
+`snapshot_package_listings` (`00022_package_origins.sql`). The SQL function
+`advisory_origin_reason` classifies each package against the base row's archive
+facts (`Advisory.ArchiveOrigin`, `Codename`, `ArchiveSuites` — the
+security-supported pockets — and pinned `ArchiveSigners`) and the derivative's
+vendor origins: a package is covered only if every listing is a verified
+base-archive index of a covered suite. Covered packages match exactly as on the
+base release; every other package is excluded from matching. The finding-set key
+folds in the coverage policy and the snapshot's origin evidence, so equal
+derivative inventories share one set but never share a set with a base device, and
+the set records its uncovered count. Uncovered packages are reported UNKNOWN with
+a stable reason (vendor archive only, ambiguous with another source, unlisted,
+unverified, other origin, uncovered base pocket or origin unavailable) through
+`ListDeviceUncoveredPackages`, classified at read time from the evaluated snapshot
+rather than materialized. The evaluation state of such a device is always
+`partial` with reason `vendor_feed_unavailable_<os-release ID>` and an uncovered
+count; findings of covered packages remain current exposure
+(`advisory_device_status` treats `partial` like `evaluated`), fleet counts report
+partial devices separately, and any UNKNOWN cause overrides partial. A derivative
+device without a single verified base-origin package is UNKNOWN
+`package_origin_unavailable`. Base releases and every other distribution ignore
+origin evidence.
+
 `advisory_exceptions.manage` requires fresh actor authorization and a locked device
 scope. Acceptance binds the device, advisory, installed package version and
 architecture, records the actor/reason and expires within 366 days. It is not a fix
@@ -1936,7 +1982,8 @@ Each side sends its complete current state, never a stream of events:
      account and group-0 peers.
    - It reads logind over the pinned root system bus. The caller must have exactly
      one session with `Class=user`, `Type=wayland|x11`, `Remote=false`,
-     `Active=true` and `LockedHint=false`.
+     `Active=true` and `LockedHint=false`. `LockedHint=false` proves "unlocked"
+     only on desktops that report it; see the lock-observability table below.
    - The executor, not the helper, stamps the user, UID, logind session ID, type
      and desktop on every report.
    - The first helper to report `PROMPTED` claims an invitation and binds it. Only
@@ -1946,6 +1993,25 @@ Each side sends its complete current state, never a stream of events:
    `lindm-session.service` (`WantedBy=graphical-session.target`). It shows a
    critical, non-expiring desktop notification with explicit **Allow** and
    **Decline** actions. Only the `allow` action consents.
+   - Before showing the prompt it requires notification actions, the portal
+     frontend's `ScreenCast` interface with a monitor source and, for control,
+     `RemoteDesktop` with keyboard and pointer devices. A missing interface ends
+     the session `UNAVAILABLE` (`portal_screencast_unavailable`,
+     `portal_remote_desktop_unavailable`, ...) before consent; control is never
+     reduced to view.
+   - It then requires that every lock of the desktop is observable. The helper
+     subscribes to logind `Session.Lock` for its bound session and to
+     `Manager.PrepareForSleep`, and ends every session `SESSION_LOCKED`
+     (`logind_lock`, `logind_prepare_for_sleep`) when either fires; without that
+     watch no prompt is shown (`lock_watch_unavailable`). The helper's
+     `XDG_CURRENT_DESKTOP`, the identification xdg-desktop-portal itself uses to
+     select backends, selects from an explicit lock-observability table: `GNOME`
+     (gnome-shell sets `LockedHint` on every lock) and `COSMIC` (cosmic-greeter
+     locks only on logind `Lock` and `PrepareForSleep`; COSMIC's lock-screen
+     and idle actions run `loginctl lock-session`). Any other desktop, including
+     Cinnamon 6.6 and Hyprland, ends `UNAVAILABLE`
+     (`session_lock_state_unreported`) before consent, because a lock there
+     would not end sharing.
    - After **Allow** it opens the XDG ScreenCast portal (view) or the
      RemoteDesktop+ScreenCast portal (control). On GNOME, keyboard and pointer
      access is a separate switch in that dialog, off by default. If the user
@@ -1980,7 +2046,7 @@ Termination sources and recorded causes:
 | The notification's **Stop sharing** action                                                                                                   | `USER_STOPPED`                                                 |
 | The desktop's own sharing indicator, or the portal session closing                                                                           | `PORTAL_CLOSED`                                                |
 | Decline, or cancelling the portal dialog                                                                                                     | `DECLINED`                                                     |
-| Lock                                                                                                                                         | `SESSION_LOCKED`                                               |
+| Lock (`LockedHint`, or logind `Session.Lock`/`PrepareForSleep` seen by the helper)                                                           | `SESSION_LOCKED`                                               |
 | Logout, session change, or the helper missing for 10 s                                                                                       | `SESSION_ENDED`                                                |
 | Consent deadline passing                                                                                                                     | `CONSENT_TIMEOUT` (or `NO_ELIGIBLE_SESSION` with no helper)    |
 | `ends_at` passing                                                                                                                            | `EXPIRED` (each of server, executor and helper uses its clock) |

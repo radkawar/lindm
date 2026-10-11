@@ -59,11 +59,13 @@ func TestNativeDistributionRejectsAliasesAndImmutableDerivatives(t *testing.T) {
 }
 
 func TestSUSEOracleKeepsRPMIdentity(t *testing.T) {
-	for _, id := range []string{"opensuse-leap", "opensuse-tumbleweed"} {
-		t.Run(id, func(t *testing.T) {
+	// Each identity is a registry release, so release-scoped health rules
+	// (such as the non-APT origin rule) apply as on a real guest.
+	for _, tc := range []struct{ id, version string }{{"opensuse-leap", "16.0"}, {"opensuse-tumbleweed", "20261001"}} {
+		t.Run(tc.id, func(t *testing.T) {
 			truth, actual := vmTestObservation()
-			truth.host[0] = id
-			actual.Host.OsId.Value = id
+			truth.host[0], truth.host[1] = tc.id, tc.version
+			actual.Host.OsId.Value, actual.Host.OsVersion.Value = tc.id, tc.version
 			if err := compareVMObservation(truth, actual); err != nil {
 				t.Fatalf("RPM package identity rejected for SUSE: %v", err)
 			}

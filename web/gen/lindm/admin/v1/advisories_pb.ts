@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/advisories.proto.
  */
 export const file_lindm_admin_v1_advisories: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hZHZpc29yaWVzLnByb3RvEg5saW5kbS5hZG1pbi52MSKWAQoRQWR2aXNvcnlFeGNlcHRpb24SEAoIYWN0b3JfaWQYASABKAkSDgoGcmVhc29uGAIgASgJEi8KC2FjY2VwdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKCAwoPQWR2aXNvcnlGaW5kaW5nEgoKAmlkGAEgASgJEhMKC2Fkdmlzb3J5X2lkGAIgASgJEgwKBGN2ZXMYAyADKAkSFAoMcGFja2FnZV9uYW1lGAQgASgJEhkKEWluc3RhbGxlZF92ZXJzaW9uGAUgASgJEhUKDWZpeGVkX3ZlcnNpb24YBiABKAkSFAoMYXJjaGl0ZWN0dXJlGAcgASgJEhAKCHNldmVyaXR5GAggASgJEjAKDHB1Ymxpc2hlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoFc3RhdGUYCiABKA4yJC5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmdTdGF0ZRI0CglleGNlcHRpb24YCyABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbhIPCgdmZWVkX2lkGAwgASgJEhIKCnNvdXJjZV91cmwYDSABKAkSDgoGcmVhc29uGA4gASgJIusCChFBZHZpc29yeUZyZXNobmVzcxIzCgVzdGF0ZRgBIAEoDjIkLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmluZGluZ1N0YXRlEg4KBnJlYXNvbhgCIAEoCRITCgtzbmFwc2hvdF9pZBgDIAEoCRIwCgxpbnZlbnRvcnlfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjgKFGludmVudG9yeV9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIzCg9mZWVkX2NoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2ZlZWRfZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHZmVlZF9pZBgIIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAkgASgJInMKGUxpc3REZXZpY2VGaW5kaW5nc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglwYWdlX3NpemUYAiABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAIIp4BChpMaXN0RGV2aWNlRmluZGluZ3NSZXNwb25zZRIxCghmaW5kaW5ncxgBIAMoCzIfLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmluZGluZxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkSNAoJZnJlc2huZXNzGAMgASgLMiEubGluZG0uYWRtaW4udjEuQWR2aXNvcnlGcmVzaG5lc3MiVwoaTGlzdEFkdmlzb3J5U3VtbWFyeVJlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiACCKTAQoPQWR2aXNvcnlTdW1tYXJ5EhMKC2Fkdmlzb3J5X2lkGAEgASgJEhAKCHNldmVyaXR5GAIgASgJEhgKEGFmZmVjdGVkX2RldmljZXMYAyABKAQSGAoQYWNjZXB0ZWRfZGV2aWNlcxgEIAEoBBIXCg91bmtub3duX2RldmljZXMYBSABKAQSDAoEY3ZlcxgGIAMoCSKfAQobTGlzdEFkdmlzb3J5U3VtbWFyeVJlc3BvbnNlEjMKCmFkdmlzb3JpZXMYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhcKD3Vua25vd25fZGV2aWNlcxgDIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgEIAEoBCIaChhMaXN0QWR2aXNvcnlGZWVkc1JlcXVlc3Qi7wMKEkFkdmlzb3J5RmVlZFN0YXR1cxIKCgJpZBgBIAEoCRIOCgZkaXN0cm8YAiABKAkSDwoHcmVsZWFzZRgDIAEoCRISCgpzb3VyY2VfdXJsGAQgASgJEhUKDXNvdXJjZV9zaGEyNTYYBSABKAkSLgoKY2hlY2tlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMYXR0ZW1wdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVlcnJvchgJIAEoCRINCgVmcmVzaBgKIAEoCBIWCg5hZHZpc29yeV9jb3VudBgLIAEoBBIXCg9wbGF0Zm9ybV9zdHJlYW0YDCABKAkSMgoJYXJ0aWZhY3RzGA0gAygLMh8ubGluZG0uYWR2aXNvcnkudjEuRmVlZEFydGlmYWN0Ei8KC3NuYXBzaG90X2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI7ChByZWplY3RlZF9yZWNvcmRzGA8gAygLMiEubGluZG0uYWR2aXNvcnkudjEuUmVqZWN0ZWRSZWNvcmQiTgoZTGlzdEFkdmlzb3J5RmVlZHNSZXNwb25zZRIxCgVmZWVkcxgBIAMoCzIiLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmVlZFN0YXR1cyLKAQocQWNjZXB0QWR2aXNvcnlGaW5kaW5nUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEhwKCmZpbmRpbmdfaWQYAyABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEjYKCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQEiVQodQWNjZXB0QWR2aXNvcnlGaW5kaW5nUmVzcG9uc2USNAoJZXhjZXB0aW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQWR2aXNvcnlFeGNlcHRpb24qzgEKFEFkdmlzb3J5RmluZGluZ1N0YXRlEiYKIkFEVklTT1JZX0ZJTkRJTkdfU1RBVEVfVU5TUEVDSUZJRUQQABIjCh9BRFZJU09SWV9GSU5ESU5HX1NUQVRFX0FGRkVDVEVEEAESIwofQURWSVNPUllfRklORElOR19TVEFURV9BQ0NFUFRFRBACEiIKHkFEVklTT1JZX0ZJTkRJTkdfU1RBVEVfVU5LTk9XThADEiAKHEFEVklTT1JZX0ZJTkRJTkdfU1RBVEVfQ0xFQVIQBEIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_advisory_v1_feed, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hZHZpc29yaWVzLnByb3RvEg5saW5kbS5hZG1pbi52MSKWAQoRQWR2aXNvcnlFeGNlcHRpb24SEAoIYWN0b3JfaWQYASABKAkSDgoGcmVhc29uGAIgASgJEi8KC2FjY2VwdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKCAwoPQWR2aXNvcnlGaW5kaW5nEgoKAmlkGAEgASgJEhMKC2Fkdmlzb3J5X2lkGAIgASgJEgwKBGN2ZXMYAyADKAkSFAoMcGFja2FnZV9uYW1lGAQgASgJEhkKEWluc3RhbGxlZF92ZXJzaW9uGAUgASgJEhUKDWZpeGVkX3ZlcnNpb24YBiABKAkSFAoMYXJjaGl0ZWN0dXJlGAcgASgJEhAKCHNldmVyaXR5GAggASgJEjAKDHB1Ymxpc2hlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoFc3RhdGUYCiABKA4yJC5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmdTdGF0ZRI0CglleGNlcHRpb24YCyABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbhIPCgdmZWVkX2lkGAwgASgJEhIKCnNvdXJjZV91cmwYDSABKAkSDgoGcmVhc29uGA4gASgJIocDChFBZHZpc29yeUZyZXNobmVzcxIzCgVzdGF0ZRgBIAEoDjIkLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmluZGluZ1N0YXRlEg4KBnJlYXNvbhgCIAEoCRITCgtzbmFwc2hvdF9pZBgDIAEoCRIwCgxpbnZlbnRvcnlfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjgKFGludmVudG9yeV9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIzCg9mZWVkX2NoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2ZlZWRfZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHZmVlZF9pZBgIIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAkgASgJEhoKEnVuY292ZXJlZF9wYWNrYWdlcxgKIAEoBCJzChlMaXN0RGV2aWNlRmluZGluZ3NSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJcGFnZV9zaXplGAIgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiACCKeAQoaTGlzdERldmljZUZpbmRpbmdzUmVzcG9uc2USMQoIZmluZGluZ3MYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmcSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEjQKCWZyZXNobmVzcxgDIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RnJlc2huZXNzInwKIkxpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglwYWdlX3NpemUYAiABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAIIlcKEFVuY292ZXJlZFBhY2thZ2USDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJEhQKDGFyY2hpdGVjdHVyZRgDIAEoCRIOCgZyZWFzb24YBCABKAkiqAEKI0xpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1Jlc3BvbnNlEjIKCHBhY2thZ2VzGAEgAygLMiAubGluZG0uYWRtaW4udjEuVW5jb3ZlcmVkUGFja2FnZRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkSNAoJZnJlc2huZXNzGAMgASgLMiEubGluZG0uYWRtaW4udjEuQWR2aXNvcnlGcmVzaG5lc3MiVwoaTGlzdEFkdmlzb3J5U3VtbWFyeVJlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiACCKTAQoPQWR2aXNvcnlTdW1tYXJ5EhMKC2Fkdmlzb3J5X2lkGAEgASgJEhAKCHNldmVyaXR5GAIgASgJEhgKEGFmZmVjdGVkX2RldmljZXMYAyABKAQSGAoQYWNjZXB0ZWRfZGV2aWNlcxgEIAEoBBIXCg91bmtub3duX2RldmljZXMYBSABKAQSDAoEY3ZlcxgGIAMoCSK4AQobTGlzdEFkdmlzb3J5U3VtbWFyeVJlc3BvbnNlEjMKCmFkdmlzb3JpZXMYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhcKD3Vua25vd25fZGV2aWNlcxgDIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgEIAEoBBIXCg9wYXJ0aWFsX2RldmljZXMYBSABKAQiGgoYTGlzdEFkdmlzb3J5RmVlZHNSZXF1ZXN0Iu8DChJBZHZpc29yeUZlZWRTdGF0dXMSCgoCaWQYASABKAkSDgoGZGlzdHJvGAIgASgJEg8KB3JlbGVhc2UYAyABKAkSEgoKc291cmNlX3VybBgEIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAUgASgJEi4KCmNoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGF0dGVtcHRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCSABKAkSDQoFZnJlc2gYCiABKAgSFgoOYWR2aXNvcnlfY291bnQYCyABKAQSFwoPcGxhdGZvcm1fc3RyZWFtGAwgASgJEjIKCWFydGlmYWN0cxgNIAMoCzIfLmxpbmRtLmFkdmlzb3J5LnYxLkZlZWRBcnRpZmFjdBIvCgtzbmFwc2hvdF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOwoQcmVqZWN0ZWRfcmVjb3JkcxgPIAMoCzIhLmxpbmRtLmFkdmlzb3J5LnYxLlJlamVjdGVkUmVjb3JkIk4KGUxpc3RBZHZpc29yeUZlZWRzUmVzcG9uc2USMQoFZmVlZHMYASADKAsyIi5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZlZWRTdGF0dXMiygEKHEFjY2VwdEFkdmlzb3J5RmluZGluZ1JlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIcCgpmaW5kaW5nX2lkGAMgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARI2CgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBIlUKHUFjY2VwdEFkdmlzb3J5RmluZGluZ1Jlc3BvbnNlEjQKCWV4Y2VwdGlvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RXhjZXB0aW9uKvIBChRBZHZpc29yeUZpbmRpbmdTdGF0ZRImCiJBRFZJU09SWV9GSU5ESU5HX1NUQVRFX1VOU1BFQ0lGSUVEEAASIwofQURWSVNPUllfRklORElOR19TVEFURV9BRkZFQ1RFRBABEiMKH0FEVklTT1JZX0ZJTkRJTkdfU1RBVEVfQUNDRVBURUQQAhIiCh5BRFZJU09SWV9GSU5ESU5HX1NUQVRFX1VOS05PV04QAxIgChxBRFZJU09SWV9GSU5ESU5HX1NUQVRFX0NMRUFSEAQSIgoeQURWSVNPUllfRklORElOR19TVEFURV9QQVJUSUFMEAVCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_advisory_v1_feed, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AdvisoryException
@@ -180,6 +180,13 @@ export type AdvisoryFreshness = Message<"lindm.admin.v1.AdvisoryFreshness"> & {
    * @generated from field: string source_sha256 = 9;
    */
   sourceSha256: string;
+
+  /**
+   * Installed packages the applied feed does not cover (PARTIAL only).
+   *
+   * @generated from field: uint64 uncovered_packages = 10;
+   */
+  uncoveredPackages: bigint;
 };
 
 /**
@@ -244,6 +251,95 @@ export const ListDeviceFindingsResponseSchema: GenMessage<ListDeviceFindingsResp
   messageDesc(file_lindm_admin_v1_advisories, 4);
 
 /**
+ * @generated from message lindm.admin.v1.ListDeviceUncoveredPackagesRequest
+ */
+export type ListDeviceUncoveredPackagesRequest = Message<"lindm.admin.v1.ListDeviceUncoveredPackagesRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: uint32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListDeviceUncoveredPackagesRequest.
+ * Use `create(ListDeviceUncoveredPackagesRequestSchema)` to create a new message.
+ */
+export const ListDeviceUncoveredPackagesRequestSchema: GenMessage<ListDeviceUncoveredPackagesRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_advisories, 5);
+
+/**
+ * UncoveredPackage is an installed package whose exposure is UNKNOWN because
+ * the applied feed does not cover its verified origin; reason is a stable code.
+ *
+ * @generated from message lindm.admin.v1.UncoveredPackage
+ */
+export type UncoveredPackage = Message<"lindm.admin.v1.UncoveredPackage"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string version = 2;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string architecture = 3;
+   */
+  architecture: string;
+
+  /**
+   * @generated from field: string reason = 4;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.UncoveredPackage.
+ * Use `create(UncoveredPackageSchema)` to create a new message.
+ */
+export const UncoveredPackageSchema: GenMessage<UncoveredPackage> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_advisories, 6);
+
+/**
+ * @generated from message lindm.admin.v1.ListDeviceUncoveredPackagesResponse
+ */
+export type ListDeviceUncoveredPackagesResponse = Message<"lindm.admin.v1.ListDeviceUncoveredPackagesResponse"> & {
+  /**
+   * @generated from field: repeated lindm.admin.v1.UncoveredPackage packages = 1;
+   */
+  packages: UncoveredPackage[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+
+  /**
+   * @generated from field: lindm.admin.v1.AdvisoryFreshness freshness = 3;
+   */
+  freshness?: AdvisoryFreshness | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListDeviceUncoveredPackagesResponse.
+ * Use `create(ListDeviceUncoveredPackagesResponseSchema)` to create a new message.
+ */
+export const ListDeviceUncoveredPackagesResponseSchema: GenMessage<ListDeviceUncoveredPackagesResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_advisories, 7);
+
+/**
  * @generated from message lindm.admin.v1.ListAdvisorySummaryRequest
  */
 export type ListAdvisorySummaryRequest = Message<"lindm.admin.v1.ListAdvisorySummaryRequest"> & {
@@ -263,7 +359,7 @@ export type ListAdvisorySummaryRequest = Message<"lindm.admin.v1.ListAdvisorySum
  * Use `create(ListAdvisorySummaryRequestSchema)` to create a new message.
  */
 export const ListAdvisorySummaryRequestSchema: GenMessage<ListAdvisorySummaryRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 5);
+  messageDesc(file_lindm_admin_v1_advisories, 8);
 
 /**
  * @generated from message lindm.admin.v1.AdvisorySummary
@@ -305,7 +401,7 @@ export type AdvisorySummary = Message<"lindm.admin.v1.AdvisorySummary"> & {
  * Use `create(AdvisorySummarySchema)` to create a new message.
  */
 export const AdvisorySummarySchema: GenMessage<AdvisorySummary> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 6);
+  messageDesc(file_lindm_admin_v1_advisories, 9);
 
 /**
  * @generated from message lindm.admin.v1.ListAdvisorySummaryResponse
@@ -330,6 +426,13 @@ export type ListAdvisorySummaryResponse = Message<"lindm.admin.v1.ListAdvisorySu
    * @generated from field: uint64 evaluated_devices = 4;
    */
   evaluatedDevices: bigint;
+
+  /**
+   * Devices whose current evaluation covers only part of their packages.
+   *
+   * @generated from field: uint64 partial_devices = 5;
+   */
+  partialDevices: bigint;
 };
 
 /**
@@ -337,7 +440,7 @@ export type ListAdvisorySummaryResponse = Message<"lindm.admin.v1.ListAdvisorySu
  * Use `create(ListAdvisorySummaryResponseSchema)` to create a new message.
  */
 export const ListAdvisorySummaryResponseSchema: GenMessage<ListAdvisorySummaryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 7);
+  messageDesc(file_lindm_admin_v1_advisories, 10);
 
 /**
  * @generated from message lindm.admin.v1.ListAdvisoryFeedsRequest
@@ -350,7 +453,7 @@ export type ListAdvisoryFeedsRequest = Message<"lindm.admin.v1.ListAdvisoryFeeds
  * Use `create(ListAdvisoryFeedsRequestSchema)` to create a new message.
  */
 export const ListAdvisoryFeedsRequestSchema: GenMessage<ListAdvisoryFeedsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 8);
+  messageDesc(file_lindm_admin_v1_advisories, 11);
 
 /**
  * @generated from message lindm.admin.v1.AdvisoryFeedStatus
@@ -437,7 +540,7 @@ export type AdvisoryFeedStatus = Message<"lindm.admin.v1.AdvisoryFeedStatus"> & 
  * Use `create(AdvisoryFeedStatusSchema)` to create a new message.
  */
 export const AdvisoryFeedStatusSchema: GenMessage<AdvisoryFeedStatus> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 9);
+  messageDesc(file_lindm_admin_v1_advisories, 12);
 
 /**
  * @generated from message lindm.admin.v1.ListAdvisoryFeedsResponse
@@ -454,7 +557,7 @@ export type ListAdvisoryFeedsResponse = Message<"lindm.admin.v1.ListAdvisoryFeed
  * Use `create(ListAdvisoryFeedsResponseSchema)` to create a new message.
  */
 export const ListAdvisoryFeedsResponseSchema: GenMessage<ListAdvisoryFeedsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 10);
+  messageDesc(file_lindm_admin_v1_advisories, 13);
 
 /**
  * @generated from message lindm.admin.v1.AcceptAdvisoryFindingRequest
@@ -491,7 +594,7 @@ export type AcceptAdvisoryFindingRequest = Message<"lindm.admin.v1.AcceptAdvisor
  * Use `create(AcceptAdvisoryFindingRequestSchema)` to create a new message.
  */
 export const AcceptAdvisoryFindingRequestSchema: GenMessage<AcceptAdvisoryFindingRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 11);
+  messageDesc(file_lindm_admin_v1_advisories, 14);
 
 /**
  * @generated from message lindm.admin.v1.AcceptAdvisoryFindingResponse
@@ -508,11 +611,13 @@ export type AcceptAdvisoryFindingResponse = Message<"lindm.admin.v1.AcceptAdviso
  * Use `create(AcceptAdvisoryFindingResponseSchema)` to create a new message.
  */
 export const AcceptAdvisoryFindingResponseSchema: GenMessage<AcceptAdvisoryFindingResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 12);
+  messageDesc(file_lindm_admin_v1_advisories, 15);
 
 /**
  * UNKNOWN means the inventory, source coverage or advisory feed cannot establish
  * current exposure. ACCEPTED is time-limited risk acceptance, never a fix.
+ * PARTIAL is a device-level state only: exposure is known for the packages the
+ * applied feed covers and every other package is listed as uncovered.
  *
  * @generated from enum lindm.admin.v1.AdvisoryFindingState
  */
@@ -541,6 +646,11 @@ export enum AdvisoryFindingState {
    * @generated from enum value: ADVISORY_FINDING_STATE_CLEAR = 4;
    */
   CLEAR = 4,
+
+  /**
+   * @generated from enum value: ADVISORY_FINDING_STATE_PARTIAL = 5;
+   */
+  PARTIAL = 5,
 }
 
 /**

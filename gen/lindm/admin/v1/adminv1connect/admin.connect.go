@@ -240,6 +240,9 @@ const (
 	// AdminServiceListDeviceFindingsProcedure is the fully-qualified name of the AdminService's
 	// ListDeviceFindings RPC.
 	AdminServiceListDeviceFindingsProcedure = "/lindm.admin.v1.AdminService/ListDeviceFindings"
+	// AdminServiceListDeviceUncoveredPackagesProcedure is the fully-qualified name of the
+	// AdminService's ListDeviceUncoveredPackages RPC.
+	AdminServiceListDeviceUncoveredPackagesProcedure = "/lindm.admin.v1.AdminService/ListDeviceUncoveredPackages"
 	// AdminServiceListAdvisorySummaryProcedure is the fully-qualified name of the AdminService's
 	// ListAdvisorySummary RPC.
 	AdminServiceListAdvisorySummaryProcedure = "/lindm.admin.v1.AdminService/ListAdvisorySummary"
@@ -325,6 +328,7 @@ type AdminServiceClient interface {
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
 	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
 	ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error)
+	ListDeviceUncoveredPackages(context.Context, *connect.Request[v1.ListDeviceUncoveredPackagesRequest]) (*connect.Response[v1.ListDeviceUncoveredPackagesResponse], error)
 	ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error)
 	ListAdvisoryFeeds(context.Context, *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error)
 	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
@@ -761,6 +765,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListDeviceFindings")),
 			connect.WithClientOptions(opts...),
 		),
+		listDeviceUncoveredPackages: connect.NewClient[v1.ListDeviceUncoveredPackagesRequest, v1.ListDeviceUncoveredPackagesResponse](
+			httpClient,
+			baseURL+AdminServiceListDeviceUncoveredPackagesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDeviceUncoveredPackages")),
+			connect.WithClientOptions(opts...),
+		),
 		listAdvisorySummary: connect.NewClient[v1.ListAdvisorySummaryRequest, v1.ListAdvisorySummaryResponse](
 			httpClient,
 			baseURL+AdminServiceListAdvisorySummaryProcedure,
@@ -854,6 +864,7 @@ type adminServiceClient struct {
 	setDeviceGroup                       *connect.Client[v1.SetDeviceGroupRequest, v1.SetDeviceGroupResponse]
 	deleteDeviceGroup                    *connect.Client[v1.DeleteDeviceGroupRequest, v1.DeleteDeviceGroupResponse]
 	listDeviceFindings                   *connect.Client[v1.ListDeviceFindingsRequest, v1.ListDeviceFindingsResponse]
+	listDeviceUncoveredPackages          *connect.Client[v1.ListDeviceUncoveredPackagesRequest, v1.ListDeviceUncoveredPackagesResponse]
 	listAdvisorySummary                  *connect.Client[v1.ListAdvisorySummaryRequest, v1.ListAdvisorySummaryResponse]
 	listAdvisoryFeeds                    *connect.Client[v1.ListAdvisoryFeedsRequest, v1.ListAdvisoryFeedsResponse]
 	acceptAdvisoryFinding                *connect.Client[v1.AcceptAdvisoryFindingRequest, v1.AcceptAdvisoryFindingResponse]
@@ -1212,6 +1223,11 @@ func (c *adminServiceClient) ListDeviceFindings(ctx context.Context, req *connec
 	return c.listDeviceFindings.CallUnary(ctx, req)
 }
 
+// ListDeviceUncoveredPackages calls lindm.admin.v1.AdminService.ListDeviceUncoveredPackages.
+func (c *adminServiceClient) ListDeviceUncoveredPackages(ctx context.Context, req *connect.Request[v1.ListDeviceUncoveredPackagesRequest]) (*connect.Response[v1.ListDeviceUncoveredPackagesResponse], error) {
+	return c.listDeviceUncoveredPackages.CallUnary(ctx, req)
+}
+
 // ListAdvisorySummary calls lindm.admin.v1.AdminService.ListAdvisorySummary.
 func (c *adminServiceClient) ListAdvisorySummary(ctx context.Context, req *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error) {
 	return c.listAdvisorySummary.CallUnary(ctx, req)
@@ -1301,6 +1317,7 @@ type AdminServiceHandler interface {
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
 	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
 	ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error)
+	ListDeviceUncoveredPackages(context.Context, *connect.Request[v1.ListDeviceUncoveredPackagesRequest]) (*connect.Response[v1.ListDeviceUncoveredPackagesResponse], error)
 	ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error)
 	ListAdvisoryFeeds(context.Context, *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error)
 	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
@@ -1733,6 +1750,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ListDeviceFindings")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListDeviceUncoveredPackagesHandler := connect.NewUnaryHandler(
+		AdminServiceListDeviceUncoveredPackagesProcedure,
+		svc.ListDeviceUncoveredPackages,
+		connect.WithSchema(adminServiceMethods.ByName("ListDeviceUncoveredPackages")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceListAdvisorySummaryHandler := connect.NewUnaryHandler(
 		AdminServiceListAdvisorySummaryProcedure,
 		svc.ListAdvisorySummary,
@@ -1893,6 +1916,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceDeleteDeviceGroupHandler.ServeHTTP(w, r)
 		case AdminServiceListDeviceFindingsProcedure:
 			adminServiceListDeviceFindingsHandler.ServeHTTP(w, r)
+		case AdminServiceListDeviceUncoveredPackagesProcedure:
+			adminServiceListDeviceUncoveredPackagesHandler.ServeHTTP(w, r)
 		case AdminServiceListAdvisorySummaryProcedure:
 			adminServiceListAdvisorySummaryHandler.ServeHTTP(w, r)
 		case AdminServiceListAdvisoryFeedsProcedure:
@@ -2186,6 +2211,10 @@ func (UnimplementedAdminServiceHandler) DeleteDeviceGroup(context.Context, *conn
 
 func (UnimplementedAdminServiceHandler) ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDeviceFindings is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDeviceUncoveredPackages(context.Context, *connect.Request[v1.ListDeviceUncoveredPackagesRequest]) (*connect.Response[v1.ListDeviceUncoveredPackagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDeviceUncoveredPackages is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error) {

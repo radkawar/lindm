@@ -73,6 +73,7 @@ func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, 
 	if err != nil {
 		return nil, nil, err
 	}
+	vm.release = manifestRelease(manifest)
 	// QEMU inherited its own descriptor before Start returned. A later rename
 	// of the cache pathname cannot switch the machine to different image bytes.
 	return vm, verified, nil

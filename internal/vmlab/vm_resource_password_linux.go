@@ -114,7 +114,7 @@ func enablePasswordProvider(ctx context.Context, packages *nativeGuestPackages, 
 }
 
 const passwordFixtureScript = `set -eu
-. /etc/os-release
+` + nativeOSRelease + `
 case "$ID" in
  ubuntu|debian) DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality libpwquality-tools ;;
  fedora|rhel|almalinux|rocky) rpm -q libpwquality pam authselect ;;
@@ -126,7 +126,7 @@ command -v pwscore
 // with no authselect selection. The provider refuses that unmanaged stack; the
 // lane then selects the vendor sssd profile, as an installer-provisioned EL host
 // has, before qualifying the managed path.
-const passwordUnmanagedProbe = `. /etc/os-release
+const passwordUnmanagedProbe = nativeOSRelease + `
 case "$ID" in
  rhel|almalinux|rocky) if authselect current --raw >/dev/null 2>&1; then echo managed; else echo unmanaged; fi ;;
  *) echo managed ;;
@@ -160,7 +160,7 @@ const (
 // native configuration, and the distribution's PAM password stack.
 func passwordOracle(minLength uint32) func(context.Context, *guestVM) (VMResourceNativeRecord, error) {
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
-		stack := ". /etc/os-release; case \"$ID\" in ubuntu|debian) stack=/etc/pam.d/common-password ;; fedora|rhel|almalinux|rocky) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
+		stack := nativeOSRelease + "; case \"$ID\" in ubuntu|debian) stack=/etc/pam.d/common-password ;; fedora|rhel|almalinux|rocky) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
 		command := stack + "printf '%s\\n' " + passwordLongCandidate + " | pwscore; "
 		if minLength > 12 {
 			command += "if printf '%s\\n' " + passwordShortCandidate + " | pwscore; then exit 1; fi; printf 'short-rejected\\n'; "
@@ -168,12 +168,20 @@ func passwordOracle(minLength uint32) func(context.Context, *guestVM) (VMResourc
 			command += "printf '%s\\n' " + passwordShortCandidate + " | pwscore; printf 'short-accepted\\n'; "
 		}
 		command += "grep -rh '^[[:space:]]*\\(minlen\\|minclass\\)' /etc/security/pwquality.conf /etc/security/pwquality.conf.d/ || true"
+		command, err := vm.nativeScript(command)
+		if err != nil {
+			return VMResourceNativeRecord{}, err
+		}
 		return resourceOracle(ctx, vm, "native-pwquality-pam-stack", command)
 	}
 }
 
 func exerciseResourcePassword(ctx context.Context, packages *nativeGuestPackages, r *resourceDispatch, evidence *VMResourceKindEvidence) (resultErr error) {
-	if err := lifecycleCommand(ctx, r.vm, "install native password quality tools", passwordFixtureScript); err != nil {
+	fixture, err := r.vm.nativeScript(passwordFixtureScript)
+	if err != nil {
+		return err
+	}
+	if err := lifecycleCommand(ctx, r.vm, "install native password quality tools", fixture); err != nil {
 		return err
 	}
 	session, err := openRootRecoverySession(ctx, r.vm)
@@ -185,7 +193,11 @@ func exerciseResourcePassword(ctx context.Context, packages *nativeGuestPackages
 		return err
 	}
 	names := []string{"quality-baseline-rejects-short", "quality-reconcile-length", "repeat", "release-restores-defaults"}
-	probe, err := r.vm.run(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(passwordUnmanagedProbe), nil, 4096, time.Minute)
+	probeScript, err := r.vm.nativeScript(passwordUnmanagedProbe)
+	if err != nil {
+		return err
+	}
+	probe, err := r.vm.run(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(probeScript), nil, 4096, time.Minute)
 	if err != nil {
 		return fmt.Errorf("probe PAM stack manager: %w", err)
 	}

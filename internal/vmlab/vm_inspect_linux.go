@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -483,6 +484,8 @@ type vmTruth struct {
 	host     [6]string
 	manager  string
 	details  *inventoryv1.NativeDetails
+	// origins is APT's own per-package Release identity (dpkg systems only).
+	origins map[aptPackageKey][]aptRelease
 }
 
 // release identifies the guest from its observed os-release ID and VERSION_ID.
@@ -510,6 +513,16 @@ func collectVMTruth(ctx context.Context, vm *guestVM, release *platform.Release)
 	if err != nil {
 		return nil, err
 	}
+	var origins map[aptPackageKey][]aptRelease
+	if manager == "dpkg" {
+		data, err := vm.run(ctx, aptOriginTruthCommand, nil, maxGuestOutput, 2*time.Minute)
+		if err != nil {
+			return nil, fmt.Errorf("native APT origin truth: %w", err)
+		}
+		if origins, err = parseAptOriginTruth(data); err != nil {
+			return nil, err
+		}
+	}
 	host, err := vm.run(ctx, hostTruthCommand, nil, 64<<10, 15*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("native host truth: %w", err)
@@ -518,7 +531,7 @@ func collectVMTruth(ctx context.Context, vm *guestVM, release *platform.Release)
 	if len(lines) != 7 || lines[6] != "" {
 		return nil, errors.New("unexpected native host truth shape")
 	}
-	truth := &vmTruth{packages: packages, manager: manager}
+	truth := &vmTruth{packages: packages, manager: manager, origins: origins}
 	for i := range truth.host {
 		if (lines[i] == "" && (i != 1 || release.Version.Rule != platform.VersionAbsent)) || strings.ContainsAny(lines[i], "\x00\r") {
 			return nil, errors.New("invalid native host truth")
@@ -603,6 +616,14 @@ func stableVMTruth(before, after *vmTruth) error {
 	if before.manager != after.manager || !sameVMPackages(before.packages, after.packages) {
 		return errors.New("native package truth changed during inspection; no collector verdict")
 	}
+	if len(before.origins) != len(after.origins) {
+		return errors.New("native APT origin truth changed during inspection; no collector verdict")
+	}
+	for key, releases := range before.origins {
+		if !slices.Equal(releases, after.origins[key]) {
+			return errors.New("native APT origin truth changed during inspection; no collector verdict")
+		}
+	}
 	return nil
 }
 
@@ -640,6 +661,11 @@ func compareVMObservation(expected *vmTruth, actual *inventoryv1.NativeObservati
 			}
 		}
 		return fmt.Errorf("complete native package comparison failed: %d missing, %d unexpected records", missing, extra)
+	}
+	if expected.manager == "dpkg" {
+		if err := compareAptOrigins(expected.origins, actual.Packages.Packages); err != nil {
+			return err
+		}
 	}
 	host := actual.Host
 	names := []string{"OS ID", "OS version", "architecture", "kernel release", "hostname", "boot ID"}

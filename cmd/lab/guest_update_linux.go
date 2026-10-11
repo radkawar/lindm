@@ -50,6 +50,15 @@ func guestUpdateUnpack(ctx context.Context, output io.Writer) (resultErr error) 
 		return err
 	}
 	var group string
+	var start unix.Stat_t
+	held, err := unix.Open(packaging.BinaryPath, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return fmt.Errorf("observe installed agent binary: %w", err)
+	}
+	defer func() { resultErr = errors.Join(resultErr, unix.Close(held)) }()
+	if err := unix.Fstat(held, &start); err != nil {
+		return fmt.Errorf("observe installed agent binary: %w", err)
+	}
 	var nextStatus time.Time
 	buffer := make([]byte, 64<<10)
 	for {
@@ -85,7 +94,7 @@ func guestUpdateUnpack(ctx context.Context, output io.Writer) (resultErr error) 
 			}
 		}
 		if group != "" {
-			witness, err := freezeNativeUnpack(ctx, group, packaging.BinaryPath)
+			witness, err := freezeNativeUnpack(ctx, group, packaging.BinaryPath, &start)
 			if err != nil {
 				return err
 			}
@@ -144,9 +153,19 @@ func parseNativeUpdateCgroup(unit string, data []byte) (string, error) {
 	return "/sys/fs/cgroup" + group, nil
 }
 
-func nativeUnpackFiles(binary string) ([]string, error) {
+// nativeUnpackFiles lists the partial-write paths of the native managers: RPM
+// writes "<path>;<id>" and dpkg "<path>.dpkg-new" before renaming. libalpm
+// unlinks and writes the final path in place, so for pacman only a binary on
+// another inode than the probe-start one is a candidate. The caller holds
+// that original inode open, so its number cannot be reused meanwhile.
+func nativeUnpackFiles(binary string, original *unix.Stat_t) ([]string, error) {
 	files, err := filepath.Glob(binary + ";*")
-	return append(files, binary+".dpkg-new"), err
+	files = append(files, binary+".dpkg-new")
+	var stat unix.Stat_t
+	if original != nil && unix.Lstat(binary, &stat) == nil && (stat.Ino != original.Ino || stat.Dev != original.Dev) {
+		files = append(files, binary)
+	}
+	return files, err
 }
 
 func partialNativeFile(path string) (int64, error) {
@@ -163,8 +182,8 @@ func partialNativeFile(path string) (int64, error) {
 	return info.Size(), nil
 }
 
-func freezeNativeUnpack(ctx context.Context, group, binary string) (witness string, resultErr error) {
-	files, err := nativeUnpackFiles(binary)
+func freezeNativeUnpack(ctx context.Context, group, binary string, original *unix.Stat_t) (witness string, resultErr error) {
+	files, err := nativeUnpackFiles(binary, original)
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +254,8 @@ func freezeNativeUnpack(ctx context.Context, group, binary string) (witness stri
 			}
 			name := strings.TrimSpace(string(comm))
 			observed = append(observed, fmt.Sprintf("%d:%q", pid, name))
-			if name == "dnf" || name == "dnf5" || name == "dpkg" || name == "apt-get" {
+			inPlace := file == binary
+			if (inPlace && name == "pacman") || (!inPlace && (name == "dnf" || name == "dnf5" || name == "dpkg" || name == "apt-get")) {
 				return fmt.Sprintf("%s pid=%d unpack=%s bytes=%d cgroup=%s frozen=1", name, pid, file, size, filepath.Base(group)), nil
 			}
 		}

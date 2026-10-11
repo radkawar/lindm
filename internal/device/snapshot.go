@@ -335,6 +335,7 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 		}
 		if !batch.Stored && row.State == "staging" {
 			rows := make([]devicedb.InsertSnapshotPackagesParams, len(packages))
+			var listings []devicedb.InsertSnapshotPackageListingsParams
 			for i, pkg := range packages {
 				position := batch.FirstPosition + int32(i)
 				if position < batch.FirstPosition || position >= maxSnapshotRecords {
@@ -346,11 +347,24 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 					SourceName: pkg.GetSourceName(), SourceVersion: pkg.GetSourceVersion(),
 					ModuleStatus: int32(pkg.GetModule().GetStatus()), ModuleName: pkg.GetModule().GetName(),
 					ModuleStream: pkg.GetModule().GetStream(), ModuleVersion: pkg.GetModule().GetVersion(),
-					ModuleContext: pkg.GetModule().GetContext(),
+					ModuleContext: pkg.GetModule().GetContext(), OriginStatus: int16(pkg.GetOrigin().GetStatus()),
+				}
+				// Validation bounds listings to 16 per package.
+				for ordinal, listing := range pkg.GetOrigin().GetListings() {
+					listings = append(listings, devicedb.InsertSnapshotPackageListingsParams{
+						SnapshotID: snapshotID, Position: position, Ordinal: int16(ordinal),
+						Origin: listing.GetOrigin(), Label: listing.GetLabel(), Suite: listing.GetSuite(), Codename: listing.GetCodename(),
+						Signature: int16(listing.GetSignature()), Signer: listing.GetSigner(),
+					})
 				}
 			}
 			if len(rows) > 0 {
 				if _, err := q.InsertSnapshotPackages(ctx, rows); err != nil {
+					return err
+				}
+			}
+			if len(listings) > 0 {
+				if _, err := q.InsertSnapshotPackageListings(ctx, listings); err != nil {
 					return err
 				}
 			}

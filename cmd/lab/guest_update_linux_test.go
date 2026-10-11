@@ -6,8 +6,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"golang.org/x/sys/unix"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
@@ -44,9 +47,42 @@ func TestGuestUpdateUnpackCannotWitnessWithoutOwnedCgroup(t *testing.T) {
 	if err := os.WriteFile(binary+".dpkg-new", []byte("partial"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	witness, err := freezeNativeUnpack(context.Background(), filepath.Join(root, "absent-cgroup"), binary)
+	witness, err := freezeNativeUnpack(context.Background(), filepath.Join(root, "absent-cgroup"), binary, nil)
 	if err == nil || witness != "" {
 		t.Fatalf("unowned partial file became frozen native evidence: %q %v", witness, err)
+	}
+}
+
+// libalpm writes the final path in place after unlinking it: only a replaced
+// inode is a pacman unpack candidate, never the untouched installed binary.
+func TestGuestUpdateUnpackPacmanInPlaceCandidate(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "lindm-agent")
+	if err := os.WriteFile(binary, []byte("installed agent"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	held, err := os.Open(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = held.Close() })
+	var original unix.Stat_t
+	if err := unix.Fstat(int(held.Fd()), &original); err != nil {
+		t.Fatal(err)
+	}
+	if files, err := nativeUnpackFiles(binary, &original); err != nil || slices.Contains(files, binary) {
+		t.Fatalf("unchanged installed binary became an unpack candidate: %v %v", files, err)
+	}
+	if err := os.Remove(binary); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(binary, []byte("partial"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if files, err := nativeUnpackFiles(binary, &original); err != nil || !slices.Contains(files, binary) {
+		t.Fatalf("replaced inode is not a pacman candidate: %v %v", files, err)
+	}
+	if witness, err := freezeNativeUnpack(context.Background(), filepath.Join(t.TempDir(), "absent-cgroup"), binary, &original); err == nil || witness != "" {
+		t.Fatalf("unowned in-place write became frozen native evidence: %q %v", witness, err)
 	}
 }
 

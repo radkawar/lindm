@@ -66,6 +66,12 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err = media.release.Gate(platform.Encryption); err != nil {
 		return nil, err
 	}
+	omarchy := media.release.Lab.Installer == platform.OmarchyCidata
+	if omarchy {
+		if err = omarchyEncryptedOptions(&opts, m); err != nil {
+			return nil, err
+		}
+	}
 	hardware, err := encryptedMachineHardware(m, opts)
 	if err != nil {
 		return nil, err
@@ -156,63 +162,75 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if _, err = hostCommand(ctx, staging, "qemu-img", nil, "create", "-f", "qcow2", "disk.qcow2", "24G"); err != nil {
 		return nil, err
 	}
-	recipe, err := encryptedInstallerRecipeForMachine(media, state.Secret, loginPublic, string(state.HostKey), hostPublic, opts.Desktop, opts.TPMBoot, hardware.Architecture)
-	if err != nil {
-		return nil, err
-	}
-	installer, err := prepareEncryptedInstallerForMachine(ctx, staging, verified.Path, media.release.Lab.Installer, recipe, hardware.Architecture)
-	if err != nil {
-		return nil, err
-	}
 	config, err := encryptedSSHConfig(state.LoginKey, state.HostKey)
 	if err != nil {
 		return nil, err
 	}
 	vm := &EncryptedVM{dir: staging, config: config, firmware: fw, initialSecret: state.Secret, cacheDir: opts.CacheDir, hardware: hardware}
 	defer func() { err = errors.Join(err, vm.Kill()) }()
-	// Debian's netinst fetches its whole GNOME task from the signed archive
-	// during installation; 45 minutes did not cover it on the shared lab link.
-	installctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
-	defer cancel()
-	if err = vm.start(installctx, installer); err != nil {
-		return nil, err
-	}
-	serial, err := vm.serial(installctx)
-	if err != nil {
-		return nil, err
-	}
-	console := io.Discard
-	if opts.InstallerLog != "" {
-		// Opt-in diagnostics only: the installer console can echo lab
-		// configuration, so the log is a new owner-only file, never evidence.
-		logFile, openErr := os.OpenFile(opts.InstallerLog, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if openErr != nil {
-			return nil, fmt.Errorf("create private installer console log: %w", openErr)
+	if omarchy {
+		// Vendor cidata install on the unmodified ISO plus documented lab
+		// provisioning; the generic first cold boot below still applies.
+		if err = omarchyEncryptedInstall(ctx, m, staging, verified, hardware, state); err != nil {
+			return nil, err
 		}
-		defer func() { err = errors.Join(err, logFile.Close()) }()
-		console = &cappedWriter{w: logFile, remaining: maxInstallerLogBytes}
-	}
-	drained := make(chan struct{})
-	go func() { _, _ = io.Copy(console, serial); close(drained) }()
-	select {
-	case <-installctx.Done():
-		err = fmt.Errorf("encrypted installer deadline: %w", installctx.Err())
-	case <-vm.guest.done:
-		if !vm.guest.cmd.ProcessState.Success() {
-			err = errors.New("encrypted installer QEMU exited unsuccessfully")
+	} else {
+		recipe, err := encryptedInstallerRecipeForMachine(media, state.Secret, loginPublic, string(state.HostKey), hostPublic, opts.Desktop, opts.TPMBoot, hardware.Architecture)
+		if err != nil {
+			return nil, err
 		}
-	}
-	closeErr := serial.Close()
-	<-drained
-	err = errors.Join(err, closeErr, vm.Kill())
-	if err != nil {
-		return nil, err
+		installer, err := prepareEncryptedInstallerForMachine(ctx, staging, verified.Path, media.release.Lab.Installer, recipe, hardware.Architecture)
+		if err != nil {
+			return nil, err
+		}
+		// Debian's netinst fetches its whole GNOME task from the signed archive
+		// during installation; 45 minutes did not cover it on the shared lab link.
+		installctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
+		defer cancel()
+		if err = vm.start(installctx, installer); err != nil {
+			return nil, err
+		}
+		serial, err := vm.serial(installctx)
+		if err != nil {
+			return nil, err
+		}
+		console := io.Discard
+		if opts.InstallerLog != "" {
+			// Opt-in diagnostics only: the installer console can echo lab
+			// configuration, so the log is a new owner-only file, never evidence.
+			logFile, openErr := os.OpenFile(opts.InstallerLog, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+			if openErr != nil {
+				return nil, fmt.Errorf("create private installer console log: %w", openErr)
+			}
+			defer func() { err = errors.Join(err, logFile.Close()) }()
+			console = &cappedWriter{w: logFile, remaining: maxInstallerLogBytes}
+		}
+		drained := make(chan struct{})
+		go func() { _, _ = io.Copy(console, serial); close(drained) }()
+		select {
+		case <-installctx.Done():
+			err = fmt.Errorf("encrypted installer deadline: %w", installctx.Err())
+		case <-vm.guest.done:
+			if !vm.guest.cmd.ProcessState.Success() {
+				err = errors.New("encrypted installer QEMU exited unsuccessfully")
+			}
+		}
+		closeErr := serial.Close()
+		<-drained
+		if err = errors.Join(err, closeErr, vm.Kill()); err != nil {
+			return nil, err
+		}
 	}
 	if _, err = vm.ColdBoot(ctx, state.Secret); err != nil {
 		return nil, fmt.Errorf("first encrypted installed boot: %w", err)
 	}
 	if _, err = observeEncryptedGuest(ctx, vm, opts.Firmware.SecureBoot); err != nil {
 		return nil, err
+	}
+	if omarchy {
+		if err = omarchyEncryptedProbes(ctx, vm, m); err != nil {
+			return nil, err
+		}
 	}
 	shutdown, stop := context.WithTimeout(ctx, 2*time.Minute)
 	err = vm.PowerOff(shutdown)
@@ -444,6 +462,15 @@ func encryptedGoldenID(m *labv1.ImageManifest, opts EncryptedVMOptions, codeDige
 	if !tpm {
 		ownedDBKey += "\ntpm:absent"
 	}
-	sum := sha256.Sum256([]byte(encryptedRecipeVersion + "\n" + m.Sha256 + "\n" + codeDigest + "\n" + varsDigest + "\n" + opts.Firmware.Package + "\n" + opts.Firmware.Version + fmt.Sprint(opts.Firmware.SecureBoot) + "\n" + opts.Desktop + "\n" + fmt.Sprint(opts.TPMBoot) + ownedDBKey))
+	// Installers whose recipe is versioned with the installed-image recipe
+	// extend the version; existing goldens' identities are unchanged.
+	recipeVersion := encryptedRecipeVersion
+	switch platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer {
+	case platform.Ubiquity:
+		recipeVersion += "\n" + mintInstallerRecipeVersion
+	case platform.OmarchyCidata:
+		recipeVersion += "\n" + omarchyInstallerRecipeVersion
+	}
+	sum := sha256.Sum256([]byte(recipeVersion + "\n" + m.Sha256 + "\n" + codeDigest + "\n" + varsDigest + "\n" + opts.Firmware.Package + "\n" + opts.Firmware.Version + fmt.Sprint(opts.Firmware.SecureBoot) + "\n" + opts.Desktop + "\n" + fmt.Sprint(opts.TPMBoot) + ownedDBKey))
 	return hex.EncodeToString(sum[:])
 }

@@ -20,17 +20,6 @@ import (
 	"lindm/internal/platform"
 )
 
-// assistanceUserPrelude runs a command inside the autologin user's session
-// manager and bus. Only the disposable lab overlay is touched.
-const assistanceUserPrelude = `u=` + actionDesktopUser + `
-uid=$(id -u "$u")
-as() { sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus WAYLAND_DISPLAY=wayland-0 "$@"; }
-`
-
-func assistanceRootScript(script string) string {
-	return "sudo -n sh -eu -c " + nativeQuote(assistanceUserPrelude+script)
-}
-
 // routeAssistanceLocalhost makes the guest resolve "localhost" to QEMU's host
 // alias 10.0.2.2, as the recovery boot artifact lanes do. The signed device
 // origin (https://localhost:PORT) and the relay URL (turn:localhost:PORT) then
@@ -108,36 +97,39 @@ func pollGuest(ctx context.Context, vm *guestVM, timeout time.Duration, what, co
 	}
 }
 
-// prepareAssistanceDesktop logs the lab user into GNOME through GDM autologin
-// and removes first-login and idle surfaces that would cover the consent
-// controls: the release-upgrade prompt, the welcome tour and initial
-// overview, idle blanking and the automatic screen lock.
-func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, release *platform.Release) (*actionDesktopEvidence, error) {
+// prepareAssistanceDesktop logs the lab user into the golden's desktop through
+// its display manager's autologin and removes first-login and idle surfaces
+// that would cover the consent controls: the release-upgrade prompt, the
+// welcome tour or window and initial overview, idle blanking and the
+// automatic screen lock.
+func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, desktop *labDesktop, release *platform.Release) (*actionDesktopEvidence, error) {
 	if prompt := release.Lab.Session.UpgradePrompt; prompt != "" {
 		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote("if test -f "+nativeQuote(prompt)+"; then sed -i 's/^Prompt=.*/Prompt=never/' "+nativeQuote(prompt)+"; fi"), nil); err != nil {
 			return nil, fmt.Errorf("suppress release-upgrade prompt: %w", err)
 		}
 	}
-	if _, err := prepareActionDesktop(ctx, vm, release.Lab.Session); err != nil {
+	if _, err := prepareActionDesktop(ctx, vm, desktop, release); err != nil {
 		return nil, err
 	}
-	// gnome-session reaches its running phase only after the shell finished
-	// startup, which is when GNOME 50 opens its login overview.
-	if err := pollGuest(ctx, vm.guest, 3*time.Minute, "GNOME session startup", assistanceRootScript(`as gdbus call --session --dest org.gnome.SessionManager --object-path /org/gnome/SessionManager --method org.gnome.SessionManager.IsSessionRunning | grep -q true`)); err != nil {
+	if err := pollGuest(ctx, vm.guest, 3*time.Minute, desktop.name+" session startup", desktop.rootScript(desktop.ready)); err != nil {
 		return nil, err
 	}
-	settings := `as gsettings set org.gnome.desktop.session idle-delay 0
-as gsettings set org.gnome.desktop.screensaver lock-enabled false
-as gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
-as gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing
-as gsettings set org.gnome.shell welcome-dialog-last-shown-version 999
-pkill -u "$u" -x gnome-tour || true
+	settings := desktop.quiet + `
 session=$(loginctl list-sessions --no-legend --no-pager | awk -v u="$u" '$3 == u {print $1}' | while read -r id; do if test "$(loginctl show-session "$id" -p Class --value)" = user; then echo "$id"; fi; done)
 test -n "$session"
 loginctl unlock-session "$session"`
-	if result, err := vm.guest.runResult(ctx, assistanceRootScript(settings), nil, 16<<10, time.Minute); err != nil || result.ExitCode != 0 {
-		return nil, errors.Join(fmt.Errorf("configure lab GNOME session: exit %d: %s", result.ExitCode, bytes.TrimSpace(result.Stderr)), err)
+	if result, err := vm.guest.runResult(ctx, desktop.rootScript(settings), nil, 16<<10, time.Minute); err != nil || result.ExitCode != 0 {
+		return nil, errors.Join(fmt.Errorf("configure lab %s session: exit %d: %s", desktop.name, result.ExitCode, bytes.TrimSpace(result.Stderr)), err)
 	}
+	if desktop.name == "gnome" {
+		if err := closeGNOMEOverview(ctx, vm, desktop); err != nil {
+			return nil, err
+		}
+	}
+	return waitActionDesktop(ctx, vm, desktop, desktop.expectedLock(false))
+}
+
+func closeGNOMEOverview(ctx context.Context, vm *EncryptedVM, desktop *labDesktop) error {
 	// GNOME 50 opens the overview at login, after its startup animation, which
 	// can begin seconds after the shell answers on the bus. Escape on the local
 	// seat closes it; the desktop counts as ready only once the overview has
@@ -146,7 +138,7 @@ loginctl unlock-session "$session"`
 	defer cancel()
 	var last string
 	for closed := 0; closed < 5; {
-		result, err := vm.guest.runResult(ctx2, assistanceRootScript(`as gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.freedesktop.DBus.Properties.Get org.gnome.Shell OverviewActive`), nil, 4096, 15*time.Second)
+		result, err := vm.guest.runResult(ctx2, desktop.rootScript(`as gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.freedesktop.DBus.Properties.Get org.gnome.Shell OverviewActive`), nil, 4096, 15*time.Second)
 		switch {
 		case err != nil:
 			closed, last = 0, err.Error()
@@ -157,25 +149,25 @@ loginctl unlock-session "$session"`
 		default:
 			closed, last = 0, "overview open"
 			if err := vm.guest.sendKey(ctx2, "esc"); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		select {
 		case <-ctx2.Done():
-			return nil, fmt.Errorf("GNOME overview did not stay closed (last: %s)", last)
+			return fmt.Errorf("GNOME overview did not stay closed (last: %s)", last)
 		case <-time.After(time.Second):
 		}
 	}
-	return waitActionDesktop(ctx, vm, false)
+	return nil
 }
 
 // waitAssistanceSessionUnit observes the packaged user unit in the autologin
 // user's manager. It reports whether the unit came up on its own through
 // graphical-session.target; only if it did not is it started explicitly, and
 // that fact is recorded, never hidden.
-func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, evidence *assistanceGuestEvidence) error {
+func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, desktop *labDesktop, evidence *assistanceGuestEvidence) error {
 	state := func() (string, string, error) {
-		out, err := vm.runResult(ctx, assistanceRootScript(`as systemctl --user is-active lindm-session.service graphical-session.target || true`), nil, 4096, 15*time.Second)
+		out, err := vm.runResult(ctx, desktop.rootScript(`as systemctl --user is-active lindm-session.service graphical-session.target || true`), nil, 4096, 15*time.Second)
 		if err != nil {
 			return "", "", err
 		}
@@ -205,10 +197,10 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, evidence *assis
 		case <-time.After(2 * time.Second):
 		}
 	}
-	if _, err := vm.run(ctx, assistanceRootScript(`as systemctl --user start lindm-session.service`), nil, 4096, time.Minute); err != nil {
+	if _, err := vm.run(ctx, desktop.rootScript(`as systemctl --user start lindm-session.service`), nil, 4096, time.Minute); err != nil {
 		return fmt.Errorf("start lindm-session.service in the user manager: %w", err)
 	}
-	if err := pollGuest(ctx, vm, 30*time.Second, "lindm-session.service", assistanceRootScript(`as systemctl --user is-active --quiet lindm-session.service`)); err != nil {
+	if err := pollGuest(ctx, vm, 30*time.Second, "lindm-session.service", desktop.rootScript(`as systemctl --user is-active --quiet lindm-session.service`)); err != nil {
 		return err
 	}
 	evidence.SessionUnitState = "active"
@@ -218,7 +210,7 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, evidence *assis
 // openAssistanceTerminal starts a terminal in the lab user's session whose
 // shell reads exactly one line into path. Only keyboard input that reaches the
 // focused window can produce the file.
-func openAssistanceTerminal(ctx context.Context, vm *guestVM, release *platform.Release, path string) (string, error) {
+func openAssistanceTerminal(ctx context.Context, vm *guestVM, desktop *labDesktop, release *platform.Release, path string) (string, error) {
 	argv := release.Lab.Session.Terminal
 	if len(argv) == 0 {
 		return "", fmt.Errorf("assistance terminal is not maintained for %s", release.Name)
@@ -226,8 +218,8 @@ func openAssistanceTerminal(ctx context.Context, vm *guestVM, release *platform.
 	terminal := argv[0]
 	reader := `IFS= read -r line && printf %s "$line" > ` + nativeQuote(path)
 	script := `rm -f ` + nativeQuote(path) + `
-setsid sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus WAYLAND_DISPLAY=wayland-0 ` + strings.Join(argv, " ") + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
-	if _, err := vm.run(ctx, assistanceRootScript(script), nil, 4096, 30*time.Second); err != nil {
+setsid sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus ` + desktop.userEnv + ` ` + strings.Join(argv, " ") + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
+	if _, err := vm.run(ctx, desktop.rootScript(script), nil, 4096, 30*time.Second); err != nil {
 		return "", fmt.Errorf("open %s in the lab session: %w", terminal, err)
 	}
 	return terminal, pollGuest(ctx, vm, 30*time.Second, "terminal reader", "pgrep -u "+actionDesktopUser+" -f "+nativeQuote("read -r line")+" >/dev/null")
@@ -294,6 +286,40 @@ func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platfo
 		return nil, fmt.Errorf("observe capture stack packages: %w", err)
 	}
 	return strings.Fields(string(out)), nil
+}
+
+// observeAssistanceCapabilities records, before any scenario, what the
+// session helper's environment, portal frontend and notification server
+// expose natively. Absent interfaces are recorded, not failed: the
+// scenarios assert the product's visible handling of them.
+func observeAssistanceCapabilities(ctx context.Context, vm *guestVM, desktop *labDesktop) (*assistanceCapabilityEvidence, error) {
+	probe := func(script string) (string, error) {
+		result, err := vm.runResult(ctx, desktop.rootScript(script), nil, 64<<10, 30*time.Second)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(result.Stdout)), nil
+	}
+	const get = `as timeout 20 gdbus call --session --dest org.freedesktop.portal.Desktop --object-path /org/freedesktop/portal/desktop --method org.freedesktop.DBus.Properties.Get`
+	evidence := &assistanceCapabilityEvidence{}
+	var err error
+	if evidence.CurrentDesktop, err = probe(`as systemctl --user show-environment | sed -n 's/^XDG_CURRENT_DESKTOP=//p'`); err != nil {
+		return nil, err
+	}
+	interfaces, err := probe(`for p in ScreenCast:version ScreenCast:AvailableSourceTypes ScreenCast:AvailableCursorModes RemoteDesktop:version RemoteDesktop:AvailableDeviceTypes; do
+printf '%s=%s\n' "$p" "$(` + get + ` org.freedesktop.portal.${p%%:*} ${p#*:} 2>&1 | tr -d '\n')"
+done`)
+	if err != nil {
+		return nil, err
+	}
+	evidence.PortalInterfaces = strings.Split(interfaces, "\n")
+	if evidence.NotificationServer, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetServerInformation 2>&1 || true`); err != nil {
+		return nil, err
+	}
+	if evidence.NotificationCapabilities, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetCapabilities 2>&1 || true`); err != nil {
+		return nil, err
+	}
+	return evidence, nil
 }
 
 // assistanceJournalUnits are the bounded, nonsecret journal excerpts recorded

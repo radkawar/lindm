@@ -286,7 +286,8 @@ export function DashboardView() {
                     ariaLabel="Open findings by severity"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Devices checked: {findings.evaluatedDevices.toString()} · not checked:{" "}
+                    Devices checked: {findings.evaluatedDevices.toString()} · partly checked:{" "}
+                    {findings.partialDevices.toString()} · not checked:{" "}
                     {findings.unknownDevices.toString()}
                   </p>
                 </>

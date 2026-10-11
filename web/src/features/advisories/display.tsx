@@ -20,6 +20,33 @@ export function findingStateLabel(state: AdvisoryFindingState) {
     ? "Unknown"
     : label.charAt(0) + label.slice(1).toLowerCase().replaceAll("_", " ");
 }
+
+// Derivative vendors whose packages no published feed covers. The evaluation
+// reason names the vendor; uncovered vendor packages share that text.
+const vendorFeedText: Record<string, string> = {
+  vendor_feed_unavailable_linuxmint: "vendor feed unavailable for Linux Mint packages",
+  vendor_feed_unavailable_pop: "vendor feed unavailable for Pop!_OS packages",
+};
+
+const uncoveredReasonText: Record<string, string> = {
+  origin_unavailable: "APT origin evidence unavailable",
+  origin_unlisted: "installed version not listed by any APT source",
+  origin_ambiguous: "version also listed by a non-Ubuntu source",
+  origin_unverified: "listed only by unsigned or unverified APT sources",
+  origin_not_covered: "listed only by sources no advisory feed covers",
+  base_pocket_uncovered: "Ubuntu pocket without security support (backports or proposed)",
+};
+
+export function advisoryReasonText(reason: string) {
+  return vendorFeedText[reason] ?? reason.replaceAll("_", " ");
+}
+
+export function uncoveredPackageReasonText(reason: string, evaluationReason: string) {
+  if (reason === "vendor_feed_unavailable") {
+    return vendorFeedText[evaluationReason] ?? "vendor feed unavailable";
+  }
+  return uncoveredReasonText[reason] ?? reason.replaceAll("_", " ");
+}
 export function AdvisoryPaging({
   token,
   next,

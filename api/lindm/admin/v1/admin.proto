@@ -101,6 +101,7 @@ service AdminService {
   rpc SetDeviceGroup(SetDeviceGroupRequest) returns (SetDeviceGroupResponse);
   rpc DeleteDeviceGroup(DeleteDeviceGroupRequest) returns (DeleteDeviceGroupResponse);
   rpc ListDeviceFindings(ListDeviceFindingsRequest) returns (ListDeviceFindingsResponse);
+  rpc ListDeviceUncoveredPackages(ListDeviceUncoveredPackagesRequest) returns (ListDeviceUncoveredPackagesResponse);
   rpc ListAdvisorySummary(ListAdvisorySummaryRequest) returns (ListAdvisorySummaryResponse);
   rpc ListAdvisoryFeeds(ListAdvisoryFeedsRequest) returns (ListAdvisoryFeedsResponse);
   rpc AcceptAdvisoryFinding(AcceptAdvisoryFindingRequest) returns (AcceptAdvisoryFindingResponse);
@@ -250,6 +251,8 @@ message DevicePackage {
   string source_version = 7;
   // Absent only on historical snapshots predating native module evidence.
   lindm.inventory.v1.ModuleObservation module = 8;
+  // APT index origin evidence; absent only on historical snapshots.
+  lindm.inventory.v1.PackageOrigin origin = 9;
 }
 
 message ListDevicePackagesResponse {

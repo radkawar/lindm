@@ -51,7 +51,7 @@ func collect(ctx context.Context, rootObservation bool) (*inventoryv1.NativeObse
 	}
 	result := &inventoryv1.NativeObservation{
 		Host:     host,
-		Packages: collectPackages(ctx, release, os.Stat, runNative),
+		Packages: collectPackages(ctx, release, os.Stat, runNative, nativeApt),
 	}
 	if err := protovalidate.Validate(result); err != nil {
 		return nil, fmt.Errorf("validate native observation: %w", err)

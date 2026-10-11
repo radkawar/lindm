@@ -607,6 +607,18 @@ type InsertSnapshotBatchesParams struct {
 	Stored        bool
 }
 
+type InsertSnapshotPackageListingsParams struct {
+	SnapshotID uuid.UUID
+	Position   int32
+	Ordinal    int16
+	Origin     string
+	Label      string
+	Suite      string
+	Codename   string
+	Signature  int16
+	Signer     string
+}
+
 type InsertSnapshotPackagesParams struct {
 	SnapshotID    uuid.UUID
 	Position      int32
@@ -621,6 +633,7 @@ type InsertSnapshotPackagesParams struct {
 	ModuleStream  string
 	ModuleVersion string
 	ModuleContext string
+	OriginStatus  int16
 }
 
 const listExpiredOpenSnapshots = `-- name: ListExpiredOpenSnapshots :many
@@ -800,9 +813,63 @@ func (q *Queries) ListReleasableSnapshotBulk(ctx context.Context, arg ListReleas
 	return items, nil
 }
 
+const listSnapshotPackageListings = `-- name: ListSnapshotPackageListings :many
+SELECT position, ordinal, origin, label, suite, codename, signature, signer
+FROM snapshot_package_listings
+WHERE snapshot_id = $1
+  AND position = ANY($2::integer[])
+ORDER BY position, ordinal
+`
+
+type ListSnapshotPackageListingsParams struct {
+	SnapshotID uuid.UUID
+	Positions  []int32
+}
+
+type ListSnapshotPackageListingsRow struct {
+	Position  int32
+	Ordinal   int16
+	Origin    string
+	Label     string
+	Suite     string
+	Codename  string
+	Signature int16
+	Signer    string
+}
+
+// Origin listings of one bounded page of package positions (at most 16 each).
+func (q *Queries) ListSnapshotPackageListings(ctx context.Context, arg ListSnapshotPackageListingsParams) ([]ListSnapshotPackageListingsRow, error) {
+	rows, err := q.db.Query(ctx, listSnapshotPackageListings, arg.SnapshotID, arg.Positions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSnapshotPackageListingsRow{}
+	for rows.Next() {
+		var i ListSnapshotPackageListingsRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.Ordinal,
+			&i.Origin,
+			&i.Label,
+			&i.Suite,
+			&i.Codename,
+			&i.Signature,
+			&i.Signer,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSnapshotPackages = `-- name: ListSnapshotPackages :many
 SELECT position, name, version, architecture, manager, source_name, source_version,
-       module_status, module_name, module_stream, module_version, module_context
+       module_status, module_name, module_stream, module_version, module_context, origin_status
 FROM snapshot_packages
 WHERE snapshot_id = $1
   AND position >= $2
@@ -837,6 +904,7 @@ type ListSnapshotPackagesRow struct {
 	ModuleStream  string
 	ModuleVersion string
 	ModuleContext string
+	OriginStatus  int16
 }
 
 func (q *Queries) ListSnapshotPackages(ctx context.Context, arg ListSnapshotPackagesParams) ([]ListSnapshotPackagesRow, error) {
@@ -868,6 +936,7 @@ func (q *Queries) ListSnapshotPackages(ctx context.Context, arg ListSnapshotPack
 			&i.ModuleStream,
 			&i.ModuleVersion,
 			&i.ModuleContext,
+			&i.OriginStatus,
 		); err != nil {
 			return nil, err
 		}

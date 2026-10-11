@@ -18,7 +18,7 @@ import (
 func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm assistance", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04 or Fedora 44 encrypted installer manifest")
+	manifestPath := flags.String("manifest", "", "signed encrypted installer manifest of a release whose registry row supports assistance")
 	var options vmlab.VMAssistanceOptions
 	hardware := &vmlab.VMHardwareOptions{TPM: true, Desktop: true, AllowNetwork: true}
 	flags.StringVar(&hardware.Architecture, "architecture", "x86_64", "emulated architecture; manifest and installer must qualify it")
@@ -32,15 +32,17 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&options.RelayAddress, "relay-address", "127.0.0.1", "specific IPv4 address for TURN relay allocations on this host")
 	flags.StringVar(&options.Encrypted.CacheDir, "cache", ".cache/lab/images", "verified official image cache")
 	flags.StringVar(&options.Encrypted.GoldenDir, "golden-cache", ".cache/lab/encrypted", "private encrypted installer golden cache")
-	flags.BoolVar(&options.Encrypted.RequireCachedGolden, "require-cached-golden", false, "fail instead of provisioning a missing encrypted GNOME golden")
+	flags.BoolVar(&options.Encrypted.RequireCachedGolden, "require-cached-golden", false, "fail instead of provisioning a missing encrypted desktop golden")
 	flags.StringVar(&options.Encrypted.WorkDir, "work-dir", "", "existing short parent for private disposable VM state (QEMU unix socket paths must stay under 108 bytes)")
 	flags.StringVar(&options.Encrypted.Firmware.Code, "firmware-code", "", "package-owned OVMF code")
 	flags.StringVar(&options.Encrypted.Firmware.Vars, "firmware-vars", "", "matching package-owned OVMF NVRAM template")
 	flags.StringVar(&options.Encrypted.Firmware.Package, "firmware-package", "", "installed host firmware package")
 	flags.StringVar(&options.Encrypted.Firmware.Version, "firmware-version", "", "exact required firmware package version")
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
+	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland")
+	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack (must match the cached golden)")
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
-	scenarios := flags.String("scenarios", "", "comma-separated subset of control,view,decline,portal-cancel,lock; -hold defaults to none")
+	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	flags.BoolVar(&options.ConsoleTURNTCP, "console-turn-tcp", false, "restrict the operator Chromium to TURN over TCP (a remote console behind an SSH forward) and require a TCP relay pair")
 	controlPlane := flags.String("control-plane", "", "private single-use controller handle (internal SSH lane input)")
@@ -84,8 +86,6 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 			return err
 		}
 	}
-	options.Encrypted.Desktop = "gnome"
-	options.Encrypted.TPMBoot = true
 	options.Encrypted.Hardware = hardware
 	if *hold {
 		options.Hold = func(access *vmlab.AssistanceHold) error { return writeAssistanceHold(stdout, *evidence, access) }

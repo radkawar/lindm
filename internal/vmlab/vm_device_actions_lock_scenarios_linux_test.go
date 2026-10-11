@@ -5,19 +5,41 @@ package vmlab
 import (
 	"strings"
 	"testing"
+
+	"lindm/internal/platform"
 )
 
+func mustLabDesktop(t *testing.T, name string) *labDesktop {
+	t.Helper()
+	for _, desktop := range labDesktops {
+		if desktop.name == name {
+			return desktop
+		}
+	}
+	t.Fatalf("no lab desktop profile %q", name)
+	return nil
+}
+
+func desktopFields(desktop *labDesktop, kind, label string, state lockState) []string {
+	hint, locker := "no", "unlocked"
+	if state.hint {
+		hint = "yes"
+	}
+	if state.locker {
+		locker = "locked"
+	}
+	return []string{"4", kind, label, hint, "user", actionDesktopUser, desktop.services[0], locker}
+}
+
 func TestActionDesktopRequiresGenuineUserAndBothLockOracles(t *testing.T) {
-	for _, desktop := range []string{"", "ubuntu", "gnome"} {
+	gnome := mustLabDesktop(t, "gnome")
+	for _, label := range []string{"", "ubuntu", "gnome"} {
 		for _, kind := range []string{"wayland", "x11"} {
 			for _, locked := range []bool{false, true} {
-				fields := []string{"4", kind, desktop, "no", "user", actionDesktopUser, "gdm-autologin", "(false,)"}
-				if locked {
-					fields[3], fields[7] = "yes", "(true,)"
-				}
-				observed, err := parseActionDesktop([]byte(strings.Join(fields, "\n")+"\n"), locked)
-				if err != nil || observed == nil || observed.LockedHint != locked || observed.ScreenSaverActive != locked || observed.Desktop != desktop {
-					t.Fatalf("%s/%s locked=%t: observed=%+v error=%v", desktop, kind, locked, observed, err)
+				want := gnome.expectedLock(locked)
+				observed, err := parseActionDesktop(gnome, []byte(strings.Join(desktopFields(gnome, kind, label, want), "\n")+"\n"), want)
+				if err != nil || observed == nil || observed.LockedHint != locked || observed.ScreenSaverActive != locked || observed.Desktop != label {
+					t.Fatalf("%s/%s locked=%t: observed=%+v error=%v", label, kind, locked, observed, err)
 				}
 			}
 		}
@@ -32,19 +54,50 @@ func TestActionDesktopRequiresGenuineUserAndBothLockOracles(t *testing.T) {
 		{"wrong_user", 5, "gdm"},
 		{"not_gdm_login", 6, "sshd"},
 		{"missing_logind_ack", 3, "no"},
-		{"missing_gnome_ack", 7, "(false,)"},
+		{"missing_gnome_ack", 7, "unlocked"},
 		{"invalid_logind", 3, "unknown"},
-		{"invalid_gnome", 7, "()"},
+		{"invalid_gnome", 7, "invalid"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			fields := []string{"4", "wayland", "ubuntu", "yes", "user", actionDesktopUser, "gdm-autologin", "(true,)"}
+			want := gnome.expectedLock(true)
+			fields := desktopFields(gnome, "wayland", "ubuntu", want)
 			fields[test.field] = test.value
-			if _, err := parseActionDesktop([]byte(strings.Join(fields, "\n")), true); err == nil {
+			if _, err := parseActionDesktop(gnome, []byte(strings.Join(fields, "\n")), want); err == nil {
 				t.Fatal("invalid native observation was accepted")
 			}
 		})
 	}
-	if _, err := parseActionDesktop(nil, false); err == nil {
+	if _, err := parseActionDesktop(gnome, nil, gnome.expectedLock(false)); err == nil {
 		t.Fatal("no logged-in session was accepted")
+	}
+}
+
+// Cinnamon 6.6 engages its own locker on logind Lock but never reports
+// LockedHint; the lab requires exactly that, and refuses a GNOME-style claim.
+func TestCinnamonLockExpectsLockerWithoutLockedHint(t *testing.T) {
+	cinnamon := mustLabDesktop(t, "cinnamon")
+	want := cinnamon.expectedLock(true)
+	if want.hint || !want.locker {
+		t.Fatalf("cinnamon lock expectation %+v", want)
+	}
+	if _, err := parseActionDesktop(cinnamon, []byte(strings.Join(desktopFields(cinnamon, "x11", "cinnamon", want), "\n")), want); err != nil {
+		t.Fatal(err)
+	}
+	claimed := lockState{hint: true, locker: true}
+	if _, err := parseActionDesktop(cinnamon, []byte(strings.Join(desktopFields(cinnamon, "x11", "cinnamon", claimed), "\n")), want); err == nil {
+		t.Fatal("a LockedHint the desktop never sets was accepted")
+	}
+	if _, err := parseActionDesktop(cinnamon, []byte(strings.Join(desktopFields(cinnamon, "wayland", "cinnamon", want), "\n")), want); err == nil {
+		t.Fatal("a Wayland session was accepted for the X11 Cinnamon profile")
+	}
+	release := &platform.Release{Name: "fixture", Lab: platform.Lab{Session: platform.LabSession{Desktops: map[string][]string{"gnome": nil, "kde": nil}}}}
+	if _, err := labDesktopFor("cinnamon", release); err == nil {
+		t.Fatal("cinnamon profile accepted on a release whose lab session lacks it")
+	}
+	if _, err := labDesktopFor("kde", release); err == nil {
+		t.Fatal("a lab session without a desktop profile was accepted")
+	}
+	if desktop, err := labDesktopFor("gnome", release); err != nil || desktop.name != "gnome" {
+		t.Fatalf("gnome profile = %v, %v", desktop, err)
 	}
 }

@@ -144,6 +144,16 @@ type fakePortal struct {
 	mu     sync.Mutex
 	modes  []agentv1.AssistanceMode
 	opened chan struct{}
+	// refuse maps a mode to the Check result a desktop's portal produces.
+	refuse  map[agentv1.AssistanceMode]error
+	checked []agentv1.AssistanceMode
+}
+
+func (p *fakePortal) Check(_ context.Context, mode agentv1.AssistanceMode) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.checked = append(p.checked, mode)
+	return p.refuse[mode]
 }
 
 func (p *fakePortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (Grant, error) {
@@ -321,10 +331,55 @@ type harness struct {
 	portal   *fakePortal
 	capturer *fakeCapturer
 	peers    *fakePeers
+	locks    *fakeLocks
 	ctx      context.Context
 }
 
+// fakeLocks is the LockMonitor boundary: one channel per subscription.
+type fakeLocks struct {
+	mu         sync.Mutex
+	err        error
+	subscribed []string
+	current    *fakeLockWatch
+}
+
+type fakeLockWatch struct {
+	locked chan string
+	once   sync.Once
+	closed bool
+}
+
+func (w *fakeLockWatch) Locked() <-chan string { return w.locked }
+
+func (w *fakeLockWatch) Close() error {
+	w.once.Do(func() { w.closed = true })
+	return nil
+}
+
+func (l *fakeLocks) Subscribe(_ context.Context, sessionID string) (LockSubscription, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.subscribed = append(l.subscribed, sessionID)
+	if l.err != nil {
+		return nil, l.err
+	}
+	l.current = &fakeLockWatch{locked: make(chan string, 4)}
+	return l.current, nil
+}
+
+func (l *fakeLocks) watch() *fakeLockWatch {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.current
+}
+
 func newHarness(t *testing.T) *harness {
+	return newDesktopHarness(t, "ubuntu:GNOME")
+}
+
+// newDesktopHarness builds a helper for a session whose XDG_CURRENT_DESKTOP
+// is currentDesktop.
+func newDesktopHarness(t *testing.T, currentDesktop string) *harness {
 	t.Helper()
 	h := &harness{
 		t:        t,
@@ -334,16 +389,19 @@ func newHarness(t *testing.T) *harness {
 		portal:   &fakePortal{grant: &fakeGrant{closed: make(chan struct{})}},
 		capturer: newFakeCapturer(),
 		peers:    newFakePeers(),
+		locks:    &fakeLocks{},
 		ctx:      t.Context(),
 	}
 	h.client.set(h.directives())
 	helper, err := newHelper(Config{
-		Client:   h.client,
-		Notifier: h.notifier,
-		Portal:   h.portal,
-		Capturer: h.capturer,
-		Peers:    h.peers,
-		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Client:         h.client,
+		Notifier:       h.notifier,
+		Portal:         h.portal,
+		Capturer:       h.capturer,
+		Peers:          h.peers,
+		Locks:          h.locks,
+		CurrentDesktop: currentDesktop,
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}, testUID)
 	if err != nil {
 		t.Fatal(err)

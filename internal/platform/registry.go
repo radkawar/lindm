@@ -24,6 +24,11 @@ const (
 	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
 	reasonEL8Packages    = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
 	reasonRockyOSV       = "Rocky's OSV export uses source-like package mappings without a complete binary universe"
+	reasonPacmanHost     = "host resource providers have no pacman/Arch implementation or measured native quirks"
+	// The owned systemd-boot recovery fixture needs systemd-ukify, sbsigntools
+	// and busybox, absent from the authenticated Omarchy ISO's offline
+	// repository; a partial install from rolling mirrors is not used.
+	reasonOmarchyOwnedBoot = "owned-boot recovery fixture packages (systemd-ukify, sbsigntools, busybox) are not on the authenticated Omarchy ISO and partial pacman upgrades are unsupported"
 )
 
 func caps(groups ...[]Capability) []Capability { return slices.Concat(groups...) }
@@ -206,8 +211,13 @@ var registry = []*Release{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 255, UpgradeTo: "ubuntu-26.04",
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
+		// Archive facts observed on every 24.04 pocket (archive, security,
+		// ports and the Pop!_OS mirror) on 2026-10-11: Ubuntu Archive Automatic
+		// Signing Key (2018). Ubuntu's OSV export assesses the release, -updates
+		// and -security pockets; -backports and -proposed get no security support.
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:24.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "noble", CodenameRelease: true,
-			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
+			Exports:       map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}},
+			ArchiveOrigin: "Ubuntu", ArchiveSuites: []string{"noble", "noble-security", "noble-updates"}, ArchiveSigners: []string{"F6ECB3762474EDA9D21B7022871920D1991BC93C"}},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
@@ -407,17 +417,40 @@ var registry = []*Release{
 		Key: "linuxmint-22.3", Name: "Linux Mint 22.3", Distribution: "Linux Mint", ID: "linuxmint", Version: Exact("22.3"),
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "mint.md", Family: FamilyDebian, Architectures: x86,
-		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", Lock: "cinnamon-screensaver"},
-		Supports: caps(agentCore, hostResources, []Capability{Password}),
-		Gates:    actionGates(string(Advisories), "no vendor advisory feed; the Ubuntu feed covers only verified Ubuntu-archive packages"),
+		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver"}, Firewall: ufw,
+		// The ISO's Ubiquity runs noninteractively from a debconf preseed; the
+		// installed root uses Ubuntu's initramfs-tools and archive package names.
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Ubiquity, Guest: ubuntuGuest,
+			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}},
+			// The live media install Cinnamon itself; LightDM autologs into it.
+			Session: LabSession{Desktops: map[string][]string{"cinnamon": nil}, Name: "cinnamon", Terminal: []string{"gnome-terminal", "--"},
+				Capture: []string{"cinnamon", "cinnamon-screensaver", "lightdm", "xdg-desktop-portal", "xdg-desktop-portal-xapp", "xdg-desktop-portal-gtk", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good"}}},
+		// packages.linuxmint.com publishes Release + Release.gpg with Origin
+		// "linuxmint" (observed 2026-10-11).
+		Advisory: Advisory{VendorOrigins: []string{"linuxmint"}, Partial: "vendor feed unavailable for Linux Mint packages"},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
+		Gates:    gates(string(Assistance), "portal_screencast_unavailable: xdg-desktop-portal-xapp/-gtk implement no ScreenCast or RemoteDesktop; lindm has no X11 capture path"),
 	},
 	{
 		Key: "pop-24.04", Name: "Pop!_OS 24.04 LTS", Distribution: "Pop!_OS", ID: "pop", Version: Exact("24.04"),
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "popos.md", Family: FamilyDebian, Architectures: x86,
-		FDE: "LUKS (distinst)", Desktop: Desktop{Name: "COSMIC", DisplayManager: "cosmic-greeter", Lock: "cosmic-greeter (logind)"},
-		Supports: caps(agentCore, hostResources, []Capability{Password}),
-		Gates:    actionGates(string(Advisories), "no vendor advisory feed; the Ubuntu feed covers only verified Ubuntu-archive packages"),
+		FDE: "LVM on LUKS (distinst)", Desktop: Desktop{Name: "COSMIC", DisplayManager: "cosmic-greeter", Lock: "cosmic-greeter (logind)"}, Firewall: ufw,
+		// The ISO's distinst runs pop-installer's erase layout; the installed
+		// root uses Pop's initramfs-tools and Ubuntu's archive package names.
+		// COSMIC comes from the ISO itself (no packages). The shipped
+		// cosmic.portal declares ScreenCast but no RemoteDesktop; the ISO lacks
+		// gstreamer1.0-pipewire, which the agent package Recommends.
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Distinst, Guest: ubuntuGuest,
+			Session: LabSession{Desktops: map[string][]string{"cosmic": nil}, Name: "cosmic", Terminal: []string{"cosmic-term", "-e"},
+				Capture: []string{"cosmic-comp", "cosmic-greeter", "cosmic-notifications", "xdg-desktop-portal", "xdg-desktop-portal-cosmic", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good"}},
+			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
+		// apt.pop-os.org/release ("pop-os-release") and /proprietary
+		// ("system76") use codename noble and the Pop!_OS key; its Ubuntu mirror
+		// serves Ubuntu's own signed InRelease (observed 2026-10-11).
+		Advisory: Advisory{VendorOrigins: []string{"pop-os-release", "system76"}, Partial: "vendor feed unavailable for Pop!_OS packages"},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
+		Gates:    gates(),
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),
@@ -431,9 +464,24 @@ var registry = []*Release{
 		Key: "omarchy-4.0.4", Name: "Omarchy 4.0.4", Distribution: "Omarchy", ID: "omarchy", Version: Exact("4.0.4"),
 		IDLike: []string{"arch"}, Base: "arch",
 		Tier: Tier2, Page: "omarchy.md", Family: FamilyArch, Architectures: x86,
-		FDE: "LUKS on Btrfs", Desktop: Desktop{Name: "Hyprland", Lock: "hyprlock"},
-		Supports: agentCore,
-		Gates:    actionGates(string(Advisories), "no vendor advisory feed; the Arch feed does not cover Omarchy packages"),
+		Systemd: 261,
+		FDE:     "LUKS2 on Btrfs (archinstall via the Omarchy ISO); mkinitcpio busybox encrypt hook, no TPM2 token unlock",
+		Desktop: Desktop{Name: "Hyprland", Version: "Hyprland 0.56.2", DisplayManager: "sddm", Lock: "Quickshell WlSessionLock (Omarchy shell)"}, Firewall: "ufw (active)",
+		// The ISO's offline repository supplies cloud-init and the action
+		// prerequisites at the install snapshot; see vmlab omarchy installer.
+		Lab: Lab{Lanes: []LabLane{LaneUpdates}, Installer: OmarchyCidata,
+			Guest: LabGuest{Actions: []string{"cryptsetup", "nftables", "iproute2", "iputils", "tpm2-tools", "bind", "curl"}},
+			TPM:   LabTPM{Unsupported: "the vendor mkinitcpio busybox encrypt hook cannot unlock with systemd TPM2 tokens, and no lab TPM early-boot variant replaces the vendor boot path"},
+			// The ISO always installs Hyprland; encrypted installs autologin
+			// SDDM into omarchy.desktop (uwsm). xdg-terminal-exec selects foot.
+			Session: LabSession{Desktops: map[string][]string{"hyprland": nil}, Name: "omarchy", Terminal: []string{"foot", "--"},
+				Capture: []string{"hyprland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "quickshell"}}},
+		Supports: caps(agentCore, []Capability{Encryption, Wipe, ReportLoss, Lock}),
+		Gates: gates(string(Advisories), "no vendor advisory feed; the Arch feed does not cover Omarchy packages",
+			string(RecoverySanitize), reasonOmarchyOwnedBoot,
+			string(Assistance), "session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland",
+			string(Packages), reasonPacmanHost, string(Accounts), reasonPacmanHost, string(Sysctl), reasonPacmanHost,
+			string(Definitions), reasonPacmanHost, string(Firewall), reasonPacmanHost, string(Password), reasonPacmanHost),
 	},
 	{
 		Key: "opensuse-tumbleweed", Name: "openSUSE Tumbleweed", Distribution: "openSUSE Tumbleweed", ID: "opensuse-tumbleweed", Version: Snapshot(),

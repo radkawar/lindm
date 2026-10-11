@@ -10,19 +10,20 @@ import (
 )
 
 type AdvisoryEvaluation struct {
-	DeviceID       uuid.UUID
-	ID             uuid.UUID
-	SnapshotID     *uuid.UUID
-	FeedID         string
-	FeedRevision   *uuid.UUID
-	EvaluatedAt    pgtype.Timestamptz
-	InventoryAt    pgtype.Timestamptz
-	HostReceivedAt pgtype.Timestamptz
-	ExpiresAt      pgtype.Timestamptz
-	State          string
-	Reason         string
-	FindingDigest  []byte
-	FindingSetID   *uuid.UUID
+	DeviceID          uuid.UUID
+	ID                uuid.UUID
+	SnapshotID        *uuid.UUID
+	FeedID            string
+	FeedRevision      *uuid.UUID
+	EvaluatedAt       pgtype.Timestamptz
+	InventoryAt       pgtype.Timestamptz
+	HostReceivedAt    pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	State             string
+	Reason            string
+	FindingDigest     []byte
+	FindingSetID      *uuid.UUID
+	UncoveredPackages int32
 }
 
 type AdvisoryFeed struct {
@@ -62,18 +63,19 @@ type AdvisoryFinding struct {
 }
 
 type AdvisoryFindingSet struct {
-	ID            uuid.UUID
-	FeedID        string
-	FeedRevision  uuid.UUID
-	PackageDigest []byte
-	State         string
-	Reason        string
-	FindingDigest []byte
-	FindingCount  int32
-	CriticalCount int32
-	HighCount     int32
-	MediumCount   int32
-	LowCount      int32
-	OtherCount    int32
-	CreatedAt     pgtype.Timestamptz
+	ID                uuid.UUID
+	FeedID            string
+	FeedRevision      uuid.UUID
+	PackageDigest     []byte
+	State             string
+	Reason            string
+	FindingDigest     []byte
+	FindingCount      int32
+	CriticalCount     int32
+	HighCount         int32
+	MediumCount       int32
+	LowCount          int32
+	OtherCount        int32
+	CreatedAt         pgtype.Timestamptz
+	UncoveredPackages int32
 }

@@ -133,12 +133,26 @@ INSERT INTO snapshot_packages (
     module_name,
     module_stream,
     module_version,
-    module_context
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+    module_context,
+    origin_status
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+
+-- name: InsertSnapshotPackageListings :copyfrom
+INSERT INTO snapshot_package_listings (
+    snapshot_id,
+    position,
+    ordinal,
+    origin,
+    label,
+    suite,
+    codename,
+    signature,
+    signer
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 
 -- name: ListSnapshotPackages :many
 SELECT position, name, version, architecture, manager, source_name, source_version,
-       module_status, module_name, module_stream, module_version, module_context
+       module_status, module_name, module_stream, module_version, module_context, origin_status
 FROM snapshot_packages
 WHERE snapshot_id = sqlc.arg('snapshot_id')
   AND position >= sqlc.arg('next_position')
@@ -149,6 +163,14 @@ WHERE snapshot_id = sqlc.arg('snapshot_id')
   )
 ORDER BY position
 LIMIT sqlc.arg('row_limit')::int;
+
+-- name: ListSnapshotPackageListings :many
+-- Origin listings of one bounded page of package positions (at most 16 each).
+SELECT position, ordinal, origin, label, suite, codename, signature, signer
+FROM snapshot_package_listings
+WHERE snapshot_id = sqlc.arg('snapshot_id')
+  AND position = ANY(sqlc.arg('positions')::integer[])
+ORDER BY position, ordinal;
 
 -- name: DeleteSnapshotPackages :exec
 DELETE FROM snapshot_packages
