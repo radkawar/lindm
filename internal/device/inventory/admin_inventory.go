@@ -217,120 +217,124 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 			position = start
 			pageToken = req.Msg.GetPageToken()
 		}
-		expires, ok := core.FiniteTime(cursor.ExpiresAt)
-		if !ok {
-			return core.ErrInternalState
-		}
-		// A request can wait on the cursor row after taking the device lock.
-		// Judge its fixed expiry only after both locks have been acquired.
-		if !s.Now().Before(expires) {
-			return core.ErrPageExpired
-		}
-		snapshot, err := q.GetPackageSnapshot(ctx, cursor.SnapshotID)
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				return core.ErrSnapshotExpired
-			}
-			return err
-		}
-		if snapshot.DeviceID != device.ID || !snapshot.BulkRetained {
-			return core.ErrSnapshotExpired
-		}
-		if snapshot.Sequence < 0 {
-			return core.ErrInternalState
-		}
-		pattern := "%"
-		if cursor.NamePrefix != "" {
-			pattern = likePrefix(cursor.NamePrefix)
-		}
-		rows, err := q.ListSnapshotPackages(ctx, devicedb.ListSnapshotPackagesParams{
-			SnapshotID: cursor.SnapshotID, NextPosition: int32(position), Manager: cursor.Manager,
-			NamePrefix: cursor.NamePrefix, NamePattern: pattern, RowLimit: limit + 1,
-		})
-		if err != nil {
-			return err
-		}
-		// Origin listings for the bounded page (≤16 per package) in one query.
-		positions := make([]int32, 0, len(rows))
-		for _, row := range rows {
-			if row.OriginStatus != 0 {
-				positions = append(positions, row.Position)
-			}
-		}
-		origins := map[int32]*inventoryv1.PackageOrigin{}
-		if len(positions) > 0 {
-			listed, err := q.ListSnapshotPackageListings(ctx, devicedb.ListSnapshotPackageListingsParams{SnapshotID: cursor.SnapshotID, Positions: positions})
-			if err != nil {
-				return err
-			}
-			for _, listing := range listed {
-				origin := origins[listing.Position]
-				if origin == nil {
-					origin = &inventoryv1.PackageOrigin{}
-					origins[listing.Position] = origin
-				}
-				origin.Listings = append(origin.Listings, &inventoryv1.AptListing{
-					Origin: listing.Origin, Label: listing.Label, Suite: listing.Suite, Codename: listing.Codename,
-					Signature: inventoryv1.AptReleaseSignature(listing.Signature), Signer: listing.Signer,
-				})
-			}
-		}
-		var budget core.ResponsePageBudget
-		packages := make([]*adminv1.DevicePackage, 0, min(len(rows), int(limit)))
-		for _, row := range rows {
-			if int32(len(packages)) == limit {
-				break
-			}
-			if row.Position < 0 {
-				return core.ErrInternalState
-			}
-			item := &adminv1.DevicePackage{
-				Position: uint32(row.Position), Name: row.Name, Version: row.Version, Architecture: row.Architecture, Manager: row.Manager,
-				SourceName: row.SourceName, SourceVersion: row.SourceVersion,
-			}
-			if row.ModuleStatus != 0 {
-				item.Module = &inventoryv1.ModuleObservation{
-					Status: inventoryv1.CollectionStatus(row.ModuleStatus), Modular: row.ModuleName != "",
-					Name: row.ModuleName, Stream: row.ModuleStream, Version: row.ModuleVersion, Context: row.ModuleContext,
-				}
-			}
-			if row.OriginStatus != 0 {
-				item.Origin = origins[row.Position]
-				if item.Origin == nil {
-					item.Origin = &inventoryv1.PackageOrigin{}
-				}
-				item.Origin.Status = inventoryv1.CollectionStatus(row.OriginStatus)
-			}
-			fits, err := budget.Take(item)
-			if err != nil {
-				return err
-			}
-			if !fits {
-				if len(packages) == 0 {
-					return core.ErrInternalState
-				}
-				break
-			}
-			packages = append(packages, item)
-		}
-		next := ""
-		if len(packages) < len(rows) {
-			last := packages[len(packages)-1]
-			next, err = encodePackagePage(cursor.ID, last.Position+1)
-			if err != nil {
-				return err
-			}
-		}
-		response = &adminv1.ListDevicePackagesResponse{
-			SnapshotId: cursor.SnapshotID.String(), Sequence: uint64(snapshot.Sequence), Packages: packages,
-			NextPageToken: next, CursorExpiresAt: timestamppb.New(expires), PageToken: pageToken,
-		}
-		return nil
+		response, err = s.readPackagePage(ctx, q, cursor, device.ID, position, pageToken, limit)
+		return err
 	})
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
 	return connect.NewResponse(response), nil
+}
+
+func (s *Service) readPackagePage(ctx context.Context, q *devicedb.Queries, cursor devicedb.PackagePageCursor, deviceID uuid.UUID, position uint32, pageToken string, limit int32) (*adminv1.ListDevicePackagesResponse, error) {
+	expires, ok := core.FiniteTime(cursor.ExpiresAt)
+	if !ok {
+		return nil, core.ErrInternalState
+	}
+	// A request can wait on the cursor row after taking the device lock.
+	// Judge its fixed expiry only after both locks have been acquired.
+	if !s.Now().Before(expires) {
+		return nil, core.ErrPageExpired
+	}
+	snapshot, err := q.GetPackageSnapshot(ctx, cursor.SnapshotID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, core.ErrSnapshotExpired
+		}
+		return nil, err
+	}
+	if snapshot.DeviceID != deviceID || !snapshot.BulkRetained {
+		return nil, core.ErrSnapshotExpired
+	}
+	if snapshot.Sequence < 0 {
+		return nil, core.ErrInternalState
+	}
+	pattern := "%"
+	if cursor.NamePrefix != "" {
+		pattern = likePrefix(cursor.NamePrefix)
+	}
+	rows, err := q.ListSnapshotPackages(ctx, devicedb.ListSnapshotPackagesParams{
+		SnapshotID: cursor.SnapshotID, NextPosition: int32(position), Manager: cursor.Manager,
+		NamePrefix: cursor.NamePrefix, NamePattern: pattern, RowLimit: limit + 1,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Origin listings for the bounded page (≤16 per package) in one query.
+	positions := make([]int32, 0, len(rows))
+	for _, row := range rows {
+		if row.OriginStatus != 0 {
+			positions = append(positions, row.Position)
+		}
+	}
+	origins := map[int32]*inventoryv1.PackageOrigin{}
+	if len(positions) > 0 {
+		listed, err := q.ListSnapshotPackageListings(ctx, devicedb.ListSnapshotPackageListingsParams{SnapshotID: cursor.SnapshotID, Positions: positions})
+		if err != nil {
+			return nil, err
+		}
+		for _, listing := range listed {
+			origin := origins[listing.Position]
+			if origin == nil {
+				origin = &inventoryv1.PackageOrigin{}
+				origins[listing.Position] = origin
+			}
+			origin.Listings = append(origin.Listings, &inventoryv1.AptListing{
+				Origin: listing.Origin, Label: listing.Label, Suite: listing.Suite, Codename: listing.Codename,
+				Signature: inventoryv1.AptReleaseSignature(listing.Signature), Signer: listing.Signer,
+			})
+		}
+	}
+	var budget core.ResponsePageBudget
+	packages := make([]*adminv1.DevicePackage, 0, min(len(rows), int(limit)))
+	for _, row := range rows {
+		if int32(len(packages)) == limit {
+			break
+		}
+		if row.Position < 0 {
+			return nil, core.ErrInternalState
+		}
+		item := &adminv1.DevicePackage{
+			Position: uint32(row.Position), Name: row.Name, Version: row.Version, Architecture: row.Architecture, Manager: row.Manager,
+			SourceName: row.SourceName, SourceVersion: row.SourceVersion,
+		}
+		if row.ModuleStatus != 0 {
+			item.Module = &inventoryv1.ModuleObservation{
+				Status: inventoryv1.CollectionStatus(row.ModuleStatus), Modular: row.ModuleName != "",
+				Name: row.ModuleName, Stream: row.ModuleStream, Version: row.ModuleVersion, Context: row.ModuleContext,
+			}
+		}
+		if row.OriginStatus != 0 {
+			item.Origin = origins[row.Position]
+			if item.Origin == nil {
+				item.Origin = &inventoryv1.PackageOrigin{}
+			}
+			item.Origin.Status = inventoryv1.CollectionStatus(row.OriginStatus)
+		}
+		fits, err := budget.Take(item)
+		if err != nil {
+			return nil, err
+		}
+		if !fits {
+			if len(packages) == 0 {
+				return nil, core.ErrInternalState
+			}
+			break
+		}
+		packages = append(packages, item)
+	}
+	next := ""
+	if len(packages) < len(rows) {
+		last := packages[len(packages)-1]
+		next, err = encodePackagePage(cursor.ID, last.Position+1)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &adminv1.ListDevicePackagesResponse{
+		SnapshotId: cursor.SnapshotID.String(), Sequence: uint64(snapshot.Sequence), Packages: packages,
+		NextPageToken: next, CursorExpiresAt: timestamppb.New(expires), PageToken: pageToken,
+	}, nil
 }
 
 func deviceFromDetail(row devicedb.GetDeviceDetailRow) (*adminv1.Device, error) {

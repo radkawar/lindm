@@ -10,6 +10,7 @@ import (
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,6 +18,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
@@ -165,64 +167,10 @@ func (s *Service) AuthorizeRecoveryStart(ctx context.Context, req *connect.Reque
 		}
 		response.StartGrantEnvelope = row.StartGrantEnvelope
 	} else {
-		checkpoint, err := recoveryCheckpoint(row)
+		response.StartGrantEnvelope, err = s.mintRecoveryStart(ctx, tx, q, req, admission, action, row, authorization, pair, snapshot, verifier, now, challengeDocument)
 		if err != nil {
-			return nil, core.MapErr(err)
-		}
-		if checkpoint.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED || checkpoint.GetBootId() != challenge.GetBootId() || checkpoint.GetExecutorIncarnation() != challenge.GetExecutorIncarnation() {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_boot_checkpoint_required")
-		}
-		if pair == nil || authorization == nil || !now.Before(action.ExpiresAt.Time) {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_authority_expired")
-		}
-		if err := s.VerifyRecoveryAttestation(ctx, handoff, row.CheckpointReceiptEnvelope, challenge, req.Msg.GetAttestation()); err != nil {
 			return nil, err
 		}
-		if err := core.RequireActionRestriction(ctx, q, action.DeviceID, handoff.GetIntent().GetSpec()); err != nil {
-			return nil, core.MapErr(err)
-		}
-		if _, err := verifier.VerifyDeviceActionRecoveryCredential(ctx, snapshot.Root, snapshot.Delegation, row.CredentialEnvelope, handoff, now); err != nil {
-			return nil, core.ExecutionError(err)
-		}
-		if _, err := verifier.VerifyDeviceActionIntent(ctx, snapshot.Root, snapshot.Delegation, action.IntentEnvelope, now); err != nil {
-			return nil, core.ExecutionError(err)
-		}
-		issued, expires := challenge.GetIssuedAt().AsTime(), challenge.GetExpiresAt().AsTime()
-		if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(expires) {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
-		}
-		for _, limit := range []time.Time{issued.Add(30 * time.Second), issued.Add(authorization.ExpiresAt().Sub(now)), row.ExpiresAt.Time, action.ExpiresAt.Time, snapshot.Delegation.GetExpiresAt().AsTime()} {
-			if limit.Before(expires) {
-				expires = limit
-			}
-		}
-		if !expires.After(issued) {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_start_window_empty")
-		}
-		grant := &agentv1.DeviceActionStartGrant{Challenge: challenge, ActorId: action.ActorID.String(), AuthorizationVersion: authorization.Version(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: challenge.GetIssuedAt(), ExpiresAt: timestamppb.New(expires), Approvals: recoveryHumanApprovals(handoff.GetIntent(), pair)}
-		envelope, err := s.Authority.Sign(ctx, grant, s.Signing.StartKey)
-		if err != nil {
-			return nil, core.ExecutionError(err)
-		}
-		if _, err := verifier.VerifyRecoveryStart(ctx, snapshot.Root, snapshot.Delegation, envelope, handoff.GetIntent(), challenge, admission.credential, issued); err != nil {
-			return nil, core.ExecutionError(err)
-		}
-		if err := q.SetRecoveryStartGrant(ctx, devicedb.SetRecoveryStartGrantParams{ActionID: row.ActionID, ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(now)}); err != nil {
-			return nil, core.MapErr(err)
-		}
-		if err := q.SetDeviceActionGrant(ctx, devicedb.SetDeviceActionGrantParams{ID: row.ActionID, ChallengeProof: req.Msg.GetRequestProof(), ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(now)}); err != nil {
-			return nil, core.MapErr(err)
-		}
-		if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_start", action.ID, "authority", "fresh_two_human_recovery_authority"); err != nil {
-			return nil, core.MapErr(err)
-		}
-		if err := s.Identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {
-			return nil, core.ApprovalError(err)
-		}
-		if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionExecuteDestructive); err != nil {
-			return nil, core.ExecutionError(err)
-		}
-		response.StartGrantEnvelope = envelope
 	}
 	if err := storeRecoveryRequest(ctx, q, admission, response); err != nil {
 		return nil, core.MapErr(err)
@@ -231,4 +179,67 @@ func (s *Service) AuthorizeRecoveryStart(ctx context.Context, req *connect.Reque
 		return nil, core.MapErr(err)
 	}
 	return core.NoStore(response), nil
+}
+
+func (s *Service) mintRecoveryStart(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[recoveryv1.AuthorizeRecoveryStartRequest], admission *recoveryAdmission, action devicedb.DeviceAction, row devicedb.DeviceActionRecovery, authorization *identity.Authorization, pair *identity.ApprovalConsumption, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, now time.Time, challengeDocument []byte) ([]byte, error) {
+	challenge := req.Msg.GetChallenge()
+	handoff := admission.credential.GetHandoff()
+	checkpoint, err := recoveryCheckpoint(row)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	if checkpoint.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED || checkpoint.GetBootId() != challenge.GetBootId() || checkpoint.GetExecutorIncarnation() != challenge.GetExecutorIncarnation() {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_boot_checkpoint_required")
+	}
+	if pair == nil || authorization == nil || !now.Before(action.ExpiresAt.Time) {
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_authority_expired")
+	}
+	if err := s.VerifyRecoveryAttestation(ctx, handoff, row.CheckpointReceiptEnvelope, challenge, req.Msg.GetAttestation()); err != nil {
+		return nil, err
+	}
+	if err := core.RequireActionRestriction(ctx, q, action.DeviceID, handoff.GetIntent().GetSpec()); err != nil {
+		return nil, core.MapErr(err)
+	}
+	if _, err := verifier.VerifyDeviceActionRecoveryCredential(ctx, snapshot.Root, snapshot.Delegation, row.CredentialEnvelope, handoff, now); err != nil {
+		return nil, core.ExecutionError(err)
+	}
+	if _, err := verifier.VerifyDeviceActionIntent(ctx, snapshot.Root, snapshot.Delegation, action.IntentEnvelope, now); err != nil {
+		return nil, core.ExecutionError(err)
+	}
+	issued, expires := challenge.GetIssuedAt().AsTime(), challenge.GetExpiresAt().AsTime()
+	if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(expires) {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
+	}
+	for _, limit := range []time.Time{issued.Add(30 * time.Second), issued.Add(authorization.ExpiresAt().Sub(now)), row.ExpiresAt.Time, action.ExpiresAt.Time, snapshot.Delegation.GetExpiresAt().AsTime()} {
+		if limit.Before(expires) {
+			expires = limit
+		}
+	}
+	if !expires.After(issued) {
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_start_window_empty")
+	}
+	grant := &agentv1.DeviceActionStartGrant{Challenge: challenge, ActorId: action.ActorID.String(), AuthorizationVersion: authorization.Version(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: challenge.GetIssuedAt(), ExpiresAt: timestamppb.New(expires), Approvals: recoveryHumanApprovals(handoff.GetIntent(), pair)}
+	envelope, err := s.Authority.Sign(ctx, grant, s.Signing.StartKey)
+	if err != nil {
+		return nil, core.ExecutionError(err)
+	}
+	if _, err := verifier.VerifyRecoveryStart(ctx, snapshot.Root, snapshot.Delegation, envelope, handoff.GetIntent(), challenge, admission.credential, issued); err != nil {
+		return nil, core.ExecutionError(err)
+	}
+	if err := q.SetRecoveryStartGrant(ctx, devicedb.SetRecoveryStartGrantParams{ActionID: row.ActionID, ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(now)}); err != nil {
+		return nil, core.MapErr(err)
+	}
+	if err := q.SetDeviceActionGrant(ctx, devicedb.SetDeviceActionGrantParams{ID: row.ActionID, ChallengeProof: req.Msg.GetRequestProof(), ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(now)}); err != nil {
+		return nil, core.MapErr(err)
+	}
+	if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_start", action.ID, "authority", "fresh_two_human_recovery_authority"); err != nil {
+		return nil, core.MapErr(err)
+	}
+	if err := s.Identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {
+		return nil, core.ApprovalError(err)
+	}
+	if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionExecuteDestructive); err != nil {
+		return nil, core.ExecutionError(err)
+	}
+	return envelope, nil
 }

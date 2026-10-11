@@ -18,8 +18,10 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
+	"lindm/internal/trust"
 )
 
 func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Request[recoveryv1.CheckpointRecoveryActionRequest]) (*connect.Response[recoveryv1.CheckpointRecoveryActionResponse], error) {
@@ -94,48 +96,8 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 		}
 		response = &recoveryv1.CheckpointRecoveryActionResponse{CheckpointSha256: digest, Sequence: checkpoint.GetSequence(), ReceiptEnvelope: row.CheckpointReceiptEnvelope}
 	} else {
-		previous, err := recoveryCheckpoint(row)
-		if err != nil {
-			return nil, core.MapErr(err)
-		}
-		if action.ClosedAt.Valid || int64(checkpoint.GetSequence()) != row.CheckpointSequence+1 || !bytes.Equal(checkpoint.GetPreviousSha256(), row.CheckpointSha256) || checkpoint.GetAt().AsTime().After(now.Add(time.Minute)) {
-			return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_checkpoint_conflict")
-		}
-		switch checkpoint.GetPhase() {
-		case agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED:
-			if previous != nil || len(row.StartGrantEnvelope) > 0 || row.EffectCommittedAt.Valid || len(checkpoint.GetGrantSha256()) != 0 {
-				return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_boot_already_consumed")
-			}
-		case agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED:
-			if pair == nil || authorization == nil || previous.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED || row.EffectCommittedAt.Valid || len(row.StartGrantEnvelope) == 0 {
-				return nil, rpcreason.Error(connect.CodeFailedPrecondition, "recovery_effect_already_consumed")
-			}
-			challenge := new(agentv1.DeviceActionChallenge)
-			if proto.Unmarshal(row.ChallengeDocument, challenge) != nil {
-				return nil, core.MapErr(core.ErrInternalState)
-			}
-			grantDigest := sha256.Sum256(row.StartGrantEnvelope)
-			if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) || challenge.GetBootId() != checkpoint.GetBootId() || challenge.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() || previous.GetBootId() != checkpoint.GetBootId() || previous.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() {
-				return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_effect_binding_rejected")
-			}
-			// New effect authority is evaluated on server time, not the request's clock.
-			if _, err := verifier.VerifyRecoveryStart(ctx, snapshot.Root, snapshot.Delegation, row.StartGrantEnvelope, admission.credential.GetHandoff().GetIntent(), challenge, admission.credential, now); err != nil {
-				return nil, core.ExecutionError(err)
-			}
-		case agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL:
-			if previous == nil || previous.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL {
-				return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_terminal_conflict")
-			}
-			if len(row.StartGrantEnvelope) > 0 {
-				grantDigest := sha256.Sum256(row.StartGrantEnvelope)
-				if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) {
-					return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
-				}
-			} else if len(checkpoint.GetGrantSha256()) != 0 {
-				return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
-			}
-		default:
-			return nil, core.Invalid("invalid_recovery_checkpoint")
+		if err := validateRecoveryCheckpoint(ctx, checkpoint, action, row, admission, authorization, pair, snapshot, verifier, now); err != nil {
+			return nil, err
 		}
 		receipt := &agentv1.RecoveryCheckpointReceipt{CredentialId: row.CredentialID.String(), ActionId: row.ActionID.String(), Sequence: checkpoint.GetSequence(), CheckpointSha256: digest, StoredAt: timestamppb.New(now), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion()}
 		envelope, err := s.Authority.Sign(ctx, receipt, s.Signing.StartKey)
@@ -174,6 +136,53 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 		return nil, core.MapErr(err)
 	}
 	return core.NoStore(response), nil
+}
+
+func validateRecoveryCheckpoint(ctx context.Context, checkpoint *agentv1.RecoveryCheckpoint, action devicedb.DeviceAction, row devicedb.DeviceActionRecovery, admission *recoveryAdmission, authorization *identity.Authorization, pair *identity.ApprovalConsumption, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, now time.Time) error {
+	previous, err := recoveryCheckpoint(row)
+	if err != nil {
+		return core.MapErr(err)
+	}
+	if action.ClosedAt.Valid || int64(checkpoint.GetSequence()) != row.CheckpointSequence+1 || !bytes.Equal(checkpoint.GetPreviousSha256(), row.CheckpointSha256) || checkpoint.GetAt().AsTime().After(now.Add(time.Minute)) {
+		return rpcreason.Error(connect.CodeAlreadyExists, "recovery_checkpoint_conflict")
+	}
+	switch checkpoint.GetPhase() {
+	case agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED:
+		if previous != nil || len(row.StartGrantEnvelope) > 0 || row.EffectCommittedAt.Valid || len(checkpoint.GetGrantSha256()) != 0 {
+			return rpcreason.Error(connect.CodeFailedPrecondition, "recovery_boot_already_consumed")
+		}
+	case agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED:
+		if pair == nil || authorization == nil || previous.GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED || row.EffectCommittedAt.Valid || len(row.StartGrantEnvelope) == 0 {
+			return rpcreason.Error(connect.CodeFailedPrecondition, "recovery_effect_already_consumed")
+		}
+		challenge := new(agentv1.DeviceActionChallenge)
+		if proto.Unmarshal(row.ChallengeDocument, challenge) != nil {
+			return core.MapErr(core.ErrInternalState)
+		}
+		grantDigest := sha256.Sum256(row.StartGrantEnvelope)
+		if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) || challenge.GetBootId() != checkpoint.GetBootId() || challenge.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() || previous.GetBootId() != checkpoint.GetBootId() || previous.GetExecutorIncarnation() != checkpoint.GetExecutorIncarnation() {
+			return rpcreason.Error(connect.CodePermissionDenied, "recovery_effect_binding_rejected")
+		}
+		// New effect authority is evaluated on server time, not the request's clock.
+		if _, err := verifier.VerifyRecoveryStart(ctx, snapshot.Root, snapshot.Delegation, row.StartGrantEnvelope, admission.credential.GetHandoff().GetIntent(), challenge, admission.credential, now); err != nil {
+			return core.ExecutionError(err)
+		}
+	case agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL:
+		if previous == nil || previous.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_TERMINAL {
+			return rpcreason.Error(connect.CodeAlreadyExists, "recovery_terminal_conflict")
+		}
+		if len(row.StartGrantEnvelope) > 0 {
+			grantDigest := sha256.Sum256(row.StartGrantEnvelope)
+			if !bytes.Equal(grantDigest[:], checkpoint.GetGrantSha256()) {
+				return rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
+			}
+		} else if len(checkpoint.GetGrantSha256()) != 0 {
+			return rpcreason.Error(connect.CodePermissionDenied, "recovery_terminal_grant_rejected")
+		}
+	default:
+		return core.Invalid("invalid_recovery_checkpoint")
+	}
+	return nil
 }
 
 func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request[recoveryv1.ReportRecoveryResultRequest]) (*connect.Response[recoveryv1.ReportRecoveryResultResponse], error) {

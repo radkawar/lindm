@@ -21,6 +21,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
@@ -114,7 +115,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	}
 	var authorization *identity.Authorization
 	var pair *identity.ApprovalConsumption
-	existing, lookupErr := devicedb.New(s.Pool).GetDeviceActionRecovery(ctx, id)
+	_, lookupErr := devicedb.New(s.Pool).GetDeviceActionRecovery(ctx, id)
 	if errors.Is(lookupErr, pgx.ErrNoRows) {
 		authorization, pair, err = s.recoveryApproval(ctx, captured)
 		if err != nil {
@@ -123,6 +124,10 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	} else if lookupErr != nil {
 		return nil, core.MapErr(lookupErr)
 	}
+	return s.registerRecoveryHandoff(ctx, req, principal, id, intent, digest, handoff, authorization, pair)
+}
+
+func (s *Service) registerRecoveryHandoff(ctx context.Context, req *connect.Request[devicev1.RegisterDeviceActionRecoveryRequest], principal core.DevicePrincipal, id uuid.UUID, intent *agentv1.DeviceActionIntent, digest [sha256.Size]byte, handoff *agentv1.DeviceActionRecoveryHandoff, authorization *identity.Authorization, pair *identity.ApprovalConsumption) (*connect.Response[devicev1.RegisterDeviceActionRecoveryResponse], error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return nil, core.MapErr(err)
@@ -159,7 +164,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	if _, err := s.Authority.VerifyDeviceActionRecoveryHandoff(ctx, req.Msg.GetHandoffProof(), req.Msg.GetCertificatePem(), s.CA, intent, digest, now, trust.MaxDeviceClockSkew); err != nil {
 		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_handoff_rejected")
 	}
-	existing, lookupErr = q.GetDeviceActionRecovery(ctx, id)
+	existing, lookupErr := q.GetDeviceActionRecovery(ctx, id)
 	if lookupErr == nil {
 		if !bytes.Equal(existing.HandoffProof, req.Msg.GetHandoffProof()) {
 			return nil, rpcreason.Error(connect.CodeAlreadyExists, "recovery_handoff_conflict")
@@ -190,6 +195,11 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	if snapshot.Delegation == nil {
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
+	return s.mintRecoveryHandoff(ctx, tx, q, req, principal, action, intent, handoff, authorization, pair, snapshot, verifier, now)
+}
+
+func (s *Service) mintRecoveryHandoff(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[devicev1.RegisterDeviceActionRecoveryRequest], principal core.DevicePrincipal, action devicedb.DeviceAction, intent *agentv1.DeviceActionIntent, handoff *agentv1.DeviceActionRecoveryHandoff, authorization *identity.Authorization, pair *identity.ApprovalConsumption, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, now time.Time) (*connect.Response[devicev1.RegisterDeviceActionRecoveryResponse], error) {
+	id := action.ID
 	issued := handoff.GetChallenge().GetIssuedAt().AsTime()
 	expires := handoff.GetChallenge().GetExpiresAt().AsTime()
 	if issued.After(now.Add(trust.MaxDeviceClockSkew)) || !now.Add(-trust.MaxDeviceClockSkew).Before(expires) {

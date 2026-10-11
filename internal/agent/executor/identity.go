@@ -156,56 +156,11 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 			return nil, errKey
 		}
 	}
-	if pending := state.GetPendingRenewal(); pending != nil {
-		if out.cert == nil {
-			return nil, errKey
-		}
-		next, nextPublic, err := consistentKey(pending.GetPrivateKey())
-		if err != nil {
-			return nil, err
-		}
-		if _, err := parseCSR(pending.GetCsrPem(), nextPublic); err != nil {
-			return nil, err
-		}
-		if _, err := recipientPublic(pending.GetEncryptionPrivateKey()); err != nil {
-			return nil, err
-		}
-		if err := verifyRenewalProofs(ctx, authority, state, pending, public, nextPublic, out.cert); err != nil {
-			return nil, err
-		}
-		out.renewal = &boundRenewal{
-			id: pending.GetIssuanceRequestId(), key: next, public: nextPublic,
-			csr: bytes.Clone(pending.GetCsrPem()), authority: bytes.Clone(pending.GetAuthorityProof()),
-			retrieval: bytes.Clone(pending.GetRetrievalProof()), epoch: pending.GetSessionEpoch(),
-			fingerprint: sha256.Sum256(out.cert.Raw),
-		}
+	if err := out.bindRenewal(ctx, authority); err != nil {
+		return nil, err
 	}
-	if prior := state.GetPriorCredential(); prior != nil {
-		priorKey, priorPublic, err := consistentKey(prior.GetPrivateKey())
-		if err != nil {
-			return nil, err
-		}
-		device, err := canonicalUUID(state.GetDeviceId())
-		if err != nil {
-			return nil, err
-		}
-		generation, err := canonicalUUID(state.GetEnrollmentGeneration())
-		if err != nil {
-			return nil, err
-		}
-		cert, err := parsePinnedCert(prior.GetCertificatePem(), priorPublic, verified.DeviceCA, deployment, device, generation)
-		if err != nil || prior.GetRetainUntil() == nil {
-			return nil, errCert
-		}
-		priorEncryption, err := recipientPublic(prior.GetEncryptionPrivateKey())
-		if err != nil {
-			return nil, err
-		}
-		out.prior = &boundPrior{
-			key: priorKey, public: priorPublic, cert: cert, pem: bytes.Clone(prior.GetCertificatePem()),
-			retain: prior.GetRetainUntil().AsTime(), fingerprint: sha256.Sum256(cert.Raw),
-			encryptionPublic: priorEncryption,
-		}
+	if err := out.bindPriorCredential(deployment); err != nil {
+		return nil, err
 	}
 	if pending := state.GetPendingSession(); pending != nil {
 		claim := &agentv1.SessionAcquisition{}
@@ -220,6 +175,69 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 		}
 	}
 	return out, nil
+}
+
+func (b *bound) bindRenewal(ctx context.Context, authority *trust.Authority) error {
+	pending := b.state.GetPendingRenewal()
+	if pending == nil {
+		return nil
+	}
+	if b.cert == nil {
+		return errKey
+	}
+	next, nextPublic, err := consistentKey(pending.GetPrivateKey())
+	if err != nil {
+		return err
+	}
+	if _, err := parseCSR(pending.GetCsrPem(), nextPublic); err != nil {
+		return err
+	}
+	if _, err := recipientPublic(pending.GetEncryptionPrivateKey()); err != nil {
+		return err
+	}
+	if err := verifyRenewalProofs(ctx, authority, b.state, pending, b.identityPublic, nextPublic, b.cert); err != nil {
+		return err
+	}
+	b.renewal = &boundRenewal{
+		id: pending.GetIssuanceRequestId(), key: next, public: nextPublic,
+		csr: bytes.Clone(pending.GetCsrPem()), authority: bytes.Clone(pending.GetAuthorityProof()),
+		retrieval: bytes.Clone(pending.GetRetrievalProof()), epoch: pending.GetSessionEpoch(),
+		fingerprint: sha256.Sum256(b.cert.Raw),
+	}
+	return nil
+}
+
+func (b *bound) bindPriorCredential(deployment uuid.UUID) error {
+	prior := b.state.GetPriorCredential()
+	if prior == nil {
+		return nil
+	}
+	priorKey, priorPublic, err := consistentKey(prior.GetPrivateKey())
+	if err != nil {
+		return err
+	}
+	device, err := canonicalUUID(b.state.GetDeviceId())
+	if err != nil {
+		return err
+	}
+	generation, err := canonicalUUID(b.state.GetEnrollmentGeneration())
+	if err != nil {
+		return err
+	}
+	cert, err := parsePinnedCert(prior.GetCertificatePem(), priorPublic, b.bootstrap.DeviceCA, deployment, device, generation)
+	if err != nil || prior.GetRetainUntil() == nil {
+		return errCert
+	}
+	priorEncryption, err := recipientPublic(prior.GetEncryptionPrivateKey())
+	if err != nil {
+		return err
+	}
+	b.prior = &boundPrior{
+		key: priorKey, public: priorPublic, cert: cert, pem: bytes.Clone(prior.GetCertificatePem()),
+		retain: prior.GetRetainUntil().AsTime(), fingerprint: sha256.Sum256(cert.Raw),
+		encryptionPublic: priorEncryption,
+	}
+	return nil
 }
 
 func verifyRenewalProofs(ctx context.Context, authority *trust.Authority, state *agentv1.ExecutorJournalState, pending *agentv1.PendingIdentityRenewal, current, next ed25519.PublicKey, cert *x509.Certificate) error {

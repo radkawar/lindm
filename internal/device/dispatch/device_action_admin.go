@@ -17,6 +17,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
@@ -113,6 +114,11 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.MapErr(err)
 	}
+	return s.createAuthorizedDeviceAction(ctx, tx, q, req, actor, authorization, permission, snapshot, verifier, device, generationID, requestID, digest, document)
+}
+
+func (s *Service) createAuthorizedDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.CreateDeviceActionRequest], actor identity.Principal, authorization *identity.Authorization, permission identity.Permission, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, device devicedb.GetDeviceForUpdateRow, generationID, requestID uuid.UUID, digest, document []byte) (*connect.Response[adminv1.CreateDeviceActionResponse], error) {
+	deviceID := device.ID
 	if device.State != core.StateActive || device.CurrentGenerationID == nil || *device.CurrentGenerationID != generationID {
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_rejected")
 	}
@@ -173,6 +179,10 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.MapErr(err)
 	}
+	return s.mintDeviceAction(ctx, tx, q, req, actor, authorization, permission, snapshot, verifier, deviceID, generationID, requestID, digest, document, now, expires)
+}
+
+func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.CreateDeviceActionRequest], actor identity.Principal, authorization *identity.Authorization, permission identity.Permission, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, deviceID, generationID, requestID uuid.UUID, digest, document []byte, now, expires time.Time) (*connect.Response[adminv1.CreateDeviceActionResponse], error) {
 	var approvalID *uuid.UUID
 	if req.Msg.GetApprovalId() != "" {
 		parsed, _ := uuid.Parse(req.Msg.GetApprovalId())

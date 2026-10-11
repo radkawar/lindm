@@ -21,6 +21,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/recovery"
+	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/trust"
 )
 
@@ -72,26 +73,9 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		s.mu.Unlock()
 		return nil, err
 	}
-	if s.recoveryPending != nil {
-		prior, revision, err := s.loadDeviceAction(ctx, loaded, s.recoveryPending.actionID)
-		if err != nil {
-			s.mu.Unlock()
-			return nil, err
-		}
-		if err := s.expireDeviceAction(ctx, loaded, prior, revision); err != nil {
-			s.mu.Unlock()
-			return nil, err
-		}
-		if prior.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED {
-			s.mu.Unlock()
-			return nil, fmt.Errorf("%w: prior_recovery_pending", errResourceRejected)
-		}
-		pending := s.recoveryPending
-		s.recoveryPending = nil
-		if err := pending.key.Close(); err != nil {
-			s.mu.Unlock()
-			return nil, err
-		}
+	if err := s.expirePendingRecoveryLocked(ctx, loaded); err != nil {
+		s.mu.Unlock()
+		return nil, err
 	}
 	planner, ok := s.actionProvider.(recoveryPlanner)
 	if !ok || s.recoveryConfig == nil || intent.GetSpec().GetSanitize().GetRecovery() == nil || !s.actionMu.TryLock() {
@@ -106,26 +90,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	defer s.actionMu.Unlock()
 	defer cancel()
 	defer stop()
-	plan, err := planner.PrepareRecovery(ctx, intent.GetSpec())
-	if err != nil {
-		return nil, err
-	}
-	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !plan.GetBefore().GetSupported() {
-		return nil, fmt.Errorf("%w: recovery_plan_unsupported", errResourceRejected)
-	}
-	plan.ActionId = intent.GetActionId()
-	if s.admit(plan) != nil {
-		return nil, errInternal
-	}
-	devices, err := planner.RecoveryTargetDevices(ctx, plan)
-	if err != nil {
-		return nil, err
-	}
-	boot, err := s.bootID()
-	if err != nil {
-		return nil, err
-	}
-	stage, err := s.recoveryStageRequest(intent, boot, devices)
+	plan, boot, stage, err := s.planDeviceActionRecovery(ctx, planner, intent)
 	if err != nil {
 		return nil, err
 	}
@@ -159,26 +124,10 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 			return nil, err
 		}
 		defer func() { _ = offTarget.Close() }()
-		if found, err := offTarget.Load(new(agentv1.RecoveryJournal)); err != nil {
-			return nil, err
-		} else if found {
-			return nil, fmt.Errorf("%w: off_target_journal_present", errResourceRejected)
-		}
-		if consumed, err := offTarget.Consumed(); err != nil {
-			return nil, err
-		} else if consumed {
-			return nil, fmt.Errorf("%w: off_target_journal_consumed", errResourceRejected)
-		}
-		key, err := platform.ProvisionKey(filepath.Join(stage.StateDirectory, "action.key"))
+		public, err = provisionRecoveryPublicKey(offTarget, platform, stage.StateDirectory)
 		if err != nil {
 			return nil, err
 		}
-		if len(key) != ed25519.PrivateKeySize {
-			clear(key)
-			return nil, errInternal
-		}
-		public = bytes.Clone(key[ed25519.SeedSize:])
-		clear(key)
 	}
 	var measured *agentv1.RecoveryMeasuredBoot
 	if stage.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
@@ -195,14 +144,99 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, err
 	}
 	defer s.mu.Unlock()
-	if s.agentUpdateBusy() {
-		return nil, fmt.Errorf("%w: agent_update_busy", errResourceRejected)
-	}
-	loaded, err = s.enrolled(ctx)
+	record, err := s.acceptDeviceActionRecoveryLocked(ctx, envelope, plan, boot, public, measured)
 	if err != nil {
 		return nil, err
 	}
-	intent, err = deviceAction.current(ctx, s, loaded, envelope)
+	if pending != nil {
+		s.recoveryPending = &recoveryPendingAction{actionID: actionID, key: pending}
+		retained = true
+	}
+	return recoveryPreparation(record), nil
+}
+
+// expirePendingRecoveryLocked releases TPM custody only after the prior action
+// has expired. The caller holds the authority mutex.
+func (s *Service) expirePendingRecoveryLocked(ctx context.Context, loaded *bound) error {
+	if s.recoveryPending == nil {
+		return nil
+	}
+	prior, revision, err := s.loadDeviceAction(ctx, loaded, s.recoveryPending.actionID)
+	if err != nil {
+		return err
+	}
+	if err := s.expireDeviceAction(ctx, loaded, prior, revision); err != nil {
+		return err
+	}
+	if prior.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED {
+		return fmt.Errorf("%w: prior_recovery_pending", errResourceRejected)
+	}
+	pending := s.recoveryPending
+	s.recoveryPending = nil
+	return pending.key.Close()
+}
+
+func (s *Service) planDeviceActionRecovery(ctx context.Context, planner recoveryPlanner, intent *agentv1.DeviceActionIntent) (*agentv1.DeviceActionPlan, string, recoveryboot.StageRequest, error) {
+	plan, err := planner.PrepareRecovery(ctx, intent.GetSpec())
+	if err != nil {
+		return nil, "", recoveryboot.StageRequest{}, err
+	}
+	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !plan.GetBefore().GetSupported() {
+		return nil, "", recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_plan_unsupported", errResourceRejected)
+	}
+	plan.ActionId = intent.GetActionId()
+	if s.admit(plan) != nil {
+		return nil, "", recoveryboot.StageRequest{}, errInternal
+	}
+	devices, err := planner.RecoveryTargetDevices(ctx, plan)
+	if err != nil {
+		return nil, "", recoveryboot.StageRequest{}, err
+	}
+	boot, err := s.bootID()
+	if err != nil {
+		return nil, "", recoveryboot.StageRequest{}, err
+	}
+	stage, err := s.recoveryStageRequest(intent, boot, devices)
+	return plan, boot, stage, err
+}
+
+// provisionRecoveryPublicKey requires an unused off-target journal, whose lock
+// the caller retains through durable acceptance of the recovery handoff.
+func provisionRecoveryPublicKey(offTarget *recovery.Journal, platform recoveryBootPlatform, directory string) ([]byte, error) {
+	if found, err := offTarget.Load(new(agentv1.RecoveryJournal)); err != nil {
+		return nil, err
+	} else if found {
+		return nil, fmt.Errorf("%w: off_target_journal_present", errResourceRejected)
+	}
+	if consumed, err := offTarget.Consumed(); err != nil {
+		return nil, err
+	} else if consumed {
+		return nil, fmt.Errorf("%w: off_target_journal_consumed", errResourceRejected)
+	}
+	key, err := platform.ProvisionKey(filepath.Join(directory, "action.key"))
+	if err != nil {
+		return nil, err
+	}
+	if len(key) != ed25519.PrivateKeySize {
+		clear(key)
+		return nil, errInternal
+	}
+	public := bytes.Clone(key[ed25519.SeedSize:])
+	clear(key)
+	return public, nil
+}
+
+// acceptDeviceActionRecoveryLocked rechecks authority after native preflight
+// and persists the signed handoff while the caller holds the authority mutex.
+func (s *Service) acceptDeviceActionRecoveryLocked(ctx context.Context, envelope []byte, plan *agentv1.DeviceActionPlan, boot string, public []byte, measured *agentv1.RecoveryMeasuredBoot) (*agentv1.DeviceActionRecord, error) {
+	if s.agentUpdateBusy() {
+		return nil, fmt.Errorf("%w: agent_update_busy", errResourceRejected)
+	}
+	loaded, err := s.enrolled(ctx)
+	if err != nil {
+		return nil, err
+	}
+	intent, err := deviceAction.current(ctx, s, loaded, envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -232,11 +266,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	if _, err := s.store.AcceptDeviceAction(ctx, loaded.revision, loaded.execution.revision, record); err != nil {
 		return nil, s.resourceStoreError(err)
 	}
-	if pending != nil {
-		s.recoveryPending = &recoveryPendingAction{actionID: actionID, key: pending}
-		retained = true
-	}
-	return recoveryPreparation(record), nil
+	return record, nil
 }
 
 func recoveryPreparation(record *agentv1.DeviceActionRecord) *agentv1.PrepareDeviceActionRecoveryResponse {

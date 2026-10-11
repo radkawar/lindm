@@ -16,6 +16,10 @@ standard, not a claim of Google certification. Linters cannot certify maintainab
   by default, interfaces at real consumer/test boundaries and explicit constructors.
 - Separate transport/auth, domain decisions, SQL persistence, agent reconciliation
   and OS providers. Do not put business authorization exclusively in RPC middleware.
+- Extract long functions at domain boundaries, not arbitrary line counts. Device
+  dispatch separates replay, selection and minting; recovery separates admission
+  from signed authority issuance. Keep lock order, final authorization fences,
+  transaction lifetime and error mapping unchanged across these steps.
 - Context deadlines/cancellation, structured errors, no panic for routine failures,
   no hidden global state, no goroutine without bounded lifetime/backpressure.
 - Review allocations and copying on agent/inventory/artifact paths. Stream artifacts,
@@ -35,6 +39,15 @@ standard, not a claim of Google certification. Linters cannot certify maintainab
   Each proposed test must identify a plausible product failure it would catch.
 - Public APIs and irreversible migrations require design review. Sensitive execution,
   auth, update, encryption and wipe changes require security-owner review.
+
+Executor action preparation separates native planning from durable acceptance:
+native preflight runs outside the authority mutex, then acceptance rechecks identity
+and signed authority under that mutex. The coordinating function retains operation
+accounting, cancellation and cleanup ownership, including the off-target recovery
+journal lock through handoff acceptance. Device-action effects report admission only
+after durable consumption; renewal and prior-credential binding remain independent
+identity checks. These extractions preserve the existing execution and custody
+contracts, without changing RPC behavior.
 
 ### Schema and runtime validation
 

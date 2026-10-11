@@ -125,59 +125,65 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 		defer releaseActionCredential(credential)
 		defer cancel()
 		defer stopRequest()
-		consumed := false
-		gate := func(gateCtx context.Context) error {
-			if consumed {
-				if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
-					return s.recheckPowerActionStart(gateCtx, record, envelope)
-				}
-				return errResourceRejected
-			}
-			status, err := s.consumeDeviceAction(gateCtx, record, envelope, confirm)
-			if err != nil {
-				return err
-			}
-			consumed = true
-			// A canceled caller can no longer revoke a consumed native start.
-			// Shutdown still cancels work and leaves durable unknown evidence.
-			stopRequest()
-			admission <- deviceActionAdmission{status: status}
-			return nil
-		}
-		var result *agentv1.DeviceActionVerification
-		var sealed *agentv1.PrivateCustodyEnvelope
-		var operationErr error
-		localAdmin := record.GetIntent().GetSpec().GetLocalAdminPasswordRotate() != nil
-		switch {
-		case confirm && localAdmin:
-			result, operationErr = s.actionProvider.SetLocalAdminPassword(work, record.GetNativePlan(), record.GetVerification(), record.GetLocalAdminPassword(), gate)
-		case confirm:
-			result, operationErr = s.actionProvider.ConfirmEscrow(work, record.GetNativePlan(), record.GetVerification(), credential, gate)
-		case localAdmin:
-			result, sealed, operationErr = s.actionProvider.StageLocalAdminPassword(work, record.GetNativePlan(), gate)
-		case record.GetIntent().GetSpec().GetRefreshInventory() != nil:
-			result, operationErr = s.beginInventoryRefresh(work, record, gate)
-		case record.GetIntent().GetSpec().GetPatchNow() != nil:
-			// The runner request may not outlive the signed action.
-			bounded, stop := context.WithDeadline(work, record.GetIntent().GetExpiresAt().AsTime())
-			result, operationErr = s.actionProvider.Apply(bounded, record.GetNativePlan(), credential, gate)
-			stop()
-		default:
-			result, operationErr = s.actionProvider.Apply(work, record.GetNativePlan(), credential, gate)
-		}
-		s.finishDeviceAction(actionID, result, sealed, operationErr, confirm)
-		if !consumed {
-			if operationErr == nil {
-				operationErr = errInternal
-			}
-			admission <- deviceActionAdmission{err: operationErr}
-		}
+		s.executeDeviceAction(work, actionID, record, envelope, confirm, credential, stopRequest, admission)
 	}()
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case admitted := <-admission:
 		return admitted.status, admitted.err
+	}
+}
+
+// executeDeviceAction owns the native effect gate and reports admission once
+// durable consumption has detached execution from the requesting RPC.
+func (s *Service) executeDeviceAction(work context.Context, actionID string, record *agentv1.DeviceActionRecord, envelope []byte, confirm bool, credential []byte, stopRequest func() bool, admission chan<- deviceActionAdmission) {
+	consumed := false
+	gate := func(gateCtx context.Context) error {
+		if consumed {
+			if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
+				return s.recheckPowerActionStart(gateCtx, record, envelope)
+			}
+			return errResourceRejected
+		}
+		status, err := s.consumeDeviceAction(gateCtx, record, envelope, confirm)
+		if err != nil {
+			return err
+		}
+		consumed = true
+		// A canceled caller can no longer revoke a consumed native start.
+		// Shutdown still cancels work and leaves durable unknown evidence.
+		stopRequest()
+		admission <- deviceActionAdmission{status: status}
+		return nil
+	}
+	var result *agentv1.DeviceActionVerification
+	var sealed *agentv1.PrivateCustodyEnvelope
+	var operationErr error
+	localAdmin := record.GetIntent().GetSpec().GetLocalAdminPasswordRotate() != nil
+	switch {
+	case confirm && localAdmin:
+		result, operationErr = s.actionProvider.SetLocalAdminPassword(work, record.GetNativePlan(), record.GetVerification(), record.GetLocalAdminPassword(), gate)
+	case confirm:
+		result, operationErr = s.actionProvider.ConfirmEscrow(work, record.GetNativePlan(), record.GetVerification(), credential, gate)
+	case localAdmin:
+		result, sealed, operationErr = s.actionProvider.StageLocalAdminPassword(work, record.GetNativePlan(), gate)
+	case record.GetIntent().GetSpec().GetRefreshInventory() != nil:
+		result, operationErr = s.beginInventoryRefresh(work, record, gate)
+	case record.GetIntent().GetSpec().GetPatchNow() != nil:
+		// The runner request may not outlive the signed action.
+		bounded, stop := context.WithDeadline(work, record.GetIntent().GetExpiresAt().AsTime())
+		result, operationErr = s.actionProvider.Apply(bounded, record.GetNativePlan(), credential, gate)
+		stop()
+	default:
+		result, operationErr = s.actionProvider.Apply(work, record.GetNativePlan(), credential, gate)
+	}
+	s.finishDeviceAction(actionID, result, sealed, operationErr, confirm)
+	if !consumed {
+		if operationErr == nil {
+			operationErr = errInternal
+		}
+		admission <- deviceActionAdmission{err: operationErr}
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -137,78 +138,7 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
-		now, err := DispatchClock(ctx, q)
-		if err != nil {
-			return nil, err
-		}
-		if err := provisioningTokenUsable(token, now); err != nil {
-			return nil, err
-		}
-		if token.UsedCount >= token.MaxUses {
-			return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
-		}
-		deviceID, generationID := uuid.New(), uuid.New()
-		if err := q.InsertDevice(ctx, devicedb.InsertDeviceParams{ID: deviceID, EnrolledAt: Timestamptz(now)}); err != nil {
-			return nil, err
-		}
-		if err := q.InsertEnrollmentGeneration(ctx, devicedb.InsertEnrollmentGenerationParams{ID: generationID, DeviceID: deviceID, CreatedAt: Timestamptz(now)}); err != nil {
-			return nil, err
-		}
-		if err := q.SetDeviceGeneration(ctx, devicedb.SetDeviceGenerationParams{ID: deviceID, CurrentGenerationID: &generationID}); err != nil {
-			return nil, err
-		}
-		if err := q.ReserveEnrollmentInstallation(ctx, devicedb.ReserveEnrollmentInstallationParams{GenerationID: generationID, InstallationID: installationID}); err != nil {
-			return nil, err
-		}
-		if err := s.applyProvisioningMetadata(ctx, q, deviceID, assignment); err != nil {
-			return nil, err
-		}
-		receipt := devicedb.ProvisioningEnrollment{TransactionID: transactionID, TokenID: tokenID, InstallationID: installationID, DeviceID: deviceID, GenerationID: generationID, CsrPem: request.GetCsrPem(), CsrSha256: digest[:], State: "pending_approval", CreatedAt: Timestamptz(now), ExpiresAt: Timestamptz(now.Add(time.Hour))}
-		if token.ExpiresAt.Time.Before(receipt.ExpiresAt.Time) {
-			receipt.ExpiresAt = token.ExpiresAt
-		}
-		if token.ApprovalRequired {
-			payload := pendingEnrollmentPayload(token, receipt)
-			id, err := s.Identity.CreateEnrollmentApproval(ctx, tx, authorization, payload, s.ApprovalScope)
-			if err != nil {
-				return nil, ApprovalError(err)
-			}
-			receipt.ApprovalID = &id
-		} else {
-			issued, err := s.storeCertificate(ctx, q, deviceID, generationID, csr.PublicKey, now)
-			if err != nil {
-				return nil, err
-			}
-			receipt.CertificateID = &issued.ID
-			receipt.State = "ready"
-			if err := s.activateProfile(ctx, tx, token, receipt, assignment); err != nil {
-				return nil, err
-			}
-		}
-		if err := q.InsertProvisioningEnrollment(ctx, devicedb.InsertProvisioningEnrollmentParams(receipt)); err != nil {
-			var conflict *pgconn.PgError
-			if errors.As(err, &conflict) && conflict.Code == "23505" {
-				return nil, ErrIdempotencyConflict
-			}
-			return nil, err
-		}
-		consumed, err := q.ConsumeProvisioningToken(ctx, tokenID)
-		if err != nil {
-			return nil, err
-		}
-		if consumed != 1 {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_expired")
-		}
-		if err := InsertAudit(ctx, q, &token.CreatedBy, "provisioning.reserve", deviceID.String(), token.Reason); err != nil {
-			return nil, err
-		}
-		if importer != nil {
-			actor := importer.ActorID()
-			if err := InsertAudit(ctx, q, &actor, "enrollment.offline_import", transactionID.String(), token.Reason); err != nil {
-				return nil, err
-			}
-		}
-		response, err = s.provisioningResponse(ctx, q, token, receipt)
+		response, err = s.reserveNewProvisioningEnrollment(ctx, tx, q, token, request, authorization, importer, assignment, csr, transactionID, installationID, digest)
 		if err != nil {
 			return nil, err
 		}
@@ -229,6 +159,82 @@ func (s *Service) reserveProvisioning(ctx context.Context, tokenID uuid.UUID, re
 		return nil, err
 	}
 	return response, nil
+}
+
+func (s *Service) reserveNewProvisioningEnrollment(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, token devicedb.ProvisioningToken, request *enrollmentv1.ProvisionRequest, authorization, importer *identity.Authorization, assignment *adminv1.CreateProvisioningTokenRequest, csr *x509.CertificateRequest, transactionID, installationID uuid.UUID, digest [sha256.Size]byte) (*enrollmentv1.ProvisionResponse, error) {
+	tokenID := token.ID
+	now, err := DispatchClock(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	if err := provisioningTokenUsable(token, now); err != nil {
+		return nil, err
+	}
+	if token.UsedCount >= token.MaxUses {
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
+	}
+	deviceID, generationID := uuid.New(), uuid.New()
+	if err := q.InsertDevice(ctx, devicedb.InsertDeviceParams{ID: deviceID, EnrolledAt: Timestamptz(now)}); err != nil {
+		return nil, err
+	}
+	if err := q.InsertEnrollmentGeneration(ctx, devicedb.InsertEnrollmentGenerationParams{ID: generationID, DeviceID: deviceID, CreatedAt: Timestamptz(now)}); err != nil {
+		return nil, err
+	}
+	if err := q.SetDeviceGeneration(ctx, devicedb.SetDeviceGenerationParams{ID: deviceID, CurrentGenerationID: &generationID}); err != nil {
+		return nil, err
+	}
+	if err := q.ReserveEnrollmentInstallation(ctx, devicedb.ReserveEnrollmentInstallationParams{GenerationID: generationID, InstallationID: installationID}); err != nil {
+		return nil, err
+	}
+	if err := s.applyProvisioningMetadata(ctx, q, deviceID, assignment); err != nil {
+		return nil, err
+	}
+	receipt := devicedb.ProvisioningEnrollment{TransactionID: transactionID, TokenID: tokenID, InstallationID: installationID, DeviceID: deviceID, GenerationID: generationID, CsrPem: request.GetCsrPem(), CsrSha256: digest[:], State: "pending_approval", CreatedAt: Timestamptz(now), ExpiresAt: Timestamptz(now.Add(time.Hour))}
+	if token.ExpiresAt.Time.Before(receipt.ExpiresAt.Time) {
+		receipt.ExpiresAt = token.ExpiresAt
+	}
+	if token.ApprovalRequired {
+		payload := pendingEnrollmentPayload(token, receipt)
+		id, err := s.Identity.CreateEnrollmentApproval(ctx, tx, authorization, payload, s.ApprovalScope)
+		if err != nil {
+			return nil, ApprovalError(err)
+		}
+		receipt.ApprovalID = &id
+	} else {
+		issued, err := s.storeCertificate(ctx, q, deviceID, generationID, csr.PublicKey, now)
+		if err != nil {
+			return nil, err
+		}
+		receipt.CertificateID = &issued.ID
+		receipt.State = "ready"
+		if err := s.activateProfile(ctx, tx, token, receipt, assignment); err != nil {
+			return nil, err
+		}
+	}
+	if err := q.InsertProvisioningEnrollment(ctx, devicedb.InsertProvisioningEnrollmentParams(receipt)); err != nil {
+		var conflict *pgconn.PgError
+		if errors.As(err, &conflict) && conflict.Code == "23505" {
+			return nil, ErrIdempotencyConflict
+		}
+		return nil, err
+	}
+	consumed, err := q.ConsumeProvisioningToken(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	if consumed != 1 {
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_expired")
+	}
+	if err := InsertAudit(ctx, q, &token.CreatedBy, "provisioning.reserve", deviceID.String(), token.Reason); err != nil {
+		return nil, err
+	}
+	if importer != nil {
+		actor := importer.ActorID()
+		if err := InsertAudit(ctx, q, &actor, "enrollment.offline_import", transactionID.String(), token.Reason); err != nil {
+			return nil, err
+		}
+	}
+	return s.provisioningResponse(ctx, q, token, receipt)
 }
 
 func provisioningTokenUsable(token devicedb.ProvisioningToken, now time.Time) error {

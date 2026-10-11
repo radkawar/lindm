@@ -80,71 +80,9 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 			return nil, MapErr(ErrInternalState)
 		}
 	} else {
-		token, err := q.GetProvisioningTokenByHash(ctx, HashGrant(req.Msg.GetProvisioningToken()))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, MapErr(errGrantInvalid)
-		}
+		file, err = s.issueOfflineEnrollmentAuthorization(ctx, tx, q, req, actor, authorization, requestID, digest, file)
 		if err != nil {
-			return nil, MapErr(err)
-		}
-		assignment, err := provisioningAssignment(token)
-		if err != nil {
-			return nil, MapErr(err)
-		}
-		if err := provisioningAssignmentAuthority(authorization.Principal(), assignment); err != nil {
 			return nil, err
-		}
-		now, err := DispatchClock(ctx, q)
-		if err != nil {
-			return nil, MapErr(err)
-		}
-		if err := provisioningTokenUsable(token, now); err != nil {
-			return nil, MapErr(err)
-		}
-		if token.UsedCount >= token.MaxUses {
-			return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
-		}
-		snapshot, verifier, err := s.Execution.CurrentInTransaction(ctx, tx)
-		if err != nil {
-			return nil, ExecutionError(err)
-		}
-		if snapshot.Delegation == nil {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
-		}
-		_, update, err := s.Execution.ForDevice(ctx, tx, req.Msg.GetBootstrapRootVersion(), 0, 0, req.Msg.GetBootstrapRootSha256(), nil)
-		if err != nil {
-			return nil, ExecutionError(err)
-		}
-		if update == nil {
-			return nil, MapErr(ErrInternalState)
-		}
-		expires := now.Add(time.Duration(req.Msg.GetLifetimeSeconds()) * time.Second)
-		for _, limit := range []time.Time{token.ExpiresAt.Time, snapshot.Delegation.GetExpiresAt().AsTime()} {
-			if limit.Before(expires) {
-				expires = limit
-			}
-		}
-		value := &agentv1.OfflineEnrollmentAuthorization{DeploymentId: s.DeploymentID.String(), AuthorizationId: requestID.String(), TokenId: token.ID.String(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: timestamppb.New(now), ExpiresAt: timestamppb.New(expires)}
-		envelope, err := s.Authority.Sign(ctx, value, s.Signing.PlanKey)
-		if err != nil {
-			return nil, ExecutionError(err)
-		}
-		if _, err := verifier.VerifyOfflineAuthorization(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "offline_enrollment_plan_signer_not_delegated")
-		}
-		file.AuthorizationEnvelope, file.DelegationEnvelope, file.RootTransitions = envelope, update.GetDelegationEnvelope(), update.GetRootTransitions()
-		document, err := proto.Marshal(file)
-		if err != nil {
-			return nil, MapErr(err)
-		}
-		if err := q.InsertOfflineEnrollmentAuthorization(ctx, devicedb.InsertOfflineEnrollmentAuthorizationParams{ID: requestID, TokenID: token.ID, ActorID: actor.ID, RequestSha256: digest[:], AuthorizationEnvelope: document, ExpiresAt: Timestamptz(expires)}); err != nil {
-			return nil, MapErr(err)
-		}
-		if err := InsertAudit(ctx, q, &actor.ID, "enrollment.offline_authorization", requestID.String(), req.Msg.GetReason()); err != nil {
-			return nil, MapErr(err)
-		}
-		if err := CompleteAdmin(ctx, q, actor.ID, "CreateOfflineEnrollmentAuthorization", requestID, requestID, uuid.Nil, expires); err != nil {
-			return nil, MapErr(err)
 		}
 	}
 	if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionManageEnrollment); err != nil {
@@ -154,6 +92,76 @@ func (s *Service) CreateOfflineEnrollmentAuthorization(ctx context.Context, req 
 		return nil, MapErr(err)
 	}
 	return NoStore(&adminv1.CreateOfflineEnrollmentAuthorizationResponse{Authorization: file}), nil
+}
+
+func (s *Service) issueOfflineEnrollmentAuthorization(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.CreateOfflineEnrollmentAuthorizationRequest], actor identity.Principal, authorization *identity.Authorization, requestID uuid.UUID, digest [sha256.Size]byte, file *agentv1.OfflineEnrollmentAuthorizationFile) (*agentv1.OfflineEnrollmentAuthorizationFile, error) {
+	token, err := q.GetProvisioningTokenByHash(ctx, HashGrant(req.Msg.GetProvisioningToken()))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, MapErr(errGrantInvalid)
+	}
+	if err != nil {
+		return nil, MapErr(err)
+	}
+	assignment, err := provisioningAssignment(token)
+	if err != nil {
+		return nil, MapErr(err)
+	}
+	if err := provisioningAssignmentAuthority(authorization.Principal(), assignment); err != nil {
+		return nil, err
+	}
+	now, err := DispatchClock(ctx, q)
+	if err != nil {
+		return nil, MapErr(err)
+	}
+	if err := provisioningTokenUsable(token, now); err != nil {
+		return nil, MapErr(err)
+	}
+	if token.UsedCount >= token.MaxUses {
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "provisioning_token_exhausted")
+	}
+	snapshot, verifier, err := s.Execution.CurrentInTransaction(ctx, tx)
+	if err != nil {
+		return nil, ExecutionError(err)
+	}
+	if snapshot.Delegation == nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
+	}
+	_, update, err := s.Execution.ForDevice(ctx, tx, req.Msg.GetBootstrapRootVersion(), 0, 0, req.Msg.GetBootstrapRootSha256(), nil)
+	if err != nil {
+		return nil, ExecutionError(err)
+	}
+	if update == nil {
+		return nil, MapErr(ErrInternalState)
+	}
+	expires := now.Add(time.Duration(req.Msg.GetLifetimeSeconds()) * time.Second)
+	for _, limit := range []time.Time{token.ExpiresAt.Time, snapshot.Delegation.GetExpiresAt().AsTime()} {
+		if limit.Before(expires) {
+			expires = limit
+		}
+	}
+	value := &agentv1.OfflineEnrollmentAuthorization{DeploymentId: s.DeploymentID.String(), AuthorizationId: requestID.String(), TokenId: token.ID.String(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), NotBefore: timestamppb.New(now), ExpiresAt: timestamppb.New(expires)}
+	envelope, err := s.Authority.Sign(ctx, value, s.Signing.PlanKey)
+	if err != nil {
+		return nil, ExecutionError(err)
+	}
+	if _, err := verifier.VerifyOfflineAuthorization(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "offline_enrollment_plan_signer_not_delegated")
+	}
+	file.AuthorizationEnvelope, file.DelegationEnvelope, file.RootTransitions = envelope, update.GetDelegationEnvelope(), update.GetRootTransitions()
+	document, err := proto.Marshal(file)
+	if err != nil {
+		return nil, MapErr(err)
+	}
+	if err := q.InsertOfflineEnrollmentAuthorization(ctx, devicedb.InsertOfflineEnrollmentAuthorizationParams{ID: requestID, TokenID: token.ID, ActorID: actor.ID, RequestSha256: digest[:], AuthorizationEnvelope: document, ExpiresAt: Timestamptz(expires)}); err != nil {
+		return nil, MapErr(err)
+	}
+	if err := InsertAudit(ctx, q, &actor.ID, "enrollment.offline_authorization", requestID.String(), req.Msg.GetReason()); err != nil {
+		return nil, MapErr(err)
+	}
+	if err := CompleteAdmin(ctx, q, actor.ID, "CreateOfflineEnrollmentAuthorization", requestID, requestID, uuid.Nil, expires); err != nil {
+		return nil, MapErr(err)
+	}
+	return file, nil
 }
 
 // verifyOfflineEnrollmentRequest checks the currently delegated signer, retained

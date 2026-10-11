@@ -350,7 +350,13 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 		return nil, err
 	}
 	defer s.mu.Unlock()
-	loaded, err = s.enrolled(ctx)
+	return s.acceptResourcePreflightLocked(ctx, req, actionID, provider, plan, verification)
+}
+
+// acceptResourcePreflightLocked reauthenticates authority after native preflight
+// and persists its result. The caller holds the authority mutex throughout.
+func (s *Service) acceptResourcePreflightLocked(ctx context.Context, req *agentv1.PrepareResourceExecutionRequest, actionID string, provider nativeResource, plan *resourcev1.ResourcePlan, verification *resourcev1.ResourceVerification) (*agentv1.PrepareResourceExecutionResponse, error) {
+	loaded, err := s.enrolled(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +369,7 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	} else if !errors.Is(err, journal.ErrResourceActionNotFound) {
 		return nil, err
 	}
-	intent, err = resourceAction.current(ctx, s, loaded, req.GetIntentEnvelope())
+	intent, err := resourceAction.current(ctx, s, loaded, req.GetIntentEnvelope())
 	if err != nil {
 		return nil, err
 	}

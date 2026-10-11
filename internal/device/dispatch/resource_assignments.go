@@ -98,6 +98,11 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.MapErr(err)
 	}
+	return s.applyResourceAssignment(ctx, tx, q, req, actor, approval, consumption, device, requestID, digest)
+}
+
+func (s *Service) applyResourceAssignment(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.SetResourceAssignmentRequest], actor identity.Principal, approval *identity.Authorization, consumption *identity.ApprovalConsumption, device devicedb.GetDeviceForUpdateRow, requestID uuid.UUID, digest [sha256.Size]byte) (*connect.Response[adminv1.SetResourceAssignmentResponse], error) {
+	deviceID := device.ID
 	if device.CurrentGenerationID == nil || (device.State != core.StateActive && device.State != core.StatePending) {
 		return nil, core.MapErr(core.ErrDeviceRevoked)
 	}
@@ -248,54 +253,8 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			return nil, core.MapErr(err)
 		}
 		if err == nil {
-			response.Assignment = new(adminv1.ResourceAssignment)
-			if err := proto.Unmarshal(head.Document, response.Assignment); err != nil {
-				return nil, core.MapErr(core.ErrInternalState)
-			}
-			resources, err := q.ListAssignmentResources(ctx, head.ID)
-			if err != nil {
-				return nil, core.MapErr(err)
-			}
-			dispositions := make(map[string]adminv1.ResourceDisposition, len(resources))
-			for _, row := range resources {
-				resource := new(policyv1.ProfileResource)
-				if err := proto.Unmarshal(row.Document, resource); err != nil {
-					return nil, core.MapErr(core.ErrInternalState)
-				}
-				state := &adminv1.ResourceState{ResourceId: row.ResourceID.String(), Desired: resource.GetDesired(), DependsOn: resource.GetDependsOn(), Disposition: adminv1.ResourceDisposition(row.Disposition), Reason: row.Reason}
-				if state.Disposition == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING {
-					if head.BlockedReason != "" {
-						state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
-						state.Reason = head.BlockedReason
-					} else {
-						for _, dependency := range row.DependsOn {
-							d := dispositions[dependency.String()]
-							if d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED {
-								state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
-								state.Reason = "dependency_attention"
-								break
-							}
-							if d != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_SUCCEEDED {
-								state.Reason = "dependency_pending"
-							}
-						}
-					}
-				}
-				dispositions[state.ResourceId] = state.Disposition
-				latest, err := q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: head.ID, ResourceID: row.ResourceID})
-				if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-					return nil, core.MapErr(err)
-				}
-				if err == nil {
-					state.LatestAction, err = resourceActionSummary(latest)
-					if err != nil {
-						return nil, core.MapErr(err)
-					}
-				}
-				state.LastVerifiedAt = core.ProtoTime(row.LastVerifiedAt)
-				state.ObservedAt = core.ProtoTime(row.ObservedAt)
-				state.Compliance = resourceCompliance(row, state, head, now)
-				response.Resources = append(response.Resources, state)
+			if err := populateResourceStates(ctx, q, head, response, now); err != nil {
+				return nil, err
 			}
 		}
 		recent, err := q.RecentResourceActions(ctx, *device.CurrentGenerationID)
@@ -336,6 +295,59 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 		return nil, core.MapErr(err)
 	}
 	return core.NoStore(response), nil
+}
+
+func populateResourceStates(ctx context.Context, q *devicedb.Queries, head devicedb.ResourceAssignment, response *adminv1.GetDeviceResourceStateResponse, now time.Time) error {
+	response.Assignment = new(adminv1.ResourceAssignment)
+	if err := proto.Unmarshal(head.Document, response.Assignment); err != nil {
+		return core.MapErr(core.ErrInternalState)
+	}
+	resources, err := q.ListAssignmentResources(ctx, head.ID)
+	if err != nil {
+		return core.MapErr(err)
+	}
+	dispositions := make(map[string]adminv1.ResourceDisposition, len(resources))
+	for _, row := range resources {
+		resource := new(policyv1.ProfileResource)
+		if err := proto.Unmarshal(row.Document, resource); err != nil {
+			return core.MapErr(core.ErrInternalState)
+		}
+		state := &adminv1.ResourceState{ResourceId: row.ResourceID.String(), Desired: resource.GetDesired(), DependsOn: resource.GetDependsOn(), Disposition: adminv1.ResourceDisposition(row.Disposition), Reason: row.Reason}
+		if state.Disposition == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING {
+			if head.BlockedReason != "" {
+				state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
+				state.Reason = head.BlockedReason
+			} else {
+				for _, dependency := range row.DependsOn {
+					d := dispositions[dependency.String()]
+					if d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED {
+						state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
+						state.Reason = "dependency_attention"
+						break
+					}
+					if d != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_SUCCEEDED {
+						state.Reason = "dependency_pending"
+					}
+				}
+			}
+		}
+		dispositions[state.ResourceId] = state.Disposition
+		latest, err := q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: head.ID, ResourceID: row.ResourceID})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return core.MapErr(err)
+		}
+		if err == nil {
+			state.LatestAction, err = resourceActionSummary(latest)
+			if err != nil {
+				return core.MapErr(err)
+			}
+		}
+		state.LastVerifiedAt = core.ProtoTime(row.LastVerifiedAt)
+		state.ObservedAt = core.ProtoTime(row.ObservedAt)
+		state.Compliance = resourceCompliance(row, state, head, now)
+		response.Resources = append(response.Resources, state)
+	}
+	return nil
 }
 
 // Kahn ordering chooses the lexically first currently eligible unit at each step.

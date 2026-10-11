@@ -236,6 +236,10 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 		}
 		return work, nil, nil
 	}
+	return s.selectResourceWork(ctx, tx, q, principal, choice, approval, authorizationErr, snapshot, verifier, head, headErr, now)
+}
+
+func (s *Service) selectResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, principal core.DevicePrincipal, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, head devicedb.ResourceAssignment, headErr error, now time.Time) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
 	if err := core.RequireActionRestriction(ctx, q, principal.DeviceID, nil); err != nil {
 		return nil, nil, err
 	}
@@ -288,6 +292,10 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 	if snapshot == nil || snapshot.Delegation == nil {
 		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
+	return s.mintResourceWork(ctx, tx, q, principal, approval, snapshot, verifier, head, source, resources, candidate, release, now)
+}
+
+func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, principal core.DevicePrincipal, approval *identity.Authorization, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, head, source devicedb.ResourceAssignment, resources []devicedb.ResourceAssignmentResource, candidate *policyv1.ProfileResource, release *devicedb.ResourceRelease, now time.Time) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
 	operation := resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE
 	if release != nil {
 		operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
@@ -375,7 +383,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "source", "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
-	action, err = q.LockResourceAction(ctx, id)
+	action, err := q.LockResourceAction(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}

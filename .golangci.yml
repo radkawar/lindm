@@ -87,18 +87,6 @@ linters:
       - path: '(^|/)internal/agent/definitionprovider/files_linux\.go$'
         text: "Function 'snapshot' is too long"
         linters: [funlen]
-      - path: '(^|/)internal/agent/executor/device_action_execution\.go$'
-        text: "Function 'beginDeviceAction' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/agent/executor/device_action_recovery\.go$'
-        text: "Function 'prepareDeviceActionRecovery' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/agent/executor/identity\.go$'
-        text: "Function 'bind' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/agent/executor/resource_execution\.go$'
-        text: "Function 'prepareResourceExecution' is too long"
-        linters: [funlen]
       - path: '(^|/)internal/agent/journal/device_actions_linux\.go$'
         text: "Function 'validateDeviceAction' is too long"
         linters: [funlen]
@@ -132,41 +120,8 @@ linters:
       - path: '(^|/)internal/agent/sysctlprovider/native_linux\.go$'
         text: "Function 'ApplyNative' is too long"
         linters: [funlen]
-      - path: '(^|/)internal/device/inventory/admin_inventory\.go$'
-        text: "Function 'ListDevicePackages' is too long"
-        linters: [funlen]
       - path: '(^|/)internal/device/directory/admin_search\.go$'
         text: "Function 'searchDevicePage' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/connectivity_guard\.go$'
-        text: "Function 'ConnectivityConfirmationHandler' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/device_action_admin\.go$'
-        text: "Function 'CreateDeviceAction' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/device_action_recovery_register\.go$'
-        text: "Function 'RegisterDeviceActionRecovery' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/device_action_recovery_result\.go$'
-        text: "Function 'CheckpointRecoveryAction' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/device_action_recovery_start\.go$'
-        text: "Function 'AuthorizeRecoveryStart' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/core/offline_enrollment\.go$'
-        text: "Function 'CreateOfflineEnrollmentAuthorization' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/core/provisioning\.go$'
-        text: "Function 'reserveProvisioning' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/resource_assignments\.go$'
-        text: "Function 'GetDeviceResourceState' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/resource_assignments\.go$'
-        text: "Function 'SetResourceAssignment' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/dispatch/resource_dispatch\.go$'
-        text: "Function 'getResourceWork' is too long"
         linters: [funlen]
 formatters:
   enable:
