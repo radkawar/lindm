@@ -426,7 +426,7 @@ var registry = []*Release{
 		Key: "linuxmint-22.3", Name: "Linux Mint 22.3", Distribution: "Linux Mint", ID: "linuxmint", Version: Exact("22.3"),
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "mint.md", Family: FamilyDebian, Architectures: x86,
-		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver"}, Firewall: ufw,
+		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver (logind Lock; never sets LockedHint)"}, Firewall: ufw,
 		// The ISO's Ubiquity runs noninteractively from a debconf preseed; the
 		// installed root uses Ubuntu's initramfs-tools and archive package names.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Ubiquity, Guest: ubuntuGuest,

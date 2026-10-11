@@ -567,6 +567,13 @@ func TestEncryptedInstallerTPMCrypttabPreservesIdentity(t *testing.T) {
 			"luks-123 UUID=123 none discard,tpm2-device=auto\nluks-456 UUID=456 - luks,tpm2-device=auto\n",
 		},
 		{"root UUID=abc\n", "root UUID=abc none tpm2-device=auto\n"},
+		// Regression: Pop!_OS distinst writes a random-key plain swap next to
+		// the LUKS root. Tagging it tpm2-device=auto made systemd-cryptsetup
+		// ignore /dev/urandom and prompt for a cryptswap passphrase at boot.
+		{
+			"cryptdata UUID=7a1 none luks\ncryptswap UUID=e4b /dev/urandom swap,plain,offset=1024,cipher=aes-xts-plain64,size=512\n",
+			"cryptdata UUID=7a1 none luks,tpm2-device=auto\ncryptswap UUID=e4b /dev/urandom swap,plain,offset=1024,cipher=aes-xts-plain64,size=512\n",
+		},
 	} {
 		cmd := exec.Command("awk", encryptedInstallerTPMCrypttabProgram)
 		cmd.Stdin = strings.NewReader(tc.input)

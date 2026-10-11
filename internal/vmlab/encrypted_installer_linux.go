@@ -275,9 +275,13 @@ func encryptedInstallerReleaseDNF(release *platform.Release, repository, archite
 
 // The native installers already name their LUKS mappings by UUID. Preserve those
 // identities and unrelated options, removing only the initramfs-tools-only flag.
-// This transformation does not change a LUKS keyslot or token.
+// This transformation does not change a LUKS keyslot or token. Mappings keyed
+// from /dev/urandom (distinst's plain cryptswap) are recreated on every boot and
+// stay untouched: with tpm2-device= systemd-cryptsetup ignores the key file and
+// prompts for a passphrase instead.
 const encryptedInstallerTPMCrypttabProgram = `
 /^[[:space:]]*(#|$)/ { print; next }
+NF >= 3 && $3 ~ /^\/dev\/u?random$/ { print; next }
 NF < 2 || NF > 4 || $2 !~ /^UUID=/ { exit 1 }
 {
     if (NF < 3) $3 = "none"
