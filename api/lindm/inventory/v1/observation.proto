@@ -264,6 +264,14 @@ message ObservedNVMeScope {
     not_in: [0]
   }];
   lindm.agent.v1.NVMeSanitizeScope scope = 2;
+  // Fixed refusal code when the namespace's sysfs identity is absent or
+  // unusable (status INVALID_OUTPUT); never a silent fallback.
+  string reason = 3 [(buf.validate.field).string.pattern = "^([a-z][a-z0-9_]{0,63})?$"];
+  option (buf.validate.message).cel = {
+    id: "nvme_observation.reason_status"
+    message: "only invalid NVMe observations carry a refusal reason"
+    expression: "this.reason == '' || this.status == 5"
+  };
   option (buf.validate.message).cel = {
     id: "nvme_observation.scope_status"
     message: "only successful NVMe observations carry an exact native scope"

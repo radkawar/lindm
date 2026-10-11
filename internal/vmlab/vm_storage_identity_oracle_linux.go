@@ -347,6 +347,6 @@ func (o vmInventoryOracle) storageNVMeIdentity(name string, id *inventoryv1.Stor
 		return nil, errors.New("NVMe namespace NID oracle mismatch")
 	}
 	result.Status = truthSuccess
-	result.Scope = &agentv1.NVMeSanitizeScope{NamespaceId: uint32(n), Identity: &agentv1.NVMeSanitizeIdentity{Basis: basis, VendorId: controller.VID, SubsystemVendorId: controller.SSVID, ControllerSerial: serial, ControllerModel: model, ControllerFirmware: strings.TrimSpace(controller.Firmware), NamespaceSizeBytes: namespace.Size << shift, LbaFormat: namespace.Format, LbaDataSizeShift: shift}}
+	result.Scope = &agentv1.NVMeSanitizeScope{NamespaceId: uint32(n), Identity: &agentv1.NVMeSanitizeIdentity{Basis: basis, VendorId: controller.VID, SubsystemVendorId: controller.SSVID, ControllerSerial: serial, ControllerModel: model, ControllerFirmware: strings.TrimSpace(controller.Firmware), NamespaceSizeBytes: namespace.Size << shift, LbaDataSizeShift: shift}}
 	return result, nil
 }

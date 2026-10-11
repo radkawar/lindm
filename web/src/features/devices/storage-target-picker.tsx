@@ -176,7 +176,6 @@ function ObservedStorageIdentity({ selection }: { selection: ObservedStorageSele
                   {identity.controllerFirmware || "Not reported"}
                 </Fact>
                 <Fact label="Namespace size (bytes)">{identity.namespaceSizeBytes.toString()}</Fact>
-                <Fact label="LBA format index">{identity.lbaFormat}</Fact>
                 <Fact label="LBA data size shift (LBADS)">{identity.lbaDataSizeShift}</Fact>
               </>
             ) : null}

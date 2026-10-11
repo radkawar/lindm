@@ -267,7 +267,6 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
               <Fact label="Namespace size (bytes)">
                 {action.value.nvmeScope.identity.namespaceSizeBytes.toString()}
               </Fact>
-              <Fact label="LBA format index">{action.value.nvmeScope.identity.lbaFormat}</Fact>
               <Fact label="LBA data size shift (LBADS)">
                 {action.value.nvmeScope.identity.lbaDataSizeShift}
               </Fact>

@@ -132,7 +132,7 @@ func nvmePlan(action *agentv1.SanitizeAction, nsid uint32, controllerData, names
 		identity.GetBasis() != basis ||
 		identity.GetVendorId() != uint32(controller.vid) || identity.GetSubsystemVendorId() != uint32(controller.ssvid) ||
 		identity.GetControllerSerial() != controller.serial || identity.GetControllerModel() != controller.model || identity.GetControllerFirmware() != controller.firmware ||
-		identity.GetNamespaceSizeBytes() != namespace.size || identity.GetLbaFormat() != uint32(namespace.lbaf) || identity.GetLbaDataSizeShift() != uint32(namespace.shift) {
+		identity.GetNamespaceSizeBytes() != namespace.size || identity.GetLbaDataSizeShift() != uint32(namespace.shift) {
 		return nil, fmt.Errorf("%w: nvme_approved_identity_changed", ErrConflict)
 	}
 	if err := nvmeMethodScope(action.GetMethod(), action.GetNvmeScope(), controller, allocated); err != nil {
@@ -154,6 +154,7 @@ func nvmePlan(action *agentv1.SanitizeAction, nsid uint32, controllerData, names
 		IdentifyControllerSha256: controller.digest[:],
 		IdentifyNamespaceSha256:  namespace.digest[:],
 		NamespaceInventorySha256: inventory.Sum(nil),
+		LbaFormat:                uint32(namespace.lbaf),
 	}, nil
 }
 

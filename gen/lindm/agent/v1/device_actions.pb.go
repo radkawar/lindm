@@ -1121,6 +1121,8 @@ func (x *RecoveryBootSpec) GetMediaSha256() []byte {
 
 // Explicit human-approved native identity. Changing the basis or any field
 // requires new approval; native execution never falls back to another basis.
+// Inventory derives it from the kernel's sysfs projection of its own probe-time
+// Identify data, so collection needs no CAP_SYS_ADMIN on any kernel.
 type NVMeSanitizeIdentity struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Basis              NvmeIdentityBasis      `protobuf:"varint,1,opt,name=basis,proto3,enum=lindm.agent.v1.NvmeIdentityBasis" json:"basis,omitempty"`
@@ -1130,7 +1132,6 @@ type NVMeSanitizeIdentity struct {
 	ControllerModel    string                 `protobuf:"bytes,5,opt,name=controller_model,json=controllerModel,proto3" json:"controller_model,omitempty"`
 	ControllerFirmware string                 `protobuf:"bytes,6,opt,name=controller_firmware,json=controllerFirmware,proto3" json:"controller_firmware,omitempty"`
 	NamespaceSizeBytes uint64                 `protobuf:"varint,7,opt,name=namespace_size_bytes,json=namespaceSizeBytes,proto3" json:"namespace_size_bytes,omitempty"`
-	LbaFormat          uint32                 `protobuf:"varint,8,opt,name=lba_format,json=lbaFormat,proto3" json:"lba_format,omitempty"`
 	LbaDataSizeShift   uint32                 `protobuf:"varint,9,opt,name=lba_data_size_shift,json=lbaDataSizeShift,proto3" json:"lba_data_size_shift,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -1211,13 +1212,6 @@ func (x *NVMeSanitizeIdentity) GetControllerFirmware() string {
 func (x *NVMeSanitizeIdentity) GetNamespaceSizeBytes() uint64 {
 	if x != nil {
 		return x.NamespaceSizeBytes
-	}
-	return 0
-}
-
-func (x *NVMeSanitizeIdentity) GetLbaFormat() uint32 {
-	if x != nil {
-		return x.LbaFormat
 	}
 	return 0
 }
@@ -1305,8 +1299,11 @@ type NVMeSanitizePlan struct {
 	// allocation/progress counters cannot change the frozen native media scope.
 	IdentifyNamespaceSha256  []byte `protobuf:"bytes,11,opt,name=identify_namespace_sha256,json=identifyNamespaceSha256,proto3" json:"identify_namespace_sha256,omitempty"`
 	NamespaceInventorySha256 []byte `protobuf:"bytes,12,opt,name=namespace_inventory_sha256,json=namespaceInventorySha256,proto3" json:"namespace_inventory_sha256,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Current FLBAS format index from privileged Identify Namespace (bound by
+	// identify_namespace_sha256). Format NVM reuses it; it is never approved.
+	LbaFormat     uint32 `protobuf:"varint,13,opt,name=lba_format,json=lbaFormat,proto3" json:"lba_format,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NVMeSanitizePlan) Reset() {
@@ -1421,6 +1418,13 @@ func (x *NVMeSanitizePlan) GetNamespaceInventorySha256() []byte {
 		return x.NamespaceInventorySha256
 	}
 	return nil
+}
+
+func (x *NVMeSanitizePlan) GetLbaFormat() uint32 {
+	if x != nil {
+		return x.LbaFormat
+	}
+	return 0
 }
 
 type NVMeSanitizeVerification struct {
@@ -4699,7 +4703,7 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\fimage_sha256\x18\x01 \x01(\fB\a\xbaH\x04z\x02h R\vimageSha256\x12I\n" +
 	"\tboot_mode\x18\x02 \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bbootMode\x12*\n" +
-	"\fmedia_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\vmediaSha256\"\xa6\x04\n" +
+	"\fmedia_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\vmediaSha256\"\x90\x04\n" +
 	"\x14NVMeSanitizeIdentity\x12C\n" +
 	"\x05basis\x18\x01 \x01(\x0e2!.lindm.agent.v1.NvmeIdentityBasisB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05basis\x12(\n" +
@@ -4708,15 +4712,14 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x11controller_serial\x18\x04 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18\x142\b^[ -~]+$R\x10controllerSerial\x12>\n" +
 	"\x10controller_model\x18\x05 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18(2\b^[ -~]+$R\x0fcontrollerModel\x12D\n" +
 	"\x13controller_firmware\x18\x06 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18\b2\b^[ -~]+$R\x12controllerFirmware\x12:\n" +
-	"\x14namespace_size_bytes\x18\a \x01(\x04B\b\xbaH\x052\x03(\x80 R\x12namespaceSizeBytes\x12&\n" +
-	"\n" +
-	"lba_format\x18\b \x01(\rB\a\xbaH\x04*\x02\x18\x0fR\tlbaFormat\x128\n" +
-	"\x13lba_data_size_shift\x18\t \x01(\rB\t\xbaH\x06*\x04\x18\f(\tR\x10lbaDataSizeShift\"\xb8\x01\n" +
+	"\x14namespace_size_bytes\x18\a \x01(\x04B\b\xbaH\x052\x03(\x80 R\x12namespaceSizeBytes\x128\n" +
+	"\x13lba_data_size_shift\x18\t \x01(\rB\t\xbaH\x06*\x04\x18\f(\tR\x10lbaDataSizeShiftJ\x04\b\b\x10\tR\n" +
+	"lba_format\"\xb8\x01\n" +
 	"\x11NVMeSanitizeScope\x120\n" +
 	"\fnamespace_id\x18\x01 \x01(\rB\r\xbaH\n" +
 	"*\b\x18\xfe\xff\xff\xff\x0f(\x01R\vnamespaceId\x12'\n" +
 	"\x0fcontroller_wide\x18\x02 \x01(\bR\x0econtrollerWide\x12H\n" +
-	"\bidentity\x18\x03 \x01(\v2$.lindm.agent.v1.NVMeSanitizeIdentityB\x06\xbaH\x03\xc8\x01\x01R\bidentity\"\xab\x05\n" +
+	"\bidentity\x18\x03 \x01(\v2$.lindm.agent.v1.NVMeSanitizeIdentityB\x06\xbaH\x03\xc8\x01\x01R\bidentity\"\xd3\x05\n" +
 	"\x10NVMeSanitizePlan\x12?\n" +
 	"\x05scope\x18\x01 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeB\x06\xbaH\x03\xc8\x01\x01R\x05scope\x127\n" +
 	"\x11controller_serial\x18\x02 \x01(\tB\n" +
@@ -4734,7 +4737,9 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x1aidentify_controller_sha256\x18\n" +
 	" \x01(\fB\a\xbaH\x04z\x02h R\x18identifyControllerSha256\x12C\n" +
 	"\x19identify_namespace_sha256\x18\v \x01(\fB\a\xbaH\x04z\x02h R\x17identifyNamespaceSha256\x12E\n" +
-	"\x1anamespace_inventory_sha256\x18\f \x01(\fB\a\xbaH\x04z\x02h R\x18namespaceInventorySha256\"\xa6\x03\n" +
+	"\x1anamespace_inventory_sha256\x18\f \x01(\fB\a\xbaH\x04z\x02h R\x18namespaceInventorySha256\x12&\n" +
+	"\n" +
+	"lba_format\x18\r \x01(\rB\a\xbaH\x04*\x02\x18\x0fR\tlbaFormat\"\xa6\x03\n" +
 	"\x18NVMeSanitizeVerification\x12O\n" +
 	"\x0eobserved_scope\x18\x01 \x01(\v2 .lindm.agent.v1.NVMeSanitizePlanB\x06\xbaH\x03\xc8\x01\x01R\robservedScope\x122\n" +
 	"\x0fsanitize_status\x18\x02 \x01(\rB\t\xbaH\x06*\x04\x18\xff\xff\x03R\x0esanitizeStatus\x126\n" +

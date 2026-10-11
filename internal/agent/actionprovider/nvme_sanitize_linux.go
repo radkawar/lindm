@@ -60,7 +60,7 @@ func (p *Provider) sanitizeNVMe(ctx context.Context, plan *agentv1.DeviceActionP
 		NvmeSanitize: &agentv1.NVMeSanitizeVerification{ObservedScope: fresh},
 		Evidence:     "Native command has no verified completion; a consumed/interrupted operation must not be restarted.",
 	}
-	if err := p.startNVMeCommand(ctx, target.file, action.GetMethod(), fresh.GetScope().GetNamespaceId(), byte(fresh.GetScope().GetIdentity().GetLbaFormat()), gate, revalidate, result.NvmeSanitize); err != nil {
+	if err := p.startNVMeCommand(ctx, target.file, action.GetMethod(), fresh.GetScope().GetNamespaceId(), byte(fresh.GetLbaFormat()), gate, revalidate, result.NvmeSanitize); err != nil {
 		if errors.Is(err, ErrOutcomeUnknown) {
 			return result, err
 		}

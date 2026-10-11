@@ -30,34 +30,60 @@ func nvmeNamespaceID(file *os.File) (uint32, error) {
 	return uint32(id), nil
 }
 
-// ReadNVMeSanitizeScope discovers approval identity using native read-only
-// namespace/controller ioctls. The caller owns the pinned read-only block
-// descriptor and supplies the independently observed storage target. This does
-// not authorize erasure, qualify a method, or select controller-wide scope.
+// ReadNVMeSanitizeScope discovers approval identity from the kernel's sysfs
+// projection of the Identify data it read at probe time, so it needs no
+// CAP_SYS_ADMIN on any kernel (Linux <6.2 refuses unprivileged Identify). The
+// caller owns the pinned read-only block descriptor and supplies the
+// independently observed storage target. An absent or unusable attribute is an
+// explicit *NVMeScopeRefusal, never a fallback to another source. This does not
+// authorize erasure, qualify a method, or select controller-wide scope.
 func ReadNVMeSanitizeScope(ctx context.Context, file *os.File, target *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if file == nil || target == nil {
-		return nil, ErrUnsupported
-	}
-	var stat unix.Stat_t
-	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
-		return nil, err
-	}
-	flags, err := unix.FcntlInt(file.Fd(), unix.F_GETFL, 0)
+	nsid, rdev, err := pinnedNVMeNamespace(ctx, file, target)
 	if err != nil {
 		return nil, err
 	}
-	if stat.Mode&unix.S_IFMT != unix.S_IFBLK || flags&unix.O_ACCMODE != unix.O_RDONLY {
-		return nil, fmt.Errorf("%w: nvme_read_only_namespace_required", ErrUnsupported)
+	size, err := blockSize(file)
+	if err != nil {
+		return nil, err
 	}
-	nsid, err := nvmeNamespaceID(file)
+	return readNVMeSysfsScope(os.DirFS("/sys"), rdev, size, target, nsid)
+}
+
+// ReadNVMeIdentifyScope derives the same approval identity from native Identify
+// Controller/Namespace admin passthrough. It is the parity oracle for the sysfs
+// reader; inventory never uses it.
+func ReadNVMeIdentifyScope(ctx context.Context, file *os.File, target *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error) {
+	nsid, _, err := pinnedNVMeNamespace(ctx, file, target)
 	if err != nil {
 		return nil, err
 	}
 	p := &Provider{run: runNative}
 	return p.readNVMeSanitizeScope(ctx, file, target, nsid)
+}
+
+func pinnedNVMeNamespace(ctx context.Context, file *os.File, target *agentv1.StorageTarget) (uint32, uint64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, 0, err
+	}
+	if file == nil || target == nil {
+		return 0, 0, ErrUnsupported
+	}
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+		return 0, 0, err
+	}
+	flags, err := unix.FcntlInt(file.Fd(), unix.F_GETFL, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFBLK || flags&unix.O_ACCMODE != unix.O_RDONLY {
+		return 0, 0, fmt.Errorf("%w: nvme_read_only_namespace_required", ErrUnsupported)
+	}
+	nsid, err := nvmeNamespaceID(file)
+	if err != nil {
+		return 0, 0, err
+	}
+	return nsid, stat.Rdev, nil
 }
 
 func (p *Provider) readNVMeIdentify(ctx context.Context, file *os.File, nsid uint32) ([]byte, []byte, error) {
@@ -99,7 +125,6 @@ func (p *Provider) readNVMeSanitizeScope(ctx context.Context, file *os.File, tar
 			ControllerModel:    controller.model,
 			ControllerFirmware: controller.firmware,
 			NamespaceSizeBytes: namespace.size,
-			LbaFormat:          uint32(namespace.lbaf),
 			LbaDataSizeShift:   uint32(namespace.shift),
 		},
 	}, nil

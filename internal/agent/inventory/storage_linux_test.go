@@ -18,6 +18,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/agent/actionprovider"
 )
 
 // Synthetic util-linux/cryptsetup-format inputs, not VM/native qualification.
@@ -358,6 +359,22 @@ func TestNVMeScopeUsesExactReadOnlyTargetSeam(t *testing.T) {
 	}
 	if got := collectNVMeScope(t.Context(), s, "nvme0n1", device); got.Status != invalid || got.Scope != nil {
 		t.Fatalf("controller-wide authority: %v", got)
+	}
+	// An NVMe namespace whose sysfs identity is absent is an explicit invalid
+	// observation with its fixed reason, never a namespace without scope.
+	s.nvmeScope = func(context.Context, *os.File, *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error) {
+		return nil, &actionprovider.NVMeScopeRefusal{Reason: "nvme_sysfs_wwid_absent"}
+	}
+	got = collectNVMeScope(t.Context(), s, "nvme0n1", device)
+	if got.Status != invalid || got.Scope != nil || got.Reason != "nvme_sysfs_wwid_absent" {
+		t.Fatalf("sysfs refusal: %v", got)
+	}
+	if err := protovalidate.Validate(got); err != nil {
+		t.Fatal(err)
+	}
+	got.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	if err := protovalidate.Validate(got); err == nil {
+		t.Fatal("refusal reason accepted on a non-invalid observation")
 	}
 	for _, candidate := range []string{path, "/dev/null"} {
 		file, err := openStorageBlock(candidate)

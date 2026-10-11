@@ -394,8 +394,12 @@ verified in-process. It still needs a `CONFIG_RD_GZIP=y` kernel, the unchanged
 distro-signed modules and host-side signing to build the image. The KVM image's
 generic initramfs (about 240 MB) cannot fit the ESP in an ordinary UKI, so the
 owned-boot fixture embeds a `dracut --hostonly` image instead. The signed
-recovery UKI is 45.8–51.4 MB and fits the remaining ESP space. SATA passed on
-9.8 and 10.2 and NVMe on 10.2; see
+recovery UKI is 45.8–51.6 MB and fits the remaining ESP space. SATA and NVMe
+passed on 9.8 and 10.2. NVMe on 9.8 first failed because inventory read the
+approval scope with NVMe Identify passthrough from a capability-free unit, which
+the 5.14 kernel refuses (Linux before 6.2 requires `CAP_SYS_ADMIN` for any admin
+passthrough). Inventory now reads the kernel's sysfs projection of Identify on
+every kernel; see
 [verification](../verification.md#rhel-encrypted-device-actions-and-self-update).
 
 Original-device recovery sanitize on stock RHEL would use

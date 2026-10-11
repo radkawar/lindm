@@ -3,6 +3,7 @@
 package actionprovider
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"testing"
@@ -52,6 +53,29 @@ func TestNVMePlanBindsExactControllerNamespaceAndInventory(t *testing.T) {
 			t.Fatalf("changed native binding not observed: %v", err)
 		}
 	}
+	// The FLBAS index is not approved: the plan carries the privileged
+	// Identify's index for Format NVM, and the namespace digest binds it.
+	if before.GetLbaFormat() != 0 {
+		t.Fatalf("plan format index = %d", before.GetLbaFormat())
+	}
+	sameSize := nvmeNamespaceFixture()
+	sameSize[25], sameSize[26], sameSize[134] = 1, 1, 9
+	reformatted, err := nvmePlan(action, 1, controller, sameSize, inventory, inventory)
+	if err != nil || reformatted.GetLbaFormat() != 1 || bytes.Equal(reformatted.GetIdentifyNamespaceSha256(), before.GetIdentifyNamespaceSha256()) {
+		t.Fatalf("same-size format index not carried by the plan: %v %v", reformatted, err)
+	}
+	for _, mutate := range []func([]byte){
+		func(n []byte) { n[25], n[26], n[134] = 1, 1, 12 },           // Changed data size.
+		func(n []byte) { n[25], n[26], n[132], n[134] = 1, 1, 8, 9 }, // Metadata.
+		func(n []byte) { n[29] = 1 },                                 // Protection information.
+		func(n []byte) { n[25], n[26], n[134] = 1, 0x11, 9 },         // Extended LBA format.
+	} {
+		n := nvmeNamespaceFixture()
+		mutate(n)
+		if _, err := nvmePlan(action, 1, controller, n, inventory, inventory); err == nil {
+			t.Fatal("approved size/shift admitted a changed or unsupported LBA format")
+		}
+	}
 	for _, mutate := range []func(*agentv1.SanitizeAction){
 		func(a *agentv1.SanitizeAction) { a.NvmeScope.NamespaceId = 2 },
 		func(a *agentv1.SanitizeAction) { a.Target.Serial = "other-controller" },
@@ -68,7 +92,6 @@ func TestNVMePlanBindsExactControllerNamespaceAndInventory(t *testing.T) {
 		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.ControllerModel = "other-model" },
 		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.ControllerFirmware = "2.0" },
 		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.NamespaceSizeBytes++ },
-		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.LbaFormat++ },
 		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.LbaDataSizeShift++ },
 	} {
 		wrong := proto.CloneOf(action)
@@ -181,7 +204,6 @@ func TestNVMePlanRejectsNativeIdentityMutation(t *testing.T) {
 		func(c, _ []byte) { c[24] = 'X' },
 		func(c, _ []byte) { c[64] = '2' },
 		func(_, n []byte) { binary.LittleEndian.PutUint64(n[:8], 16384) },
-		func(_, n []byte) { n[25], n[26], n[134] = 1, 1, 9 },
 		func(_, n []byte) {
 			binary.LittleEndian.PutUint64(n[:8], 4096)
 			binary.LittleEndian.PutUint64(n[8:16], 4096)

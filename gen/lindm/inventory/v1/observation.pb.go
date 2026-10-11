@@ -1348,9 +1348,12 @@ func (x *StorageIdentity) GetGptDiskGuid() *ObservedString {
 }
 
 type ObservedNVMeScope struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        CollectionStatus       `protobuf:"varint,1,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
-	Scope         *v1.NVMeSanitizeScope  `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Status CollectionStatus       `protobuf:"varint,1,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
+	Scope  *v1.NVMeSanitizeScope  `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	// Fixed refusal code when the namespace's sysfs identity is absent or
+	// unusable (status INVALID_OUTPUT); never a silent fallback.
+	Reason        string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1397,6 +1400,13 @@ func (x *ObservedNVMeScope) GetScope() *v1.NVMeSanitizeScope {
 		return x.Scope
 	}
 	return nil
+}
+
+func (x *ObservedNVMeScope) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
 }
 
 type StorageDetails struct {
@@ -3160,11 +3170,13 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\fbacking_disk\x18\x0f \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\vbackingDisk\x12K\n" +
 	"\froot_backing\x18\x10 \x01(\v2 .lindm.inventory.v1.ObservedBoolB\x06\xbaH\x03\xc8\x01\x01R\vrootBacking\x12A\n" +
 	"\x04nvme\x18\x11 \x01(\v2%.lindm.inventory.v1.ObservedNVMeScopeB\x06\xbaH\x03\xc8\x01\x01R\x04nvme\x12F\n" +
-	"\rgpt_disk_guid\x18\x12 \x01(\v2\".lindm.inventory.v1.ObservedStringR\vgptDiskGuid\"\xb5\x03\n" +
+	"\rgpt_disk_guid\x18\x12 \x01(\v2\".lindm.inventory.v1.ObservedStringR\vgptDiskGuid\"\xef\x04\n" +
 	"\x11ObservedNVMeScope\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x127\n" +
-	"\x05scope\x18\x02 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeR\x05scope:\x9c\x02\xbaH\x98\x02\x1a\x85\x01\n" +
+	"\x05scope\x18\x02 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeR\x05scope\x128\n" +
+	"\x06reason\x18\x03 \x01(\tB \xbaH\x1dr\x1b2\x19^([a-z][a-z0-9_]{0,63})?$R\x06reason:\x9c\x03\xbaH\x98\x03\x1a~\n" +
+	"\x1envme_observation.reason_status\x125only invalid NVMe observations carry a refusal reason\x1a%this.reason == '' || this.status == 5\x1a\x85\x01\n" +
 	"\x1dnvme_observation.scope_status\x12=only successful NVMe observations carry an exact native scope\x1a%(this.status == 1) == has(this.scope)\x1a\x8d\x01\n" +
 	" nvme_observation.namespace_scope\x128inventory does not authorize controller-wide destruction\x1a/!has(this.scope) || !this.scope.controller_wide\"\x8f\x02\n" +
 	"\x0eStorageDetails\x12H\n" +

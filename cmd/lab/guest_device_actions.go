@@ -146,9 +146,11 @@ func guestDeviceActionProbe(ctx context.Context, output io.Writer, denialExpecte
 	}{denial.Code().String(), rpcreason.Get(denial), time.Now().UTC()})
 }
 
-// guestNVMeIdentity is a read-only root lab probe. Approval receives the native
-// Identify Controller/Namespace identity, not controller facts from sysfs.
-func guestNVMeIdentity(ctx context.Context, path string, output io.Writer) (err error) {
+// guestNVMeIdentity is a read-only lab probe: it reads one approval scope from
+// the exact guest namespace with the supplied reader (sysfs or Identify).
+// identify selects the Identify admin-passthrough parity oracle instead of the
+// inventory's sysfs reader.
+func guestNVMeIdentity(ctx context.Context, identify bool, path string, output io.Writer) (err error) {
 	if os.Geteuid() != 0 || filepath.Dir(path) != "/dev" || filepath.Clean(path) != path {
 		return errors.New("native NVMe identity requires root and an exact guest block path")
 	}
@@ -176,7 +178,11 @@ func guestNVMeIdentity(ctx context.Context, path string, output io.Writer) (err 
 	if stat.Mode&unix.S_IFMT != unix.S_IFBLK {
 		return errors.New("native NVMe identity requires a block descriptor")
 	}
-	scope, err := actionprovider.ReadNVMeSanitizeScope(ctx, file, target)
+	read := actionprovider.ReadNVMeSanitizeScope
+	if identify {
+		read = actionprovider.ReadNVMeIdentifyScope
+	}
+	scope, err := read(ctx, file, target)
 	if err != nil {
 		return err
 	}

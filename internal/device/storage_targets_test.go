@@ -335,7 +335,7 @@ func TestObservedStorageTargetExactTupleAndLiveSet(t *testing.T) {
 }
 
 func fixtureNVMeScope() *agentv1.NVMeSanitizeScope {
-	return &agentv1.NVMeSanitizeScope{NamespaceId: 1, Identity: &agentv1.NVMeSanitizeIdentity{Basis: agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID, VendorId: 1, SubsystemVendorId: 2, ControllerSerial: "serial-", ControllerModel: "fixture storage", ControllerFirmware: "1", NamespaceSizeBytes: 1 << 30, LbaFormat: 0, LbaDataSizeShift: 9}}
+	return &agentv1.NVMeSanitizeScope{NamespaceId: 1, Identity: &agentv1.NVMeSanitizeIdentity{Basis: agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID, VendorId: 1, SubsystemVendorId: 2, ControllerSerial: "serial-", ControllerModel: "fixture storage", ControllerFirmware: "1", NamespaceSizeBytes: 1 << 30, LbaDataSizeShift: 9}}
 }
 
 func TestObservedNVMeIdentityRequiresExactBasisAndFields(t *testing.T) {
@@ -362,7 +362,6 @@ func TestObservedNVMeIdentityRequiresExactBasisAndFields(t *testing.T) {
 		{"model", func(s *agentv1.NVMeSanitizeScope) { s.Identity.ControllerModel += "x" }},
 		{"firmware", func(s *agentv1.NVMeSanitizeScope) { s.Identity.ControllerFirmware += "x" }},
 		{"size", func(s *agentv1.NVMeSanitizeScope) { s.Identity.NamespaceSizeBytes++ }},
-		{"format", func(s *agentv1.NVMeSanitizeScope) { s.Identity.LbaFormat++ }},
 		{"shift", func(s *agentv1.NVMeSanitizeScope) { s.Identity.LbaDataSizeShift++ }},
 	} {
 		t.Run(test.name, func(t *testing.T) {

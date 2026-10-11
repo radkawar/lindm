@@ -13,12 +13,16 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -46,6 +50,7 @@ type actionSignedHandoffEvidence struct {
 	ApproverID           string                            `json:"approver_id"`
 	Method               string                            `json:"method"`
 	NVMeScope            *agentv1.NVMeSanitizeScope        `json:"approved_nvme_scope,omitempty"`
+	NVMeIdentityParity   *nvmeIdentityParity               `json:"nvme_identity_parity,omitempty"`
 	RecoveryReadiness    *adminv1.RecoveryReadiness        `json:"preapproval_recovery_readiness,omitempty"`
 	ReadinessRefresh     *actionDispatchEvidence           `json:"readiness_inventory_refresh,omitempty"`
 	ServerState          string                            `json:"server_state"`
@@ -284,19 +289,9 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		if err != nil {
 			return evidence, err
 		}
-		observed, err := vm.runResult(ctx, "sudo -n "+guestLifecycleProbe+" guest nvme-identity "+nativeQuote(currentPath), bytes.NewReader(targetJSON), 16<<10, 90*time.Second)
+		scope, parity, err := observeNVMeIdentityParity(ctx, vm, currentPath, targetJSON)
+		evidence.NVMeIdentityParity = parity
 		if err != nil {
-			return evidence, fmt.Errorf("observe approved native NVMe identity: %w", err)
-		}
-		if observed.ExitCode != 0 || len(observed.Stderr) != 0 {
-			// This read-only identity probe carries no key material.
-			return evidence, fmt.Errorf("observe approved native NVMe identity: exit=%d stderr=%q", observed.ExitCode, observed.Stderr)
-		}
-		scope := new(agentv1.NVMeSanitizeScope)
-		if err := protojson.Unmarshal(observed.Stdout, scope); err != nil {
-			return evidence, err
-		}
-		if err := protovalidate.Validate(scope); err != nil {
 			return evidence, err
 		}
 		sanitize.NvmeScope = scope
@@ -470,12 +465,158 @@ func nativeAttestationRefusal(ctx context.Context, vm *guestVM, owner, approver 
 }
 
 // actionServerStorageTargets reads the server's public sanitize candidates
-// (identity, size and NVMe scope; no key material) after a target refusal.
+// and the accepted storage observation, including each collection status
+// (identity, size and NVMe scope; no key material), after a target refusal.
 func actionServerStorageTargets(ctx context.Context, owner *devlab.OwnerSession, deviceID string, refusal error) (json.RawMessage, error) {
-	response, err := owner.Admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: deviceID, ActionKind: "sanitize"}))
+	targets, err := owner.Admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: deviceID, ActionKind: "sanitize"}))
 	if err != nil {
 		return nil, errors.Join(refusal, fmt.Errorf("read server storage targets after refusal: %w", err))
 	}
-	data, err := protojson.Marshal(response.Msg)
+	device, err := owner.Admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: deviceID}))
+	if err != nil {
+		return nil, errors.Join(refusal, fmt.Errorf("read accepted storage observation after refusal: %w", err))
+	}
+	targetsJSON, targetsErr := protojson.Marshal(targets.Msg)
+	storageJSON, storageErr := protojson.Marshal(device.Msg.GetHost().GetObservation().GetDetails().GetStorage())
+	if err := errors.Join(targetsErr, storageErr); err != nil {
+		return nil, errors.Join(refusal, err)
+	}
+	data, err := json.Marshal(map[string]json.RawMessage{"candidates": targetsJSON, "storage_observation": storageJSON})
 	return data, errors.Join(refusal, err)
+}
+
+// nvmeIdentityParity records, field by field, that the inventory's sysfs
+// approval scope equals native Identify read with no capabilities (admitted by
+// Linux >= 6.2) and as full root (every kernel).
+type nvmeIdentityParity struct {
+	Kernel                    string                    `json:"kernel"`
+	UnprivilegedIdentifyMust  bool                      `json:"unprivileged_identify_required"`
+	UnprivilegedIdentifyError string                    `json:"unprivileged_identify_error,omitempty"`
+	Fields                    []nvmeIdentityParityField `json:"fields"`
+}
+
+type nvmeIdentityParityField struct {
+	Field                string `json:"field"`
+	Sysfs                string `json:"sysfs"`
+	IdentifyUnprivileged string `json:"identify_unprivileged,omitempty"`
+	IdentifyPrivileged   string `json:"identify_privileged"`
+}
+
+// nvmeUnprivilegedIdentifyKernel reports whether Linux nvme_cmd_allowed (6.2+)
+// admits Identify Controller/Namespace without CAP_SYS_ADMIN.
+func nvmeUnprivilegedIdentifyKernel(release string) (bool, error) {
+	major, rest, ok := strings.Cut(release, ".")
+	minor, _, _ := strings.Cut(rest, ".")
+	minor = strings.TrimRightFunc(minor, func(r rune) bool { return r < '0' || r > '9' })
+	m, majorErr := strconv.Atoi(major)
+	n, minorErr := strconv.Atoi(minor)
+	if !ok || majorErr != nil || minorErr != nil {
+		return false, fmt.Errorf("unparseable guest kernel release %q", release)
+	}
+	return m > 6 || m == 6 && n >= 2, nil
+}
+
+func nvmeScopeFields(scope *agentv1.NVMeSanitizeScope) map[string]string {
+	fields := map[string]string{}
+	var walk func(prefix string, message protoreflect.Message)
+	walk = func(prefix string, message protoreflect.Message) {
+		fieldsOf := message.Descriptor().Fields()
+		for i := range fieldsOf.Len() {
+			field := fieldsOf.Get(i)
+			name := prefix + string(field.Name())
+			if field.Kind() == protoreflect.MessageKind {
+				walk(name+".", message.Get(field).Message())
+				continue
+			}
+			value := message.Get(field)
+			if field.Kind() == protoreflect.EnumKind {
+				if enum := field.Enum().Values().ByNumber(value.Enum()); enum != nil {
+					fields[name] = string(enum.Name())
+					continue
+				}
+			}
+			fields[name] = fmt.Sprint(value.Interface())
+		}
+	}
+	walk("", scope.ProtoReflect())
+	return fields
+}
+
+func observeNVMeIdentityParity(ctx context.Context, vm *guestVM, path string, target []byte) (*agentv1.NVMeSanitizeScope, *nvmeIdentityParity, error) {
+	read := func(prefix, operation string) (*agentv1.NVMeSanitizeScope, string, error) {
+		observed, err := vm.runResult(ctx, prefix+guestLifecycleProbe+" guest "+operation+" "+nativeQuote(path), bytes.NewReader(target), 16<<10, 90*time.Second)
+		if err != nil {
+			return nil, "", fmt.Errorf("observe native NVMe identity (%s): %w", operation, err)
+		}
+		if observed.ExitCode != 0 || len(observed.Stderr) != 0 {
+			// These read-only identity probes carry no key material.
+			return nil, fmt.Sprintf("exit=%d stderr=%q", observed.ExitCode, observed.Stderr), nil
+		}
+		scope := new(agentv1.NVMeSanitizeScope)
+		if err := protojson.Unmarshal(observed.Stdout, scope); err != nil {
+			return nil, "", err
+		}
+		if err := protovalidate.Validate(scope); err != nil {
+			return nil, "", err
+		}
+		return scope, "", nil
+	}
+	release, err := vm.run(ctx, "uname -r", nil, 256, 15*time.Second)
+	if err != nil {
+		return nil, nil, err
+	}
+	parity := &nvmeIdentityParity{Kernel: strings.TrimSpace(string(release))}
+	if parity.UnprivilegedIdentifyMust, err = nvmeUnprivilegedIdentifyKernel(parity.Kernel); err != nil {
+		return nil, parity, err
+	}
+	sysfs, failure, err := read("sudo -n ", "nvme-identity")
+	if err != nil || failure != "" {
+		return nil, parity, errors.Join(err, failureError("sysfs NVMe identity", failure))
+	}
+	// Root with an empty capability bounding set: the inventory unit's
+	// privilege, isolating the kernel's CAP_SYS_ADMIN rule for Identify.
+	unprivileged, failure, err := read("sudo -n setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs ", "nvme-identify")
+	if err != nil {
+		return nil, parity, err
+	}
+	parity.UnprivilegedIdentifyError = failure
+	if unprivileged == nil && parity.UnprivilegedIdentifyMust {
+		return nil, parity, fmt.Errorf("kernel %s refused unprivileged NVMe Identify: %s", parity.Kernel, failure)
+	}
+	privileged, failure, err := read("sudo -n ", "nvme-identify")
+	if err != nil || failure != "" {
+		return nil, parity, errors.Join(err, failureError("privileged NVMe Identify", failure))
+	}
+	want, root := nvmeScopeFields(sysfs), nvmeScopeFields(privileged)
+	var plain map[string]string
+	if unprivileged != nil {
+		plain = nvmeScopeFields(unprivileged)
+	}
+	names := make([]string, 0, len(want))
+	for name := range want {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var mismatches []string
+	for _, name := range names {
+		field := nvmeIdentityParityField{Field: name, Sysfs: want[name], IdentifyPrivileged: root[name]}
+		if plain != nil {
+			field.IdentifyUnprivileged = plain[name]
+		}
+		parity.Fields = append(parity.Fields, field)
+		if root[name] != want[name] || plain != nil && plain[name] != want[name] {
+			mismatches = append(mismatches, name)
+		}
+	}
+	if len(mismatches) != 0 || !proto.Equal(sysfs, privileged) || unprivileged != nil && !proto.Equal(sysfs, unprivileged) {
+		return nil, parity, fmt.Errorf("sysfs NVMe identity differs from native Identify: %v", mismatches)
+	}
+	return sysfs, parity, nil
+}
+
+func failureError(what, failure string) error {
+	if failure == "" {
+		return nil
+	}
+	return fmt.Errorf("%s: %s", what, failure)
 }

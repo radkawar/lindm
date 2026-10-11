@@ -148,7 +148,7 @@ func TestNativeSanitizeGrantRequiresExactObservedNamespace(t *testing.T) {
 		{name: "different namespace size", change: func(c *agentv1.DeviceActionChallenge) {
 			c.NativePlan.Before.NvmeSanitize.Scope.Identity.NamespaceSizeBytes++
 		}},
-		{name: "different LBA format", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.Identity.LbaFormat++ }},
+		{name: "plan-observed LBA format index is not approval identity", valid: true, change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.LbaFormat++ }},
 		{name: "different LBA data size", change: func(c *agentv1.DeviceActionChallenge) {
 			c.NativePlan.Before.NvmeSanitize.Scope.Identity.LbaDataSizeShift++
 		}},

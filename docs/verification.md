@@ -4166,9 +4166,14 @@ all stamped `0.1.0`.
 | `rhel98-recovery-sata-04.json`          | `0606531234893f924040cab24548d6b15f5ec826bd6f1feb3eb5fcdf18f4e2f0` | Transient: Red Hat SSO HTTPS authentication request failed before registration (nothing registered). Not a product result.                                                                                                                    |
 | `rhel98-recovery-nvme-04.json`          | `55b79a7913b84d7692db9bca4cd4a831aed5c517df9e6e6f79a3696904d703b6` | Hostonly owned UKI built and booted; post-reboot `bootctl status` stderr refused (systemd's BLS `Unknown line` notices for grub keys, fixed in `89d5756c`). Registration cleaned up.                                                          |
 | `rhel98-recovery-sata-05.json`          | `28403f9d59257d33140f7228f9a69406c79bccd7c476120fa3e2efda774c9665` | **SATA original-device recovery sanitize passed.**                                                                                                                                                                                            |
-| `rhel98-recovery-nvme-05.json`          | `df07c739101599234fccff9415fe3ce86af1b25f01d7928ef932a013ea9853b2` | Two-human approval succeeded, then `CreateDeviceAction` refused `device_action_storage_target_mismatch`; no action. Under diagnosis (see below).                                                                                              |
+| `rhel98-recovery-nvme-05.json`          | `df07c739101599234fccff9415fe3ce86af1b25f01d7928ef932a013ea9853b2` | Two-human approval succeeded, then `CreateDeviceAction` refused `device_action_storage_target_mismatch`; no action. Root cause below.                                                                                                         |
+| `rhel98-recovery-nvme-06.json`          | `60cee8fe9b679cdcfd2dac6cca509f7498d41871a0b00ba4b579bc04d91096ee` | Same refusal; retains the server's sanitize candidates: right WWN, serial and size but no NVMe scope.                                                                                                                                         |
+| `rhel98-recovery-nvme-07.json`          | `68ca6ac68b3ae913c0a394930497a3cd82146b112d39c72c5ef0f4fc0818f826` | Same refusal; retains the server's storage observation: NVMe scope `INVALID_OUTPUT` on both namespaces.                                                                                                                                       |
+| `rhel98-recovery-nvme-08.json`          | `38c4e18242a91dc46bcd98dff3dc85a3d9a51e643dc06caa31bc4869dc617c77` | Same refusal; the same Identify succeeded as root on the host, in the executor's mount namespace and under its sandbox properties, isolating the capability-free inventory unit.                                                              |
+| `rhel98-recovery-nvme-09.json`          | `9afae38c72ce3b42e75d86744084e11023480156913683a37e5159f1ce6510d1` | **NVMe original-device recovery sanitize passed** with the sysfs approval scope; unprivileged Identify refused (5.14), privileged Identify equal to sysfs on every field.                                                                     |
 | `rhel102-recovery-sata-04.json`         | `914c714b8ee81638ffccc51f7684e152bc2ee972c68062aba766c4b1f7a633d6` | **SATA original-device recovery sanitize passed.**                                                                                                                                                                                            |
 | `rhel102-recovery-nvme-04.json`         | `38454aeaf3faf13e2ead17e5a09f510dffb8541c38616ec5e2bb9e6700bc5754` | **NVMe original-device recovery sanitize passed.**                                                                                                                                                                                            |
+| `rhel102-recovery-nvme-05.json`         | `67ee4ef04ba26c7aef0a7971a13e1b505bd01b81b8694f57f41dac1a586f44e4` | **NVMe original-device recovery sanitize passed** with the sysfs approval scope; unprivileged and privileged Identify equal to sysfs on every field (6.12).                                                                                   |
 | `rhel98-live-report-loss-01.json`       | `4e33999ba1a32d1f635390630964a72e8a02375a411c83a1cf1fff06c4ca9753` | **Live-root report-loss passed.**                                                                                                                                                                                                             |
 | `rhel102-live-report-loss-01.json`      | none (no record)                                                   | Not a product result: `context deadline exceeded` exactly 3 h after start with no record written, so the lane never returned a result; consistent with waiting for a local lease (inference). Ran on the pre-fix binary.                      |
 | `rhel102-lock-quarantine-01.json`       | `5294527d651a9810d6ce61ab1598f07e862203440c4c30f08ddc953fb28199c8` | **Lock, release, account disable and quarantine passed** with a real GDM Wayland session.                                                                                                                                                     |
@@ -4251,9 +4256,42 @@ changed.
 | 9.8 SATA      |         45,834,808 |           45,838,336 / 150,827,008 | `5.14.0-687.5.3.el9_8.x86_64`  |
 | 10.2 SATA     |         47,172,664 |           47,173,632 / 139,493,376 | `6.12.0-211.7.3.el10_2.x86_64` |
 | 10.2 NVMe     |         51,365,944 |           51,367,936 / 139,333,632 | `6.12.0-211.7.3.el10_2.x86_64` |
+| 9.8 NVMe      |         49,216,568 |           49,217,536 / 150,667,264 | `5.14.0-687.5.3.el9_8.x86_64`  |
+| 10.2 NVMe -05 |         51,612,216 |           51,613,696 / 139,333,632 | `6.12.0-211.7.3.el10_2.x86_64` |
 
 The available space is what remains of the 200 MiB vendor ESP after the owned
 signed systemd-boot and hostonly ordinary UKI; the vendor ESP was not resized.
+
+`rhel98-recovery-nvme-05` through `-08` root cause: the root inventory runs in a
+transient unit with an empty capability bounding set and read the NVMe approval
+scope with Identify admin passthrough. Linux before 6.2 refuses every NVMe admin
+passthrough, Identify included, without `CAP_SYS_ADMIN` (6.2+ admits Identify), so
+the 5.14 kernel reported the scope `INVALID_OUTPUT`, the server's candidate had
+no NVMe scope, and admission correctly refused the approved scope. Ubuntu 22.04
+(5.15) hit the same refusal on measured GRUB. Inventory now derives the scope from
+the kernel's sysfs projection of its probe-time Identify on every kernel, with no
+added privilege. An absent or inconsistent attribute is `INVALID_OUTPUT` with a
+fixed `reason`. The FLBAS index left the approval identity, and execution binds it
+under `CAP_SYS_ADMIN` (see [architecture](architecture.md)). An independent
+security review found no blocking issue. Each NVMe lane now records
+`nvme_identity_parity`: the sysfs scope against Identify read as root with an
+empty capability bounding set (`setpriv`, the inventory unit's privilege; required
+to succeed on 6.2+) and as full root (every kernel), field by field. Any
+difference fails the lane. On 9.8 the unprivileged Identify exited 1 and all ten
+sysfs fields equal privileged Identify. On 10.2 both Identify reads equal sysfs.
+`rhel98-recovery-nvme-09` and `rhel102-recovery-nvme-05` used runner
+`lab-actions-12`
+(`2fa4c898311d9c743dd3dd215faeea412e1501e8fc2b49ada701bf792d134258`) and
+`lindmd-actions-12`
+(`9e9d1e65007a9b8d25f6f4ac311c3e055a8225fb5c8f6c8eed89c6268281aad5`), with the
+same pass criteria as above. The same fix passed NVMe on measured GRUB for Fedora
+44 (`fedora44-mgrub-nvme-x86-03.json`
+`495c48f654518466dc66b66b131dfe3e8b8d5ccac87d3f5391194ddd29967af3`), Ubuntu
+24.04 (`ubuntu24-mgrub-nvme-x86-02.json`
+`6c30f385d02ab158da29fc7b501ce80923d13bfa32967d0c86057e0f9566d16f`) and Ubuntu
+22.04 (`ubuntu22-mgrub-nvme-x86-02.json`
+`6c20f2d1e917f4c07ef94786014d8bc7128d14881718593625aae6c391e4745b`, unprivileged
+Identify refused). Those records are under `$HOME/.cache/lindm-fedoragaps-20261011/`.
 
 Self-update passed on unregistered vendor KVM images: `rhel98-updates-01.json` and
 `rhel102-updates-01.json` under `$HOME/.cache/lindm-rhel-updates/` (hashes in the

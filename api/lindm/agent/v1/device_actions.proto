@@ -191,7 +191,16 @@ enum NvmeIdentityBasis {
 }
 // Explicit human-approved native identity. Changing the basis or any field
 // requires new approval; native execution never falls back to another basis.
+// Inventory derives it from the kernel's sysfs projection of its own probe-time
+// Identify data, so collection needs no CAP_SYS_ADMIN on any kernel.
 message NVMeSanitizeIdentity {
+  // Former lba_format (FLBAS format index). Sysfs does not export the index,
+  // and the approval does not need it: the namespace is bound by basis, size
+  // and lba_data_size_shift, and execution re-reads Identify Namespace under
+  // CAP_SYS_ADMIN, refuses any metadata/protection/extended-LBA format or a
+  // changed data size, and formats with the index it observed (plan).
+  reserved 8;
+  reserved "lba_format";
   NvmeIdentityBasis basis = 1 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
@@ -217,7 +226,6 @@ message NVMeSanitizeIdentity {
     pattern: "^[ -~]+$"
   }];
   uint64 namespace_size_bytes = 7 [(buf.validate.field).uint64.gte = 4096];
-  uint32 lba_format = 8 [(buf.validate.field).uint32.lte = 15];
   uint32 lba_data_size_shift = 9 [(buf.validate.field).uint32 = {
     gte: 9
     lte: 12
@@ -265,6 +273,9 @@ message NVMeSanitizePlan {
   // allocation/progress counters cannot change the frozen native media scope.
   bytes identify_namespace_sha256 = 11 [(buf.validate.field).bytes.len = 32];
   bytes namespace_inventory_sha256 = 12 [(buf.validate.field).bytes.len = 32];
+  // Current FLBAS format index from privileged Identify Namespace (bound by
+  // identify_namespace_sha256). Format NVM reuses it; it is never approved.
+  uint32 lba_format = 13 [(buf.validate.field).uint32.lte = 15];
 }
 message NVMeSanitizeVerification {
   NVMeSanitizePlan observed_scope = 1 [(buf.validate.field).required = true];

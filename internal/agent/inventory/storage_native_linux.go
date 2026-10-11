@@ -69,6 +69,12 @@ func collectNVMeScope(ctx context.Context, s detailSources, name string, device 
 		return result
 	}
 	scope, err := s.nvmeScope(ctx, file, &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: id.Wwn.Value, Serial: id.Serial.Value, SizeBytes: device.SizeBytes.Value})
+	if refusal := (*actionprovider.NVMeScopeRefusal)(nil); errors.As(err, &refusal) {
+		// An NVMe namespace whose sysfs identity is absent or unusable is
+		// reported as such, never as a namespace without native scope.
+		result.Status, result.Reason = invalid, refusal.Reason
+		return result
+	}
 	if errors.Is(err, actionprovider.ErrUnsupported) {
 		return result
 	}

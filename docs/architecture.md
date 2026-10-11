@@ -866,19 +866,39 @@ Receipt recovery runs before collection, so lost commit/confirmation responses
 and process restarts cannot force a second upload after the one-use slots were spent.
 
 Native NVMe sanitize approvals carry an explicit `NVMeSanitizeScope.identity`.
-The two human reviewers approve either `namespace-nid` (the observed WWN matches
-Identify Namespace NGUID/EUI-64) or `controller-serial-nsid` (namespace identifiers
-are absent or the kernel discarded them). Both bases freeze Identify Controller
-VID, SSVID, serial, model and firmware, plus namespace ID, byte size and LBA format/
-data-size shift. Controller facts come from native Identify admin ioctls, not
-sysfs strings. The latter basis requires the kernel-observed canonical
-VID/serial/model/NSID fallback WWN to agree with those native facts; it never
-invents an EUI-64 or silently relaxes namespace identity. The approved basis and
-all fields remain in the specification digest, native plan and result evidence.
-Execution re-reads the same identity immediately before the sanitize command;
-changed controller, namespace, layout or identity basis is a refusal requiring
-new approval, never an automatic downgrade. Shared-controller, unsupported
-command-scope and offline/off-target restrictions still apply independently.
+The two human reviewers approve either `namespace-nid` (the kernel's namespace
+`wwid` is the NGUID/EUI-64 `eui.` form and equals the observed WWN) or
+`controller-serial-nsid` (namespace identifiers are absent or the kernel discarded
+them). Both bases freeze VID, SSVID, controller serial, model and firmware, plus
+namespace ID, byte size and LBA data-size shift. Inventory reads them from the
+kernel's sysfs projection of the Identify data it read at probe time (controller
+`serial`/`model`/`firmware_rev`/`transport`, namespace `nsid`/`size`/
+`logical_block_size`/`wwid`, and the PCI function's `vendor`/`subsystem_vendor`,
+which NVMe defines as Identify VID/SSVID). The root observation unit therefore
+needs no capability: Linux before 6.2 refuses any NVMe admin passthrough,
+including Identify, without `CAP_SYS_ADMIN`. The `controller-serial-nsid` basis
+requires the kernel's own VID/serial/model/NSID fallback `wwid` (spelled from
+Identify VID) to equal the one recomputed from those facts, which also proves the
+PCI vendor equals Identify VID. A UUID `wwid`, a non-PCIe transport, a subsystem
+with more than one controller, or any absent or inconsistent attribute is an
+explicit `INVALID_OUTPUT` observation with a fixed `reason`, never a fallback to
+another source. The approved basis and all fields remain in the specification
+digest, native plan and result evidence.
+
+The FLBAS format index is not part of the approval identity: sysfs does not export
+it, and the layout is bound without it. Approval binds data size (shift) and
+namespace size; execution re-reads Identify Controller/Namespace under the
+executor's `CAP_SYS_ADMIN`, refuses any metadata, protection-information,
+extended-LBA or in-progress format and any changed size, VID, SSVID, serial,
+model, firmware or identity basis, and records the observed index in the native
+plan (`NVMeSanitizePlan.lba_format`, bound by the Identify Namespace digest).
+Format NVM reuses exactly that index. Two indices with the same data size and no
+metadata describe the same user-visible layout; the namespace digest still ties
+the index the executor formats with to the one it planned with. Any change is a
+refusal requiring new approval, never an automatic downgrade. Shared-controller,
+unsupported command-scope and offline/off-target restrictions still apply
+independently. Agents that predate this change and observe a nonzero index send
+the removed field and are refused as unknown-field observations until they update.
 
 Signed recovery approvals require a fresh read-only readiness observation from
 the root executor, published alongside host inventory. It identifies the current
