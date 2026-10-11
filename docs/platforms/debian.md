@@ -198,6 +198,12 @@ acquire this fallback just because its disk lacks a WWN
 Recovery media capacity, independent cold boots, escrow/rotation and destructive
 wipe remain separately gated by [verification](../verification.md).
 
+Debian 12/13 use the same grub.d `custom.cfg` flavor of
+`RECOVERY_BOOT_MODE_MEASURED_GRUB` as Ubuntu
+([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
+Debian 13's signed `grubx64.efi` contains the measurement strings. No Debian
+measured lane has run yet, so the method is unqualified here.
+
 ## Device actions
 
 The two ARM dispatch records qualify nine connected **systemd service** scenarios,

@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_actions.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
@@ -17,8 +18,11 @@ message RecoveryReadinessObservation {
   ];
   bool available = 3;
   string reason = 4 [(buf.validate.field).string.max_len = 256];
+  // ESP identity for UKI; empty for measured GRUB.
   string esp_uuid = 5 [(buf.validate.field).string.max_len = 64];
+  // Staging directory: the ESP for UKI, /boot for measured GRUB.
   string esp_path = 6 [(buf.validate.field).string.max_len = 4096];
+  // Capacity of the staging directory's filesystem.
   uint64 free_bytes = 7;
   uint64 allocation_unit_bytes = 8;
   bool secure_boot = 9;
@@ -26,10 +30,19 @@ message RecoveryReadinessObservation {
   // Local configured identity only, never release-size authority for admission.
   optional bytes configured_image_sha256 = 11 [(buf.validate.field).bytes.len = 32];
   optional uint64 configured_image_size = 12 [(buf.validate.field).uint64.gt = 0];
+  // The configured method these facts qualify.
+  RecoveryBootMode boot_mode = 13 [(buf.validate.field).enum.defined_only = true];
+  // Measured GRUB only: SHA-256 of the ordinary boot's vendor kernel,
+  // whose current-boot event log shows GRUB measuring kernel, command line and
+  // initramfs into PCRs 8/9 with a usable TPM resource manager.
+  bytes measured_kernel_sha256 = 14 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
   option (buf.validate.message).cel = {
     id: "recovery_readiness.availability"
     message: "available observations need native identity and capability; failures need a reason"
-    expression: "this.available ? (this.boot_id != '' && this.reason == '' && this.esp_uuid != '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && this.uki_capable) : this.reason != ''"
+    expression: "this.available ? (this.boot_id != '' && this.reason == '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && ((this.boot_mode == 1 && this.esp_uuid != '' && this.uki_capable) || (this.boot_mode == 3 && this.measured_kernel_sha256.size() == 32))) : this.reason != ''"
   };
 }
 

@@ -161,6 +161,10 @@ enum RecoveryBootMode {
   RECOVERY_BOOT_MODE_UNSPECIFIED = 0;
   RECOVERY_BOOT_MODE_UKI = 1;
   RECOVERY_BOOT_MODE_KEXEC = 2;
+  // Vendor-signed kernel through stock shim+GRUB (a Boot Loader Spec entry or
+  // a grub.d custom.cfg entry) and an unsigned lindm initramfs whose
+  // integrity a fresh TPM quote proves before any start grant.
+  RECOVERY_BOOT_MODE_MEASURED_GRUB = 3;
 }
 message RecoveryBootSpec {
   bytes image_sha256 = 1 [(buf.validate.field).bytes.len = 32];

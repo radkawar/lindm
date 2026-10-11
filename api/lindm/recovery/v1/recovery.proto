@@ -81,6 +81,27 @@ message AuthorizeRecoveryStartRequest {
   }];
   lindm.agent.v1.DeviceActionChallenge challenge = 3 [(buf.validate.field).required = true];
   bytes recovery_image_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  // Required exactly for measured GRUB handoffs; verified before any grant.
+  RecoveryAttestation attestation = 5;
+}
+// TPM2 quote over SHA-256 PCRs 4, 7, 8 and 9 by the handoff attestation key.
+// The server replays the event log itself; no PCR values are trusted from here.
+message RecoveryAttestation {
+  // Marshaled TPMS_ATTEST.
+  bytes quote = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1024
+  }];
+  // Marshaled TPMT_SIGNATURE.
+  bytes signature = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1024
+  }];
+  // TCG PC Client crypto-agile firmware event log.
+  bytes event_log = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 262144
+  }];
 }
 message AuthorizeRecoveryStartResponse {
   bytes start_grant_envelope = 1 [(buf.validate.field).bytes = {

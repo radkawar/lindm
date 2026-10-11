@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"buf.build/go/protovalidate"
+
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
@@ -18,6 +20,23 @@ func TestRecoveryBootPathsUseProtectedConfigurationBase(t *testing.T) {
 	}
 	if cfg.GetImageFile() != filepath.Join(base, "images/recovery.efi") || cfg.GetSignerCertificateFile() != filepath.Join(base, "signing.pem") || cfg.GetEspDirectory() != filepath.Join(base, "esp") || cfg.GetStateDirectory() != filepath.Join(base, "state") {
 		t.Fatal("recovery paths did not resolve against protected configuration")
+	}
+}
+
+// Regression: native Fedora measured staging was refused because the absent
+// UKI signer path resolved to the configuration directory.
+func TestMeasuredRecoveryBootKeepsSignerAbsent(t *testing.T) {
+	base := t.TempDir()
+	digest := make([]byte, 32)
+	cfg := &agentv1.RecoveryBootConfig{ImageFile: "native-recovery.initrd", ImageSha256: digest, ImageSize: 1, EspDirectory: "boot", StateDirectory: "state", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, KernelSha256: digest}
+	if err := resolveRecoveryBoot(base, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.GetSignerCertificateFile() != "" {
+		t.Fatalf("absent signer resolved to %q", cfg.GetSignerCertificateFile())
+	}
+	if err := protovalidate.Validate(cfg); err != nil {
+		t.Fatalf("resolved measured configuration invalid: %v", err)
 	}
 }
 

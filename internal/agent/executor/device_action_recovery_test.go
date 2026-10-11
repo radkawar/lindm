@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recovery"
 	"lindm/internal/agent/recoveryboot"
+	"lindm/internal/platform"
 )
 
 // The native boot seam never touches host firmware, disks or reboot. Signature,
@@ -36,6 +38,8 @@ type recoveryBootBoundary struct {
 	custodyCheck    func(context.Context) error
 	capsule         []byte
 	armDeadline     time.Time
+	measured        *agentv1.RecoveryMeasuredBoot
+	staged          recoveryboot.StageRequest
 }
 
 func (n *recoveryBootBoundary) Preflight(ctx context.Context, request recoveryboot.StageRequest) error {
@@ -47,6 +51,14 @@ func (n *recoveryBootBoundary) Preflight(ctx context.Context, request recoverybo
 func (n *recoveryBootBoundary) ProvisionKey(string) (ed25519.PrivateKey, error) {
 	n.provisions.Add(1)
 	return bytes.Clone(n.key), nil
+}
+
+// UKI fixtures never request a measured binding.
+func (n *recoveryBootBoundary) PrepareMeasured(_ context.Context, request recoveryboot.StageRequest) (*agentv1.RecoveryMeasuredBoot, error) {
+	if n.measured == nil || request.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		return nil, errors.New("unexpected measured binding")
+	}
+	return proto.CloneOf(n.measured), nil
 }
 func (n *recoveryBootBoundary) Stage(ctx context.Context, request recoveryboot.StageRequest) (recoveryBootStaged, error) {
 	n.custodyCheck = request.TrustedTPMCustody
@@ -61,6 +73,7 @@ func (n *recoveryBootBoundary) Stage(ctx context.Context, request recoveryboot.S
 		}
 	}
 	n.stages.Add(1)
+	n.staged = request
 	return n, nil
 }
 func (n *recoveryBootBoundary) Arm(ctx context.Context, gate func(context.Context) error) error {
@@ -120,7 +133,7 @@ func newRecoveryBootFixtureWithSetup(t *testing.T, setup func(*deviceActionFixtu
 		t.Fatal(err)
 	}
 	image := bytes.Repeat([]byte{9}, 32)
-	f.svc.recoveryConfig = &RecoveryBootConfig{StateDirectory: directory, ImagePath: "/qualified/recovery.efi", ImageSHA256: image, ImageSize: 1024, CertificatePath: "/qualified/signing.pem", CertificateSHA256: bytes.Repeat([]byte{7}, 32), ESPPath: "/qualified/esp", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET}
+	f.svc.recoveryConfig = &RecoveryBootConfig{StateDirectory: directory, ImagePath: "/qualified/recovery.efi", ImageSHA256: image, ImageSize: 1024, CertificatePath: "/qualified/signing.pem", CertificateSHA256: bytes.Repeat([]byte{7}, 32), ESPPath: "/qualified/esp", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
 	native := &recoveryBootBoundary{key: testKey(t)}
 	f.svc.recoveryBoot = native
 	if setup != nil {
@@ -131,7 +144,7 @@ func newRecoveryBootFixtureWithSetup(t *testing.T, setup func(*deviceActionFixtu
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: image, MediaSha256: media, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}}}}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: image, MediaSha256: media, BootMode: f.svc.recoveryConfig.BootMode}}}}
 	intent := f.actionIntent(t, 1, spec)
 	intent.DelegationVersion = 2
 	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
@@ -219,6 +232,82 @@ func TestRecoveryBootRequiresPurposeGrantAndDurableConsumption(t *testing.T) {
 	}
 	if native.reboots.Load() != 1 {
 		t.Fatal("restart replayed boot commitment")
+	}
+}
+
+func TestMeasuredRecoveryHandoffBindsAttestationKeyIntoStaging(t *testing.T) {
+	binding := &agentv1.RecoveryMeasuredBoot{AttestationKeyPublic: []byte("tpm-public-area"), KernelSha256: bytes.Repeat([]byte{4}, 32), KernelPath: "/boot/vmlinuz-6.19.10-300.fc44.x86_64", KernelOptions: "rdinit=/init panic=10 quiet lindm.recovery.action=fixture", InitrdPath: "/boot/lindm-recovery-12345678-1234-1234-1234-123456789abc.initrd"}
+	f, native, intent := newRecoveryBootFixtureWithSetup(t, func(f *deviceActionFixture) {
+		cfg := f.svc.recoveryConfig
+		cfg.BootMode, cfg.CertificatePath, cfg.CertificateSHA256, cfg.ESPPath, cfg.KernelSHA256 = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, "", nil, "/boot", bytes.Repeat([]byte{4}, 32)
+		boundary, ok := f.svc.recoveryBoot.(*recoveryBootBoundary)
+		if !ok {
+			t.Fatal("recovery fixture lacks its boot boundary")
+		}
+		boundary.measured = binding
+		f.svc.recoveryGRUB = func() (platform.GRUBChain, error) {
+			return platform.GRUBChain{Entries: platform.GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}, nil
+		}
+	})
+	record, _ := deviceActionRow(t, f.svc, intent.GetActionId())
+	handoff, err := protectedRecoveryHandoff(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proto.Equal(handoff.GetMeasuredBoot(), binding) || handoff.GetCustody() != agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET {
+		t.Fatalf("device-signed handoff lacks the measured binding: %v", handoff.GetMeasuredBoot())
+	}
+	credential, boot, _ := recoveryBootEnvelopes(t, f, intent)
+	if _, err := f.svc.CommitDeviceActionRecovery(t.Context(), connect.NewRequest(&agentv1.CommitDeviceActionRecoveryRequest{ActionId: intent.GetActionId(), CredentialEnvelope: credential, BootGrantEnvelope: boot})); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.operations.Wait()
+	if native.reboots.Load() != 1 || native.staged.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || !bytes.Equal(native.staged.AttestationKeyPublic, binding.GetAttestationKeyPublic()) || !bytes.Equal(native.staged.KernelSHA256, binding.GetKernelSha256()) {
+		t.Fatalf("measured staging did not receive the signed attestation binding: %+v", native.staged)
+	}
+	if native.staged.GRUB.Entries != platform.GRUBBLS || native.staged.GrubEnv == nil {
+		t.Fatal("measured staging lacks the registry GRUB chain or the executor's editenv runner")
+	}
+}
+
+// The executor never receives a block device: grub-editenv runs in its own
+// transient unit, and only registry tools and closed operations are allowed.
+func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
+	s := &Service{rootInventorySystemd: func(context.Context, string) (rootInventoryUnits, error) {
+		t.Fatal("refused grub-editenv invocation reached PID 1")
+		return nil, nil
+	}}
+	run := s.grubEnvironment("/boot", "grub2")
+	for _, call := range [][]string{{"/usr/bin/sh", "-", "list"}, {"/usr/bin/grub2-editenv", "/etc/shadow", "list"}, {"/usr/bin/grub2-editenv", "-", "create"}, {"/usr/bin/grub2-editenv"}} {
+		if _, err := run(t.Context(), call[0], call[1:]...); err == nil {
+			t.Fatalf("grub-editenv invocation %v accepted", call)
+		}
+	}
+	var allow []struct{ Path, Access string }
+	var writable []string
+	for _, property := range grubEnvironmentProperties("/usr/bin/grub2-editenv", []string{"-", "list"}, "/dev/vda3", false, "/boot/grub2") {
+		switch property.Name {
+		case "DeviceAllow":
+			allow, _ = property.Value.Value().([]struct{ Path, Access string })
+		case "ReadWritePaths":
+			writable, _ = property.Value.Value().([]string)
+		case "PrivateNetwork", "NoNewPrivileges":
+			if value, _ := property.Value.Value().(bool); !value {
+				t.Fatalf("%s disabled", property.Name)
+			}
+		}
+	}
+	if len(allow) != 1 || allow[0].Path != "/dev/vda3" || allow[0].Access != "r" || len(writable) != 1 || writable[0] != "/boot/grub2" {
+		t.Fatalf("grub-editenv unit not scoped: allow=%v writable=%v", allow, writable)
+	}
+}
+
+func TestRecoveryPreparationRefusesConfiguredModeMismatch(t *testing.T) {
+	f := newDeviceActionFixture(t)
+	f.svc.recoveryConfig = &RecoveryBootConfig{ImageSHA256: bytes.Repeat([]byte{9}, 32), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Recovery: &agentv1.RecoveryBootSpec{ImageSha256: bytes.Repeat([]byte{9}, 32), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}}}}
+	if _, err := f.svc.recoveryStageRequest(&agentv1.DeviceActionIntent{ActionId: uuid.NewString(), Spec: spec}, uuid.NewString(), nil); !errors.Is(err, errResourceRejected) || !strings.Contains(err.Error(), "recovery_boot_spec_mismatch") {
+		t.Fatalf("UKI action staged through measured configuration: %v", err)
 	}
 }
 

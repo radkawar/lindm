@@ -26,22 +26,31 @@ const (
 // Read-only root observation, not authorization or readiness for an artifact.
 // The server derives artifact readiness from its authenticated release size.
 type RecoveryReadinessObservation struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	ObservedAt          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	BootId              string                 `protobuf:"bytes,2,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
-	Available           bool                   `protobuf:"varint,3,opt,name=available,proto3" json:"available,omitempty"`
-	Reason              string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	EspUuid             string                 `protobuf:"bytes,5,opt,name=esp_uuid,json=espUuid,proto3" json:"esp_uuid,omitempty"`
-	EspPath             string                 `protobuf:"bytes,6,opt,name=esp_path,json=espPath,proto3" json:"esp_path,omitempty"`
-	FreeBytes           uint64                 `protobuf:"varint,7,opt,name=free_bytes,json=freeBytes,proto3" json:"free_bytes,omitempty"`
-	AllocationUnitBytes uint64                 `protobuf:"varint,8,opt,name=allocation_unit_bytes,json=allocationUnitBytes,proto3" json:"allocation_unit_bytes,omitempty"`
-	SecureBoot          bool                   `protobuf:"varint,9,opt,name=secure_boot,json=secureBoot,proto3" json:"secure_boot,omitempty"`
-	UkiCapable          bool                   `protobuf:"varint,10,opt,name=uki_capable,json=ukiCapable,proto3" json:"uki_capable,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	ObservedAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	BootId     string                 `protobuf:"bytes,2,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	Available  bool                   `protobuf:"varint,3,opt,name=available,proto3" json:"available,omitempty"`
+	Reason     string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	// ESP identity for UKI; empty for measured GRUB.
+	EspUuid string `protobuf:"bytes,5,opt,name=esp_uuid,json=espUuid,proto3" json:"esp_uuid,omitempty"`
+	// Staging directory: the ESP for UKI, /boot for measured GRUB.
+	EspPath string `protobuf:"bytes,6,opt,name=esp_path,json=espPath,proto3" json:"esp_path,omitempty"`
+	// Capacity of the staging directory's filesystem.
+	FreeBytes           uint64 `protobuf:"varint,7,opt,name=free_bytes,json=freeBytes,proto3" json:"free_bytes,omitempty"`
+	AllocationUnitBytes uint64 `protobuf:"varint,8,opt,name=allocation_unit_bytes,json=allocationUnitBytes,proto3" json:"allocation_unit_bytes,omitempty"`
+	SecureBoot          bool   `protobuf:"varint,9,opt,name=secure_boot,json=secureBoot,proto3" json:"secure_boot,omitempty"`
+	UkiCapable          bool   `protobuf:"varint,10,opt,name=uki_capable,json=ukiCapable,proto3" json:"uki_capable,omitempty"`
 	// Local configured identity only, never release-size authority for admission.
 	ConfiguredImageSha256 []byte  `protobuf:"bytes,11,opt,name=configured_image_sha256,json=configuredImageSha256,proto3,oneof" json:"configured_image_sha256,omitempty"`
 	ConfiguredImageSize   *uint64 `protobuf:"varint,12,opt,name=configured_image_size,json=configuredImageSize,proto3,oneof" json:"configured_image_size,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// The configured method these facts qualify.
+	BootMode RecoveryBootMode `protobuf:"varint,13,opt,name=boot_mode,json=bootMode,proto3,enum=lindm.agent.v1.RecoveryBootMode" json:"boot_mode,omitempty"`
+	// Measured GRUB only: SHA-256 of the ordinary boot's vendor kernel,
+	// whose current-boot event log shows GRUB measuring kernel, command line and
+	// initramfs into PCRs 8/9 with a usable TPM resource manager.
+	MeasuredKernelSha256 []byte `protobuf:"bytes,14,opt,name=measured_kernel_sha256,json=measuredKernelSha256,proto3" json:"measured_kernel_sha256,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *RecoveryReadinessObservation) Reset() {
@@ -158,6 +167,20 @@ func (x *RecoveryReadinessObservation) GetConfiguredImageSize() uint64 {
 	return 0
 }
 
+func (x *RecoveryReadinessObservation) GetBootMode() RecoveryBootMode {
+	if x != nil {
+		return x.BootMode
+	}
+	return RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED
+}
+
+func (x *RecoveryReadinessObservation) GetMeasuredKernelSha256() []byte {
+	if x != nil {
+		return x.MeasuredKernelSha256
+	}
+	return nil
+}
+
 type GetRecoveryReadinessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -252,7 +275,7 @@ var File_lindm_agent_v1_recovery_readiness_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_recovery_readiness_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/recovery_readiness.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xae\a\n" +
+	"'lindm/agent/v1/recovery_readiness.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\"\x99\t\n" +
 	"\x1cRecoveryReadinessObservation\x12C\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"observedAt\x12$\n" +
@@ -270,8 +293,11 @@ const file_lindm_agent_v1_recovery_readiness_proto_rawDesc = "" +
 	" \x01(\bR\n" +
 	"ukiCapable\x12D\n" +
 	"\x17configured_image_sha256\x18\v \x01(\fB\a\xbaH\x04z\x02h H\x00R\x15configuredImageSha256\x88\x01\x01\x12@\n" +
-	"\x15configured_image_size\x18\f \x01(\x04B\a\xbaH\x042\x02 \x00H\x01R\x13configuredImageSize\x88\x01\x01:\xc6\x02\xbaH\xc2\x02\x1a\xbf\x02\n" +
-	"\x1frecovery_readiness.availability\x12Ravailable observations need native identity and capability; failures need a reason\x1a\xc7\x01this.available ? (this.boot_id != '' && this.reason == '' && this.esp_uuid != '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && this.uki_capable) : this.reason != ''B\x1a\n" +
+	"\x15configured_image_size\x18\f \x01(\x04B\a\xbaH\x042\x02 \x00H\x01R\x13configuredImageSize\x88\x01\x01\x12G\n" +
+	"\tboot_mode\x18\r \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bbootMode\x12@\n" +
+	"\x16measured_kernel_sha256\x18\x0e \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x14measuredKernelSha256:\xa6\x03\xbaH\xa2\x03\x1a\x9f\x03\n" +
+	"\x1frecovery_readiness.availability\x12Ravailable observations need native identity and capability; failures need a reason\x1a\xa7\x02this.available ? (this.boot_id != '' && this.reason == '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && ((this.boot_mode == 1 && this.esp_uuid != '' && this.uki_capable) || (this.boot_mode == 3 && this.measured_kernel_sha256.size() == 32))) : this.reason != ''B\x1a\n" +
 	"\x18_configured_image_sha256B\x18\n" +
 	"\x16_configured_image_size\"\x1d\n" +
 	"\x1bGetRecoveryReadinessRequest\"\xe0\x01\n" +
@@ -297,15 +323,17 @@ var file_lindm_agent_v1_recovery_readiness_proto_goTypes = []any{
 	(*GetRecoveryReadinessRequest)(nil),  // 1: lindm.agent.v1.GetRecoveryReadinessRequest
 	(*GetRecoveryReadinessResponse)(nil), // 2: lindm.agent.v1.GetRecoveryReadinessResponse
 	(*timestamppb.Timestamp)(nil),        // 3: google.protobuf.Timestamp
+	(RecoveryBootMode)(0),                // 4: lindm.agent.v1.RecoveryBootMode
 }
 var file_lindm_agent_v1_recovery_readiness_proto_depIdxs = []int32{
 	3, // 0: lindm.agent.v1.RecoveryReadinessObservation.observed_at:type_name -> google.protobuf.Timestamp
-	0, // 1: lindm.agent.v1.GetRecoveryReadinessResponse.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 1: lindm.agent.v1.RecoveryReadinessObservation.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	0, // 2: lindm.agent.v1.GetRecoveryReadinessResponse.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_recovery_readiness_proto_init() }
@@ -313,6 +341,7 @@ func file_lindm_agent_v1_recovery_readiness_proto_init() {
 	if File_lindm_agent_v1_recovery_readiness_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_device_actions_proto_init()
 	file_lindm_agent_v1_recovery_readiness_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

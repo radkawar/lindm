@@ -205,7 +205,11 @@ message RecoveryRuntimeConfig {
   string root_file = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   string bootstrap_file = 8 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   // Embedded signer pin avoids an impossible self-hash of the signed UKI.
-  bytes certificate_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  // Measured GRUB images have no signer; a TPM quote proves their initramfs.
+  bytes certificate_sha256 = 9 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
   RecoveryCustody custody = 10 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
@@ -213,10 +217,21 @@ message RecoveryRuntimeConfig {
   // Authenticated image-provisioning admission time for the static bootstrap.
   // Historical bootstrap restoration never relaxes current execution authority.
   google.protobuf.Timestamp bootstrap_verified_at = 11 [(buf.validate.field).required = true];
+  RecoveryBootMode boot_mode = 12 [(buf.validate.field).enum = {
+    in: [
+      1,
+      3
+    ]
+  }];
   option (buf.validate.message).cel = {
     id: "recovery_runtime.custody"
     message: "off-target custody requires its key file; TPM custody cannot select a key file"
     expression: "(this.custody == 1 && this.key_file != '') || (this.custody == 2 && this.key_file == '')"
+  };
+  option (buf.validate.message).cel = {
+    id: "recovery_runtime.boot_mode"
+    message: "UKI images pin their signer; measured GRUB images have none and use off-target custody"
+    expression: "this.boot_mode == 1 ? this.certificate_sha256.size() == 32 : (this.certificate_sha256.size() == 0 && this.custody == 1)"
   };
 }
 
@@ -227,8 +242,17 @@ message RecoveryBootConfig {
     gt: 0
     lte: 1073741824
   }];
-  string signer_certificate_file = 4 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
-  bytes signer_certificate_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // UKI only: the deployment Secure Boot signer enrolled in firmware db.
+  string signer_certificate_file = 4 [
+    (buf.validate.field).string.(lindm.validation.v1.file_reference) = true,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  bytes signer_certificate_sha256 = 5 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  // Staging directory: the running systemd-boot ESP for UKI, or the /boot
+  // directory holding the vendor kernel and GRUB configuration for measured GRUB.
   string esp_directory = 6 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   string state_directory = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   RecoveryCustody custody = 8 [(buf.validate.field).enum = {
@@ -236,9 +260,33 @@ message RecoveryBootConfig {
     not_in: 0
   }];
   bytes expected_pcr11_sha256 = 9 [(buf.validate.field).bytes.max_len = 32];
+  RecoveryBootMode boot_mode = 10 [(buf.validate.field).enum = {
+    in: [
+      1,
+      3
+    ]
+  }];
+  // Measured GRUB only: offline-release-bound vendor kernel the initramfs targets.
+  bytes kernel_sha256 = 11 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  // Measured GRUB only: optional qualified diagnostic UART in kernel options.
+  string serial_console = 12 [(buf.validate.field).string = {
+    in: [
+      "",
+      "ttyS0,115200n8",
+      "ttyAMA0,115200"
+    ]
+  }];
   option (buf.validate.message).cel = {
     id: "recovery_boot.custody"
     message: "TPM custody requires the exact qualified recovery PCR11"
     expression: "(this.custody == 2 ? this.expected_pcr11_sha256.size() == 32 : this.expected_pcr11_sha256.size() == 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "recovery_boot.mode"
+    message: "UKI needs its pinned signer; measured GRUB needs the kernel digest and off-target custody"
+    expression: "this.boot_mode == 1 ? (this.signer_certificate_file != '' && this.signer_certificate_sha256.size() == 32 && this.kernel_sha256.size() == 0 && this.serial_console == '') : (this.signer_certificate_file == '' && this.signer_certificate_sha256.size() == 0 && this.kernel_sha256.size() == 32 && this.custody == 1)"
   };
 }

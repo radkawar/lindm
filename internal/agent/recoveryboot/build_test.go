@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 func fixtureIngredient(t *testing.T, directory, name string, data []byte) Ingredient {
@@ -183,7 +185,7 @@ func TestCopyApprovedRetainsCompleteVerifiedFile(t *testing.T) {
 func TestInitramfsReproducibleAndRejectsClosureEscape(t *testing.T) {
 	dir := t.TempDir()
 	input := fixtureIngredient(t, dir, "ingredient", []byte("deterministic-approved-bytes"))
-	request := BuildRequest{Kernel: input, Stub: input, Agent: input, Config: input, Certificate: input, StateUUID: "12345678-1234-1234-1234-123456789abc", ESPUUID: "ABCD-1234", SourceDateEpoch: 1700000000}
+	request := BuildRequest{Kernel: input, Stub: input, Agent: input, Config: input, Certificate: input, StateUUID: "12345678-1234-1234-1234-123456789abc", ESPUUID: "ABCD-1234", SourceDateEpoch: 1700000000, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
 	first, second := filepath.Join(dir, "first.cpio"), filepath.Join(dir, "second.cpio")
 	closure, err := writeInitramfs(first, request)
 	if err != nil {
@@ -264,10 +266,21 @@ func TestMissingNativeClosureRejectedBeforeBuild(t *testing.T) {
 }
 
 func TestBuildRejectsUnsafeCustodyIdentityBeforeTools(t *testing.T) {
-	for _, request := range []BuildRequest{{StateUUID: "$(poweroff)"}, {ESPUUID: "invalid"}, {StateUUID: "12345678-1234-1234-1234-123456789abc", SourceDateEpoch: -1}} {
+	uki, measured := agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB
+	for _, request := range []BuildRequest{
+		{StateUUID: "$(poweroff)", BootMode: uki}, {ESPUUID: "invalid", BootMode: uki}, {StateUUID: "12345678-1234-1234-1234-123456789abc", SourceDateEpoch: -1, BootMode: uki},
+		// Measured images are bound to off-target custody and carry no signer.
+		{BootMode: measured},
+		{StateUUID: "12345678-1234-1234-1234-123456789abc", ESPUUID: "ABCD-1234", BootMode: measured},
+		{StateUUID: "12345678-1234-1234-1234-123456789abc", SigningKey: "/private/key.pem", BootMode: measured},
+		{StateUUID: "12345678-1234-1234-1234-123456789abc", SerialConsole: "ttyS0,115200n8", BootMode: measured},
+	} {
 		if _, err := Build(context.Background(), request); err == nil || !strings.Contains(err.Error(), "invalid_build_identity") {
 			t.Fatalf("unsafe build identity accepted: %v", err)
 		}
+	}
+	if _, err := Build(context.Background(), BuildRequest{StateUUID: "12345678-1234-1234-1234-123456789abc"}); err == nil || !strings.Contains(err.Error(), "unsupported_boot_mode") {
+		t.Fatalf("unspecified boot mode accepted: %v", err)
 	}
 }
 

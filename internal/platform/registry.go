@@ -73,16 +73,19 @@ var (
 	dnf5 = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
 	// DNF 4.7.0 is EL 8.10's; older DNF4 lacks the plugin selection, strict
 	// remote-RPM and query APIs the DNF4 adapter relies on.
-	dnf4        = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
-	pacman      = PackageTooling{Backend: BackendPacman}
-	zypper      = PackageTooling{Backend: BackendZypper}
-	gnomeGDM3   = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
-	gnomeGDM    = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
-	ufw         = "nftables + ufw (inactive)"
-	firewalld   = "nftables + firewalld"
-	nftables    = "nftables"
-	elQuirks9   = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect}
-	elQuirks10  = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect}
+	dnf4       = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
+	pacman     = PackageTooling{Backend: BackendPacman}
+	zypper     = PackageTooling{Backend: BackendZypper}
+	gnomeGDM3  = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
+	gnomeGDM   = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
+	ufw        = "nftables + ufw (inactive)"
+	firewalld  = "nftables + firewalld"
+	nftables   = "nftables"
+	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
+	elQuirks10 = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
+	// Stock shim+GRUB chains for measured original-device recovery.
+	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}
+	debianGRUB  = GRUBChain{Entries: GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "grub"}
 	el9Pins     = []PasswordPins{{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}}
 	el10Pins    = []PasswordPins{{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}}
 	osvFeed     = []Feed{FeedOSV}
@@ -99,9 +102,10 @@ var (
 		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell", "mutter-common"},
 	}
 	ubuntuGuest = LabGuest{
-		Initrd:    "/boot/initrd.img-%s",
-		Actions:   []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
-		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		Initrd:       "/boot/initrd.img-%s",
+		Actions:      []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
+		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	fedoraGraphical = []string{"base-graphical", "desktop-accessibility", "fonts", "guest-desktop-agents", "hardware-support", "input-methods", "networkmanager-submodules"}
 	fedoraSession   = LabSession{
@@ -111,8 +115,9 @@ var (
 	}
 	fedoraGuest = LabGuest{
 		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
-		Actions:   []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl"},
-		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		Actions:      []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl"},
+		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	// RHEL installs only from the vendor-authenticated Binary DVD (no Lab.Repository):
 	// the Workstation environment, TPM user space and action prerequisites
@@ -124,8 +129,9 @@ var (
 	}
 	rhelGuest = LabGuest{
 		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
-		Actions:   []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
-		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		Actions:      []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	rhelTPMPackages   = []string{"tpm2-tools", "tpm2-tss"}
 	reasonRHELPending = "native qualification on the pinned RHEL minor not yet passed"
@@ -137,9 +143,10 @@ var (
 		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell"},
 	}
 	debianGuest = LabGuest{
-		Initrd:    "/boot/initrd.img-%s",
-		Actions:   []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "bind9-dnsutils", "curl"},
-		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		Initrd:       "/boot/initrd.img-%s",
+		Actions:      []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "bind9-dnsutils", "curl"},
+		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	// Debian's arm64 kernels build TPM CRB but not the TIS platform driver,
 	// QEMU virt's only TPM device.
@@ -156,7 +163,7 @@ var registry = []*Release{
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
-			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}},
+			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}, RecoveryGRUB: debianGRUB},
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
@@ -174,7 +181,7 @@ var registry = []*Release{
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:24.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "noble", CodenameRelease: true},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
-			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}},
+			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
 			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
@@ -188,7 +195,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
-			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}},
+			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// The 26.04 desktop ISO carries dracut 110 and the TSS2 stack itself.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
 			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
@@ -214,7 +221,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "debian-12"},
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
-			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}},
+			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
@@ -226,7 +233,7 @@ var registry = []*Release{
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "debian-13"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
-			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}},
+			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
 		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
@@ -238,7 +245,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5,
 		Desktop: Desktop{Name: "Workstation GNOME; KDE edition", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
 		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43"},
-		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect},
+		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB},
 		Lab:      Lab{Lanes: []LabLane{LaneServices}},
 		Supports: caps(agentCore, hostResources, []Capability{Advisories}),
 		Gates:    actionGates(string(Password), reasonNoPasswordPins),
@@ -249,7 +256,7 @@ var registry = []*Release{
 		FDE: "LUKS2 (anaconda LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "Workstation GNOME; KDE edition", Version: "GNOME 50", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
 		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 44"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect,
-			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}},
+			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}, RecoveryGRUB: blsGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAcceptance},
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",

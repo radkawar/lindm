@@ -21,11 +21,34 @@ import (
 )
 
 func recoveryObservationFixture(now time.Time) *agentv1.RecoveryReadinessObservation {
-	return &agentv1.RecoveryReadinessObservation{ObservedAt: timestamppb.New(now), BootId: uuid.NewString(), Available: true, EspUuid: "1234-ABCD", EspPath: "/boot/efi", FreeBytes: 8192, AllocationUnitBytes: 4096, SecureBoot: true, UkiCapable: true}
+	return &agentv1.RecoveryReadinessObservation{ObservedAt: timestamppb.New(now), BootId: uuid.NewString(), Available: true, EspUuid: "1234-ABCD", EspPath: "/boot/efi", FreeBytes: 8192, AllocationUnitBytes: 4096, SecureBoot: true, UkiCapable: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
+}
+
+func measuredObservationFixture(now time.Time, kernel []byte) *agentv1.RecoveryReadinessObservation {
+	return &agentv1.RecoveryReadinessObservation{ObservedAt: timestamppb.New(now), BootId: uuid.NewString(), Available: true, EspPath: "/boot", FreeBytes: 1 << 20, AllocationUnitBytes: 4096, SecureBoot: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, MeasuredKernelSha256: kernel}
+}
+
+func publishRecoveryTarget(t *testing.T, publisher *releaseupdate.Publisher, directory, name string, payload []byte) {
+	t.Helper()
+	source := filepath.Join(directory, filepath.Base(name))
+	if err := os.WriteFile(source, payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := publisher.PublishArtifact(t.Context(), name, source); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // The same real signed-repository setup is used by RPC integration regressions.
 func recoveryArtifactFixture(t *testing.T, payload []byte) (*releaseupdate.Client, []byte) {
+	t.Helper()
+	client, digest, _ := recoveryArtifactRepository(t, payload, nil)
+	return client, digest
+}
+
+// A nil kernel publishes a UKI; otherwise payload is a measured-BLS initramfs
+// with its companion kernel descriptor.
+func recoveryArtifactRepository(t *testing.T, payload, kernel []byte) (*releaseupdate.Client, []byte, []byte) {
 	t.Helper()
 	directory := t.TempDir()
 	keys := filepath.Join(directory, "keys")
@@ -42,16 +65,25 @@ func recoveryArtifactFixture(t *testing.T, payload []byte) (*releaseupdate.Clien
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(payload)
-	name, err := releaseupdate.RecoveryTargetPath(digest[:])
-	if err != nil {
-		t.Fatal(err)
-	}
-	source := filepath.Join(directory, "recovery.efi")
-	if err := os.WriteFile(source, payload, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := publisher.PublishArtifact(t.Context(), name, source); err != nil {
-		t.Fatal(err)
+	var kernelDigest []byte
+	if kernel == nil {
+		name, err := releaseupdate.RecoveryTargetPath(digest[:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishRecoveryTarget(t, publisher, directory, name, payload)
+	} else {
+		name, err := releaseupdate.RecoveryInitrdTargetPath(digest[:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishRecoveryTarget(t, publisher, directory, name, payload)
+		if name, err = releaseupdate.RecoveryKernelTargetPath(digest[:]); err != nil {
+			t.Fatal(err)
+		}
+		publishRecoveryTarget(t, publisher, directory, name, kernel)
+		sum := sha256.Sum256(kernel)
+		kernelDigest = sum[:]
 	}
 	root, err := os.ReadFile(filepath.Join(repository, "metadata/1.root.json"))
 	if err != nil {
@@ -61,7 +93,7 @@ func recoveryArtifactFixture(t *testing.T, payload []byte) (*releaseupdate.Clien
 	if err != nil {
 		t.Fatal(err)
 	}
-	return client, digest[:]
+	return client, digest[:], kernelDigest
 }
 
 func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
@@ -91,18 +123,24 @@ func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
 		}, "device_action_recovery_readiness_stale"},
 		{"unavailable", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.Available = false }, "device_action_recovery_readiness_unsupported"},
 		{"secure_boot_disabled", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.SecureBoot = false }, "device_action_recovery_readiness_unsupported"},
-		{"no_uki", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.UkiCapable = false }, "device_action_recovery_readiness_unsupported"},
+		{"no_uki", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) { o.UkiCapable = false }, "device_action_recovery_boot_mode_mismatch"},
+		{"measured_observation_for_uki", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) {
+			o.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB
+		}, "device_action_recovery_boot_mode_mismatch"},
+		{"tpm_attestation_unavailable", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) {
+			o.Available, o.Reason = false, "recovery_readiness_tpm_attestation_unavailable"
+		}, "device_action_recovery_attestation_unavailable"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			observation, row := proto.CloneOf(valid), host
 			tc.change(observation, &row)
-			if got := recoveryObservationReason(row, observation, now); got != tc.reason {
+			if got := recoveryObservationReason(row, observation, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != tc.reason {
 				t.Fatalf("reason=%q want %q", got, tc.reason)
 			}
 		})
 	}
-	if got := recoveryObservationReason(host, nil, now); got != "device_action_recovery_readiness_missing" {
+	if got := recoveryObservationReason(host, nil, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, nil, now); got != "device_action_recovery_readiness_missing" {
 		t.Fatalf("missing observation: %q", got)
 	}
 }
@@ -151,5 +189,34 @@ func TestRecoveryReadinessIgnoresCallerImageSize(t *testing.T) {
 	got, err = s.recoveryReadiness(t.Context(), host, details, unknown[:], now)
 	if err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_artifact_unavailable" {
 		t.Fatalf("unregistered image admitted: %v %v", got, err)
+	}
+}
+
+func TestMeasuredRecoveryReadinessBindsSignedKernel(t *testing.T) {
+	kernel := bytes.Repeat([]byte{0x4b}, 5000)
+	client, digest, kernelDigest := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), kernel)
+	now := time.Now().UTC()
+	observation := measuredObservationFixture(now, kernelDigest)
+	host := devicedb.GetHostObservationRow{ReceivedAt: timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
+	s := &Service{recoveryArtifacts: client}
+	details := &inventoryv1.NativeDetails{RecoveryReadiness: observation}
+	got, err := s.recoveryReadiness(t.Context(), host, details, digest, now)
+	if err != nil || !got.GetReady() || got.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || got.GetImageSize() != 4097 || got.GetNeededBytes() != 8192 {
+		t.Fatalf("signed measured initramfs refused: %v %v", got, err)
+	}
+	other := sha256.Sum256([]byte("another vendor kernel"))
+	observation.MeasuredKernelSha256 = other[:]
+	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_kernel_mismatch" {
+		t.Fatalf("unsigned kernel admitted: %v %v", got, err)
+	}
+	observation.MeasuredKernelSha256 = kernelDigest
+	observation.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
+	observation.UkiCapable, observation.EspUuid = true, "1234-ABCD"
+	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_boot_mode_mismatch" {
+		t.Fatalf("UKI-capable device admitted an initramfs artifact: %v %v", got, err)
+	}
+	observation.BootMode, observation.Available, observation.Reason = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, false, "recovery_readiness_tpm_attestation_unavailable"
+	if got, err = s.recoveryReadiness(t.Context(), host, details, digest, now); err != nil || got.GetReady() || got.GetReason() != "device_action_recovery_attestation_unavailable" {
+		t.Fatalf("TPM-less device admitted measured recovery: %v %v", got, err)
 	}
 }

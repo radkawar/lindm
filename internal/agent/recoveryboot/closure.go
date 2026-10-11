@@ -38,7 +38,7 @@ func RequiredNativeHelpers(config *agentv1.RecoveryRuntimeConfig) []string {
 	return required
 }
 
-func validateBuildClosure(config Ingredient, files []Ingredient) error {
+func validateBuildClosure(config Ingredient, files []Ingredient, mode agentv1.RecoveryBootMode) error {
 	input, err := os.Open(config.Source)
 	if err != nil {
 		return err
@@ -53,6 +53,9 @@ func validateBuildClosure(config Ingredient, files []Ingredient) error {
 	runtime := new(agentv1.RecoveryRuntimeConfig)
 	if err := protojson.Unmarshal(data, runtime); err != nil {
 		return fmt.Errorf("recoveryboot: decode_runtime_config: %w", err)
+	}
+	if runtime.GetBootMode() != mode {
+		return errors.New("recoveryboot: runtime_boot_mode_mismatch")
 	}
 	if err := requireNativeHelpers(files, RequiredNativeHelpers(runtime)); err != nil {
 		return err

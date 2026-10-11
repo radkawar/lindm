@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 
 	"lindm/internal/agent/recoveryboot"
@@ -55,13 +56,39 @@ func TestRecoveryReadinessUnavailableIsExplicit(t *testing.T) {
 	}
 }
 
+func TestMeasuredRecoveryReadinessExportsKernelAndTPMGate(t *testing.T) {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	kernel := make([]byte, 32)
+	kernel[0] = 0x4b
+	cfg := &RecoveryBootConfig{ESPPath: "/boot", BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
+	s := &Service{clock: func() time.Time { return now }, bootID: func() (string, error) { return "25eec0a2-bb9f-42bc-b6cc-0508320c960e", nil }, recoveryConfig: cfg}
+	ready := s.observeRecoveryReadiness(t.Context(), func(context.Context, string) (recoveryboot.Readiness, error) {
+		return recoveryboot.Readiness{FreeBytes: 1 << 20, AllocationUnitBytes: 4096, SecureBoot: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, MeasuredKernelSHA256: kernel}, nil
+	})
+	if !ready.GetAvailable() || ready.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || ready.GetMeasuredKernelSha256()[0] != 0x4b || ready.GetUkiCapable() {
+		t.Fatalf("measured readiness: %v", ready)
+	}
+	if err := protovalidate.Validate(ready); err != nil {
+		t.Fatal(err)
+	}
+	gated := s.observeRecoveryReadiness(t.Context(), func(context.Context, string) (recoveryboot.Readiness, error) {
+		return recoveryboot.Readiness{FreeBytes: 1 << 20, AllocationUnitBytes: 4096, SecureBoot: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}, errors.New("recovery_readiness_tpm_attestation_unavailable")
+	})
+	if gated.GetAvailable() || gated.GetReason() != "recovery_readiness_tpm_attestation_unavailable" || len(gated.GetMeasuredKernelSha256()) != 0 {
+		t.Fatalf("TPM-less device reported measured readiness: %v", gated)
+	}
+	if err := protovalidate.Validate(gated); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRecoveryReadinessIsFreshAndDetachedFromConfiguration(t *testing.T) {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	cfg := &RecoveryBootConfig{ESPPath: "/boot/efi", ImageSHA256: make([]byte, 32), ImageSize: 8193}
 	s := &Service{clock: func() time.Time { return now }, bootID: func() (string, error) { return "25eec0a2-bb9f-42bc-b6cc-0508320c960e", nil }, recoveryConfig: cfg}
 	free := uint64(16384)
 	observe := func(context.Context, string) (recoveryboot.Readiness, error) {
-		return recoveryboot.Readiness{ESPUUID: "1234-5678", FreeBytes: free, AllocationUnitBytes: 4096, SecureBoot: true, UKICapable: true}, nil
+		return recoveryboot.Readiness{ESPUUID: "1234-5678", FreeBytes: free, AllocationUnitBytes: 4096, SecureBoot: true, UKICapable: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}, nil
 	}
 	first := s.observeRecoveryReadiness(t.Context(), observe)
 	cfg.ImageSHA256[0] = 1

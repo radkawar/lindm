@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -33,6 +34,9 @@ type VMDeviceActionsOptions struct {
 	// RedHatTokenFile is required only by subscription-entitled original-device
 	// recovery, whose unregistered vendor cloud image needs entitled boot tooling.
 	RedHatTokenFile string
+	// RecoveryBootMode is "" (owned systemd-boot UKI) or "measured-grub"
+	// (stock shim+GRUB, vendor kernel, TPM-attested initramfs).
+	RecoveryBootMode string
 }
 
 type VMDeviceActionsResult struct {
@@ -230,8 +234,14 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.Scenario != "all" && options.Scenario != "encryption" && options.Scenario != "wipe" && options.Scenario != "compliance" {
 		return nil, errors.New("device action scenario must be all, encryption, wipe or compliance")
 	}
-	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata"}, options.WipePhase)) {
+	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
 		return nil, errors.New("wipe phase requires scenario wipe and a supported native phase")
+	}
+	if options.RecoveryBootMode != "" && (options.RecoveryBootMode != recoveryBootMeasured || !slices.Contains([]string{"recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
+		return nil, errors.New("recovery boot mode measured-grub requires an original-device recovery phase")
+	}
+	if options.WipePhase == "recovery-attestation-refusal" && options.RecoveryBootMode != recoveryBootMeasured {
+		return nil, errors.New("attestation refusal phase requires recovery boot mode measured-grub")
 	}
 	if options.EncryptionPhase != "" && (options.Scenario != "encryption" || options.EncryptionPhase != "tpm") {
 		return nil, errors.New("encryption phase requires scenario encryption and phase tpm")
@@ -301,7 +311,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	result.PackageSHA256, result.SignerFingerprint = packages.artifact.SHA256, packages.fingerprint
 	// Resolve a potentially cold installer before creating bounded online
 	// delegation and local sessions. NewEncryptedVM reuses this verified cache.
-	if options.WipePhase != "recovery-nvme" && options.WipePhase != "recovery-sata" {
+	if !strings.HasPrefix(options.WipePhase, "recovery-") {
 		if _, err := encryptedGolden(ctx, manifest, options.Encrypted); err != nil {
 			return result, err
 		}

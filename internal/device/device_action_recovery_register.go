@@ -107,6 +107,9 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	if err != nil || !bytes.Equal(planDigest[:], handoff.GetNativePlanSha256()) {
 		return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_plan_binding_rejected")
 	}
+	if err := s.admitMeasuredHandoff(ctx, handoff); err != nil {
+		return nil, err
+	}
 	var authorization *identity.Authorization
 	var pair *identity.ApprovalConsumption
 	existing, lookupErr := devicedb.New(s.pool).GetDeviceActionRecovery(ctx, id)

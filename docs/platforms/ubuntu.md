@@ -245,6 +245,19 @@ rotation, wipe, ARM or Secure Boot off. The ARM encrypted installer timeout rema
 a failed qualification attempt in [verification](../verification.md).
 Consult that document's current encryption/recovery rows for subsequent action evidence.
 
+A stock Ubuntu machine without a deployment key in firmware `db` would use
+`RECOVERY_BOOT_MODE_MEASURED_GRUB` with the grub.d flavor
+([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
+Staging writes one `--unrestricted` menuentry to `/boot/grub/custom.cfg`, which
+the vendor `grub.cfg` already sources through `41_custom`. The entry locates the
+separate ext4 `/boot` by filesystem UUID and uses `($root)`-qualified paths, and
+it is armed with `grub-editenv - set next_entry=…`. Staging refuses a pre-existing
+`custom.cfg` and never runs `update-grub`. Ubuntu's signed `grubx64.efi` for
+24.04 and 26.04 contains the `grub_cmd`/`kernel_cmdline` measurement strings.
+Ubuntu's vendor entries pass `linux /vmlinuz-…` without a device, and the event-log
+parser accepts that form only when the kernel, command line and initramfs agree.
+This is unqualified until a native measured lane passes.
+
 Stable storage selection is hardware-dependent, not an Ubuntu guarantee. The encrypted
 demo's virtio disk supplies serial `lindm-demo-encrypted` at
 `/sys/dev/block/253:0/serial`, but no WWID or `device/serial`. Native evidence under

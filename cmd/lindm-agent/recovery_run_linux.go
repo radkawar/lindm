@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/config"
+	"lindm/internal/agent/measuredtpm"
 	"lindm/internal/agent/recovery"
 	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/agent/recoverycustody"
@@ -119,7 +122,17 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 		return errors.New("authenticated recovery handoff is missing")
 	}
 	handoff := journal.GetHandoff()
-	verifiedBoot, err := recoveryboot.VerifyBoot(ctx, cfg.GetStateDirectory(), handoff.GetIntent().GetActionId(), handoff.GetOriginalBootId(), handoff.GetRecoveryImageSha256(), cfg.GetCertificateSha256())
+	var verifiedBoot string
+	var attest func(context.Context, []byte) (*recoveryv1.RecoveryAttestation, error)
+	switch cfg.GetBootMode() {
+	case agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI:
+		verifiedBoot, err = recoveryboot.VerifyBoot(ctx, cfg.GetStateDirectory(), handoff.GetIntent().GetActionId(), handoff.GetOriginalBootId(), handoff.GetRecoveryImageSha256(), cfg.GetCertificateSha256())
+	case agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB:
+		verifiedBoot, err = recoveryboot.VerifyMeasuredBoot(ctx, cfg.GetStateDirectory(), handoff.GetIntent().GetActionId(), handoff.GetOriginalBootId(), handoff.GetMeasuredBoot(), handoff.GetRecoveryImageSha256())
+		attest = measuredAttestation(cfg.GetStateDirectory(), handoff.GetMeasuredBoot().GetAttestationKeyPublic())
+	default:
+		err = errors.New("qualified recovery boot mode is required")
+	}
 	if err != nil {
 		return err
 	}
@@ -130,5 +143,27 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	return recovery.Run(ctx, recovery.Options{Journal: store, Key: key, Bootstrap: bootstrap, Client: client, Provider: provider, BootID: verifiedBoot, ImageSHA256: handoff.GetRecoveryImageSha256(), Clock: clock, ProvisionedAt: verifiedAt.AsTime()})
+	return recovery.Run(ctx, recovery.Options{Journal: store, Key: key, Bootstrap: bootstrap, Client: client, Provider: provider, BootID: verifiedBoot, ImageSHA256: handoff.GetRecoveryImageSha256(), Clock: clock, ProvisionedAt: verifiedAt.AsTime(), Attest: attest})
+}
+
+// measuredAttestation quotes PCRs with the TPM-resident key bound by the
+// handoff and attaches this boot's firmware event log for server replay.
+func measuredAttestation(stateDirectory string, expectedPublic []byte) func(context.Context, []byte) (*recoveryv1.RecoveryAttestation, error) {
+	return func(ctx context.Context, qualifyingData []byte) (*recoveryv1.RecoveryAttestation, error) {
+		public, private, err := recoveryboot.LoadAttestationKey(stateDirectory, expectedPublic)
+		if err != nil {
+			return nil, err
+		}
+		ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+		quote, signature, err := measuredtpm.Quote(ctx, public, private, qualifyingData)
+		if err != nil {
+			return nil, err
+		}
+		eventLog, err := measuredtpm.ReadEventLog()
+		if err != nil {
+			return nil, err
+		}
+		return &recoveryv1.RecoveryAttestation{Quote: quote, Signature: signature, EventLog: eventLog}, nil
+	}
 }

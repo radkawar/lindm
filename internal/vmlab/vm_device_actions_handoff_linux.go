@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -23,6 +24,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/devlab"
+	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
 
@@ -50,22 +52,55 @@ type actionSignedHandoffEvidence struct {
 	PoweroffObservedAt   time.Time                         `json:"recovery_poweroff_observed_at"`
 	StoppedDiskSamples   *StoppedDiskSampleEvidence        `json:"host_read_only_samples"`
 	Boundary             string                            `json:"boundary"`
+	BootMode             string                            `json:"recovery_boot_mode"`
+	StockBoot            *actionStockBootEvidence          `json:"stock_measured_boot,omitempty"`
+	RecoveryKernelSHA256 string                            `json:"recovery_vendor_kernel_sha256,omitempty"`
+	// Present only for the TPM-less capability refusal phase.
+	AttestationRefusal *actionAttestationRefusal `json:"attestation_refusal,omitempty"`
+}
+
+type actionAttestationRefusal struct {
+	ReadinessReason      string `json:"readiness_reason"`
+	DeviceReason         string `json:"device_observation_reason"`
+	ApprovalReason       string `json:"approval_refusal_reason"`
+	ApprovalCode         string `json:"approval_refusal_code"`
+	ActionCreated        bool   `json:"action_created"`
+	StagedBootFilesFound bool   `json:"staged_boot_files_found"`
 }
 
 func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, approver *devlab.OwnerSession, delegation *agentv1.UpdateExecutionTrustRequest, bus string) (_ *actionSignedHandoffEvidence, err error) {
-	evidence := &actionSignedHandoffEvidence{ImageID: options.RecoveryManifest.GetId(), Boundary: "Original device identity and generation, vendor-derived disposable cloud disk, owned signer in private emulated firmware db, actual signed systemd-boot UKI and off-target ext4 one-action custody. No separately enrolled recovery identity or host boot modification. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization."}
+	evidence := &actionSignedHandoffEvidence{ImageID: options.RecoveryManifest.GetId(), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI.String(), Boundary: "Original device identity and generation, vendor-derived disposable cloud disk, owned signer in private emulated firmware db, actual signed systemd-boot UKI and off-target ext4 one-action custody. No separately enrolled recovery identity or host boot modification. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization."}
+	measured := options.RecoveryBootMode == recoveryBootMeasured
+	refusal := options.WipePhase == "recovery-attestation-refusal"
+	if measured {
+		evidence.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB.String()
+		evidence.Boundary = "Original device identity and generation, unmodified vendor cloud disk booting firmware-enrolled Microsoft/Fedora shim+GRUB and the vendor-signed kernel, unsigned lindm initramfs on /boot proven only by a fresh swtpm quote and event-log replay verified by the server, and off-target ext4 one-action custody. No firmware key, ESP, loader or kernel change. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization. Software TPM, not a physical TPM or EK-certified attestation key."
+	}
 	if !options.Encrypted.Firmware.SecureBoot {
 		return evidence, errors.New("original signed recovery requires explicitly selected Secure Boot firmware")
 	}
-	signer, err := newActionBootSigner(options.Encrypted.WorkDir)
+	workDir, err := os.MkdirTemp(options.Encrypted.WorkDir, "lindm-native-recovery-build-")
 	if err != nil {
 		return evidence, err
 	}
-	defer func() { err = errors.Join(err, signer.Close()) }()
+	defer func() { err = errors.Join(err, os.RemoveAll(workDir)) }()
+	var signer *actionBootSigner
 	firmware := options.Encrypted.Firmware
-	firmware.OwnedDBCertificate = signer.certificate
+	if !measured {
+		signer, err = newActionBootSigner(options.Encrypted.WorkDir)
+		if err != nil {
+			return evidence, err
+		}
+		defer func() { err = errors.Join(err, signer.Close()) }()
+		firmware.OwnedDBCertificate = signer.certificate
+	}
 	hardware := *options.Encrypted.Hardware
 	hardware.StorageBus, hardware.ExtraDisks, hardware.Desktop, hardware.Firmware = bus, 1, false, &firmware
+	if refusal {
+		hardware.TPM = false
+	} else if measured && !hardware.TPM {
+		return evidence, errors.New("measured GRUB recovery qualification requires a TPM")
+	}
 	vm, _, err := newVerifiedGuestWithHardware(ctx, options.RecoveryManifest, options.Encrypted.CacheDir, options.Encrypted.WorkDir, true, &hardware)
 	if err != nil {
 		return evidence, err
@@ -91,7 +126,12 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	if err != nil {
 		return evidence, err
 	}
-	evidence.Boot, err = provisionActionOwnedBoot(ctx, vm, options.RecoveryManifest, signer, actionOwnedBootEntitlement{LabBinary: options.LabBinary, RedHatTokenFile: options.RedHatTokenFile})
+	entitlement := actionOwnedBootEntitlement{LabBinary: options.LabBinary, RedHatTokenFile: options.RedHatTokenFile}
+	if measured {
+		evidence.Boot, evidence.StockBoot, err = provisionActionStockBoot(ctx, vm, options.RecoveryManifest, entitlement)
+	} else {
+		evidence.Boot, err = provisionActionOwnedBoot(ctx, vm, options.RecoveryManifest, signer, entitlement)
+	}
 	err = finishBootDiagnostics(err)
 	if err != nil {
 		return evidence, err
@@ -154,32 +194,54 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		return evidence, errors.New("signed recovery bootstrap origin must bind this isolated fixture's actual admin listener")
 	}
 	recoveryProvider := &agentv1.DeviceActionProviderConfig{RecoveryEnvironment: true, ProtectedStateDirectory: "/run/lindm-recovery", Targets: []*agentv1.QualifiedActionTarget{proto.CloneOf(qualification)}}
-	runtime := &agentv1.RecoveryRuntimeConfig{StateDirectory: "/run/lindm-recovery", KeyFile: "/run/lindm-recovery/action.key", ServerUrl: origin.String(), ServerCaFile: "/etc/lindm/server-ca.pem", Provider: recoveryProvider, RootFile: "/etc/lindm/execution-root.json", BootstrapFile: "/etc/lindm/bootstrap-envelope.pb", CertificateSha256: signer.certificateSHA256, Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET}
+	runtime := &agentv1.RecoveryRuntimeConfig{StateDirectory: "/run/lindm-recovery", KeyFile: "/run/lindm-recovery/action.key", ServerUrl: origin.String(), ServerCaFile: "/etc/lindm/server-ca.pem", Provider: recoveryProvider, RootFile: "/etc/lindm/execution-root.json", BootstrapFile: "/etc/lindm/bootstrap-envelope.pb", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
+	if !measured {
+		runtime.CertificateSha256, runtime.BootMode = signer.certificateSHA256, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
+	}
 	runtime.BootstrapVerifiedAt = timestamppb.New(bootstrapVerifiedAt)
-	artifact, err := buildActionRecoveryArtifact(ctx, vm, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem())
+	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem())
 	if err != nil {
 		return evidence, err
 	}
 	evidence.RecoveryImageSHA256, evidence.RecoveryImageSize = hex.EncodeToString(artifact.SHA256), artifact.Size
 	evidence.RecoverySizeEvidence = artifact.SizeEvidence
-	if err := fixture.PublishRecoveryArtifact(ctx, artifact.Path, artifact.SHA256); err != nil {
-		return evidence, fmt.Errorf("publish exact signed recovery release: %w", err)
+	if measured {
+		evidence.RecoveryKernelSHA256 = hex.EncodeToString(artifact.KernelSHA256)
+		err = fixture.PublishMeasuredRecoveryArtifact(ctx, artifact.Path, artifact.SHA256, actionVendorKernel(workDir))
+	} else {
+		err = fixture.PublishRecoveryArtifact(ctx, artifact.Path, artifact.SHA256)
+	}
+	if err != nil {
+		return evidence, fmt.Errorf("publish exact recovery release: %w", err)
 	}
 	evidence.PredictedPCR11SHA256 = hex.EncodeToString(artifact.PCR11SHA256)
 	evidence.ClosureSHA256, err = dispatchFileDigest(artifact.ClosurePath)
 	if err != nil {
 		return evidence, err
 	}
-	imagePath, certificatePath := "/var/lib/lindm/executor/native-recovery.efi", "/var/lib/lindm/executor/native-recovery-signing.pem"
-	if err := uploadActionBootFile(ctx, vm, artifact.Path, imagePath); err != nil {
-		return evidence, err
-	}
-	if err := uploadActionBootFile(ctx, vm, signer.certificate, certificatePath); err != nil {
-		return evidence, err
-	}
 	provider.AllowRecoveryHandoff = true
 	provider.Targets = []*agentv1.QualifiedActionTarget{qualification}
-	recoveryConfig := &agentv1.RecoveryBootConfig{ImageFile: imagePath, ImageSha256: artifact.SHA256, ImageSize: uint64(artifact.Size), SignerCertificateFile: certificatePath, SignerCertificateSha256: signer.certificateSHA256, EspDirectory: "/boot/efi", StateDirectory: "/var/lib/lindm-recovery", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET}
+	var recoveryConfig *agentv1.RecoveryBootConfig
+	if measured {
+		imagePath := "/var/lib/lindm/executor/native-recovery.initrd"
+		if err := uploadActionBootFile(ctx, vm, artifact.Path, imagePath); err != nil {
+			return evidence, err
+		}
+		_, serialConsole, err := encryptedInstallerArchitecture(vm.hardware.Architecture)
+		if err != nil {
+			return evidence, err
+		}
+		recoveryConfig = &agentv1.RecoveryBootConfig{ImageFile: imagePath, ImageSha256: artifact.SHA256, ImageSize: uint64(artifact.Size), EspDirectory: "/boot", StateDirectory: "/var/lib/lindm-recovery", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, KernelSha256: artifact.KernelSHA256, SerialConsole: serialConsole}
+	} else {
+		imagePath, certificatePath := "/var/lib/lindm/executor/native-recovery.efi", "/var/lib/lindm/executor/native-recovery-signing.pem"
+		if err := uploadActionBootFile(ctx, vm, artifact.Path, imagePath); err != nil {
+			return evidence, err
+		}
+		if err := uploadActionBootFile(ctx, vm, signer.certificate, certificatePath); err != nil {
+			return evidence, err
+		}
+		recoveryConfig = &agentv1.RecoveryBootConfig{ImageFile: imagePath, ImageSha256: artifact.SHA256, ImageSize: uint64(artifact.Size), SignerCertificateFile: certificatePath, SignerCertificateSha256: signer.certificateSHA256, EspDirectory: "/boot/efi", StateDirectory: "/var/lib/lindm-recovery", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
+	}
 	if err := configureActionGuest(ctx, vm, provider, recoveryConfig); err != nil {
 		return evidence, err
 	}
@@ -204,7 +266,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	if err != nil {
 		return evidence, err
 	}
-	sanitize := &agentv1.SanitizeAction{Target: qualification.GetTarget(), Method: method, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: artifact.SHA256, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, MediaSha256: media[:]}}
+	sanitize := &agentv1.SanitizeAction{Target: qualification.GetTarget(), Method: method, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: artifact.SHA256, BootMode: recoveryConfig.GetBootMode(), MediaSha256: media[:]}}
 	if bus == "nvme" {
 		topology, err := vm.run(ctx, "lsblk --json --tree --bytes --output PATH,TYPE,SIZE,WWN,SERIAL,UUID,FSTYPE", nil, 1<<20, 15*time.Second)
 		if err != nil {
@@ -238,6 +300,10 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	}
 	request := actionRequestFor(evidence.DeviceID, evidence.EnrollmentGeneration, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: sanitize}})
 	evidence.RecoveryReadiness, err = waitRecoveryReadiness(ctx, control.session, evidence.DeviceID, artifact.SHA256)
+	if refusal {
+		evidence.AttestationRefusal, err = nativeAttestationRefusal(ctx, vm, control.session, approver, request, evidence.RecoveryReadiness, err)
+		return evidence, err
+	}
 	if err != nil {
 		return evidence, err
 	}
@@ -346,10 +412,52 @@ func waitRecoveryReadiness(ctx context.Context, owner *devlab.OwnerSession, devi
 		if last.GetReason() == "device_action_esp_insufficient" {
 			return last, fmt.Errorf("recovery preapproval: %s needed=%d available=%d", last.GetReason(), last.GetNeededBytes(), last.GetAvailableBytes())
 		}
+		// A fresh configured observation of the capability gate is terminal.
+		if last.GetReason() == "device_action_recovery_attestation_unavailable" && bytes.Equal(last.GetObservation().GetConfiguredImageSha256(), image) {
+			return last, fmt.Errorf("recovery preapproval: %s", last.GetReason())
+		}
 		select {
 		case <-ctx.Done():
 			return last, fmt.Errorf("recovery readiness publication deadline: %s: %w", last.GetReason(), ctx.Err())
 		case <-ticker.C:
 		}
 	}
+}
+
+// nativeAttestationRefusal requires the TPM-less device's own readiness gate,
+// then a real two-human approval attempt that the server refuses before any
+// approval, action, staging or boot-entry change exists.
+func nativeAttestationRefusal(ctx context.Context, vm *guestVM, owner, approver *devlab.OwnerSession, request *adminv1.CreateDeviceActionRequest, readiness *adminv1.RecoveryReadiness, readinessErr error) (*actionAttestationRefusal, error) {
+	evidence := &actionAttestationRefusal{ReadinessReason: readiness.GetReason(), DeviceReason: readiness.GetObservation().GetReason()}
+	if readinessErr == nil || evidence.ReadinessReason != "device_action_recovery_attestation_unavailable" || evidence.DeviceReason != "recovery_readiness_tpm_attestation_unavailable" || readiness.GetReady() {
+		return evidence, fmt.Errorf("TPM-less measured recovery readiness was not the capability refusal: %s/%s: %v", evidence.ReadinessReason, evidence.DeviceReason, readinessErr)
+	}
+	err := approveNativeAction(ctx, owner, approver, request)
+	var failure *connect.Error
+	if err == nil || !errors.As(err, &failure) {
+		evidence.ActionCreated = err == nil
+		return evidence, fmt.Errorf("TPM-less measured recovery approval was not refused: %v", err)
+	}
+	evidence.ApprovalCode, evidence.ApprovalReason = failure.Code().String(), rpcreason.Get(err)
+	if failure.Code() != connect.CodeFailedPrecondition || evidence.ApprovalReason != "device_action_recovery_attestation_unavailable" {
+		return evidence, fmt.Errorf("TPM-less measured recovery approval refused for another reason: %s/%s", evidence.ApprovalCode, evidence.ApprovalReason)
+	}
+	listed, err := owner.Admin.GetDeviceActions(ctx, connect.NewRequest(&adminv1.GetDeviceActionsRequest{DeviceId: request.GetDeviceId(), PageSize: 200}))
+	if err != nil {
+		return evidence, err
+	}
+	for _, action := range listed.Msg.GetActions() {
+		if action.GetSpec().GetSanitize() != nil {
+			evidence.ActionCreated = true
+		}
+	}
+	staged, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote("ls /boot/loader/entries | grep -q '^~lindm-recovery-' || ls /boot | grep -q '^lindm-recovery-' || grub2-editenv - list | grep -q '^next_entry=.'"), nil, 4096, 15*time.Second)
+	if err != nil {
+		return evidence, err
+	}
+	evidence.StagedBootFilesFound = staged.ExitCode == 0
+	if evidence.ActionCreated || evidence.StagedBootFilesFound {
+		return evidence, errors.New("TPM-less measured recovery left an action or staged boot state")
+	}
+	return evidence, nil
 }

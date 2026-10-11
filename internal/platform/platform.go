@@ -150,6 +150,36 @@ type Quirks struct {
 	SystemdFloor int
 	PAMManager   PAMManager
 	Password     []PasswordPins
+	// RecoveryGRUB is how measured original-device recovery adds a one-shot
+	// entry to the vendor shim+GRUB chain. Read from the release's own row,
+	// never a derivative's base: a derivative may ship another loader.
+	RecoveryGRUB GRUBChain
+}
+
+// GRUBEntries is the vendor GRUB menu source a one-shot entry is added to.
+type GRUBEntries string
+
+const (
+	// GRUBEntriesNone: no maintained measured-recovery method.
+	GRUBEntriesNone GRUBEntries = ""
+	// GRUBBLS: blscfg reads <boot>/loader/entries; next_entry names the
+	// entry file stem.
+	GRUBBLS GRUBEntries = "bls"
+	// GRUBCustomConfig: grub.d's 41_custom sources <boot>/<ConfigDirectory>/
+	// custom.cfg at boot without regenerating grub.cfg; next_entry names the
+	// menuentry --id.
+	GRUBCustomConfig GRUBEntries = "custom.cfg"
+)
+
+// GRUBChain is the stock shim+GRUB facts measured recovery relies on.
+type GRUBChain struct {
+	Entries GRUBEntries
+	// Editenv is the absolute path of the distribution's grub-editenv, which
+	// writes next_entry where the signed GRUB reads it (a grubenv file or the
+	// btrfs bootloader env_block).
+	Editenv string
+	// ConfigDirectory is GRUB's directory below /boot, e.g. "grub2".
+	ConfigDirectory string
 }
 
 // Desktop is the qualified graphical edition of a release.

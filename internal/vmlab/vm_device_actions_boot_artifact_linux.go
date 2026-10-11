@@ -22,12 +22,20 @@ import (
 // Inputs come from the installed signed distro and lindm packages in this guest,
 // not similarly named host binaries. Build independently closes/pins every ELF
 // dependency before signing the actual UKI with the fixture's enrolled db signer.
-func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte) (*recoveryboot.Artifact, error) {
-	_, serialConsole, err := encryptedInstallerArchitecture(vm.hardware.Architecture)
-	if err != nil {
-		return nil, err
+// A nil signer builds the unsigned measured-BLS initramfs for the vendor kernel;
+// the exact kernel bytes are retained at actionVendorKernel(workDir) for its
+// offline release descriptor.
+func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte) (*recoveryboot.Artifact, error) {
+	measured := signer == nil
+	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(workDir, "recovery-build"), StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
+	if !measured {
+		_, serialConsole, err := encryptedInstallerArchitecture(vm.hardware.Architecture)
+		if err != nil {
+			return nil, err
+		}
+		request.SigningKey, request.Certificate, request.SerialConsole = signer.key, recoveryboot.Ingredient{Source: signer.certificate, SHA256: signer.certificateSHA256}, serialConsole
+		request.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
 	}
-	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(signer.dir, "recovery-build"), SigningKey: signer.key, Certificate: recoveryboot.Ingredient{Source: signer.certificate, SHA256: signer.certificateSHA256}, StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), SerialConsole: serialConsole}
 	// The initramfs is compressed before UKI signing. Its decompressor and FAT
 	// charset modules must come from the same installed kernel as the image.
 	kernelConfig, err := vm.run(ctx, "cat "+nativeQuote("/boot/config-"+boot.KernelRelease), nil, 1<<20, 10*time.Second)
@@ -42,16 +50,18 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	if err := lifecycleCommand(ctx, vm, "create recovery module staging after owned boot", "mkdir -m 0700 /run/lindm-native-owned-boot"); err != nil {
 		return nil, err
 	}
-	espUUID, err := vm.run(ctx, "sudo -n findmnt --noheadings --output UUID --target /boot/efi", nil, 1024, 10*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("observe qualified recovery ESP identity: %w", err)
+	if !measured {
+		espUUID, err := vm.run(ctx, "sudo -n findmnt --noheadings --output UUID --target /boot/efi", nil, 1024, 10*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("observe qualified recovery ESP identity: %w", err)
+		}
+		request.ESPUUID = strings.TrimSpace(string(espUUID))
 	}
-	request.ESPUUID = strings.TrimSpace(string(espUUID))
 	counter := 0
 	collected := make(map[string]bool)
 	collect := func(source, destination string, executable bool) (recoveryboot.Ingredient, error) {
 		counter++
-		path := filepath.Join(signer.dir, fmt.Sprintf("ingredient-%04d", counter))
+		path := filepath.Join(workDir, fmt.Sprintf("ingredient-%04d", counter))
 		digest, err := downloadActionBootFile(ctx, vm, source, path, 256<<20)
 		if err != nil {
 			return recoveryboot.Ingredient{}, fmt.Errorf("collect recovery ingredient %s: %w", source, err)
@@ -59,24 +69,27 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 		return recoveryboot.Ingredient{Source: path, Destination: destination, SHA256: digest, Executable: executable}, nil
 	}
 	addPublic := func(name, destination string, data []byte) error {
-		source, digest, err := writeActionBootPublicFile(signer.dir, name, data)
+		source, digest, err := writeActionBootPublicFile(workDir, name, data)
 		if err != nil {
 			return err
 		}
 		request.Files = append(request.Files, recoveryboot.Ingredient{Source: source, Destination: destination, SHA256: digest})
 		return nil
 	}
-	request.Kernel, err = collect("/boot/vmlinuz-"+boot.KernelRelease, "", false)
+	kernel, err := downloadActionBootFile(ctx, vm, "/boot/vmlinuz-"+boot.KernelRelease, actionVendorKernel(workDir), 256<<20)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("collect recovery vendor kernel: %w", err)
 	}
-	stub := "/usr/lib/systemd/boot/efi/linuxx64.efi.stub"
-	if vm.hardware.Architecture == "aarch64" {
-		stub = "/usr/lib/systemd/boot/efi/linuxaa64.efi.stub"
-	}
-	request.Stub, err = collect(stub, "", false)
-	if err != nil {
-		return nil, err
+	request.Kernel = recoveryboot.Ingredient{Source: actionVendorKernel(workDir), SHA256: kernel}
+	if !measured {
+		stub := "/usr/lib/systemd/boot/efi/linuxx64.efi.stub"
+		if vm.hardware.Architecture == "aarch64" {
+			stub = "/usr/lib/systemd/boot/efi/linuxaa64.efi.stub"
+		}
+		request.Stub, err = collect(stub, "", false)
+		if err != nil {
+			return nil, err
+		}
 	}
 	request.Agent, err = collect(packaging.BinaryPath, "", true)
 	if err != nil {
@@ -86,7 +99,7 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	if err != nil {
 		return nil, err
 	}
-	configPath, configDigest, err := writeActionBootPublicFile(signer.dir, "recovery-config.json", encoded)
+	configPath, configDigest, err := writeActionBootPublicFile(workDir, "recovery-config.json", encoded)
 	if err != nil {
 		return nil, err
 	}
@@ -160,13 +173,20 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	// modprobe's ordered insmod closure is decompressed without altering module
 	// bytes/signatures; recovery init loads modules.load in this order with
 	// finit_module(2), so no host zstd/depmod/modprobe enters the initramfs.
-	modules := []string{"virtio_pci", "virtio_net", "vfat", "efivarfs"}
+	modules := []string{"virtio_pci", "virtio_net", "efivarfs"}
+	if !measured {
+		// Only the UKI path mounts the ESP inside recovery.
+		modules = append(modules, "vfat")
+	}
 	if runtime.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET {
 		modules = append(modules, "ext4")
 	}
 	// FAT requests these NLS modules dynamically, outside modprobe's static
 	// dependency graph. Preserve the distro kernel's actual mount defaults.
 	for _, line := range strings.Split(string(kernelConfig), "\n") {
+		if measured {
+			break
+		}
 		if value, ok := strings.CutPrefix(line, "CONFIG_FAT_DEFAULT_CODEPAGE="); ok {
 			modules = append(modules, "nls_cp"+value)
 		}
@@ -187,6 +207,10 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 			return nil, errors.New("qualified recovery TPM custody requires a TPM")
 		}
 		modules = append(modules, "tpm_tis")
+	} else if measured && vm.hardware.TPM {
+		// A TPM-less measured artifact exists only for the capability refusal
+		// lane; the device's readiness gate refuses it before any staging.
+		modules = append(modules, "tpm_tis", "tpm_crb")
 	}
 	var load strings.Builder
 	seenModules := make(map[string]bool)
@@ -237,3 +261,5 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	}
 	return recoveryboot.Build(ctx, request)
 }
+
+func actionVendorKernel(workDir string) string { return filepath.Join(workDir, "vendor-kernel") }

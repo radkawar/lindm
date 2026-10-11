@@ -7,13 +7,15 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { RecoveryBootMode } from "./device_actions_pb.js";
+import { file_lindm_agent_v1_device_actions } from "./device_actions_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file lindm/agent/v1/recovery_readiness.proto.
  */
 export const file_lindm_agent_v1_recovery_readiness: GenFile = /*@__PURE__*/
-  fileDesc("CidsaW5kbS9hZ2VudC92MS9yZWNvdmVyeV9yZWFkaW5lc3MucHJvdG8SDmxpbmRtLmFnZW50LnYxIpEGChxSZWNvdmVyeVJlYWRpbmVzc09ic2VydmF0aW9uEjcKC29ic2VydmVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhwKB2Jvb3RfaWQYAiABKAlCC7pICNgBAXIDsAEBEhEKCWF2YWlsYWJsZRgDIAEoCBIYCgZyZWFzb24YBCABKAlCCLpIBXIDGIACEhkKCGVzcF91dWlkGAUgASgJQge6SARyAhhAEhoKCGVzcF9wYXRoGAYgASgJQgi6SAVyAxiAIBISCgpmcmVlX2J5dGVzGAcgASgEEh0KFWFsbG9jYXRpb25fdW5pdF9ieXRlcxgIIAEoBBITCgtzZWN1cmVfYm9vdBgJIAEoCBITCgt1a2lfY2FwYWJsZRgKIAEoCBItChdjb25maWd1cmVkX2ltYWdlX3NoYTI1NhgLIAEoDEIHukgEegJoIEgAiAEBEisKFWNvbmZpZ3VyZWRfaW1hZ2Vfc2l6ZRgMIAEoBEIHukgEMgIgAEgBiAEBOsYCukjCAhq/AgofcmVjb3ZlcnlfcmVhZGluZXNzLmF2YWlsYWJpbGl0eRJSYXZhaWxhYmxlIG9ic2VydmF0aW9ucyBuZWVkIG5hdGl2ZSBpZGVudGl0eSBhbmQgY2FwYWJpbGl0eTsgZmFpbHVyZXMgbmVlZCBhIHJlYXNvbhrHAXRoaXMuYXZhaWxhYmxlID8gKHRoaXMuYm9vdF9pZCAhPSAnJyAmJiB0aGlzLnJlYXNvbiA9PSAnJyAmJiB0aGlzLmVzcF91dWlkICE9ICcnICYmIHRoaXMuZXNwX3BhdGggIT0gJycgJiYgdGhpcy5hbGxvY2F0aW9uX3VuaXRfYnl0ZXMgPiAwdSAmJiB0aGlzLnNlY3VyZV9ib290ICYmIHRoaXMudWtpX2NhcGFibGUpIDogdGhpcy5yZWFzb24gIT0gJydCGgoYX2NvbmZpZ3VyZWRfaW1hZ2Vfc2hhMjU2QhgKFl9jb25maWd1cmVkX2ltYWdlX3NpemUiHQobR2V0UmVjb3ZlcnlSZWFkaW5lc3NSZXF1ZXN0IsIBChxHZXRSZWNvdmVyeVJlYWRpbmVzc1Jlc3BvbnNlEkkKC29ic2VydmF0aW9uGAEgASgLMiwubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlSZWFkaW5lc3NPYnNlcnZhdGlvbkIGukgDyAEBEiUKEHJvb3Rfb2JzZXJ2YXRpb24YBCABKAxCC7pICHoGEAEYgIAFSgQIAhADSgQIAxAEUg9zdG9yYWdlX2RldGFpbHNSE3N0b3JhZ2Vfb2JzZXJ2ZWRfYXRCIlogbGluZG0vZ2VuL2xpbmRtL2FnZW50L3YxO2FnZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CidsaW5kbS9hZ2VudC92MS9yZWNvdmVyeV9yZWFkaW5lc3MucHJvdG8SDmxpbmRtLmFnZW50LnYxItwHChxSZWNvdmVyeVJlYWRpbmVzc09ic2VydmF0aW9uEjcKC29ic2VydmVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhwKB2Jvb3RfaWQYAiABKAlCC7pICNgBAXIDsAEBEhEKCWF2YWlsYWJsZRgDIAEoCBIYCgZyZWFzb24YBCABKAlCCLpIBXIDGIACEhkKCGVzcF91dWlkGAUgASgJQge6SARyAhhAEhoKCGVzcF9wYXRoGAYgASgJQgi6SAVyAxiAIBISCgpmcmVlX2J5dGVzGAcgASgEEh0KFWFsbG9jYXRpb25fdW5pdF9ieXRlcxgIIAEoBBITCgtzZWN1cmVfYm9vdBgJIAEoCBITCgt1a2lfY2FwYWJsZRgKIAEoCBItChdjb25maWd1cmVkX2ltYWdlX3NoYTI1NhgLIAEoDEIHukgEegJoIEgAiAEBEisKFWNvbmZpZ3VyZWRfaW1hZ2Vfc2l6ZRgMIAEoBEIHukgEMgIgAEgBiAEBEj0KCWJvb3RfbW9kZRgNIAEoDjIgLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Qm9vdE1vZGVCCLpIBYIBAhABEioKFm1lYXN1cmVkX2tlcm5lbF9zaGEyNTYYDiABKAxCCrpIB9gBAXoCaCA6pgO6SKIDGp8DCh9yZWNvdmVyeV9yZWFkaW5lc3MuYXZhaWxhYmlsaXR5ElJhdmFpbGFibGUgb2JzZXJ2YXRpb25zIG5lZWQgbmF0aXZlIGlkZW50aXR5IGFuZCBjYXBhYmlsaXR5OyBmYWlsdXJlcyBuZWVkIGEgcmVhc29uGqcCdGhpcy5hdmFpbGFibGUgPyAodGhpcy5ib290X2lkICE9ICcnICYmIHRoaXMucmVhc29uID09ICcnICYmIHRoaXMuZXNwX3BhdGggIT0gJycgJiYgdGhpcy5hbGxvY2F0aW9uX3VuaXRfYnl0ZXMgPiAwdSAmJiB0aGlzLnNlY3VyZV9ib290ICYmICgodGhpcy5ib290X21vZGUgPT0gMSAmJiB0aGlzLmVzcF91dWlkICE9ICcnICYmIHRoaXMudWtpX2NhcGFibGUpIHx8ICh0aGlzLmJvb3RfbW9kZSA9PSAzICYmIHRoaXMubWVhc3VyZWRfa2VybmVsX3NoYTI1Ni5zaXplKCkgPT0gMzIpKSkgOiB0aGlzLnJlYXNvbiAhPSAnJ0IaChhfY29uZmlndXJlZF9pbWFnZV9zaGEyNTZCGAoWX2NvbmZpZ3VyZWRfaW1hZ2Vfc2l6ZSIdChtHZXRSZWNvdmVyeVJlYWRpbmVzc1JlcXVlc3QiwgEKHEdldFJlY292ZXJ5UmVhZGluZXNzUmVzcG9uc2USSQoLb2JzZXJ2YXRpb24YASABKAsyLC5saW5kbS5hZ2VudC52MS5SZWNvdmVyeVJlYWRpbmVzc09ic2VydmF0aW9uQga6SAPIAQESJQoQcm9vdF9vYnNlcnZhdGlvbhgEIAEoDEILukgIegYQARiAgAVKBAgCEANKBAgDEARSD3N0b3JhZ2VfZGV0YWlsc1ITc3RvcmFnZV9vYnNlcnZlZF9hdEIiWiBsaW5kbS9nZW4vbGluZG0vYWdlbnQvdjE7YWdlbnR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_device_actions]);
 
 /**
  * Read-only root observation, not authorization or readiness for an artifact.
@@ -43,16 +45,22 @@ export type RecoveryReadinessObservation = Message<"lindm.agent.v1.RecoveryReadi
   reason: string;
 
   /**
+   * ESP identity for UKI; empty for measured GRUB.
+   *
    * @generated from field: string esp_uuid = 5;
    */
   espUuid: string;
 
   /**
+   * Staging directory: the ESP for UKI, /boot for measured GRUB.
+   *
    * @generated from field: string esp_path = 6;
    */
   espPath: string;
 
   /**
+   * Capacity of the staging directory's filesystem.
+   *
    * @generated from field: uint64 free_bytes = 7;
    */
   freeBytes: bigint;
@@ -83,6 +91,22 @@ export type RecoveryReadinessObservation = Message<"lindm.agent.v1.RecoveryReadi
    * @generated from field: optional uint64 configured_image_size = 12;
    */
   configuredImageSize?: bigint | undefined;
+
+  /**
+   * The configured method these facts qualify.
+   *
+   * @generated from field: lindm.agent.v1.RecoveryBootMode boot_mode = 13;
+   */
+  bootMode: RecoveryBootMode;
+
+  /**
+   * Measured GRUB only: SHA-256 of the ordinary boot's vendor kernel,
+   * whose current-boot event log shows GRUB measuring kernel, command line and
+   * initramfs into PCRs 8/9 with a usable TPM resource manager.
+   *
+   * @generated from field: bytes measured_kernel_sha256 = 14;
+   */
+  measuredKernelSha256: Uint8Array;
 };
 
 /**

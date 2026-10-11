@@ -182,20 +182,25 @@ The test references are scenario families in [verification](verification.md).
 
 ### Original-device sanitize capability
 
-Original-device SATA/NVMe sanitize requires the approved signed recovery image to
-fit the existing EFI system partition, including allocation-unit rounding. A
-fresh authenticated inventory observation reports the image, needed and available
-bytes before approval. Insufficient capacity is **unsupported: ESP capacity**, not
-an approval warning or a sanitization failure after erasure begins. The console
-shows those bytes and the external-recovery alternative. Execution rechecks space;
-inventory readiness is neither authority nor a reservation.
+Original-device SATA/NVMe sanitize has two boot methods. A signed UKI must fit the
+existing EFI system partition, including allocation-unit rounding, and run through
+systemd-boot with a deployment key in firmware `db`. Measured GRUB recovery stages
+an unsigned initramfs beside the vendor-signed kernel on `/boot` behind stock
+shim+GRUB and requires a TPM quote before any start grant; without a usable TPM
+it is **unsupported: attestation unavailable**. A fresh authenticated inventory
+observation reports the method, image, needed and available bytes before
+approval. Insufficient capacity is **unsupported: ESP capacity** (or `/boot`
+capacity for measured GRUB), not an approval warning or a sanitization failure
+after erasure begins. The console shows those bytes and the external-recovery
+alternative. Execution rechecks space; inventory readiness is neither authority
+nor a reservation.
 
 Do not resize the ESP, remove or compact ordinary boot images, replace the
 distribution kernel with an unqualified kernel, or weaken image trust to turn a
-gated cell green. The pinned Fedora 44 stock fixture is such a gated cell: its
-unchanged ESP has 14,888,960 bytes available, while its vendor-signed kernel alone
-is 18,479,464 bytes before the recovery stub and initramfs. Component digests and
-native records are retained in [verification](verification.md).
+gated cell green. Stock Fedora 44 uses measured GRUB; its 100 MiB vendor ESP has
+82,089,984 bytes free, but the UKI method's own systemd-boot conversion consumes
+most of it. Component digests and native records are retained in
+[verification](verification.md).
 
 An on-site operator may instead use separately qualified external recovery media
 with the same exact target validation, fresh two-person authorization and

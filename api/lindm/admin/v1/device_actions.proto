@@ -156,4 +156,6 @@ message RecoveryReadiness {
   uint64 image_size = 5;
   uint64 needed_bytes = 6;
   uint64 available_bytes = 7;
+  // Method implied by the offline-signed artifact kind (.efi or .initrd).
+  lindm.agent.v1.RecoveryBootMode boot_mode = 8;
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"time"
@@ -31,6 +32,9 @@ func (s *Service) PrepareDeviceActionRecovery(ctx context.Context, req *connect.
 	}
 	response, err := s.prepareDeviceActionRecovery(ctx, req.Msg.GetIntentEnvelope())
 	if err != nil {
+		// The RPC reduces causes to stable reasons; the journal keeps the
+		// nonsecret native stage so refusals are diagnosable on the device.
+		slog.WarnContext(ctx, "device action recovery preparation failed", "cause", err.Error())
 		return nil, mapError(err)
 	}
 	return noStore(response), nil
@@ -61,7 +65,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	}
 	if s.agentUpdateBusy() {
 		s.mu.Unlock()
-		return nil, errResourceRejected
+		return nil, fmt.Errorf("%w: agent_update_busy", errResourceRejected)
 	}
 	intent, err := s.currentDeviceActionIntent(ctx, loaded, envelope)
 	if err != nil {
@@ -80,7 +84,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		}
 		if prior.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED {
 			s.mu.Unlock()
-			return nil, errResourceRejected
+			return nil, fmt.Errorf("%w: prior_recovery_pending", errResourceRejected)
 		}
 		pending := s.recoveryPending
 		s.recoveryPending = nil
@@ -92,7 +96,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	planner, ok := s.actionProvider.(recoveryPlanner)
 	if !ok || s.recoveryConfig == nil || intent.GetSpec().GetSanitize().GetRecovery() == nil || !s.actionMu.TryLock() {
 		s.mu.Unlock()
-		return nil, errResourceRejected
+		return nil, fmt.Errorf("%w: recovery_not_configured_or_busy", errResourceRejected)
 	}
 	s.operations.Add(1)
 	ctx, cancel := context.WithCancel(ctx)
@@ -107,7 +111,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, err
 	}
 	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !plan.GetBefore().GetSupported() {
-		return nil, errResourceRejected
+		return nil, fmt.Errorf("%w: recovery_plan_unsupported", errResourceRejected)
 	}
 	plan.ActionId = intent.GetActionId()
 	if s.admit(plan) != nil {
@@ -158,12 +162,12 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		if found, err := offTarget.Load(new(agentv1.RecoveryJournal)); err != nil {
 			return nil, err
 		} else if found {
-			return nil, errResourceRejected
+			return nil, fmt.Errorf("%w: off_target_journal_present", errResourceRejected)
 		}
 		if consumed, err := offTarget.Consumed(); err != nil {
 			return nil, err
 		} else if consumed {
-			return nil, errResourceRejected
+			return nil, fmt.Errorf("%w: off_target_journal_consumed", errResourceRejected)
 		}
 		key, err := platform.ProvisionKey(filepath.Join(stage.StateDirectory, "action.key"))
 		if err != nil {
@@ -176,12 +180,23 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		public = bytes.Clone(key[ed25519.SeedSize:])
 		clear(key)
 	}
+	var measured *agentv1.RecoveryMeasuredBoot
+	if stage.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		if pending != nil {
+			return nil, fmt.Errorf("%w: measured_boot_requires_off_target_custody", errResourceRejected)
+		}
+		// The restricted TPM key is bound into the device-signed handoff; the
+		// server verifies its quote of this exact boot before any start grant.
+		if measured, err = platform.PrepareMeasured(ctx, stage); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.lock(ctx); err != nil {
 		return nil, err
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return nil, errResourceRejected
+		return nil, fmt.Errorf("%w: agent_update_busy", errResourceRejected)
 	}
 	loaded, err = s.enrolled(ctx)
 	if err != nil {
@@ -196,14 +211,14 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, err
 	}
 	if record.GetChallenge().GetBootId() != boot {
-		return nil, errResourceRejected
+		return nil, fmt.Errorf("%w: challenge_boot_changed", errResourceRejected)
 	}
 	planDigest, err := trust.RecoveryPlanDigest(plan)
 	if err != nil {
 		return nil, err
 	}
 	recoverySpec := intent.GetSpec().GetSanitize().GetRecovery()
-	handoff := &agentv1.DeviceActionRecoveryHandoff{Intent: proto.CloneOf(intent), NativePlanSha256: planDigest[:], RecoveryImageSha256: bytes.Clone(recoverySpec.GetImageSha256()), MediaSha256: bytes.Clone(recoverySpec.GetMediaSha256()), RecoveryPublicKey: public, OriginalBootId: boot, ExpiresAt: proto.CloneOf(intent.GetExpiresAt()), Custody: s.recoveryConfig.Custody, IntentSha256: bytes.Clone(record.GetIntentSha256()), Challenge: proto.CloneOf(record.GetChallenge())}
+	handoff := &agentv1.DeviceActionRecoveryHandoff{Intent: proto.CloneOf(intent), NativePlanSha256: planDigest[:], RecoveryImageSha256: bytes.Clone(recoverySpec.GetImageSha256()), MediaSha256: bytes.Clone(recoverySpec.GetMediaSha256()), RecoveryPublicKey: public, OriginalBootId: boot, ExpiresAt: proto.CloneOf(intent.GetExpiresAt()), Custody: s.recoveryConfig.Custody, IntentSha256: bytes.Clone(record.GetIntentSha256()), Challenge: proto.CloneOf(record.GetChallenge()), MeasuredBoot: measured}
 	if loaded.cert.NotAfter.Before(handoff.GetExpiresAt().AsTime()) {
 		handoff.ExpiresAt = protoTimestamp(loaded.cert.NotAfter)
 	}
@@ -395,6 +410,7 @@ func (s *Service) runRecoveryBoot(ctx context.Context, record *agentv1.DeviceAct
 		return err
 	}
 	stage.CredentialPublicKey = bytes.Clone(handoff.GetRecoveryPublicKey())
+	stage.AttestationKeyPublic = bytes.Clone(handoff.GetMeasuredBoot().GetAttestationKeyPublic())
 	checkpoint := &agentv1.RecoveryJournal{FormatVersion: 1, CredentialEnvelope: bytes.Clone(record.GetRecoveryCredentialEnvelope()), IntentEnvelope: bytes.Clone(record.GetIntentEnvelope()), AcceptedRoot: proto.CloneOf(record.GetAcceptedRoot()), DelegationEnvelope: bytes.Clone(record.GetAcceptedDelegationEnvelope()), Handoff: proto.CloneOf(handoff), State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: protoTimestamp(s.now()), CredentialRoot: proto.CloneOf(record.GetAcceptedRoot()), CredentialDelegationEnvelope: bytes.Clone(record.GetAcceptedDelegationEnvelope())}
 	checkpoint.TrustAcceptedAt = proto.CloneOf(checkpoint.GetAcceptedAt())
 	if s.admit(checkpoint) != nil {

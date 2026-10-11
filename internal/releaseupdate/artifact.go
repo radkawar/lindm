@@ -60,6 +60,26 @@ func RecoveryTargetPath(digest []byte) (string, error) {
 	return "recovery/" + hex.EncodeToString(digest) + ".efi", nil
 }
 
+// RecoveryInitrdTargetPath names a measured-BLS recovery initramfs. Its
+// companion RecoveryKernelTargetPath descriptor carries the exact vendor
+// kernel length and SHA-256 that the initramfs was built for; the kernel
+// bytes themselves are not served by lindm.
+func RecoveryInitrdTargetPath(digest []byte) (string, error) {
+	if len(digest) != sha256.Size {
+		return "", errors.New("releaseupdate: recovery digest required")
+	}
+	return "recovery/" + hex.EncodeToString(digest) + ".initrd", nil
+}
+
+// RecoveryKernelTargetPath is keyed by the initramfs digest, binding the pair
+// under one offline targets signature.
+func RecoveryKernelTargetPath(initrdDigest []byte) (string, error) {
+	if len(initrdDigest) != sha256.Size {
+		return "", errors.New("releaseupdate: recovery digest required")
+	}
+	return "recovery/" + hex.EncodeToString(initrdDigest) + ".kernel", nil
+}
+
 // PublishArtifact imports a bounded regular file and signs its exact streamed
 // hash and length using offline targets custody. Channel publication is separate.
 func (p *Publisher) PublishArtifact(ctx context.Context, name, source string) (err error) {
@@ -89,9 +109,8 @@ func (p *Publisher) PublishArtifact(ctx context.Context, name, source string) (e
 		return err
 	}
 	if strings.HasPrefix(name, "recovery/") {
-		expected, err := RecoveryTargetPath(info.Hashes["sha256"])
-		if err != nil || name != expected {
-			return errors.New("releaseupdate: recovery target name does not match image digest")
+		if err := recoveryTargetBinding(name, info.Hashes["sha256"], current.targets.Signed.Targets); err != nil {
+			return err
 		}
 	}
 	if previous := current.targets.Signed.Targets[name]; previous != nil {
@@ -103,4 +122,34 @@ func (p *Publisher) PublishArtifact(ctx context.Context, name, source string) (e
 	}
 	current.targets.Signed.Targets[name] = info
 	return p.commit(ctx, root, current, true)
+}
+
+// recoveryTargetBinding keeps recovery names self-describing: an image or
+// initramfs is named by its own digest, and a companion kernel descriptor may be
+// published only after the exact initramfs it is keyed by.
+func recoveryTargetBinding(name string, digest []byte, targets map[string]*metadata.TargetFiles) error {
+	mismatch := errors.New("releaseupdate: recovery target name does not match image digest")
+	switch {
+	case strings.HasSuffix(name, ".kernel"):
+		initrdName := strings.TrimSuffix(name, ".kernel") + ".initrd"
+		initrd := targets[initrdName]
+		if initrd == nil {
+			return errors.New("releaseupdate: recovery kernel requires its published initramfs")
+		}
+		expected, err := RecoveryKernelTargetPath(initrd.Hashes["sha256"])
+		if err != nil || name != expected || len(digest) != sha256.Size {
+			return mismatch
+		}
+	case strings.HasSuffix(name, ".initrd"):
+		expected, err := RecoveryInitrdTargetPath(digest)
+		if err != nil || name != expected {
+			return mismatch
+		}
+	default:
+		expected, err := RecoveryTargetPath(digest)
+		if err != nil || name != expected {
+			return mismatch
+		}
+	}
+	return nil
 }

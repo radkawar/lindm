@@ -1019,12 +1019,18 @@ export function DeviceActionForm({
                           setRecoveryBootMode(
                             Number(value) === RecoveryBootMode.KEXEC
                               ? RecoveryBootMode.KEXEC
-                              : RecoveryBootMode.UKI,
+                              : Number(value) === RecoveryBootMode.MEASURED_GRUB
+                                ? RecoveryBootMode.MEASURED_GRUB
+                                : RecoveryBootMode.UKI,
                           )
                         }
                         options={[
                           { value: RecoveryBootMode.UKI, label: "Signed UKI" },
                           { value: RecoveryBootMode.KEXEC, label: "Signed kexec" },
+                          {
+                            value: RecoveryBootMode.MEASURED_GRUB,
+                            label: "Vendor kernel + TPM-attested initramfs (stock shim+GRUB)",
+                          },
                         ]}
                       />
                       <RecoveryReadinessView readiness={eligibleTargets?.recoveryReadiness} />

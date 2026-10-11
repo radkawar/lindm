@@ -29,6 +29,7 @@ import (
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/statefs"
 	"lindm/internal/agent/update"
+	"lindm/internal/platform"
 	"lindm/internal/protodata"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
@@ -130,6 +131,7 @@ type Service struct {
 	pinLiveRoot           func() error
 	recoveryConfig        *RecoveryBootConfig
 	recoveryBoot          recoveryBootPlatform
+	recoveryGRUB          func() (platform.GRUBChain, error)
 	rootInventorySystemd  func(context.Context, string) (rootInventoryUnits, error)
 	logger                *slog.Logger
 	recoveryPending       *recoveryPendingAction

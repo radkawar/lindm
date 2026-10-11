@@ -33,7 +33,11 @@ func (s *Service) GetRecoveryReadiness(ctx context.Context, req *connect.Request
 		return nil, mapError(err)
 	}
 	defer s.mu.Unlock()
-	observation := s.observeRecoveryReadiness(ctx, recoveryboot.ObserveReadiness)
+	observer := recoveryboot.ObserveReadiness
+	if s.recoveryConfig != nil && s.recoveryConfig.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		observer = recoveryboot.ObserveMeasuredReadiness
+	}
+	observation := s.observeRecoveryReadiness(ctx, observer)
 	if observation.GetBootId() == "" {
 		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "readiness_boot_id", err: errors.Join(errInternal, errors.New(observation.GetReason()))})
 		return nil, mapError(errInternal)
@@ -106,6 +110,7 @@ func (s *Service) observeRecoveryReadiness(ctx context.Context, observe func(con
 	result.AllocationUnitBytes = facts.AllocationUnitBytes
 	result.SecureBoot = facts.SecureBoot
 	result.UkiCapable = facts.UKICapable
+	result.BootMode = facts.BootMode
 	if err != nil {
 		// Export only classified native reasons, never paths or raw tool output.
 		switch err.Error() {
@@ -113,17 +118,30 @@ func (s *Service) observeRecoveryReadiness(ctx context.Context, observe func(con
 			"recovery_readiness_esp_unsupported", "recovery_readiness_esp_capacity_invalid",
 			"recovery_readiness_esp_uuid_unavailable", "recovery_readiness_secure_boot_unavailable",
 			"recovery_readiness_secure_boot_required", "recovery_readiness_systemd_boot_required",
-			"recovery_readiness_loader_esp_unavailable", "recovery_readiness_loader_esp_mismatch":
+			"recovery_readiness_loader_esp_unavailable", "recovery_readiness_loader_esp_mismatch",
+			"recovery_readiness_bls_entries_unavailable", "recovery_readiness_boot_unreadable",
+			"recovery_readiness_boot_filesystem_unsupported", "recovery_readiness_tpm_attestation_unavailable",
+			"recovery_readiness_measured_grub_required", "recovery_readiness_secure_boot_unmeasured",
+			"recovery_readiness_vendor_kernel_changed", "recovery_readiness_grub_editenv_required",
+			"recovery_readiness_measured_grub_unsupported", "recovery_readiness_grub_custom_unavailable":
 			result.Reason = err.Error()
 		default:
 			result.Reason = "recovery_readiness_observation_failed"
 		}
 		return result
 	}
-	if !facts.SecureBoot || !facts.UKICapable || facts.ESPUUID == "" || facts.AllocationUnitBytes == 0 {
+	switch {
+	case !facts.SecureBoot || facts.AllocationUnitBytes == 0:
+		result.Reason = "recovery_readiness_unsupported"
+		return result
+	case facts.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI && (!facts.UKICapable || facts.ESPUUID == ""):
+		result.Reason = "recovery_readiness_unsupported"
+		return result
+	case facts.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB && len(facts.MeasuredKernelSHA256) != sha256.Size:
 		result.Reason = "recovery_readiness_unsupported"
 		return result
 	}
+	result.MeasuredKernelSha256 = bytes.Clone(facts.MeasuredKernelSHA256)
 	result.Available = true
 	return result
 }

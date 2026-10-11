@@ -632,11 +632,13 @@ type RecoveryRuntimeConfig struct {
 	RootFile       string                      `protobuf:"bytes,7,opt,name=root_file,json=rootFile,proto3" json:"root_file,omitempty"`
 	BootstrapFile  string                      `protobuf:"bytes,8,opt,name=bootstrap_file,json=bootstrapFile,proto3" json:"bootstrap_file,omitempty"`
 	// Embedded signer pin avoids an impossible self-hash of the signed UKI.
+	// Measured GRUB images have no signer; a TPM quote proves their initramfs.
 	CertificateSha256 []byte          `protobuf:"bytes,9,opt,name=certificate_sha256,json=certificateSha256,proto3" json:"certificate_sha256,omitempty"`
 	Custody           RecoveryCustody `protobuf:"varint,10,opt,name=custody,proto3,enum=lindm.agent.v1.RecoveryCustody" json:"custody,omitempty"`
 	// Authenticated image-provisioning admission time for the static bootstrap.
 	// Historical bootstrap restoration never relaxes current execution authority.
 	BootstrapVerifiedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=bootstrap_verified_at,json=bootstrapVerifiedAt,proto3" json:"bootstrap_verified_at,omitempty"`
+	BootMode            RecoveryBootMode       `protobuf:"varint,12,opt,name=boot_mode,json=bootMode,proto3,enum=lindm.agent.v1.RecoveryBootMode" json:"boot_mode,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -741,19 +743,34 @@ func (x *RecoveryRuntimeConfig) GetBootstrapVerifiedAt() *timestamppb.Timestamp 
 	return nil
 }
 
+func (x *RecoveryRuntimeConfig) GetBootMode() RecoveryBootMode {
+	if x != nil {
+		return x.BootMode
+	}
+	return RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED
+}
+
 type RecoveryBootConfig struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	ImageFile               string                 `protobuf:"bytes,1,opt,name=image_file,json=imageFile,proto3" json:"image_file,omitempty"`
-	ImageSha256             []byte                 `protobuf:"bytes,2,opt,name=image_sha256,json=imageSha256,proto3" json:"image_sha256,omitempty"`
-	ImageSize               uint64                 `protobuf:"varint,3,opt,name=image_size,json=imageSize,proto3" json:"image_size,omitempty"`
-	SignerCertificateFile   string                 `protobuf:"bytes,4,opt,name=signer_certificate_file,json=signerCertificateFile,proto3" json:"signer_certificate_file,omitempty"`
-	SignerCertificateSha256 []byte                 `protobuf:"bytes,5,opt,name=signer_certificate_sha256,json=signerCertificateSha256,proto3" json:"signer_certificate_sha256,omitempty"`
-	EspDirectory            string                 `protobuf:"bytes,6,opt,name=esp_directory,json=espDirectory,proto3" json:"esp_directory,omitempty"`
-	StateDirectory          string                 `protobuf:"bytes,7,opt,name=state_directory,json=stateDirectory,proto3" json:"state_directory,omitempty"`
-	Custody                 RecoveryCustody        `protobuf:"varint,8,opt,name=custody,proto3,enum=lindm.agent.v1.RecoveryCustody" json:"custody,omitempty"`
-	ExpectedPcr11Sha256     []byte                 `protobuf:"bytes,9,opt,name=expected_pcr11_sha256,json=expectedPcr11Sha256,proto3" json:"expected_pcr11_sha256,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ImageFile   string                 `protobuf:"bytes,1,opt,name=image_file,json=imageFile,proto3" json:"image_file,omitempty"`
+	ImageSha256 []byte                 `protobuf:"bytes,2,opt,name=image_sha256,json=imageSha256,proto3" json:"image_sha256,omitempty"`
+	ImageSize   uint64                 `protobuf:"varint,3,opt,name=image_size,json=imageSize,proto3" json:"image_size,omitempty"`
+	// UKI only: the deployment Secure Boot signer enrolled in firmware db.
+	SignerCertificateFile   string `protobuf:"bytes,4,opt,name=signer_certificate_file,json=signerCertificateFile,proto3" json:"signer_certificate_file,omitempty"`
+	SignerCertificateSha256 []byte `protobuf:"bytes,5,opt,name=signer_certificate_sha256,json=signerCertificateSha256,proto3" json:"signer_certificate_sha256,omitempty"`
+	// Staging directory: the running systemd-boot ESP for UKI, or the /boot
+	// directory holding the vendor kernel and GRUB configuration for measured GRUB.
+	EspDirectory        string           `protobuf:"bytes,6,opt,name=esp_directory,json=espDirectory,proto3" json:"esp_directory,omitempty"`
+	StateDirectory      string           `protobuf:"bytes,7,opt,name=state_directory,json=stateDirectory,proto3" json:"state_directory,omitempty"`
+	Custody             RecoveryCustody  `protobuf:"varint,8,opt,name=custody,proto3,enum=lindm.agent.v1.RecoveryCustody" json:"custody,omitempty"`
+	ExpectedPcr11Sha256 []byte           `protobuf:"bytes,9,opt,name=expected_pcr11_sha256,json=expectedPcr11Sha256,proto3" json:"expected_pcr11_sha256,omitempty"`
+	BootMode            RecoveryBootMode `protobuf:"varint,10,opt,name=boot_mode,json=bootMode,proto3,enum=lindm.agent.v1.RecoveryBootMode" json:"boot_mode,omitempty"`
+	// Measured GRUB only: offline-release-bound vendor kernel the initramfs targets.
+	KernelSha256 []byte `protobuf:"bytes,11,opt,name=kernel_sha256,json=kernelSha256,proto3" json:"kernel_sha256,omitempty"`
+	// Measured GRUB only: optional qualified diagnostic UART in kernel options.
+	SerialConsole string `protobuf:"bytes,12,opt,name=serial_console,json=serialConsole,proto3" json:"serial_console,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RecoveryBootConfig) Reset() {
@@ -849,6 +866,27 @@ func (x *RecoveryBootConfig) GetExpectedPcr11Sha256() []byte {
 	return nil
 }
 
+func (x *RecoveryBootConfig) GetBootMode() RecoveryBootMode {
+	if x != nil {
+		return x.BootMode
+	}
+	return RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED
+}
+
+func (x *RecoveryBootConfig) GetKernelSha256() []byte {
+	if x != nil {
+		return x.KernelSha256
+	}
+	return nil
+}
+
+func (x *RecoveryBootConfig) GetSerialConsole() string {
+	if x != nil {
+		return x.SerialConsole
+	}
+	return ""
+}
+
 var File_lindm_agent_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_config_proto_rawDesc = "" +
@@ -916,7 +954,7 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\rallow_discard\x18\a \x01(\bR\fallowDiscard\x123\n" +
 	"\x10qualification_id\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x0fqualificationId\x12q\n" +
 	"\x17native_sanitize_methods\x18\t \x03(\x0e2\x1e.lindm.agent.v1.SanitizeMethodB\x19\xbaH\x16\x92\x01\x13\x10\x04\x18\x01\"\r\x82\x01\n" +
-	"\x10\x01\x18\x03\x18\x04\x18\x05\x18\x06R\x15nativeSanitizeMethods\"\xbe\x06\n" +
+	"\x10\x01\x18\x03\x18\x04\x18\x05\x18\x06R\x15nativeSanitizeMethods\"\xfc\b\n" +
 	"\x15RecoveryRuntimeConfig\x122\n" +
 	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x12'\n" +
 	"\bkey_file\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\akeyFile\x12+\n" +
@@ -925,28 +963,41 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x0eserver_ca_file\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fserverCaFile\x12N\n" +
 	"\bprovider\x18\x06 \x01(\v2*.lindm.agent.v1.DeviceActionProviderConfigB\x06\xbaH\x03\xc8\x01\x01R\bprovider\x12&\n" +
 	"\troot_file\x18\a \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\brootFile\x120\n" +
-	"\x0ebootstrap_file\x18\b \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\x126\n" +
-	"\x12certificate_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\x12E\n" +
+	"\x0ebootstrap_file\x18\b \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\x129\n" +
+	"\x12certificate_sha256\x18\t \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x11certificateSha256\x12E\n" +
 	"\acustody\x18\n" +
 	" \x01(\x0e2\x1f.lindm.agent.v1.RecoveryCustodyB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\acustody\x12V\n" +
-	"\x15bootstrap_verified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x13bootstrapVerifiedAt:\xcb\x01\xbaH\xc7\x01\x1a\xc4\x01\n" +
-	"\x18recovery_runtime.custody\x12Noff-target custody requires its key file; TPM custody cannot select a key file\x1aX(this.custody == 1 && this.key_file != '') || (this.custody == 2 && this.key_file == '')J\x04\b\x05\x10\x06R\x15recovery_image_sha256\"\xca\x05\n" +
+	"\x15bootstrap_verified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x13bootstrapVerifiedAt\x12I\n" +
+	"\tboot_mode\x18\f \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeB\n" +
+	"\xbaH\a\x82\x01\x04\x18\x01\x18\x03R\bbootMode:\xbb\x03\xbaH\xb7\x03\x1a\xc4\x01\n" +
+	"\x18recovery_runtime.custody\x12Noff-target custody requires its key file; TPM custody cannot select a key file\x1aX(this.custody == 1 && this.key_file != '') || (this.custody == 2 && this.key_file == '')\x1a\xed\x01\n" +
+	"\x1arecovery_runtime.boot_mode\x12VUKI images pin their signer; measured GRUB images have none and use off-target custody\x1awthis.boot_mode == 1 ? this.certificate_sha256.size() == 32 : (this.certificate_sha256.size() == 0 && this.custody == 1)J\x04\b\x05\x10\x06R\x15recovery_image_sha256\"\xc6\n" +
+	"\n" +
 	"\x12RecoveryBootConfig\x12(\n" +
 	"\n" +
 	"image_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\timageFile\x12*\n" +
 	"\fimage_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\vimageSha256\x12,\n" +
 	"\n" +
 	"image_size\x18\x03 \x01(\x04B\r\xbaH\n" +
-	"2\b\x18\x80\x80\x80\x80\x04 \x00R\timageSize\x12A\n" +
-	"\x17signer_certificate_file\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x15signerCertificateFile\x12C\n" +
-	"\x19signer_certificate_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x17signerCertificateSha256\x12.\n" +
+	"2\b\x18\x80\x80\x80\x80\x04 \x00R\timageSize\x12D\n" +
+	"\x17signer_certificate_file\x18\x04 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\x15signerCertificateFile\x12F\n" +
+	"\x19signer_certificate_sha256\x18\x05 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x17signerCertificateSha256\x12.\n" +
 	"\resp_directory\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fespDirectory\x122\n" +
 	"\x0fstate_directory\x18\a \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x12E\n" +
 	"\acustody\x18\b \x01(\x0e2\x1f.lindm.agent.v1.RecoveryCustodyB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\acustody\x12;\n" +
-	"\x15expected_pcr11_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02\x18 R\x13expectedPcr11Sha256:\xbf\x01\xbaH\xbb\x01\x1a\xb8\x01\n" +
-	"\x15recovery_boot.custody\x127TPM custody requires the exact qualified recovery PCR11\x1af(this.custody == 2 ? this.expected_pcr11_sha256.size() == 32 : this.expected_pcr11_sha256.size() == 0)B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\x15expected_pcr11_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02\x18 R\x13expectedPcr11Sha256\x12I\n" +
+	"\tboot_mode\x18\n" +
+	" \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeB\n" +
+	"\xbaH\a\x82\x01\x04\x18\x01\x18\x03R\bbootMode\x12/\n" +
+	"\rkernel_sha256\x18\v \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\fkernelSha256\x12N\n" +
+	"\x0eserial_console\x18\f \x01(\tB'\xbaH$r\"R\x00R\x0ettyS0,115200n8R\x0ettyAMA0,115200R\rserialConsole:\xe9\x04\xbaH\xe5\x04\x1a\xb8\x01\n" +
+	"\x15recovery_boot.custody\x127TPM custody requires the exact qualified recovery PCR11\x1af(this.custody == 2 ? this.expected_pcr11_sha256.size() == 32 : this.expected_pcr11_sha256.size() == 0)\x1a\xa7\x03\n" +
+	"\x12recovery_boot.mode\x12YUKI needs its pinned signer; measured GRUB needs the kernel digest and off-target custody\x1a\xb5\x02this.boot_mode == 1 ? (this.signer_certificate_file != '' && this.signer_certificate_sha256.size() == 32 && this.kernel_sha256.size() == 0 && this.serial_console == '') : (this.signer_certificate_file == '' && this.signer_certificate_sha256.size() == 0 && this.kernel_sha256.size() == 32 && this.custody == 1)B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_config_proto_rawDescOnce sync.Once
@@ -984,6 +1035,7 @@ var file_lindm_agent_v1_config_proto_goTypes = []any{
 	(SanitizeMethod)(0),                   // 19: lindm.agent.v1.SanitizeMethod
 	(RecoveryCustody)(0),                  // 20: lindm.agent.v1.RecoveryCustody
 	(*timestamppb.Timestamp)(nil),         // 21: google.protobuf.Timestamp
+	(RecoveryBootMode)(0),                 // 22: lindm.agent.v1.RecoveryBootMode
 }
 var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	3,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
@@ -1007,12 +1059,14 @@ var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	3,  // 18: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
 	20, // 19: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
 	21, // 20: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	20, // 21: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	22, // 21: lindm.agent.v1.RecoveryRuntimeConfig.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	20, // 22: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	22, // 23: lindm.agent.v1.RecoveryBootConfig.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_config_proto_init() }

@@ -129,6 +129,10 @@ const (
 	RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED RecoveryBootMode = 0
 	RecoveryBootMode_RECOVERY_BOOT_MODE_UKI         RecoveryBootMode = 1
 	RecoveryBootMode_RECOVERY_BOOT_MODE_KEXEC       RecoveryBootMode = 2
+	// Vendor-signed kernel through stock shim+GRUB (a Boot Loader Spec entry or
+	// a grub.d custom.cfg entry) and an unsigned lindm initramfs whose
+	// integrity a fresh TPM quote proves before any start grant.
+	RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB RecoveryBootMode = 3
 )
 
 // Enum value maps for RecoveryBootMode.
@@ -137,11 +141,13 @@ var (
 		0: "RECOVERY_BOOT_MODE_UNSPECIFIED",
 		1: "RECOVERY_BOOT_MODE_UKI",
 		2: "RECOVERY_BOOT_MODE_KEXEC",
+		3: "RECOVERY_BOOT_MODE_MEASURED_GRUB",
 	}
 	RecoveryBootMode_value = map[string]int32{
-		"RECOVERY_BOOT_MODE_UNSPECIFIED": 0,
-		"RECOVERY_BOOT_MODE_UKI":         1,
-		"RECOVERY_BOOT_MODE_KEXEC":       2,
+		"RECOVERY_BOOT_MODE_UNSPECIFIED":   0,
+		"RECOVERY_BOOT_MODE_UKI":           1,
+		"RECOVERY_BOOT_MODE_KEXEC":         2,
+		"RECOVERY_BOOT_MODE_MEASURED_GRUB": 3,
 	}
 )
 
@@ -5082,11 +5088,12 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x0fCryptoEraseMode\x12!\n" +
 	"\x1dCRYPTO_ERASE_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CRYPTO_ERASE_MODE_OFFLINE\x10\x01\x12&\n" +
-	"\"CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER\x10\x02*p\n" +
+	"\"CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER\x10\x02*\x96\x01\n" +
 	"\x10RecoveryBootMode\x12\"\n" +
 	"\x1eRECOVERY_BOOT_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16RECOVERY_BOOT_MODE_UKI\x10\x01\x12\x1c\n" +
-	"\x18RECOVERY_BOOT_MODE_KEXEC\x10\x02*\xa5\x02\n" +
+	"\x18RECOVERY_BOOT_MODE_KEXEC\x10\x02\x12$\n" +
+	" RECOVERY_BOOT_MODE_MEASURED_GRUB\x10\x03*\xa5\x02\n" +
 	"\x0eSanitizeMethod\x12\x1f\n" +
 	"\x1bSANITIZE_METHOD_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19SANITIZE_METHOD_OVERWRITE\x10\x01\x12\x1b\n" +

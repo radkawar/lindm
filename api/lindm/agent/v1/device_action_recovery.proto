@@ -33,11 +33,43 @@ message DeviceActionRecoveryHandoff {
   }];
   bytes intent_sha256 = 9 [(buf.validate.field).bytes.len = 32];
   DeviceActionChallenge challenge = 10 [(buf.validate.field).required = true];
+  // Present exactly for RECOVERY_BOOT_MODE_MEASURED_GRUB.
+  RecoveryMeasuredBoot measured_boot = 11;
   option (buf.validate.message).cel = {
     id: "recovery_handoff.scope"
     message: "handoff requires signed unencrypted recovery spec and bounded expiry"
     expression: "has(this.intent.spec.sanitize) && has(this.intent.spec.sanitize.recovery) && this.expires_at <= this.intent.expires_at && this.expires_at > this.intent.not_before && this.recovery_image_sha256 == this.intent.spec.sanitize.recovery.image_sha256 && this.media_sha256 == this.intent.spec.sanitize.recovery.media_sha256"
   };
+  option (buf.validate.message).cel = {
+    id: "recovery_handoff.measured_boot"
+    message: "measured GRUB recovery requires its measured binding and off-target custody"
+    expression: "(this.intent.spec.sanitize.recovery.boot_mode == 3) == has(this.measured_boot) && (!has(this.measured_boot) || this.custody == 1)"
+  };
+}
+// Root-observed at staging and bound by the device-signed handoff. The server
+// independently requires offline-signed kernel/initramfs metadata and a fresh
+// TPM quote whose event log shows exactly this kernel, options and initramfs.
+message RecoveryMeasuredBoot {
+  // Marshaled TPMT_PUBLIC of a restricted fixedTPM ECDSA P-256 signing key.
+  bytes attestation_key_public = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1024
+  }];
+  bytes kernel_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  // GRUB-relative vendor kernel path from the ordinary GRUB boot.
+  string kernel_path = 3 [
+    (buf.validate.field).string.max_len = 255,
+    (buf.validate.field).string.pattern = "^/([A-Za-z0-9._+-]+/)*vmlinuz-[A-Za-z0-9._+-]+$"
+  ];
+  string kernel_options = 4 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 512
+  ];
+  // GRUB-relative staged initramfs path measured by the initrd command.
+  string initrd_path = 5 [
+    (buf.validate.field).string.max_len = 255,
+    (buf.validate.field).string.pattern = "^/([A-Za-z0-9._+-]+/)*lindm-recovery-[0-9a-f-]{36}[.]initrd$"
+  ];
 }
 // Start-role signature in its own DSSE domain; accepted only by RecoveryService.
 message DeviceActionRecoveryCredential {

@@ -87,6 +87,13 @@ func actionSandboxCommand(ctx context.Context, args []string, output io.Writer) 
 			}
 			devices = append(devices, "/dev/tpmrm0")
 		}
+		if recoveryBoot.GetBootMode() == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+			measured, err := measuredBootDevices()
+			if err != nil {
+				return err
+			}
+			devices = append(devices, measured...)
+		}
 	}
 	content, err := actionSandboxText(cfg, devices)
 	if err != nil {

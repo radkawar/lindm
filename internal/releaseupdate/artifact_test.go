@@ -42,6 +42,47 @@ func TestRecoveryArtifactAuthenticatedLength(t *testing.T) {
 	}
 }
 
+func TestMeasuredRecoveryPairRequiresInitramfsFirst(t *testing.T) {
+	f := newRepositoryFixture(t)
+	directory := t.TempDir()
+	initrd, kernel := filepath.Join(directory, "recovery.initrd"), filepath.Join(directory, "vmlinuz")
+	mustWrite(t, initrd, bytes.Repeat([]byte{0x1d}, 4097))
+	mustWrite(t, kernel, bytes.Repeat([]byte{0x4b}, 5000))
+	initrdDigest := sha256.Sum256(bytes.Repeat([]byte{0x1d}, 4097))
+	kernelDigest := sha256.Sum256(bytes.Repeat([]byte{0x4b}, 5000))
+	initrdName, err := RecoveryInitrdTargetPath(initrdDigest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernelName, err := RecoveryKernelTargetPath(initrdDigest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.publisher.PublishArtifact(t.Context(), kernelName, kernel); err == nil {
+		t.Fatal("kernel companion published before its initramfs")
+	}
+	if err := f.publisher.PublishArtifact(t.Context(), initrdName, kernel); err == nil {
+		t.Fatal("initramfs path naming different bytes accepted")
+	}
+	if err := f.publisher.PublishArtifact(t.Context(), initrdName, initrd); err != nil {
+		t.Fatal(err)
+	}
+	otherName, err := RecoveryKernelTargetPath(kernelDigest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.publisher.PublishArtifact(t.Context(), otherName, kernel); err == nil {
+		t.Fatal("kernel companion keyed by an unpublished initramfs accepted")
+	}
+	if err := f.publisher.PublishArtifact(t.Context(), kernelName, kernel); err != nil {
+		t.Fatal(err)
+	}
+	info, err := f.client(t, "", nil).Artifact(t.Context(), kernelName)
+	if err != nil || info.Length != 5000 || !bytes.Equal(info.SHA256, kernelDigest[:]) {
+		t.Fatalf("signed kernel companion: %v %v", info, err)
+	}
+}
+
 func TestArtifactModifiedTargetMetadataRejected(t *testing.T) {
 	f := newRepositoryFixture(t)
 	fetch := DirectoryFetch(f.directory)

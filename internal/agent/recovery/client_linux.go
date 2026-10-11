@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -19,6 +20,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
+	"lindm/internal/measuredboot"
 	"lindm/internal/protodata"
 	"lindm/internal/trust"
 )
@@ -87,6 +89,20 @@ func (r *runner) acquire(ctx context.Context) (*recoveryv1.AcquireRecoveryWorkRe
 
 func (r *runner) authorize(ctx context.Context, challenge *agentv1.DeviceActionChallenge) ([]byte, error) {
 	request := &recoveryv1.AuthorizeRecoveryStartRequest{Challenge: challenge, RecoveryImageSha256: r.record.GetHandoff().GetRecoveryImageSha256()}
+	if r.record.GetHandoff().GetMeasuredBoot() != nil {
+		// The BOOTED receipt is server-signed after this boot's checkpoint; the
+		// quote therefore cannot predate this boot's server interaction.
+		document, err := (proto.MarshalOptions{Deterministic: true}).Marshal(challenge)
+		if err != nil {
+			return nil, err
+		}
+		if r.attest == nil || len(r.record.GetCheckpointReceiptEnvelope()) == 0 || r.record.GetCheckpoint().GetPhase() != agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED {
+			return nil, errors.New("recovery_attestation_unavailable")
+		}
+		if request.Attestation, err = r.attest(ctx, measuredboot.QualifyingData(r.record.GetCheckpointReceiptEnvelope(), document)); err != nil {
+			return nil, fmt.Errorf("quote measured recovery boot: %w", err)
+		}
+	}
 	proof, err := r.proof(ctx, agentv1.RecoveryOperation_RECOVERY_OPERATION_AUTHORIZE_START, request)
 	if err != nil {
 		return nil, err

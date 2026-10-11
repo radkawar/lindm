@@ -2916,6 +2916,18 @@ OVMF `2024.02-2ubuntu0.10`, Secure Boot enforced and swtpm2. The record proves:
   both agent and executor stopped, followed by signed release of the server fence.
 - An offline action request is rejected with `device_action_offline`.
 
+The same lane **passed on Fedora 44** (encrypted GNOME golden
+`fedora-server-encrypted-44-1.7-x86-64`, x86_64 KVM, OVMF `2024.02-2ubuntu0.10`
+Secure Boot enforced, swtpm 0.7.3, virtio-scsi) with no product change:
+`$HOME/.cache/lindm-fedoragaps-20261011/fedora44-lock-quarantine-01.json`,
+SHA-256 `50985538321bb481f9baa94dbc9864564a204116ddf3e7494a89d350443428da`,
+in 438 seconds. It proves the same lock, release, account-lock/expiry restore,
+administrator-edit preservation, two quarantine/release cycles, timer expiry with
+agent and executor stopped, and offline-start refusal on a real
+`gdm-autologin` Wayland session. Lab and server SHA-256 are in the record;
+agent package SHA-256
+`6a787ce03842494d10f8f53662bdfcfed0388f74805390241e0eadf757e345b4`.
+
 This is not physical-display, boot-lock, X11, KDE, multi-user or other-distro
 qualification. The action-provider logind filter required no product change.
 
@@ -3396,13 +3408,20 @@ configuration, three modules, `lsblk` and its nine-entry library/loader
 closure. The records' component sizes give exact per-ingredient bytes and
 SHA-256.
 
-Fedora 44 stock is an explicit **unsupported: ESP capacity** capability cell,
-not a sanitize pass. Read-only libguestfs extraction of the pinned cloud image
-measured its unmodified vendor kernel
+Fedora 44 under the **owned systemd-boot UKI fixture** is a capacity-refused
+cell, not a sanitize pass. Read-only libguestfs extraction of the pinned cloud
+image measured its unmodified vendor kernel
 `/boot/vmlinuz-6.19.10-300.fc44.x86_64` at **18,479,464 bytes**, SHA-256
 `4b37e4e542a62c580c751787848be6c99e6f908f6712c8c6da85516b8d541de2`.
-The kernel alone exceeds the unchanged ESP's 14,888,960 available bytes by
-3,590,504 bytes, before the stub and initramfs. Its retained configuration has
+The kernel alone exceeds the 14,888,960 available bytes that remain after the
+fixture's own ordinary signed UKI and systemd-boot are written to the 100 MiB ESP
+by 3,590,504 bytes, before the stub and initramfs. **Correction (2026-10-11):**
+the stock, unconverted ESP has 82,089,984 bytes free (observed by `df` in the
+measured-BLS records below and by read-only `guestfish statvfs` of the pinned
+image: 40,083 free 2,048-byte clusters). The earlier "stock ESP too small"
+wording described the converted fixture, not the vendor ESP. Stock Fedora still
+cannot use the UKI path without enrolling a deployment key; it now uses measured
+BLS recovery instead (below). Its retained configuration has
 SHA-256 `1c0d2e478cdc33747fb3bdd9e332677c517b5791c8cbed0454d22e6e430042d5`
 and already uses `CONFIG_KERNEL_ZSTD=y`; initramfs xz and zstd are supported but
 cannot reduce this separate signed-kernel lower bound.
@@ -3453,6 +3472,54 @@ Final summary `recovery-time-final-native-evidence.json` has SHA-256
 `35b6c07f1b11291a972e0d48dd3072d8fe94cd8f0869692f4d808a852e25a7c8`.
 The four final runs used at most two local guests, retained at least
 55,606,804 KiB available memory and zero swap-out delta, and left zero guests.
+
+#### Measured GRUB recovery on stock Fedora 44
+
+`RECOVERY_BOOT_MODE_MEASURED_GRUB` (see
+[architecture](architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub))
+keeps the vendor shim+GRUB chain, the vendor ESP and the vendor-signed kernel,
+and proves the unsigned lindm initramfs only by a server-verified TPM quote. The
+records below predate the pre-landing rename from `MEASURED_BLS`/`measured-bls`
+(the BLS flavor, unchanged on the wire number) and the move of `grub-editenv`
+out of the executor sandbox into its own transient unit:
+
+```sh
+lab vm device-actions -scenario wipe -wipe-phase recovery-sata \
+  -recovery-boot-mode measured-grub -accelerator kvm \
+  -manifest lab/images/fedora-44-encrypted-x86_64.json \
+  -recovery-manifest lab/images/fedora-44-x86_64.json \
+  -firmware-code /usr/share/OVMF/OVMF_CODE_4M.secboot.fd \
+  -firmware-vars /usr/share/OVMF/OVMF_VARS_4M.ms.fd \
+  -firmware-package ovmf -firmware-version 2024.02-2ubuntu0.10 -secure-boot \
+  -record NEW.json   # plus the usual -repo/-lab/-lindmd/-cache inputs
+```
+
+`-wipe-phase recovery-nvme` selects the NVMe controller;
+`-wipe-phase recovery-attestation-refusal` boots the SATA tuple without a TPM and
+requires the capability refusal. Records are under
+`$HOME/.cache/lindm-fedoragaps-20261011/`:
+
+| Native record                     | SHA-256                                                            | Outcome                                                                                                                                                                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fedoras44-measured-sata-01.json` | `18348b516d1419484d403614038122393596eafb08ac3c0a28dd7266b5892b0b` | **Failed.** Readiness, release pair and two-human approval succeeded, then every relay attempt got `resource_execution_rejected` from prepare. Cause: the absent UKI signer path resolved to the configuration directory, failing measured-mode validation. Fixed with a regression; no effect. |
+| `fedora44-measured-sata-04.json`  | `5e05df3feabf4934117996e6d54c0fe31b0b287a3e8890b1cab8f37bdfeacaf0` | **Passed.** Overwrite of the exact 10,737,418,240-byte SATA target, 257 distributed zero samples, server `SUCCEEDED`, recovery powered off, three stopped-disk samples equal the zero-block digest.                                                                                             |
+| `fedora44-measured-nvme-01.json`  | `2171c51da9beb72c4ea630077062fc22d6691a49c38cc9bcf0d9fb53938eb0bc` | **Passed.** Native NVMe user-data format with the approved basis2 controller-serial/NSID1 scope (QEMU 8.2.2, `lindm-lab-0`, 10,737,418,240 bytes, LBA shift 9), server `SUCCEEDED`, recovery powered off, three stopped-disk samples equal the zero-block digest.                               |
+| `fedora44-measured-notpm-01.json` | `65d25e3578b26a5199850ba0bd52bd8fb816a8cc8cf6f1a22504c49d7f8a435c` | **Passed refusal.** TPM-less guest: device reason `recovery_readiness_tpm_attestation_unavailable`, server readiness and real two-human approval creation `failed_precondition`/`device_action_recovery_attestation_unavailable`; no action, BLS entry, initramfs or one-shot.                  |
+
+The passing SATA record binds initramfs SHA-256
+`0060bd8afcf6ecf3e38604f6f06af59ae0f4a4fb89a8d171d09d881d420cac55`
+(30,023,469 bytes, offline target `recovery/<sha>.initrd`) to vendor kernel
+`4b37e4e542a62c580c751787848be6c99e6f908f6712c8c6da85516b8d541de2`
+(`recovery/<sha>.kernel`). Readiness reported GRUB 2.12, Secure Boot, btrfs
+`/boot` with 9,225,383,936 bytes free and the measured kernel digest; the
+unchanged vendor ESP had 82,089,984 bytes free. The start grant exists only after
+`AuthorizeRecoveryStart` verified the quote, event-log replay and post-`linux`
+GRUB sequence; the record proves that grant was issued, not a separate quote
+transcript. The `sata-01` name typo is retained, not renamed. Records `02` and `03`
+do not exist: `02` waited 60 minutes for a local slot and was stopped by its
+controller deadline before a VM started, and `03` was cancelled while queued.
+These are QEMU/swtpm results, not physical TPM, EK-certified attestation key or
+physical media qualification; the initramfs used the busybox init.
 
 For encryption-only qualification use `-scenario encryption` and a distinct
 `-record` path. This excludes desktop/network restrictions and destructive erase.

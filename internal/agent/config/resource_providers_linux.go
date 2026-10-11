@@ -16,7 +16,10 @@ import (
 func resourceProtectedPaths(base string, cfg *agentv1.AgentConfig, state, runtime, spool string) ([]string, error) {
 	paths := []string{base, state, runtime, spool}
 	if recovery := cfg.GetRecoveryBoot(); recovery != nil {
-		paths = append(paths, recovery.GetStateDirectory(), recovery.GetEspDirectory(), filepath.Dir(recovery.GetImageFile()), filepath.Dir(recovery.GetSignerCertificateFile()))
+		paths = append(paths, recovery.GetStateDirectory(), recovery.GetEspDirectory(), filepath.Dir(recovery.GetImageFile()))
+		if signer := recovery.GetSignerCertificateFile(); signer != "" {
+			paths = append(paths, filepath.Dir(signer))
+		}
 	}
 	if assistance := cfg.GetRemoteAssistance(); assistance.GetEnabled() {
 		paths = append(paths, sessionRuntimeDirectory(base, assistance))

@@ -38,7 +38,7 @@ func TestReadinessCancelledDoesNotInspectESP(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	facts, err := ObserveReadiness(ctx, "/not/an/esp")
-	if !errors.Is(err, context.Canceled) || facts != (Readiness{}) {
+	if !errors.Is(err, context.Canceled) || facts.ESPUUID != "" || facts.FreeBytes != 0 || facts.AllocationUnitBytes != 0 || facts.SecureBoot || facts.UKICapable || facts.MeasuredKernelSHA256 != nil {
 		t.Fatalf("cancelled observation touched native state: facts=%+v err=%v", facts, err)
 	}
 }

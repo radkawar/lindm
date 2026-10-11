@@ -173,6 +173,9 @@ func (s *Service) AuthorizeRecoveryStart(ctx context.Context, req *connect.Reque
 		if pair == nil || authorization == nil || !now.Before(action.ExpiresAt.Time) {
 			return nil, rpcreason.Error(connect.CodePermissionDenied, "recovery_authority_expired")
 		}
+		if err := s.verifyRecoveryAttestation(ctx, handoff, row.CheckpointReceiptEnvelope, challenge, req.Msg.GetAttestation()); err != nil {
+			return nil, err
+		}
 		if err := requireActionRestriction(ctx, q, action.DeviceID, handoff.GetIntent().GetSpec()); err != nil {
 			return nil, mapErr(err)
 		}

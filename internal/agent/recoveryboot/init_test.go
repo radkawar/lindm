@@ -26,7 +26,7 @@ func TestInitParamsRenderAndStrictParse(t *testing.T) {
 	for _, params := range []initParams{
 		{Mode: initModeUKI, ESPUUID: "ABCD-1234"},
 		{Mode: initModeUKI, ESPUUID: "abcd-12ef", StateUUID: "12345678-1234-1234-1234-123456789abc"},
-		{Mode: initModeMeasuredBLS, StateUUID: "12345678-1234-1234-1234-123456789abc"},
+		{Mode: initModeMeasuredGRUB, StateUUID: "12345678-1234-1234-1234-123456789abc"},
 	} {
 		parsed, err := parseInitParams([]byte(params.render()))
 		if err != nil || parsed != params {
@@ -51,8 +51,8 @@ func TestInitParamsRenderAndStrictParse(t *testing.T) {
 		"extra line":           initParamsHeader + "\nboot_mode uki\nesp_uuid ABCD-1234\n" + state + "extra 1\n",
 		"duplicate esp":        initParamsHeader + "\nboot_mode uki\nesp_uuid ABCD-1234\nesp_uuid ABCD-1234\n",
 		"blank line":           initParamsHeader + "\n\nboot_mode uki\nesp_uuid ABCD-1234\n",
-		"bls without state":    initParamsHeader + "\nboot_mode measured_bls\n",
-		"bls with esp":         initParamsHeader + "\nboot_mode measured_bls\nesp_uuid ABCD-1234\n" + state,
+		"grub without state":   initParamsHeader + "\nboot_mode measured_grub\n",
+		"grub with esp":        initParamsHeader + "\nboot_mode measured_grub\nesp_uuid ABCD-1234\n" + state,
 		"double space":         initParamsHeader + "\nboot_mode  uki\nesp_uuid ABCD-1234\n",
 		"oversized":            initParamsHeader + "\nboot_mode uki\nesp_uuid ABCD-1234\n" + strings.Repeat("#", maxInitParamsBytes),
 		"shell substitution":   initParamsHeader + "\nboot_mode uki\nesp_uuid $(poweroff)\n",

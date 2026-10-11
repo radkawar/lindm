@@ -1049,6 +1049,22 @@ a client-supplied image size. The maintained action fixture creates its own
 isolated signed repository and waits for fresh root-observed readiness before
 asking for either human's approval.
 
+For measured GRUB recovery, build the initramfs with
+`lindm-recovery-build -boot-mode measured-grub` (no stub, certificate, key, ESP
+UUID or serial console; `-state-uuid` required) and publish
+`-target recovery/<initrd-sha256>.initrd=/path/initrd` first, then
+`-target recovery/<initrd-sha256>.kernel=/path/vendor-vmlinuz`. The publisher
+refuses a `.kernel` descriptor whose `.initrd` is not already signed. The device
+`recoveryBoot` uses `bootMode: RECOVERY_BOOT_MODE_MEASURED_GRUB`, `espDirectory:
+"/boot"`, `kernelSha256` and an optional `serialConsole`; `lindm-agent
+action-sandbox -install` then exposes only `/dev/tpmrm0`. The platform
+registry's `Quirks.RecoveryGRUB` selects the BLS or grub.d `custom.cfg` flavor
+and the `grub-editenv` path, which the executor runs in a short-lived transient
+unit. In the lab, `lab vm device-actions -recovery-boot-mode measured-grub` with
+`-wipe-phase recovery-sata`, `recovery-nvme` or `recovery-attestation-refusal`
+runs the stock shim+GRUB fixture; the registry's `Lab.Guest.MeasuredBoot` holds
+the guest package recipe.
+
 Shared `VMHardwareOptions` selects x86_64/aarch64, KVM/TCG, UEFI or x86 legacy
 BIOS, TPM2 or TPM absence, virtio-blk/scsi, NVMe or SATA/AHCI, up to four extra
 1 GiB disks and a virtio GPU/private VNC display. Encrypted installer manifests

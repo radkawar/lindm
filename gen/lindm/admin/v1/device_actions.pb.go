@@ -1107,8 +1107,10 @@ type RecoveryReadiness struct {
 	ImageSize      uint64                           `protobuf:"varint,5,opt,name=image_size,json=imageSize,proto3" json:"image_size,omitempty"`
 	NeededBytes    uint64                           `protobuf:"varint,6,opt,name=needed_bytes,json=neededBytes,proto3" json:"needed_bytes,omitempty"`
 	AvailableBytes uint64                           `protobuf:"varint,7,opt,name=available_bytes,json=availableBytes,proto3" json:"available_bytes,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Method implied by the offline-signed artifact kind (.efi or .initrd).
+	BootMode      v1.RecoveryBootMode `protobuf:"varint,8,opt,name=boot_mode,json=bootMode,proto3,enum=lindm.agent.v1.RecoveryBootMode" json:"boot_mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RecoveryReadiness) Reset() {
@@ -1188,6 +1190,13 @@ func (x *RecoveryReadiness) GetAvailableBytes() uint64 {
 		return x.AvailableBytes
 	}
 	return 0
+}
+
+func (x *RecoveryReadiness) GetBootMode() v1.RecoveryBootMode {
+	if x != nil {
+		return x.BootMode
+	}
+	return v1.RecoveryBootMode(0)
 }
 
 var File_lindm_admin_v1_device_actions_proto protoreflect.FileDescriptor
@@ -1293,7 +1302,7 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"observedAt\x12\x14\n" +
 	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12-\n" +
 	"\x12unavailable_reason\x18\a \x01(\tR\x11unavailableReason\x12P\n" +
-	"\x12recovery_readiness\x18\b \x01(\v2!.lindm.admin.v1.RecoveryReadinessR\x11recoveryReadiness\"\x9f\x02\n" +
+	"\x12recovery_readiness\x18\b \x01(\v2!.lindm.admin.v1.RecoveryReadinessR\x11recoveryReadiness\"\xde\x02\n" +
 	"\x11RecoveryReadiness\x12N\n" +
 	"\vobservation\x18\x01 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationR\vobservation\x12\x14\n" +
 	"\x05ready\x18\x02 \x01(\bR\x05ready\x12\x16\n" +
@@ -1302,7 +1311,8 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\n" +
 	"image_size\x18\x05 \x01(\x04R\timageSize\x12!\n" +
 	"\fneeded_bytes\x18\x06 \x01(\x04R\vneededBytes\x12'\n" +
-	"\x0favailable_bytes\x18\a \x01(\x04R\x0eavailableBytesB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x0favailable_bytes\x18\a \x01(\x04R\x0eavailableBytes\x12=\n" +
+	"\tboot_mode\x18\b \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeR\bbootModeB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_device_actions_proto_rawDescOnce sync.Once
@@ -1341,6 +1351,7 @@ var file_lindm_admin_v1_device_actions_proto_goTypes = []any{
 	(*v1.StorageTarget)(nil),                 // 20: lindm.agent.v1.StorageTarget
 	(*v1.NVMeSanitizeScope)(nil),             // 21: lindm.agent.v1.NVMeSanitizeScope
 	(*v1.RecoveryReadinessObservation)(nil),  // 22: lindm.agent.v1.RecoveryReadinessObservation
+	(v1.RecoveryBootMode)(0),                 // 23: lindm.agent.v1.RecoveryBootMode
 }
 var file_lindm_admin_v1_device_actions_proto_depIdxs = []int32{
 	16, // 0: lindm.admin.v1.DeviceAction.spec:type_name -> lindm.agent.v1.DeviceActionSpec
@@ -1363,11 +1374,12 @@ var file_lindm_admin_v1_device_actions_proto_depIdxs = []int32{
 	17, // 17: lindm.admin.v1.ListDeviceStorageTargetsResponse.observed_at:type_name -> google.protobuf.Timestamp
 	15, // 18: lindm.admin.v1.ListDeviceStorageTargetsResponse.recovery_readiness:type_name -> lindm.admin.v1.RecoveryReadiness
 	22, // 19: lindm.admin.v1.RecoveryReadiness.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	23, // 20: lindm.admin.v1.RecoveryReadiness.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_device_actions_proto_init() }

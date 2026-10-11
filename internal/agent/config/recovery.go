@@ -14,7 +14,11 @@ func resolveRecoveryBoot(base string, cfg *agentv1.RecoveryBootConfig) error {
 		return nil
 	}
 	cfg.ImageFile = resolve(base, cfg.GetImageFile())
-	cfg.SignerCertificateFile = resolve(base, cfg.GetSignerCertificateFile())
+	// Measured GRUB has no UKI signer. An absent path must stay absent rather
+	// than resolve to the configuration directory and fail mode validation.
+	if cfg.GetSignerCertificateFile() != "" {
+		cfg.SignerCertificateFile = resolve(base, cfg.GetSignerCertificateFile())
+	}
 	esp, err := canonicalDirectory(resolve(base, cfg.GetEspDirectory()))
 	if err != nil {
 		return fmt.Errorf("recovery ESP directory: %w", err)

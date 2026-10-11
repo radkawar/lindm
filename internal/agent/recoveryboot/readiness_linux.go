@@ -11,22 +11,26 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 // Readiness contains public native facts only. It is not artifact admission or a
 // staging grant. ObserveReadiness never provisions custody or changes boot state.
 type Readiness struct {
-	ESPUUID             string
-	FreeBytes           uint64
-	AllocationUnitBytes uint64
-	SecureBoot          bool
-	UKICapable          bool
+	ESPUUID              string
+	FreeBytes            uint64
+	AllocationUnitBytes  uint64
+	SecureBoot           bool
+	UKICapable           bool
+	BootMode             agentv1.RecoveryBootMode
+	MeasuredKernelSHA256 []byte
 }
 
 // ObserveReadiness observes the configured, protected ESP as the root executor.
 // A failure may retain already observed facts but cannot imply availability.
 func ObserveReadiness(ctx context.Context, espPath string) (Readiness, error) {
-	var result Readiness
+	result := Readiness{BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}

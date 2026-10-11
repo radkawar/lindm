@@ -68,6 +68,7 @@ func recoveryBootConfig(cfg *agentv1.RecoveryBootConfig) *executor.RecoveryBootC
 		CertificatePath: cfg.GetSignerCertificateFile(), CertificateSHA256: cfg.GetSignerCertificateSha256(),
 		ESPPath: cfg.GetEspDirectory(), StateDirectory: cfg.GetStateDirectory(),
 		Custody: cfg.GetCustody(), ExpectedPCR11SHA256: cfg.GetExpectedPcr11Sha256(),
+		BootMode: cfg.GetBootMode(), KernelSHA256: cfg.GetKernelSha256(), SerialConsole: cfg.GetSerialConsole(),
 	}
 }
 

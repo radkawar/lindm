@@ -58,6 +58,9 @@ type Options struct {
 	ImageSHA256   []byte
 	Clock         *Clock
 	ProvisionedAt time.Time
+	// Attest quotes the measured boot with the handoff's TPM attestation key.
+	// Required exactly for measured-BLS handoffs; the server verifies it.
+	Attest func(ctx context.Context, qualifyingData []byte) (*recoveryv1.RecoveryAttestation, error)
 }
 
 type runner struct {
@@ -74,6 +77,7 @@ type runner struct {
 	record              *agentv1.RecoveryJournal
 	credential          *agentv1.DeviceActionRecoveryCredential
 	delegation          *agentv1.ExecutionDelegation
+	attest              func(context.Context, []byte) (*recoveryv1.RecoveryAttestation, error)
 }
 
 // Run performs at most one effect, synchronously, with a 24-hour operation bound.
@@ -143,10 +147,13 @@ func authenticateRunner(ctx context.Context, options Options, record *agentv1.Re
 	if err := validator.Validate(record); err != nil {
 		return nil, err
 	}
-	r := &runner{journal: options.Journal, key: options.Key, client: options.Client, provider: options.Provider, bootID: options.BootID, incarnation: uuid.NewString(), clock: options.Clock, boottime: bootTime, authority: authority, verifier: verifier, validator: validator, record: record}
+	r := &runner{journal: options.Journal, key: options.Key, client: options.Client, provider: options.Provider, bootID: options.BootID, incarnation: uuid.NewString(), clock: options.Clock, boottime: bootTime, authority: authority, verifier: verifier, validator: validator, record: record, attest: options.Attest}
 	handoff := record.GetHandoff()
 	if len(options.Key) != ed25519.PrivateKeySize || handoff.GetOriginalBootId() == r.bootID || !bytes.Equal(handoff.GetRecoveryImageSha256(), options.ImageSHA256) || !bytes.Equal(handoff.GetRecoveryPublicKey(), options.Key[ed25519.SeedSize:]) {
 		return nil, errors.New("recovery_boot_or_key_binding_rejected")
+	}
+	if (handoff.GetMeasuredBoot() != nil) != (options.Attest != nil) {
+		return nil, errors.New("recovery_attestation_binding_rejected")
 	}
 	if record.GetAcceptedRoot().GetDeploymentId() != options.Bootstrap.Root.GetDeploymentId() || record.GetCredentialRoot().GetDeploymentId() != options.Bootstrap.Root.GetDeploymentId() || record.GetCredentialRoot().GetVersion() < options.Bootstrap.Root.GetVersion() || record.GetAcceptedRoot().GetVersion() < record.GetCredentialRoot().GetVersion() {
 		return nil, errors.New("recovery_root_rollback")

@@ -15,8 +15,11 @@ import (
 	"unicode/utf16"
 
 	"lindm/internal/custody"
+	"lindm/internal/platform"
 
 	"golang.org/x/sys/unix"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 const loaderGUID = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"
@@ -41,6 +44,15 @@ type StageRequest struct {
 	TrustedTPMCustody func(context.Context) error
 	CapsulePath       string
 	CapsuleSHA256     []byte
+	// BootMode selects UKI (systemd-boot ESP) or measured GRUB (ESPPath is
+	// /boot). Measured GRUB requires off-target custody, the host's registry
+	// GRUB chain and an executor-supplied grub-editenv runner.
+	BootMode             agentv1.RecoveryBootMode
+	KernelSHA256         []byte
+	SerialConsole        string
+	AttestationKeyPublic []byte
+	GRUB                 platform.GRUBChain
+	GrubEnv              GrubEnvRunner
 }
 
 // Staged is an in-process handle, not an execution grant. Durable runtime state
@@ -50,6 +62,7 @@ type Staged struct {
 	entry    string
 	image    string
 	snapshot []byte
+	measured *measuredLayout
 }
 
 func VerifyImage(ctx context.Context, name string, digest []byte) error {
@@ -115,6 +128,13 @@ func espInsufficient(needed, available uint64, cause error) error {
 // Preflight authenticates the artifact, checks ESP capacity and qualifies
 // off-target custody without creating a key, writing files, or changing boot state.
 func Preflight(ctx context.Context, request StageRequest) error {
+	if request.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		_, err := preflightMeasured(ctx, request)
+		return err
+	}
+	if request.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI {
+		return errors.New("recoveryboot: unsupported_boot_mode")
+	}
 	return preflight(ctx, request, CheckESPCapacity)
 }
 
@@ -188,6 +208,11 @@ func Stage(ctx context.Context, request StageRequest) (*Staged, error) {
 	request.CredentialPublicKey = append([]byte(nil), request.CredentialPublicKey...)
 	request.CapsuleSHA256 = append([]byte(nil), request.CapsuleSHA256...)
 	request.TargetDevices = append([]string(nil), request.TargetDevices...)
+	request.KernelSHA256 = append([]byte(nil), request.KernelSHA256...)
+	request.AttestationKeyPublic = append([]byte(nil), request.AttestationKeyPublic...)
+	if request.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		return stageMeasured(ctx, request)
+	}
 	if err := Preflight(ctx, request); err != nil {
 		return nil, err
 	}
@@ -266,6 +291,9 @@ func copyESPImage(request StageRequest, image string, capacity func(string, int6
 // read-only authority/freshness gate using CLOCK_BOOTTIME; it runs on both sides
 // of the final image hash so suspend cannot extend a grant's lifetime.
 func (s *Staged) Arm(ctx context.Context, beforeArm func(context.Context) error) error {
+	if s.measured != nil {
+		return s.armMeasured(ctx, beforeArm)
+	}
 	if err := VerifyImage(ctx, s.image, s.request.ImageSHA256); err != nil {
 		return err
 	}
@@ -317,6 +345,9 @@ func (s *Staged) Arm(ctx context.Context, beforeArm func(context.Context) error)
 // Rollback clears only our still-pending entry. If firmware consumed it, callers
 // must retain UNKNOWN and must not infer that recovery ran or restart erasure.
 func (s *Staged) Rollback(ctx context.Context) error {
+	if s.measured != nil {
+		return s.rollbackMeasured(ctx)
+	}
 	entry, err := readEFString("LoaderEntryOneShot", loaderGUID)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err

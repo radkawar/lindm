@@ -180,8 +180,8 @@ func (r *initRun) run() error {
 	switch params.Mode {
 	case initModeUKI:
 		err = r.bootUKI(params)
-	case initModeMeasuredBLS:
-		err = r.bootMeasuredBLS()
+	case initModeMeasuredGRUB:
+		err = r.bootMeasuredGRUB()
 	default:
 		err = errInitParams
 	}
@@ -409,9 +409,9 @@ func (r *initRun) bootUKI(params initParams) error {
 	return nil
 }
 
-// bootMeasuredBLS needs no loader variable or ESP: recovery-run verifies the
+// bootMeasuredGRUB needs no loader variable or ESP: recovery-run verifies the
 // measured kernel options and event log, so only securityfs is added.
-func (r *initRun) bootMeasuredBLS() error {
+func (r *initRun) bootMeasuredGRUB() error {
 	return r.mount("securityfs", "/sys/kernel/security", "securityfs", 0, "")
 }
 

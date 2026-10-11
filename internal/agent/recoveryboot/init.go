@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"strings"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 // The recovery image's PID 1 is the static lindm-agent itself, archived as
@@ -16,12 +18,12 @@ const (
 	initParamsHeader = "lindm-recovery-init-v1"
 	// initModeUKI is a systemd-boot-selected signed UKI: the selected entry is
 	// read from LoaderEntrySelected and the booted image is copied for
-	// verification. initModeMeasuredBLS is a GRUB/BLS-measured kernel and
+	// verification. initModeMeasuredGRUB is a GRUB-measured vendor kernel and
 	// initramfs: the action identity is verified by recovery-run from the
 	// measured kernel options, so init reads no loader variable or ESP.
-	initModeUKI         = "uki"
-	initModeMeasuredBLS = "measured_bls"
-	maxInitParamsBytes  = 4096
+	initModeUKI          = "uki"
+	initModeMeasuredGRUB = "measured_grub"
+	maxInitParamsBytes   = 4096
 	// systemd-boot writes a NUL-terminated UTF-16LE entry ID. The previous
 	// init read at most 512 bytes after the 4-byte efivarfs attributes.
 	maxLoaderEntryBytes  = 512
@@ -38,16 +40,19 @@ var errInitParams = errors.New("recoveryboot: invalid_init_parameters")
 type initParams struct {
 	Mode string
 	// ESPUUID is the prequalified FAT volume serial for UKI mode and empty for
-	// measured BLS mode, which never mounts the ESP.
+	// measured GRUB mode, which never mounts the ESP.
 	ESPUUID string
 	// StateUUID selects off-target custody on an ext4 volume. Empty selects TPM
-	// custody, which measured BLS mode does not support.
+	// custody, which measured GRUB mode does not support.
 	StateUUID string
 }
 
 // initParamsFor is the only mapping from a build request to image init
 // behavior; writeInitramfs and size accounting both use it.
 func initParamsFor(request BuildRequest) initParams {
+	if request.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		return initParams{Mode: initModeMeasuredGRUB, StateUUID: request.StateUUID}
+	}
 	return initParams{Mode: initModeUKI, ESPUUID: request.ESPUUID, StateUUID: request.StateUUID}
 }
 
@@ -98,7 +103,7 @@ func parseInitParams(data []byte) (initParams, error) {
 			params.StateUUID = state
 			next++
 		}
-	case initModeMeasuredBLS:
+	case initModeMeasuredGRUB:
 		if params.StateUUID, ok = field(next, "state_uuid"); !ok || !uuidText(params.StateUUID) {
 			return initParams{}, errInitParams
 		}

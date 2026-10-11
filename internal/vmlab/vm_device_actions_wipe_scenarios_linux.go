@@ -52,7 +52,8 @@ func nativeWipeEffectPhases(ctx context.Context, manifest *labv1.ImageManifest, 
 		}
 	}
 	for _, bus := range []string{"nvme", "sata"} {
-		if options.WipePhase != "" && options.WipePhase != "recovery-"+bus {
+		// The TPM-less capability refusal uses the SATA original-device tuple.
+		if options.WipePhase != "" && options.WipePhase != "recovery-"+bus && (bus != "sata" || options.WipePhase != "recovery-attestation-refusal") {
 			continue
 		}
 		recovery, recoveryErr := nativeOriginalRecoveryScenario(ctx, options, packages, fixture, control, approver, delegation, bus)

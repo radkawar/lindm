@@ -3,6 +3,7 @@ package device
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -69,6 +70,10 @@ func (s *Service) requireRecoveryReadiness(ctx context.Context, q *devicedb.Quer
 	if err != nil {
 		return err
 	}
+	if readiness.GetReady() && readiness.GetBootMode() != recovery.GetBootMode() {
+		readiness.Ready = false
+		readiness.Reason = "device_action_recovery_boot_mode_mismatch"
+	}
 	if readiness.GetReady() {
 		return nil
 	}
@@ -86,43 +91,85 @@ func (s *Service) requireRecoveryReadiness(ctx context.Context, q *devicedb.Quer
 	return failure
 }
 
+// recoveryArtifact resolves the offline-signed release descriptor kind. A UKI is
+// `recovery/<sha>.efi`; a measured-BLS initramfs is `recovery/<sha>.initrd`
+// with its companion kernel descriptor. Absence is not an error: callers report
+// the artifact as unavailable without trusting any client-supplied size.
+type recoveryArtifact struct {
+	mode         agentv1.RecoveryBootMode
+	size         int64
+	kernelSHA256 []byte
+}
+
+func (s *Service) recoveryArtifact(ctx context.Context, digest []byte) (*recoveryArtifact, error) {
+	if s.recoveryArtifacts == nil {
+		return nil, nil
+	}
+	lookup := func(name string, err error) (*releaseupdate.ArtifactMetadata, error) {
+		if err != nil {
+			return nil, nil
+		}
+		artifact, lookupErr := s.recoveryArtifacts.Artifact(ctx, name)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if lookupErr != nil || artifact.Length <= 0 || len(artifact.SHA256) != sha256.Size {
+			return nil, nil
+		}
+		return artifact, nil
+	}
+	uki, err := lookup(releaseupdate.RecoveryTargetPath(digest))
+	if err != nil {
+		return nil, err
+	}
+	if uki != nil && bytes.Equal(uki.SHA256, digest) {
+		return &recoveryArtifact{mode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, size: uki.Length}, nil
+	}
+	initrd, err := lookup(releaseupdate.RecoveryInitrdTargetPath(digest))
+	if err != nil || initrd == nil || !bytes.Equal(initrd.SHA256, digest) {
+		return nil, err
+	}
+	kernel, err := lookup(releaseupdate.RecoveryKernelTargetPath(digest))
+	if err != nil || kernel == nil {
+		return nil, err
+	}
+	return &recoveryArtifact{mode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, size: initrd.Length, kernelSHA256: bytes.Clone(kernel.SHA256)}, nil
+}
+
 // recoveryReadiness uses inventory only for local facts. Even a matching local
 // configured image size is never accepted as release authority.
 func (s *Service) recoveryReadiness(ctx context.Context, host devicedb.GetHostObservationRow, details *inventoryv1.NativeDetails, digest []byte, now time.Time) (*adminv1.RecoveryReadiness, error) {
 	observation := details.GetRecoveryReadiness()
 	result := &adminv1.RecoveryReadiness{Observation: observation, ImageSha256: digest, AvailableBytes: observation.GetFreeBytes()}
-	result.Reason = recoveryObservationReason(host, observation, now)
 	artifactReason := "device_action_recovery_artifact_required"
+	var artifact *recoveryArtifact
 	if len(digest) != 0 {
 		artifactReason = "device_action_recovery_artifact_unavailable"
-		if s.recoveryArtifacts != nil {
-			name, err := releaseupdate.RecoveryTargetPath(digest)
-			if err == nil {
-				artifact, lookupErr := s.recoveryArtifacts.Artifact(ctx, name)
-				if ctx.Err() != nil {
-					return nil, ctx.Err()
-				}
-				if lookupErr == nil && artifact.Length > 0 && bytes.Equal(artifact.SHA256, digest) {
-					result.ImageSize = uint64(artifact.Length)
-					artifactReason = ""
-				}
-			}
+		var err error
+		if artifact, err = s.recoveryArtifact(ctx, digest); err != nil {
+			return nil, err
 		}
 	}
-	if result.GetImageSize() > 0 {
-		observationReason := result.Reason
-		evaluateRecoveryCapacity(result)
-		if observationReason != "" {
-			result.Ready = false
-			result.Reason = observationReason
+	if artifact == nil {
+		result.Reason = recoveryObservationReason(host, observation, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED, nil, now)
+		if result.Reason == "" {
+			result.Reason = artifactReason
 		}
-	} else if result.Reason == "" {
-		result.Reason = artifactReason
+		return result, nil
+	}
+	result.BootMode, result.ImageSize = artifact.mode, uint64(artifact.size)
+	observationReason := recoveryObservationReason(host, observation, artifact.mode, artifact.kernelSHA256, now)
+	evaluateRecoveryCapacity(result)
+	if observationReason != "" {
+		result.Ready = false
+		result.Reason = observationReason
 	}
 	return result, nil
 }
 
-func recoveryObservationReason(host devicedb.GetHostObservationRow, observation *agentv1.RecoveryReadinessObservation, now time.Time) string {
+// recoveryObservationReason evaluates the device facts for one method. An
+// unspecified mode only checks freshness and generic availability.
+func recoveryObservationReason(host devicedb.GetHostObservationRow, observation *agentv1.RecoveryReadinessObservation, mode agentv1.RecoveryBootMode, kernelSHA256 []byte, now time.Time) string {
 	if observation == nil || observation.GetObservedAt() == nil {
 		return "device_action_recovery_readiness_missing"
 	}
@@ -130,10 +177,31 @@ func recoveryObservationReason(host devicedb.GetHostObservationRow, observation 
 	if observed.CheckValid() != nil || !actionInventoryFresh(host, now) || observed.AsTime().After(now) || now.Sub(observed.AsTime()) > 5*time.Minute || host.BootIDStatus != int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS) || observation.GetBootId() == "" || observation.GetBootId() != host.BootIDValue {
 		return "device_action_recovery_readiness_stale"
 	}
-	if !observation.GetAvailable() || !observation.GetSecureBoot() || !observation.GetUkiCapable() || observation.GetEspUuid() == "" || observation.GetEspPath() == "" || observation.GetAllocationUnitBytes() == 0 {
+	if !observation.GetAvailable() && observation.GetReason() == "recovery_readiness_tpm_attestation_unavailable" {
+		return "device_action_recovery_attestation_unavailable"
+	}
+	if !observation.GetAvailable() || !observation.GetSecureBoot() || observation.GetEspPath() == "" || observation.GetAllocationUnitBytes() == 0 {
 		return "device_action_recovery_readiness_unsupported"
 	}
-	return ""
+	switch mode {
+	case agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UNSPECIFIED:
+		return ""
+	case agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI:
+		if observation.GetBootMode() != mode || !observation.GetUkiCapable() || observation.GetEspUuid() == "" {
+			return "device_action_recovery_boot_mode_mismatch"
+		}
+		return ""
+	case agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB:
+		if observation.GetBootMode() != mode {
+			return "device_action_recovery_boot_mode_mismatch"
+		}
+		if len(kernelSHA256) != sha256.Size || !bytes.Equal(observation.GetMeasuredKernelSha256(), kernelSHA256) {
+			return "device_action_recovery_kernel_mismatch"
+		}
+		return ""
+	default:
+		return "device_action_recovery_readiness_unsupported"
+	}
 }
 
 func evaluateRecoveryCapacity(result *adminv1.RecoveryReadiness) *adminv1.RecoveryReadiness {

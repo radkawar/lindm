@@ -1,5 +1,6 @@
-// lindm-recovery-build builds a signed recovery UKI from explicitly approved
-// release ingredients. It never stages boot files or touches firmware/TPM state.
+// lindm-recovery-build builds a signed recovery UKI, or a measured-BLS recovery
+// initramfs for the vendor kernel, from explicitly approved release
+// ingredients. It never stages boot files or touches firmware/TPM state.
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
 )
 
@@ -47,6 +49,7 @@ func run(ctx context.Context, args []string) error {
 	espUUID := flags.String("esp-uuid", "", "required qualified FAT ESP volume UUID (ABCD-1234)")
 	epoch := flags.Int64("source-date-epoch", 0, "reproducible initramfs/kernel image build timestamp")
 	serialConsole := flags.String("serial-console", "", "optional signed diagnostic UART: ttyS0,115200n8 or ttyAMA0,115200")
+	bootMode := flags.String("boot-mode", "uki", "uki (signed UKI) or measured-grub (unsigned initramfs for the vendor kernel; no stub, certificate or key)")
 	var files, executables fileFlags
 	flags.Var(&files, "file", "repeat DESTINATION=SHA256:PATH for approved library, module, CA or public trust material")
 	flags.Var(&executables, "executable", "repeat DESTINATION=SHA256:PATH for approved native recovery helper")
@@ -57,10 +60,29 @@ func run(ctx context.Context, args []string) error {
 		return errors.New("unexpected positional arguments")
 	}
 	request := recoveryboot.BuildRequest{OutputDirectory: *output, SigningKey: *key, StateUUID: *uuid, ESPUUID: *espUUID, SourceDateEpoch: *epoch, SerialConsole: *serialConsole}
-	for _, input := range []struct {
+	inputs := []struct {
 		value  string
 		target *recoveryboot.Ingredient
-	}{{*kernel, &request.Kernel}, {*stub, &request.Stub}, {*agent, &request.Agent}, {*config, &request.Config}, {*cert, &request.Certificate}} {
+	}{{*kernel, &request.Kernel}, {*agent, &request.Agent}, {*config, &request.Config}}
+	switch *bootMode {
+	case "uki":
+		request.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
+		inputs = append(inputs, struct {
+			value  string
+			target *recoveryboot.Ingredient
+		}{*stub, &request.Stub}, struct {
+			value  string
+			target *recoveryboot.Ingredient
+		}{*cert, &request.Certificate})
+	case "measured-grub":
+		request.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB
+		if *stub != "" || *cert != "" || *key != "" || *espUUID != "" || *serialConsole != "" {
+			return errors.New("measured-grub takes no stub, certificate, signing key, ESP UUID or serial console")
+		}
+	default:
+		return errors.New("boot-mode must be uki or measured-grub")
+	}
+	for _, input := range inputs {
 		parsed, err := ingredient(input.value)
 		if err != nil {
 			return err
@@ -88,7 +110,7 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(os.Stdout, "image %s\nsha256 %x\nsize %d\ncertificate_sha256 %x\npcr11_sha256 %x\nclosure %s\ncomponent_sizes %s\n", artifact.Path, artifact.SHA256, artifact.Size, artifact.CertificateSHA256, artifact.PCR11SHA256, artifact.ClosurePath, artifact.SizeEvidencePath)
+	_, err = fmt.Fprintf(os.Stdout, "image %s\nsha256 %x\nsize %d\ncertificate_sha256 %x\npcr11_sha256 %x\nkernel_sha256 %x\nclosure %s\ncomponent_sizes %s\n", artifact.Path, artifact.SHA256, artifact.Size, artifact.CertificateSHA256, artifact.PCR11SHA256, artifact.KernelSHA256, artifact.ClosurePath, artifact.SizeEvidencePath)
 	return err
 }
 

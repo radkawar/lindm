@@ -477,9 +477,14 @@ and the separately attributable external-operator method is required. Physical g
 exercise compromised/replayed handoff, wrong media, power loss, expired authority,
 recovery-image changes and return to a clean installed state.
 
-If original-device recovery reports **unsupported: ESP capacity**, retain the
-signed-image digest and the displayed allocation-rounded needed/available bytes;
-do not submit a wipe approval or change the ordinary boot image to make it fit.
+If original-device recovery reports **unsupported: ESP capacity** or
+`device_action_recovery_attestation_unavailable`, retain the image digest and the
+displayed needed/available bytes or readiness reason; do not submit a wipe
+approval, change the ordinary boot image to make it fit, or disable the TPM gate.
+On a stock shim+GRUB machine with a TPM, publish a measured-GRUB initramfs and its
+vendor-kernel descriptor instead (`lindm-recovery-build -boot-mode measured-grub`,
+then `lab release repository publish-artifact` for `recovery/<sha>.initrd` and
+`recovery/<sha>.kernel`, in that order).
 The external-recovery-media alternative requires an on-site operator and a
 separately qualified, trust-verified recovery image booted from external media.
 Provide protected off-target identity and journal storage, observe the exact

@@ -159,6 +159,8 @@ type LabGuest struct {
 	// console to observe it.
 	CryptsetupConsole bool
 	// Actions are the device-action prerequisites and OwnedBoot those of the
-	// owned systemd-boot recovery fixture.
-	Actions, OwnedBoot []string
+	// owned systemd-boot recovery fixture. MeasuredBoot are the recovery
+	// closure inputs of the measured-BLS fixture, which keeps the vendor
+	// shim+GRUB chain; empty means no maintained measured-recovery recipe.
+	Actions, OwnedBoot, MeasuredBoot []string
 }

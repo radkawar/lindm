@@ -383,6 +383,17 @@ image needs neither: its `/init` is the static lindm-agent and Authenticode is
 verified in-process. It still needs a `CONFIG_RD_GZIP=y` kernel, the unchanged
 distro-signed modules and host-side signing to build the image.
 
+Original-device recovery sanitize on stock RHEL would use
+`RECOVERY_BOOT_MODE_MEASURED_GRUB` with the BLS flavor (shim+GRUB `blscfg`,
+vendor-signed kernel, TPM-quoted lindm initramfs on `/boot`), as on
+[Fedora](fedora.md#encryption-and-recovery). It is unqualified here: readiness
+requires the current boot's event log to show GRUB measuring the kernel, command
+line and initramfs into PCRs 8/9, so a GRUB build without its `tpm` module or a
+machine without a TPM refuses. When `/boot` is XFS or ext4, `grub2-editenv`
+writes the grubenv file and its short-lived unit gets the `/boot` device
+read-only. The method covers unencrypted roots only; LUKS roots use live
+crypto-erase.
+
 ## Device actions
 
 Signed service execution is not desktop lock, quarantine, restart, shutdown,

@@ -9,6 +9,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 // SizeEvidence describes the exact built image, not an estimated release size or
@@ -84,30 +86,46 @@ func measureBuildSizes(request BuildRequest, initrd, image string, signedSize in
 	if err != nil {
 		return nil, err
 	}
-	evidence.Stub, err = componentSize(request.Stub, "stub", "efi_stub")
-	if err != nil {
-		return nil, err
+	measured := request.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB
+	if !measured {
+		evidence.Stub, err = componentSize(request.Stub, "stub", "efi_stub")
+		if err != nil {
+			return nil, err
+		}
 	}
 	info, err := os.Stat(initrd)
 	if err != nil {
 		return nil, err
 	}
 	evidence.InitramfsBytes = info.Size()
-	// This includes the stub, PE headers/sections, alignment and signature. The
-	// stub input is reported separately but must not be added a second time.
-	evidence.UKIOverheadBytes = signedSize - evidence.Kernel.Bytes - evidence.InitramfsBytes
-	if evidence.UKIOverheadBytes < 0 {
+	if !measured {
+		// This includes the stub, PE headers/sections, alignment and signature. The
+		// stub input is reported separately but must not be added a second time.
+		evidence.UKIOverheadBytes = signedSize - evidence.Kernel.Bytes - evidence.InitramfsBytes
+		if evidence.UKIOverheadBytes < 0 {
+			return nil, errors.New("recoveryboot: invalid_image_size_accounting")
+		}
+	} else if signedSize != evidence.InitramfsBytes {
+		// The measured artifact is the initramfs itself; the vendor kernel is
+		// a separate, unmodified boot file and not part of the staged bytes.
 		return nil, errors.New("recoveryboot: invalid_image_size_accounting")
 	}
-	for _, item := range []struct {
+	items := []struct {
 		input Ingredient
 		name  string
 		kind  string
 	}{
 		{request.Agent, "init", "agent"},
 		{request.Config, "etc/lindm/recovery.json", "configuration"},
-		{request.Certificate, "etc/lindm/image-signing.pem", "certificate"},
-	} {
+	}
+	if !measured {
+		items = append(items, struct {
+			input Ingredient
+			name  string
+			kind  string
+		}{request.Certificate, "etc/lindm/image-signing.pem", "certificate"})
+	}
+	for _, item := range items {
 		component, err := componentSize(item.input, item.name, item.kind)
 		if err != nil {
 			return nil, err
@@ -127,6 +145,9 @@ func measureBuildSizes(request BuildRequest, initrd, image string, signedSize in
 	sort.Slice(evidence.Ingredients, func(i, j int) bool { return evidence.Ingredients[i].Name < evidence.Ingredients[j].Name })
 	for _, component := range evidence.Ingredients {
 		evidence.InitramfsPayloadBytes += component.Bytes
+	}
+	if measured {
+		return evidence, nil
 	}
 	binary, err := pe.Open(image)
 	if err != nil {

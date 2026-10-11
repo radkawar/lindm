@@ -930,7 +930,7 @@ shell was permissive:
   created exclusively as root-owned mode 0400, so a symlink left on off-target
   media is replaced rather than followed. The selection authorizes nothing:
   `recovery-run` still authenticates the image, capsule and signer.
-- Measured BLS mode reads no loader variable and mounts no ESP. It only adds
+- Measured GRUB mode reads no loader variable and mounts no ESP. It only adds
   securityfs, and `recovery-run` verifies the measured kernel options.
 - DHCPv4 keeps the `udhcpc -n -q -t 5 -T 3` bounds: interfaces are tried in
   name order after loopback is raised. Each Ethernet interface gets at most
@@ -964,6 +964,103 @@ SHA-256 of the signed content. The content's SHA-256 Authenticode digest must
 equal the image hash, and `crypto/x509` must verify the RSA signature with the
 pinned certificate key. Like UEFI and `sbverify`, certificate validity time is
 not evaluated. Unlike `sbverify`, multiple signatures are refused.
+
+#### Measured GRUB recovery (`RECOVERY_BOOT_MODE_MEASURED_GRUB`)
+
+The UKI path requires a running systemd-boot and a deployment key in firmware
+`db`. A stock Fedora, RHEL, Ubuntu or Debian machine boots Microsoft-signed
+shim, vendor-signed GRUB and a vendor-signed kernel, and its ESP may be shared
+or small. The measured GRUB path boots the **unmodified vendor-signed kernel**
+through that stock chain with an unsigned, reproducible lindm recovery
+initramfs. Secure Boot cannot verify the initramfs, so its integrity is
+established by TPM measured boot and remote attestation before any start grant
+exists.
+
+Method selection is a readiness fact, never an operator override of a missing
+precondition:
+
+| Method                             | Preconditions                                                                                                             | Entry and one-shot                                                                               | Releases (platform registry `Quirks.RecoveryGRUB`)        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `RECOVERY_BOOT_MODE_UKI`           | Running systemd-boot, deployment certificate in firmware `db`, ESP capacity for the signed UKI                            | `loader/entries` on the ESP, `LoaderEntryOneShot`                                                | Owner-keyed fleets on any release whose cell qualifies it |
+| `RECOVERY_BOOT_MODE_MEASURED_GRUB` | Stock shim+GRUB with Secure Boot, TPM 2.0 resource manager, GRUB PCR 8/9 event log for the current boot, `/boot` capacity | BLS: `/boot/loader/entries/~lindm-recovery-<action>.conf`; GRUB `next_entry` via `grub2-editenv` | Fedora 43/44, RHEL/Rocky/AlmaLinux 9 and 10 (`blscfg`)    |
+| `RECOVERY_BOOT_MODE_MEASURED_GRUB` | Same                                                                                                                      | grub.d: `/boot/grub/custom.cfg` (sourced by `41_custom`); GRUB `next_entry` via `grub-editenv`   | Ubuntu 22.04/24.04/26.04, Debian 12/13                    |
+
+A release without a registry GRUB chain reports
+`recovery_readiness_measured_grub_unsupported`; a grub.d `grub.cfg` that does
+not source `custom.cfg` reports `recovery_readiness_grub_custom_unavailable`.
+Neither flavor regenerates `grub.cfg` or runs `update-grub`/`grub2-mkconfig`.
+
+Release authority is offline TUF: target `recovery/<initrd-sha256>.initrd` gives
+the initramfs length/digest and companion `recovery/<initrd-sha256>.kernel` gives
+the exact vendor kernel the initramfs modules were built for. Readiness reports
+the booted kernel digest, `/boot` capacity, Secure Boot, and whether the current
+boot's TCG event log shows GRUB measuring kernel, command line and initramfs
+into PCRs 8/9. Without a TPM resource manager and such an event log the device
+reports `recovery_readiness_tpm_attestation_unavailable`; the server refuses
+approval and action creation with `device_action_recovery_attestation_unavailable`.
+There is no unmeasured or unattested fallback. Custody is off-target only.
+
+Staging (root executor, after the existing durable BOOT consumption gate):
+
+1. Creates a restricted, `fixedTPM`/`fixedParent` ECDSA P-256 attestation key
+   (AK) under the owner-hierarchy storage key, retains only its TPM-wrapped blobs
+   on the off-target state volume and binds the public area, kernel path/digest
+   and exact kernel options into the device-signed handoff.
+2. Copies the approved initramfs to `/boot/lindm-recovery-<action>.initrd` and
+   writes the entry exclusively. BLS: `~lindm-recovery-<action>.conf`, whose `~`
+   prefix sorts last in GRUB's BLS ordering. grub.d: a single
+   `menuentry … --unrestricted --id lindm-recovery-<action>` in `custom.cfg`
+   that locates `/boot` by filesystem UUID and loads `($root)`-qualified kernel
+   and initramfs paths; a pre-existing `custom.cfg` refuses. The ordinary
+   default is unchanged in both flavors.
+3. Arms only GRUB's one-shot `next_entry`; GRUB clears it during that boot. An
+   unrelated pending one-shot refuses; rollback removes only its own entry,
+   initramfs and still-pending one-shot. The executor keeps `PrivateDevices`:
+   `grub-editenv` runs as a separate short-lived systemd unit with only the
+   `/boot` backing device allowed (writable only on btrfs, where GRUB keeps its
+   environment block in the bootloader area), no capabilities, and only the
+   GRUB directory writable.
+
+The kernel options are a closed grammar, `rdinit=/init panic=10 quiet`, an
+optional qualified serial console and `lindm.recovery.action=<action>`. The
+recovery reads the action from that measured command line. After authenticated
+time, acquisition and the BOOTED checkpoint, the recovery quotes PCRs 4, 7, 8 and
+9 (SHA-256 bank). The qualifying data is SHA-256 over a purpose domain, the
+server-signed BOOTED checkpoint receipt and the deterministic start challenge.
+That receipt is server-issued after the boot-bound checkpoint, so the quote
+cannot predate this boot's server interaction. The quote, signature and TCG event
+log travel inside the proof-covered `AuthorizeRecoveryStart` request.
+
+Before signing a start grant, the server requires all of:
+
+- The AK public area from the authenticated handoff, with exact restricted
+  signing attributes, and a valid ECDSA signature over a `TPM_GENERATED`
+  quote attestation carrying the expected qualifying data.
+- The quoted PCR selection is exactly SHA-256 {4,7,8,9}, and the digest equals
+  the server's own replay of the supplied event log.
+- PCR 7 records `SecureBoot=1`.
+- The final GRUB `linux` command is followed, in log order, by the PCR 9
+  measurement of the TUF-approved kernel digest, the PCR 8 `kernel_cmdline`
+  equal to that kernel path plus the handoff options, one `initrd` command for
+  the staged path and the PCR 9 measurement of the approved initramfs digest.
+  No later PCR 8/9 event is accepted.
+
+Any failure is `recovery_attestation_rejected` before approval consumption.
+
+| Threat                                                               | Control                                                                                                                            | Residual limit                                                                                    |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Offline or ordinary-root replacement of the `/boot` initramfs        | PCR 9 digest of the loaded initramfs must equal offline-signed release metadata in a fresh quote                                   | Detected at start authorization, after the reboot; erasure is refused, not prevented from booting |
+| Appended second initramfs, changed options or GRUB commands          | Exact post-`linux` event sequence, exact `kernel_cmdline`, no later PCR 8/9 events                                                 | Commands before the final `linux` are trusted only to signed GRUB in Secure Boot lockdown         |
+| Different or downgraded signed kernel                                | PCR 9 kernel digest must equal the TUF companion target; shim/GRUB still verify the signature                                      | Revocation of vulnerable signed bootloaders depends on firmware `dbx`/SBAT                        |
+| Forged or replayed quote                                             | Restricted TPM AK; qualifying data binds the server-signed BOOTED receipt and challenge; quote is inside the proof-covered request | A quote proves PCR state, not that the measured code is bug-free                                  |
+| Software AK registered by a compromised ordinary root before staging | Same trust as the existing one-action credential: ordinary root at staging is trusted                                              | No EK certificate chain; a root-compromised device can already steal the off-target credential    |
+| Secure Boot disabled or attacker-enrolled keys                       | PCR 7 `SecureBoot=1` required; replay must match quoted PCR 7                                                                      | A firmware/platform owner who enrolls keys can run a lying GRUB                                   |
+| No TPM or measured GRUB                                              | Readiness capability gate and server refusal                                                                                       | Such devices need the UKI path or external recovery media                                         |
+| TPM reset or bus interposition                                       | PCRs 8/9 cannot be reset without platform reset                                                                                    | Physical attacks on discrete TPM buses are out of scope                                           |
+
+The off-target journal, consumption fences, authenticated time, two-human start
+authority and native media identity checks are unchanged. Quote verification is
+start admission, not evidence that erasure happened.
 
 ### Secret custody, per-device delivery and managed local-admin passwords
 

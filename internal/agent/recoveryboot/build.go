@@ -1,5 +1,8 @@
-// Package recoveryboot builds signed, closed recovery UKIs and stages a single
-// systemd-boot handoff. It never authorizes an erase or treats staging as boot proof.
+// Package recoveryboot builds closed recovery images and stages a single
+// original-device handoff: a signed UKI through systemd-boot, or an unsigned
+// initramfs with the vendor kernel through GRUB whose integrity the server
+// verifies by TPM quote. It never authorizes an erase or treats staging as
+// boot proof.
 package recoveryboot
 
 import (
@@ -19,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/nativeexec"
 )
 
@@ -49,8 +53,12 @@ type BuildRequest struct {
 	ESPUUID         string
 	SourceDateEpoch int64
 	// SerialConsole selects an optional signed diagnostic UART, not arbitrary
-	// kernel arguments. The normal framebuffer console remains enabled.
+	// kernel arguments. The normal framebuffer console remains enabled. Measured
+	// GRUB images take the console from staging options instead.
 	SerialConsole string
+	// BootMode selects a signed UKI or a measured-GRUB initramfs. Measured
+	// builds take no stub, signing key or certificate and require StateUUID.
+	BootMode agentv1.RecoveryBootMode
 }
 
 type Artifact struct {
@@ -62,6 +70,8 @@ type Artifact struct {
 	PCR11SHA256       []byte
 	SizeEvidence      *SizeEvidence
 	SizeEvidencePath  string
+	// KernelSHA256 is the vendor kernel a measured initramfs was built for.
+	KernelSHA256 []byte
 }
 
 func digestFile(name string) (_ []byte, size int64, err error) {
@@ -106,6 +116,12 @@ func equalDigest(a, b []byte) bool {
 // Build runs only artifact tools against a newly owned private directory. It does
 // not invoke bootctl, mount, TPM tools or change the running machine's firmware.
 func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
+	if request.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		return buildMeasured(request)
+	}
+	if request.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI {
+		return nil, errors.New("recoveryboot: unsupported_boot_mode")
+	}
 	if request.SourceDateEpoch < 0 || !fatUUID(request.ESPUUID) || (request.StateUUID != "" && !uuidText(request.StateUUID)) {
 		return nil, errors.New("recoveryboot: invalid_build_identity")
 	}
@@ -120,25 +136,11 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 			return nil, err
 		}
 	}
-	if err := validateBuildClosure(request.Config, request.Files); err != nil {
+	if err := validateBuildClosure(request.Config, request.Files, request.BootMode); err != nil {
 		return nil, err
 	}
-	// The agent is PID 1: it must run before any loader or library exists.
-	binary, err := elf.Open(request.Agent.Source)
-	if err != nil {
-		return nil, fmt.Errorf("recoveryboot: executable ELF: %w", err)
-	}
-	dynamic := false
-	for _, segment := range binary.Progs {
-		if segment.Type == elf.PT_INTERP {
-			dynamic = true
-		}
-	}
-	if err := binary.Close(); err != nil {
+	if err := requireStaticAgent(request.Agent); err != nil {
 		return nil, err
-	}
-	if dynamic {
-		return nil, errors.New("recoveryboot: agent_must_be_static")
 	}
 	keyInfo, err := os.Lstat(request.SigningKey)
 	if err != nil {
@@ -209,6 +211,89 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 		return nil, err
 	}
 	return &Artifact{Path: image, SHA256: digest, Size: size, CertificateSHA256: request.Certificate.SHA256, ClosurePath: closurePath, PCR11SHA256: pcr11, SizeEvidence: sizes, SizeEvidencePath: sizePath}, nil
+}
+
+// requireStaticAgent rejects a dynamically linked agent: it is PID 1 and must
+// run before any loader or library exists.
+func requireStaticAgent(agent Ingredient) error {
+	binary, err := elf.Open(agent.Source)
+	if err != nil {
+		return fmt.Errorf("recoveryboot: executable ELF: %w", err)
+	}
+	dynamic := false
+	for _, segment := range binary.Progs {
+		if segment.Type == elf.PT_INTERP {
+			dynamic = true
+		}
+	}
+	if err := binary.Close(); err != nil {
+		return err
+	}
+	if dynamic {
+		return errors.New("recoveryboot: agent_must_be_static")
+	}
+	return nil
+}
+
+// buildMeasured emits the deterministic gzip initramfs itself as the release
+// artifact. The vendor kernel is pinned by digest for its modules and the
+// companion release descriptor; it is neither copied into nor signed with it.
+func buildMeasured(request BuildRequest) (_ *Artifact, err error) {
+	if request.SourceDateEpoch < 0 || request.ESPUUID != "" || !uuidText(request.StateUUID) || request.SerialConsole != "" || request.SigningKey != "" || request.Stub.Source != "" || request.Certificate.Source != "" {
+		return nil, errors.New("recoveryboot: invalid_build_identity")
+	}
+	inputs := []Ingredient{request.Kernel, request.Agent, request.Config}
+	inputs = append(inputs, request.Files...)
+	for _, in := range inputs {
+		if err := approved(in); err != nil {
+			return nil, err
+		}
+	}
+	if err := validateBuildClosure(request.Config, request.Files, request.BootMode); err != nil {
+		return nil, err
+	}
+	if err := requireStaticAgent(request.Agent); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(request.OutputDirectory, 0700); err != nil {
+		return nil, err
+	}
+	dir, err := filepath.Abs(request.OutputDirectory)
+	if err != nil {
+		return nil, err
+	}
+	for i := range inputs {
+		name := filepath.Join(dir, fmt.Sprintf("input-%04d", i))
+		if err := copyApproved(inputs[i], name, 0600); err != nil {
+			return nil, err
+		}
+		inputs[i].Source = name
+	}
+	request.Kernel, request.Agent, request.Config = inputs[0], inputs[1], inputs[2]
+	request.Files = inputs[3:]
+	initrd := filepath.Join(dir, "lindm-recovery.initrd")
+	closure, err := writeInitramfs(initrd, request)
+	if err != nil {
+		return nil, err
+	}
+	closurePath := filepath.Join(dir, "closure.txt")
+	if err := writeExclusive(closurePath, []byte(closure), 0600); err != nil {
+		return nil, err
+	}
+	digest, size, err := digestFile(initrd)
+	if err != nil {
+		return nil, err
+	}
+	sizes, err := measureBuildSizes(request, initrd, initrd, size)
+	if err != nil {
+		return nil, err
+	}
+	sizes.SignedImageSHA256 = hex.EncodeToString(digest)
+	sizePath := filepath.Join(dir, "component-sizes.json")
+	if err := writeSizeEvidence(sizePath, sizes); err != nil {
+		return nil, err
+	}
+	return &Artifact{Path: initrd, SHA256: digest, Size: size, ClosurePath: closurePath, SizeEvidence: sizes, SizeEvidencePath: sizePath, KernelSHA256: append([]byte(nil), request.Kernel.SHA256...)}, nil
 }
 
 func recoveryCommandLine(serialConsole string) (string, error) {
@@ -326,10 +411,15 @@ func uuidText(value string) bool {
 }
 
 func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
-	files := []Ingredient{request.Agent, request.Config, request.Certificate}
+	files := []Ingredient{request.Agent, request.Config}
 	files[0].Destination, files[0].Executable = "init", true
 	files[1].Destination, files[1].Executable = "etc/lindm/recovery.json", false
-	files[2].Destination, files[2].Executable = "etc/lindm/image-signing.pem", false
+	// A measured image is proven by TPM quote; it carries no UKI signer.
+	if request.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		certificate := request.Certificate
+		certificate.Destination, certificate.Executable = "etc/lindm/image-signing.pem", false
+		files = append(files, certificate)
+	}
 	files = append(files, request.Files...)
 	// The initramfs root may start with tmpfs's replaceable default mode.
 	// Archive "." explicitly so every protected configuration ancestor is
@@ -403,7 +493,7 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	sort.Slice(files, func(i, j int) bool { return files[i].Destination < files[j].Destination })
 	var closure strings.Builder
 	fmt.Fprintf(&closure, "lindm-recovery-closure-v2\nepoch %d\nstate_uuid %s\nkernel %x\nstub %x\ncertificate %x\ninit_parameters %x\n", request.SourceDateEpoch, request.StateUUID, request.Kernel.SHA256, request.Stub.SHA256, request.Certificate.SHA256, sha256.Sum256([]byte(params)))
-	fmt.Fprintf(&closure, "esp_uuid %s\n", request.ESPUUID)
+	fmt.Fprintf(&closure, "esp_uuid %s\nboot_mode %s\n", request.ESPUUID, request.BootMode)
 	for _, node := range recoveryDeviceNodes {
 		fmt.Fprintf(&closure, "device %s %o %d:%d\n", node.name, node.mode, node.major, node.minor)
 	}

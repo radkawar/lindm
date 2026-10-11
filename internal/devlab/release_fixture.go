@@ -45,6 +45,26 @@ func (f *AuthorityFixture) PublishRecoveryArtifact(ctx context.Context, source s
 	return f.releasePublisher.PublishArtifact(ctx, "recovery/"+hex.EncodeToString(digest)+".efi", source)
 }
 
+// PublishMeasuredRecoveryArtifact publishes a measured-BLS initramfs and then
+// its companion vendor-kernel descriptor under the same offline targets role.
+func (f *AuthorityFixture) PublishMeasuredRecoveryArtifact(ctx context.Context, initrd string, digest []byte, kernel string) error {
+	if f.releasePublisher == nil || len(digest) != 32 {
+		return errors.New("recovery artifact requires an isolated release authority and SHA-256")
+	}
+	initrdName, err := releaseupdate.RecoveryInitrdTargetPath(digest)
+	if err != nil {
+		return err
+	}
+	if err := f.releasePublisher.PublishArtifact(ctx, initrdName, initrd); err != nil {
+		return err
+	}
+	kernelName, err := releaseupdate.RecoveryKernelTargetPath(digest)
+	if err != nil {
+		return err
+	}
+	return f.releasePublisher.PublishArtifact(ctx, kernelName, kernel)
+}
+
 func (s *OwnerSession) ReleaseManagement() releasemanagementv1connect.ReleaseManagementServiceClient {
 	return releasemanagementv1connect.NewReleaseManagementServiceClient(s.client, s.origin, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"fmt"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
@@ -24,6 +25,9 @@ type RecoveryBootConfig struct {
 	StateDirectory      string
 	Custody             agentv1.RecoveryCustody
 	ExpectedPCR11SHA256 []byte
+	BootMode            agentv1.RecoveryBootMode
+	KernelSHA256        []byte
+	SerialConsole       string
 }
 
 func WithRecoveryBootConfig(config *RecoveryBootConfig) Option {
@@ -35,6 +39,7 @@ func WithRecoveryBootConfig(config *RecoveryBootConfig) Option {
 		copy.ImageSHA256 = bytes.Clone(config.ImageSHA256)
 		copy.CertificateSHA256 = bytes.Clone(config.CertificateSHA256)
 		copy.ExpectedPCR11SHA256 = bytes.Clone(config.ExpectedPCR11SHA256)
+		copy.KernelSHA256 = bytes.Clone(config.KernelSHA256)
 		s.recoveryConfig = &copy
 	}
 }
@@ -93,6 +98,7 @@ func (s *Service) generateRecoveryTPM() (recoveryTPMPending, error) {
 type recoveryBootPlatform interface {
 	Preflight(context.Context, recoveryboot.StageRequest) error
 	ProvisionKey(string) (ed25519.PrivateKey, error)
+	PrepareMeasured(context.Context, recoveryboot.StageRequest) (*agentv1.RecoveryMeasuredBoot, error)
 	Stage(context.Context, recoveryboot.StageRequest) (recoveryBootStaged, error)
 	Reboot(context.Context) error
 	WriteCapsule(string, string, []byte) (string, []byte, error)
@@ -105,6 +111,9 @@ func (nativeRecoveryBoot) Preflight(ctx context.Context, request recoveryboot.St
 }
 func (nativeRecoveryBoot) ProvisionKey(path string) (ed25519.PrivateKey, error) {
 	return recoveryboot.ProvisionKey(path)
+}
+func (nativeRecoveryBoot) PrepareMeasured(ctx context.Context, request recoveryboot.StageRequest) (*agentv1.RecoveryMeasuredBoot, error) {
+	return recoveryboot.PrepareMeasured(ctx, request)
 }
 func (nativeRecoveryBoot) Stage(ctx context.Context, request recoveryboot.StageRequest) (recoveryBootStaged, error) {
 	return recoveryboot.Stage(ctx, request)
@@ -123,15 +132,26 @@ func (s *Service) recoveryPlatform() recoveryBootPlatform {
 
 func (s *Service) recoveryStageRequest(intent *agentv1.DeviceActionIntent, boot string, devices []string) (recoveryboot.StageRequest, error) {
 	cfg, recovery := s.recoveryConfig, intent.GetSpec().GetSanitize().GetRecovery()
-	if cfg == nil || recovery == nil || recovery.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI || !bytes.Equal(cfg.ImageSHA256, recovery.GetImageSha256()) {
-		return recoveryboot.StageRequest{}, errResourceRejected
+	if cfg == nil || recovery == nil || recovery.GetBootMode() != cfg.BootMode || !bytes.Equal(cfg.ImageSHA256, recovery.GetImageSha256()) {
+		return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_boot_spec_mismatch", errResourceRejected)
 	}
-	if cfg.ImageSize < 0 || s.admit(&agentv1.RecoveryBootConfig{ImageFile: cfg.ImagePath, ImageSha256: cfg.ImageSHA256, ImageSize: uint64(cfg.ImageSize), SignerCertificateFile: cfg.CertificatePath, SignerCertificateSha256: cfg.CertificateSHA256, EspDirectory: cfg.ESPPath, StateDirectory: cfg.StateDirectory, Custody: cfg.Custody, ExpectedPcr11Sha256: cfg.ExpectedPCR11SHA256}) != nil {
-		return recoveryboot.StageRequest{}, errResourceRejected
+	if cfg.ImageSize < 0 || s.admit(&agentv1.RecoveryBootConfig{ImageFile: cfg.ImagePath, ImageSha256: cfg.ImageSHA256, ImageSize: uint64(cfg.ImageSize), SignerCertificateFile: cfg.CertificatePath, SignerCertificateSha256: cfg.CertificateSHA256, EspDirectory: cfg.ESPPath, StateDirectory: cfg.StateDirectory, Custody: cfg.Custody, ExpectedPcr11Sha256: cfg.ExpectedPCR11SHA256, BootMode: cfg.BootMode, KernelSha256: cfg.KernelSHA256, SerialConsole: cfg.SerialConsole}) != nil {
+		return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_boot_config_invalid", errResourceRejected)
 	}
 	media, err := digestMessage(intent.GetSpec().GetSanitize().GetTarget())
 	if err != nil || !bytes.Equal(media, recovery.GetMediaSha256()) {
-		return recoveryboot.StageRequest{}, errResourceRejected
+		return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_media_mismatch", errResourceRejected)
 	}
-	return recoveryboot.StageRequest{ImagePath: cfg.ImagePath, ImageSHA256: bytes.Clone(cfg.ImageSHA256), ImageSize: cfg.ImageSize, CertificatePath: cfg.CertificatePath, CertificateSHA256: bytes.Clone(cfg.CertificateSHA256), ESPPath: cfg.ESPPath, StateDirectory: cfg.StateDirectory, ActionID: intent.GetActionId(), SourceBootID: boot, TargetDevices: devices}, nil
+	request := recoveryboot.StageRequest{ImagePath: cfg.ImagePath, ImageSHA256: bytes.Clone(cfg.ImageSHA256), ImageSize: cfg.ImageSize, CertificatePath: cfg.CertificatePath, CertificateSHA256: bytes.Clone(cfg.CertificateSHA256), ESPPath: cfg.ESPPath, StateDirectory: cfg.StateDirectory, ActionID: intent.GetActionId(), SourceBootID: boot, TargetDevices: devices, BootMode: cfg.BootMode, KernelSHA256: bytes.Clone(cfg.KernelSHA256), SerialConsole: cfg.SerialConsole}
+	if cfg.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
+		chain := s.recoveryGRUB
+		if chain == nil {
+			chain = recoveryboot.HostGRUBChain
+		}
+		if request.GRUB, err = chain(); err != nil {
+			return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_grub_chain_unavailable: %w", errResourceRejected, err)
+		}
+		request.GrubEnv = s.grubEnvironment(cfg.ESPPath, request.GRUB.ConfigDirectory)
+	}
+	return request, nil
 }

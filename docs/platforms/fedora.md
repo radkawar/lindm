@@ -240,9 +240,11 @@ never counts as rejection
 ([`vm_device_actions_linux.go:133-139`](../../internal/vmlab/vm_device_actions_linux.go#L133-L139),
 [systemd v259.5 source](https://github.com/systemd/systemd/blob/b3d8fc43e9cb531d958c17ef2cd93b374bc14e8a/src/cryptsetup/cryptsetup.c)).
 
-The stock Fedora 44 cloud ESP is an explicit **unsupported: ESP capacity** cell
-for original-device signed recovery. Available space was 14,888,960 bytes; the
-unaltered vendor kernel alone was 18,479,464 bytes. Evidence under
+The earlier **unsupported: ESP capacity** cell for the owned systemd-boot UKI
+path was a property of that lab fixture, not of the stock ESP. The 100 MiB
+vendor ESP has 82,089,984 bytes free; the UKI fixture first installs its own
+signed ordinary UKI and systemd-boot there, leaving 14,888,960 bytes, less than
+the 18,479,464-byte vendor kernel. Those records remain historical refusals under
 `$HOME/.cache/lindm-recovery-time-20261010/`:
 
 - `fedora-vendor-kernel-capacity.json`, SHA-256
@@ -252,9 +254,54 @@ unaltered vendor kernel alone was 18,479,464 bytes. Evidence under
 - `fedora44-recovery-nvme-02.json`, SHA-256
   `39ee001297527b4d1e762b5a93160956e2b75f6c0ac203dc38f29663f16420cb`.
 
-Both recovery records refuse before sanitize approval/action. Do not resize the
-ESP, delete vendor boot files or substitute a kernel to relabel this stock cell
-as passed. Separately qualified external recovery is a different capability.
+A stock Fedora machine runs Microsoft-signed shim, Fedora-signed GRUB 2.12
+(`bli` publishes `LoaderInfo=GRUB 2.12`) and has no deployment key in firmware
+`db`, so it uses `RECOVERY_BOOT_MODE_MEASURED_GRUB` with the BLS flavor
+([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
+Fedora specifics:
+
+- `/boot` is the `boot` subvolume of the btrfs root. BLS entry paths are
+  GRUB-relative (`/boot/vmlinuz-…`) and staging reuses the prefix GRUB measured.
+- GRUB keeps its environment in the btrfs bootloader `env_block`
+  (`env_block=512+1`); `grub2-editenv` writes it through the raw `/boot` block
+  device. The executor keeps `PrivateDevices` and exposes only `/dev/tpmrm0`;
+  `grub2-editenv` runs in a separate short-lived unit allowed that exact device.
+- Fedora's `blscfg` sorts entries by RPM version comparison of the file name,
+  so a `lindm-…` name would become the default when `saved_entry` is unset; the
+  `~lindm-recovery-<action>` name sorts last. Observed: the vendor entry stayed
+  default, `grub2-editenv - set next_entry=…` booted the entry once and GRUB
+  cleared it.
+- GRUB measures `grub_cmd:` and `kernel_cmdline:` text into PCR 8 and every
+  file it loads (configs, BLS entries, kernel, initramfs) into PCR 9. The kernel
+  EFI stub logs no separate initrd event. `/proc/cmdline` carries GRUB's
+  `BOOT_IMAGE=` prefix, which is not part of the measured options.
+- Fedora kernels build `tpm_tis`/`tpm_crb`, securityfs and IMA in; IMA's PCR 10
+  is not quoted.
+
+Without a TPM the device reports `recovery_readiness_tpm_attestation_unavailable`
+and approval is refused. Native records are under
+`$HOME/.cache/lindm-fedoragaps-20261011/` (Fedora Cloud 44-1.7 x86_64, KVM, OVMF
+`2024.02-2ubuntu0.10` with Microsoft keys, Secure Boot enforced, swtpm 0.7.3):
+
+- `fedora44-measured-sata-04.json`, SHA-256
+  `5e05df3feabf4934117996e6d54c0fe31b0b287a3e8890b1cab8f37bdfeacaf0`: passed.
+  Two humans approved; the vendor kernel booted the 30,023,469-byte lindm
+  initramfs once from `/boot`; the server verified the quote before the grant;
+  the whole 10 GiB SATA target was overwritten and three independent stopped-disk
+  samples read zero. The vendor ESP was not changed.
+- `fedora44-measured-nvme-01.json`, SHA-256
+  `2171c51da9beb72c4ea630077062fc22d6691a49c38cc9bcf0d9fb53938eb0bc`: passed.
+  The same path ran a native NVMe user-data format under the approved
+  controller-serial/NSID scope with a 35,104,440-byte initramfs; the server
+  verified the scoped result and stopped-disk samples read zero.
+- `fedora44-measured-notpm-01.json`, SHA-256
+  `65d25e3578b26a5199850ba0bd52bd8fb816a8cc8cf6f1a22504c49d7f8a435c`: passed
+  refusal. A TPM-less guest reported the capability gate, two-human approval
+  creation failed with `device_action_recovery_attestation_unavailable`, and no
+  action, BLS entry, initramfs or one-shot existed.
+
+Do not resize the ESP, delete vendor boot files or substitute a kernel. A TPM-less
+machine needs the UKI path with an enrolled deployment key or external recovery.
 
 ## Resource providers
 
@@ -369,11 +416,25 @@ or sanitize success. Follow the per-action records in [verification](../verifica
 Fedora 44 ships nftables 1.1.6, whose JSON prints a `typeof` set's key as the
 typeof expression rather than `integer`; the quarantine read-back accepts both
 forms, so the real quarantine action no longer ends `OUTCOME_UNKNOWN` and rolls
-itself back on Fedora. The quarantine/release cycle is native-exercised only in the
-firewall coexistence lane above; the device-action lane's quarantine record is
-Ubuntu's. Quarantine admits loopback only from its `127.0.0.1` endpoint, so the
-systemd-resolved stub's `127.0.0.53` replies are dropped while quarantined (the
-failed name lookup was observed on Ubuntu; on Fedora it follows from the same rules).
+itself back on Fedora. Quarantine admits loopback only from its `127.0.0.1`
+endpoint, so the systemd-resolved stub's `127.0.0.53` replies are dropped while
+quarantined.
+
+The lock/release/account-disable/quarantine lane **passed** on the Fedora 44
+encrypted GNOME golden (x86_64, KVM, OVMF Secure Boot, swtpm, virtio-scsi)
+without product changes:
+`$HOME/.cache/lindm-fedoragaps-20261011/fedora44-lock-quarantine-01.json`,
+SHA-256 `50985538321bb481f9baa94dbc9864564a204116ddf3e7494a89d350443428da`.
+A real GDM `gdm-autologin` Wayland session went from unlocked to logind
+`LockedHint` and GNOME ScreenSaver active, and stayed locked after the signed
+release. The password-enabled account was locked and expired, then restored
+byte-for-byte; a second cycle preserved an intervening administrator expiry
+edit. Two quarantine/release cycles blocked the namespace peer and routed host
+endpoint while keeping the management endpoint and explicit DNS; kernel-timer
+expiry restored traffic with agent and executor stopped. An offline start was
+refused with `device_action_offline`. Not covered: physical displays, X11, KDE,
+multi-user seats and aarch64.
+
 The historical Fedora credential-helper SELinux denial used D-Bus forwarding of
 an SSH-session FIFO; the corrected lab uses a no-swap/no-core scope without
 relaxing policy. Failed record
@@ -584,5 +645,6 @@ a bundle)
 and production signing custody remain separate obligations. Fedora 43
 inspection/signed-service lifecycle, Fedora 44 self-update and Fedora 44 encryption
 cover different cells. DNF5 package
-resource work is not qualified by any of them; the stock small-ESP refusal is an
-explicit capability boundary rather than missing permission to bypass a gate.
+resource work is not qualified by any of them. Measured-BLS recovery is qualified
+only with swtpm and the cloud image's btrfs `/boot`; physical TPMs, ext4/XFS
+`/boot`, XBOOTLDR and Workstation installs are unqualified.

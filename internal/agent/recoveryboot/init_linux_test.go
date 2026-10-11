@@ -228,7 +228,7 @@ func expectedInitOps(params initParams) []string {
 	switch params.Mode {
 	case initModeUKI:
 		ops = append(ops, `mount /dev/sda1 /run/recovery-esp vfat 0xf ""`, "umount /run/recovery-esp")
-	case initModeMeasuredBLS:
+	case initModeMeasuredGRUB:
 		ops = append(ops, `mount securityfs /sys/kernel/security securityfs 0x0 ""`)
 	}
 	return append(ops,
@@ -263,7 +263,7 @@ func TestRecoveryInitSequenceAndHandoff(t *testing.T) {
 	for name, params := range map[string]initParams{
 		"uki off-target": {Mode: initModeUKI, ESPUUID: testESPUUID, StateUUID: testStateUUID},
 		"uki tpm":        {Mode: initModeUKI, ESPUUID: strings.ToLower(testESPUUID)},
-		"measured bls":   {Mode: initModeMeasuredBLS, StateUUID: testStateUUID},
+		"measured grub":  {Mode: initModeMeasuredGRUB, StateUUID: testStateUUID},
 	} {
 		t.Run(name, func(t *testing.T) {
 			run, fake := newInitFixture(t, params)
