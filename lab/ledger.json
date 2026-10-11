@@ -1359,6 +1359,36 @@
       "verified": true,
       "scope": "lock, release, account disable and quarantine; GDM Wayland; Secure Boot on",
       "reference": "#rhel-encrypted-device-actions-and-self-update"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "assistance",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-assistance-05/assistance.json",
+      "sha256": "8f8005297ae745a0ad1c2f05dbf74433d3f1a1fcef95ada1495b975d153e4099",
+      "recorded": "2026-10-11T10:34:00.754056963Z",
+      "revision": "252d016384534347c1eaead24ab4c40c4d009961",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME Wayland assistance; all five scenarios; colocated dgx20; Secure Boot on",
+      "reference": "#native-aarch64-spark-qualification-and-held-demo"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "assistance",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-assistance-split-03/assistance.json",
+      "sha256": "4177c9d6d2b0a02c9cef0669079a5c1afd3c31f2d5277de168215db8b75e916e",
+      "recorded": "2026-10-11T12:03:54.727409404Z",
+      "revision": "252d016384534347c1eaead24ab4c40c4d009961-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME Wayland assistance; all five scenarios; split controller/dgx20; Secure Boot on",
+      "reference": "#routed-split-topology-assistance"
     }
   ]
 }
