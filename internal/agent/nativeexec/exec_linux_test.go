@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,27 @@ func TestRunRejectsUntrustedExecutable(t *testing.T) {
 		_, err := Run(t.Context(), Command{Path: path, Timeout: time.Second, StdoutLimit: 1, StderrLimit: 1})
 		if !errors.Is(err, ErrUntrustedExecutable) {
 			t.Errorf("%s: %v, want untrusted executable", path, err)
+		}
+	}
+}
+
+// systemd InaccessiblePaths= masks a tool with a root-owned mode-0000 regular
+// file; callers must see execve's permission failure, not a custody failure,
+// while non-regular leaves stay untrusted.
+func TestLeafErrorClassifiesMaskedTool(t *testing.T) {
+	for _, c := range []struct {
+		mode                  uint32
+		permission, untrusted bool
+	}{
+		{mode: unix.S_IFREG | 0o755},
+		{mode: unix.S_IFREG, permission: true}, // mode 0000
+		{mode: unix.S_IFREG | 0o644, permission: true},
+		{mode: unix.S_IFCHR, untrusted: true},
+		{mode: unix.S_IFDIR | 0o755, untrusted: true},
+	} {
+		err := leafError(c.mode, "/usr/bin/tool")
+		if errors.Is(err, fs.ErrPermission) != c.permission || errors.Is(err, ErrUntrustedExecutable) != c.untrusted || (err == nil) != (!c.permission && !c.untrusted) {
+			t.Errorf("mode %o: %v", c.mode, err)
 		}
 	}
 }

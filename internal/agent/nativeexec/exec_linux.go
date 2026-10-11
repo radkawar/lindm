@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -144,7 +145,9 @@ func (e *ExitError) ExitCode() int { return e.Code }
 
 // Executable resolves path and requires the target to live under /usr/, to be
 // reached through root-owned directories that no group or other user can write,
-// and itself to be a root-owned, non-writable, executable regular file.
+// and itself to be a root-owned, non-writable, executable regular file. A
+// protected regular file without execute bits is reported as fs.ErrPermission,
+// as execve's EACCES would be (systemd InaccessiblePaths= masks a tool so).
 func Executable(path string) (string, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return "", fmt.Errorf("%w: %s", ErrUntrustedExecutable, path)
@@ -163,10 +166,23 @@ func Executable(path string) (string, error) {
 	if err := file.Close(); err != nil {
 		return "", err
 	}
-	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0111 == 0 {
-		return "", fmt.Errorf("%w: %s", ErrUntrustedExecutable, path)
+	if err := leafError(stat.Mode, path); err != nil {
+		return "", err
 	}
 	return resolved, nil
+}
+
+// leafError classifies a custody-checked leaf: anything but a regular file is
+// untrusted, and a regular file without execute bits is an access failure.
+func leafError(mode uint32, path string) error {
+	switch {
+	case mode&unix.S_IFMT != unix.S_IFREG:
+		return fmt.Errorf("%w: %s", ErrUntrustedExecutable, path)
+	case mode&0o111 == 0:
+		return fmt.Errorf("%w: %s", fs.ErrPermission, path)
+	default:
+		return nil
+	}
 }
 
 // sessionBusAddress accepts only a user's runtime-directory session bus, in

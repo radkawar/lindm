@@ -493,8 +493,11 @@ One policy applies to every call:
 
 - argv only, never a shell; the executable path is absolute and clean, resolves
   under `/usr/`, is reached through root-owned directories without group or other
-  write and is itself a root-owned, non-writable executable regular file. The
-  verified target runs with the requested name as `argv[0]`;
+  write and is itself a root-owned, non-writable executable regular file. A
+  protected regular file without execute bits (for example a systemd
+  `InaccessiblePaths=` mask) fails as permission denied, like `execve`'s `EACCES`,
+  not as untrusted custody. The verified target runs with the requested name as
+  `argv[0]`;
 - a clean environment: `PATH=/usr/sbin:/usr/bin`, `LANG=C`, `LC_ALL=C` plus only
   allowlisted keys (`HOME`, `TZ`, `DEBIAN_FRONTEND`, `APT_CONFIG`,
   `DPKG_FRONTEND_LOCKED`, `NEEDRESTART_MODE`, `SYSTEMD_*` display/unit-path
