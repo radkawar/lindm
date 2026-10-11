@@ -1046,14 +1046,18 @@ Before signing a start grant, the server requires all of:
   measurement of the TUF-approved kernel digest, the PCR 8 `kernel_cmdline`
   equal to that kernel path plus the handoff options, one `initrd` command for
   the staged path and the PCR 9 measurement of the approved initramfs digest.
-  No later PCR 8/9 event is accepted.
+  The only later PCR 8/9 events accepted are the vendor kernel's own EFI stub
+  `EV_EVENT_TAG` events in PCR 9, in the stub's order and at most once each:
+  `LOADED_IMAGE::LoadOptions` (the options GRUB already measured), then
+  `Linux initrd`, whose digest must equal the approved initramfs digest.
+  Ubuntu's arm64 6.8 kernel emits both; Fedora's x86_64 kernel emits neither.
 
 Any failure is `recovery_attestation_rejected` before approval consumption.
 
 | Threat                                                               | Control                                                                                                                            | Residual limit                                                                                    |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Offline or ordinary-root replacement of the `/boot` initramfs        | PCR 9 digest of the loaded initramfs must equal offline-signed release metadata in a fresh quote                                   | Detected at start authorization, after the reboot; erasure is refused, not prevented from booting |
-| Appended second initramfs, changed options or GRUB commands          | Exact post-`linux` event sequence, exact `kernel_cmdline`, no later PCR 8/9 events                                                 | Commands before the final `linux` are trusted only to signed GRUB in Secure Boot lockdown         |
+| Appended second initramfs, changed options or GRUB commands          | Exact post-`linux` event sequence, exact `kernel_cmdline`, only the kernel stub's tagged load-options/initrd events afterwards     | Commands before the final `linux` are trusted only to signed GRUB in Secure Boot lockdown         |
 | Different or downgraded signed kernel                                | PCR 9 kernel digest must equal the TUF companion target; shim/GRUB still verify the signature                                      | Revocation of vulnerable signed bootloaders depends on firmware `dbx`/SBAT                        |
 | Forged or replayed quote                                             | Restricted TPM AK; qualifying data binds the server-signed BOOTED receipt and challenge; quote is inside the proof-covered request | A quote proves PCR state, not that the measured code is bug-free                                  |
 | Software AK registered by a compromised ordinary root before staging | Same trust as the existing one-action credential: ordinary root at staging is trusted                                              | No EK certificate chain; a root-compromised device can already steal the off-target credential    |

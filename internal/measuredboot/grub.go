@@ -9,15 +9,23 @@ import (
 )
 
 const (
+	evEventTag                = 0x6
 	evIPL                     = 0xd
 	evEFIVariableDriverConfig = 0x80000001
-	grubCommandPCR            = 8
-	grubFilePCR               = 9
-	secureBootPCR             = 7
-	grubCommandPrefix         = "grub_cmd: "
-	grubLinuxCommand          = "linux "
-	grubInitrdCommand         = "initrd "
-	grubKernelCmdlinePrefix   = "kernel_cmdline: "
+	// The Linux EFI stub (drivers/firmware/efi/libstub) measures its load
+	// options and the initrd it loads as EV_EVENT_TAG events in PCR 9, after
+	// GRUB hands over. IDs and descriptions are the stub's fixed constants.
+	stubLoadOptionsTag      = 0x8F3B22ED
+	stubLoadOptionsText     = "LOADED_IMAGE::LoadOptions\x00"
+	stubInitrdTag           = 0x8F3B22EC
+	stubInitrdText          = "Linux initrd\x00"
+	grubCommandPCR          = 8
+	grubFilePCR             = 9
+	secureBootPCR           = 7
+	grubCommandPrefix       = "grub_cmd: "
+	grubLinuxCommand        = "linux "
+	grubInitrdCommand       = "initrd "
+	grubKernelCmdlinePrefix = "kernel_cmdline: "
 	// secureBootName is "SecureBoot" in UTF-16LE.
 	secureBootName = "S\x00e\x00c\x00u\x00r\x00e\x00B\x00o\x00o\x00t\x00"
 )
@@ -61,8 +69,10 @@ type Loaded struct {
 // PCR 9 kernel file, the PCR 8 kernel_cmdline with identical options, one PCR 8
 // "grub_cmd: initrd" with a single path and the PCR 9 initramfs file, all on the
 // same GRUB device, or all without one. PCR 8 text must hash to its SHA-256
-// digest, so the matched
-// strings are bound to the replayed PCR value.
+// digest, so the matched strings are bound to the replayed PCR value. The only
+// later PCR 8/9 events accepted are the measured kernel's own EFI stub events:
+// at most one load-options event, then at most one initrd event whose digest is
+// the GRUB-measured initramfs digest.
 func FinalGRUBBoot(events []Event) (*Loaded, error) {
 	last := -1
 	for i, event := range events {
@@ -86,6 +96,7 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 		return nil, errGRUBLinuxMalformed
 	}
 	var sequence [4]Event
+	var trailing []Event
 	count := 0
 	for _, event := range events[last+1:] {
 		if event.PCR != grubCommandPCR && event.PCR != grubFilePCR {
@@ -93,6 +104,8 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 		}
 		if count < len(sequence) {
 			sequence[count] = event
+		} else {
+			trailing = append(trailing, event)
 		}
 		count++
 	}
@@ -146,8 +159,8 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 	if err != nil {
 		return nil, err
 	}
-	if count > len(sequence) {
-		return nil, errGRUBTrailingMeasurement
+	if err := checkStubEvents(trailing, initrdSHA256); err != nil {
+		return nil, err
 	}
 	return &Loaded{
 		KernelPath:    kernelPath,
@@ -156,6 +169,38 @@ func FinalGRUBBoot(events []Event) (*Loaded, error) {
 		InitrdPath:    initrdPath,
 		InitrdSHA256:  bytes.Clone(initrdSHA256),
 	}, nil
+}
+
+// checkStubEvents admits only the Linux EFI stub's tagged PCR 9 events, in the
+// stub's order and each at most once. Its initrd event must measure exactly the
+// initramfs GRUB measured; its load options are the same options GRUB already
+// measured in kernel_cmdline and are not separately trusted.
+func checkStubEvents(trailing []Event, initrdSHA256 []byte) error {
+	next := 0
+	for _, event := range trailing {
+		if event.PCR != grubFilePCR || event.Type != evEventTag || len(event.SHA256) != sha256.Size {
+			return errGRUBTrailingMeasurement
+		}
+		id, ok := taggedEvent(event.Data)
+		switch {
+		case ok && id == stubLoadOptionsTag && next == 0 && string(event.Data[8:]) == stubLoadOptionsText:
+			next = 1
+		case ok && id == stubInitrdTag && next < 2 && string(event.Data[8:]) == stubInitrdText && bytes.Equal(event.SHA256, initrdSHA256):
+			next = 2
+		default:
+			return errGRUBTrailingMeasurement
+		}
+	}
+	return nil
+}
+
+// taggedEvent returns the ID of a TCG_PCClientTaggedEvent whose declared data
+// size is exactly the rest of the event.
+func taggedEvent(data []byte) (uint32, bool) {
+	if len(data) < 8 || uint64(binary.LittleEndian.Uint32(data[4:8])) != uint64(len(data)-8) {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint32(data[:4]), true
 }
 
 func checkKernelCmdline(event Event, device, kernelPath, options string) error {
