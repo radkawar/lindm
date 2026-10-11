@@ -60,6 +60,13 @@ func TestConsolePoolServesAdminReadsUnderDeviceSaturation(t *testing.T) {
 	if _, err := devices.GetFleetSummary(saturated, connect.NewRequest(&adminv1.GetFleetSummaryRequest{})); err == nil {
 		t.Fatal("device pool was not saturated; the regression would prove nothing")
 	}
+	// Warm the console pool's connections and prepared statements first; the
+	// budget applies to steady-state console reads, not connection setup.
+	for range 3 {
+		if _, err := console.GetFleetSummary(owner, connect.NewRequest(&adminv1.GetFleetSummaryRequest{})); err != nil {
+			t.Fatalf("console warm-up under device saturation: %v", err)
+		}
+	}
 	var latencies []time.Duration
 	for range 20 {
 		started := time.Now()
