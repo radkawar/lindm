@@ -23,6 +23,12 @@ import (
 )
 
 func (p *Provider) pinPath(ref *resourcev1.ResourceRef) string {
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		return pacmanConfigPath
+	}
+	if p.managerPath == "/usr/bin/zypper" {
+		return zypperLocksPath
+	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return dnf.VersionlockPathFor(p.manager)
 	}
@@ -55,6 +61,10 @@ func readPin(path string) (*resourcev1.FileIdentity, []byte, error) {
 func pinClaimsPackage(ref *resourcev1.ResourceRef, o *resourcev1.NativePackageObservation) bool {
 	if o.GetPinFile() == nil {
 		return false
+	}
+	if o.GetPinFile().GetPath() == pacmanConfigPath || o.GetPinFile().GetPath() == zypperLocksPath {
+		_, block, err := removeOwnedPin(o.GetPinContents(), ref)
+		return err != nil || len(block) != 0
 	}
 	if o.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return true
@@ -118,6 +128,8 @@ func dnf4LockEntry(d *resourcev1.NativePackageDesired) string {
 }
 func (p *Provider) renderPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) ([]byte, error) {
 	switch {
+	case p.rolling():
+		return renderRollingPin(ref, d, current, p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM)
 	case p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB:
 		return aptPin(d), nil
 	case p.manager == dnf.DNF4:
@@ -139,6 +151,8 @@ func (p *Provider) renderPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePa
 }
 func pinMatches(backend resourcev1.Backend, ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) bool {
 	switch backend {
+	case resourcev1.Backend_BACKEND_ALPM, resourcev1.Backend_BACKEND_ZYPPER:
+		return rollingPinMatches(ref, d, current, backend == resourcev1.Backend_BACKEND_ALPM)
 	case resourcev1.Backend_BACKEND_APT:
 		return bytes.Equal(aptPin(d), current)
 	case resourcev1.Backend_BACKEND_DNF4:

@@ -58,9 +58,13 @@ func TestEncryptedUnlockSerialFragmentedPrompt(t *testing.T) {
 		cancel()
 		done <- err
 	}()
-	seen, err := unlockEncryptedSerial(ctx, host, "recovery-key")
+	var diagnostic strings.Builder
+	seen, err := unlockEncryptedSerial(ctx, host, "recovery-key", &cappedWriter{w: &diagnostic, remaining: 4096})
 	if err != nil || !seen {
 		t.Fatalf("unlock prompt: seen=%v err=%v", seen, err)
+	}
+	if diagnostic.String() != "booting kernel\r\nPlease enter passphrase for disk fixture: " {
+		t.Fatalf("private diagnosis did not retain only the received console bytes: %q", diagnostic.String())
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -85,7 +89,7 @@ func TestEncryptedUnlockSerialRejectsRepeatedPrompt(t *testing.T) {
 		_, err := io.WriteString(guest, "No key available\r\nPlease unlock disk cryptroot: ")
 		done <- err
 	}()
-	seen, err := unlockEncryptedSerial(ctx, host, "wrong-key")
+	seen, err := unlockEncryptedSerial(ctx, host, "wrong-key", nil)
 	if !seen || err == nil || !strings.Contains(err.Error(), "rejected") {
 		t.Fatalf("expected explicit rejection, seen=%v err=%v", seen, err)
 	}
@@ -125,7 +129,7 @@ func TestEncryptedUnlockSerialRejectsFailureWithoutRepeatedPrompt(t *testing.T) 
 				}
 				done <- nil
 			}()
-			seen, err := unlockEncryptedSerial(ctx, host, "wrong-key")
+			seen, err := unlockEncryptedSerial(ctx, host, "wrong-key", nil)
 			if !seen || err == nil || err.Error() != "encrypted boot rejected unlock secret" {
 				t.Fatalf("expected explicit passphrase rejection, seen=%v err=%v", seen, err)
 			}
@@ -151,7 +155,7 @@ func TestEncryptedUnattendedBootRejectsPasswordPrompt(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() { _, err := io.WriteString(guest, "Please unlock disk cryptroot: "); done <- err }()
-	seen, err := unlockEncryptedSerial(ctx, host, "")
+	seen, err := unlockEncryptedSerial(ctx, host, "", nil)
 	if err == nil || !seen || !strings.Contains(err.Error(), "unattended") {
 		t.Fatalf("prompt was not rejected: seen=%v err=%v", seen, err)
 	}

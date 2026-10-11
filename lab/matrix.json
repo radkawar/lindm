@@ -37,14 +37,22 @@
       "capabilityKinds": true,
       "image": "MATRIX_IMAGE_CLOUD",
       "lane": "resources",
-      "args": ["-local-authority", "-kinds=files"]
+      "args": ["-phase=connected", "-allow-network", "-local-authority", "-kinds=files"]
+    },
+    {
+      "name": "services",
+      "title": "Services",
+      "capabilities": ["dispatch"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "services"
     },
     {
       "name": "encrypted",
       "title": "Encryption",
       "capabilities": ["encryption"],
       "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
-      "lane": "encrypted"
+      "lane": "device-actions",
+      "args": ["-scenario=encryption"]
     },
     {
       "name": "device-actions",
@@ -52,7 +60,7 @@
       "capabilities": ["wipe", "report-loss", "lock"],
       "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
       "lane": "device-actions",
-      "args": ["-scenario=wipe"]
+      "args": ["-scenario=wipe", "-wipe-phase=live-actions"]
     },
     {
       "name": "recovery-sanitize",
@@ -81,7 +89,7 @@
       "title": "Advisories",
       "capabilities": ["advisories"],
       "image": "MATRIX_IMAGE_CLOUD",
-      "noLane": "server-side feed matching has no maintained lab lane"
+      "lane": "advisories"
     },
     {
       "name": "os-update",
@@ -100,7 +108,31 @@
       "args": ["-phase=release-upgrade", "-allow-network", "-local-authority"]
     }
   ],
+  "rollingRequalificationCells": [
+    "inventory",
+    "enroll-from-console",
+    "lifecycle",
+    "dispatch",
+    "resources",
+    "services",
+    "encrypted",
+    "device-actions",
+    "recovery-sanitize",
+    "self-update",
+    "assistance",
+    "advisories",
+    "os-update",
+    "release-upgrade"
+  ],
   "architectureArgs": {
+    "x86_64": {
+      "args": [
+        "-firmware-code=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd",
+        "-firmware-vars=/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "-firmware-package=ovmf",
+        "-firmware-version=2024.02-2ubuntu0.10"
+      ]
+    },
     "aarch64": {
       "args": [
         "-firmware-code=/usr/share/AAVMF/AAVMF_CODE.secboot.fd",

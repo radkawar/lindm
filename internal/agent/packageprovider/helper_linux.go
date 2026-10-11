@@ -40,7 +40,7 @@ func helperProvider(ctx context.Context, stateDirectory string, request *agentv1
 		return nil, "", ErrConflict
 	}
 	p := &Provider{config: Config{StateDirectory: stateDirectory, Native: &agentv1.NativePackageProviderConfig{Sources: []*agentv1.NativePackageSource{request.GetSource()}}, Platform: request.GetPlatform()}, state: filepath.Join(stateDirectory, "packageprovider"), ecosystem: request.GetDesired().GetNativePackage().GetPackage().GetEcosystem(), run: runNative}
-	if p.ecosystem != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB && p.ecosystem != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+	if p.ecosystem != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB && p.ecosystem != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && p.ecosystem != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
 		return nil, "", ErrUnsupported
 	}
 	if err := p.checkPlatform(); err != nil {
@@ -70,7 +70,11 @@ func helperProvider(ctx context.Context, stateDirectory string, request *agentv1
 			return nil, "", err
 		}
 	}
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+	if p.rolling() {
+		if err := p.selectRolling(); err != nil {
+			return nil, "", err
+		}
+	} else if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		if _, err := p.selectDNF(ctx, directory); err != nil {
 			return nil, "", err
 		}
@@ -147,7 +151,9 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 	}
 	var entries []*resourcev1.PackageTransactionEntry
 	var snapshot *resourcev1.RepositorySnapshot
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+	if p.rolling() {
+		entries, snapshot, err = p.planRolling(ctx, directory, d, db, request.GetSource())
+	} else if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		entries, snapshot, err = p.planAPT(ctx, directory, d, db, request.GetSource())
 	} else {
 		entries, snapshot, err = p.planDNF(ctx, directory, d, db, request.GetSource())
@@ -245,6 +251,24 @@ func validateArtifactCapacity(entries []*resourcev1.PackageTransactionEntry, dir
 	return reserveSpace(directory, 64<<20)
 }
 func validateEntries(entries []*resourcev1.PackageTransactionEntry, d *resourcev1.NativePackageDesired, db *database) error {
+	// libalpm indexes installed packages by name, not name/architecture.
+	// Refuse all architecture transitions before looking up Before, including
+	// dependencies: otherwise an implicit replacement masquerades as INSTALL.
+	if d.GetPackage().GetEcosystem() == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		selected := make(map[string]string, len(entries))
+		for _, entry := range entries {
+			name, arch := entry.GetPackage().GetNativeName(), entry.GetPackage().GetArchitecture()
+			if previous, exists := selected[name]; exists && previous != arch {
+				return ErrConflict
+			}
+			selected[name] = arch
+		}
+		for _, record := range db.records {
+			if arch, found := selected[record.GetPackage().GetNativeName()]; found && arch != record.GetPackage().GetArchitecture() {
+				return errors.New("packageprovider: ALPM architecture replacement refused")
+			}
+		}
+	}
 	seen := make(map[string]bool, len(entries))
 	for _, entry := range entries {
 		if entry.GetPackage().GetNativeName() == "lindm-agent" {
@@ -304,14 +328,8 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if !proto.Equal(manifest, prepared) {
 		return ErrConflict
 	}
-	if !proto.Equal(manifest.GetOriginalPin(), request.GetOriginalPin()) || !bytes.Equal(manifest.GetCandidatePinSha256(), request.GetCandidatePinSha256()) {
-		return ErrConflict
-	}
-	if request.GetOriginalPin() != nil {
-		digest := sha256.Sum256(request.GetCandidatePinContents())
-		if !bytes.Equal(digest[:], manifest.GetCandidatePinSha256()) || !bytes.Equal(request.GetCandidatePinContents(), pinProjection(plan.GetBackend().GetBackend(), plan.GetNativePackage().GetPinContents())) {
-			return ErrConflict
-		}
+	if err := validateCandidatePin(request); err != nil {
+		return err
 	}
 	if err := checkArtifact(p.nativeTransactionPath(directory), manifest.GetNativeTransaction()); err != nil {
 		return err
@@ -357,16 +375,21 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if err := reserveSpace(directory, 64<<20); err != nil {
 		return err
 	}
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		return p.executeALPM(ctx, directory, request, beforeEffect)
+	}
 	if err := beforeEffect(ctx); err != nil {
 		return err
 	}
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+	if !p.rolling() && p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		if err := p.applyPin(plan); err != nil {
 			return errors.Join(ErrOutcomeUnknown, err)
 		}
 	}
 	if len(manifest.GetEntries()) != 0 {
-		if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+		if p.rolling() {
+			err = p.commitZypper(ctx, directory, request.GetEffectiveDesired(), manifest.GetEntries())
+		} else if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 			for _, args := range dpkgArgs {
 				if _, err = commitNative(ctx, "/usr/bin/dpkg", args, "/", []string{"DPKG_FRONTEND_LOCKED=true"}); err != nil {
 					break
@@ -381,7 +404,7 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 			return errors.Join(ErrOutcomeUnknown, err)
 		}
 	}
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+	if p.rolling() || p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		if err := p.applyPin(plan); err != nil {
 			return errors.Join(ErrOutcomeUnknown, err)
 		}
@@ -395,12 +418,28 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	}
 	return nil
 }
+
+func validateCandidatePin(request *agentv1.NativePackageTransactionRequest) error {
+	manifest := request.GetManifest()
+	if !proto.Equal(manifest.GetOriginalPin(), request.GetOriginalPin()) || !bytes.Equal(manifest.GetCandidatePinSha256(), request.GetCandidatePinSha256()) {
+		return ErrConflict
+	}
+	if request.GetOriginalPin() != nil {
+		digest := sha256.Sum256(request.GetCandidatePinContents())
+		plan := request.GetPlan()
+		if !bytes.Equal(digest[:], manifest.GetCandidatePinSha256()) || !bytes.Equal(request.GetCandidatePinContents(), pinProjection(plan.GetBackend().GetBackend(), plan.GetNativePackage().GetPinContents())) {
+			return ErrConflict
+		}
+	}
+	return nil
+}
+
 func (p *Provider) checkStagedSource(directory string, source *agentv1.NativePackageSource, manifest *resourcev1.PackageTransactionManifest) error {
 	if err := checkSource(source); err != nil {
 		return err
 	}
 	name := "lists"
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+	if p.rolling() || p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		name = "cache"
 	}
 	metadata, err := snapshotDirectory(filepath.Join(directory, name))
@@ -445,6 +484,9 @@ func validateEffectiveTarget(request *agentv1.NativePackageTransactionRequest) e
 	return nil
 }
 func (p *Provider) checkStagedArtifacts(ctx context.Context, directory string, request *agentv1.NativePackageTransactionRequest, manifest *resourcev1.PackageTransactionManifest, before *database) error {
+	if p.rolling() {
+		return p.checkRollingArtifacts(ctx, directory, request, manifest)
+	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		data, err := custody.ReadRoot(p.nativeTransactionPath(directory), 4<<20, false)
 		if err != nil {

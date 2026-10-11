@@ -1,0 +1,288 @@
+//go:build linux
+
+package vmlab
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
+
+	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+
+	adminv1 "lindm/gen/lindm/admin/v1"
+	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
+	"lindm/internal/platform"
+)
+
+// VMAdvisoryEvidence binds the vendor acquisition, independently checked native
+// package multiset and persisted server evaluation. Partial-feed matching never
+// asserts complete coverage or a clean device.
+type VMAdvisoryEvidence struct {
+	Scope           string                       `json:"scope"`
+	Source          *advisoryv1.FeedSource       `json:"source"`
+	PartialCoverage string                       `json:"partial_coverage,omitempty"`
+	Refresh         *devlab.AcceptanceFeedResult `json:"refresh,omitempty"`
+	Inventory       *vmInventoryEvidence         `json:"inventory,omitempty"`
+	Packages        []*inventoryv1.Package       `json:"packages,omitempty"`
+	InventorySHA256 string                       `json:"inventory_sha256,omitempty"`
+	Feed            *adminv1.AdvisoryFeedStatus  `json:"feed,omitempty"`
+	Freshness       *adminv1.AdvisoryFreshness   `json:"freshness,omitempty"`
+	Findings        []*adminv1.AdvisoryFinding   `json:"findings,omitempty"`
+	NativeMatches   int                          `json:"native_matches"`
+	AffectedMatches int                          `json:"affected_matches"`
+	Boundary        *VMAdvisoryBoundaryEvidence  `json:"boundary,omitempty"`
+	Outcome         string                       `json:"outcome"`
+}
+
+// vmAdvisorySource deliberately permits registry-declared partial sources so
+// the lane can record their actual UNKNOWN result rather than invent coverage.
+// No URL, distribution identity or architecture support is guessed here.
+func vmAdvisorySource(release *platform.Release, architecture string) (*advisoryv1.FeedSource, error) {
+	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
+		return nil, errors.New("advisories: no maintained vendor source")
+	}
+	switch architecture {
+	case "amd64":
+		architecture = "x86_64"
+	case "arm64":
+		architecture = "aarch64"
+	}
+	if !slices.Contains(release.Architectures, architecture) {
+		return nil, fmt.Errorf("advisories: unsupported architecture %q", architecture)
+	}
+	primary := release.Advisory.Feeds[0]
+	export, ok := release.Advisory.Exports[primary]
+	url := export.URL
+	if len(export.ArchitectureURLs) != 0 {
+		url = export.ArchitectureURLs[architecture]
+	}
+	format, supported := advisoryv1.FeedFormat_value["FEED_FORMAT_"+strings.ToUpper(strings.ReplaceAll(export.Format, "-", "_"))]
+	if !ok || url == "" || export.MaxAgeSeconds == 0 || !supported || format == 0 {
+		return nil, fmt.Errorf("advisories: no maintained primary export for %s/%s", release.Key, architecture)
+	}
+	if release.Native().Packages.Backend == platform.BackendAPT {
+		switch architecture {
+		case "x86_64":
+			architecture = "amd64"
+		case "aarch64":
+			architecture = "arm64"
+		}
+	}
+	source := &advisoryv1.FeedSource{
+		Id:     "matrix-" + release.Key + "-" + architecture,
+		Distro: release.ID, Release: release.FeedRelease(release.Version.Value), Architecture: architecture,
+		Url: url, Format: advisoryv1.FeedFormat(format), MaxAgeSeconds: export.MaxAgeSeconds,
+		PlatformStream: export.PlatformStream,
+	}
+	if export.MaxArchiveBytes != 0 {
+		source.MaxArchiveBytes = proto.Uint64(export.MaxArchiveBytes)
+	}
+	return source, nil
+}
+
+func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPlane, fixture *devlab.AuthorityFixture, manifest *labv1.ImageManifest, cacheDir, deviceID string) (evidence *VMAdvisoryEvidence, err error) {
+	release := manifestRelease(manifest)
+	source, err := vmAdvisorySource(release, manifest.GetArchitecture())
+	if err != nil {
+		return nil, err
+	}
+	evidence = &VMAdvisoryEvidence{Source: source, PartialCoverage: release.Advisory.Partial, Outcome: "incomplete"}
+	before, err := collectVMTruth(ctx, vm, release)
+	if err != nil {
+		return evidence, err
+	}
+	evidence.Inventory, err = control.WaitSnapshot(ctx, deviceID, before, nil, 5*time.Minute)
+	if err != nil {
+		return evidence, err
+	}
+	// Cursor tokens are session authority, not durable evidence. Retain snapshot
+	// identity and complete package rows, but do not publish the cursor.
+	evidence.Inventory.FirstPageToken = ""
+	after, err := collectVMTruth(ctx, vm, release)
+	if err != nil {
+		return evidence, err
+	}
+	if err := stableVMTruth(before, after); err != nil {
+		return evidence, err
+	}
+	evidence.Packages, evidence.InventorySHA256, err = vmAdvisoryInventory(evidence.Inventory.packages)
+	if err != nil {
+		return evidence, err
+	}
+	evidence.Refresh, err = fixture.RefreshVendorFeeds(ctx, filepath.Join(cacheDir, "advisories"), 512<<20, 10*time.Minute, []*advisoryv1.FeedSource{source})
+	if err != nil {
+		evidence.Outcome = "feed_refresh_failed"
+		return evidence, err
+	}
+	feeds, err := control.session.Admin.ListAdvisoryFeeds(ctx, connect.NewRequest(&adminv1.ListAdvisoryFeedsRequest{}))
+	if err != nil {
+		return evidence, vmControlPlaneError("read published advisory feeds", err)
+	}
+	for _, candidate := range feeds.Msg.GetFeeds() {
+		if candidate.GetId() == source.GetId() {
+			evidence.Feed = candidate
+			break
+		}
+	}
+	if err := vmAdvisoryAcquisition(evidence); err != nil {
+		evidence.Outcome = "feed_publication_unqualified"
+		return evidence, err
+	}
+	if err := waitVMAdvisoryEvaluation(ctx, control, deviceID, evidence); err != nil {
+		return evidence, err
+	}
+	evidence.Boundary, err = exerciseVMAdvisoryBoundary(ctx, vm, fixture, evidence, before.manager)
+	if err != nil {
+		evidence.Outcome = "vendor_boundary_unqualified"
+		return evidence, err
+	}
+	err = qualifyVMAdvisoryMatches(evidence)
+	return evidence, err
+}
+
+// The digest covers compact encoding/json of the complete sorted Package list,
+// with multiplicity and native source/module identity retained. The same list is
+// embedded in the immutable lane record so its digest can be reproduced.
+func vmAdvisoryInventory(packages map[nativePackage]int) ([]*inventoryv1.Package, string, error) {
+	var rows []*inventoryv1.Package
+	for p, count := range packages {
+		if count <= 0 || count > 100000-len(rows) {
+			return nil, "", errors.New("advisories: invalid native package multiplicity")
+		}
+		for range count {
+			rows = append(rows, &inventoryv1.Package{Name: p.name, Version: p.version, Architecture: p.architecture, Manager: p.manager, SourceName: p.sourceName, SourceVersion: p.sourceVersion, Module: &inventoryv1.ModuleObservation{Status: p.module.status, Modular: p.module.modular, Name: p.module.name, Stream: p.module.stream, Version: p.module.version, Context: p.module.context}})
+		}
+	}
+	if len(rows) == 0 {
+		return nil, "", errors.New("advisories: empty native inventory")
+	}
+	// Package JSON has fixed struct-field ordering. Sort the complete row, not
+	// only name/version, to preserve reproducibility with duplicate identities.
+	encoded := make(map[*inventoryv1.Package]string, len(rows))
+	for _, row := range rows {
+		data, err := json.Marshal(row)
+		if err != nil {
+			return nil, "", err
+		}
+		encoded[row] = string(data)
+	}
+	slices.SortFunc(rows, func(a, b *inventoryv1.Package) int { return strings.Compare(encoded[a], encoded[b]) })
+	data, err := json.Marshal(rows)
+	if err != nil {
+		return nil, "", err
+	}
+	digest := sha256.Sum256(data)
+	return rows, hex.EncodeToString(digest[:]), nil
+}
+
+func vmAdvisoryAcquisition(e *VMAdvisoryEvidence) error {
+	f := e.Feed
+	if f == nil || f.GetId() != e.Source.GetId() || f.GetSourceUrl() != e.Source.GetUrl() || !vmValidTime(f.GetCheckedAt()) || f.GetAdvisoryCount() == 0 || f.GetError() != "" {
+		return errors.New("advisories: missing, failed or empty vendor publication")
+	}
+	digest, err := hex.DecodeString(f.GetSourceSha256())
+	if err != nil || len(digest) != sha256.Size || e.Refresh == nil || len(e.Refresh.Artifacts) == 0 || len(f.GetArtifacts()) == 0 {
+		return errors.New("advisories: vendor publication lacks acquisition hashes")
+	}
+	for _, artifact := range f.GetArtifacts() {
+		found := false
+		for _, fetched := range e.Refresh.Artifacts {
+			if fetched.URL == artifact.GetUrl() && fetched.SHA256 == hex.EncodeToString(artifact.GetSha256()) && fetched.Bytes > 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("advisories: published artifact was not fetched and hashed by this run")
+		}
+	}
+	return nil
+}
+
+func waitVMAdvisoryEvaluation(ctx context.Context, control *vmControlPlane, deviceID string, e *VMAdvisoryEvidence) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		response, err := control.session.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 200}))
+		if err != nil {
+			return vmControlPlaneError("read server advisory evaluation", err)
+		}
+		e.Freshness = response.Msg.GetFreshness()
+		if e.Freshness.GetReason() != "evaluation_pending" && e.Freshness.GetSnapshotId() == e.Inventory.SnapshotID && e.Freshness.GetFeedId() == e.Source.GetId() && e.Freshness.GetSourceSha256() == e.Feed.GetSourceSha256() {
+			e.Findings = response.Msg.GetFindings()
+			cursor := response.Msg.GetNextPageToken()
+			seen := make(map[string]bool)
+			for cursor != "" {
+				if seen[cursor] || len(e.Findings) >= 100000 {
+					return errors.New("advisories: findings pagination exceeded bound or repeated cursor")
+				}
+				seen[cursor] = true
+				page, err := control.session.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 200, PageToken: cursor}))
+				if err != nil {
+					return vmControlPlaneError("read server advisory findings page", err)
+				}
+				if !proto.Equal(page.Msg.GetFreshness(), e.Freshness) || len(page.Msg.GetFindings()) == 0 {
+					return errors.New("advisories: evaluation changed during pagination")
+				}
+				e.Findings = append(e.Findings, page.Msg.GetFindings()...)
+				cursor = page.Msg.GetNextPageToken()
+			}
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			e.Outcome = "evaluation_not_bound_to_native_snapshot"
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func qualifyVMAdvisoryMatches(e *VMAdvisoryEvidence) error {
+	e.NativeMatches, e.AffectedMatches = 0, 0
+	if len(e.Packages) == 0 {
+		return errors.New("advisories: native inventory is empty")
+	}
+	for _, finding := range e.Findings {
+		if finding.GetFeedId() != e.Source.GetId() || finding.GetAdvisoryId() == "" || finding.GetSourceUrl() == "" {
+			return errors.New("advisories: finding lacks vendor identity")
+		}
+		matched := slices.ContainsFunc(e.Packages, func(p *inventoryv1.Package) bool {
+			return p.GetName() == finding.GetPackageName() && p.GetVersion() == finding.GetInstalledVersion() && p.GetArchitecture() == finding.GetArchitecture()
+		})
+		if !matched {
+			return errors.New("advisories: finding does not identify an actually installed native package")
+		}
+		e.NativeMatches++
+		if finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
+			e.AffectedMatches++
+		}
+	}
+	partial := e.Freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN && e.Freshness.GetReason() == "feed_partial_coverage"
+	if !vmValidTime(e.Feed.GetExpiresAt()) || !time.Now().Before(e.Feed.GetExpiresAt().AsTime()) || (e.Freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN && !partial) || (!e.Feed.GetFresh() && !partial) || (e.PartialCoverage != "" && !partial) {
+		e.Outcome = "unsupported_coverage"
+		return fmt.Errorf("advisories: native evaluation remains unqualified: %s", e.Freshness.GetReason())
+	}
+	if e.AffectedMatches == 0 && !validVMAdvisoryBoundary(e.Boundary) {
+		e.Outcome = "no_positive_matching_oracle"
+		return errors.New("advisories: no affected native package or real vendor boundary oracle; an empty match alone is not a pass")
+	}
+	e.Scope, e.Outcome = "native feed matching; not complete device coverage", "qualified_native_match"
+	if partial || e.PartialCoverage != "" {
+		e.Scope, e.Outcome = "partial-feed matching", "qualified_partial_feed_matching"
+	}
+	return nil
+}

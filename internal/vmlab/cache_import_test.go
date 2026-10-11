@@ -34,6 +34,12 @@ func TestImportCacheAuthenticatesAndPreservesPublishedBytes(t *testing.T) {
 		}
 	}
 	destination := filepath.Join(t.TempDir(), "cache")
+	if err := InitializeImageCache(context.Background(), destination); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(destination, "repository-snapshots"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	var group sync.WaitGroup
 	for range 3 {
 		group.Go(func() {
@@ -81,5 +87,18 @@ func TestImportCacheAuthenticatesAndPreservesPublishedBytes(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(fresh, "sha256-"+manifest.Sha256)); !os.IsNotExist(err) {
 		t.Fatalf("failed import published an entry: %v", err)
+	}
+}
+
+func TestInitializeImageCachePreservesUnmarkedDirectoryBoundary(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "unrelated"), []byte("owner data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitializeImageCache(context.Background(), directory); err == nil {
+		t.Fatal("unmarked nonempty directory adopted")
+	}
+	if _, err := os.Stat(filepath.Join(directory, ".lindm-images")); !os.IsNotExist(err) {
+		t.Fatalf("rejected directory was marked: %v", err)
 	}
 }

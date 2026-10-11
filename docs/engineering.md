@@ -945,14 +945,43 @@ Snapshot20261007 **DVD** (manifest edition `dvd`; the openSUSE key signs the
 through an AutoYaST profile (`tumbleweed_installer_linux.go`). The base system comes
 only from the authenticated DVD repository, so it is pinned by the ISO digest. The
 DVD lacks cloud-init, which the lab needs for fresh NoCloud credentials, so the
-profile adds the official online OSS tree at a lower priority (120 versus the DVD's
-99), which supplies only cloud-init's closure. The lab requires that tree's
-`repomd.xml`, signed by the manifest's pinned key, to name the manifest snapshot
-(`cpe:/o:opensuse:opensuse:20261007`) both before and after installation. Published
-snapshots only advance, so this bounds the metadata libzypp resolved; once the
-tree moves on, building a new golden fails closed. Maintaining the cell means bumping
-the manifest to the current snapshot DVD, while an existing golden keeps being
-reused from its integrity-pinned cache.
+profile adds the captured signed OSS dependency closure at a lower priority
+(120 versus the DVD's 99). The image manifest selects
+`repository_snapshot_manifest_sha256` and `repository_snapshot_repomd_sha256`
+alongside `repository_snapshot_date`; these are immutable identities, not a
+live mirror address. Capture retains a bounded, native-solver-complete package
+set and the vendor-signed metadata, not a full repository mirror. Missing
+packages or an unavailable historical closure fail closed; a partial clone is
+not a qualified snapshot.
+
+During ordinary/encrypted golden installation, dispatch and update lanes,
+`internal/vmlab/reposnapshot.Start` verifies the selected closure before opening
+a loopback-only TLS listener. The disposable QEMU guest reaches it through
+`https://10.0.2.2:<ephemeral-port>/snapshots/<manifest-sha256>/`; only exact
+manifest-listed file paths support GET/HEAD. A retained signing-key path also
+accepts its exact `?fpr=<fingerprint>` query from signed repomd; other queries
+are rejected. There is no directory listing, path cleaning, redirect, symlink
+traversal or write API. Every response is
+size/digest checked into an unlinked private spool; the sole writable descriptor
+is closed before transmission, so a cache mutation cannot change verified
+response bytes. Only one bounded payload is spooled/transmitted at a time.
+Cancellation or lane cleanup closes the listener and removes its private spool.
+
+Each listener mints its own short-lived P-256 CA and server certificate entirely
+in memory. AutoYaST installs only the public CA into installer and disposable
+guest trust; subsequent lanes replace that fixture CA before using the new
+origin. No host trust, repository, firewall or TLS verification policy changes.
+The guest imports only the retained registry-pinned vendor key and RPM signing
+keys explicitly delegated by signed repomd, all verified by `Load`, and keeps
+repository/package GPG checks enabled. Dispatch
+and update fixtures disable live vendor repositories in the disposable guest
+before native package prerequisites run. Evidence records the selected source
+date, repomd SHA-256 and closure-manifest SHA-256; neither the ephemeral URL nor
+the CA changes the golden cache identity. Serving starts automatically with the
+maintained `lab vm encrypted`, `lab vm dispatch` and `lab vm updates` commands
+using the pinned image manifest and `-cache` directory; no separate repository
+daemon or host trust setup is required.
+
 The vendor ARM DVD catalogs its EFI FAT image with El Torito platform 0 and points a
 hybrid USB MBR partition at that file, which `xorriso -boot_image any replay`
 rejects. The remaster therefore re-declares the unchanged vendor FAT image as the
@@ -1275,6 +1304,12 @@ and fail rather than skip when those inputs are missing.
 It moves only owned session timestamps across the idle boundary, verifies the
 old-session 401, rejects login while the approver is disabled, restores the
 account through the real API, and verifies fresh two-human approvals.
+
+The matrix **Encryption** cell runs `lab vm device-actions -scenario=encryption`,
+including real signed escrow/rotation and native TPM binding with independent
+cold-boot checks. The installer-only `lab vm encrypted` smoke below does not
+qualify that column. Live wipe/loss/lock uses `-wipe-phase=live-actions` and
+does not depend on the separately qualified recovery-sanitize cell.
 
 The encrypted installer lane is `lab vm encrypted -manifest
 lab/images/ubuntu-noble-encrypted-amd64.json` (or
@@ -2221,19 +2256,23 @@ browser signs in again and confirms the exact device's server-side **Enrolled**
 state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
-The `enroll-from-console` matrix cell targets Ubuntu 24.04, Ubuntu 26.04 and
-Fedora 44, including native aarch64 on a configured Spark. Use the declared pinned
-AAVMF arguments and
-normal host admission; never substitute an amd64 guest or pre-provision CA, agent
+The `enroll-from-console` matrix cell targets Ubuntu 24.04, Ubuntu 26.04, Fedora 44,
+Arch Linux x86_64 and Tumbleweed x86_64/aarch64, including native aarch64 on a
+configured Spark. Use the declared pinned firmware arguments and normal host
+admission; never substitute an amd64 guest or pre-provision lindm's server CA, agent
 packages or bootstrap trust into the machine under test. The copied command must
-perform those steps. Fixture loopback ports can be forwarded without changing
+perform those steps. Rolling guests first bind only their separate vendor
+repositories to the manifest's dated snapshot; Arch establishes that whole-system
+snapshot before enrollment instead of refreshing databases for a partial upgrade.
+Fixture loopback ports can be forwarded without changing
 their signed HTTPS origins. Keep browser capture inputs and command files private,
 retain redacted light/dark desktop/mobile dialog screenshots separately, and link
 completed native records in [verification](verification.md).
 
 For `lab matrix run`, use `-console-browser-config-dir DIR` containing an owned
 mode-0600 `PLATFORM-ARCH.json` for each selected cell, for example
-`ubuntu-26.04-x86_64.json` and `ubuntu-26.04-aarch64.json`, plus
+`ubuntu-26.04-x86_64.json`, `arch-x86_64.json` and
+`opensuse-tumbleweed-aarch64.json`, plus
 `-console-admin-address 127.0.0.1:PORT` and
 `-console-device-address 127.0.0.1:PORT` for a loopback fixture.
 The remote runner preserves those HTTPS ports with explicit IPv4-loopback
@@ -2302,6 +2341,29 @@ an unreadable one needs the documented digest and date and is stored unverified.
 [Tier capability matrix](verification.md#tier-capability-matrix);
 `go run ./cmd/dev generate-docs -check` fails when it is stale. Commit the
 ledger and the regenerated table together.
+
+Rolling platforms additionally declare their requalification interval in the
+registry. `lab/matrix.json` lists the complete periodic capability lane set.
+Schedule `lab matrix run -rolling-requalification -evidence NEW_DIRECTORY` with
+the ordinary fixture/cache arguments; `plan` accepts the same selection flag.
+It selects missing, failed, partial or expired rolling results, and succeeds
+without starting guests when none are due. Explicit gates remain visible rather
+than being interpreted as successful qualification.
+
+Each run retains `<cell>-<architecture>.manifest.json` beside its evidence and
+executes against that copy. The ledger records its SHA-256 and repository
+snapshot date as well as the native record SHA-256. A rolling pass without exact
+matching manifest bytes and repository date cannot qualify the selected snapshot.
+The date of the base image and the date of the repository are distinct pins.
+Historical `pass` remains a historical lane outcome, not an unbounded certificate;
+the periodic selector uses the registry interval to decide what must run again.
+
+For owner-selected boot topology, `-manifest-id ID` requires the exact single
+`-platform` and `-architecture` and prefers that pinned image for its image kind.
+It never relabels another architecture or substitutes a different bootloader.
+The connected `resources` cell exercises every implemented kind; the `services`
+cell separately exercises native service-provider semantics. The executor-only
+resource smoke path is not an all-kind qualification.
 
 ### Isolated native install and custody check
 
@@ -2479,7 +2541,7 @@ days). RPM metadata/CSAF and Arch require explicit architecture. Vendor OSV uses
   or Leap major/minor. Tumbleweed uses `rolling`, but GA-media aggregate notices
   are rejected as fix boundaries.
 - `FEED_FORMAT_ARCH_JSON`: `arch`, `rolling`, `x86_64`, official
-  `https://security.archlinux.org/all.json`; the official `advisories.json` companion
+  `https://security.archlinux.org/issues/all.json`; the official `advisories.json` companion
   supplies dates only for exact AVG/package matches. AUR/derivatives are not covered.
 - `FEED_FORMAT_DEBIAN_TRACKER_JSON`: Debian numeric release and
   `https://security-tracker.debian.org/tracker/data/json`. A release absent from the

@@ -85,7 +85,11 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 	if measured {
 		kernelSource += ".file"
 	}
-	kernel, err := downloadActionBootFile(ctx, vm, "/boot/vmlinuz-"+boot.KernelRelease, kernelSource, 256<<20)
+	kernelPath := boot.KernelPath
+	if kernelPath == "" {
+		kernelPath = "/boot/vmlinuz-" + boot.KernelRelease
+	}
+	kernel, err := downloadActionBootFile(ctx, vm, kernelPath, kernelSource, 256<<20)
 	if err != nil {
 		return nil, fmt.Errorf("collect recovery vendor kernel: %w", err)
 	}

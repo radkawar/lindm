@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+	<oval_definitions
+		xsi:schemaLocation="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux linux-definitions-schema.xsd http://oval.mitre.org/XMLSchema/oval-definitions-5#unix unix-definitions-schema.xsd http://oval.mitre.org/XMLSchema/oval-definitions-5 oval-definitions-schema.xsd http://oval.mitre.org/XMLSchema/oval-common-5 oval-common-schema.xsd"
+		xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:oval="http://oval.mitre.org/XMLSchema/oval-common-5"
+		xmlns:oval-def="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+	  <generator>
+	      <oval:product_name>Marcus Updateinfo to OVAL Converter</oval:product_name>
+	      <oval:schema_version>5.5</oval:schema_version>
+	      <oval:timestamp>2026-10-10T07:30:35</oval:timestamp>
+	  </generator>
+<definitions>
+<definition id="oval:org.opensuse.security:def:20011267" version="1" class="vulnerability">
+ <metadata>
+ <title>CVE-2001-1267</title>
+    <affected family="unix">
+            <platform>openSUSE Tumbleweed</platform>
+    </affected>
+    <reference ref_id="Mitre CVE-2001-1267" ref_url="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2001-1267" source="CVE"/>
+    <reference ref_id="SUSE CVE-2001-1267" ref_url="https://www.suse.com/security/cve/CVE-2001-1267" source="SUSE CVE"/>
+		<reference ref_id="SUSE-SR:2007:019" ref_url="https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/UBLPLGSRDQQXOBBXTFGPXQZUFQYCTZ7C/#UBLPLGSRDQQXOBBXTFGPXQZUFQYCTZ7C" source="SUSE-SU"/>
+    <description>
+    Directory traversal vulnerability in GNU tar 1.13.19 and earlier allows local users to overwrite arbitrary files during archive extraction via a tar file whose filenames contain a .. (dot dot).
+    </description>
+<advisory from="security@suse.de">
+	<issued date="2021-10-02"/>
+	<updated date="2025-09-18"/>
+	<severity>Moderate</severity>
+	<cve href="https://www.suse.com/security/cve/CVE-2001-1267/">CVE-2001-1267 at SUSE</cve>
+	<cve href="https://nvd.nist.gov/vuln/detail/CVE-2001-1267">CVE-2001-1267 at NVD</cve>
+	<bugzilla href="https://bugzilla.suse.com/1203750">SUSE bug 1203750</bugzilla>
+	<bugzilla href="https://bugzilla.suse.com/299738">SUSE bug 299738</bugzilla>
+	<bugzilla href="https://bugzilla.suse.com/299745">SUSE bug 299745</bugzilla>
+	<bugzilla href="https://bugzilla.suse.com/299747">SUSE bug 299747</bugzilla>
+	<affected_cpe_list>
+		<cpe>cpe:/o:opensuse:tumbleweed</cpe>
+	</affected_cpe_list>
+</advisory>
+ </metadata>
+		<criteria operator="AND">
+			<criterion test_ref="oval:org.opensuse.security:tst:2009634834" comment="openSUSE Tumbleweed is installed"/>
+			<criteria operator="OR">
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913464" comment="tar-1.34-2.2 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913465" comment="tar-backup-scripts-1.34-2.2 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913466" comment="tar-doc-1.34-2.2 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913467" comment="tar-lang-1.34-2.2 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913468" comment="tar-rmt-1.34-2.2 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2009913469" comment="tar-tests-1.34-2.2 is installed"/>
+			</criteria>
+		</criteria>
+</definition>
+<definition id="oval:org.opensuse.security:def:202645992" version="1" class="vulnerability">
+ <metadata>
+ <title>CVE-2026-45992</title>
+    <affected family="unix">
+            <platform>openSUSE Tumbleweed</platform>
+    </affected>
+    <reference ref_id="Mitre CVE-2026-45992" ref_url="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-45992" source="CVE"/>
+    <reference ref_id="SUSE CVE-2026-45992" ref_url="https://www.suse.com/security/cve/CVE-2026-45992" source="SUSE CVE"/>
+    <description>
+    This CVE ID has been rejected or withdrawn by its CVE Numbering Authority.
+    </description>
+<advisory from="security@suse.de">
+	<issued date="2026-06-30"/>
+	<updated date="2026-06-30"/>
+	<severity>Moderate</severity>
+	<cve href="https://www.suse.com/security/cve/CVE-2026-45992/">CVE-2026-45992 at SUSE</cve>
+	<cve href="https://nvd.nist.gov/vuln/detail/CVE-2026-45992">CVE-2026-45992 at NVD</cve>
+	<bugzilla href="https://bugzilla.suse.com/1267231">SUSE bug 1267231</bugzilla>
+	<affected_cpe_list>
+		<cpe>cpe:/o:opensuse:tumbleweed</cpe>
+	</affected_cpe_list>
+</advisory>
+ </metadata>
+		<criteria operator="AND">
+			<criterion test_ref="oval:org.opensuse.security:tst:2009634834" comment="openSUSE Tumbleweed is installed"/>
+			<criteria operator="OR">
+				<criterion test_ref="oval:org.opensuse.security:tst:2010080629" comment="kernel-source-7.0.11-1.1 is installed"/>
+				<criterion test_ref="oval:org.opensuse.security:tst:2010080630" comment="kernel-source-vanilla-7.0.11-1.1 is installed"/>
+			</criteria>
+		</criteria>
+</definition>
+</definitions>
+<tests>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009634834" version="1" comment="openSUSE-release is &gt;=20210101" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009031246"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009149429"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913464" version="1" comment="tar is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009030401"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913465" version="1" comment="tar-backup-scripts is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009040867"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913466" version="1" comment="tar-doc is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009047241"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913467" version="1" comment="tar-lang is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009033728"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913468" version="1" comment="tar-rmt is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009042566"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2009913469" version="1" comment="tar-tests is &lt;1.34-2.2 for aarch64,ppc64le,s390x,x86_64" check="at least one" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009040868"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009218887"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2010080629" version="1" comment="kernel-source is &lt;7.0.11-1.1 for aarch64,ppc64le,s390x,x86_64" check="all" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009030418"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009223839"/>
+	</rpminfo_test>
+<rpminfo_test id="oval:org.opensuse.security:tst:2010080630" version="1" comment="kernel-source-vanilla is &lt;7.0.11-1.1 for aarch64,ppc64le,s390x,x86_64" check="all" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<object object_ref="oval:org.opensuse.security:obj:2009033559"/>
+		<state state_ref="oval:org.opensuse.security:ste:2009223839"/>
+	</rpminfo_test>
+</tests>
+<objects>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009030401" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009030418" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>kernel-source</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009031246" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>openSUSE-release</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009033559" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>kernel-source-vanilla</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009033728" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar-lang</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009040867" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar-backup-scripts</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009040868" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar-tests</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009042566" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar-rmt</name>
+	</rpminfo_object>
+<rpminfo_object id="oval:org.opensuse.security:obj:2009047241" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+		<name>tar-doc</name>
+	</rpminfo_object>
+</objects>
+<states>
+<rpminfo_state id="oval:org.opensuse.security:ste:2009149429" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+   <evr datatype="evr_string" operation="greater than or equal">0:20210101-0</evr>
+  </rpminfo_state>
+<rpminfo_state id="oval:org.opensuse.security:ste:2009218887" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+   <arch datatype="string" operation="pattern match">(aarch64|ppc64le|s390x|x86_64)</arch>
+   <evr datatype="evr_string" operation="less than">0:1.34-2.2</evr>
+  </rpminfo_state>
+<rpminfo_state id="oval:org.opensuse.security:ste:2009223839" version="1" xmlns="http://oval.mitre.org/XMLSchema/oval-definitions-5#linux">
+   <arch datatype="string" operation="pattern match">(aarch64|ppc64le|s390x|x86_64)</arch>
+   <evr datatype="evr_string" operation="less than">0:7.0.11-1.1</evr>
+  </rpminfo_state>
+</states>
+</oval_definitions>

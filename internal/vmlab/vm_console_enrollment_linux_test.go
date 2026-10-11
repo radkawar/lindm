@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"lindm/internal/platform"
 )
 
 // A changed newline or shell quote changes the command the console authenticated.
@@ -69,5 +71,29 @@ func TestReadConsoleCommandRejectsUnsafeCapture(t *testing.T) {
 				t.Fatal("error disclosed credential")
 			}
 		})
+	}
+}
+
+// The same native query must refuse a preinstalled package and later attest
+// the package installed by the copied console command. Zypper is not DNF, but
+// both use the RPM database; pacman must never fall through to a missing RPM.
+func TestConsoleEnrollmentQueriesNativePackageDatabase(t *testing.T) {
+	for _, test := range []struct {
+		backend     platform.Backend
+		tool, query string
+	}{
+		{platform.BackendAPT, "dpkg-query", "dpkg-query -W -f='${Package} ${Version} ${Architecture}\\n' lindm-agent"},
+		{platform.BackendDNF4, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
+		{platform.BackendDNF5, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
+		{platform.BackendZypper, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
+		{platform.BackendPacman, "pacman", "pacman --query lindm-agent"},
+	} {
+		tool, query, err := consoleEnrollmentPackageQuery(test.backend)
+		if err != nil || tool != test.tool || query != test.query {
+			t.Fatalf("%s: wrong native database: %q %q %v", test.backend, tool, query, err)
+		}
+	}
+	if _, _, err := consoleEnrollmentPackageQuery(platform.BackendNone); err == nil {
+		t.Fatal("unregistered backend inherited a package database")
 	}
 }

@@ -17,6 +17,8 @@ const backendLabels: Record<OSUpdateBackend, string> = {
   [OSUpdateBackend.OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES]: "APT unattended-upgrades",
   [OSUpdateBackend.OS_UPDATE_BACKEND_DNF5_AUTOMATIC]: "DNF5 automatic",
   [OSUpdateBackend.OS_UPDATE_BACKEND_DNF4_AUTOMATIC]: "dnf-automatic",
+  [OSUpdateBackend.OS_UPDATE_BACKEND_PACMAN]: "pacman whole-system upgrade",
+  [OSUpdateBackend.OS_UPDATE_BACKEND_ZYPPER]: "zypper distribution upgrade",
 };
 
 const triggerLabels: Record<PatchRunTrigger, string> = {
@@ -50,6 +52,9 @@ const toolLabels: Record<PatchRunTool, string> = {
   [PatchRunTool.DNF_AUTOMATIC]: "dnf-automatic",
   [PatchRunTool.LOGIND]: "systemd-logind",
   [PatchRunTool.LINDM_AGENT]: "lindm-agent",
+  [PatchRunTool.PACMAN]: "pacman",
+  [PatchRunTool.ZYPPER]: "zypper",
+  [PatchRunTool.SNAPPER]: "snapper",
 };
 
 const phaseLabels: Record<PatchRunPhase, string> = {

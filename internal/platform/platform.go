@@ -119,6 +119,35 @@ type PackageTooling struct {
 	Backend Backend
 	// Minimum is the oldest backend version the providers accept.
 	Minimum string
+	// ALPM identifies the supported native ABI used by the retained-transaction
+	// adapter. These are repository-artifact facts, not native qualification.
+	ALPM ALPMABI
+	// ResourceDependencies are mandatory runtime packages for advertised
+	// native package resource execution, in the backend's package namespace.
+	ResourceDependencies []string
+}
+
+type ALPMABI struct {
+	Path    string
+	SONAME  string
+	Version string
+}
+
+// ResourceDependencies returns the union needed by one backend's packages.
+// Derivatives use their explicit base's native tooling facts.
+func (b Backend) ResourceDependencies() []string {
+	var dependencies []string
+	for _, release := range registry {
+		tooling := release.Native().Packages
+		if tooling.Backend == b {
+			for _, dependency := range tooling.ResourceDependencies {
+				if !slices.Contains(dependencies, dependency) {
+					dependencies = append(dependencies, dependency)
+				}
+			}
+		}
+	}
+	return dependencies
 }
 
 // PAMManager owns a release's PAM stack.
@@ -128,10 +157,13 @@ const (
 	PAMManagerNone          PAMManager = ""
 	PAMManagerPamAuthUpdate PAMManager = "pam-auth-update"
 	PAMManagerAuthselect    PAMManager = "authselect"
+	PAMManagerNative        PAMManager = "native-pam"
+	PAMManagerPamConfig     PAMManager = "pam-config"
 )
 
-// PasswordPins are the exact upstream releases the password provider qualified
-// for one VERSION_ID: libpwquality, the PAM modules package and the PAM manager.
+// PasswordPins are qualified libpwquality, PAM module and manager releases.
+// Rolling managers require the full native package release; other managers use
+// upstream versions. Pins apply only to the exact observed VERSION_ID.
 type PasswordPins struct {
 	Version string // exact VERSION_ID the pins were measured on
 	Quality string
@@ -202,6 +234,7 @@ const (
 	FeedRPMUpdateinfo Feed = "rpm-updateinfo"
 	FeedRedHatCSAF    Feed = "redhat-csaf"
 	FeedSUSECSAF      Feed = "suse-csaf"
+	FeedSUSEOVAL      Feed = "suse-oval"
 	FeedArchASA       Feed = "arch-asa"
 )
 
@@ -228,6 +261,10 @@ type Advisory struct {
 	// updateinfo product name or the CSAF product CPE, in which a trailing
 	// "spN" stands for the configured SLES service pack.
 	Ecosystem string
+	// OVALPlatform and OVALReleasePackage bind OVAL metadata and its native
+	// installed-product prerequisite; neither is inferred from display names.
+	OVALPlatform       string
+	OVALReleasePackage string
 	// PURLNamespace and PURLDistro are the package-URL namespace and distro
 	// qualifier the vendor feed uses for this release.
 	PURLNamespace string
@@ -281,6 +318,14 @@ type ModuleBlocklistTooling struct {
 	StateDirectory      string // Native tool state; absent state needs its parent for that invocation.
 }
 
+// RollingUpdateTooling describes the whole-system snapshot update model.
+// Snapshot dates are signed policy inputs, never moving registry defaults.
+type RollingUpdateTooling struct {
+	ArchiveURL        string
+	Repositories      []string
+	SnapshotCPEPrefix string
+}
+
 // Release is one registry row.
 type Release struct {
 	Key  string // stable key, e.g. "ubuntu-24.04"; lab matrix and docs key
@@ -304,6 +349,7 @@ type Release struct {
 	Family          Family
 	Architectures   []string
 	Packages        PackageTooling
+	RollingUpdate   *RollingUpdateTooling
 	Systemd         int
 	FDE             string
 	Desktop         Desktop
@@ -312,6 +358,10 @@ type Release struct {
 	Quirks          Quirks
 	Lab             Lab
 	ModuleBlocklist ModuleBlocklistTooling
+	// RequalificationDays scopes a rolling snapshot's evidence window. Zero
+	// means this release does not use the periodic rolling qualification lane.
+	// Native tooling derivatives inherit their base's cadence.
+	RequalificationDays int
 	// Supports lists the implemented capabilities; every other capability is
 	// gated, with the reason in Gates or a default reason.
 	Supports []Capability

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// An authenticated, bounded native-solver closure. This is not a full mirror.
+message RepositorySnapshotManifest {
+  string distribution = 1;
+  string architecture = 2;
+  string snapshot_date = 3;
+  string source_root_url = 4;
+  string signer_fingerprint = 5;
+  string repomd_sha256 = 6;
+  repeated RepositorySnapshotFile files = 7;
+  repeated string requested_packages = 8;
+  // SHA256 of deterministic protobuf encoding with this field empty.
+  string manifest_sha256 = 9;
+  uint64 total_bytes = 10;
+  uint64 max_bytes = 11;
+  uint32 max_packages = 12;
+  string base_image_sha256 = 13;
+  repeated string base_packages = 14;
+  // Native solver version and exact successful transaction output are retained.
+  string solver_version = 15;
+}
+
+message RepositorySnapshotFile {
+  string path = 1;
+  string sha256 = 2;
+  uint64 size_bytes = 3;
+}

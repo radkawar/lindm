@@ -140,6 +140,15 @@ test("APT publishes a deb822 source restricted to its pinned signing key", () =>
   assert.doesNotMatch(install, /\/etc\/apt\/sources.list.d\/lindm.list/);
 });
 
+test("pacman refreshes only lindmd but retains native dependency resolution", () => {
+  const script = enrollmentInstallScript(instructions, { ...platform, packageFamily: "pacman" });
+  checkShell(script);
+  assert.match(script, /pacman --config "\$work\/pacman.conf" --sync --refresh --noconfirm\n/);
+  assert.match(script, /pacman --sync --noconfirm 'lindm\/lindm-agent'/);
+  assert.doesNotMatch(script, /pacman --config[^\n]*lindm-agent/);
+  assert.doesNotMatch(script, /pacman --sync --refresh/);
+});
+
 test("every native manager shares CA certificate and execution-root authentication", () => {
   for (const family of ["apt", "dnf", "zypper", "pacman"]) {
     const data = {

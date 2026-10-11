@@ -94,6 +94,7 @@ type runSpec struct {
 	// windowStart anchors the deferral ledger of window runs.
 	windowStart time.Time
 	zone        *time.Location
+	rolling     *resourcev1.RollingUpdateSnapshot
 }
 
 func (r *Runner) loadPolicy() (*agentv1.OSUpdateRunPolicy, error) {
@@ -144,6 +145,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	desired := policy.GetDesired()
 	spec.selection, spec.reboot = desired.GetSelection(), desired.GetRebootPolicy()
+	spec.rolling = desired.GetRollingSnapshot()
 	zone, err := time.LoadLocation(desired.GetMaintenance().GetTimeZone())
 	if err != nil {
 		return r.recordOnly(ctx, spec, started, agentv1.PatchRunResult_PATCH_RUN_RESULT_FAILED,
@@ -195,6 +197,7 @@ func (r *Runner) RunNow(ctx context.Context) error {
 	spec.reboot = request.GetRebootPolicy()
 	// Messages use the maintenance window zone when a policy is installed.
 	if policy, err := r.loadPolicy(); err == nil {
+		spec.rolling = policy.GetDesired().GetRollingSnapshot()
 		if zone, err := time.LoadLocation(policy.GetDesired().GetMaintenance().GetTimeZone()); err == nil {
 			spec.zone = zone
 		}
@@ -308,6 +311,15 @@ func (r *Runner) execute(ctx context.Context, spec runSpec, started time.Time) (
 	summary := r.summary(spec, started, agentv1.PatchRunResult_PATCH_RUN_RESULT_UNSPECIFIED)
 	state := r.loadRunState()
 	native, detectErr := detect(osReleasePaths, 0)
+	if detectErr == nil {
+		if rolling, ok := native.(*rollingBackend); ok {
+			detectErr = rolling.configure(&resourcev1.OSUpdateDesired{Selection: spec.selection, RollingSnapshot: spec.rolling})
+			summary.RollbackStatus = "unavailable"
+			summary.RepositorySnapshotDate = spec.rolling.GetDate()
+		} else if spec.rolling != nil {
+			detectErr = errors.New("rolling_snapshot_on_nonrolling_backend")
+		}
+	}
 	fail := func(phase error) {
 		summary.Result = agentv1.PatchRunResult_PATCH_RUN_RESULT_FAILED
 		summary.Diagnostic = failureDiagnostic(phase)
@@ -345,6 +357,11 @@ func (r *Runner) execute(ctx context.Context, spec runSpec, started time.Time) (
 	if writeErr := r.writeRunState(state); writeErr != nil {
 		return writeErr
 	}
+	if _, rolling := native.(*rollingBackend); rolling && summary.GetResult() == agentv1.PatchRunResult_PATCH_RUN_RESULT_SUCCEEDED {
+		if clearErr := clearRollingHold(); clearErr != nil {
+			return clearErr
+		}
+	}
 	if writeErr := r.writeStatus(status); writeErr != nil {
 		return writeErr
 	}
@@ -367,6 +384,13 @@ func (r *Runner) ledgerAnchor(spec runSpec) time.Time {
 // native runs refresh, listing, deferral, installation, the reboot oracle and
 // the reboot schedule, filling summary. fail records the first failure.
 func (r *Runner) native(ctx context.Context, native backend, spec runSpec, state *agentv1.OSUpdateRunState, summary *agentv1.PatchRunSummary, fail func(error)) {
+	_, rolling := native.(*rollingBackend)
+	if rolling {
+		if err := rollingHold(); err != nil {
+			fail(err)
+			return
+		}
+	}
 	if err := native.refresh(ctx); err != nil {
 		fail(err)
 		return
@@ -386,9 +410,9 @@ func (r *Runner) native(ctx context.Context, native backend, spec runSpec, state
 	plan := planRun(spec.selection, pending, ledger, spec.deferral, anchor)
 	summary.DeferredPackages = uint32(min(len(plan.deferred), maxCount))
 	switch {
-	case plan.selected == 0:
+	case plan.selected == 0 && !rolling:
 		summary.Result = agentv1.PatchRunResult_PATCH_RUN_RESULT_SUCCEEDED
-	case plan.eligible == 0:
+	case plan.eligible == 0 && !rolling:
 		summary.Result = agentv1.PatchRunResult_PATCH_RUN_RESULT_DEFERRED
 	default:
 		before, err := native.installed(ctx)
@@ -396,13 +420,42 @@ func (r *Runner) native(ctx context.Context, native backend, spec runSpec, state
 			fail(err)
 			return
 		}
+		if rolling {
+			// The root-side marker must be in the pre-snapshot too, so
+			// restoring it cannot replay the old policy automatically.
+			if err := r.beginRollingHold(summary); err != nil {
+				fail(err)
+				return
+			}
+			if err := rollingSnapshot(ctx, summary); err != nil {
+				fail(err)
+				return
+			}
+			if err := r.beginRollingHold(summary); err != nil {
+				fail(err)
+				return
+			}
+		}
 		installErr := native.install(ctx, installRequest{selection: spec.selection, deferred: plan.deferred, patchNow: spec.trigger == agentv1.PatchRunTrigger_PATCH_RUN_TRIGGER_PATCH_NOW})
-		if after, err := native.installed(ctx); err == nil {
+		after, observeErr := native.installed(ctx)
+		if observeErr == nil {
 			summary.UpdatedPackages = changedPackages(before, after)
 		}
 		if installErr != nil {
 			fail(installErr)
 			return
+		}
+		if observeErr != nil {
+			fail(observeErr)
+			return
+		}
+		if rolling && summary.GetUpdatedPackages() > 0 {
+			// Conservative whole-system reboot policy, not an assertion that
+			// only a kernel package can require a reboot.
+			if err := writeAtomic(rollingReboot, []byte(bootID())); err != nil {
+				fail(err)
+				return
+			}
 		}
 		summary.Result = agentv1.PatchRunResult_PATCH_RUN_RESULT_SUCCEEDED
 	}
@@ -530,6 +583,13 @@ func (r *Runner) unavailable(reason string, state *agentv1.OSUpdateRunState) *ag
 // or any listing or oracle failure is unavailable, never zero counts.
 func (r *Runner) observe(ctx context.Context, native backend, state *agentv1.OSUpdateRunState) (*agentv1.PatchStatusObservation, []pendingPackage) {
 	status := r.unavailable("", state)
+	if _, rolling := native.(*rollingBackend); rolling {
+		// A whole-system receipt is not a security classification. Publishing
+		// an available zero security count would falsely label this fleet clean.
+		status.Backend = native.kind()
+		status.Reason = "rolling_security_classification_unavailable"
+		return status, nil
+	}
 	if _, pkg := native.missingTool(false); pkg != "" {
 		status.Reason = reasonToolMissing + ":" + pkg
 		return status, nil

@@ -161,6 +161,11 @@ func detectBackend(osRelease []byte) (backend, error) {
 		return dnfBackend{dnf5: true}, nil
 	case platform.BackendDNF4:
 		return dnfBackend{}, nil
+	case platform.BackendPacman, platform.BackendZypper:
+		if release.Native().RollingUpdate == nil {
+			return nil, errors.New(reasonPlatform)
+		}
+		return &rollingBackend{release: release.Native()}, nil
 	default:
 		return nil, errors.New(reasonPlatform)
 	}

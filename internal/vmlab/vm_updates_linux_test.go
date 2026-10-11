@@ -21,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/packaging"
 )
 
 // An aarch64 guest cannot boot without pinned EFI firmware. The lane must refuse
@@ -60,6 +61,26 @@ func TestUpdateHardwareResolvedBeforePackageBuild(t *testing.T) {
 	}
 	if _, err := UpdateVM(context.Background(), amd, VMUpdateOptions{Repository: t.TempDir(), WorkDir: work}); err == nil || !strings.Contains(err.Error(), "no maintained vm updates lane") {
 		t.Fatalf("unqualified Debian 12 x86_64 update lane admitted: %v", err)
+	}
+}
+
+// The signed update target must use the native version, including the package
+// release, or the executor cannot reconcile an interrupted transaction.
+func TestUpdateChannelUsesNativePackageVersion(t *testing.T) {
+	for _, test := range []struct {
+		format packaging.Format
+		want   string
+	}{
+		{packaging.FormatDEB, "0.2.0"},
+		{packaging.FormatRPM, "0.2.0-" + packaging.RPMRelease},
+		{packaging.FormatArch, "0.2.0-1"},
+	} {
+		t.Run(string(test.format), func(t *testing.T) {
+			channel, _ := updateChannel(packaging.Artifact{Version: "0.2.0", Format: test.format}, 1, false, 100)
+			if got := channel.GetArtifacts()[0].GetNativeVersion(); got != test.want {
+				t.Fatalf("native version = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 

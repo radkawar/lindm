@@ -59,6 +59,8 @@ type VMDispatchOptions struct {
 	RuntimeAuthorization  bool
 	Resources             bool
 	ResourceExecutionOnly bool
+	// Advisories qualifies real vendor feeds against this enrolled guest.
+	Advisories bool
 	// ResourceKinds selects connected lane kind groups; see resourceKindSelection.
 	ResourceKinds map[string]bool
 	// ReleaseUpgrade runs the connected profile across the vendor's in-place
@@ -83,36 +85,39 @@ type VMDispatchScenario struct {
 }
 
 type VMDispatchResult struct {
-	Distribution           string                          `json:"distribution"`
-	Version                string                          `json:"version"`
-	RepositorySnapshotDate string                          `json:"repository_snapshot_date,omitempty"`
-	ImageID                string                          `json:"image_id"`
-	ImageSHA256            string                          `json:"image_sha256"`
-	PackageSHA256          string                          `json:"package_sha256"`
-	LabSHA256              string                          `json:"lab_sha256"`
-	LindmdSHA256           string                          `json:"lindmd_sha256"`
-	SignerFingerprint      string                          `json:"signer_fingerprint"`
-	DeviceID               string                          `json:"device_id"`
-	Generation             string                          `json:"generation"`
-	Database               string                          `json:"database"`
-	Runtime                *vmRuntimeEvidence              `json:"runtime,omitempty"`
-	RedHat                 *VMRedHatEvidence               `json:"redhat,omitempty"`
-	SELinux                string                          `json:"selinux"`
-	Baseline               string                          `json:"baseline"`
-	Scenarios              []VMDispatchScenario            `json:"scenarios"`
-	RecentActions          []*adminv1.DeviceResourceAction `json:"recent_actions,omitempty"`
-	StartedAt              time.Time                       `json:"started_at"`
-	FinishedAt             time.Time                       `json:"finished_at"`
-	Passed                 bool                            `json:"passed"`
-	Failure                string                          `json:"failure,omitempty"`
-	ClockSkew              []*VMDispatchClockEvidence      `json:"clock_skew,omitempty"`
-	Hold                   *VMDispatchHoldEvidence         `json:"hold,omitempty"`
-	Power                  *VMPowerEvidence                `json:"power,omitempty"`
-	Resources              *VMResourceEvidence             `json:"resources,omitempty"`
-	RecoveryReadiness      *VMRecoveryReadinessEvidence    `json:"recovery_readiness,omitempty"`
-	Architecture           string                          `json:"architecture,omitempty"`
-	ReleaseUpgrade         *VMReleaseUpgradeEvidence       `json:"release_upgrade,omitempty"`
-	RuntimeAuthorization   *VMRuntimeAuthorizationEvidence `json:"runtime_authorization,omitempty"`
+	Distribution                     string                          `json:"distribution"`
+	Version                          string                          `json:"version"`
+	RepositorySnapshotDate           string                          `json:"repository_snapshot_date,omitempty"`
+	RepositorySnapshotManifestSHA256 string                          `json:"repository_snapshot_manifest_sha256,omitempty"`
+	RepositorySnapshotRepomdSHA256   string                          `json:"repository_snapshot_repomd_sha256,omitempty"`
+	ImageID                          string                          `json:"image_id"`
+	ImageSHA256                      string                          `json:"image_sha256"`
+	PackageSHA256                    string                          `json:"package_sha256"`
+	LabSHA256                        string                          `json:"lab_sha256"`
+	LindmdSHA256                     string                          `json:"lindmd_sha256"`
+	SignerFingerprint                string                          `json:"signer_fingerprint"`
+	DeviceID                         string                          `json:"device_id"`
+	Generation                       string                          `json:"generation"`
+	Database                         string                          `json:"database"`
+	Runtime                          *vmRuntimeEvidence              `json:"runtime,omitempty"`
+	RedHat                           *VMRedHatEvidence               `json:"redhat,omitempty"`
+	SELinux                          string                          `json:"selinux"`
+	Baseline                         string                          `json:"baseline"`
+	Scenarios                        []VMDispatchScenario            `json:"scenarios"`
+	RecentActions                    []*adminv1.DeviceResourceAction `json:"recent_actions,omitempty"`
+	StartedAt                        time.Time                       `json:"started_at"`
+	FinishedAt                       time.Time                       `json:"finished_at"`
+	Passed                           bool                            `json:"passed"`
+	Failure                          string                          `json:"failure,omitempty"`
+	ClockSkew                        []*VMDispatchClockEvidence      `json:"clock_skew,omitempty"`
+	Hold                             *VMDispatchHoldEvidence         `json:"hold,omitempty"`
+	Power                            *VMPowerEvidence                `json:"power,omitempty"`
+	Resources                        *VMResourceEvidence             `json:"resources,omitempty"`
+	RecoveryReadiness                *VMRecoveryReadinessEvidence    `json:"recovery_readiness,omitempty"`
+	Architecture                     string                          `json:"architecture,omitempty"`
+	ReleaseUpgrade                   *VMReleaseUpgradeEvidence       `json:"release_upgrade,omitempty"`
+	RuntimeAuthorization             *VMRuntimeAuthorizationEvidence `json:"runtime_authorization,omitempty"`
+	Advisories                       *VMAdvisoryEvidence             `json:"advisories,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -129,6 +134,17 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return nil, errors.New("runtime authorization requires local authority without another dispatch scenario")
 	}
 	release := manifestRelease(manifest)
+	if options.Advisories {
+		if err := release.LabLaneOn(platform.LaneAdvisories, manifest.GetArchitecture()); err != nil {
+			return nil, err
+		}
+		if options.Resources || options.PowerActions || options.Hold != 0 {
+			return nil, errors.New("advisories run without resource, power or hold scenarios")
+		}
+		if _, err := vmAdvisorySource(release, manifest.GetArchitecture()); err != nil {
+			return nil, err
+		}
+	}
 	if options.Resources {
 		if err := release.LabLane(platform.LaneResources); err != nil {
 			return nil, err
@@ -166,6 +182,8 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	result = &VMDispatchResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), StartedAt: time.Now().UTC()}
 	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
+	result.RepositorySnapshotManifestSHA256 = manifest.GetRepositorySnapshotManifestSha256()
+	result.RepositorySnapshotRepomdSHA256 = manifest.GetRepositorySnapshotRepomdSha256()
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.Passed = err == nil
@@ -280,6 +298,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err := pinArchRepositories(ctx, vm, manifest); err != nil {
 		return result, err
 	}
+	snapshot, err := prepareGuestRollingSnapshot(ctx, vm, manifest, options.CacheDir)
+	if err != nil {
+		return result, err
+	}
+	if snapshot != nil {
+		defer func() { err = errors.Join(err, snapshot.Close()) }()
+	}
 	backend, err := nativeBackend(release)
 	if err != nil {
 		return result, err
@@ -305,6 +330,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
+	packages.rollingSnapshot = rollingSnapshotDesired(manifest, snapshot)
 	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
 		return result, err
 	}
@@ -320,7 +346,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if firewall != nil {
-		if err := firewall.installPeer(ctx, manifest, artifact, apt, publicKey, signer.Fingerprint); err != nil {
+		if err := firewall.installPeer(ctx, manifest, artifact, apt, publicKey, signer.Fingerprint, arch...); err != nil {
 			return result, fmt.Errorf("install probe peer package: %w", err)
 		}
 	}
@@ -440,6 +466,10 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if _, err := waitVMExecutionTrust(ctx, vm, authority, delegation); err != nil {
+		return result, err
+	}
+	if options.Advisories {
+		result.Advisories, err = exerciseVMAdvisories(ctx, vm, control, fixture, manifest, options.CacheDir, result.DeviceID)
 		return result, err
 	}
 	if options.ResourceExecutionOnly {

@@ -349,3 +349,9 @@ DELETE FROM advisory_exception_requests WHERE (actor_id,request_id) IN
 DELETE FROM advisory_exceptions WHERE (device_id,finding_id) IN
  (SELECT device_id,finding_id FROM advisory_exceptions WHERE expires_at < now()-interval '90 days'
  ORDER BY expires_at LIMIT 1000);
+
+-- name: AdvisoryNativeInstances :many
+-- Native OVAL predicates bind all installed instances, including installonly
+-- versions and secondary architectures. The extra row detects the hard bound.
+SELECT manager,version,architecture FROM snapshot_packages
+WHERE snapshot_id=$1 AND name=$2 ORDER BY position LIMIT 1025;

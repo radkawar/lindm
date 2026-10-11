@@ -65,6 +65,9 @@ enum PatchRunTool {
   PATCH_RUN_TOOL_DNF_AUTOMATIC = 6;
   PATCH_RUN_TOOL_LOGIND = 7;
   PATCH_RUN_TOOL_LINDM_AGENT = 8;
+  PATCH_RUN_TOOL_PACMAN = 9;
+  PATCH_RUN_TOOL_ZYPPER = 10;
+  PATCH_RUN_TOOL_SNAPPER = 11;
 }
 
 enum PatchRunPhase {
@@ -136,6 +139,26 @@ message PatchRunSummary {
   PatchRunDiagnostic diagnostic = 12;
   // Graphical sessions that accepted a desktop notification.
   uint32 notified_sessions = 13 [(buf.validate.field).uint32.lte = 1024];
+  // Empty for nonrolling backends. "unavailable" explicitly means no rollback;
+  // "snapper_pre_snapshot" records a configured Btrfs root snapshot, not proof
+  // of boot recovery or rollback of excluded subvolumes, user data or databases.
+  string rollback_status = 14 [(buf.validate.field).string = {
+    in: [
+      "",
+      "unavailable",
+      "snapper_pre_snapshot"
+    ]
+  }];
+  uint64 rollback_snapshot = 15;
+  string repository_snapshot_date = 16 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+  ];
+  option (buf.validate.message).cel = {
+    id: "patch_run_summary.rollback"
+    message: "only a recorded snapper pre-snapshot carries a snapshot number"
+    expression: "(this.rollback_status == 'snapper_pre_snapshot') == (this.rollback_snapshot > 0)"
+  };
   option (buf.validate.message).cel = {
     id: "patch_run_summary.trigger"
     message: "patch-now runs carry their action identity; window runs do not"

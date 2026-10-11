@@ -29,6 +29,7 @@ type VMServicesOptions struct {
 	CacheDir       string
 	WorkDir        string
 	DiagnosticsDir string
+	Hardware       *VMHardwareOptions
 }
 
 type VMServiceNativeState struct {
@@ -67,15 +68,18 @@ type VMServicesEvidence struct {
 }
 
 type VMServicesResult struct {
-	Distribution  string              `json:"distribution"`
-	Version       string              `json:"version"`
-	ImageID       string              `json:"image_id"`
-	ImageSHA256   string              `json:"image_sha256"`
-	LabSHA256     string              `json:"lab_sha256"`
-	Runtime       *vmRuntimeEvidence  `json:"runtime"`
-	SELinuxBefore string              `json:"selinux_before,omitempty"`
-	SELinuxAfter  string              `json:"selinux_after,omitempty"`
-	Services      *VMServicesEvidence `json:"services"`
+	Distribution                     string              `json:"distribution"`
+	Version                          string              `json:"version"`
+	RepositorySnapshotDate           string              `json:"repository_snapshot_date,omitempty"`
+	RepositorySnapshotManifestSHA256 string              `json:"repository_snapshot_manifest_sha256,omitempty"`
+	RepositorySnapshotRepomdSHA256   string              `json:"repository_snapshot_repomd_sha256,omitempty"`
+	ImageID                          string              `json:"image_id"`
+	ImageSHA256                      string              `json:"image_sha256"`
+	LabSHA256                        string              `json:"lab_sha256"`
+	Runtime                          *vmRuntimeEvidence  `json:"runtime"`
+	SELinuxBefore                    string              `json:"selinux_before,omitempty"`
+	SELinuxAfter                     string              `json:"selinux_after,omitempty"`
+	Services                         *VMServicesEvidence `json:"services"`
 }
 
 // ServicesVM qualifies the native provider, not remote execution authority.
@@ -85,16 +89,17 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 		return nil, err
 	}
 	release := manifestRelease(manifest)
-	if err := release.LabLane(platform.LaneServices); err != nil {
+	if err := release.LabLaneOn(platform.LaneServices, manifest.GetArchitecture()); err != nil {
 		return nil, err
 	}
-	if manifest.Architecture != "amd64" && manifest.Architecture != "x86_64" {
-		return nil, errors.New("vm services requires an amd64/x86_64 manifest")
+	architecture, machine, err := inspectArchitecture(manifest.GetArchitecture())
+	if err != nil {
+		return nil, err
 	}
 	selinux := release.Native().Packages.Backend.DNF()
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()
-	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, false)
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, options.Hardware)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +117,7 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 	}()
 	// Hash and validate the private snapshot, not a pathname which could be
 	// replaced between ELF inspection and upload.
-	snapshot, digest, err := snapshotServicesProbe(ctx, vm.dir, options.LabBinary)
+	snapshot, digest, err := snapshotServicesProbe(ctx, vm.dir, options.LabBinary, machine)
 	if err != nil {
 		return nil, err
 	}
@@ -127,15 +132,25 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 	if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
 		return nil, fmt.Errorf("service guest cloud-init: %w", err)
 	}
+	repositorySnapshot, err := prepareGuestRollingSnapshot(ctx, vm, manifest, options.CacheDir)
+	if err != nil {
+		return nil, err
+	}
+	if repositorySnapshot != nil {
+		defer func() { err = errors.Join(err, repositorySnapshot.Close()) }()
+	}
 	host, err := vm.run(ctx, hostTruthCommand, nil, 4096, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	identity := strings.Split(string(host), "\n")
-	if len(identity) != 7 || identity[0] != manifest.Distribution || identity[1] != manifest.Version || identity[2] != "x86_64" {
+	if len(identity) != 7 || identity[0] != manifest.Distribution || (release.Version.Rule != platform.VersionAbsent && identity[1] != manifest.Version) || identity[2] != architecture {
 		return nil, errors.New("service guest OS identity differs from manifest")
 	}
 	result = &VMServicesResult{Distribution: manifest.Distribution, Version: manifest.Version, ImageID: manifest.Id, ImageSHA256: verified.SHA256, LabSHA256: digest, Runtime: runtimeEvidence}
+	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
+	result.RepositorySnapshotManifestSHA256 = manifest.GetRepositorySnapshotManifestSha256()
+	result.RepositorySnapshotRepomdSHA256 = manifest.GetRepositorySnapshotRepomdSha256()
 	if selinux {
 		result.SELinuxBefore, err = serviceGuestEnforcing(ctx, vm)
 		if err != nil {
@@ -239,7 +254,7 @@ func serviceGuestEnforcing(ctx context.Context, vm *guestVM) (string, error) {
 	return "Enforcing", nil
 }
 
-func snapshotServicesProbe(ctx context.Context, dir, path string) (_ *os.File, digest string, err error) {
+func snapshotServicesProbe(ctx context.Context, dir, path string, machine elf.Machine) (_ *os.File, digest string, err error) {
 	file, err := openRegular(path)
 	if err != nil {
 		return nil, "", err
@@ -259,8 +274,8 @@ func snapshotServicesProbe(ctx context.Context, dir, path string) (_ *os.File, d
 		return nil, "", err
 	}
 	binary, err := elf.NewFile(snapshot)
-	if err != nil || binary.Machine != elf.EM_X86_64 || binary.Class != elf.ELFCLASS64 || (binary.Type != elf.ET_EXEC && binary.Type != elf.ET_DYN) {
-		return nil, "", errors.New("service laboratory probe must be an executable amd64 ELF binary")
+	if err != nil || binary.Machine != machine || binary.Class != elf.ELFCLASS64 || (binary.Type != elf.ET_EXEC && binary.Type != elf.ET_DYN) {
+		return nil, "", errors.New("service laboratory probe must be a 64-bit executable ELF for the selected guest architecture")
 	}
 	if _, err := snapshot.Seek(0, io.SeekStart); err != nil {
 		return nil, "", err

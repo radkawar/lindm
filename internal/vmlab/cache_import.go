@@ -11,6 +11,17 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 )
 
+// InitializeImageCache applies the existing ownership marker and initialization
+// lock before another cache namespace publishes entries alongside base images.
+// Unmarked nonempty directories remain forbidden.
+func InitializeImageCache(ctx context.Context, directory string) error {
+	root, err := openCache(ctx, directory, true)
+	if err != nil {
+		return err
+	}
+	return root.Close()
+}
+
 // ImportCache publishes an rsync-staged authenticated entry into the host's
 // persistent image cache. The destination uses the ordinary cache locks and
 // verifier. Existing entries are reverified, never replaced or repaired.

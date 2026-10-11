@@ -18,7 +18,7 @@ import (
 
 func archSource() *advisoryv1.FeedSource {
 	config := source("arch", "rolling", advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON)
-	config.Url = "https://security.archlinux.org/all.json"
+	config.Url = "https://security.archlinux.org/issues/all.json"
 	config.Architecture = "x86_64"
 	return config
 }

@@ -64,7 +64,7 @@ func Claims(desired *resourcev1.ResourceDesiredState) ([]*resourcev1.ResourceCla
 			b.requireRef(state.FlatpakApp.GetRemote())
 		}
 	case *resourcev1.ResourceDesiredState_OsUpdate:
-		b.osUpdate()
+		b.osUpdate(state.OsUpdate)
 	case *resourcev1.ResourceDesiredState_PasswordPolicy:
 		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PAM_OWNER, "system/local-auth", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "password-policy")
 	case *resourcev1.ResourceDesiredState_CertificateEnrollment:
@@ -306,7 +306,12 @@ func (b *claimBuilder) nativePackage(pkg *resourcev1.NativePackageDesired) error
 // osUpdate claims the single native update scheduler per device; owned fixed
 // paths exclude any managed file or systemd definition resource from the same
 // objects.
-func (b *claimBuilder) osUpdate() {
+func (b *claimBuilder) osUpdate(desired *resourcev1.OSUpdateDesired) {
+	if desired.GetRollingSnapshot() != nil {
+		// A whole-system snapshot cannot honor a separate exact version pin
+		// or package removal. Never silently turn those into exclusions.
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "*", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "rolling-whole-system")
+	}
 	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE, "system", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
 	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "timer/"+OSUpdateTimerUnit, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
 	for _, kind := range OSUpdateNativeFiles() {

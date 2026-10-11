@@ -59,7 +59,13 @@ func TestOSUpdateSnapshotsPassJournalAdmission(t *testing.T) {
 	}
 	s := &Store{validator: validator}
 	ref := &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}
-	backends := map[resourcev1.OSUpdateBackend]resourcev1.Backend{1: resourcev1.Backend_BACKEND_APT, 2: resourcev1.Backend_BACKEND_DNF5, 3: resourcev1.Backend_BACKEND_DNF4}
+	backends := map[resourcev1.OSUpdateBackend]resourcev1.Backend{
+		1: resourcev1.Backend_BACKEND_APT,
+		2: resourcev1.Backend_BACKEND_DNF5,
+		3: resourcev1.Backend_BACKEND_DNF4,
+		4: resourcev1.Backend_BACKEND_ALPM,
+		5: resourcev1.Backend_BACKEND_ZYPPER,
+	}
 	for update, native := range backends {
 		for _, present := range []bool{false, true} {
 			snapshot := osUpdateSnapshot(update, present)
@@ -81,7 +87,7 @@ func TestOSUpdateSnapshotsPassJournalAdmission(t *testing.T) {
 }
 
 func TestOSUpdateSnapshotBindsBackendFileSet(t *testing.T) {
-	for _, backend := range []resourcev1.OSUpdateBackend{1, 2, 3} {
+	for _, backend := range []resourcev1.OSUpdateBackend{1, 2, 3, 4, 5} {
 		if !osUpdateOwnershipSnapshotValid(osUpdateSnapshot(backend, true)) || !osUpdateOwnershipSnapshotValid(osUpdateSnapshot(backend, false)) {
 			t.Fatalf("valid %v snapshot rejected", backend)
 		}

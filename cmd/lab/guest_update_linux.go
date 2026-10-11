@@ -255,7 +255,7 @@ func freezeNativeUnpack(ctx context.Context, group, binary string, original *uni
 			name := strings.TrimSpace(string(comm))
 			observed = append(observed, fmt.Sprintf("%d:%q", pid, name))
 			inPlace := file == binary
-			if (inPlace && name == "pacman") || (!inPlace && (name == "dnf" || name == "dnf5" || name == "dpkg" || name == "apt-get")) {
+			if (inPlace && name == "pacman") || (!inPlace && (name == "dnf" || name == "dnf5" || name == "zypper" || name == "dpkg" || name == "apt-get")) {
 				return fmt.Sprintf("%s pid=%d unpack=%s bytes=%d cgroup=%s frozen=1", name, pid, file, size, filepath.Base(group)), nil
 			}
 		}

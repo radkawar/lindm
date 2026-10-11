@@ -365,6 +365,7 @@ func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advis
 	findings := make(map[uuid.UUID]advisorydb.InsertAdvisorySetFindingsParams)
 	// Per-stream vendor feeds bind native module name/stream identity.
 	modules := platform.ForFeed(selectedSource.GetDistro(), selectedSource.GetRelease()).Advisory.PlatformStreams
+	var nativePredicates map[string]nativePredicateResult
 	afterPosition, afterRecord := int32(-1), uuid.Nil
 matching:
 	for {
@@ -380,6 +381,24 @@ matching:
 			if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
 				unknown("advisory_record_invalid")
 				break matching
+			}
+			// OVAL architecture predicates constrain native instances exactly;
+			// unlike repository noarch claims, they are not wildcard joins.
+			if record.GetPrerequisitePackage() != "" && (row.Manager != "rpm" || record.GetArchitecture() != "" && row.Architecture != record.GetArchitecture()) {
+				continue
+			}
+			if nativePredicates == nil && (record.GetPrerequisitePackage() != "" || record.GetAllInstalledInstances()) {
+				nativePredicates = make(map[string]nativePredicateResult)
+			}
+			applicable, err := nativeApplicability(ctx, q, snapshotID, &record, nativePredicates)
+			if err != nil {
+				return set, err
+			}
+			if !applicable.applies {
+				if applicable.reason != "" {
+					unknown(applicable.reason)
+				}
+				continue
 			}
 			if modules && !record.GetSourceRecordRejected() {
 				if row.ModuleStatus != 1 {
@@ -397,7 +416,7 @@ matching:
 			if record.GetSourcePackage() {
 				version = row.SourceVersion
 			}
-			affected, err := matches(row.Manager, version, &record)
+			affected, err := MatchesVersion(row.Manager, version, &record)
 			if err != nil {
 				unknown("package_version_unrecognized")
 				continue
@@ -521,7 +540,10 @@ func findingKey(parts ...string) uuid.UUID {
 	return key
 }
 
-func matches(manager, installed string, record *advisoryv1.Advisory) (bool, error) {
+// MatchesVersion evaluates only a normalized native version range. Callers must
+// separately bind product, package, architecture and installed-product predicates.
+// A true unknown/rejected assessment is not a claim of known vulnerability.
+func MatchesVersion(manager, installed string, record *advisoryv1.Advisory) (bool, error) {
 	// A rejected source record supplies no trustworthy version or module
 	// boundary. Its exact candidate package identity alone requires UNKNOWN.
 	if record.GetSourceRecordRejected() {

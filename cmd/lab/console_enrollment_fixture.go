@@ -45,7 +45,7 @@ func runConsoleEnrollment(ctx context.Context, args []string, stdout, stderr io.
 		return err
 	}
 	defer func() { enrollment.Secret = "" }()
-	_, err = fmt.Fprintf(stdout, "Protected disposable enrollment console; output contains a one-time secret.\nEnrollment URL: %s/enroll\nUsername: console-owner\nEnrollment secret: %s\nExpires: %s\nAdmin address: %s\nDevice address: %s\nNative repositories: %s/repo/apt and %s/repo/rpm\nNo devices are pre-enrolled. Copy the production install command after the native lane reports a fresh guest ready.\nCtrl-C removes this fixture's owned server, database, packages and signing custody.\n", fixture.ConsoleOrigin, enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), fixture.AdminAddress, fixture.DeviceAddress, fixture.ConsoleOrigin, fixture.ConsoleOrigin)
+	_, err = fmt.Fprintf(stdout, "Protected disposable enrollment console; output contains a one-time secret.\nEnrollment URL: %s/enroll\nUsername: console-owner\nEnrollment secret: %s\nExpires: %s\nAdmin address: %s\nDevice address: %s\nNative repositories: %s/repo/apt, %s/repo/rpm and %s/repo/arch\nNo devices are pre-enrolled. Copy the production install command after the native lane reports a fresh guest ready.\nCtrl-C removes this fixture's owned server, database, packages and signing custody.\n", fixture.ConsoleOrigin, enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), fixture.AdminAddress, fixture.DeviceAddress, fixture.ConsoleOrigin, fixture.ConsoleOrigin, fixture.ConsoleOrigin)
 	enrollment.Secret = ""
 	if err != nil {
 		return err

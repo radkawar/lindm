@@ -6,6 +6,31 @@ import (
 	"testing"
 )
 
+func TestSnapshotRecipeRequiresExactKernelAndSnapshot(t *testing.T) {
+	for _, target := range []struct{ version, architecture string }{
+		{"20261007", "aarch64"},
+		{"20261009", "x86_64"},
+	} {
+		inputs, err := RepositorySnapshotInputs("opensuse-tumbleweed", target.version, target.architecture)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(inputs, "kernel-default=7.2.9-1.1") || slices.Contains(inputs, "kernel-default") {
+			t.Fatalf("%s/%s does not require the exact signed snapshot kernel: %v", target.version, target.architecture, inputs)
+		}
+	}
+	for _, target := range []struct{ version, architecture string }{
+		{"20261007", "x86_64"},
+		{"20261009", "aarch64"},
+		{"20261010", "x86_64"},
+		{"", "aarch64"},
+	} {
+		if _, err := RepositorySnapshotInputs("opensuse-tumbleweed", target.version, target.architecture); err == nil {
+			t.Fatalf("unrecorded snapshot %s/%s admitted without an exact kernel", target.version, target.architecture)
+		}
+	}
+}
+
 func TestIdentify(t *testing.T) {
 	for _, test := range []struct {
 		os  OSRelease

@@ -53,11 +53,17 @@ var allowedEnv = map[string]bool{
 	"DEBIAN_FRONTEND":      true, // noninteractive apt/dpkg
 	"APT_CONFIG":           true, // private staged APT configuration
 	"DPKG_FRONTEND_LOCKED": true, // dpkg invoked under the caller's frontend lock
-	"SYSTEMD_COLORS":       true,
-	"SYSTEMD_PAGER":        true,
-	"SYSTEMD_UNIT_PATH":    true, // private staged unit verification
-	"SOURCE_DATE_EPOCH":    true, // reproducible recovery image builds
-	"NEEDRESTART_MODE":     true, // needrestart's dpkg hook restarts services without prompting
+	// libzypp's documented EnvironmentVariables/zypp.conf inputs. Preparation
+	// uses a private lock root; live apply deliberately omits that override.
+	"ZYPP_CONF":          true, // sole private staged zypp configuration
+	"ZYPP_LOGFILE":       true, // private caller-owned diagnostic destination
+	"ZYPP_LOCK_TIMEOUT":  true, // fail immediately when the native lock is busy
+	"ZYPP_LOCKFILE_ROOT": true, // isolate preparation's frontend lock only
+	"SYSTEMD_COLORS":     true,
+	"SYSTEMD_PAGER":      true,
+	"SYSTEMD_UNIT_PATH":  true, // private staged unit verification
+	"SOURCE_DATE_EPOCH":  true, // reproducible recovery image builds
+	"NEEDRESTART_MODE":   true, // needrestart's dpkg hook restarts services without prompting
 	// The caller's own user session bus, validated by sessionBusAddress: only
 	// unix:path=/run/user/<uid>/bus, and with Credential set only that UID's.
 	"DBUS_SESSION_BUS_ADDRESS": true,

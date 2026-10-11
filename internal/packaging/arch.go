@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+
+	"lindm/internal/platform"
 )
 
 const archRelease = "1"
@@ -70,6 +72,9 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	pkgver := version + "-" + archRelease
 	var info strings.Builder
 	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = UNLICENSED\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", PackageName, PackageName, pkgver, agentProduct().summary, epoch, size, arch.Arch)
+	for _, dependency := range platform.BackendPacman.ResourceDependencies() {
+		fmt.Fprintf(&info, "depend = %s\n", dependency)
+	}
 	for _, optional := range agentProduct().archOptdepends {
 		fmt.Fprintf(&info, "optdepend = %s\n", optional)
 	}

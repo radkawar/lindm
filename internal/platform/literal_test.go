@@ -16,6 +16,7 @@ import (
 // distribution; each needs a reason.
 var nonDistroLiterals = map[string]map[string]string{
 	"internal/advisory/feed/osv.go":               {"arch": "OSV package-URL qualifier key"},
+	"internal/advisory/feed/suse_oval.go":         {"arch": "OVAL rpminfo architecture element name"},
 	"internal/agent/dnf/versionlock.go":           {"arch": "DNF versionlock condition key (RPM architecture)"},
 	"internal/agent/packageprovider/pin_linux.go": {"arch": "DNF versionlock condition key (RPM architecture)"},
 	"internal/packaging/result.go":                {"arch": "pacman package format name and .PKGINFO architecture field key"},

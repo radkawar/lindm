@@ -306,6 +306,11 @@ func absentIdentity() []byte {
 // target derives the complete owned image from signed desired state and the
 // protected ledger only; server-provided inverse content is never accepted.
 func (p *Provider) target(ctx context.Context, desired *resourcev1.OSUpdateDesired, before *agentv1.ResourceOwnershipSnapshot, ledger *agentv1.ResourceOwnershipLedger, operation resourcev1.ResourceOperation) (*agentv1.ResourceOwnershipSnapshot, error) {
+	if operation != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+		if err := osupdate.ValidateRollingPolicy(p.update, desired); err != nil {
+			return nil, err
+		}
+	}
 	target := proto.CloneOf(before)
 	observation := target.GetObservation().GetOsUpdate()
 	if observation == nil || target.GetOsUpdate() == nil {
@@ -860,6 +865,8 @@ func (p *Provider) conflicts(ctx context.Context) ([]string, error) {
 		return p.manager.Conflicts(ctx, []string{"dnf5-automatic*.timer", "dnf-automatic*.timer"})
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
 		return p.manager.Conflicts(ctx, []string{"dnf-automatic*.timer"})
+	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN, resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER:
+		return p.manager.Conflicts(ctx, []string{"pacman*.timer", "pamac*.timer", "zypper*.timer", "transactional-update*.timer"})
 	default:
 		return nil, ErrUnsupported
 	}

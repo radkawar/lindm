@@ -84,6 +84,13 @@ func nativeVersion(v *resourcev1.NativeVersion) string {
 	if r := v.GetRpm(); r != nil {
 		return strconv.FormatUint(r.GetEpoch(), 10) + ":" + r.GetVersion() + "-" + r.GetRelease()
 	}
+	if a := v.GetAlpm(); a != nil {
+		version := a.GetPkgver() + "-" + a.GetPkgrel()
+		if a.GetEpoch() != 0 {
+			version = strconv.FormatUint(a.GetEpoch(), 10) + ":" + version
+		}
+		return version
+	}
 	return v.GetDeb()
 }
 func debVersion(v string) *resourcev1.NativeVersion {
@@ -212,6 +219,9 @@ func parseDatabase(data []byte, ecosystem resourcev1.PackageEcosystem) (*databas
 }
 
 func (p *Provider) database(ctx context.Context) (_ *database, resultErr error) {
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		return alpmDatabase(ctx, "/var/lib/pacman")
+	}
 	var executable string
 	var args []string
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
@@ -259,7 +269,7 @@ func (p *Provider) database(ctx context.Context) (_ *database, resultErr error) 
 // /usr/lib/sysimage/rpm (Fedora, EL10) or /var/lib/rpm (EL9), or EL8's
 // Berkeley DB. A missing or empty database is never authoritative absence.
 func rpmDatabase() (string, error) {
-	for _, path := range []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/var/lib/rpm/Packages"} {
+	for _, path := range []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/var/lib/rpm/Packages", "/usr/lib/sysimage/rpm/Packages.db", "/var/lib/rpm/Packages.db"} {
 		info, err := os.Stat(path)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -291,6 +301,8 @@ func checkNoDowngrade(before, after *resourcev1.NativeVersion) error {
 	manager := "dpkg"
 	if after.GetRpm() != nil {
 		manager = "rpm"
+	} else if after.GetAlpm() != nil {
+		manager = "pacman"
 	}
 	order, err := feed.Compare(manager, nativeVersion(after), nativeVersion(before))
 	if err != nil {

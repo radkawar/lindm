@@ -50,10 +50,7 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 	if err := checkPlatform(plan.GetBackend().GetProduct()); err != nil {
 		return nil, err
 	}
-	backend := resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE
-	if authselectProduct(plan.GetBackend().GetProduct()) {
-		backend = resourcev1.Backend_BACKEND_AUTHSELECT
-	}
+	backend := passwordBackend(plan.GetBackend().GetProduct())
 	if plan.GetBackend().GetBackend() != backend {
 		return nil, ErrUnsupported
 	}
@@ -92,7 +89,14 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 			err = errors.Join(err, tx.Close())
 		}
 	}()
-	for _, file := range fresh.GetPasswordPolicy().GetFiles() {
+	files := fresh.GetPasswordPolicy().GetFiles()
+	if nativePAMProduct(p.config.Platform) && nativeFile(target, 10).GetState().GetExists() {
+		// Install the policy before exposing its include. Release removes the
+		// include first; a partial transaction never leaves a dangling include.
+		files = slices.Clone(files)
+		files[len(files)-2], files[len(files)-1] = files[len(files)-1], files[len(files)-2]
+	}
+	for _, file := range files {
 		next := nativeFile(target, file.GetKind())
 		if next == nil {
 			return nil, ErrConflict
@@ -126,7 +130,8 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 		return nil, err
 	}
 	// Disable only acquired manager features before removing their profile files.
-	if plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+	ownedStackFiles := nativePAMProduct(p.config.Platform) || pamConfigProduct(p.config.Platform)
+	if !ownedStackFiles && plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		if err := managerUnchanged(ctx, p.config.Platform, fresh, target, p.run); err != nil {
 			return nil, errors.Join(ErrOutcomeUnknown, err)
 		}
@@ -135,11 +140,21 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 		}
 	}
 	for _, tx := range changes {
-		if _, err := tx.Commit(ctx, func(c context.Context) error { return c.Err() }); err != nil {
+		if _, err := tx.Commit(ctx, func(c context.Context) error {
+			if err := c.Err(); err != nil {
+				return err
+			}
+			if pamConfigProduct(p.config.Platform) {
+				return pamConfigUnchanged(c, fresh, func(ctx context.Context) (*managerState, error) {
+					return inspectPamConfig(ctx, p.run)
+				})
+			}
+			return nil
+		}); err != nil {
 			return nil, errors.Join(ErrOutcomeUnknown, err)
 		}
 	}
-	if plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
+	if !ownedStackFiles && plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
 		if err := managerUnchanged(ctx, p.config.Platform, fresh, target, p.run); err != nil {
 			return nil, errors.Join(ErrOutcomeUnknown, err)
 		}
@@ -167,6 +182,13 @@ func fileSnapshot(parent *agentv1.ResourceOwnershipSnapshot, file *agentv1.Passw
 func managerChangeSupported(ctx context.Context, platform *resourcev1.PlatformProduct, before, target *agentv1.ResourceOwnershipSnapshot, run commandRunner) error {
 	if before.GetPasswordPolicy().GetManagerProfile() != target.GetPasswordPolicy().GetManagerProfile() {
 		return ErrConflict
+	}
+	if nativePAMProduct(platform) {
+		return nativePAMChangeSupported(before, target)
+	}
+	if pamConfigProduct(platform) {
+		_, err := pamConfigOperation(before, target)
+		return err
 	}
 	if !authselectProduct(platform) || slices.Equal(before.GetPasswordPolicy().GetEnabledFeatures(), target.GetPasswordPolicy().GetEnabledFeatures()) {
 		return nil

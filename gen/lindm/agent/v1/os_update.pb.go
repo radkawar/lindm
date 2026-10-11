@@ -147,20 +147,26 @@ const (
 	PatchRunTool_PATCH_RUN_TOOL_DNF_AUTOMATIC      PatchRunTool = 6
 	PatchRunTool_PATCH_RUN_TOOL_LOGIND             PatchRunTool = 7
 	PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT        PatchRunTool = 8
+	PatchRunTool_PATCH_RUN_TOOL_PACMAN             PatchRunTool = 9
+	PatchRunTool_PATCH_RUN_TOOL_ZYPPER             PatchRunTool = 10
+	PatchRunTool_PATCH_RUN_TOOL_SNAPPER            PatchRunTool = 11
 )
 
 // Enum value maps for PatchRunTool.
 var (
 	PatchRunTool_name = map[int32]string{
-		0: "PATCH_RUN_TOOL_UNSPECIFIED",
-		1: "PATCH_RUN_TOOL_APT_GET",
-		2: "PATCH_RUN_TOOL_UNATTENDED_UPGRADE",
-		3: "PATCH_RUN_TOOL_NEEDRESTART",
-		4: "PATCH_RUN_TOOL_DNF5",
-		5: "PATCH_RUN_TOOL_DNF",
-		6: "PATCH_RUN_TOOL_DNF_AUTOMATIC",
-		7: "PATCH_RUN_TOOL_LOGIND",
-		8: "PATCH_RUN_TOOL_LINDM_AGENT",
+		0:  "PATCH_RUN_TOOL_UNSPECIFIED",
+		1:  "PATCH_RUN_TOOL_APT_GET",
+		2:  "PATCH_RUN_TOOL_UNATTENDED_UPGRADE",
+		3:  "PATCH_RUN_TOOL_NEEDRESTART",
+		4:  "PATCH_RUN_TOOL_DNF5",
+		5:  "PATCH_RUN_TOOL_DNF",
+		6:  "PATCH_RUN_TOOL_DNF_AUTOMATIC",
+		7:  "PATCH_RUN_TOOL_LOGIND",
+		8:  "PATCH_RUN_TOOL_LINDM_AGENT",
+		9:  "PATCH_RUN_TOOL_PACMAN",
+		10: "PATCH_RUN_TOOL_ZYPPER",
+		11: "PATCH_RUN_TOOL_SNAPPER",
 	}
 	PatchRunTool_value = map[string]int32{
 		"PATCH_RUN_TOOL_UNSPECIFIED":        0,
@@ -172,6 +178,9 @@ var (
 		"PATCH_RUN_TOOL_DNF_AUTOMATIC":      6,
 		"PATCH_RUN_TOOL_LOGIND":             7,
 		"PATCH_RUN_TOOL_LINDM_AGENT":        8,
+		"PATCH_RUN_TOOL_PACMAN":             9,
+		"PATCH_RUN_TOOL_ZYPPER":             10,
+		"PATCH_RUN_TOOL_SNAPPER":            11,
 	}
 )
 
@@ -543,8 +552,14 @@ type PatchRunSummary struct {
 	Diagnostic   *PatchRunDiagnostic `protobuf:"bytes,12,opt,name=diagnostic,proto3" json:"diagnostic,omitempty"`
 	// Graphical sessions that accepted a desktop notification.
 	NotifiedSessions uint32 `protobuf:"varint,13,opt,name=notified_sessions,json=notifiedSessions,proto3" json:"notified_sessions,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Empty for nonrolling backends. "unavailable" explicitly means no rollback;
+	// "snapper_pre_snapshot" records a configured Btrfs root snapshot, not proof
+	// of boot recovery or rollback of excluded subvolumes, user data or databases.
+	RollbackStatus         string `protobuf:"bytes,14,opt,name=rollback_status,json=rollbackStatus,proto3" json:"rollback_status,omitempty"`
+	RollbackSnapshot       uint64 `protobuf:"varint,15,opt,name=rollback_snapshot,json=rollbackSnapshot,proto3" json:"rollback_snapshot,omitempty"`
+	RepositorySnapshotDate string `protobuf:"bytes,16,opt,name=repository_snapshot_date,json=repositorySnapshotDate,proto3" json:"repository_snapshot_date,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *PatchRunSummary) Reset() {
@@ -666,6 +681,27 @@ func (x *PatchRunSummary) GetNotifiedSessions() uint32 {
 		return x.NotifiedSessions
 	}
 	return 0
+}
+
+func (x *PatchRunSummary) GetRollbackStatus() string {
+	if x != nil {
+		return x.RollbackStatus
+	}
+	return ""
+}
+
+func (x *PatchRunSummary) GetRollbackSnapshot() uint64 {
+	if x != nil {
+		return x.RollbackSnapshot
+	}
+	return 0
+}
+
+func (x *PatchRunSummary) GetRepositorySnapshotDate() string {
+	if x != nil {
+		return x.RepositorySnapshotDate
+	}
+	return ""
 }
 
 type OSUpdateDeferralEntry struct {
@@ -1061,7 +1097,7 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\texit_code\x18\x03 \x01(\x05B\x13\xbaH\x10\x1a\x0e\x18\xff\x01(\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01R\bexitCode\x12E\n" +
 	"\verror_lines\x18\x04 \x03(\tB$\xbaH!\x92\x01\x1e\x10\b\"\x1ar\x18\x18\x80\x042\x13^[^\\x00-\\x1f\\x7f]*$R\n" +
 	"errorLines\x12\x1c\n" +
-	"\ttruncated\x18\x05 \x01(\bR\ttruncated\"\xbb\b\n" +
+	"\ttruncated\x18\x05 \x01(\bR\ttruncated\"\xd0\v\n" +
 	"\x0fPatchRunSummary\x12E\n" +
 	"\atrigger\x18\x01 \x01(\x0e2\x1f.lindm.agent.v1.PatchRunTriggerB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\atrigger\x12(\n" +
@@ -1082,7 +1118,11 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\n" +
 	"diagnostic\x18\f \x01(\v2\".lindm.agent.v1.PatchRunDiagnosticR\n" +
 	"diagnostic\x125\n" +
-	"\x11notified_sessions\x18\r \x01(\rB\b\xbaH\x05*\x03\x18\x80\bR\x10notifiedSessions:\x81\x02\xbaH\xfd\x01\x1a\x8a\x01\n" +
+	"\x11notified_sessions\x18\r \x01(\rB\b\xbaH\x05*\x03\x18\x80\bR\x10notifiedSessions\x12S\n" +
+	"\x0frollback_status\x18\x0e \x01(\tB*\xbaH'r%R\x00R\vunavailableR\x14snapper_pre_snapshotR\x0erollbackStatus\x12+\n" +
+	"\x11rollback_snapshot\x18\x0f \x01(\x04R\x10rollbackSnapshot\x12`\n" +
+	"\x18repository_snapshot_date\x18\x10 \x01(\tB&\xbaH#\xd8\x01\x01r\x1e2\x1c^[0-9]{4}-[0-9]{2}-[0-9]{2}$R\x16repositorySnapshotDate:\xb2\x03\xbaH\xae\x03\x1a\xae\x01\n" +
+	"\x1apatch_run_summary.rollback\x12>only a recorded snapper pre-snapshot carries a snapshot number\x1aP(this.rollback_status == 'snapper_pre_snapshot') == (this.rollback_snapshot > 0)\x1a\x8a\x01\n" +
 	"\x19patch_run_summary.trigger\x12>patch-now runs carry their action identity; window runs do not\x1a-(this.trigger == 2) == (this.action_id != '')\x1an\n" +
 	"\x19patch_run_summary.failure\x12%failed runs carry a native diagnostic\x1a*(this.result == 2) == has(this.diagnostic)\"\xdb\x01\n" +
 	"\x15OSUpdateDeferralEntry\x12>\n" +
@@ -1127,7 +1167,7 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\x17PATCH_RUN_RESULT_FAILED\x10\x02\x12+\n" +
 	"'PATCH_RUN_RESULT_SKIPPED_OUTSIDE_WINDOW\x10\x03\x12\x1d\n" +
 	"\x19PATCH_RUN_RESULT_DEFERRED\x10\x04\x12\x1d\n" +
-	"\x19PATCH_RUN_RESULT_REJECTED\x10\x05*\x9f\x02\n" +
+	"\x19PATCH_RUN_RESULT_REJECTED\x10\x05*\xf1\x02\n" +
 	"\fPatchRunTool\x12\x1e\n" +
 	"\x1aPATCH_RUN_TOOL_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16PATCH_RUN_TOOL_APT_GET\x10\x01\x12%\n" +
@@ -1137,7 +1177,11 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\x12PATCH_RUN_TOOL_DNF\x10\x05\x12 \n" +
 	"\x1cPATCH_RUN_TOOL_DNF_AUTOMATIC\x10\x06\x12\x19\n" +
 	"\x15PATCH_RUN_TOOL_LOGIND\x10\a\x12\x1e\n" +
-	"\x1aPATCH_RUN_TOOL_LINDM_AGENT\x10\b*\x91\x02\n" +
+	"\x1aPATCH_RUN_TOOL_LINDM_AGENT\x10\b\x12\x19\n" +
+	"\x15PATCH_RUN_TOOL_PACMAN\x10\t\x12\x19\n" +
+	"\x15PATCH_RUN_TOOL_ZYPPER\x10\n" +
+	"\x12\x1a\n" +
+	"\x16PATCH_RUN_TOOL_SNAPPER\x10\v*\x91\x02\n" +
 	"\rPatchRunPhase\x12\x1f\n" +
 	"\x1bPATCH_RUN_PHASE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aPATCH_RUN_PHASE_VALIDATION\x10\x01\x12\x1b\n" +

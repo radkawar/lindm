@@ -14,6 +14,8 @@ func packageRef(identity *resourcev1.PackageIdentity) *resourcev1.ResourceRef {
 	ecosystem := "deb"
 	if identity.GetEcosystem() == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		ecosystem = "rpm"
+	} else if identity.GetEcosystem() == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		ecosystem = "alpm"
 	}
 	return &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: ecosystem + "/" + packageKey(identity)}
 }

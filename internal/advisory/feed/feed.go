@@ -93,6 +93,10 @@ func (c *Client) Fetch(ctx context.Context, config *advisoryv1.FeedSource) (*adv
 	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 	switch config.GetFormat() {
+	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL:
+		return collectBoundedClaims(func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			return c.fetchSUSEOVAL(ctx, config, emit, nil)
+		})
 	case advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP:
 		return c.fetchOSVArchive(ctx, config, nil, nil)
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF:
@@ -214,6 +218,11 @@ func Parse(config *advisoryv1.FeedSource, raw io.Reader) (*advisoryv1.FeedDocume
 	}
 	if err := validator.Validate(config); err != nil {
 		return nil, fmt.Errorf("feed: validate source: %w", err)
+	}
+	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL {
+		return collectBoundedClaims(func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			return stageSUSEOVAL(context.Background(), config, validator, raw, emit, nil)
+		})
 	}
 	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
 		return stageOSVArchive(context.Background(), config, validator, raw, nil, nil)

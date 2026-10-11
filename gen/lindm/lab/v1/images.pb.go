@@ -124,8 +124,11 @@ type ImageManifest struct {
 	// Guest package repositories use this immutable YYYY-MM-DD snapshot.
 	// Required for Arch Linux Archive; the image build date is a separate pin.
 	RepositorySnapshotDate *string `protobuf:"bytes,18,opt,name=repository_snapshot_date,json=repositorySnapshotDate,proto3,oneof" json:"repository_snapshot_date,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Content-addressed dependency-complete repository closure, never a runtime URL.
+	RepositorySnapshotManifestSha256 *string `protobuf:"bytes,19,opt,name=repository_snapshot_manifest_sha256,json=repositorySnapshotManifestSha256,proto3,oneof" json:"repository_snapshot_manifest_sha256,omitempty"`
+	RepositorySnapshotRepomdSha256   *string `protobuf:"bytes,20,opt,name=repository_snapshot_repomd_sha256,json=repositorySnapshotRepomdSha256,proto3,oneof" json:"repository_snapshot_repomd_sha256,omitempty"`
+	unknownFields                    protoimpl.UnknownFields
+	sizeCache                        protoimpl.SizeCache
 }
 
 func (x *ImageManifest) Reset() {
@@ -284,11 +287,25 @@ func (x *ImageManifest) GetRepositorySnapshotDate() string {
 	return ""
 }
 
+func (x *ImageManifest) GetRepositorySnapshotManifestSha256() string {
+	if x != nil && x.RepositorySnapshotManifestSha256 != nil {
+		return *x.RepositorySnapshotManifestSha256
+	}
+	return ""
+}
+
+func (x *ImageManifest) GetRepositorySnapshotRepomdSha256() string {
+	if x != nil && x.RepositorySnapshotRepomdSha256 != nil {
+		return *x.RepositorySnapshotRepomdSha256
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_images_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xe4\x10\n" +
+	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\x84\x13\n" +
 	"\rImageManifest\x120\n" +
 	"\x02id\x18\x01 \x01(\tB \xbaH\x1dr\x1b\x10\x01\x18d2\x15^[a-z0-9][a-z0-9.-]*$R\x02id\x12-\n" +
 	"\fdistribution\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\fdistribution\x12#\n" +
@@ -310,11 +327,15 @@ const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\fchecksumMode\x12C\n" +
 	"\x15signer_provenance_url\x18\x10 \x01(\tB\x0f\xbaH\f\xd8\x01\x01r\a\x88\xb5\x18\x01\x88\x01\x01R\x13signerProvenanceUrl\x12B\n" +
 	"\x16release_provenance_url\x18\x11 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x14releaseProvenanceUrl\x12y\n" +
-	"\x18repository_snapshot_date\x18\x12 \x01(\tB:\xbaH7r523^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$H\x01R\x16repositorySnapshotDate\x88\x01\x01:\xd9\a\xbaH\xd5\a\x1a\xaf\x06\n" +
+	"\x18repository_snapshot_date\x18\x12 \x01(\tB:\xbaH7r523^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$H\x01R\x16repositorySnapshotDate\x88\x01\x01\x12i\n" +
+	"#repository_snapshot_manifest_sha256\x18\x13 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$H\x02R repositorySnapshotManifestSha256\x88\x01\x01\x12e\n" +
+	"!repository_snapshot_repomd_sha256\x18\x14 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$H\x03R\x1erepositorySnapshotRepomdSha256\x88\x01\x01:\xd9\a\xbaH\xd5\a\x1a\xaf\x06\n" +
 	"\x14image.signature_mode\x12|signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims\x1a\x98\x05this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4 || this.checksum_mode == 5) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))\x1a\xa0\x01\n" +
 	"\x1eimage.arch_repository_snapshot\x12;Arch Linux images require a pinned repository snapshot date\x1aAthis.distribution != 'arch' || has(this.repository_snapshot_date)B\x10\n" +
 	"\x0e_signature_urlB\x1b\n" +
-	"\x19_repository_snapshot_date*\xd5\x01\n" +
+	"\x19_repository_snapshot_dateB&\n" +
+	"$_repository_snapshot_manifest_sha256B$\n" +
+	"\"_repository_snapshot_repomd_sha256*\xd5\x01\n" +
 	"\fChecksumMode\x12\x1d\n" +
 	"\x19CHECKSUM_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16CHECKSUM_MODE_DETACHED\x10\x01\x12\x1d\n" +

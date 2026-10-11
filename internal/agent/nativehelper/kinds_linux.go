@@ -239,6 +239,8 @@ var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativ
 				s.paths = append(s.paths, "/usr/share/pam-configs", "/var/lib/pam", "/var/cache/debconf")
 			case platform.PAMManagerAuthselect:
 				s.paths = append(s.paths, "/var/lib/authselect")
+			case platform.PAMManagerNative, platform.PAMManagerPamConfig:
+				// Native PAM includes and pam-config output are confined to /etc.
 			default:
 				return errors.New("native_password_platform_not_supported")
 			}
@@ -260,7 +262,9 @@ var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativ
 				s.paths = append(s.paths, filepath.Dir(resource.OSUpdateAPTPeriodPath))
 			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC:
 				s.paths = append(s.paths, filepath.Dir(resource.OSUpdateDNF5AutomaticPath))
-			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
+			case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC,
+				resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN,
+				resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER:
 			default:
 				return errors.New("native_os_update_platform_not_supported")
 			}

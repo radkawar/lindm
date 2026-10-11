@@ -225,7 +225,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	guestProbe := remote + "/bin/lab"
 	if r.Architecture != nativeArch {
 		switch args[1] {
-		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance":
+		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance", "advisories":
 			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
 			guestProbe = remote + "/bin/lab-guest"
 		}
@@ -233,7 +233,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	switch args[1] {
 	case "inspect", "inspect-storage":
 		executables = append(executables, executable{"lindm-agent", r.Architecture, "./cmd/lindm-agent"})
-	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle", "assistance":
+	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle", "assistance", "advisories":
 		executables = append(executables, executable{"lindmd", nativeArch, "./cmd/lindmd"})
 	}
 	for _, item := range executables {
@@ -275,10 +275,10 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if args[1] == "inspect" || args[1] == "inspect-storage" {
 		args = SetFlag(args, "agent", remote+"/bin/lindm-agent")
 	}
-	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "assistance" {
+	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "assistance" || args[1] == "advisories" {
 		args = SetFlag(args, "lab", guestProbe)
 	}
-	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" || args[1] == "assistance" {
+	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" || args[1] == "assistance" || args[1] == "advisories" {
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}
 	if args[1] == "enroll-unattended" || args[1] == "enroll-from-console" {
@@ -303,7 +303,14 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	}
 	// Copy only authenticated image entries, never unrelated cache contents.
 	markerStaged := false
+	snapshotsStaged := make(map[string]bool)
 	for _, image := range manifests {
+		if digest := image.GetRepositorySnapshotManifestSha256(); digest != "" && !snapshotsStaged[digest] {
+			if err := stageRepositorySnapshot(ctx, r.Host.SshAlias, remote+"/bin/lab", filepath.Join(work, "images"), cache, digest, r.Stderr); err != nil {
+				return fmt.Errorf("stage authenticated repository closure: %w", err)
+			}
+			snapshotsStaged[digest] = true
+		}
 		if _, existsErr := runOutput(ctx, r.Host.SshAlias, "test -d "+QuoteShell(filepath.Join(work, "images", "sha256-"+image.Sha256))); existsErr != nil {
 			if !markerStaged {
 				if err := stage.sync(filepath.Join(cache, ".lindm-images"), remote+"/images/.lindm-images"); err != nil {
@@ -331,6 +338,17 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			return err
 		}
 		args = SetFlag(args, "demo-root", demo)
+	}
+	if args[1] == "snapshot" {
+		if retained := FlagValue(args, "retained-metadata"); retained != "" {
+			if len(manifests) != 1 {
+				return errors.New("snapshot metadata staging requires one pinned native image")
+			}
+			if err := stage.stageRepositoryMetadata(manifests[0], args, retained); err != nil {
+				return err
+			}
+			args = SetFlag(args, "retained-metadata", remote+"/snapshot-metadata")
+		}
 	}
 	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
 		value := FlagValue(args, name)
@@ -417,7 +435,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 		database := ""
 		switch args[1] {
-		case "dispatch", "resources", "device-actions", "updates", "enroll-unattended", "lifecycle", "assistance":
+		case "dispatch", "resources", "device-actions", "updates", "enroll-unattended", "lifecycle", "assistance", "advisories":
 			database = " --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock --group-add \"$(stat -c %g /var/run/docker.sock)\""
 		}
 		script = "exec docker run -i --name " + QuoteShell(container) + " --network host --user \"$(id -u):$(id -g)\"" + devices + database + " --mount " + QuoteShell("type=bind,src="+work+",dst="+work) + " --workdir " + QuoteShell(remote+"/source") + " --env " + QuoteShell("TMPDIR="+remote+"/work") + " " + QuoteShell(r.Host.RunnerImage) + " " + strings.Join(command, " ")
@@ -558,6 +576,21 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			continue
 		}
 		relocated[remote+"/records/"+name] = absolute
+	}
+	if runErr == nil && args[1] == "snapshot" {
+		destination := FlagValue(r.Args, "snapshot-cache")
+		if destination == "" {
+			destination = cache
+		}
+		// Multi-GiB authenticated closures have their own bounded lifetime,
+		// not the short post-run budget for returning small evidence records.
+		transferCtx, stopTransfer := context.WithTimeout(ctx, 45*time.Minute)
+		transferErr := collectRepositorySnapshot(transferCtx, r.Host.SshAlias, remote+"/bin/lab", filepath.Join(work, "images"), destination, outputs["record"], r.Stderr)
+		stopTransfer()
+		if transferErr != nil {
+			preserveRemote = true
+			err = errors.Join(err, transferErr)
+		}
 	}
 	return err
 }

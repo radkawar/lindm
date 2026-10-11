@@ -5,11 +5,17 @@ package vmlab
 import (
 	"context"
 	"time"
+
+	"lindm/internal/platform"
 )
 
 func resourceFixtureEvidence(ctx context.Context, packages *nativeGuestPackages) ([]VMResourceNativeRecord, error) {
 	command := "cd " + resourceFixtureRoot + "; cat keys.colons; sha256sum repository.asc repository.gpg https.crt; "
-	if packages.backend.DNF() {
+	if packages.backend == platform.BackendPacman {
+		command += "for version in 1.0 2.0; do gpgv --keyring " + resourceFixtureRoot + "/repository.gpg repo/$version/lindm-resource-lab.db.tar.gz.sig repo/$version/lindm-resource-lab.db.tar.gz; done; sha256sum repo/*.pkg.tar.zst*; pacman --version; pacman-conf --version"
+	} else if packages.backend == platform.BackendZypper {
+		command += "gpgv --keyring " + resourceFixtureRoot + "/repository.gpg repo/repodata/repomd.xml.asc repo/repodata/repomd.xml; sha256sum repo/repodata/* repo/*.rpm; rpm --version; zypper --version"
+	} else if packages.backend.DNF() {
 		command += "gpgv --keyring " + resourceFixtureRoot + "/repository.gpg repo/repodata/repomd.xml.asc repo/repodata/repomd.xml; sha256sum repo/repodata/* repo/*.rpm; rpm --version; " +
 			// Fedora's DNF5 versus EL's DNF4 with its versionlock plugin and entrypoint interpreter.
 			"if command -v dnf5 >/dev/null; then dnf5 --version; python3 -c 'import libdnf5; print(libdnf5.__file__)'; else dnf --version; head -1 /usr/bin/dnf; rpm -q dnf python3-dnf python3-dnf-plugin-versionlock rpm-plugin-selinux; cat /etc/dnf/plugins/versionlock.conf; fi"

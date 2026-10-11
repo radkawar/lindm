@@ -182,6 +182,8 @@ func TestOSUpdateHelperOnlyReceivesOwnedConfigurationParents(t *testing.T) {
 		{"fedora", "44", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system", "/etc/dnf"}},
 		{"rhel", "9.8", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
 		{"rhel", "10.2", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
+		{"arch", "", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
+		{"opensuse-tumbleweed", "20261007", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER, []string{directory, "/etc/lindm/os-update", "/etc/systemd/system"}},
 	} {
 		plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: test.os, Version: test.version}}, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{Desired: &resourcev1.OSUpdateDesired{}, Backend: test.backend}}}
 		values := unitValues(t, directory, plan, nil, nil)
@@ -192,7 +194,7 @@ func TestOSUpdateHelperOnlyReceivesOwnedConfigurationParents(t *testing.T) {
 			t.Fatal("update policy helper inherited package privileges")
 		}
 	}
-	plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: "arch"}}, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{Desired: &resourcev1.OSUpdateDesired{}}}}
+	plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY, CanonicalKey: "system"}, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: "opensuse-leap", Version: "16.0"}}, Plan: &resourcev1.ResourcePlan_OsUpdate{OsUpdate: &resourcev1.OSUpdatePlan{Desired: &resourcev1.OSUpdateDesired{}}}}
 	kind, err := effectKind(plan.GetRef().GetKind())
 	if err != nil {
 		t.Fatal(err)

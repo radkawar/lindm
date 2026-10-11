@@ -35,20 +35,26 @@ const (
 	PasswordNativeFile_PASSWORD_NATIVE_FILE_HISTORY_PROFILE      PasswordNativeFile = 6
 	PasswordNativeFile_PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE     PasswordNativeFile = 7
 	PasswordNativeFile_PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE PasswordNativeFile = 8
+	PasswordNativeFile_PASSWORD_NATIVE_FILE_ARCH_SYSTEM_AUTH     PasswordNativeFile = 9
+	PasswordNativeFile_PASSWORD_NATIVE_FILE_ARCH_POLICY          PasswordNativeFile = 10
+	PasswordNativeFile_PASSWORD_NATIVE_FILE_PAM_CONFIG_PASSWORD  PasswordNativeFile = 11
 )
 
 // Enum value maps for PasswordNativeFile.
 var (
 	PasswordNativeFile_name = map[int32]string{
-		0: "PASSWORD_NATIVE_FILE_UNSPECIFIED",
-		1: "PASSWORD_NATIVE_FILE_QUALITY",
-		2: "PASSWORD_NATIVE_FILE_HISTORY",
-		3: "PASSWORD_NATIVE_FILE_FAILLOCK",
-		4: "PASSWORD_NATIVE_FILE_LOGIN_DEFAULTS",
-		5: "PASSWORD_NATIVE_FILE_QUALITY_PROFILE",
-		6: "PASSWORD_NATIVE_FILE_HISTORY_PROFILE",
-		7: "PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE",
-		8: "PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE",
+		0:  "PASSWORD_NATIVE_FILE_UNSPECIFIED",
+		1:  "PASSWORD_NATIVE_FILE_QUALITY",
+		2:  "PASSWORD_NATIVE_FILE_HISTORY",
+		3:  "PASSWORD_NATIVE_FILE_FAILLOCK",
+		4:  "PASSWORD_NATIVE_FILE_LOGIN_DEFAULTS",
+		5:  "PASSWORD_NATIVE_FILE_QUALITY_PROFILE",
+		6:  "PASSWORD_NATIVE_FILE_HISTORY_PROFILE",
+		7:  "PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE",
+		8:  "PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE",
+		9:  "PASSWORD_NATIVE_FILE_ARCH_SYSTEM_AUTH",
+		10: "PASSWORD_NATIVE_FILE_ARCH_POLICY",
+		11: "PASSWORD_NATIVE_FILE_PAM_CONFIG_PASSWORD",
 	}
 	PasswordNativeFile_value = map[string]int32{
 		"PASSWORD_NATIVE_FILE_UNSPECIFIED":          0,
@@ -60,6 +66,9 @@ var (
 		"PASSWORD_NATIVE_FILE_HISTORY_PROFILE":      6,
 		"PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE":     7,
 		"PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE": 8,
+		"PASSWORD_NATIVE_FILE_ARCH_SYSTEM_AUTH":     9,
+		"PASSWORD_NATIVE_FILE_ARCH_POLICY":          10,
+		"PASSWORD_NATIVE_FILE_PAM_CONFIG_PASSWORD":  11,
 	}
 )
 
@@ -1815,7 +1824,7 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x0fclaim_action_id\x18\x10 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\rclaimActionId\x12`\n" +
 	"\x12owned_member_edges\x18\x11 \x03(\v2'.lindm.agent.v1.ResourceOwnedMemberEdgeB\t\xbaH\x06\x92\x01\x03\x10\x80\bR\x10ownedMemberEdges:\xf4\x01\xbaH\xf0\x01\x1a\xed\x01\n" +
 	"\x17ownership_ledger.effect\x12;effect evidence and action binding must be present together\x1a\x94\x01has(this.before_effect) == has(this.effect_action_id) && (this.state != 3 || has(this.before_effect)) && (this.state != 2 || has(this.last_applied))B\x13\n" +
-	"\x11_effect_action_id*\xf8\x02\n" +
+	"\x11_effect_action_id*\xf7\x03\n" +
 	"\x12PasswordNativeFile\x12$\n" +
 	" PASSWORD_NATIVE_FILE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cPASSWORD_NATIVE_FILE_QUALITY\x10\x01\x12 \n" +
@@ -1825,7 +1834,11 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"$PASSWORD_NATIVE_FILE_QUALITY_PROFILE\x10\x05\x12(\n" +
 	"$PASSWORD_NATIVE_FILE_HISTORY_PROFILE\x10\x06\x12)\n" +
 	"%PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE\x10\a\x12-\n" +
-	")PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE\x10\b*\xb0\x01\n" +
+	")PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE\x10\b\x12)\n" +
+	"%PASSWORD_NATIVE_FILE_ARCH_SYSTEM_AUTH\x10\t\x12$\n" +
+	" PASSWORD_NATIVE_FILE_ARCH_POLICY\x10\n" +
+	"\x12,\n" +
+	"(PASSWORD_NATIVE_FILE_PAM_CONFIG_PASSWORD\x10\v*\xb0\x01\n" +
 	"\x15PasswordNativeFeature\x12'\n" +
 	"#PASSWORD_NATIVE_FEATURE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fPASSWORD_NATIVE_FEATURE_QUALITY\x10\x01\x12#\n" +

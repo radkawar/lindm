@@ -165,6 +165,12 @@ func inspectManager(ctx context.Context, platform *resourcev1.PlatformProduct, r
 	if !productSupported(platform) {
 		return nil, ErrUnsupported
 	}
+	if nativePAMProduct(platform) {
+		return inspectNativePAM()
+	}
+	if pamConfigProduct(platform) {
+		return inspectPamConfig(ctx, run)
+	}
 	state := &managerState{stacks: make(map[string][]byte)}
 	graph := sha256.New()
 	profileHash := sha256.New()
@@ -440,8 +446,11 @@ func inspectStacks(stacks map[string][]byte) ([]agentv1.PasswordNativeFeature, e
 	return active, nil
 }
 func moduleDirectory(platform *resourcev1.PlatformProduct) string {
-	if authselectProduct(platform) {
+	if authselectProduct(platform) || pamConfigProduct(platform) {
 		return "/usr/lib64/security/"
+	}
+	if nativePAMProduct(platform) {
+		return "/usr/lib/security/"
 	}
 	switch runtime.GOARCH {
 	case "amd64":
@@ -488,6 +497,16 @@ func observeModules(ctx context.Context, platform *resourcev1.PlatformProduct, f
 		}
 		if !moduleVersionSupported(platform, feature, version) {
 			return nil, nil, fmt.Errorf("%w: unsupported PAM module package version", ErrUnsupported)
+		}
+		if feature == 1 && pamConfigProduct(platform) {
+			library, err := packageVersion(ctx, platform, "libpwquality1", run)
+			if err != nil {
+				return nil, nil, err
+			}
+			if library != version {
+				return nil, nil, fmt.Errorf("%w: libpwquality and PAM module package releases differ", ErrUnsupported)
+			}
+			modules = append(modules, &resourcev1.NativeModuleVersion{Name: "libpwquality1", Version: library})
 		}
 		hash.Write([]byte(moduleName(feature)))
 		hash.Write(digest)
@@ -652,6 +671,27 @@ func effectivePolicy(s *agentv1.ResourceOwnershipSnapshot, dropins map[string]st
 func readQualityDropins() (map[string]string, []byte, error) {
 	values := make(map[string]string)
 	hash := sha256.New()
+	// Vendor builds can select /usr/lib when the administrator file is absent.
+	// Never replace an active vendor policy with inferred defaults.
+	vendor, err := readNative("/usr/lib/security/pwquality.conf", 32768)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, nil, err
+	}
+	hashRecord(hash, "vendor/pwquality.conf", vendor, err == nil)
+	if err == nil {
+		_, localErr := os.Lstat(filePath(1))
+		if errors.Is(localErr, os.ErrNotExist) {
+			settings, err := parseConfig(vendor, false)
+			if err != nil {
+				return nil, nil, err
+			}
+			if len(settings) != 0 {
+				return nil, nil, fmt.Errorf("%w: provision vendor quality policy in /etc before adoption", ErrUnsupported)
+			}
+		} else if localErr != nil {
+			return nil, nil, localErr
+		}
+	}
 	entries, err := os.ReadDir("/etc/security/pwquality.conf.d")
 	if errors.Is(err, os.ErrNotExist) {
 		return values, hash.Sum(nil), nil
@@ -716,14 +756,22 @@ func (p *Provider) snapshot(ctx context.Context, d *resourcev1.PasswordPolicyDes
 	}
 	observed := &resourcev1.ResourceObservation{Ref: passwordRef(), Metadata: &resourcev1.ObservationMetadata{BootId: strings.TrimSpace(string(boot)), ExecutorIncarnation: p.config.ExecutorIncarnation, ObservedAt: timestamppb.Now(), Backend: proto.CloneOf(p.backend), NativeRevision: make([]byte, 32), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK}}
 	result := &agentv1.ResourceOwnershipSnapshot{Observation: observed, PasswordPolicy: &agentv1.PasswordPolicyOwnership{ManagerProfile: manager.profile, ManagerGenerationSha256: manager.generation, ManagerProfileSha256: manager.profileDigest, EnabledFeatures: manager.features}}
-	last := agentv1.PasswordNativeFile(4)
-	if !authselectProduct(p.config.Platform) {
-		last = 8
+	kinds := []agentv1.PasswordNativeFile{1, 2, 3, 4}
+	switch passwordBackend(p.config.Platform) {
+	case resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE:
+		kinds = append(kinds, 5, 6, 7, 8)
+	case resourcev1.Backend_BACKEND_NATIVE_PAM:
+		kinds = append(kinds, 9, 10)
+	case resourcev1.Backend_BACKEND_PAM_CONFIG:
+		kinds = append(kinds, 11)
 	}
-	for kind := agentv1.PasswordNativeFile(1); kind <= last; kind++ {
+	for _, kind := range kinds {
 		file, err := nativefile.Capture(filePath(kind), observed)
 		if err != nil {
 			return nil, err
+		}
+		if kind == 11 && file.GetObservation().GetManagedFile().GetExists() && !bytes.Equal(file.GetManagedFileContent(), manager.stacks["common-password"]) {
+			return nil, ErrConflict
 		}
 		result.PasswordPolicy.Files = append(result.PasswordPolicy.Files, &agentv1.PasswordNativeFileSnapshot{Kind: kind, State: proto.CloneOf(file.GetObservation().GetManagedFile()), Content: bytes.Clone(file.GetManagedFileContent()), Xattrs: file.GetManagedFileXattrs(), NativeRevisionSha256: bytes.Clone(file.GetObservation().GetMetadata().GetNativeRevision())})
 	}

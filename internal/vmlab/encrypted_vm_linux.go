@@ -37,7 +37,8 @@ type EncryptedVMOptions struct {
 	// is absent. Read-only observation lanes must set this option.
 	RequireCachedGolden bool
 	// InstallerLog, when set, names a new owner-only file receiving a bounded
-	// copy of the installer's serial console for diagnostics.
+	// copy of the installer and first installed-boot serial consoles. It may
+	// contain lab credentials and must never be published as evidence.
 	InstallerLog string
 	// DiagnosticsDir retains private failure observations outside VM teardown.
 	DiagnosticsDir string
@@ -65,6 +66,8 @@ type EncryptedVM struct {
 	diagnosticsDir string
 	hardware       VMHardwareOptions
 	recoveryActive bool
+	// bootConsole is set only while an explicitly logged golden is built.
+	bootConsole    io.Writer
 	persistentLock *os.File
 	closed         bool
 }
@@ -83,11 +86,20 @@ func startEncryptedProcess(ctx context.Context, dir, name string, args ...string
 // startEncryptedProcessFiles also passes files as descriptors 3 onward, for
 // media borrowed by a verified descriptor rather than by path.
 func startEncryptedProcessFiles(ctx context.Context, dir string, files []*os.File, name string, args ...string) (*encryptedProcess, error) {
+	return startEncryptedProcessOutput(ctx, dir, files, nil, name, args...)
+}
+
+// A separate stdout sink permits bounded private installer-console diagnostics
+// without mixing guest serial bytes into the ordinary QEMU stderr log.
+func startEncryptedProcessOutput(ctx context.Context, dir string, files []*os.File, stdout io.Writer, name string, args ...string) (*encryptedProcess, error) {
 	// Not labexec: the Pdeathsig must be bound to a thread locked for the process's lifetime.
 	p := &encryptedProcess{cmd: exec.CommandContext(ctx, name, args...), done: make(chan struct{}), log: new(vmLog)}
 	p.cmd.Dir = dir
 	p.cmd.ExtraFiles = files
 	p.cmd.Stdout, p.cmd.Stderr = p.log, p.log
+	if stdout != nil {
+		p.cmd.Stdout = stdout
+	}
 	p.cmd.WaitDelay = 2 * time.Second
 	// The owning lane handles terminal signals and joins these exact children.
 	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
@@ -399,7 +411,7 @@ func (v *EncryptedVM) ColdBoot(ctx context.Context, secret string) (out UnlockOu
 	}
 	prompt := make(chan promptResult, 1)
 	go func() {
-		seen, err := unlockEncryptedSerial(bootctx, console, secret)
+		seen, err := unlockEncryptedSerial(bootctx, console, secret, v.bootConsole)
 		prompt <- promptResult{seen, err}
 		if err != nil {
 			stop()
@@ -463,7 +475,7 @@ func encryptedUnlockPrompt(text string) bool {
 // secret, longer than any prompt-to-tcsetattr gap of a native password reader.
 const encryptedPromptSettle = time.Second
 
-func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (bool, error) {
+func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string, diagnostic io.Writer) (bool, error) {
 	var pending string
 	sent := false
 	buf := make([]byte, 4096)
@@ -473,6 +485,11 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (b
 		}
 		n, err := conn.Read(buf)
 		if n > 0 {
+			if diagnostic != nil {
+				if _, logErr := diagnostic.Write(buf[:n]); logErr != nil {
+					return sent, errors.Join(errors.New("write private first-boot console"), logErr)
+				}
+			}
 			pending += string(buf[:n])
 			if len(pending) > 8192 {
 				pending = pending[len(pending)-8192:]

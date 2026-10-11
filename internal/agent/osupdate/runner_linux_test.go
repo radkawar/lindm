@@ -94,6 +94,12 @@ func TestRunStepBoundsFitTheUnitTimeout(t *testing.T) {
 	if worst >= runBudget || runBudget+runTermGrace > unitRunTimeout || unitRunTimeout != 6*time.Hour {
 		t.Fatalf("worst case %v, budget %v, unit %v", worst, runBudget, unitRunTimeout)
 	}
+	rollingWorst := runLockWait + refreshTimeout + listTimeout +
+		3*snapshotTimeout + oracleTimeout + installTimeout +
+		3*oracleTimeout + logindTimeout + notifyBudget // reboot and two native hold queries
+	if rollingWorst >= runBudget {
+		t.Fatalf("rolling transaction and snapper budget %v exceeds %v", rollingWorst, runBudget)
+	}
 	const unitStatusTimeout = 5 * time.Minute
 	if statusBudget >= unitStatusTimeout || statusLockWait >= statusBudget {
 		t.Fatalf("status budget %v exceeds unit timeout", statusBudget)

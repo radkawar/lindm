@@ -27,7 +27,7 @@ func TestReleaseFixtureReturnsResignedBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture, _, err := OpenReleaseAuthorityFixture(ctx, repository, binary)
+	fixture, _, err := OpenReleaseAuthorityFixture(ctx, repository, binary, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -166,6 +166,7 @@ type actionOwnedBootEvidence struct {
 	OriginalBootID    string             `json:"original_boot_id"`
 	ConvertedBootID   string             `json:"converted_boot_id"`
 	KernelRelease     string             `json:"kernel_release"`
+	KernelPath        string             `json:"kernel_path,omitempty"`
 	SignerPEMSHA256   string             `json:"signer_pem_sha256"`
 	SystemdBootSHA256 string             `json:"signed_systemd_boot_sha256"`
 	OrdinaryUKISHA256 string             `json:"signed_ordinary_uki_sha256"`
@@ -301,7 +302,12 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if vm.hardware.Architecture == "aarch64" {
 		loader, stub, fallback = "systemd-bootaa64.efi", "linuxaa64.efi.stub", "BOOTAA64.EFI"
 	}
-	initrd := fmt.Sprintf(release.Lab.Guest.Initrd, evidence.KernelRelease)
+	initrd := strings.ReplaceAll(release.Lab.Guest.Initrd, "%s", evidence.KernelRelease)
+	evidence.KernelPath = release.Lab.Guest.Kernel
+	if evidence.KernelPath == "" {
+		evidence.KernelPath = "/boot/vmlinuz-%s"
+	}
+	evidence.KernelPath = strings.ReplaceAll(evidence.KernelPath, "%s", evidence.KernelRelease)
 	prepare := "install -d -m 0700 /run/lindm-native-owned-boot; test -d /boot/efi/EFI; mount -o remount,umask=0077 /boot/efi; "
 	if release.Lab.Guest.OwnedBootHostonly {
 		// The vendor's generic initramfs would not fit the ESP; the owned
@@ -309,7 +315,7 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 		initrd = "/run/lindm-native-owned-boot/ordinary-initrd.img"
 		prepare += "dracut --quiet --force --hostonly " + nativeQuote(initrd) + " " + nativeQuote(evidence.KernelRelease) + "; "
 	}
-	prepare += "ukify build --linux=" + nativeQuote("/boot/vmlinuz-"+evidence.KernelRelease) + " --initrd=" + nativeQuote(initrd) + " --stub=" + nativeQuote("/usr/lib/systemd/boot/efi/"+stub) + " --cmdline=@/proc/cmdline --output=/run/lindm-native-owned-boot/ordinary-unsigned.efi"
+	prepare += "ukify build --linux=" + nativeQuote(evidence.KernelPath) + " --initrd=" + nativeQuote(initrd) + " --stub=" + nativeQuote("/usr/lib/systemd/boot/efi/"+stub) + " --cmdline=@/proc/cmdline --output=/run/lindm-native-owned-boot/ordinary-unsigned.efi"
 	prepared, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(prepare), nil, 8192, 10*time.Minute)
 	if err != nil {
 		return evidence, err

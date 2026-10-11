@@ -1,0 +1,22 @@
+{
+  "id": "opensuse-tumbleweed-20261009-x86-64",
+  "distribution": "opensuse-tumbleweed",
+  "version": "20261009",
+  "architecture": "x86_64",
+  "edition": "dvd",
+  "release": "Snapshot20261009",
+  "imageFilename": "openSUSE-Tumbleweed-DVD-x86_64-Snapshot20261009-Media.iso",
+  "imageUrl": "https://mirror.ihost.md/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Snapshot20261009-Media.iso",
+  "checksumUrl": "https://mirror.ihost.md/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Snapshot20261009-Media.iso.sha256",
+  "signatureUrl": "https://mirror.ihost.md/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Snapshot20261009-Media.iso.sha256.asc",
+  "keyUrl": "https://download.opensuse.org/tumbleweed/repo/oss/repodata/repomd.xml.key",
+  "sha256": "902aff62e0de2ff0bf8075c1b878d3b7804c94f4ac40fe1c1f3f03f8a4567a02",
+  "signerFingerprint": "AD485664E901B867051AB15F35A2F86E29B700A4",
+  "imageSizeBytes": "4687134720",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://build.opensuse.org/projects/openSUSE:Factory/signing_keys",
+  "releaseProvenanceUrl": "https://download.opensuse.org/tumbleweed/iso/",
+  "repositorySnapshotDate": "2026-10-09",
+  "repositorySnapshotManifestSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
+  "repositorySnapshotRepomdSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae"
+}

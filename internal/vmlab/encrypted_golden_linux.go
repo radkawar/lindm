@@ -63,6 +63,17 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 		return nil, errors.New("encrypted lab requires an official installer ISO manifest")
 	}
 	media := encryptedInstallerMedia(m)
+	if media.release.Lab.Installer == platform.ArchISO && opts.Firmware.SecureBoot {
+		return nil, errors.New("official Arch installer has no vendor Secure Boot trust; select non-Secure-Boot firmware and qualify owner trust separately")
+	}
+	if media.release.Lab.Installer == platform.AutoYaST {
+		if m.GetRepositorySnapshotManifestSha256() == "" {
+			return nil, errors.New("encrypted AutoYaST requires a retained signed repository snapshot closure")
+		}
+		if _, err = tumbleweedInstallerImage(m); err != nil {
+			return nil, err
+		}
+	}
 	if err = media.release.Gate(platform.Encryption); err != nil {
 		return nil, err
 	}
@@ -169,6 +180,14 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if _, err = hostCommand(ctx, staging, "qemu-img", nil, "create", "-f", "qcow2", "disk.qcow2", "24G"); err != nil {
 		return nil, err
 	}
+	snapshot, err := startImageRepositorySnapshot(ctx, m, opts.CacheDir)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot != nil {
+		defer func() { err = errors.Join(err, snapshot.Close()) }()
+		media.snapshot = &tumbleweedSnapshotRepository{URL: snapshot.URL, CAPEM: snapshot.CAPEM}
+	}
 	config, err := encryptedSSHConfig(state.LoginKey, state.HostKey)
 	if err != nil {
 		return nil, err
@@ -211,6 +230,7 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 			}
 			defer func() { err = errors.Join(err, logFile.Close()) }()
 			console = &cappedWriter{w: logFile, remaining: maxInstallerLogBytes}
+			vm.bootConsole = console
 		}
 		drained := make(chan struct{})
 		go func() { _, _ = io.Copy(console, serial); close(drained) }()
@@ -477,6 +497,15 @@ func encryptedGoldenID(m *labv1.ImageManifest, opts EncryptedVMOptions, codeDige
 		recipeVersion += "\n" + mintEncryptedRecipeVersion
 	case platform.OmarchyCidata:
 		recipeVersion += "\n" + omarchyInstallerRecipeVersion
+	}
+	if platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer == platform.ArchISO {
+		ownedDBKey += "\narchiso-v2:" + m.GetEdition() + "\nrepository:" + m.GetRepositorySnapshotDate()
+	}
+	if platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer == platform.AutoYaST {
+		ownedDBKey += "\nautoyast-encrypted-v1\n" + tumbleweedInstallerRecipeVersion
+	}
+	if m.GetRepositorySnapshotManifestSha256() != "" {
+		ownedDBKey += "\nrepository-closure:" + m.GetRepositorySnapshotManifestSha256()
 	}
 	sum := sha256.Sum256([]byte(recipeVersion + "\n" + m.Sha256 + "\n" + codeDigest + "\n" + varsDigest + "\n" + opts.Firmware.Package + "\n" + opts.Firmware.Version + fmt.Sprint(opts.Firmware.SecureBoot) + "\n" + opts.Desktop + "\n" + fmt.Sprint(opts.TPMBoot) + ownedDBKey))
 	return hex.EncodeToString(sum[:])

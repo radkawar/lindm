@@ -289,7 +289,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		}
 	}
 	if mode == authorityReleaseUpdates || mode == authorityDeviceActions {
-		if err := f.configureReleaseRepository(ctx, cfg, material); err != nil {
+		if err := f.configureReleaseRepository(ctx, cfg, material, options.nativeReleasePackages); err != nil {
 			return nil, err
 		}
 	}

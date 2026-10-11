@@ -37,10 +37,14 @@ type resourceDispatch struct {
 	reboot func(context.Context) error
 	// awaitReboot waits for a guest-initiated reboot away from the previous
 	// boot ID within timeout and reopens the forwards; nil like reboot.
-	awaitReboot func(ctx context.Context, previousBoot string, timeout time.Duration) error
+	awaitReboot     func(ctx context.Context, previousBoot string, timeout time.Duration) error
+	rollingSnapshot *resourcev1.RollingUpdateSnapshot
 }
 
 func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.ResourceDesiredState, ownership *resourcev1.OwnershipPolicy) error {
+	if err := selectALPMFixture(ctx, r.vm, desired); err != nil {
+		return err
+	}
 	request := &adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: r.profile, Reason: "disposable signed native resource qualification", Spec: &policyv1.ResourceProfile{Name: "Native resource qualification", Resources: []*policyv1.ProfileResource{{ResourceId: r.resource, Desired: desired, Ownership: ownership, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 300, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}}}}}
 	if r.revision != "" {
 		request.ExpectedRevisionId = proto.String(r.revision)
@@ -156,12 +160,11 @@ func resourceCreatePolicy() *resourcev1.OwnershipPolicy {
 	return &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}
 }
 
-// resourcePackaging selects the guest's native package format, architecture
-// and, for RPM, the native DNF generation (EL DNF4 versus Fedora DNF5).
-type resourcePackaging struct{ rpm, arm, dnf4 bool }
+// resourcePackaging selects the native package database, frontend and architecture.
+type resourcePackaging struct{ rpm, arm, dnf4, pacman, zypper bool }
 
 func newResourcePackaging(backend platform.Backend, architecture string) resourcePackaging {
-	return resourcePackaging{rpm: backend.DNF(), arm: architecture == "arm64", dnf4: backend == platform.BackendDNF4}
+	return resourcePackaging{rpm: backend.PackageDB() == platform.PackageDBRPM, arm: architecture == "arm64" || architecture == "aarch64", dnf4: backend == platform.BackendDNF4, pacman: backend == platform.BackendPacman, zypper: backend == platform.BackendZypper}
 }
 
 // dnf4VersionlockList is the native DNF4 versionlock plugin's lock list.
@@ -170,9 +173,9 @@ const dnf4VersionlockList = "/etc/dnf/plugins/versionlock.list"
 // nativeArch is the package manager's own architecture name.
 func (p resourcePackaging) nativeArch() string {
 	switch {
-	case p.rpm && p.arm:
+	case (p.rpm || p.pacman) && p.arm:
 		return "aarch64"
-	case p.rpm:
+	case p.rpm || p.pacman:
 		return "x86_64"
 	case p.arm:
 		return "arm64"
@@ -187,6 +190,9 @@ func resourcePackageDesired(rpm resourcePackaging, version string, present bool)
 	if rpm.rpm {
 		ecosystem, key, repo = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM, "rpm/", "rpm/"
 		exact = &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Rpm{Rpm: &resourcev1.RPMVersion{Version: version, Release: "1"}}}
+	} else if rpm.pacman {
+		ecosystem, key, repo = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM, "alpm/", "alpm/"
+		exact = &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Alpm{Alpm: &resourcev1.ALPMVersion{Pkgver: version, Pkgrel: "1"}}}
 	}
 	desired := &resourcev1.NativePackageDesired{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: resourcePackageName, Architecture: arch}, Presence: resourcev1.Presence_PRESENCE_PRESENT, Repository: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: repo + resourceRepositoryID}, Removal: resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_PRESERVE_DATA, Version: &resourcev1.NativePackageDesired_Exact{Exact: exact}}
 	if !present {
@@ -236,7 +242,9 @@ func resourceOracleInput(ctx context.Context, vm *guestVM, name, command string,
 
 func packageOracle(ctx context.Context, vm *guestVM, rpm resourcePackaging, version string, present bool) (VMResourceNativeRecord, error) {
 	command := ""
-	if rpm.rpm {
+	if rpm.pacman || rpm.zypper {
+		command = rollingPackageOracle(rpm, version, present)
+	} else if rpm.rpm {
 		command = "rpm -q --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\\n' " + resourceDependencyName + "; "
 		switch {
 		case present && rpm.dnf4:
@@ -310,6 +318,7 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
 	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot, awaitReboot: awaitReboot}
+	r.rollingSnapshot = packages.rollingSnapshot
 	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	kinds := result.Resources.Kinds
 	if selected["packages"] {

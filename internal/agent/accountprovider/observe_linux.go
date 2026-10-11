@@ -38,7 +38,16 @@ func nativeProvider(ctx context.Context, c nativeConfig) (*Provider, error) {
 	case platform.PackageDBDpkg:
 		version, err = p.run(ctx, nil, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "passwd")
 	case platform.PackageDBRPM:
-		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "shadow-utils")
+		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-qf", "--qf", "%{VERSION}-%{RELEASE}", "/usr/sbin/useradd")
+	case platform.PackageDBPacman:
+		version, err = p.run(ctx, nil, "/usr/bin/pacman", "-Qo", "--", "/usr/bin/useradd")
+		if err == nil {
+			fields := strings.Fields(string(version))
+			if len(fields) == 0 {
+				return nil, ErrUnsupported
+			}
+			version = []byte(fields[len(fields)-1])
+		}
 	default:
 		return nil, ErrUnsupported
 	}

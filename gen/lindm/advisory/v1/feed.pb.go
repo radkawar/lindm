@@ -37,21 +37,23 @@ const (
 	FeedFormat_FEED_FORMAT_ARCH_JSON            FeedFormat = 7
 	FeedFormat_FEED_FORMAT_DEBIAN_TRACKER_JSON  FeedFormat = 8
 	FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES FeedFormat = 9
+	FeedFormat_FEED_FORMAT_SUSE_OVAL            FeedFormat = 10
 )
 
 // Enum value maps for FeedFormat.
 var (
 	FeedFormat_name = map[int32]string{
-		0: "FEED_FORMAT_UNSPECIFIED",
-		1: "FEED_FORMAT_OSV_JSON",
-		2: "FEED_FORMAT_OSV_ZIP",
-		3: "FEED_FORMAT_RPM_UPDATEINFO",
-		4: "FEED_FORMAT_RPM_REPOMD",
-		5: "FEED_FORMAT_REDHAT_CSAF",
-		6: "FEED_FORMAT_SUSE_CSAF",
-		7: "FEED_FORMAT_ARCH_JSON",
-		8: "FEED_FORMAT_DEBIAN_TRACKER_JSON",
-		9: "FEED_FORMAT_REDHAT_CSAF_ARCHIVES",
+		0:  "FEED_FORMAT_UNSPECIFIED",
+		1:  "FEED_FORMAT_OSV_JSON",
+		2:  "FEED_FORMAT_OSV_ZIP",
+		3:  "FEED_FORMAT_RPM_UPDATEINFO",
+		4:  "FEED_FORMAT_RPM_REPOMD",
+		5:  "FEED_FORMAT_REDHAT_CSAF",
+		6:  "FEED_FORMAT_SUSE_CSAF",
+		7:  "FEED_FORMAT_ARCH_JSON",
+		8:  "FEED_FORMAT_DEBIAN_TRACKER_JSON",
+		9:  "FEED_FORMAT_REDHAT_CSAF_ARCHIVES",
+		10: "FEED_FORMAT_SUSE_OVAL",
 	}
 	FeedFormat_value = map[string]int32{
 		"FEED_FORMAT_UNSPECIFIED":          0,
@@ -64,6 +66,7 @@ var (
 		"FEED_FORMAT_ARCH_JSON":            7,
 		"FEED_FORMAT_DEBIAN_TRACKER_JSON":  8,
 		"FEED_FORMAT_REDHAT_CSAF_ARCHIVES": 9,
+		"FEED_FORMAT_SUSE_OVAL":            10,
 	}
 )
 
@@ -277,8 +280,16 @@ type Advisory struct {
 	PlatformStream       string `protobuf:"bytes,15,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
 	ModuleName           string `protobuf:"bytes,16,opt,name=module_name,json=moduleName,proto3" json:"module_name,omitempty"`
 	ModuleStream         string `protobuf:"bytes,17,opt,name=module_stream,json=moduleStream,proto3" json:"module_stream,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Native installed-product prerequisite, evaluated against the same snapshot.
+	PrerequisitePackage    string `protobuf:"bytes,19,opt,name=prerequisite_package,json=prerequisitePackage,proto3" json:"prerequisite_package,omitempty"`
+	PrerequisiteMinVersion string `protobuf:"bytes,20,opt,name=prerequisite_min_version,json=prerequisiteMinVersion,proto3" json:"prerequisite_min_version,omitempty"`
+	// OVAL check=all applies to every installed instance of package_name,
+	// including other architectures; it is not a per-row vulnerability claim.
+	AllInstalledInstances bool `protobuf:"varint,21,opt,name=all_installed_instances,json=allInstalledInstances,proto3" json:"all_installed_instances,omitempty"`
+	// The complete architecture disjunction of a native all-instances test.
+	InstanceArchitectures []string `protobuf:"bytes,22,rep,name=instance_architectures,json=instanceArchitectures,proto3" json:"instance_architectures,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *Advisory) Reset() {
@@ -437,6 +448,34 @@ func (x *Advisory) GetModuleStream() string {
 	return ""
 }
 
+func (x *Advisory) GetPrerequisitePackage() string {
+	if x != nil {
+		return x.PrerequisitePackage
+	}
+	return ""
+}
+
+func (x *Advisory) GetPrerequisiteMinVersion() string {
+	if x != nil {
+		return x.PrerequisiteMinVersion
+	}
+	return ""
+}
+
+func (x *Advisory) GetAllInstalledInstances() bool {
+	if x != nil {
+		return x.AllInstalledInstances
+	}
+	return false
+}
+
+func (x *Advisory) GetInstanceArchitectures() []string {
+	if x != nil {
+		return x.InstanceArchitectures
+	}
+	return nil
+}
+
 type FeedDocument struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	Advisories []*Advisory            `protobuf:"bytes,1,rep,name=advisories,proto3" json:"advisories,omitempty"`
@@ -446,7 +485,7 @@ type FeedDocument struct {
 	// False for single OSV documents; absence must then remain UNKNOWN.
 	CompleteSnapshot bool            `protobuf:"varint,3,opt,name=complete_snapshot,json=completeSnapshot,proto3" json:"complete_snapshot,omitempty"`
 	Artifacts        []*FeedArtifact `protobuf:"bytes,4,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
-	// Verified vendor snapshot signing time, where available; bounds freshness.
+	// Authenticated vendor signing time or conservative generation-time bound.
 	SnapshotAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
 	RejectedRecords []*RejectedRecord      `protobuf:"bytes,6,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -710,7 +749,7 @@ var File_lindm_advisory_v1_feed_proto protoreflect.FileDescriptor
 
 const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x87\x11\n" +
+	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc6\x11\n" +
 	"\n" +
 	"FeedSource\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
@@ -732,15 +771,15 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x12total_claims_limit\x18\f \x01(\x04B\f\xbaH\t2\a\x18\x80\xda\xc4\t(\x01H\x02R\x10totalClaimsLimit\x88\x01\x01\x12I\n" +
 	"\x18progress_timeout_seconds\x18\r \x01(\rB\n" +
 	"\xbaH\a*\x05\x18\x90\x1c(\x01H\x03R\x16progressTimeoutSeconds\x88\x01\x01\x12H\n" +
-	"\x17refresh_timeout_seconds\x18\x0e \x01(\rB\v\xbaH\b*\x06\x18\x80\xa3\x05(\x01H\x04R\x15refreshTimeoutSeconds\x88\x01\x01:\x97\t\xbaH\x93\t\x1a\xad\x03\n" +
-	"\x13feed_source.release\x12]release must identify a numeric distro release, Ubuntu noble, or an explicitly rolling distro\x1a\xb6\x02(this.distro == 'ubuntu' && this.release == 'noble') || (this.distro in ['arch', 'opensuse-tumbleweed'] && this.release == 'rolling') || (!(this.distro in ['arch', 'opensuse-tumbleweed']) && this.release.matches('^[0-9]+(\\\\.[0-9]+)?$') && (this.distro != 'fedora' || this.release.matches('^[1-9][0-9]{1,2}$')))\x1a\xbb\x03\n" +
-	"\x12feed_source.format\x123format must belong to the selected vendor ecosystem\x1a\xef\x02(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian')\x1a\xa2\x02\n" +
+	"\x17refresh_timeout_seconds\x18\x0e \x01(\rB\v\xbaH\b*\x06\x18\x80\xa3\x05(\x01H\x04R\x15refreshTimeoutSeconds\x88\x01\x01:\xd6\t\xbaH\xd2\t\x1a\xad\x03\n" +
+	"\x13feed_source.release\x12]release must identify a numeric distro release, Ubuntu noble, or an explicitly rolling distro\x1a\xb6\x02(this.distro == 'ubuntu' && this.release == 'noble') || (this.distro in ['arch', 'opensuse-tumbleweed'] && this.release == 'rolling') || (!(this.distro in ['arch', 'opensuse-tumbleweed']) && this.release.matches('^[0-9]+(\\\\.[0-9]+)?$') && (this.distro != 'fedora' || this.release.matches('^[1-9][0-9]{1,2}$')))\x1a\xfa\x03\n" +
+	"\x12feed_source.format\x123format must belong to the selected vendor ecosystem\x1a\xae\x03(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian') || (this.format == 10 && this.distro == 'opensuse-tumbleweed')\x1a\xa2\x02\n" +
 	"\x1bfeed_source.platform_stream\x12SRHEL requires standard, eus or e4s; extended streams require an exact minor release\x1a\xad\x01this.distro == 'rhel' ? (this.platform_stream in ['standard','eus','e4s'] && (this.platform_stream == 'standard' || this.release.contains('.'))) : this.platform_stream == ''B\x14\n" +
 	"\x12_max_archive_bytesB\x17\n" +
 	"\x15_max_rejected_recordsB\x15\n" +
 	"\x13_total_claims_limitB\x1b\n" +
 	"\x19_progress_timeout_secondsB\x1a\n" +
-	"\x18_refresh_timeout_seconds\"\xa1\b\n" +
+	"\x18_refresh_timeout_seconds\"\xca\v\n" +
 	"\bAdvisory\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x02id\x12?\n" +
@@ -763,7 +802,12 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x0fplatform_stream\x18\x0f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x0eplatformStream\x12)\n" +
 	"\vmodule_name\x18\x10 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\n" +
 	"moduleName\x12-\n" +
-	"\rmodule_stream\x18\x11 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\fmoduleStream:\x8d\x01\xbaH\x89\x01\x1a\x86\x01\n" +
+	"\rmodule_stream\x18\x11 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\fmoduleStream\x12;\n" +
+	"\x14prerequisite_package\x18\x13 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x13prerequisitePackage\x12B\n" +
+	"\x18prerequisite_min_version\x18\x14 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\x16prerequisiteMinVersion\x126\n" +
+	"\x17all_installed_instances\x18\x15 \x01(\bR\x15allInstalledInstances\x12I\n" +
+	"\x16instance_architectures\x18\x16 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18@R\x15instanceArchitectures:\xb2\x02\xbaH\xae\x02\x1a\xa2\x01\n" +
+	"\x15advisory.prerequisite\x12=native prerequisite requires both package and minimum version\x1aJ(this.prerequisite_package == '') == (this.prerequisite_min_version == '')\x1a\x86\x01\n" +
 	"\x13advisory.assessment\x12>an advisory cannot be both unknown and explicitly not affected\x1a/!(this.assessment_unknown && this.not_affected)\"\xe7\x02\n" +
 	"\fFeedDocument\x12;\n" +
 	"\n" +
@@ -786,7 +830,7 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12#\n" +
 	"\rpackage_names\x18\x03 \x03(\tR\fpackageNames\x12\x1a\n" +
-	"\bunscoped\x18\x04 \x01(\bR\bunscoped*\xb6\x02\n" +
+	"\bunscoped\x18\x04 \x01(\bR\bunscoped*\xd1\x02\n" +
 	"\n" +
 	"FeedFormat\x12\x1b\n" +
 	"\x17FEED_FORMAT_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -798,7 +842,9 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x15FEED_FORMAT_SUSE_CSAF\x10\x06\x12\x19\n" +
 	"\x15FEED_FORMAT_ARCH_JSON\x10\a\x12#\n" +
 	"\x1fFEED_FORMAT_DEBIAN_TRACKER_JSON\x10\b\x12$\n" +
-	" FEED_FORMAT_REDHAT_CSAF_ARCHIVES\x10\tB(Z&lindm/gen/lindm/advisory/v1;advisoryv1b\x06proto3"
+	" FEED_FORMAT_REDHAT_CSAF_ARCHIVES\x10\t\x12\x19\n" +
+	"\x15FEED_FORMAT_SUSE_OVAL\x10\n" +
+	"B(Z&lindm/gen/lindm/advisory/v1;advisoryv1b\x06proto3"
 
 var (
 	file_lindm_advisory_v1_feed_proto_rawDescOnce sync.Once

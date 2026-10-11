@@ -4,6 +4,8 @@ package vmlab
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/measuredboot"
 )
 
 type encryptedGuestEvidence struct {
@@ -18,6 +21,9 @@ type encryptedGuestEvidence struct {
 	SecureBoot bool              `json:"secure_boot"`
 	SetupMode  bool              `json:"setup_mode"`
 	Headers    []EncryptedHeader `json:"headers"`
+	// Ordinary firmware/loader measurements are evidence, not a recovery pass.
+	EventLogSHA256 string `json:"ordinary_event_log_sha256,omitempty"`
+	EventLog       []byte `json:"ordinary_event_log,omitempty"`
 }
 
 // EncryptedSmokeEvidence contains no unlock secrets, SSH keys or raw console.
@@ -168,6 +174,17 @@ printf "]"
 	}
 	if len(result.Headers) == 0 {
 		return nil, errors.New("guest contains no observed LUKS2 headers")
+	}
+	if vm.hardware.TPM {
+		log, err := vm.guest.run(ctx, "sudo -n cat /sys/kernel/security/tpm0/binary_bios_measurements", nil, measuredboot.MaxEventLogBytes, 10*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("observe encrypted ordinary boot event log: %w", err)
+		}
+		if _, err := measuredboot.ParseEventLog(log); err != nil {
+			return nil, fmt.Errorf("parse encrypted ordinary boot event log: %w", err)
+		}
+		digest := sha256.Sum256(log)
+		result.EventLogSHA256, result.EventLog = hex.EncodeToString(digest[:]), log
 	}
 	return result, nil
 }

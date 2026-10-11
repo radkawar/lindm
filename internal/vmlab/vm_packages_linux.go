@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/packaging"
 	"lindm/internal/platform"
 )
@@ -31,17 +32,18 @@ var nativeFingerprint = regexp.MustCompile(`^(?:[A-F0-9]{40}|[A-F0-9]{64})$`)
 // digests; the guest then authenticates them independently with a pinned key.
 // It owns no VM and must be closed before its VM is removed.
 type nativeGuestPackages struct {
-	vm        *guestVM
-	backend   platform.Backend
-	first     packaging.Artifact
-	second    packaging.Artifact
-	apt       *packaging.APTRepository
-	arch      []*packaging.ArchRepository
-	keyPath   string
-	server    *aptPublicServer
-	forward   *guestForward
-	account   string
-	installed bool
+	vm              *guestVM
+	backend         platform.Backend
+	first           packaging.Artifact
+	second          packaging.Artifact
+	apt             *packaging.APTRepository
+	arch            []*packaging.ArchRepository
+	keyPath         string
+	server          *aptPublicServer
+	forward         *guestForward
+	account         string
+	installed       bool
+	rollingSnapshot *resourcev1.RollingUpdateSnapshot
 }
 
 func nativeQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }

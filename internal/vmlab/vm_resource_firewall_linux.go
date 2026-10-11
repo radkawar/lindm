@@ -314,7 +314,7 @@ func writeGuestAgentConfig(ctx context.Context, vm *guestVM, config *agentv1.Age
 }
 
 // installPeer installs the same signed agent package on the unenrolled peer.
-func (f *firewallLane) installPeer(ctx context.Context, manifest *labv1.ImageManifest, artifact packaging.Artifact, apt *packaging.APTRepository, publicKey, fingerprint string) error {
+func (f *firewallLane) installPeer(ctx context.Context, manifest *labv1.ImageManifest, artifact packaging.Artifact, apt *packaging.APTRepository, publicKey, fingerprint string, arch ...*packaging.ArchRepository) error {
 	if err := f.peer.connect(ctx); err != nil {
 		return fmt.Errorf("connect probe peer: %w", err)
 	}
@@ -324,7 +324,7 @@ func (f *firewallLane) installPeer(ctx context.Context, manifest *labv1.ImageMan
 	if err := pinArchRepositories(ctx, f.peer, manifest); err != nil {
 		return err
 	}
-	packages, err := newNativeGuestPackages(ctx, f.peer, artifact, artifact, apt, publicKey, fingerprint)
+	packages, err := newNativeGuestPackages(ctx, f.peer, artifact, artifact, apt, publicKey, fingerprint, arch...)
 	if err != nil {
 		return err
 	}
@@ -537,7 +537,8 @@ func (f *firewallLane) provisionDevice(ctx context.Context, vm *guestVM) ([]VMRe
 	script := `set -eu
 if ! command -v nft >/dev/null 2>&1; then
  if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; apt-get install -y nftables >/dev/null 2>&1 || { apt-get update -q >/dev/null && apt-get install -y nftables >/dev/null; }
- else dnf install -y nftables >/dev/null; fi
+ elif command -v dnf >/dev/null 2>&1; then dnf install -y nftables >/dev/null
+ else echo 'snapshot must provision nftables before firewall qualification' >&2; exit 1; fi
 fi
 # Quarantine admits loopback only from its 127.0.0.1 management endpoint, so
 # the systemd-resolved stub (127.0.0.53) is unreachable while quarantined; the

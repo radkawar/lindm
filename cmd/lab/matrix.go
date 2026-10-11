@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -51,6 +53,8 @@ func runMatrix(ctx context.Context, args []string, stdout, stderr io.Writer) err
 // matrixSelection is the shared platform/cell/architecture selection.
 type matrixSelection struct {
 	root, platforms, cells, architecture string
+	manifestID                           string
+	requalifyDue                         bool
 }
 
 func newMatrixSelection(flags *flag.FlagSet) *matrixSelection {
@@ -59,6 +63,8 @@ func newMatrixSelection(flags *flag.FlagSet) *matrixSelection {
 	flags.StringVar(&s.platforms, "platform", "", "comma-separated registry keys (default: every Tier 1/2 release)")
 	flags.StringVar(&s.cells, "cells", "", "comma-separated matrix cells (default: all)")
 	flags.StringVar(&s.architecture, "architecture", "", "x86_64 or aarch64 (default: every registry architecture)")
+	flags.StringVar(&s.manifestID, "manifest-id", "", "prefer this pinned image for an explicit single platform and architecture (owner-selected boot topology)")
+	flags.BoolVar(&s.requalifyDue, "rolling-requalification", false, "select due rolling-snapshot lanes from the matrix periodic schedule")
 	return s
 }
 
@@ -71,13 +77,38 @@ func (s *matrixSelection) plan() (*labmatrix.Inputs, []*labmatrix.Cell, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	specs, err := in.Cells(splitList(s.cells))
+	if s.manifestID != "" {
+		index := slices.IndexFunc(in.Manifests, func(m *labmatrix.Manifest) bool { return m.Image.GetId() == s.manifestID })
+		if index < 0 {
+			return nil, nil, fmt.Errorf("unknown pinned manifest %q", s.manifestID)
+		}
+		selected := in.Manifests[index]
+		if len(releases) != 1 || releases[0].Key != selected.Release.Key || s.architecture != selected.Architecture {
+			return nil, nil, errors.New("-manifest-id requires its exact single -platform and -architecture")
+		}
+		in.PreferredManifest = selected.Image.GetId()
+	}
+	names := splitList(s.cells)
+	if s.requalifyDue {
+		if s.cells != "" {
+			return nil, nil, errors.New("-rolling-requalification uses the matrix's complete lane set, not -cells")
+		}
+		names = in.Matrix.GetRollingRequalificationCells()
+		if len(names) == 0 {
+			return nil, nil, errors.New("matrix has no rolling requalification lanes")
+		}
+	}
+	specs, err := in.Cells(names)
 	if err != nil {
 		return nil, nil, err
 	}
 	cells := in.Plan(releases, specs)
 	if s.architecture != "" {
 		cells = slices.DeleteFunc(cells, func(c *labmatrix.Cell) bool { return c.Architecture != s.architecture })
+	}
+	if s.requalifyDue {
+		now := time.Now()
+		cells = slices.DeleteFunc(cells, func(c *labmatrix.Cell) bool { return !c.RequalificationDue(now) })
 	}
 	return in, cells, nil
 }
@@ -339,6 +370,8 @@ var laneInputs = map[string][]string{
 	"updates":             {"repo", "build-repo", "lab", "record"},
 	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
 	"enroll-from-console": {"console-browser", "record"},
+	"services":            {"record"},
+	"advisories":          {"repo", "build-repo", "lab", "lindmd", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -362,6 +395,10 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	}
 	in, cells, err := selection.plan()
 	if err != nil {
+		return err
+	}
+	if selection.requalifyDue && len(cells) == 0 {
+		_, err := fmt.Fprintln(stdout, "no rolling requalification lanes are due")
 		return err
 	}
 	cells = slices.DeleteFunc(cells, func(c *labmatrix.Cell) bool {
@@ -598,6 +635,11 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
+	pinned := base + ".manifest.json"
+	if err := retainMatrixManifest(filepath.Join(r.root, c.Manifest.Path), pinned, c.Manifest.SHA256); err != nil {
+		return fmt.Errorf("%s: retain snapshot manifest: %w", name, err)
+	}
+	args = labhost.SetFlag(args, "manifest", pinned)
 	if slices.Contains(laneInputs[c.Spec.GetLane()], "evidence") {
 		record = filepath.Join(base, c.Spec.GetLane()+".json")
 	}
@@ -629,7 +671,15 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	if err != nil {
 		return err
 	}
-	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN}
+	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), ManifestSha256: c.Manifest.SHA256, RepositorySnapshotDate: c.Manifest.Image.GetRepositorySnapshotDate(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN, Verified: true}
+	entry.RepositoryClosureSha256 = c.Manifest.Image.GetRepositorySnapshotManifestSha256()
+	entry.RepositoryMetadataSha256 = c.Manifest.Image.GetRepositorySnapshotRepomdSha256()
+	if c.Spec.GetLane() == "advisories" && verdict == labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
+		entry.Scope, err = advisoryRecordScope(record)
+		if err != nil {
+			return fmt.Errorf("%s: record qualification scope: %w", name, err)
+		}
+	}
 	r.ledger.Lock()
 	err = labmatrix.Append(filepath.Join(r.root, labmatrix.LedgerFile), entry)
 	r.ledger.Unlock()
@@ -639,6 +689,53 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	}
 	if verdict != labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
 		return fmt.Errorf("%s failed: %w (log %s.log)", name, laneErr, base)
+	}
+	return nil
+}
+
+func advisoryRecordScope(path string) (scope string, err error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	var record struct {
+		Advisories struct {
+			Scope string `json:"scope"`
+		} `json:"advisories"`
+	}
+	if err := json.NewDecoder(io.LimitReader(file, 32<<20)).Decode(&record); err != nil {
+		return "", err
+	}
+	switch record.Advisories.Scope {
+	case "partial-feed matching", "native feed matching; not complete device coverage":
+		return record.Advisories.Scope, nil
+	default:
+		return "", errors.New("advisory lane omitted its explicit coverage scope")
+	}
+}
+
+// retainMatrixManifest preserves the exact planned pin and runs the lane against
+// those bytes, not a checkout file that another process may change while queued.
+func retainMatrixManifest(source, destination, expected string) (err error) {
+	input, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, input.Close()) }()
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, output.Close()) }()
+	digest := sha256.New()
+	const maxManifestBytes = 16 << 20
+	n, err := io.Copy(io.MultiWriter(output, digest), io.LimitReader(input, maxManifestBytes+1))
+	if err != nil {
+		return err
+	}
+	if n > maxManifestBytes || fmt.Sprintf("%x", digest.Sum(nil)) != expected {
+		return errors.New("image manifest changed after planning")
 	}
 	return nil
 }

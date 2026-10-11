@@ -28,7 +28,9 @@ func missingPackage(platform *resourcev1.PlatformProduct, name string, cause err
 	case aptProduct(platform):
 		// unattended-upgrades and needrestart are Architecture: all.
 		ecosystem, arch = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB, "all"
-	case name == "dnf5-plugin-automatic" || name == "dnf5-plugins":
+	case name == "pacman":
+		ecosystem, arch = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM, rpmArchitecture()
+	case name == "dnf5-plugin-automatic" || name == "dnf5-plugins" || name == "zypper":
 		arch = rpmArchitecture()
 	}
 	return &PrerequisiteError{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: name, Architecture: arch}, Cause: cause}

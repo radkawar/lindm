@@ -455,6 +455,10 @@ enum OSUpdateBackend {
   OS_UPDATE_BACKEND_DNF5_AUTOMATIC = 2;
   // dnf-automatic(8) on DNF4.
   OS_UPDATE_BACKEND_DNF4_AUTOMATIC = 3;
+  // A dated Arch Linux Archive whole-system pacman transaction.
+  OS_UPDATE_BACKEND_PACMAN = 4;
+  // A pinned Tumbleweed repository distribution upgrade.
+  OS_UPDATE_BACKEND_ZYPPER = 5;
 }
 // Closed set of lindm-owned native objects. Paths are fixed by the provider.
 enum OSUpdateNativeFile {

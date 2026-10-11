@@ -275,13 +275,14 @@ func (x *NativePackageProviderConfig) GetSources() []*NativePackageSource {
 
 // Locally provisioned signing material, never a remotely supplied filesystem path.
 type NativePackageSource struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Repository               *v1.RepositoryDesired  `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
-	SigningKeyFile           string                 `protobuf:"bytes,2,opt,name=signing_key_file,json=signingKeyFile,proto3" json:"signing_key_file,omitempty"`
-	SigningKeySha256         []byte                 `protobuf:"bytes,3,opt,name=signing_key_sha256,json=signingKeySha256,proto3" json:"signing_key_sha256,omitempty"`
-	RpmSigningKeyFingerprint string                 `protobuf:"bytes,4,opt,name=rpm_signing_key_fingerprint,json=rpmSigningKeyFingerprint,proto3" json:"rpm_signing_key_fingerprint,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Repository                *v1.RepositoryDesired  `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
+	SigningKeyFile            string                 `protobuf:"bytes,2,opt,name=signing_key_file,json=signingKeyFile,proto3" json:"signing_key_file,omitempty"`
+	SigningKeySha256          []byte                 `protobuf:"bytes,3,opt,name=signing_key_sha256,json=signingKeySha256,proto3" json:"signing_key_sha256,omitempty"`
+	RpmSigningKeyFingerprint  string                 `protobuf:"bytes,4,opt,name=rpm_signing_key_fingerprint,json=rpmSigningKeyFingerprint,proto3" json:"rpm_signing_key_fingerprint,omitempty"`
+	AlpmSigningKeyFingerprint string                 `protobuf:"bytes,5,opt,name=alpm_signing_key_fingerprint,json=alpmSigningKeyFingerprint,proto3" json:"alpm_signing_key_fingerprint,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *NativePackageSource) Reset() {
@@ -338,6 +339,13 @@ func (x *NativePackageSource) GetSigningKeySha256() []byte {
 func (x *NativePackageSource) GetRpmSigningKeyFingerprint() string {
 	if x != nil {
 		return x.RpmSigningKeyFingerprint
+	}
+	return ""
+}
+
+func (x *NativePackageSource) GetAlpmSigningKeyFingerprint() string {
+	if x != nil {
+		return x.AlpmSigningKeyFingerprint
 	}
 	return ""
 }
@@ -916,16 +924,17 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x1bNativePackageProviderConfig\x12I\n" +
 	"\asources\x18\x01 \x03(\v2#.lindm.agent.v1.NativePackageSourceB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10 R\asources:\xe3\x01\xbaH\xdf\x01\x1a\xdc\x01\n" +
-	"&native_package_provider.unique_sources\x12?approved package sources must have unique repository identities\x1aqthis.sources.all(s, this.sources.filter(o, o.repository.repository_id == s.repository.repository_id).size() == 1)\"\xda\a\n" +
+	"&native_package_provider.unique_sources\x12?approved package sources must have unique repository identities\x1aqthis.sources.all(s, this.sources.filter(o, o.repository.repository_id == s.repository.repository_id).size() == 1)\"\xab\v\n" +
 	"\x13NativePackageSource\x12L\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\v2$.lindm.resource.v1.RepositoryDesiredB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"repository\x123\n" +
 	"\x10signing_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0esigningKeyFile\x125\n" +
 	"\x12signing_key_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x10signingKeySha256\x12d\n" +
-	"\x1brpm_signing_key_fingerprint\x18\x04 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x18rpmSigningKeyFingerprint:\xa2\x05\xbaH\x9e\x05\x1a\xea\x01\n" +
-	"\x1enative_package_source.approved\x12Gnative package sources must be present approved APT or RPM repositories\x1a\x7fthis.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm))\x1a\xae\x03\n" +
-	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\xa2\a\n" +
+	"\x1brpm_signing_key_fingerprint\x18\x04 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x18rpmSigningKeyFingerprint\x12f\n" +
+	"\x1calpm_signing_key_fingerprint\x18\x05 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x19alpmSigningKeyFingerprint:\x8b\b\xbaH\x87\b\x1a\x8e\x02\n" +
+	"\x1enative_package_source.approved\x12Mnative package sources must be present approved APT, RPM or ALPM repositories\x1a\x9c\x01this.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm) || has(this.repository.alpm))\x1a\xf3\x05\n" +
+	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\x8f\x05(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.alpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.alpm_signing_key_fingerprint == '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256) || (has(this.repository.alpm) && this.rpm_signing_key_fingerprint == '' && this.alpm_signing_key_fingerprint != '' && this.repository.alpm.signing_keys.size() == 1 && this.repository.alpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\xa2\a\n" +
 	"\x1aDeviceActionProviderConfig\x12I\n" +
 	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
 	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +

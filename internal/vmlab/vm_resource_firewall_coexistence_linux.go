@@ -45,6 +45,11 @@ fedora|rhel|almalinux|rocky)
  systemctl enable --now firewalld.service >/dev/null 2>&1
  firewall-cmd --state >/dev/null
  ;;
+*)
+ command -v firewall-cmd >/dev/null
+ systemctl enable --now firewalld.service >/dev/null 2>&1
+ firewall-cmd --state >/dev/null
+ ;;
 esac`
 
 // firewallNativeTablesOracle digests every nftables table lindm does not own
@@ -69,7 +74,7 @@ func (f *firewallLane) nativeManager() (tables []string, status, reload string, 
 	switch f.release.Native().Packages.Backend.PackageDB() {
 	case platform.PackageDBDpkg:
 		return []string{"ip filter", "ip6 filter"}, "ufw status verbose", "ufw reload >/dev/null && ufw status | grep -qx 'Status: active'", nil
-	case platform.PackageDBRPM:
+	case platform.PackageDBRPM, platform.PackageDBPacman:
 		return []string{"inet firewalld"}, "firewall-cmd --get-default-zone; firewall-cmd --list-all", "firewall-cmd --reload >/dev/null && firewall-cmd --state", nil
 	}
 	return nil, "", "", fmt.Errorf("no qualified native firewall manager for %s", f.release.Name)

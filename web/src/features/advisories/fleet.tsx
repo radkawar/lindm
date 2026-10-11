@@ -266,7 +266,7 @@ export function AdvisoryFleet() {
                 items={[
                   { label: "Last attempt", value: formatTimestamp(feed.attemptedAt).local },
                   {
-                    label: "Signed snapshot",
+                    label: "Snapshot time",
                     value: feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : undefined,
                   },
                   { label: "Reported error", value: feed.error },

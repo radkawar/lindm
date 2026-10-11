@@ -1,6 +1,7 @@
 package labhost
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -334,5 +335,27 @@ func TestReadOnlyReturnedRecordIsAnnotated(t *testing.T) {
 	entries, err := os.ReadDir(root)
 	if err != nil || len(entries) != 2 {
 		t.Fatalf("annotation left temporary files: %v, %v", entries, err)
+	}
+}
+
+func TestSnapshotReturnPreservesDeadlineAfterExporterStarts(t *testing.T) {
+	root := t.TempDir()
+	exporter := filepath.Join(root, "exporter")
+	if err := os.WriteFile(exporter, []byte("#!/bin/sh\nprintf started >&2\nexec sleep 30\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	record := filepath.Join(root, "record.json")
+	if err := os.WriteFile(record, []byte(`{"repository_snapshot_manifest_sha256":"`+strings.Repeat("a", 64)+`"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	var stderr bytes.Buffer
+	err := collectRepositorySnapshot(ctx, "", exporter, root, filepath.Join(root, "cache"), record, &stderr)
+	if stderr.String() != "started" {
+		t.Fatalf("exporter did not reach its blocking stream: %q, %v", stderr.String(), err)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("bulk return hid its actual deadline behind EOF or a killed subprocess: %v", err)
 	}
 }

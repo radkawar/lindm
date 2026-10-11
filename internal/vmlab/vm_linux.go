@@ -82,6 +82,7 @@ type guestVM struct {
 	hardware           VMHardwareOptions
 	firmware           *EncryptedFirmwareEvidence
 	tpm                *encryptedProcess
+	usingOfflineRTC    bool
 	// Only configured UEFI guests defer a requested no-reboot policy until SSH.
 	// Manually assembled encrypted guests retain their existing reboot policy.
 	stopRebootAfterConnect bool
@@ -224,6 +225,10 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	}
 	if h.stockAcceptance {
 		delete(config, "runcmd")
+	}
+	if h.offlineRTCEnabled() {
+		config["bootcmd"] = []any{[]string{"systemctl", "disable", "--now", h.offlineRTCWaitUnit}}
+		vm.usingOfflineRTC = true
 	}
 	if enrollment != nil {
 		enrollment.apply(config)

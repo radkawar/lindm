@@ -14,11 +14,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+
+	"lindm/internal/platform"
 )
 
 // These tests cover archive bytes and real GPG trust boundaries. The payload is
@@ -185,6 +188,11 @@ func assertArchArchive(t *testing.T, artifact Artifact, staged []stagedFile) {
 	}
 	if strings.Join(info["license"], ",") != "UNLICENSED" || len(info["url"]) != 0 {
 		t.Fatalf("package invents license or project URL: %+v", info)
+	}
+	for _, dependency := range platform.BackendPacman.ResourceDependencies() {
+		if !slices.Contains(info["depend"], dependency) {
+			t.Fatalf("advertised native resource runtime is only optional: %s", dependency)
+		}
 	}
 	buildinfo := string(data[".BUILDINFO"])
 	for _, required := range []string{"format = 2\n", "pkgarch = x86_64\n", "buildtool = go\n", "buildtoolver = " + strings.TrimPrefix(runtime.Version(), "go") + "-1-any\n", fmt.Sprintf("pkgbuild_sha256sum = %x\n", sha256.Sum256(data[".PKGBUILD"]))} {

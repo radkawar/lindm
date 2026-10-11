@@ -14,6 +14,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/dnf"
 	"lindm/internal/agent/journal/journaldb"
+	"lindm/internal/agent/packagepin"
 	"lindm/internal/resource"
 )
 
@@ -508,14 +509,15 @@ func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapsh
 	}
 }
 
-// nativePinClaimed reports an existing pin for this package. An APT pin file is
-// per package; DNF's versionlock (DNF5 TOML or the DNF4 plugin list) is one
-// shared document whose entries for other packages do not make this package's
-// creation an adoption.
+// nativePinClaimed shares the provider's owned-block parser for pacman/zypp
+// documents. APT is per-package; DNF uses its manager-specific shared parser.
 func nativePinClaimed(observation *resourcev1.ResourceObservation) bool {
 	pkg := observation.GetNativePackage()
 	if pkg.GetPinFile() == nil {
 		return false
+	}
+	if path := pkg.GetPinFile().GetPath(); path == packagepin.PacmanPath || path == packagepin.ZypperPath {
+		return packagepin.ClaimsBlock(pkg.GetPinContents(), observation.GetRef().GetCanonicalKey())
 	}
 	if pkg.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return true

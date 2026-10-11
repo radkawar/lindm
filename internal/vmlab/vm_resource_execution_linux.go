@@ -102,6 +102,9 @@ func exerciseSignedNativeResources(ctx context.Context, packages *nativeGuestPac
 }
 
 func executeSignedNativeResource(ctx context.Context, packages *nativeGuestPackages, signer *devlab.ExecutionTrustExercise, identity *labv1.ConnectionIdentityEvidence, profile, resourceID string, sequence uint64, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation, history *[]vmServiceAttestationPhase) (*agentv1.ResourceExecutionStatus, []byte, error) {
+	if err := selectALPMFixture(ctx, packages.vm, desired); err != nil {
+		return nil, nil, err
+	}
 	now := time.Now().UTC()
 	revision := uuid.NewString()
 	intent := &agentv1.ResourceExecutionIntent{DeploymentId: identity.GetDeploymentId(), DeviceId: identity.GetDeviceId(), EnrollmentGeneration: identity.GetEnrollmentGeneration(), ActionId: uuid.NewString(), DesiredRevision: revision, ActorId: uuid.NewString(), ResourceSequence: sequence, RecoveryEpoch: 1, RootVersion: 2, DelegationVersion: 2, AuthorizationVersion: 1, NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: timestamppb.New(now.Add(10 * time.Minute)), Desired: desired, Operation: operation, Ownership: &agentv1.ResourceOwnershipBinding{AssignmentId: revision, ResourceId: resourceID, Policy: resourceCreatePolicy(), Sources: []*agentv1.ResourceOwnershipSource{{ProfileId: profile, ProfileRevision: revision, ResourceId: resourceID}}}}

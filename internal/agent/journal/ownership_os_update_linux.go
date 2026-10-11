@@ -66,7 +66,9 @@ func osUpdateBackendFiles(backend resourcev1.OSUpdateBackend) []resourcev1.OSUpd
 		return append(files, resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_APT_PERIODIC)
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC:
 		return append(files, resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC)
-	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
+	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC,
+		resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN,
+		resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER:
 		return files
 	default:
 		return nil

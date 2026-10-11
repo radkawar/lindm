@@ -126,10 +126,14 @@ func osUpdatePackageOracle(rpm resourcePackaging) func(context.Context, *guestVM
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
 		list := "dpkg-query -W -f '${Package}:${Architecture} ${Version} ${db:Status-Abbrev}\\n'"
 		if rpm.rpm {
+			// Both DNF and zypper use the canonical RPM database oracle.
 			list = "rpm -qa --qf '%{NAME}.%{ARCH} %{EPOCHNUM}:%{VERSION}-%{RELEASE}\\n'"
 		}
+		if rpm.pacman {
+			list = "pacman -Q"
+		}
 		command := list + " | LC_ALL=C sort > /tmp/lindm-lab-packages; printf 'packages %s\\n' \"$(sha256sum < /tmp/lindm-lab-packages | cut -d' ' -f1)\"; wc -l < /tmp/lindm-lab-packages; uname -r"
-		if !rpm.rpm {
+		if !rpm.rpm && !rpm.pacman {
 			command += "; dpkg-query -W -f 'version ${Package} ${Version}\\n' apt unattended-upgrades needrestart update-notifier-common || true"
 		}
 		return resourceOracle(ctx, vm, "native-package-database", command)
@@ -146,11 +150,16 @@ func osUpdateConfigOracle(rpm resourcePackaging) func(context.Context, *guestVM)
 			if (rpm.rpm && kind == resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_APT_PERIODIC) || ((!rpm.rpm || rpm.dnf4) && kind == resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC) {
 				continue
 			}
+			if (rpm.pacman || rpm.zypper) && (kind == resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_APT_PERIODIC || kind == resourcev1.OSUpdateNativeFile_OS_UPDATE_NATIVE_FILE_DNF5_AUTOMATIC) {
+				continue
+			}
 			path := nativeQuote(resource.OSUpdateNativePath(kind))
 			command.WriteString("if test -e " + path + "; then stat -c 'file %n %a %U %G %s' " + path + "; sha256sum " + path + "; else echo absent " + path + "; fi; ")
 		}
 		command.WriteString("systemctl show -p LoadState -p ActiveState -p FragmentPath -p TimersCalendar " + resource.OSUpdateTimerUnit + "; ")
-		if rpm.rpm {
+		if rpm.pacman || rpm.zypper {
+			command.WriteString("systemctl show -p ActiveState pacman-lindm-conflict.timer 2>/dev/null || true")
+		} else if rpm.rpm {
 			command.WriteString("systemctl show -p UnitFileState -p ActiveState dnf-automatic.timer dnf5-automatic.timer 2>/dev/null || true")
 		} else {
 			command.WriteString("printf 'apt-periodic %s\\n' \"$(apt-config shell V APT::Periodic::Unattended-Upgrade)\"")
@@ -173,7 +182,7 @@ func osUpdateInstalledOracle(rpm resourcePackaging, zone *time.Location, start t
 		if strings.Contains(text, "absent ") || !strings.Contains(text, "ActiveState=active") || !strings.Contains(text, "FragmentPath="+resource.OSUpdateTimerPath) || !strings.Contains(text, calendar) {
 			return record, fmt.Errorf("owned update policy objects or timer calendar %q not installed: %s", calendar, text)
 		}
-		if !rpm.rpm && !strings.Contains(text, "apt-periodic V='0'") {
+		if !rpm.rpm && !rpm.pacman && !strings.Contains(text, "apt-periodic V='0'") {
 			return record, errors.New("APT periodic unattended upgrades remain enabled outside the window")
 		}
 		return record, nil
@@ -569,6 +578,9 @@ func osUpdateDiagnostics(rpm resourcePackaging) func(context.Context, *guestVM) 
 }
 
 func exerciseResourceOSUpdate(ctx context.Context, r *resourceDispatch, rpm resourcePackaging, evidence *VMResourceKindEvidence) error {
+	if rpm.pacman || rpm.zypper {
+		return exerciseRollingOSUpdate(ctx, r, rpm, evidence)
+	}
 	vm := r.vm
 	if r.awaitReboot == nil {
 		return errors.New("update policy lane requires a guest-initiated reboot boundary")

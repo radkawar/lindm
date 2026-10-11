@@ -169,6 +169,8 @@ func TestDetectBackend(t *testing.T) {
 		{"NAME=\"Fedora Linux\"\nID=fedora\nVERSION_ID=44\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC},
 		{"NAME=\"Red Hat Enterprise Linux\"\nID=\"rhel\"\nVERSION_ID=\"9.6\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"NAME=\"Red Hat Enterprise Linux\"\nID=\"rhel\"\nVERSION_ID=\"10.2\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
+		{"ID=arch\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN},
+		{"ID=opensuse-tumbleweed\nVERSION_ID=20261007\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER},
 	} {
 		native, err := detectBackend([]byte(tc.release))
 		if err != nil || native.kind() != tc.want {

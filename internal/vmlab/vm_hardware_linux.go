@@ -42,7 +42,12 @@ type VMHardwareOptions struct {
 	// Acceptance preserves vendor timers rather than quiescing inventory fixtures.
 	stockAcceptance bool
 	// dataLink adds nic1 on a lane-owned host-local L2 link to one peer guest.
-	dataLink *vmDataLink
+	dataLink           *vmDataLink
+	offlineRTCWaitUnit string
+}
+
+func (h *VMHardwareOptions) offlineRTCEnabled() bool {
+	return h.offlineRTCWaitUnit != "" && !h.AllowNetwork && !h.stockAcceptance
 }
 
 // vmDataLink is a guest's second NIC on a host-local Unix datagram Ethernet
@@ -213,6 +218,9 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 		machine += ",smm=on"
 	}
 	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", "unix:serial.sock,server=on,wait=off", "-monitor", "none", "-qmp", "unix:qmp.sock,server=on,wait=off", "-machine", machine, "-cpu", cpu, "-m", "2048", "-smp", "2"}
+	if h.offlineRTCEnabled() {
+		args = append(args, "-rtc", "base=utc,clock=host")
+	}
 	// Fresh UEFI variables/TPM state can require a firmware initialization reset.
 	// Enforce a caller's no-reboot policy only after pinned SSH readiness.
 	if !allowReboot && h.Firmware == nil {
@@ -341,6 +349,7 @@ type vmRuntimeEvidence struct {
 	Desktop           bool                       `json:"desktop"`
 	Display           string                     `json:"display"`
 	NetworkAccess     string                     `json:"network_access"`
+	ClockPolicy       string                     `json:"clock_policy,omitempty"`
 	DataLink          string                     `json:"data_link,omitempty"`
 	Emulated          bool                       `json:"emulated"`
 	Physical          bool                       `json:"physical"`
@@ -363,6 +372,16 @@ func (v *guestVM) runtimeEvidence(ctx context.Context) (*vmRuntimeEvidence, erro
 	e.NetworkAccess = "restricted-user"
 	if h.AllowNetwork {
 		e.NetworkAccess = "user-egress"
+	}
+	if v.usingOfflineRTC {
+		state, err := v.runResult(ctx, "systemctl is-enabled -- "+nativeQuote(h.offlineRTCWaitUnit), nil, 1024, 10*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("observe offline RTC bootstrap policy: %w", err)
+		}
+		if state.ExitCode != 1 || strings.TrimSpace(string(state.Stdout)) != "disabled" || len(state.Stderr) != 0 {
+			return nil, errors.New("offline RTC bootstrap did not disable its declared network time wait")
+		}
+		e.ClockPolicy = "offline-host-utc-rtc; NTP synchronization not asserted"
 	}
 	if h.dataLink != nil {
 		e.DataLink = "nic1 " + h.dataLink.MAC + " host-local unix-dgram L2 peer link"

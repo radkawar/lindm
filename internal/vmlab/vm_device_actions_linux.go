@@ -244,7 +244,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.Scenario != "all" && options.Scenario != "encryption" && options.Scenario != "wipe" && options.Scenario != "compliance" {
 		return nil, errors.New("device action scenario must be all, encryption, wipe or compliance")
 	}
-	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
+	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"live-actions", "lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
 		return nil, errors.New("wipe phase requires scenario wipe and a supported native phase")
 	}
 	if options.RecoveryBootMode != "" && (options.RecoveryBootMode != recoveryBootMeasured || !slices.Contains([]string{"recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
@@ -374,7 +374,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		result.EncryptionPhase = options.EncryptionPhase
 		return result, nativeTPMScenario(ctx, manifest, options, packages, fixture, control, delegation, result)
 	}
-	if options.Scenario == "wipe" && options.WipePhase != "" && options.WipePhase != "lock-quarantine" {
+	if options.Scenario == "wipe" && options.WipePhase != "" && options.WipePhase != "lock-quarantine" && options.WipePhase != "live-actions" {
 		result.WipePhase = options.WipePhase
 		return result, nativeWipeEffectPhases(ctx, manifest, options, packages, fixture, control, approver, delegation, result)
 	}
@@ -616,6 +616,8 @@ func deviceActionCapabilities(scenario, wipePhase string) []platform.Capability 
 		return []platform.Capability{platform.Encryption}
 	}
 	switch wipePhase {
+	case "live-actions":
+		return []platform.Capability{platform.Wipe, platform.ReportLoss, platform.Lock}
 	case "lock-quarantine":
 		return []platform.Capability{platform.Lock}
 	case "live-erase":

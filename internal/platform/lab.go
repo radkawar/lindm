@@ -18,6 +18,13 @@ type Lab struct {
 	// Installer is the vendor installer the lab's encrypted and installed-image
 	// recipes remaster; InstallerNone when the lab installs from cloud images.
 	Installer Installer
+	// InstallerPackages is the explicit base closure requested by a live
+	// installer rather than a vendor's task or guided package selection.
+	InstallerPackages []string
+	// OfflineRTCWaitUnit is a lab-only network time wait disabled when a
+	// disposable offline guest uses the QEMU host's UTC hardware clock.
+	// It does not assert NTP synchronization or change production agents.
+	OfflineRTCWaitUnit string
 	// Kickstart is the Anaconda kickstart syntax version, e.g. "F44".
 	// Repository and RepositoryKey are the immutable signed release tree and
 	// its key file that the installed root adds packages from; %s is the
@@ -29,6 +36,8 @@ type Lab struct {
 	Session LabSession
 	// Guest names the native guest facts of the device-action lanes.
 	Guest LabGuest
+	// ResourcePackages are the native tools for signed resource fixtures.
+	ResourcePackages []string
 	// FirstBootAccount: the installer hands the lab account to cloud-init,
 	// which creates it on first boot, so installer late commands cannot own
 	// files to it (Ubuntu 22.04's subiquity); the login key arrives through
@@ -50,6 +59,7 @@ const (
 	LaneUnattended LabLane = "unattended"
 	LaneServices   LabLane = "services"
 	LaneServer     LabLane = "server"
+	LaneAdvisories LabLane = "advisories"
 	// LaneAcceptance is the stock-image console acceptance lane and
 	// LaneEncryptedAcceptance its vendor-installer encrypted variant.
 	LaneAcceptance          LabLane = "acceptance"
@@ -59,7 +69,7 @@ const (
 
 // LabLanes lists every lane whose recipes are tracked per release; a lane
 // outside this list needs no per-release recipe.
-var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole}
+var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole}
 
 // LabLane returns nil when the release has a maintained recipe for the lane.
 func (r *Release) LabLane(l LabLane) error {
@@ -114,15 +124,17 @@ const (
 	// labeled cidata carries the configurator's archinstall files. Nothing is
 	// remastered, so it has no InstallerMedia.
 	OmarchyCidata Installer = "omarchy-cidata"
+	ArchISO       Installer = "archiso" // vendor live ISO with a local installation script
 )
 
 // InstallerMedia is the vendor ISO layout an installer recipe is remastered
 // into. The recipe lives in the ISO's /lindm-seed directory.
 type InstallerMedia struct {
-	// GRUB is the vendor grub.cfg on the ISO. EFIImage: the El Torito EFI FAT
-	// image carries the same file, which must be patched too.
-	GRUB     string
-	EFIImage bool
+	// GRUB is the vendor boot configuration on the ISO (a BLS entry when
+	// SystemdBoot). EFIImage mirrors it inside the El Torito EFI FAT image.
+	GRUB        string
+	EFIImage    bool
+	SystemdBoot bool
 	// Seed is the recipe file name and Args the kernel arguments that make the
 	// installer read it.
 	Seed, Args string
@@ -160,6 +172,7 @@ var installerMedia = map[Installer]InstallerMedia{
 	// noninteractive (automatic, X-less) frontend instead of the live session;
 	// noprompt skips casper's remove-the-medium wait at the final reboot.
 	Ubiquity: {GRUB: "/boot/grub/grub.cfg", Seed: "preseed.cfg", Args: "noninteractive noprompt file=/cdrom/lindm-seed/preseed.cfg", Entry: "0", LiveSeparator: true},
+	ArchISO:  {GRUB: "/loader/entries/01-archiso-linux.conf", EFIImage: true, SystemdBoot: true, Seed: "install.sh", Args: "script=/run/archiso/bootmnt/lindm-seed/install.sh"},
 }
 
 // Media returns the installer's remastering layout; ok is false for
@@ -215,6 +228,9 @@ type LabSession struct {
 type LabGuest struct {
 	// Initrd is the installed initramfs path; %s is the kernel release.
 	Initrd string
+	// Kernel overrides the conventional /boot/vmlinuz-%s path. Like Initrd,
+	// it may be a fixed path or contain %s for the observed kernel release.
+	Kernel string
 	// CryptsetupConsole: the initramfs reports a rejected passphrase only in
 	// the journal, so the lab routes systemd-cryptsetup diagnostics to the
 	// console to observe it.

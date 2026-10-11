@@ -17,7 +17,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud recovery image manifest")
 	var options vmlab.VMDeviceActionsOptions
 	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")
-	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
+	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
 	flags.StringVar(&options.EncryptionPhase, "encryption-phase", "", "with -scenario encryption: tpm for separately recorded bind/cold-boot/PCR recovery; empty runs all")
 	flags.StringVar(&options.RecoveryBootMode, "recovery-boot-mode", "", "original-device recovery: empty for the owned systemd-boot UKI, measured-grub for stock shim+GRUB with a TPM-attested initramfs")
 	hardware := &vmlab.VMHardwareOptions{TPM: true, Desktop: true, AllowNetwork: true}

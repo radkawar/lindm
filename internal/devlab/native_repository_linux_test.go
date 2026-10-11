@@ -4,7 +4,10 @@ package devlab
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"lindm/internal/packaging"
 )
 
 func TestNativeRepositoryCustodyNeverServesPrivateSigner(t *testing.T) {
@@ -27,5 +30,14 @@ func TestNativeRepositoryArchitecturesRejectDuplicatesAndPaths(t *testing.T) {
 		if err := nativeRepositoryCustody(root, root+"-custody", architectures); err == nil {
 			t.Fatalf("invalid architecture selection accepted: %q", architectures)
 		}
+	}
+}
+
+func TestNativeEnrollmentPublicationIncludesOnlyAdmittedPacmanArchitecture(t *testing.T) {
+	if !slices.Equal(nativeEnrollmentFormats("amd64"), []packaging.Format{packaging.FormatDEB, packaging.FormatRPM, packaging.FormatArch}) {
+		t.Fatal("own-server fixture omits the admitted Arch enrollment repository")
+	}
+	if !slices.Equal(nativeEnrollmentFormats("arm64"), []packaging.Format{packaging.FormatDEB, packaging.FormatRPM}) {
+		t.Fatal("generic arm64 package build invented an Arch Linux ARM installation row")
 	}
 }

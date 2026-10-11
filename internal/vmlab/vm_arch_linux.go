@@ -22,14 +22,18 @@ import (
 func pinArchRepositories(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest) error {
 	// Only a row that itself ships the pacman repositories (not a derivative
 	// inheriting them) is pinned to the Arch Linux Archive.
-	if manifestRelease(manifest).Packages.Backend != platform.BackendPacman {
+	release := manifestRelease(manifest)
+	if release.Packages.Backend != platform.BackendPacman {
 		return nil
 	}
 	date, err := time.Parse("2006-01-02", manifest.GetRepositorySnapshotDate())
 	if err != nil {
 		return errors.New("arch guest requires an exact repository snapshot date")
 	}
-	mirror := "Server = https://archive.archlinux.org/repos/" + date.Format("2006/01/02") + "/$repo/os/$arch\n"
+	if release.RollingUpdate.ArchiveURL == "" {
+		return errors.New("arch guest requires a registry archive origin")
+	}
+	mirror := "Server = " + release.RollingUpdate.ArchiveURL + date.Format("2006/01/02") + "/$repo/os/$arch\n"
 	_, err = vm.run(ctx, "sudo -n sh -eu -c 'test -f /etc/pacman.conf; test -d /etc/pacman.d; cat > /etc/pacman.d/mirrorlist'", strings.NewReader(mirror), 4096, time.Minute)
 	return err
 }

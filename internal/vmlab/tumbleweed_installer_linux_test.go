@@ -58,6 +58,24 @@ type autoyastProfile struct {
 	} `xml:"scripts>chroot-scripts>script"`
 }
 
+const tumbleweedTestRepository = "https://10.0.2.2:12345/snapshots/" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"
+
+func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error) {
+	version := tumbleweedInstallerTestVersion(architecture)
+	return tumbleweedInstallerRecipeWithEncryption(platform.ForManifest("opensuse-tumbleweed", version), version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, "", "", false, &tumbleweedSnapshotRepository{URL: tumbleweedTestRepository, CAPEM: []byte("test-only CA")})
+}
+
+func tumbleweedInstallerTestVersion(architecture string) string {
+	switch architecture {
+	case "x86_64":
+		return "20261009"
+	case "aarch64":
+		return "20261007"
+	default:
+		return ""
+	}
+}
+
 func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, architecture := range []string{"x86_64", "aarch64"} {
@@ -95,10 +113,10 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 			}
 			// The DVD (default priority 99) outranks the one online repository,
 			// whose signed snapshot binding uses this exact URL and alias.
-			if len(profile.AddOns) != 1 || profile.AddOns[0].URL != tumbleweedRepository(architecture) || profile.AddOns[0].Alias != tumbleweedRepositoryAlias || profile.AddOns[0].Priority != "120" {
+			if len(profile.AddOns) != 1 || profile.AddOns[0].URL != tumbleweedTestRepository || profile.AddOns[0].Alias != tumbleweedRepositoryAlias || profile.AddOns[0].Priority != "120" {
 				t.Fatalf("profile lacks the bound lower-priority repository: %+v", profile.AddOns)
 			}
-			unbound := strings.NewReplacer("http://www.suse.com/1.0/yast2ns", "", "http://www.suse.com/1.0/configns", "", tumbleweedRepository(architecture), "").Replace(string(recipe))
+			unbound := strings.NewReplacer("http://www.suse.com/1.0/yast2ns", "", "http://www.suse.com/1.0/configns", "", tumbleweedTestRepository, "").Replace(string(recipe))
 			if strings.Contains(unbound, "://") || strings.Contains(unbound, "add_on_products") {
 				t.Fatal("profile adds an unbound network repository")
 			}
@@ -137,6 +155,19 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 				if !bytes.Contains(payload, []byte(want)) {
 					t.Fatalf("installed provisioning lost %q", want)
 				}
+			}
+			const machineIDReset = "install -m 0644 /dev/null /etc/machine-id"
+			if !bytes.Contains(payload, []byte(machineIDReset)) {
+				t.Fatal("machine identity inherits private credential mode")
+			}
+			machineID := filepath.Join(t.TempDir(), "machine-id")
+			reset := exec.Command("/bin/sh", "-eu", "-c", "umask 077\n"+strings.ReplaceAll(machineIDReset, "/etc/machine-id", nativeQuote(machineID)))
+			if output, err := reset.CombinedOutput(); err != nil {
+				t.Fatalf("reset public machine identity: %v: %s", err, output)
+			}
+			info, err := os.Stat(machineID)
+			if err != nil || info.Mode().Perm() != 0644 || info.Size() != 0 {
+				t.Fatalf("machine identity must be empty and mode 0644 under umask 077: %v %v", info, err)
 			}
 			// A failing payload must fail the AutoYaST script, not the cleanup.
 			if !strings.Contains(script, "/bin/sh -eu /tmp/lindm-provision && rm -f") {
@@ -196,6 +227,9 @@ func TestTumbleweedInstallerManifestPinsSnapshotDVD(t *testing.T) {
 	if !strings.Contains(probes["version"], "'20261007'") || !strings.Contains(probes["source_marker"], manifest.GetSha256()) || !strings.Contains(probes["removable_boot"], "bootaa64.efi") {
 		t.Fatalf("validation does not bind the installed snapshot, media and boot path: %v", probes)
 	}
+	if !strings.Contains(probes["exact_snapshot_packages"], "'kernel-default'") || !strings.Contains(probes["exact_snapshot_packages"], "'0:7.2.9-1.1'") {
+		t.Fatal("ordinary first boot does not enforce the registry's exact full-kernel pin")
+	}
 	for name, mutate := range map[string]func(*labv1.ImageManifest){
 		"moving release": func(m *labv1.ImageManifest) { m.Release = "Current" },
 		"network media": func(m *labv1.ImageManifest) {
@@ -223,44 +257,6 @@ func TestTumbleweedInstallerManifestPinsSnapshotDVD(t *testing.T) {
 	}
 	if spec, err := installerImageFor(cloud); spec != nil || err != nil {
 		t.Fatalf("cloud disk routed through installer: %v", err)
-	}
-}
-
-// Tags from the signed ports/aarch64 OSS repomd.xml on 2026-10-10 and from the
-// Snapshot20261007 DVD's own repomd.xml, whose distro tag carries no date.
-const (
-	tumbleweedOnlineRepomd = `<?xml version="1.0" encoding="UTF-8"?>
-<repomd xmlns="http://linux.duke.edu/metadata/repo" xmlns:rpm="http://linux.duke.edu/metadata/rpm">
-  <revision>1791425296</revision>
-  <tags>
-    <content>pool</content>
-    <repo>obsproduct://build.opensuse.org/openSUSE:Factory:ARM/openSUSE/20261007</repo>
-    <distro cpeid="cpe:/o:opensuse:opensuse:20261007">openSUSE Tumbleweed 20261007</distro>
-  </tags>
-</repomd>
-`
-	tumbleweedDVDRepomd = `<repomd xmlns="http://linux.duke.edu/metadata/repo"><tags>
-    <repo>obsproduct://build.opensuse.org/openSUSE:Factory:ARM/openSUSE/20261006/aarch64</repo>
-    <distro cpeid="cpe:/o:opensuse:opensuse:20261006">openSUSE Tumbleweed</distro>
-</tags></repomd>`
-)
-
-func TestTumbleweedRepositoryDistroNamesSignedSnapshot(t *testing.T) {
-	snapshot, err := tumbleweedRepositoryDistro([]byte(tumbleweedOnlineRepomd))
-	if err != nil || snapshot != "20261007" {
-		t.Fatalf("snapshot = %q, %v", snapshot, err)
-	}
-	for name, metadata := range map[string]string{
-		"undated name":   tumbleweedDVDRepomd,
-		"two distros":    strings.Replace(tumbleweedOnlineRepomd, "</tags>", `<distro cpeid="cpe:/o:opensuse:opensuse:20261009">openSUSE Tumbleweed 20261009</distro></tags>`, 1),
-		"no distro":      strings.Replace(tumbleweedOnlineRepomd, "distro", "other", 2),
-		"other product":  strings.Replace(tumbleweedOnlineRepomd, "cpe:/o:opensuse:opensuse:", "cpe:/o:opensuse:leap:", 1),
-		"mismatched tag": strings.Replace(tumbleweedOnlineRepomd, "openSUSE Tumbleweed 20261007", "openSUSE Tumbleweed 20261009", 1),
-		"malformed":      "<repomd",
-	} {
-		if _, err := tumbleweedRepositoryDistro([]byte(metadata)); err == nil {
-			t.Fatalf("%s accepted", name)
-		}
 	}
 }
 

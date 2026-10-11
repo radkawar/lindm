@@ -141,6 +141,10 @@ func productBackend(p *resourcev1.PlatformProduct) (resourcev1.OSUpdateBackend, 
 		return resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC, resourcev1.Backend_BACKEND_DNF5, true
 	case lindmplatform.BackendDNF4:
 		return resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC, resourcev1.Backend_BACKEND_DNF4, true
+	case lindmplatform.BackendPacman:
+		return resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN, resourcev1.Backend_BACKEND_ALPM, release.Native().RollingUpdate != nil
+	case lindmplatform.BackendZypper:
+		return resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER, resourcev1.Backend_BACKEND_ZYPPER, release.Native().RollingUpdate != nil
 	default:
 		return 0, 0, false
 	}
@@ -195,14 +199,17 @@ func rpmArchitecture() string {
 // as errNotInstalled; any other failure or ambiguous output is an error.
 func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, name string, run commandRunner) (string, error) {
 	switch name {
-	case "unattended-upgrades", "needrestart", "dnf5-plugin-automatic", "dnf5-plugins", "dnf-automatic", "dnf-plugins-core":
+	case "unattended-upgrades", "needrestart", "dnf5-plugin-automatic", "dnf5-plugins", "dnf-automatic", "dnf-plugins-core", "pacman", "zypper":
 	default:
 		return "", ErrUnsupported
 	}
 	var output []byte
 	var err error
 	if aptProduct(platform) {
+		// dpkg status distinguishes installed from merely retained config.
 		output, err = run(ctx, "/usr/bin/dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Version}\n", name)
+	} else if name == "pacman" {
+		output, err = run(ctx, "/usr/bin/pacman", "-Q", name)
 	} else {
 		output, err = run(ctx, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}\n", name)
 	}
@@ -212,6 +219,13 @@ func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, n
 	version := strings.TrimSuffix(string(output), "\n")
 	if strings.Contains(version, "\n") {
 		return "", fmt.Errorf("%w: ambiguous native package %s", ErrUnsupported, name)
+	}
+	if name == "pacman" {
+		var ok bool
+		version, ok = strings.CutPrefix(version, "pacman ")
+		if !ok {
+			return "", ErrUnsupported
+		}
 	}
 	if aptProduct(platform) {
 		status, value, ok := strings.Cut(version, "\t")
@@ -250,6 +264,10 @@ func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run 
 		tool, oracle = "dnf5-plugin-automatic", "dnf5-plugins"
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
 		tool, oracle = "dnf-automatic", "dnf-plugins-core"
+	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN:
+		tool = "pacman"
+	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER:
+		tool = "zypper"
 	default:
 		return "", false, ErrUnsupported
 	}
@@ -259,6 +277,9 @@ func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run 
 	}
 	if err != nil {
 		return "", false, err
+	}
+	if oracle == "" {
+		return tool + " " + version, true, nil
 	}
 	if _, err := packageVersion(ctx, platform, oracle, run); errors.Is(err, errNotInstalled) {
 		return "", false, missingPackage(platform, oracle, err)

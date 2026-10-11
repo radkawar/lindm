@@ -27,13 +27,14 @@ func captureConsoleBrowser(ctx context.Context, repository, private, configPath,
 	if err := readConsoleBrowserJSON(configPath, &cfg); err != nil {
 		return nil, err
 	}
-	family := "apt"
-	if platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Native().Packages.Backend.DNF() {
-		family = "dnf"
+	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	family, err := consoleEnrollmentFamily(release.Native().Packages.Backend)
+	if err != nil {
+		return nil, err
 	}
 	cfg.Mode, cfg.Engine = "grant", "chromium"
 	cfg.RequireRepositories, cfg.EnrollmentScreenshots = true, true
-	cfg.EnrollmentPlatforms = map[string]string{family: platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Name}
+	cfg.EnrollmentPlatforms = map[string]string{family: release.Name}
 	cfg.EnrollmentCommandPaths = map[string]string{family: commandPath}
 	cfg.ResultPath = filepath.Join(private, "browser-result.json")
 	if cfg.EvidenceDirectory == "" {
@@ -60,6 +61,21 @@ func captureConsoleBrowser(ctx context.Context, repository, private, configPath,
 		return nil, errors.New("browser did not provide a clipboard command binding and screenshots")
 	}
 	return &consoleBrowserCapture{SHA256: captured.Grant.SHA256[family], Source: captured.Grant.Sources[family], Screenshots: captured.Screenshots}, nil
+}
+
+func consoleEnrollmentFamily(backend platform.Backend) (string, error) {
+	switch backend {
+	case platform.BackendAPT:
+		return "apt", nil
+	case platform.BackendDNF4, platform.BackendDNF5:
+		return "dnf", nil
+	case platform.BackendPacman:
+		return "pacman", nil
+	case platform.BackendZypper:
+		return "zypper", nil
+	default:
+		return "", errors.New("console enrollment requires a registered native package family")
+	}
 }
 
 type consoleBrowserEnrollment struct {

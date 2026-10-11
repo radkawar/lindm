@@ -260,10 +260,11 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 	case backend.DNF():
 		return "dnf -y install " + strings.Join(packages, " "), nil
 	case backend == platform.BackendPacman:
-		// A partial pacman -S against rolling mirrors is unsupported; the lab
-		// golden installed these from its authenticated installer media's
-		// signed offline repository, so the lane only proves their presence.
+		// Rolling goldens provision the prerequisites from their pinned source.
+		// Do not refresh to a different snapshot merely to prepare an action.
 		return "pacman -Q " + strings.Join(packages, " "), nil
+	case backend == platform.BackendZypper:
+		return "rpm -q " + strings.Join(packages, " "), nil
 	default:
 		return "", fmt.Errorf("no lab package installer for %s", release.Name)
 	}

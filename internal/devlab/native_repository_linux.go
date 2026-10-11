@@ -15,21 +15,24 @@ import (
 
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // NativeEnrollmentRepository records actual native package and signed metadata
 // publication. Private signing custody is never under the served directory.
 type NativeEnrollmentRepository struct {
-	APTURL            string                   `json:"apt_url"`
-	RPMURL            string                   `json:"rpm_url"`
-	SignerFingerprint string                   `json:"signer_fingerprint"`
-	Artifacts         []packaging.Artifact     `json:"artifacts"`
-	APT               *packaging.APTRepository `json:"apt"`
-	RPM               *packaging.RPMRepository `json:"rpm"`
+	APTURL            string                    `json:"apt_url"`
+	RPMURL            string                    `json:"rpm_url"`
+	ArchURL           string                    `json:"arch_url,omitempty"`
+	SignerFingerprint string                    `json:"signer_fingerprint"`
+	Artifacts         []packaging.Artifact      `json:"artifacts"`
+	APT               *packaging.APTRepository  `json:"apt"`
+	RPM               *packaging.RPMRepository  `json:"rpm"`
+	Arch              *packaging.ArchRepository `json:"arch,omitempty"`
 }
 
 // ConfigureNativeEnrollmentRepository builds this checkout's real agent packages
-// and publishes both native formats before lindmd starts. The caller owns a NEW
+// and publishes admitted native formats before lindmd starts. The caller owns a NEW
 // custodyDirectory and its cleanup. Existing published repositories are never
 // overwritten. This is development signing, not production signing custody.
 func ConfigureNativeEnrollmentRepository(ctx context.Context, cfg *configv1.ServerConfig, sourceRepository, custodyDirectory string, architectures []string) (*NativeEnrollmentRepository, error) {
@@ -55,13 +58,13 @@ func ConfigureNativeEnrollmentRepository(ctx context.Context, cfg *configv1.Serv
 		return nil, err
 	}
 	result := &NativeEnrollmentRepository{APTURL: cfg.GetPublicUrl() + "/repo/apt", RPMURL: cfg.GetPublicUrl() + "/repo/rpm", SignerFingerprint: signer.Fingerprint}
-	var debs, rpms []string
+	var debs, rpms, archPackages []string
 	for _, architecture := range architectures {
 		output := filepath.Join(custody, architecture)
 		if err := os.Mkdir(output, 0700); err != nil {
 			return nil, err
 		}
-		built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: sourceRepository, Revision: "console-enrollment-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: output, Formats: []packaging.Format{packaging.FormatDEB, packaging.FormatRPM}, Signer: *signer}})
+		built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: sourceRepository, Revision: "console-enrollment-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: output, Formats: nativeEnrollmentFormats(architecture), Signer: *signer}})
 		if err != nil {
 			return nil, err
 		}
@@ -71,6 +74,8 @@ func ConfigureNativeEnrollmentRepository(ctx context.Context, cfg *configv1.Serv
 				debs = append(debs, artifact.Path)
 			case packaging.FormatRPM:
 				rpms = append(rpms, artifact.Path)
+			case packaging.FormatArch:
+				archPackages = append(archPackages, artifact.Path)
 			}
 		}
 		result.Artifacts = append(result.Artifacts, built.Artifacts...)
@@ -88,7 +93,29 @@ func ConfigureNativeEnrollmentRepository(ctx context.Context, cfg *configv1.Serv
 		return nil, err
 	}
 	cfg.ReleaseRepository.NativeRepositories = &configv1.NativeRepositoriesConfig{AptSigningKeyFingerprint: proto.String(signer.Fingerprint), RpmSigningKeyFingerprint: proto.String(signer.Fingerprint)}
+	if len(archPackages) != 0 {
+		result.Arch, err = packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: repo, Packages: archPackages, Signer: *signer})
+		if err != nil {
+			return nil, err
+		}
+		result.ArchURL = cfg.GetPublicUrl() + "/repo/arch"
+		cfg.ReleaseRepository.NativeRepositories.ArchSigningKeyFingerprint = proto.String(signer.Fingerprint)
+	}
 	return result, nil
+}
+
+// Publish pacman only for architectures admitted by registry lifecycle rows.
+// A generic aarch64 package build is not Arch Linux ARM qualification.
+func nativeEnrollmentFormats(architecture string) []packaging.Format {
+	formats := []packaging.Format{packaging.FormatDEB, packaging.FormatRPM}
+	native := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[architecture]
+	for _, release := range platform.Releases() {
+		if release.Native().Packages.Backend == platform.BackendPacman &&
+			release.Supported(platform.Lifecycle) && slices.Contains(release.Architectures, native) {
+			return append(formats, packaging.FormatArch)
+		}
+	}
+	return formats
 }
 
 func nativeRepositoryCustody(root, custody string, architectures []string) error {
@@ -108,7 +135,7 @@ func nativeRepositoryCustody(root, custody string, architectures []string) error
 }
 
 // OpenEnrollmentConsoleAuthorityFixture starts a local-auth server with real
-// current-build APT and RPM repositories, ready for browser-created credentials.
+// current-build native repositories, ready for browser-created credentials.
 func OpenEnrollmentConsoleAuthorityFixture(ctx context.Context, repository, sourceRepository, binary string, architectures []string) (*AuthorityFixture, error) {
 	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityDeviceActions, LoadAuthorityOptions{NativeEnrollmentArchitectures: architectures, NativeEnrollmentSourceRepository: sourceRepository})
 }

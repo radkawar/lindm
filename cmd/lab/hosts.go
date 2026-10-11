@@ -143,7 +143,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		arch = manifestArch
 	}
 	memory := uint32(2048)
-	if clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" {
+	if clean[1] == "snapshot" || clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" {
 		memory = 4096
 	}
 	cfg, err := labhost.Load()
@@ -288,7 +288,7 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates":
+	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -402,10 +402,13 @@ func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.W
 		}
 	}
 	args = labhost.SetFlag(args, "cache", persistentCache)
+	if lane == "snapshot" {
+		args = labhost.SetFlag(args, "snapshot-cache", persistentCache)
+	}
 	if lane == "assistance" && vmHolds(args[1:]) && labhost.FlagValue(args, "advisory-cache") == "" {
 		args = labhost.SetFlag(args, "advisory-cache", filepath.Join(work, "advisory-cache"))
 	}
-	if (lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance") && labhost.FlagValue(args, "control-plane") == "" {
+	if (lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" || lane == "assistance" || lane == "advisories") && labhost.FlagValue(args, "control-plane") == "" {
 		repo := labhost.FlagValue(args, "repo")
 		if repo == "" {
 			return errors.New("remote control-plane lane requires staged -repo")

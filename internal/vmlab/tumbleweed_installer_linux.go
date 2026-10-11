@@ -3,12 +3,12 @@
 package vmlab
 
 import (
-	"context"
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"os"
+	"net/url"
 	"path"
 	"strings"
 	"time"
@@ -21,13 +21,12 @@ import (
 
 // tumbleweedInstallerEdition names signed openSUSE Tumbleweed snapshot DVD
 // media. The DVD carries the installation repository for exactly one snapshot,
-// so the base system is pinned by the authenticated ISO digest. The DVD lacks
-// cloud-init; only that closure comes from the official online repository,
-// which tumbleweedRepositorySnapshot binds to the same signed snapshot.
+// so the base system is pinned by the authenticated ISO digest. Packages absent
+// from the DVD come from the retained, signed repository snapshot closure.
 const tumbleweedInstallerEdition = "dvd"
 
 // Bump when the AutoYaST profile or machine layout changes.
-const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v2"
+const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v7"
 
 // tumbleweedSSHDOrdering closes a vendor boot race. Tumbleweed starts sshd and
 // systemd-user-sessions in parallel once cloud-init's network stage finishes;
@@ -50,12 +49,17 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 		return nil, errors.New("tumbleweed installer requires a dated snapshot version")
 	}
 	release := platform.ForManifest(m.GetDistribution(), m.GetVersion())
-	if release.Lab.Installer != platform.AutoYaST || m.GetEdition() != tumbleweedInstallerEdition || m.GetRelease() != "Snapshot"+m.GetVersion() ||
+	if release.Lab.Installer != platform.AutoYaST || (m.GetEdition() != tumbleweedInstallerEdition && m.GetEdition() != "dvd-encrypted-lab") || m.GetRelease() != "Snapshot"+m.GetVersion() ||
 		m.GetImageFilename() != "openSUSE-Tumbleweed-DVD-"+architecture+"-Snapshot"+m.GetVersion()+"-Media.iso" ||
 		m.GetChecksumMode() != labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
 		return nil, errors.New("tumbleweed installed image requires a signed snapshot-pinned Tumbleweed DVD manifest")
 	}
 	version := m.GetVersion()
+	_, pinnedPackages, err := tumbleweedSnapshotPackageSelection(release, version, architecture)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := new(tumbleweedSnapshotRepository)
 	return &installerImage{
 		label:     "tumbleweed",
 		installer: platform.AutoYaST,
@@ -63,9 +67,9 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 		version:   tumbleweedInstallerRecipeVersion,
 		// YaST resolves the full DVD repository in memory.
 		memoryMiB: 4096,
-		recipe:    tumbleweedInstallerRecipe,
-		bindSources: func(ctx context.Context, root *os.Root, staging, phase string) error {
-			return tumbleweedRepositorySnapshot(ctx, m, root, staging, phase)
+		snapshot:  snapshot,
+		recipe: func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error) {
+			return tumbleweedInstallerRecipeWithEncryption(release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, "", "", false, snapshot)
 		},
 		probes: []installedProbe{
 			{"distribution", ". /etc/os-release; test \"$ID\" = " + nativeQuote(release.ID)},
@@ -78,6 +82,7 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 			{"sshd_after_user_sessions", "systemctl show sshd.service -p After --value | tr ' ' '\\n' | grep -qx systemd-user-sessions.service"},
 			// The vendor TW cloud configuration, not MicroOS's alternative.
 			{"cloud_config", "rpm -q cloud-init-config-suse >/dev/null"},
+			{"exact_snapshot_packages", pinnedPackages},
 			// Fresh firmware variables boot only the removable-media path.
 			{"removable_boot", "test -s /boot/efi/EFI/BOOT/" + tumbleweedRemovableLoader(architecture)},
 		},
@@ -91,88 +96,24 @@ func tumbleweedRemovableLoader(architecture string) string {
 	return "bootx64.efi"
 }
 
-// tumbleweedRepository is the official online OSS tree; aarch64 is published
-// under ports. The download.opensuse.org origin serves signed metadata itself.
-func tumbleweedRepository(architecture string) string {
-	if architecture == "aarch64" {
-		return "https://download.opensuse.org/ports/aarch64/tumbleweed/repo/oss/"
-	}
-	return "https://download.opensuse.org/tumbleweed/repo/oss/"
+// The server is started from a verified content-addressed snapshot, not a new
+// vendor authority. RPM and repository signatures still use the vendor key.
+type tumbleweedSnapshotRepository struct {
+	URL   string
+	CAPEM []byte
 }
 
-// tumbleweedRepositorySnapshot requires the online repository's repomd.xml,
-// signed by the manifest's pinned key, to name the manifest snapshot. It runs
-// before and after installation: published snapshots only advance, so equal
-// signed snapshots on both sides bound the metadata libzypp resolved between
-// them. A moved repository fails closed; bump the manifest to its new DVD.
-func tumbleweedRepositorySnapshot(ctx context.Context, m *labv1.ImageManifest, root *os.Root, staging, phase string) error {
-	architecture, _, err := encryptedInstallerArchitecture(m.GetArchitecture())
-	if err != nil {
-		return err
-	}
-	if phase != "before" && phase != "after" {
-		return errors.New("tumbleweed repository binding requires a known phase")
-	}
-	client := (Fetcher{}).client()
-	defer client.CloseIdleConnections()
-	base := tumbleweedRepository(architecture)
-	files := make(map[string][]byte, 3)
-	for _, source := range []struct{ name, url string }{
-		{"repomd.xml", base + "repodata/repomd.xml"},
-		{"repomd.xml.asc", base + "repodata/repomd.xml.asc"},
-		{"key", m.GetKeyUrl()},
-	} {
-		name := staging + "/repository-" + phase + "-" + source.name
-		if err := download(ctx, client, root, name, source.url, maxMetadataBytes, 2*time.Minute); err != nil {
-			return fmt.Errorf("tumbleweed repository %s: %w", phase, err)
-		}
-		if files[source.name], err = readCacheFile(root, name, maxMetadataBytes); err != nil {
-			return err
-		}
-	}
-	_, _, metadata, err := verifySignedBytes(ctx, m.GetSignerFingerprint(), false, files["repomd.xml"], files["repomd.xml.asc"], files["key"])
-	if err != nil {
-		return fmt.Errorf("tumbleweed repository %s: %w", phase, err)
-	}
-	snapshot, err := tumbleweedRepositoryDistro(metadata)
-	if err != nil {
-		return err
-	}
-	if snapshot != m.GetVersion() {
-		return fmt.Errorf("tumbleweed repository %s installation is snapshot %s, not pinned %s", phase, snapshot, m.GetVersion())
-	}
-	return nil
+// Both golden variants use the same snapshot-bound AutoYaST path. An explicit
+// unencrypted /boot keeps GRUB outside the LUKS2 root; systemd in the initrd
+// owns unlocking, including TPM tokens enrolled later by the signed action.
+func tumbleweedInstallerRecipeWithEncryption(release *platform.Release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, passphrase, desktop string, tpmBoot bool, snapshot *tumbleweedSnapshotRepository) ([]byte, error) {
+	return tumbleweedInstallerProfile(release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, passphrase, desktop, tpmBoot, snapshot, false)
 }
 
-// tumbleweedRepositoryDistro returns the snapshot of the single distro tag in
-// signed repomd.xml, for example cpe:/o:opensuse:opensuse:20261007.
-func tumbleweedRepositoryDistro(metadata []byte) (string, error) {
-	var repomd struct {
-		Distros []struct {
-			CPE  string `xml:"cpeid,attr"`
-			Name string `xml:",chardata"`
-		} `xml:"tags>distro"`
-	}
-	if err := xml.Unmarshal(metadata, &repomd); err != nil {
-		return "", fmt.Errorf("tumbleweed repository metadata: %w", err)
-	}
-	if len(repomd.Distros) != 1 {
-		return "", errors.New("tumbleweed repository metadata must name exactly one distribution")
-	}
-	snapshot, ok := strings.CutPrefix(repomd.Distros[0].CPE, "cpe:/o:opensuse:opensuse:")
-	if _, err := time.Parse("20060102", snapshot); !ok || err != nil || len(snapshot) != 8 || strings.TrimSpace(repomd.Distros[0].Name) != "openSUSE Tumbleweed "+snapshot {
-		return "", errors.New("tumbleweed repository metadata names no dated snapshot")
-	}
-	return snapshot, nil
-}
-
-// tumbleweedInstallerRecipe returns an AutoYaST profile. The vendor guided
-// proposal partitions the owned disk (Btrfs root, as on a default install).
-// The DVD repository outranks the snapshot-bound online repository, which only
-// supplies packages the DVD lacks. YaST installs the bootloader to the
-// removable path without touching firmware variables, because every later
-// guest starts from fresh pinned variables.
-func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error) {
+// captureOnly is reachable only from the signed-DVD native solver bootstrap,
+// never from ordinary/encrypted golden admission. It has no network repository
+// or cloud-init dependency; its fixed SSH identity exists only for this run.
+func tumbleweedInstallerProfile(release *platform.Release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, passphrase, desktop string, tpmBoot bool, snapshot *tumbleweedSnapshotRepository, captureOnly bool) ([]byte, error) {
 	if disk != "/dev/vda" && disk != "/dev/sda" && disk != "/dev/nvme0n1" {
 		return nil, errors.New("tumbleweed installer requires an owned guest root disk")
 	}
@@ -195,14 +136,87 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
 	if len(sourceDigest) != 64 || strings.Trim(sourceDigest, "0123456789abcdef") != "" {
 		return nil, errors.New("tumbleweed installer requires verified source SHA256")
 	}
-	provision := "set -eu\n" + encryptedInstallerProvision(login, hostPrivate, hostPublic)
-	provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
+	var addOn, preScript, trust, cloudPackages string
+	recommended, enhancedBase := "true", "<pattern>enhanced_base</pattern>"
+	if captureOnly {
+		if passphrase != "" || desktop != "" || tpmBoot || snapshot != nil || release == nil {
+			return nil, errors.New("capture bootstrap cannot select an encrypted, desktop or network installer")
+		}
+		recommended, enhancedBase = "false", ""
+		preScript = `<pre-scripts config:type="list"><script><filename>lindm-bootstrap-stage</filename><interpreter>shell</interpreter><source><![CDATA[` + tumbleweedInstallerStage("profile-pre") + `]]></source></script></pre-scripts>`
+	} else {
+		repository, before, ca, repositoryErr := tumbleweedInstallerRepository(snapshot)
+		if repositoryErr != nil {
+			return nil, repositoryErr
+		}
+		preScript, trust = before, ca
+		addOn = `<add-on><add_on_others config:type="list"><listentry><media_url>` + repository + `</media_url><alias>` + tumbleweedRepositoryAlias + `</alias><name>openSUSE Tumbleweed OSS (snapshot-bound)</name><priority config:type="integer">120</priority><ask_on_error config:type="boolean">false</ask_on_error></listentry></add_on_others></add-on>`
+		cloudPackages = "<package>cloud-init</package><package>cloud-init-config-suse</package>"
+	}
+	provision := "set -eu\n"
+	if captureOnly {
+		provision += tumbleweedInstallerStage("provision-start")
+	}
+	provision += trust + encryptedInstallerProvision(login, hostPrivate, hostPublic)
+	if !captureOnly {
+		provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
+	}
 	provision += "printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + "\n"
-	// SUSE's cloud-init.service has no [Install]; its generator enables
-	// cloud-init.target, which wants these stage units.
-	provision += "systemctl enable sshd.service cloud-init-local.service cloud-config.service cloud-final.service\n"
+	provision += "systemctl enable sshd.service\n"
+	if !captureOnly {
+		// SUSE's generator enables cloud-init.target; the stage units have
+		// their own install hooks.
+		provision += "systemctl enable cloud-init-local.service cloud-config.service cloud-final.service\ncloud-init clean --logs\n"
+	}
 	provision += "install -d -m 0755 " + path.Dir(tumbleweedSSHDOrdering) + "\nprintf '%s\\n' '[Unit]' 'After=systemd-user-sessions.service' > " + tumbleweedSSHDOrdering + "\n"
-	provision += "cloud-init clean --logs\nrm -f /etc/machine-id\ntouch /etc/machine-id\n"
+	// The credential writer leaves umask 077. The first boot fills this public
+	// identity without changing its mode; unprivileged D-Bus must read it.
+	provision += "rm -f /etc/machine-id\ninstall -m 0644 /dev/null /etc/machine-id\n"
+	partitions, packages, loader := "", "", ""
+	pinnedPackages := ""
+	if !captureOnly {
+		packages, pinnedPackages, err = tumbleweedSnapshotPackageSelection(release, version, architecture)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if captureOnly {
+		for _, pkg := range release.Lab.InstallerPackages {
+			packages += "<package>" + pkg + "</package>\n"
+		}
+		provision += "printf '%s\\n' 'repository-bootstrap-v1' > /etc/lindm-repository-bootstrap\n"
+		provision += tumbleweedInstallerStage("provision-complete")
+	}
+	if passphrase != "" {
+		loader = "<loader_type>grub2-bls</loader_type>"
+		var escaped bytes.Buffer
+		if err := xml.EscapeText(&escaped, []byte(passphrase)); err != nil {
+			return nil, err
+		}
+		partitions = `<disklabel>gpt</disklabel><partitions config:type="list">
+<partition><mount>/boot/efi</mount><filesystem config:type="symbol">vfat</filesystem><size>1G</size><partition_id config:type="integer">259</partition_id></partition>
+<partition><mount>/boot</mount><filesystem config:type="symbol">ext4</filesystem><size>1G</size></partition>
+<partition><mount>/</mount><filesystem config:type="symbol">btrfs</filesystem><size>max</size><crypt_fs config:type="boolean">true</crypt_fs><crypt_method config:type="symbol">luks2</crypt_method><crypt_key>` + escaped.String() + `</crypt_key></partition>
+</partitions>`
+		for _, pkg := range append(append([]string{}, release.Lab.Guest.Actions...), release.Lab.Session.Desktops[desktop]...) {
+			packages += "<package>" + pkg + "</package>\n"
+		}
+		if tpmBoot {
+			for _, pkg := range release.Lab.TPM.Packages {
+				packages += "<package>" + pkg + "</package>\n"
+			}
+			provision += encryptedInstallerTPMProvision(release.Lab.TPM, architecture)
+			provision += "sdbootutil --no-variables mkinitrd\n"
+		}
+		if desktop != "" {
+			provision += encryptedInstallerDesktopProvision(release, desktop, architecture)
+		}
+	}
+	provision += pinnedPackages
+	target := "multi-user"
+	if desktop != "" {
+		target = "graphical"
+	}
 	// Base64 keeps credential bytes outside XML and shell token syntax.
 	script := "printf '%s' '" + base64.StdEncoding.EncodeToString([]byte(provision)) + "' | base64 -d > /tmp/lindm-provision && /bin/sh -eu /tmp/lindm-provision && rm -f /tmp/lindm-provision\n"
 	return []byte(fmt.Sprintf(`<?xml version="1.0"?>
@@ -219,17 +233,7 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
     <errors><show config:type="boolean">true</show><timeout config:type="integer">0</timeout><log config:type="boolean">true</log></errors>
     <warnings><show config:type="boolean">true</show><timeout config:type="integer">10</timeout><log config:type="boolean">true</log></warnings>
   </report>
-  <add-on>
-    <add_on_others config:type="list">
-      <listentry>
-        <media_url>%[4]s</media_url>
-        <alias>%[5]s</alias>
-        <name>openSUSE Tumbleweed OSS (snapshot-bound)</name>
-        <priority config:type="integer">120</priority>
-        <ask_on_error config:type="boolean">false</ask_on_error>
-      </listentry>
-    </add_on_others>
-  </add-on>
+  %[4]s
   <language><language>en_US</language></language>
   <keyboard><keymap>english-us</keymap></keyboard>
   <timezone><hwclock>UTC</hwclock><timezone>UTC</timezone></timezone>
@@ -241,9 +245,11 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
       <device>%[1]s</device>
       <initialize config:type="boolean">true</initialize>
       <use>all</use>
+      %[6]s
     </drive>
   </partitioning>
   <bootloader>
+    %[8]s
     <global>
       <append>net.ifnames=0 console=tty0 console=%[2]s</append>
       <terminal>console</terminal>
@@ -252,20 +258,20 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
     </global>
   </bootloader>
   <software>
-    <install_recommended config:type="boolean">true</install_recommended>
+    <install_recommended config:type="boolean">%[11]s</install_recommended>
     <patterns config:type="list">
       <pattern>base</pattern>
-      <pattern>enhanced_base</pattern>
+      %[12]s
     </patterns>
     <packages config:type="list">
       <package>openssh-server</package>
       <package>sudo</package>
-      <package>cloud-init</package>
-      <package>cloud-init-config-suse</package>
+      %[5]s
+      %[7]s
     </packages>
   </software>
   <services-manager>
-    <default_target>multi-user</default_target>
+    <default_target>%[10]s</default_target>
   </services-manager>
   <firewall>
     <enable_firewall config:type="boolean">true</enable_firewall>
@@ -294,6 +300,7 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
     </user>
   </users>
   <scripts>
+    %[9]s
     <chroot-scripts config:type="list">
       <script>
         <filename>lindm-provision</filename>
@@ -304,5 +311,58 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
     </chroot-scripts>
   </scripts>
 </profile>
-`, disk, console, script, tumbleweedRepository(architecture), tumbleweedRepositoryAlias)), nil
+`, disk, console, script, addOn, cloudPackages, partitions, packages, loader, preScript, target, recommended, enhancedBase)), nil
+}
+
+func tumbleweedInstallerRepository(snapshot *tumbleweedSnapshotRepository) (repository, preScript, provision string, err error) {
+	if snapshot == nil {
+		return "", "", "", errors.New("AutoYaST requires a retained signed repository snapshot")
+	}
+	u, err := url.Parse(snapshot.URL)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || len(snapshot.CAPEM) == 0 {
+		return "", "", "", errors.New("AutoYaST snapshot requires an HTTPS repository and its lab CA")
+	}
+	var escaped bytes.Buffer
+	if err := xml.EscapeText(&escaped, []byte(snapshot.URL)); err != nil {
+		return "", "", "", err
+	}
+	provision = "install -d -m 0755 /etc/pki/trust/anchors\n" +
+		encryptedInstallerProvisionFile("/etc/pki/trust/anchors/lindm-snapshot.pem", string(snapshot.CAPEM)) +
+		"update-ca-certificates\n"
+	preScript = `<pre-scripts config:type="list"><script><filename>lindm-snapshot-trust</filename><interpreter>shell</interpreter><source><![CDATA[set -eu
+` + provision + `]]></source></script></pre-scripts>`
+	return escaped.String(), preScript, provision, nil
+}
+
+func tumbleweedInstallerStage(stage string) string {
+	return "printf '\\n%s\\n' 'LINDM_INSTALLER_STAGE=" + stage + "' > /dev/console\n"
+}
+
+// AutoYaST's package list requests native package names. Exact snapshot EVRs
+// are checked in the installed chroot, and again by the ordinary first-boot
+// probe, so YaST cannot silently substitute a DVD kernel or a reduced flavor.
+func tumbleweedSnapshotPackageSelection(release *platform.Release, version, architecture string) (packages, check string, err error) {
+	if release == nil {
+		return "", "", errors.New("final AutoYaST requires platform package facts")
+	}
+	pins := platform.RepositorySnapshotRecipes[release.ID].SnapshotPackages[version][architecture]
+	if len(pins) == 0 {
+		return "", "", fmt.Errorf("no exact AutoYaST package recipe for %s %s %s", release.ID, version, architecture)
+	}
+	for _, pin := range pins {
+		name, evr, exact := strings.Cut(pin, "=")
+		if !exact || name == "" || evr == "" {
+			return "", "", errors.New("AutoYaST snapshot package requires an exact native EVR")
+		}
+		var escaped bytes.Buffer
+		if err := xml.EscapeText(&escaped, []byte(name)); err != nil {
+			return "", "", err
+		}
+		packages += "<package>" + escaped.String() + "</package>\n"
+		if !strings.Contains(evr, ":") {
+			evr = "0:" + evr
+		}
+		check += "test \"$(rpm -q --qf '%{EPOCHNUM}:%{VERSION}-%{RELEASE}\\n' -- " + nativeQuote(name) + ")\" = " + nativeQuote(evr) + "\n"
+	}
+	return packages, check, nil
 }

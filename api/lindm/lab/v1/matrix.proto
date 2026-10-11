@@ -29,6 +29,18 @@ message LabMatrix {
       "aarch64"
     ]
   }];
+  // Full capability lanes rerun periodically for registry rolling platforms.
+  // Cadence belongs to the platform registry, not the scheduler.
+  repeated string rolling_requalification_cells = 3 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 63
+      }
+    }
+  }];
 }
 
 // MatrixArgs is a list of fixed lane arguments.
@@ -166,6 +178,15 @@ message MatrixLedgerEntry {
     max_len: 200
     pattern: "^(#[a-z0-9-]+)?$"
   }];
+  // Exact selected manifest bytes, retained beside the lane record. A changed
+  // image/repository pin cannot reuse an earlier rolling-snapshot result.
+  string manifest_sha256 = 14 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  // Repository snapshot date, separate from the base image's build date.
+  string repository_snapshot_date = 15 [(buf.validate.field).string.pattern = "^([0-9]{4}-[0-9]{2}-[0-9]{2})?$"];
+  // Content-addressed dependency closure used when no immutable vendor archive
+  // exists, and the authenticated repository metadata it retains unchanged.
+  string repository_closure_sha256 = 16 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  string repository_metadata_sha256 = 17 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
 }
 
 // MatrixVerdict is a lane outcome.

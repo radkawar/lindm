@@ -1,9 +1,9 @@
 //go:build linux
 
 // Package passwordprovider manages closed local PAM policy controls through
-// authselect or pam-auth-update and module configuration, never generated PAM
-// stack edits. login.defs changes future defaults, not existing accounts. Native
-// effects require a guarded root helper and signed dimension ownership; partial
+// distro managers or owned native includes and module configuration. Generated
+// PAM stacks are never edited. login.defs affects defaults, not existing accounts.
+// Effects require a guarded root helper and signed dimension ownership; partial
 // effects remain UNKNOWN and are never automatically replayed.
 package passwordprovider
 
@@ -82,6 +82,12 @@ func filePath(kind agentv1.PasswordNativeFile) string {
 		return "/usr/share/pam-configs/lindm-faillock"
 	case 8:
 		return "/usr/share/pam-configs/lindm-faillock-pre"
+	case 9:
+		return "/etc/pam.d/system-auth"
+	case 10:
+		return "/etc/pam.d/lindm-password"
+	case 11:
+		return "/etc/pam.d/common-password-pc"
 	default:
 		return ""
 	}

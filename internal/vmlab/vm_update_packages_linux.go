@@ -31,6 +31,7 @@ type updatePackageFixture struct {
 	arch         []*packaging.ArchRepository
 	publicKey    string
 	fingerprint  string
+	signer       packaging.SigningKey
 }
 
 func buildUpdatePackages(ctx context.Context, repository, work string, release *platform.Release, architecture string) (*updatePackageFixture, error) {
@@ -61,6 +62,7 @@ func buildUpdatePackages(ctx context.Context, repository, work string, release *
 		return nil, err
 	}
 	fixture.fingerprint = signer.Fingerprint
+	fixture.signer = *signer
 	for _, version := range []string{updateInitialVersion, updateNextVersion} {
 		out := filepath.Join(work, "agent-"+version)
 		if err := os.Mkdir(out, 0o700); err != nil {

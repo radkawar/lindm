@@ -322,7 +322,7 @@ func TestUnlockEncryptedSerialWaitsOutPromptFlush(t *testing.T) {
 	defer cancel()
 	result := make(chan error, 1)
 	go func() {
-		_, err := unlockEncryptedSerial(ctx, host, "lab-secret")
+		_, err := unlockEncryptedSerial(ctx, host, "lab-secret", nil)
 		result <- err
 	}()
 	prompted := time.Now()

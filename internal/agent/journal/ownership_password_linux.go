@@ -22,11 +22,18 @@ func passwordOwnershipSnapshotValid(snapshot *agentv1.ResourceOwnershipSnapshot)
 		return false
 	}
 	files := private.GetFiles()
-	if len(files) != 4 && len(files) != 8 {
+	if len(files) != 4 && len(files) != 5 && len(files) != 6 && len(files) != 8 {
 		return false
 	}
 	for i, file := range files {
-		if int(file.GetKind()) != i+1 || len(file.GetNativeRevisionSha256()) != 32 {
+		expected := i + 1
+		if len(files) == 6 && i >= 4 {
+			expected = i + 5
+		}
+		if len(files) == 5 && i == 4 {
+			expected = 11
+		}
+		if int(file.GetKind()) != expected || len(file.GetNativeRevisionSha256()) != 32 {
 			return false
 		}
 		var path string
@@ -47,6 +54,12 @@ func passwordOwnershipSnapshotValid(snapshot *agentv1.ResourceOwnershipSnapshot)
 			path = "/usr/share/pam-configs/lindm-faillock"
 		case 8:
 			path = "/usr/share/pam-configs/lindm-faillock-pre"
+		case 9:
+			path = "/etc/pam.d/system-auth"
+		case 10:
+			path = "/etc/pam.d/lindm-password"
+		case 11:
+			path = "/etc/pam.d/common-password-pc"
 		default:
 			return false
 		}

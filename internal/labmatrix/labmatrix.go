@@ -7,12 +7,14 @@
 package labmatrix
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -47,6 +49,8 @@ const (
 type Manifest struct {
 	Path  string
 	Image *labv1.ImageManifest
+	// SHA256 binds the exact selected manifest bytes, including repository pins.
+	SHA256 string
 	// Release is the registry row the manifest identifies.
 	Release *platform.Release
 	// Architecture is the registry spelling (x86_64 or aarch64).
@@ -89,11 +93,29 @@ func (c *Cell) Runnable() bool {
 	return c.State != Gated && c.State != NoLane && c.State != NoImage
 }
 
+// RequalificationDue reports whether a rolling cell lacks a current, complete
+// pass for its exact snapshot. Gated cells remain visible to the scheduler.
+func (c *Cell) RequalificationDue(now time.Time) bool {
+	days := c.Release.Native().RequalificationDays
+	if days == 0 {
+		return false
+	}
+	e := c.Entry
+	if c.State != Pass || e == nil || e.GetScope() != "" {
+		return true
+	}
+	recorded := e.GetRecorded().AsTime()
+	return recorded.After(now) || !now.Before(recorded.Add(time.Duration(days)*24*time.Hour))
+}
+
 // Inputs are the loaded declarative inputs of a plan.
 type Inputs struct {
-	Matrix    *labv1.LabMatrix
-	Manifests []*Manifest
-	Ledger    *labv1.MatrixLedger
+	// PreferredManifest is an explicit owner-selected image, never a guessed
+	// boot topology. Otherwise rolling rows select the newest repository date.
+	PreferredManifest string
+	Matrix            *labv1.LabMatrix
+	Manifests         []*Manifest
+	Ledger            *labv1.MatrixLedger
 }
 
 // Load reads the matrix, image manifests and ledger under a repository root.
@@ -126,6 +148,11 @@ func LoadMatrix(path string) (*labv1.LabMatrix, error) {
 			}
 		}
 	}
+	for _, name := range matrix.GetRollingRequalificationCells() {
+		if !slices.ContainsFunc(matrix.GetCells(), func(c *labv1.MatrixCell) bool { return c.GetName() == name }) {
+			return nil, fmt.Errorf("lab matrix: rolling requalification names unknown cell %q", name)
+		}
+	}
 	return matrix, nil
 }
 
@@ -139,7 +166,11 @@ func LoadManifests(root string) ([]*Manifest, error) {
 	out := make([]*Manifest, 0, len(paths))
 	for _, path := range paths {
 		image := new(labv1.ImageManifest)
-		if err := decode(path, image); err != nil {
+		data, err := readBounded(path)
+		if err != nil {
+			return nil, err
+		}
+		if err := decodeBytes(path, data, image); err != nil {
 			return nil, err
 		}
 		arch, ok := architecture(image.GetArchitecture())
@@ -150,7 +181,7 @@ func LoadManifests(root string) ([]*Manifest, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, &Manifest{Path: rel, Image: image, Release: platform.ForManifest(image.GetDistribution(), image.GetVersion()), Architecture: arch})
+		out = append(out, &Manifest{Path: rel, Image: image, SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Release: platform.ForManifest(image.GetDistribution(), image.GetVersion()), Architecture: arch})
 	}
 	return out, nil
 }
@@ -169,6 +200,10 @@ func decode(path string, m proto.Message) error {
 	if err != nil {
 		return err
 	}
+	return decodeBytes(path, data, m)
+}
+
+func decodeBytes(path string, data []byte, m proto.Message) error {
 	if err := protojson.Unmarshal(data, m); err != nil {
 		return fmt.Errorf("lab matrix: decode %s: %w", path, err)
 	}
@@ -273,7 +308,7 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	if spec.GetImage() == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
 		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch)
 	}
-	c.Entry = in.latest(r.Key, spec.GetName(), arch)
+	c.Entry = in.latest(c)
 	switch {
 	case gated:
 		c.State, c.Reason = Gated, strings.Join(reasons, "; ")
@@ -293,22 +328,35 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	return c
 }
 
-// manifest returns the first pinned manifest (by path) of the given kind for
-// the release and architecture.
+// manifest selects the explicit owner choice, otherwise the newest pinned
+// repository date for rolling releases. Fixed releases retain path ordering.
 func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch string) *Manifest {
+	var selected *Manifest
 	for _, m := range in.Manifests {
-		if m.Release.Key == r.Key && m.Architecture == arch && m.kind() == kind {
+		if m.Release.Key != r.Key || m.Architecture != arch || m.kind() != kind {
+			continue
+		}
+		if m.Image.GetId() == in.PreferredManifest {
 			return m
 		}
+		if selected == nil || (r.Native().RequalificationDays != 0 && m.Image.GetRepositorySnapshotDate() > selected.Image.GetRepositorySnapshotDate()) {
+			selected = m
+		}
 	}
-	return nil
+	return selected
 }
 
-// latest returns the most recently recorded ledger entry for a cell.
-func (in *Inputs) latest(platformKey, cell, arch string) *labv1.MatrixLedgerEntry {
+// latest returns the newest entry for the cell's exact rolling snapshot.
+// Legacy fixed-release imports retain their historical scope.
+func (in *Inputs) latest(c *Cell) *labv1.MatrixLedgerEntry {
 	var out *labv1.MatrixLedgerEntry
 	for _, e := range in.Ledger.GetEntries() {
-		if e.GetPlatform() != platformKey || e.GetCell() != cell || e.GetArchitecture() != arch {
+		if e.GetPlatform() != c.Release.Key || e.GetCell() != c.Spec.GetName() || e.GetArchitecture() != c.Architecture {
+			continue
+		}
+		if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||
+			e.GetManifest() != c.Manifest.Image.GetId() || e.GetManifestSha256() != c.Manifest.SHA256 ||
+			e.GetRepositorySnapshotDate() != c.Manifest.Image.GetRepositorySnapshotDate()) {
 			continue
 		}
 		if out == nil || !e.GetRecorded().AsTime().Before(out.GetRecorded().AsTime()) {

@@ -78,6 +78,29 @@ func TestRunUsesCleanAllowlistedEnvironment(t *testing.T) {
 	}
 }
 
+func TestRunZyppEnvironmentPolicy(t *testing.T) {
+	base := []string{"ZYPP_CONF=/var/lib/lindm/stage/zypp.conf", "ZYPP_LOGFILE=/var/lib/lindm/stage/zypp.log", "ZYPP_LOCK_TIMEOUT=0"}
+	for _, preparation := range []bool{false, true} {
+		env := append([]string(nil), base...)
+		if preparation {
+			env = append(env, "ZYPP_LOCKFILE_ROOT=/var/lib/lindm/stage")
+		}
+		result, err := Run(t.Context(), Command{Path: "/usr/bin/env", Env: env, Timeout: 5 * time.Second, StdoutLimit: 4096, StderrLimit: 4096})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(result.Stdout), "PATH=/usr/sbin:/usr/bin\nLANG=C\nLC_ALL=C\n"+strings.Join(env, "\n")+"\n"; got != want {
+			t.Fatalf("preparation=%t: environment %q, want %q", preparation, got, want)
+		}
+	}
+	for _, extra := range []string{"ZYPP_FULLLOG=1", "ZYPP_PLUGIN_PATH=/tmp/plugins", "LD_PRELOAD=/tmp/library.so", "PATH=/tmp"} {
+		_, err := Run(t.Context(), Command{Path: "/usr/bin/env", Env: append(append([]string(nil), base...), extra), Timeout: time.Second, StdoutLimit: 4096, StderrLimit: 4096})
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Fatalf("unapproved environment %q: %v", extra, err)
+		}
+	}
+}
+
 func TestRunRequiresDeadlineAndLimits(t *testing.T) {
 	for _, c := range []Command{
 		{Path: shell, StdoutLimit: 1, StderrLimit: 1},

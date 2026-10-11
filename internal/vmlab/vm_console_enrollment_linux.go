@@ -48,9 +48,11 @@ type VMConsoleEnrollmentResult struct {
 	OwnedCleanupComplete bool               `json:"owned_cleanup_complete"`
 }
 
-// EnrollFromConsoleVM never stages an agent, repository, CA or bootstrap into the
-// guest. Only the captured command may install them. The read-only lab observer
-// is uploaded AFTER that command exits successfully.
+// EnrollFromConsoleVM never stages a lindm agent, repository, CA or bootstrap
+// into the guest. Only the captured command may install them. Rolling vendor
+// repositories are bound to the manifest's snapshot before enrollment; their
+// vendor trust is separate from the lindm server's enrollment authority.
+// The read-only lab observer is uploaded AFTER that command exits successfully.
 func EnrollFromConsoleVM(ctx context.Context, manifest *labv1.ImageManifest, options VMConsoleEnrollmentOptions) (result *VMConsoleEnrollmentResult, err error) {
 	defer func() {
 		if err != nil {
@@ -86,14 +88,34 @@ func EnrollFromConsoleVM(ctx context.Context, manifest *labv1.ImageManifest, opt
 	if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
 		return nil, err
 	}
+	if err := pinArchRepositories(ctx, vm, manifest); err != nil {
+		return nil, err
+	}
+	snapshot, err := prepareGuestRollingSnapshot(ctx, vm, manifest, options.CacheDir)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot != nil {
+		defer func() { err = errors.Join(err, snapshot.Close()) }()
+	}
+	backend := manifestRelease(manifest).Native().Packages.Backend
+	// Arch's stock cloud databases belong to its image date, not necessarily
+	// the repository date. Establish that whole-system snapshot together;
+	// never refresh its databases and leave a partially upgraded base.
+	if backend == platform.BackendPacman {
+		if _, err := vm.run(ctx, "sudo -n pacman --sync --refresh --sysupgrade --noconfirm", nil, 1<<20, 20*time.Minute); err != nil {
+			return nil, fmt.Errorf("prepare whole-system enrollment snapshot: %w", err)
+		}
+	}
+	tool, query, err := consoleEnrollmentPackageQuery(backend)
+	if err != nil {
+		return nil, err
+	}
 	pristine := `set -eu
 if command -v lindm-agent >/dev/null; then exit 1; fi
 for path in /usr/bin/lindm-agent /etc/lindm /var/lib/lindm /run/lindm; do test ! -e "$path"; done
-if command -v dpkg-query >/dev/null; then
- if dpkg-query -W lindm-agent >/dev/null 2>&1; then exit 1; fi
-else
- if rpm -q lindm-agent >/dev/null 2>&1; then exit 1; fi
-fi
+command -v ` + nativeQuote(tool) + ` >/dev/null
+if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 `
 	if _, err := vm.run(ctx, "sudo -n sh -eu -c "+nativeQuote(pristine), nil, 4096, time.Minute); err != nil {
 		return nil, errors.New("console enrollment refuses a guest with a preinstalled agent or prior enrollment state")
@@ -161,10 +183,6 @@ fi
 	if _, err := vm.run(ctx, "sudo -n systemctl is-active --quiet lindm-executor.service && sudo -n systemctl is-active --quiet lindm-agent.service", nil, 4096, time.Minute); err != nil {
 		return nil, err
 	}
-	query := "dpkg-query -W -f='${Package} ${Version} ${Architecture}\\n' lindm-agent"
-	if manifestRelease(manifest).Native().Packages.Backend.DNF() {
-		query = "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"
-	}
 	observed, err := vm.run(ctx, query, nil, 4096, time.Minute)
 	if err != nil {
 		return nil, err
@@ -186,6 +204,19 @@ fi
 		return nil, fmt.Errorf("server-side enrollment was not confirmed before guest teardown: %w", err)
 	}
 	return result, nil
+}
+
+func consoleEnrollmentPackageQuery(backend platform.Backend) (tool, query string, err error) {
+	switch backend {
+	case platform.BackendAPT:
+		return "dpkg-query", "dpkg-query -W -f='${Package} ${Version} ${Architecture}\\n' lindm-agent", nil
+	case platform.BackendDNF4, platform.BackendDNF5, platform.BackendZypper:
+		return "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent", nil
+	case platform.BackendPacman:
+		return "pacman", "pacman --query lindm-agent", nil
+	default:
+		return "", "", errors.New("console enrollment has no native package query for this backend")
+	}
 }
 
 func readConsoleCommand(path string) (_ []byte, err error) {

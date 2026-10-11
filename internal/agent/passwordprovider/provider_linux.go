@@ -87,10 +87,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	if err := accessGuard(ctx, config.Native, runNative); err != nil {
 		return nil, err
 	}
-	backend := resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE
-	if authselectProduct(config.Platform) {
-		backend = resourcev1.Backend_BACKEND_AUTHSELECT
-	}
+	backend := passwordBackend(config.Platform)
 	version, err := managerVersion(ctx, config.Platform, runNative)
 	if err != nil {
 		return nil, err
@@ -159,6 +156,16 @@ func (p *Provider) target(ctx context.Context, d *resourcev1.PasswordPolicyDesir
 	target, err := targetSnapshot(d, before, ledger, operation)
 	if err != nil {
 		return nil, err
+	}
+	if nativePAMProduct(p.config.Platform) {
+		if err := targetNativePAM(before, target, ledger); err != nil {
+			return nil, err
+		}
+	}
+	if pamConfigProduct(p.config.Platform) {
+		if err := targetPamConfig(ctx, before, target, p.run); err != nil {
+			return nil, err
+		}
 	}
 	for _, file := range target.GetPasswordPolicy().GetFiles() {
 		if file.GetState().GetExists() && !nativeFile(before, file.GetKind()).GetState().GetExists() {
@@ -309,6 +316,9 @@ func targetMatches(a, b *agentv1.ResourceOwnershipSnapshot) bool {
 		return false
 	}
 	if !bytes.Equal(a.GetPasswordPolicy().GetManagerProfileSha256(), b.GetPasswordPolicy().GetManagerProfileSha256()) || !bytes.Equal(a.GetPasswordPolicy().GetQualityDropinsSha256(), b.GetPasswordPolicy().GetQualityDropinsSha256()) {
+		return false
+	}
+	if a.GetPasswordPolicy().GetManagerProfile() == "pam-config" && !bytes.Equal(a.GetPasswordPolicy().GetManagerGenerationSha256(), b.GetPasswordPolicy().GetManagerGenerationSha256()) {
 		return false
 	}
 	for _, f := range a.GetPasswordPolicy().GetFiles() {

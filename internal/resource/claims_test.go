@@ -55,6 +55,26 @@ func TestCrossKindClaimConflicts(t *testing.T) {
 	}
 }
 
+func TestRollingWholeSystemPolicyConflictsWithPackagePins(t *testing.T) {
+	desired := desiredJSON(t, updateJSON())
+	desired.GetOsUpdate().Selection = resourcev1.UpdateSelection_UPDATE_SELECTION_ALL
+	desired.GetOsUpdate().DeferralDays = 0
+	desired.GetOsUpdate().RollingSnapshot = &resourcev1.RollingUpdateSnapshot{Date: "2026-10-02"}
+	rolling, err := Claims(desired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, document := range []string{
+		`{"nativePackage":{"package":{"ecosystem":1,"nativeName":"chrony","architecture":"amd64"},"presence":1,"exact":{"deb":"1.0-1"},"repository":` + fixtureRepository + `,"removal":1}}`,
+		`{"nativePackage":{"package":{"ecosystem":1,"nativeName":"chrony","architecture":"amd64"},"presence":2,"any":{},"repository":` + fixtureRepository + `,"removal":1}}`,
+	} {
+		packages := claimsJSON(t, document)
+		if !Conflicts(rolling, packages) || !Conflicts(packages, rolling) {
+			t.Fatal("rolling transaction silently overrode a separately owned package pin or removal")
+		}
+	}
+}
+
 func TestSSHRejectsNoAdministrationMechanism(t *testing.T) {
 	desired := desiredJSON(t, `{"sshServer":{"passwordAuthentication":false,"keyboardInteractiveAuthentication":false,"publicKeyAuthentication":false}}`)
 	if _, err := Claims(desired); err == nil {

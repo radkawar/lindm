@@ -1,0 +1,22 @@
+{
+  "id": "opensuse-tumbleweed-20261007-encrypted-aarch64",
+  "distribution": "opensuse-tumbleweed",
+  "version": "20261007",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "Snapshot20261007",
+  "imageFilename": "openSUSE-Tumbleweed-DVD-aarch64-Snapshot20261007-Media.iso",
+  "imageUrl": "https://ftp.gwdg.de/pub/opensuse/ports/aarch64/tumbleweed/iso/openSUSE-Tumbleweed-DVD-aarch64-Snapshot20261007-Media.iso",
+  "checksumUrl": "https://download.opensuse.org/ports/aarch64/tumbleweed/iso/openSUSE-Tumbleweed-DVD-aarch64-Snapshot20261007-Media.iso.sha256",
+  "signatureUrl": "https://download.opensuse.org/ports/aarch64/tumbleweed/iso/openSUSE-Tumbleweed-DVD-aarch64-Snapshot20261007-Media.iso.sha256.asc",
+  "keyUrl": "https://download.opensuse.org/ports/aarch64/tumbleweed/repo/oss/repodata/repomd.xml.key",
+  "sha256": "bc84067c9a14aee474d151559b67fc8718295d2508d66669cb75edec587cb261",
+  "signerFingerprint": "AD485664E901B867051AB15F35A2F86E29B700A4",
+  "imageSizeBytes": "4270606336",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://build.opensuse.org/projects/openSUSE:Factory:ARM/signing_keys",
+  "releaseProvenanceUrl": "https://download.opensuse.org/ports/aarch64/tumbleweed/iso/",
+  "repositorySnapshotDate": "2026-10-07",
+  "repositorySnapshotManifestSha256": "0d7092d787d82a590b2b1818db4c5516c940e05dc07d792657745269e87ff545",
+  "repositorySnapshotRepomdSha256": "990c58b81cf28ff8d14ede123cfc6bc39c0cb0484ceba9f0e3e3e772e88d49ff"
+}

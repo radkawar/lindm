@@ -50,7 +50,9 @@ func (c *Client) Acquire(ctx context.Context, source *advisoryv1.FeedSource, out
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES:
 		return nil, ErrOfflineUnsupported
 	case advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP:
-		return c.acquireOSVArchive(ctx, source, output)
+		return c.acquireArchive(ctx, source, output, osvArchiveBound(source))
+	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL:
+		return c.acquireArchive(ctx, source, output, ovalArchiveBound(source))
 	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF:
 		raw, artifact, signedAt, err := c.fetchSignedCSAF(ctx, source)
 		if err != nil {
@@ -110,9 +112,9 @@ func (c *Client) Acquire(ctx context.Context, source *advisoryv1.FeedSource, out
 	}
 }
 
-// acquireOSVArchive stages the archive with the online download checks, then
+// acquireArchive stages the archive with the online download checks, then
 // streams the authenticated file to output while re-hashing it.
-func (c *Client) acquireOSVArchive(ctx context.Context, source *advisoryv1.FeedSource, output io.Writer) (acquisition *Acquisition, err error) {
+func (c *Client) acquireArchive(ctx context.Context, source *advisoryv1.FeedSource, output io.Writer, bound int64) (acquisition *Acquisition, err error) {
 	file, err := os.CreateTemp("", "lindm-feed-osv-*")
 	if err != nil {
 		return nil, fmt.Errorf("feed: stage OSV archive: %w", err)
@@ -125,7 +127,7 @@ func (c *Client) acquireOSVArchive(ctx context.Context, source *advisoryv1.FeedS
 	}()
 	// Archive transfers use the client without a whole-request timeout; the
 	// caller's context deadline bounds this request.
-	digest, err := c.downloadArchive(ctx, source.GetUrl(), file, osvArchiveBound(source), nil)
+	digest, err := c.downloadArchive(ctx, source.GetUrl(), file, bound, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +138,7 @@ func (c *Client) acquireOSVArchive(ctx context.Context, source *advisoryv1.FeedS
 		return nil, fmt.Errorf("feed: rewind OSV archive: %w", err)
 	}
 	hash := sha256.New()
-	if err := copyArchive(ctx, io.MultiWriter(output, hash), file, osvArchiveBound(source)); err != nil {
+	if err := copyArchive(ctx, io.MultiWriter(output, hash), file, bound); err != nil {
 		return nil, err
 	}
 	if !bytes.Equal(hash.Sum(nil), digest) {

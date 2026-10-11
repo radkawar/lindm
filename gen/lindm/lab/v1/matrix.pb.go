@@ -184,8 +184,11 @@ type LabMatrix struct {
 	// Execution-host arguments every hardware-selecting lane receives for a guest
 	// architecture, e.g. the pinned EFI firmware aarch64 guests require.
 	ArchitectureArgs map[string]*MatrixArgs `protobuf:"bytes,2,rep,name=architecture_args,json=architectureArgs,proto3" json:"architecture_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Full capability lanes rerun periodically for registry rolling platforms.
+	// Cadence belongs to the platform registry, not the scheduler.
+	RollingRequalificationCells []string `protobuf:"bytes,3,rep,name=rolling_requalification_cells,json=rollingRequalificationCells,proto3" json:"rolling_requalification_cells,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *LabMatrix) Reset() {
@@ -228,6 +231,13 @@ func (x *LabMatrix) GetCells() []*MatrixCell {
 func (x *LabMatrix) GetArchitectureArgs() map[string]*MatrixArgs {
 	if x != nil {
 		return x.ArchitectureArgs
+	}
+	return nil
+}
+
+func (x *LabMatrix) GetRollingRequalificationCells() []string {
+	if x != nil {
+		return x.RollingRequalificationCells
 	}
 	return nil
 }
@@ -454,9 +464,18 @@ type MatrixLedgerEntry struct {
 	// Named subset of the cell the record covers, empty for the complete lane.
 	Scope string `protobuf:"bytes,12,opt,name=scope,proto3" json:"scope,omitempty"`
 	// docs/verification.md anchor narrating the record, e.g. "#resource-kind-coverage".
-	Reference     string `protobuf:"bytes,13,opt,name=reference,proto3" json:"reference,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Reference string `protobuf:"bytes,13,opt,name=reference,proto3" json:"reference,omitempty"`
+	// Exact selected manifest bytes, retained beside the lane record. A changed
+	// image/repository pin cannot reuse an earlier rolling-snapshot result.
+	ManifestSha256 string `protobuf:"bytes,14,opt,name=manifest_sha256,json=manifestSha256,proto3" json:"manifest_sha256,omitempty"`
+	// Repository snapshot date, separate from the base image's build date.
+	RepositorySnapshotDate string `protobuf:"bytes,15,opt,name=repository_snapshot_date,json=repositorySnapshotDate,proto3" json:"repository_snapshot_date,omitempty"`
+	// Content-addressed dependency closure used when no immutable vendor archive
+	// exists, and the authenticated repository metadata it retains unchanged.
+	RepositoryClosureSha256  string `protobuf:"bytes,16,opt,name=repository_closure_sha256,json=repositoryClosureSha256,proto3" json:"repository_closure_sha256,omitempty"`
+	RepositoryMetadataSha256 string `protobuf:"bytes,17,opt,name=repository_metadata_sha256,json=repositoryMetadataSha256,proto3" json:"repository_metadata_sha256,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *MatrixLedgerEntry) Reset() {
@@ -580,15 +599,44 @@ func (x *MatrixLedgerEntry) GetReference() string {
 	return ""
 }
 
+func (x *MatrixLedgerEntry) GetManifestSha256() string {
+	if x != nil {
+		return x.ManifestSha256
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRepositorySnapshotDate() string {
+	if x != nil {
+		return x.RepositorySnapshotDate
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRepositoryClosureSha256() string {
+	if x != nil {
+		return x.RepositoryClosureSha256
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRepositoryMetadataSha256() string {
+	if x != nil {
+		return x.RepositoryMetadataSha256
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_matrix_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/matrix.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb1\x03\n" +
+	"\x19lindm/lab/v1/matrix.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x89\x04\n" +
 	"\tLabMatrix\x12:\n" +
 	"\x05cells\x18\x01 \x03(\v2\x18.lindm.lab.v1.MatrixCellB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10@R\x05cells\x12w\n" +
-	"\x11architecture_args\x18\x02 \x03(\v2-.lindm.lab.v1.LabMatrix.ArchitectureArgsEntryB\x1b\xbaH\x18\x9a\x01\x15\"\x13r\x11R\x06x86_64R\aaarch64R\x10architectureArgs\x1a]\n" +
+	"\x11architecture_args\x18\x02 \x03(\v2-.lindm.lab.v1.LabMatrix.ArchitectureArgsEntryB\x1b\xbaH\x18\x9a\x01\x15\"\x13r\x11R\x06x86_64R\aaarch64R\x10architectureArgs\x12V\n" +
+	"\x1drolling_requalification_cells\x18\x03 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18?R\x1brollingRequalificationCells\x1a]\n" +
 	"\x15ArchitectureArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
 	"\x05value\x18\x02 \x01(\v2\x18.lindm.lab.v1.MatrixArgsR\x05value:\x028\x01:\x8f\x01\xbaH\x8b\x01\x1a\x88\x01\n" +
@@ -610,7 +658,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x14lab.matrix_cell_lane\x12Ya cell names either a lane or the reason no maintained lane exists; arguments need a lane\x1aTthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
-	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xf0\x04\n" +
+	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xc3\a\n" +
 	"\x11MatrixLedgerEntry\x12%\n" +
 	"\bplatform\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\bplatform\x12\x1d\n" +
 	"\x04cell\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\x04cell\x12:\n" +
@@ -628,7 +676,11 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06source\x12\x1a\n" +
 	"\bverified\x18\v \x01(\bR\bverified\x12\x1d\n" +
 	"\x05scope\x18\f \x01(\tB\a\xbaH\x04r\x02\x18dR\x05scope\x128\n" +
-	"\treference\x18\r \x01(\tB\x1a\xbaH\x17r\x15\x18\xc8\x012\x10^(#[a-z0-9-]+)?$R\treference*i\n" +
+	"\treference\x18\r \x01(\tB\x1a\xbaH\x17r\x15\x18\xc8\x012\x10^(#[a-z0-9-]+)?$R\treference\x12A\n" +
+	"\x0fmanifest_sha256\x18\x0e \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x0emanifestSha256\x12`\n" +
+	"\x18repository_snapshot_date\x18\x0f \x01(\tB&\xbaH#r!2\x1f^([0-9]{4}-[0-9]{2}-[0-9]{2})?$R\x16repositorySnapshotDate\x12T\n" +
+	"\x19repository_closure_sha256\x18\x10 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x17repositoryClosureSha256\x12V\n" +
+	"\x1arepository_metadata_sha256\x18\x11 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x18repositoryMetadataSha256*i\n" +
 	"\vMatrixImage\x12\x1c\n" +
 	"\x18MATRIX_IMAGE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MATRIX_IMAGE_CLOUD\x10\x01\x12$\n" +

@@ -31,6 +31,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "host-exec" {
 		return runHostExec(ctx, args[1:], stdout, stderr)
 	}
+	if len(args) > 1 && args[0] == "images" && args[1] == "snapshot" {
+		return runScheduledVM(ctx, append([]string{"vm", "snapshot"}, args[2:]...), stdout, stderr)
+	}
 	if len(args) > 1 && args[0] == "vm" {
 		return runScheduledVM(ctx, args, stdout, stderr)
 	}
@@ -38,6 +41,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 }
 
 func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) >= 2 && args[0] == "images" && (args[1] == "snapshot-export" || args[1] == "snapshot-import") {
+		return runSnapshotTransfer(ctx, args[1], args[2:], os.Stdin, stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "snapshot" {
+		return runImageSnapshot(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 1 && args[0] == "acceptance" {
 		return runAcceptance(ctx, args[1:], stdout, stderr)
 	}
@@ -122,6 +131,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "dispatch" {
 		return runVMDispatch(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "advisories" {
+		return runVMAdvisories(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "resources" {
 		return runVMResources(ctx, args[2:], stdout, stderr)
 	}
@@ -150,7 +162,7 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 		return runRedHatImages(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab matrix {plan|report|import|run} [flags]; lab acceptance -evidence NEW_DIRECTORY [-web-only|-skip-feeds] [flags]; lab hosts baseline-browser -record NEW_FILE [flags]; lab packages {keygen|build|build-server|build-cli|apt|rpm|arch|rejection-fixtures} [flags]; lab release {attestation-keygen|build|verify|repository} [flags]; lab auth {check|check-fresh|check-broker|check-entra} [-repo DIR] [-lindmd FILE] [-cleanup-prefix PREFIX]; lab cli check [-root DIR] [-lindmd FILE] [-record NEW_FILE]; lab load -lindmd FILE [-record NEW_FILE] [flags]; lab ha -lindmd FILE -upgrade-lindmd FILE [-record NEW_FILE] [flags]; lab console -lindmd FILE [-devices 300] [flags]; lab profiles check-catalog -lindmd FILE [flags]; lab native {check-install-projection|check-install-snapshot} [flags]; lab vm {inspect|lifecycle|services|dispatch|server|updates|encrypted|device-actions|assistance|enroll-unattended} [flags]; lab server compose [-repo DIR] [-record NEW_FILE]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab images redhat {discover|fetch|inventory|cleanup} [flags]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
+		return errors.New("usage: lab matrix {plan|report|import|run} [flags]; lab acceptance -evidence NEW_DIRECTORY [-web-only|-skip-feeds] [flags]; lab hosts baseline-browser -record NEW_FILE [flags]; lab packages {keygen|build|build-server|build-cli|apt|rpm|arch|rejection-fixtures} [flags]; lab release {attestation-keygen|build|verify|repository} [flags]; lab auth {check|check-fresh|check-broker|check-entra} [-repo DIR] [-lindmd FILE] [-cleanup-prefix PREFIX]; lab cli check [-root DIR] [-lindmd FILE] [-record NEW_FILE]; lab load -lindmd FILE [-record NEW_FILE] [flags]; lab ha -lindmd FILE -upgrade-lindmd FILE [-record NEW_FILE] [flags]; lab console -lindmd FILE [-devices 300] [flags]; lab profiles check-catalog -lindmd FILE [flags]; lab native {check-install-projection|check-install-snapshot} [flags]; lab vm {inspect|lifecycle|services|dispatch|server|updates|encrypted|device-actions|assistance|advisories|enroll-unattended} [flags]; lab server compose [-repo DIR] [-record NEW_FILE]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab images snapshot -manifest FILE -snapshot-date YYYY-MM-DD -repomd-sha256 HEX -record NEW_FILE [flags]; lab images redhat {discover|fetch|inventory|cleanup} [flags]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -279,6 +291,7 @@ func runVMServices(ctx context.Context, args []string, stdout, stderr io.Writer)
 	workDir := flags.String("work-dir", "", "existing parent for owned disposable VM state")
 	diagnostics := flags.String("diagnostics", "", "existing directory for opt-in private failure diagnostics")
 	record := flags.String("record", "", "write successful native service evidence to a new private JSON file")
+	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -293,7 +306,7 @@ func runVMServices(ctx context.Context, args []string, stdout, stderr io.Writer)
 	if err != nil {
 		return err
 	}
-	result, err := vmlab.ServicesVM(ctx, manifest, vmlab.VMServicesOptions{LabBinary: binary, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics})
+	result, err := vmlab.ServicesVM(ctx, manifest, vmlab.VMServicesOptions{LabBinary: binary, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, Hardware: hardware.options()})
 	if err != nil {
 		return err
 	}

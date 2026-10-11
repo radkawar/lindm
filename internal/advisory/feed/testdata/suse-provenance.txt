@@ -101,3 +101,32 @@ Tests also mutate decoded copies in memory to exercise refusal paths. Those
 copies are deliberately invalid test inputs, not retained vendor documents.
 No acquisition time, release timestamp, synthetic architecture mapping, or
 source-package mapping is used to create authoritative records.
+
+Tumbleweed OVAL source research (2026-10-11)
+------------------------------------------
+URL: https://ftp.suse.com/pub/projects/security/oval/opensuse.tumbleweed.xml.gz
+Acquired compressed bytes: 10686297
+SHA256: 61c2efd98f5ec427c8bc16710db06126c0bbc0c4ef240cfd2b10b6c3dd1d102c
+Retained full research payload: ~/.cache/lindm-tier2-advisories-research/tumbleweed.xml.gz
+The HTTPS download and hash above were exercised; this is not native matching
+qualification or a claim of a detached vendor signature.
+
+suse-tumbleweed-subset.xml is explicitly a projected XML test document, not
+the complete vendor payload. Its generator and two complete definitions
+(CVE-2001-1267 and CVE-2026-45992), and every transitively referenced native
+test/object/state, retain original vendor XML fragments without rewriting.
+Only the enclosing section assembly and selection are local. Projection SHA256:
+c9c3e7e57b424f0bc16df400831fc7e5be1344da6ae899b87dd73d53a6ad2b42
+SUSE OVAL license: https://ftp.suse.com/pub/projects/security/oval/LICENSE
+Vendor: SUSE Product Security Team. Attribution and research do not turn this
+projection into a signed snapshot or native qualification record.
+
+All 29328 downloaded vulnerability definitions bind the exact Tumbleweed CPE
+and an openSUSE-release RPM >=0:20210101-0. Referenced package tests use native
+EVR less-than predicates; some require all installed instances, not any one
+old kernel. Unreferenced test/state entries contain additional unsupported
+predicates and do not authorize any definition. The parser resolves references
+instead of reading display comments. The generator timestamp lacks an offset;
+freshness conservatively starts 14 hours earlier than the displayed wall time.
+The export does not assert complete historical/third-party/unfixed coverage.
+The patch export is not substituted: SUSE says it also contains patches in QA.

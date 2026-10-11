@@ -104,6 +104,9 @@ message ImageManifest {
   // Guest package repositories use this immutable YYYY-MM-DD snapshot.
   // Required for Arch Linux Archive; the image build date is a separate pin.
   optional string repository_snapshot_date = 18 [(buf.validate.field).string.pattern = "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"];
+  // Content-addressed dependency-complete repository closure, never a runtime URL.
+  optional string repository_snapshot_manifest_sha256 = 19 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  optional string repository_snapshot_repomd_sha256 = 20 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
 }
 
 enum ChecksumMode {

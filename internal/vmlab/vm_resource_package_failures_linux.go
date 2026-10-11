@@ -42,8 +42,12 @@ func resourceWrongSigner(ctx context.Context, vm *guestVM, rpm resourcePackaging
 	source := config.GetPackageProvider().GetSources()[0]
 	source.SigningKeyFile = path
 	source.SigningKeySha256 = digest[:]
-	if rpm.rpm {
-		artifact := source.GetRepository().GetRpm().GetSigningKeys()[0]
+	if rpm.rpm || rpm.pacman {
+		keys := source.GetRepository().GetRpm().GetSigningKeys()
+		if rpm.pacman {
+			keys = source.GetRepository().GetAlpm().GetSigningKeys()
+		}
+		artifact := keys[0]
 		artifact.Sha256 = digest[:]
 		artifact.SizeBytes = uint64(len(key))
 		listed, err := vm.run(ctx, "sudo -n cat "+resourceFixtureRoot+"/wrong-keys.colons", nil, 16384, 15*time.Second)
@@ -57,6 +61,10 @@ func resourceWrongSigner(ctx context.Context, vm *guestVM, rpm resourcePackaging
 				source.RpmSigningKeyFingerprint = fields[9]
 				break
 			}
+		}
+		if rpm.pacman {
+			source.AlpmSigningKeyFingerprint = source.RpmSigningKeyFingerprint
+			source.RpmSigningKeyFingerprint = ""
 		}
 	} else {
 		artifact := source.GetRepository().GetApt().GetSigningKey()
@@ -146,6 +154,10 @@ func exercisePackageDrift(ctx context.Context, r *resourceDispatch, rpm resource
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	path := "/etc/dnf/versionlock.toml"
 	switch {
+	case rpm.pacman:
+		path = "/etc/pacman.conf"
+	case rpm.zypper:
+		path = "/etc/zypp/locks"
 	case rpm.dnf4:
 		path = dnf4VersionlockList
 	case !rpm.rpm:
@@ -249,6 +261,8 @@ func exercisePackageInterruption(ctx context.Context, r *resourceDispatch, rpm r
 	command := "test \"$(cat " + resourceFixtureRoot + "/interrupt.log)\" = entered; cat " + resourceFixtureRoot + "/interrupt.log; cat " + resourceFixtureRoot + "/maintainer.log; "
 	if rpm.rpm {
 		command += "rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' 'lindm-resource-*'"
+	} else if rpm.pacman {
+		command += "pacman -Q"
 	} else {
 		command += "dpkg-query -W -f='${Package} ${Version} ${db:Status-Status}\\n' 'lindm-resource-*'"
 	}

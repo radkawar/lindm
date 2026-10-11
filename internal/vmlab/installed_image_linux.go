@@ -39,6 +39,12 @@ type installerImage struct {
 	// noninteractive frontend), so the vendor media never boots twice.
 	exitOnReboot bool
 	recipe       func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error)
+	// offline denies installer egress for the signed-DVD capture bootstrap.
+	offline bool
+	// diagnostics is enabled only for the offline, unencrypted capture guest.
+	diagnostics *installerDiagnostics
+	// snapshot is populated only for the Tumbleweed recipe before rendering.
+	snapshot *tumbleweedSnapshotRepository
 	// bindSources, when set, authenticates network installation sources
 	// outside the ISO. It runs before and after the installer under a phase
 	// label and must fail closed.
@@ -108,6 +114,9 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 		return nil, err
 	}
 	identity := strings.Join([]string{spec.version, source.SHA256, m.Version, hardware.Architecture, hardware.StorageBus, codeDigest, varsDigest, hardware.Firmware.Package, hardware.Firmware.Version, fmt.Sprint(hardware.Firmware.SecureBoot)}, "\n")
+	if m.GetRepositorySnapshotManifestSha256() != "" {
+		identity += "\nrepository-closure:" + m.GetRepositorySnapshotManifestSha256()
+	}
 	sum := sha256.Sum256([]byte(identity))
 	id := hex.EncodeToString(sum[:])
 	lock, err := lockImage(ctx, root, id)
@@ -134,6 +143,17 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 		if err := copyEncryptedFile(filepath.Join(firmwareDir, name), filepath.Join(dir, name), 0600); err != nil {
 			return nil, err
 		}
+	}
+	snapshot, err := startImageRepositorySnapshot(ctx, m, cacheDir)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot != nil {
+		defer func() { err = errors.Join(err, snapshot.Close()) }()
+		if spec.snapshot == nil {
+			return nil, errors.New("tumbleweed installer recipe lacks repository snapshot binding")
+		}
+		*spec.snapshot = tumbleweedSnapshotRepository{URL: snapshot.URL, CAPEM: snapshot.CAPEM}
 	}
 	// Pin the exact verified descriptor during remastering. A pathname rename
 	// cannot switch media between the digest check and xorriso's inherited fd.
@@ -171,7 +191,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", "24G"); err != nil {
 		return nil, err
 	}
-	if spec.bindSources != nil {
+	if spec.bindSources != nil && snapshot == nil {
 		if err := spec.bindSources(ctx, root, partial, "before"); err != nil {
 			return nil, err
 		}
@@ -184,7 +204,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	if err != nil {
 		return nil, err
 	}
-	if spec.bindSources != nil {
+	if spec.bindSources != nil && snapshot == nil {
 		if err := spec.bindSources(ctx, root, partial, "after"); err != nil {
 			return nil, err
 		}
@@ -306,12 +326,23 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 	if hardware.Architecture == "x86_64" && hardware.Firmware.SecureBoot {
 		machine += ",smm=on"
 	}
-	// Keep the guest UART present for the vendor text frontend, but discard
-	// serial bytes rather than retaining credential-bearing installer output.
-	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", "null", "-monitor", "none", "-machine", machine, "-cpu", cpu, "-m", fmt.Sprint(spec.memoryMiB), "-smp", "2",
+	network := "user,id=net0"
+	if spec.offline {
+		network += ",restrict=on"
+	}
+	// Other installers still discard serial, which can contain unlock secrets.
+	// Capture-only diagnostics use a separate bounded, redacted stdout sink.
+	serial, console := "null", io.Writer(nil)
+	if spec.diagnostics != nil {
+		if !spec.offline {
+			return errors.New("installer console diagnostics require the offline capture profile")
+		}
+		serial, console = "stdio", spec.diagnostics
+	}
+	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", serial, "-monitor", "none", "-machine", machine, "-cpu", cpu, "-m", fmt.Sprint(spec.memoryMiB), "-smp", "2",
 		"-drive", "if=pflash,format=raw,unit=0,readonly=on,file=firmware-code.fd", "-drive", "if=pflash,format=raw,unit=1,file=nvram.fd",
 		"-drive", "if=none,id=disk,format=qcow2,file=image", "-device", "virtio-rng-pci",
-		"-netdev", "user,id=net0", "-device", "virtio-net-pci,netdev=net0,id=nic0",
+		"-netdev", network, "-device", "virtio-net-pci,netdev=net0,id=nic0",
 		"-drive", "if=none,id=installer,media=cdrom,readonly=on,format=raw,file=" + relative,
 		"-device", "virtio-scsi-pci,id=installer-scsi", "-device", "scsi-cd,bus=installer-scsi.0,drive=installer,bootindex=0"}
 	if hardware.Architecture == "x86_64" && hardware.Firmware.SecureBoot {
@@ -323,7 +354,13 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 	args = append(args, vmStorageArguments(hardware, []string{"disk"}, 1)...)
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()
-	process, err := startEncryptedProcess(ctx, dir, "qemu-system-"+hardware.Architecture, args...)
+	var process *encryptedProcess
+	defer func() {
+		if err != nil && spec.diagnostics != nil {
+			err = spec.diagnostics.saveFailure(dir, process, err)
+		}
+	}()
+	process, err = startEncryptedProcessOutput(ctx, dir, nil, console, "qemu-system-"+hardware.Architecture, args...)
 	if err != nil {
 		return err
 	}

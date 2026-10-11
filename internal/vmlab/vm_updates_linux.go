@@ -42,31 +42,35 @@ type VMUpdateStep struct {
 }
 
 type VMUpdateResult struct {
-	ImageID              string                   `json:"image_id"`
-	ImageSHA256          string                   `json:"image_sha256"`
-	SourceSHA256         string                   `json:"source_snapshot_sha256"`
-	LabSHA256            string                   `json:"lab_sha256"`
-	ServerBuild          *packaging.BuildResult   `json:"server_build"`
-	AgentBuilds          []*packaging.BuildResult `json:"agent_builds"`
-	Runtime              *vmRuntimeEvidence       `json:"runtime"`
-	SELinux              string                   `json:"selinux"`
-	DeviceID             string                   `json:"device_id"`
-	EnrollmentGeneration string                   `json:"enrollment_generation"`
-	InitialTimestampSHA  string                   `json:"initial_timestamp_sha256"`
-	InitialBootID        string                   `json:"initial_boot_id"`
-	FinalBootID          string                   `json:"final_boot_id"`
-	InitialSessionEpoch  uint64                   `json:"initial_session_epoch"`
-	FinalSessionEpoch    uint64                   `json:"final_session_epoch"`
-	InitialInventory     *vmInventoryEvidence     `json:"initial_inventory"`
-	FinalInventory       *vmInventoryEvidence     `json:"final_inventory"`
-	InterruptionWitness  string                   `json:"interruption_witness"`
-	Steps                []VMUpdateStep           `json:"steps"`
-	StartedAt            time.Time                `json:"started_at"`
-	FinishedAt           time.Time                `json:"finished_at"`
-	Passed               bool                     `json:"passed"`
-	Outcome              string                   `json:"outcome"`
-	CancellationReason   string                   `json:"cancellation_reason,omitempty"`
-	Failure              string                   `json:"failure,omitempty"`
+	ImageID                          string                   `json:"image_id"`
+	ImageSHA256                      string                   `json:"image_sha256"`
+	RepositorySnapshotDate           string                   `json:"repository_snapshot_date,omitempty"`
+	RepositorySnapshotManifestSHA256 string                   `json:"repository_snapshot_manifest_sha256,omitempty"`
+	RepositorySnapshotRepomdSHA256   string                   `json:"repository_snapshot_repomd_sha256,omitempty"`
+	SourceSHA256                     string                   `json:"source_snapshot_sha256"`
+	LabSHA256                        string                   `json:"lab_sha256"`
+	ServerBuild                      *packaging.BuildResult   `json:"server_build"`
+	AgentBuilds                      []*packaging.BuildResult `json:"agent_builds"`
+	NativeRepositoryURL              string                   `json:"native_repository_url,omitempty"`
+	Runtime                          *vmRuntimeEvidence       `json:"runtime"`
+	SELinux                          string                   `json:"selinux"`
+	DeviceID                         string                   `json:"device_id"`
+	EnrollmentGeneration             string                   `json:"enrollment_generation"`
+	InitialTimestampSHA              string                   `json:"initial_timestamp_sha256"`
+	InitialBootID                    string                   `json:"initial_boot_id"`
+	FinalBootID                      string                   `json:"final_boot_id"`
+	InitialSessionEpoch              uint64                   `json:"initial_session_epoch"`
+	FinalSessionEpoch                uint64                   `json:"final_session_epoch"`
+	InitialInventory                 *vmInventoryEvidence     `json:"initial_inventory"`
+	FinalInventory                   *vmInventoryEvidence     `json:"final_inventory"`
+	InterruptionWitness              string                   `json:"interruption_witness"`
+	Steps                            []VMUpdateStep           `json:"steps"`
+	StartedAt                        time.Time                `json:"started_at"`
+	FinishedAt                       time.Time                `json:"finished_at"`
+	Passed                           bool                     `json:"passed"`
+	Outcome                          string                   `json:"outcome"`
+	CancellationReason               string                   `json:"cancellation_reason,omitempty"`
+	Failure                          string                   `json:"failure,omitempty"`
 }
 
 // UpdateVM uses real signed packages, a real isolated control plane and real
@@ -88,6 +92,9 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Minute)
 	defer cancel()
 	result = &VMUpdateResult{ImageID: manifest.GetId(), StartedAt: time.Now().UTC()}
+	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
+	result.RepositorySnapshotManifestSHA256 = manifest.GetRepositorySnapshotManifestSha256()
+	result.RepositorySnapshotRepomdSHA256 = manifest.GetRepositorySnapshotRepomdSha256()
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		switch {
@@ -137,6 +144,13 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
 		return result, err
 	}
+	snapshot, err := prepareGuestRollingSnapshot(ctx, vm, manifest, options.CacheDir)
+	if err != nil {
+		return result, err
+	}
+	if snapshot != nil {
+		defer func() { err = errors.Join(err, snapshot.Close()) }()
+	}
 	result.SELinux = "not applicable"
 	if backend, _ := nativeBackend(release); backend.DNF() {
 		mode, err := vm.run(ctx, "getenforce", nil, 128, 10*time.Second)
@@ -159,7 +173,11 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := packages.InstallFirst(ctx); err != nil {
 		return result, err
 	}
-	fixture, publisher, err := devlab.OpenReleaseAuthorityFixture(ctx, options.Repository, built.serverBinary)
+	var nativeRepository *devlab.NativeReleasePackages
+	if packages.backend == platform.BackendPacman || packages.backend == platform.BackendZypper {
+		nativeRepository = &devlab.NativeReleasePackages{Format: built.first.Format, Paths: []string{built.first.Path}, Signer: built.signer}
+	}
+	fixture, publisher, err := devlab.OpenReleaseAuthorityFixture(ctx, options.Repository, built.serverBinary, nativeRepository)
 	if err != nil {
 		return result, err
 	}
@@ -176,6 +194,12 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	defer func() { err = errors.Join(err, closeLifecycleForwards(forwards)) }()
+	if err := exerciseUpdateRepository(ctx, packages, options.Repository, built.first); err != nil {
+		return result, err
+	}
+	if nativeRepository != nil {
+		result.NativeRepositoryURL = "https://localhost:18444/repo/" + string(nativeRepository.Format)
+	}
 	control, err := openVMControlPlane(ctx, options.Repository, fixture)
 	if err != nil {
 		return result, err
@@ -477,11 +501,16 @@ func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestP
 		return err
 	}
 	manager := agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT
-	switch {
-	case packages.backend.DNF():
+	switch packages.backend {
+	case platform.BackendAPT:
+	case platform.BackendDNF4, platform.BackendDNF5:
 		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_DNF
-	case packages.backend == platform.BackendPacman:
+	case platform.BackendPacman:
 		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN
+	case platform.BackendZypper:
+		manager = agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_ZYPPER
+	default:
+		return errors.New("update lane has no native manager for selected package backend")
 	}
 	cfg.Updates = &agentv1.AgentUpdateConfig{RepositoryUrl: "https://localhost:18444/updates/", Ring: "canary", PollIntervalSeconds: 1, Manager: manager}
 	data, err = protojson.Marshal(cfg)

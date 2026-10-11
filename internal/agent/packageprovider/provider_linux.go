@@ -1,7 +1,7 @@
 //go:build linux
 
-// Package packageprovider reconciles native APT, DNF5 and DNF4 packages on
-// mutable Debian/Ubuntu, Fedora and RHEL/AlmaLinux/Rocky systems. It never
+// Package packageprovider reconciles native APT, DNF, pacman and zypper packages
+// on explicitly registered mutable platforms. It never
 // executes shell providers, invents installed provenance, purges data,
 // autoremoves dependencies, or downgrades. Approved distro package scriptlets
 // still run with native root privileges. Plans bind complete staged solver
@@ -145,6 +145,12 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		backend = resourcev1.Backend_BACKEND_APT
 	case platform.PackageDBRPM:
 		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
+		if platform.Of(config.Platform).Native().Packages.Backend == platform.BackendZypper {
+			tool, backend = "/usr/bin/zypper", resourcev1.Backend_BACKEND_ZYPPER
+		}
+	case platform.PackageDBPacman:
+		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM
+		tool, backend = "/usr/bin/pacman", resourcev1.Backend_BACKEND_ALPM
 	default:
 		return nil, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
 	}
@@ -174,7 +180,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		return nil, err
 	}
 	var version string
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && tool == "" {
 		manager, err := p.selectDNF(ctx, p.state)
 		if err != nil {
 			return nil, err
@@ -189,6 +195,12 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 			return nil, err
 		}
 		p.managerPath = tool
+		if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+			p.rpmdb, err = rpmDatabase()
+			if err != nil {
+				return nil, err
+			}
+		}
 		version = strings.SplitN(strings.TrimSpace(string(result.stdout)), "\n", 2)[0]
 	}
 	if version == "" || len(version) > 128 {
@@ -249,6 +261,8 @@ func sourceRef(source *agentv1.NativePackageSource) *resourcev1.ResourceRef {
 	ecosystem := "apt"
 	if source.GetRepository().GetRpm() != nil {
 		ecosystem = "rpm"
+	} else if source.GetRepository().GetAlpm() != nil {
+		ecosystem = "alpm"
 	}
 	return &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: ecosystem + "/" + source.GetRepository().GetRepositoryId()}
 }
@@ -455,7 +469,7 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 		Platform: proto.CloneOf(p.config.Platform), ActionId: p.config.ActionID,
 		StagingExpiresAt: proto.CloneOf(expires), StagingMaxBytes: maximum, IntentSha256: bytes.Clone(p.config.IntentDigest),
 	}
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && before.GetNativePackage().GetPinFile() != nil {
+	if !p.rolling() && p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && before.GetNativePackage().GetPinFile() != nil {
 		request.CandidatePinContents = pinProjection(p.backend.GetBackend(), pin)
 		digest := sha256.Sum256(request.GetCandidatePinContents())
 		request.CandidatePinSha256 = digest[:]
@@ -530,12 +544,18 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 	return plan, nil
 }
 func (p *Provider) nativeLockIdentity() string {
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM {
+		return "alpm:/var/lib/pacman/db.lck"
+	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		return "dpkg:/var/lib/dpkg/lock-frontend:/var/lib/dpkg/lock"
 	}
 	return "rpm:" + filepath.Join(p.rpmdb, ".rpm.lock")
 }
 func (p *Provider) nativeTransactionPath(directory string) string {
+	if p.rolling() {
+		return filepath.Join(directory, "native-transaction.pb")
+	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		return filepath.Join(directory, "native-transaction.txt")
 	}

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"lindm/internal/platform"
 )
 
 func TestConsoleBrowserConfigCustody(t *testing.T) {
@@ -42,5 +44,26 @@ func TestConsoleBrowserConfigCustody(t *testing.T) {
 	}
 	if err := readConsoleBrowserJSON(path, &cfg); err == nil || strings.Contains(err.Error(), "private-owner-secret") {
 		t.Fatal("malformed config accepted or credential disclosed")
+	}
+}
+
+func TestConsoleEnrollmentCapturesMatchingNativeFamily(t *testing.T) {
+	for _, test := range []struct {
+		backend platform.Backend
+		family  string
+	}{
+		{platform.BackendAPT, "apt"},
+		{platform.BackendDNF4, "dnf"},
+		{platform.BackendDNF5, "dnf"},
+		{platform.BackendPacman, "pacman"},
+		{platform.BackendZypper, "zypper"},
+	} {
+		family, err := consoleEnrollmentFamily(test.backend)
+		if err != nil || family != test.family {
+			t.Fatalf("clipboard capture family differs from native installer: %q %v", family, err)
+		}
+	}
+	if _, err := consoleEnrollmentFamily(platform.BackendNone); err == nil {
+		t.Fatal("unknown package family defaulted to APT")
 	}
 }

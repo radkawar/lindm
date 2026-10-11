@@ -33,9 +33,10 @@ var loadContainerIDPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // LoadAuthorityOptions selects only maintained, local lab database resources.
 // No connection URL, Docker endpoint, image override or host device is accepted.
 type LoadAuthorityOptions struct {
-	DatabaseStorage string
-	PostgresCPUs    string
-	ServerCPUs      string
+	DatabaseStorage       string
+	PostgresCPUs          string
+	ServerCPUs            string
+	nativeReleasePackages *NativeReleasePackages
 	// networkContainer joins dedicated PostgreSQL to that exact container's
 	// network namespace (shared by the caller) instead of publishing a port.
 	networkContainer    string

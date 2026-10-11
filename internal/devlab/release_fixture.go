@@ -20,16 +20,25 @@ import (
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	"lindm/gen/lindm/releasemanagement/v1/releasemanagementv1connect"
 	updatev1 "lindm/gen/lindm/update/v1"
+	"lindm/internal/packaging"
 	"lindm/internal/releaseupdate"
 	"lindm/internal/trust"
 )
+
+// NativeReleasePackages publishes the actual signed update fixture packages
+// through lindmd's native repository before its immutable file snapshot opens.
+type NativeReleasePackages struct {
+	Format packaging.Format
+	Paths  []string
+	Signer packaging.SigningKey
+}
 
 // OpenReleaseAuthorityFixture owns a local-auth control plane, fresh five-role
 // TUF repository and replacement signed bootstrap. Shared .cache/dev material
 // is only read; no production key generation or bootstrap trust fallback occurs.
 // The publisher is a lab release-authority handle, not a server authorization bypass.
-func OpenReleaseAuthorityFixture(ctx context.Context, repository, binary string) (*AuthorityFixture, *releaseupdate.Publisher, error) {
-	fixture, err := openAuthorityFixture(ctx, repository, binary, authorityReleaseUpdates)
+func OpenReleaseAuthorityFixture(ctx context.Context, repository, binary string, native *NativeReleasePackages) (*AuthorityFixture, *releaseupdate.Publisher, error) {
+	fixture, err := openAuthorityFixtureWithOptions(ctx, repository, binary, authorityReleaseUpdates, LoadAuthorityOptions{nativeReleasePackages: native})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -165,7 +174,7 @@ func (f *AuthorityFixture) SetRollout(ctx context.Context, request *releasemanag
 
 // This hook runs before the first lindmd process and before execution authority
 // is initialized. Replacing an already pinned live trust domain is not supported.
-func (f *AuthorityFixture) configureReleaseRepository(ctx context.Context, cfg *configv1.ServerConfig, material *AgentFixture) error {
+func (f *AuthorityFixture) configureReleaseRepository(ctx context.Context, cfg *configv1.ServerConfig, material *AgentFixture, native *NativeReleasePackages) error {
 	directory := filepath.Join(f.directory, "release-repository")
 	custody := filepath.Join(f.directory, "release-custody")
 	onlineCustody := filepath.Join(f.directory, "release-online-custody")
@@ -200,6 +209,24 @@ func (f *AuthorityFixture) configureReleaseRepository(ctx context.Context, cfg *
 		return err
 	}
 	cfg.ReleaseRepository = &configv1.ReleaseRepositoryConfig{Directory: directory, Signing: &configv1.ReleaseRepositorySigning{Directory: onlineCustody}, VerificationStateDirectory: proto.String(filepath.Join(f.directory, "release-verification"))}
+	if native != nil {
+		output := filepath.Join(directory, "repo")
+		if err := os.Mkdir(output, 0o700); err != nil {
+			return err
+		}
+		switch native.Format {
+		case packaging.FormatArch:
+			if _, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: native.Paths, Signer: native.Signer}); err != nil {
+				return err
+			}
+		case packaging.FormatRPM:
+			if _, err := packaging.PublishRPM(ctx, packaging.RPMRequest{OutputDir: output, RPMs: native.Paths, Signer: native.Signer}); err != nil {
+				return err
+			}
+		default:
+			return errors.New("native release fixture requires signed pacman or RPM packages")
+		}
+	}
 	f.releasePublisher = publisher
 	return nil
 }

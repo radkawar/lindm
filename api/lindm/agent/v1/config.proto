@@ -91,15 +91,16 @@ message NativePackageSource {
   string signing_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   bytes signing_key_sha256 = 3 [(buf.validate.field).bytes.len = 32];
   string rpm_signing_key_fingerprint = 4 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})?$"];
+  string alpm_signing_key_fingerprint = 5 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})?$"];
   option (buf.validate.message).cel = {
     id: "native_package_source.approved"
-    message: "native package sources must be present approved APT or RPM repositories"
-    expression: "this.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm))"
+    message: "native package sources must be present approved APT, RPM or ALPM repositories"
+    expression: "this.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm) || has(this.repository.alpm))"
   };
   option (buf.validate.message).cel = {
     id: "native_package_source.signer"
     message: "the local key must match the approved repository signing artifact"
-    expression: "(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)"
+    expression: "(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.alpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.alpm_signing_key_fingerprint == '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256) || (has(this.repository.alpm) && this.rpm_signing_key_fingerprint == '' && this.alpm_signing_key_fingerprint != '' && this.repository.alpm.signing_keys.size() == 1 && this.repository.alpm.signing_keys[0].sha256 == this.signing_key_sha256)"
   };
 }
 

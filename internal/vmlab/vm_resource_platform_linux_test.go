@@ -29,7 +29,12 @@ func TestResourceLanePlatformAdmitsOnlyBuiltFixtures(t *testing.T) {
 			t.Errorf("%s %s refused", p.id, p.version)
 		}
 	}
-	for _, p := range [][2]string{{"ubuntu", "25.10"}, {"ubuntu", "20.04"}, {"debian", "11"}, {"debian", "14"}, {"fedora", "43"}, {"rhel", "8.10"}, {"opensuse-leap", "16.0"}, {"arch", ""}} {
+	for _, p := range [][2]string{{"arch", "rolling"}, {"opensuse-tumbleweed", "20261007"}} {
+		if err := manifestRelease(&labv1.ImageManifest{Distribution: p[0], Version: p[1]}).LabLane(platform.LaneResources); err != nil {
+			t.Error(err)
+		}
+	}
+	for _, p := range [][2]string{{"ubuntu", "25.10"}, {"ubuntu", "20.04"}, {"debian", "11"}, {"debian", "14"}, {"fedora", "43"}, {"rhel", "8.10"}, {"opensuse-leap", "16.0"}} {
 		if manifestRelease(&labv1.ImageManifest{Distribution: p[0], Version: p[1]}).LabLane(platform.LaneResources) == nil {
 			t.Errorf("%s %s admitted without a native fixture", p[0], p[1])
 		}
@@ -39,7 +44,7 @@ func TestResourceLanePlatformAdmitsOnlyBuiltFixtures(t *testing.T) {
 // Every admitted product reaches its own native package-tool branch of the
 // fixture builder, not the refusal; its package format follows the family.
 func TestResourceFixtureSelectsNativeToolPerAdmittedPlatform(t *testing.T) {
-	start := strings.Index(resourceFixtureScript, `case "$ID:$VERSION_ID" in`)
+	start := strings.Index(resourceFixtureScript, `case "$LINDM_RESOURCE_BACKEND:$ID:${VERSION_ID:-}" in`)
 	end := strings.Index(resourceFixtureScript, "\nesac\n")
 	if start < 0 || end < start {
 		t.Fatal("fixture platform selection not found")
@@ -57,7 +62,7 @@ esac
 	}
 	for _, p := range resourceLanePlatforms {
 		cmd := exec.Command("/bin/sh", "-eu", "-c", selection)
-		cmd.Env, cmd.Dir = []string{"PATH=" + bin, "ID=" + p.id, "VERSION_ID=" + p.version}, t.TempDir()
+		cmd.Env, cmd.Dir = []string{"PATH=" + bin, "ID=" + p.id, "VERSION_ID=" + p.version, "LINDM_RESOURCE_BACKEND="}, t.TempDir()
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("%s %s: %v: %s", p.id, p.version, err, output)
@@ -72,17 +77,25 @@ esac
 		}
 	}
 	cmd := exec.Command("/bin/sh", "-eu", "-c", selection)
-	cmd.Env, cmd.Dir = []string{"PATH=" + bin, "ID=debian", "VERSION_ID=11"}, t.TempDir()
+	cmd.Env, cmd.Dir = []string{"PATH=" + bin, "ID=debian", "VERSION_ID=11", "LINDM_RESOURCE_BACKEND="}, t.TempDir()
 	if output, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("unbuilt platform accepted: %s", output)
 	}
 }
 
 func TestResourceLaneScriptsParse(t *testing.T) {
-	for name, script := range map[string]string{
-		"fixture": resourceFixtureScript, "password": passwordFixtureScript, "password-probe": passwordUnmanagedProbe,
+	scripts := map[string]string{
+		"fixture": resourceFixtureScript, "password-probe": passwordUnmanagedProbe,
 		"link": firewallLinkScript, "native-manager": firewallNativeManagerScript, "host": resourceHostFixtureScript, "root-login": rootRecoveryLoginScript, "crash-watch": firewallCrashWatch,
-	} {
+	}
+	for _, manager := range []platform.PAMManager{platform.PAMManagerPamAuthUpdate, platform.PAMManagerAuthselect, platform.PAMManagerNative, platform.PAMManagerPamConfig} {
+		script, err := passwordFixtureCommand(manager)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scripts["password-"+string(manager)] = script
+	}
+	for name, script := range scripts {
 		cmd := exec.Command("/bin/sh", "-n")
 		cmd.Stdin = strings.NewReader(script)
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -164,5 +177,57 @@ func TestSystemctlKillOptionFollowsNativeSystemd(t *testing.T) {
 		if err != nil || strings.TrimSpace(string(got)) != tc.want {
 			t.Fatalf("systemd %s ran %q: %v", tc.version, got, err)
 		}
+	}
+}
+
+func TestNativePasswordPrerequisitesUseWholeSnapshotUpgrade(t *testing.T) {
+	command, err := passwordFixtureCommand(platform.PAMManagerNative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(command, "pacman -Syu --needed --noconfirm ") {
+		t.Fatal("native PAM prerequisite installation permits an Arch partial upgrade")
+	}
+}
+
+func TestPasswordConversationBoundariesRejectDefaultPolicyFalsePositive(t *testing.T) {
+	for _, managed := range []uint32{14, 16} {
+		candidate, err := passwordConversationBoundary(managed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(candidate) != int(managed)-1 {
+			t.Fatalf("minlen=%d did not probe its immediate boundary", managed)
+		}
+		// A native minlen=8 stack would accept this candidate, so it cannot
+		// satisfy the conversation's required failure for minlen=14 or 16.
+		if len(candidate) < 8 {
+			t.Fatalf("default native policy also rejects minlen=%d probe", managed)
+		}
+		classes := 0
+		for _, alphabet := range []string{"abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "0123456789"} {
+			if strings.ContainsAny(candidate, alphabet) {
+				classes++
+			}
+		}
+		if classes != 3 {
+			t.Fatalf("minlen=%d candidate violates the independent class policy", managed)
+		}
+	}
+}
+
+func TestPasswordConversationReleaseRejectsRetainedManagedPolicy(t *testing.T) {
+	candidate, err := passwordConversationBoundary(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This successful ordinary-user change must accept exactly the candidate
+	// rejected by the preceding managed minlen=16 conversations.
+	managed, err := passwordConversationBoundary(16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate != managed || len(candidate) < 8 || len(candidate) >= 16 {
+		t.Fatal("release probe does not distinguish baseline from managed policy")
 	}
 }

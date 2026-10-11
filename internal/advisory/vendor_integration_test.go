@@ -33,7 +33,7 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 		format                                                                                  advisoryv1.FeedFormat
 	}{
 		{"sles", "sles", "15.6", "", "suse-suse-su-2024_2275-1.json", "https://ftp.suse.com/pub/projects/security/csaf/suse-su-2024_2275-1.json", "openssh", "rpm", "9.6p1-150600.6.2.1", "9.6p1-150600.6.3.1", "CVE-2024-6387", "", advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF},
-		{"arch", "arch", "rolling", "", "arch-backport.json", "https://security.archlinux.org/all.json", "wpa_supplicant", "pacman", "2:2.9-7", "2:2.9-8", "CVE-2021-0326", "", advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON},
+		{"arch", "arch", "rolling", "", "arch-backport.json", "https://security.archlinux.org/issues/all.json", "wpa_supplicant", "pacman", "2:2.9-7", "2:2.9-8", "CVE-2021-0326", "", advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON},
 		{"debian-tracker", "debian", "12", "", "debian-tracker-subset.json", "https://security-tracker.debian.org/tracker/data/json", "openssh-server", "dpkg", "1:9.2p1-2+deb12u2", "1:9.2p1-2+deb12u3", "CVE-2024-6387", "", advisoryv1.FeedFormat_FEED_FORMAT_DEBIAN_TRACKER_JSON},
 		{"rhel-standard", "rhel", "9", "standard", "redhat-rhsa-2024_6783.json", "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_6783.json", "openssl-libs", "rpm", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", "CVE-2024-6119", "", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF},
 		{"rhel-e4s", "rhel", "8.6", "e4s", "redhat-rhsa-2024_7846.json", "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_7846.json", "openssl-libs", "rpm", "1:1.1.1k-13.el8_6", "1:1.1.1k-14.el8_6", "CVE-2024-5535", "", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF},
@@ -205,7 +205,7 @@ func TestAdvisoryArchAbsentVersionIsNativeRollingEvidence(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			pool, _ := testdb.Open(t)
-			source := &advisoryv1.FeedSource{Id: "arch", Distro: "arch", Release: "rolling", Architecture: "x86_64", Format: advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON, Url: "https://security.archlinux.org/all.json", MaxAgeSeconds: 86400}
+			source := &advisoryv1.FeedSource{Id: "arch", Distro: "arch", Release: "rolling", Architecture: "x86_64", Format: advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON, Url: "https://security.archlinux.org/issues/all.json", MaxAgeSeconds: 86400}
 			s, doc := launchVendor(t, pool, source, "arch-backport.json")
 			if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 				t.Fatal(err)

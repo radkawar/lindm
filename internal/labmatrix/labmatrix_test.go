@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	labv1 "lindm/gen/lindm/lab/v1"
@@ -20,6 +21,20 @@ func release(t *testing.T, key string) *platform.Release {
 		t.Fatalf("registry has no %s", key)
 	}
 	return r
+}
+
+func TestRollingManifestPrefersNewestSnapshotButHonorsOwnerChoice(t *testing.T) {
+	r := release(t, "opensuse-tumbleweed")
+	old := &Manifest{Image: &labv1.ImageManifest{Id: "old", RepositorySnapshotDate: proto.String("2026-10-07")}, Release: r, Architecture: "x86_64"}
+	current := &Manifest{Image: &labv1.ImageManifest{Id: "current", RepositorySnapshotDate: proto.String("2026-10-09")}, Release: r, Architecture: "x86_64"}
+	in := &Inputs{Manifests: []*Manifest{old, current}}
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64"); got != current {
+		t.Fatal("historical path ordering hid the current rolling snapshot")
+	}
+	in.PreferredManifest = old.Image.GetId()
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64"); got != old {
+		t.Fatal("newer snapshot silently replaced an explicit owner choice")
+	}
 }
 
 func entry(key, cell, arch string, verdict labv1.MatrixVerdict, at time.Time) *labv1.MatrixLedgerEntry {
@@ -137,5 +152,46 @@ func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
 	}
 	if got := in.cell(release(t, "debian-12"), cell, "aarch64"); got.State != NoLane {
 		t.Fatalf("unsupported console enrollment recipe became runnable: %s", got.State)
+	}
+}
+
+// Snapshot promotion must not carry a rolling platform's old pass forward, even
+// if an operator keeps the manifest ID while changing its repository date.
+func TestRollingSnapshotEvidenceIdentity(t *testing.T) {
+	arch := release(t, "arch")
+	spec := &labv1.MatrixCell{Name: "inventory", Capabilities: []string{"inventory"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: "inspect"}
+	at := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	manifest := &Manifest{Release: arch, Architecture: "x86_64", SHA256: strings.Repeat("b", 64), Image: &labv1.ImageManifest{Id: "arch-snapshot", RepositorySnapshotDate: proto.String("2026-10-02")}}
+	record := entry("arch", "inventory", "x86_64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, at)
+	record.Manifest = manifest.Image.GetId()
+	record.ManifestSha256 = manifest.SHA256
+	record.RepositorySnapshotDate = manifest.Image.GetRepositorySnapshotDate()
+	in := &Inputs{Manifests: []*Manifest{manifest}, Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{record}}}
+	if c := in.cell(arch, spec, "x86_64"); c.State != Pass || c.RequalificationDue(at) {
+		t.Fatalf("matching snapshot is not a current pass: %s", c.State)
+	}
+	for _, field := range []*string{&record.Manifest, &record.ManifestSha256, &record.RepositorySnapshotDate} {
+		saved := *field
+		*field = ""
+		c := in.cell(arch, spec, "x86_64")
+		if c.State != NotRun || !c.RequalificationDue(at) {
+			t.Fatalf("incomplete snapshot binding reused result: %s", c.State)
+		}
+		*field = saved
+	}
+	c := in.cell(arch, spec, "x86_64")
+	if c.RequalificationDue(at.Add(14*24*time.Hour-time.Nanosecond)) || !c.RequalificationDue(at.Add(14*24*time.Hour)) {
+		t.Fatal("rolling requalification window is not exactly registry cadence")
+	}
+	if !c.RequalificationDue(at.Add(-time.Second)) {
+		t.Fatal("future-dated evidence suppressed requalification")
+	}
+	record.Scope = "files-only"
+	if !c.RequalificationDue(at) {
+		t.Fatal("partial evidence suppressed complete requalification")
+	}
+	fixed := &Cell{Release: release(t, "ubuntu-24.04"), State: NotRun}
+	if fixed.RequalificationDue(at) {
+		t.Fatal("fixed release entered rolling requalification lane")
 	}
 }

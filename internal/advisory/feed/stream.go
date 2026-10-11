@@ -34,6 +34,9 @@ func (c *Client) FetchStream(ctx context.Context, source *advisoryv1.FeedSource,
 	if err := c.validator.Validate(source); err != nil {
 		return nil, fmt.Errorf("feed: validate source: %w", err)
 	}
+	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL {
+		return c.fetchSUSEOVAL(ctx, source, emit, progress)
+	}
 	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
 		return c.fetchRedHatStream(ctx, source, emit, progress)
 	}
@@ -61,13 +64,16 @@ func ParseStream(ctx context.Context, source *advisoryv1.FeedSource, input io.Re
 	if source == nil || input == nil || emit == nil {
 		return nil, errors.New("feed: source, reader and claim consumer required")
 	}
-	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
+	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL {
 		validator, err := protovalidate.New(protovalidate.WithMessages(source, &advisoryv1.Advisory{}))
 		if err != nil {
 			return nil, fmt.Errorf("feed: compile source validation: %w", err)
 		}
 		if err := validator.Validate(source); err != nil {
 			return nil, fmt.Errorf("feed: validate source: %w", err)
+		}
+		if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_SUSE_OVAL {
+			return stageSUSEOVAL(ctx, source, validator, input, emit, progress)
 		}
 		if source.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
 			return stageRedHatStream(ctx, source, validator, input, emit)

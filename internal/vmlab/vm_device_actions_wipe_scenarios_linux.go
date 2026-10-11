@@ -39,13 +39,13 @@ func nativeWipeScenarios(ctx context.Context, manifest *labv1.ImageManifest, opt
 }
 
 func nativeWipeEffectPhases(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, approver *devlab.OwnerSession, delegation *agentv1.UpdateExecutionTrustRequest, result *VMDeviceActionsResult) (err error) {
-	if options.WipePhase == "" || options.WipePhase == "live-erase" {
+	if options.WipePhase == "" || options.WipePhase == "live-actions" || options.WipePhase == "live-erase" {
 		result.LiveErase, err = nativeLiveEraseScenario(ctx, manifest, options, packages, fixture, control, approver, delegation, false)
 		if err != nil {
 			return err
 		}
 	}
-	if options.WipePhase == "" || options.WipePhase == "live-report-loss" {
+	if options.WipePhase == "" || options.WipePhase == "live-actions" || options.WipePhase == "live-report-loss" {
 		result.LiveEraseReportLoss, err = nativeLiveEraseScenario(ctx, manifest, options, packages, fixture, control, approver, delegation, true)
 		if err != nil {
 			return err

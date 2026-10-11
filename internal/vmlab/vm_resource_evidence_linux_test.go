@@ -134,7 +134,7 @@ func TestModuleBuiltinFixtureUsesObservedCanonicalEntry(t *testing.T) {
 }
 
 func TestResourceLaneDesiredIdentities(t *testing.T) {
-	for _, rpm := range []resourcePackaging{{}, {rpm: true}, {arm: true}, {rpm: true, arm: true}} {
+	for _, rpm := range []resourcePackaging{{}, {rpm: true}, {arm: true}, {rpm: true, arm: true}, {pacman: true}, {rpm: true, zypper: true}, {rpm: true, zypper: true, arm: true}} {
 		for _, present := range []bool{false, true} {
 			desired := resourcePackageDesired(rpm, "1.0", present)
 			if err := protovalidate.Validate(desired); err != nil {

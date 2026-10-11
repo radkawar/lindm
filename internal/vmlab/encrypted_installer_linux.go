@@ -33,12 +33,14 @@ const encryptedDesktopMediaEdition = "desktop-encrypted-lab"
 type encryptedMedia struct {
 	release *platform.Release
 	// desktop selects the encryptedDesktopMediaEdition recipe.
-	desktop bool
+	desktop  bool
+	manifest *labv1.ImageManifest
+	snapshot *tumbleweedSnapshotRepository
 }
 
 // encryptedInstallerMedia maps a manifest to its installer recipe layout.
 func encryptedInstallerMedia(m *labv1.ImageManifest) encryptedMedia {
-	return encryptedMedia{release: platform.ForManifest(m.GetDistribution(), m.GetVersion()), desktop: m.GetEdition() == encryptedDesktopMediaEdition}
+	return encryptedMedia{release: platform.ForManifest(m.GetDistribution(), m.GetVersion()), desktop: m.GetEdition() == encryptedDesktopMediaEdition, manifest: m}
 }
 
 // encryptedInstallerDracutKernels rebuilds every installed kernel's initrd at
@@ -98,7 +100,7 @@ func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginP
 	} else if desktop != "" && len(lab.Session.Desktops[desktop]) == 0 {
 		return nil, fmt.Errorf("encrypted installer: no maintained %s desktop for %s", desktop, media.release.Name)
 	}
-	if lab.Installer != platform.Subiquity && lab.Installer != platform.Anaconda && lab.Installer != platform.DebianInstaller {
+	if lab.Installer != platform.Subiquity && lab.Installer != platform.Anaconda && lab.Installer != platform.DebianInstaller && lab.Installer != platform.AutoYaST && lab.Installer != platform.ArchISO {
 		return nil, fmt.Errorf("encrypted installer: no maintained recipe for %s", media.release.Name)
 	}
 	// Serial unlock is line-oriented. Exclude control characters rather than
@@ -125,6 +127,12 @@ func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginP
 	}
 	if lab.Installer == platform.DebianInstaller {
 		return debianEncryptedInstallerRecipe(media.release, architecture, passphrase, login, hostPrivateKey, host, desktop, tpmBoot)
+	}
+	if lab.Installer == platform.AutoYaST {
+		return tumbleweedInstallerRecipeWithEncryption(media.release, media.manifest.GetVersion(), "/dev/vda", architecture, media.manifest.GetSha256(), login, hostPrivateKey, host, passphrase, desktop, tpmBoot, media.snapshot)
+	}
+	if lab.Installer == platform.ArchISO {
+		return archEncryptedInstallerRecipe(media, architecture, passphrase, login, hostPrivateKey, host, desktop)
 	}
 	provision := encryptedInstallerProvision(login, hostPrivateKey, host)
 	if lab.FirstBootAccount {
@@ -522,6 +530,9 @@ func encryptedInstallerGRUBForMachine(original []byte, installer platform.Instal
 	if !ok {
 		return nil, errors.New("encrypted installer: unsupported installer")
 	}
+	if layout.SystemdBoot {
+		return encryptedInstallerBLS(original, layout.Args+" console=tty0 console="+serialConsole)
+	}
 	args, defaultEntry := layout.Args+" console=tty0 console="+serialConsole, layout.Entry
 	lines := strings.Split(string(original), "\n")
 	kernels := 0
@@ -623,4 +634,40 @@ func encryptedInstallerCommand(ctx context.Context, dir string, files []*os.File
 		return nil, errors.New("encrypted installer: command output exceeded limit")
 	}
 	return out.Bytes(), nil
+}
+
+// encryptedInstallerBLS keeps the vendor kernel/initrd and ISO search identity.
+// Only the local script and serial-console arguments change; multiple options
+// records or an unexpected boot target are rejected before remastering.
+func encryptedInstallerBLS(original []byte, args string) ([]byte, error) {
+	lines := strings.Split(string(original), "\n")
+	options, kernels, initrds := 0, 0, 0
+	for i, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		switch fields[0] {
+		case "linux":
+			if len(fields) != 2 || !strings.HasPrefix(fields[1], "/") {
+				return nil, errors.New("encrypted installer: invalid vendor BLS kernel")
+			}
+			kernels++
+		case "initrd":
+			initrds++
+		case "options":
+			options++
+			kept := fields[:1]
+			for _, field := range fields[1:] {
+				if !strings.HasPrefix(field, "console=") && !strings.HasPrefix(field, "script=") {
+					kept = append(kept, field)
+				}
+			}
+			lines[i] = strings.Join(kept, " ") + " " + args
+		}
+	}
+	if kernels != 1 || initrds == 0 || options != 1 {
+		return nil, errors.New("encrypted installer: vendor BLS entry requires one kernel/options record and an initrd")
+	}
+	return []byte(strings.Join(lines, "\n")), nil
 }

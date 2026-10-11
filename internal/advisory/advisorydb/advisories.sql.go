@@ -202,6 +202,44 @@ func (q *Queries) AdvisoryDeviceVisible(ctx context.Context, arg AdvisoryDeviceV
 	return column_1, err
 }
 
+const advisoryNativeInstances = `-- name: AdvisoryNativeInstances :many
+SELECT manager,version,architecture FROM snapshot_packages
+WHERE snapshot_id=$1 AND name=$2 ORDER BY position LIMIT 1025
+`
+
+type AdvisoryNativeInstancesParams struct {
+	SnapshotID uuid.UUID
+	Name       string
+}
+
+type AdvisoryNativeInstancesRow struct {
+	Manager      string
+	Version      string
+	Architecture string
+}
+
+// Native OVAL predicates bind all installed instances, including installonly
+// versions and secondary architectures. The extra row detects the hard bound.
+func (q *Queries) AdvisoryNativeInstances(ctx context.Context, arg AdvisoryNativeInstancesParams) ([]AdvisoryNativeInstancesRow, error) {
+	rows, err := q.db.Query(ctx, advisoryNativeInstances, arg.SnapshotID, arg.Name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdvisoryNativeInstancesRow{}
+	for rows.Next() {
+		var i AdvisoryNativeInstancesRow
+		if err := rows.Scan(&i.Manager, &i.Version, &i.Architecture); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const advisoryOriginDigest = `-- name: AdvisoryOriginDigest :one
 SELECT sha256(convert_to(coalesce(string_agg(
  concat_ws(',', p.position, p.origin_status, coalesce(l.ordinal, -1), length(l.origin), l.origin,

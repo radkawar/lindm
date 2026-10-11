@@ -15,6 +15,39 @@ var (
 	actionLanes = []Capability{Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}
 )
 
+// RepositorySnapshotRecipes is the trust/source and explicit lane input set for
+// maintained bounded repository captures. Other backends fail closed.
+var RepositorySnapshotRecipes = map[string]RepositorySnapshotRecipe{
+	"opensuse-tumbleweed": {
+		Signer: "AD485664E901B867051AB15F35A2F86E29B700A4",
+		Sources: map[string]string{
+			"x86_64":  "https://download.opensuse.org/history/%s/tumbleweed/repo/oss/",
+			"aarch64": "https://download.opensuse.org/ports/aarch64/tumbleweed/repo/oss/",
+		},
+		Packages: []string{
+			"cloud-init", "cloud-init-config-suse", "openssh-server", "sudo",
+			"cryptsetup", "tpm2.0-tools", "libtss2-esys0", "nftables", "python313",
+			"libpwquality-tools", "libpwquality1", "pam", "pam_pwquality", "pam-config",
+			"dracut", "udev", "patterns-gnome-gnome", "gnome-terminal",
+			"xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire",
+			"gstreamer-plugins-good", "rpm-build", "rpm", "createrepo_c",
+			"gpg2", "openssl", "attr", "acl", "curl", "firewalld", "zypper",
+			"iproute2", "iputils", "bind-utils", "xdg-desktop-portal",
+			"gnome-shell", "mutter", "sdbootutil",
+			"patterns-base-base", "patterns-base-enhanced_base",
+			"nvme-cli", "e2fsprogs", "kmod", "zstd",
+		},
+		ArchitecturePackages: map[string][]string{
+			"aarch64": {"grub2-arm64-efi-bls"},
+			"x86_64":  {"grub2-x86_64-efi-bls"},
+		},
+		SnapshotPackages: map[string]map[string][]string{
+			"20261007": {"aarch64": {"kernel-default=7.2.9-1.1"}},
+			"20261009": {"x86_64": {"kernel-default=7.2.9-1.1"}},
+		},
+	},
+}
+
 const (
 	reasonNoActionRecipe = "no maintained encrypted installer, native action prerequisites or graphical golden"
 	reasonNoPasswordPins = "libpwquality/PAM/manager versions not measured on this release"
@@ -78,8 +111,14 @@ var (
 	dnf5 = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
 	// DNF 4.7.0 is EL 8.10's; older DNF4 lacks the plugin selection, strict
 	// remote-RPM and query APIs the DNF4 adapter relies on.
-	dnf4       = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
-	pacman     = PackageTooling{Backend: BackendPacman}
+	dnf4 = PackageTooling{Backend: BackendDNF4, Minimum: "4.7.0"}
+	// ALA 2026/10/02 pacman-7.1.0.r9.g54d9411-2, SHA256
+	// 2092ec7a0391416e4a1757c455bc071d7b58a124cedc83f582cb7d37d52f211b:
+	// packaged public headers and library filename identify this ABI.
+	// Detached package signature verified against the Arch developer page's
+	// primary fingerprint 02FD1C7A934E614545849F19A6234074498E9CEE.
+	// Native runtime qualification remains a separate matrix receipt.
+	pacman     = PackageTooling{Backend: BackendPacman, ALPM: ALPMABI{Path: "/usr/lib/libalpm.so.16.0.1", SONAME: "libalpm.so.16", Version: "16.0.1"}, ResourceDependencies: []string{"python"}}
 	zypper     = PackageTooling{Backend: BackendZypper}
 	gnomeGDM3  = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
 	gnomeGDM   = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
@@ -480,10 +519,35 @@ var registry = []*Release{
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),
 		Tier: Tier2, Page: "arch.md", Family: FamilyArch, Architectures: x86, Packages: pacman,
-		Desktop:  Desktop{Name: "owner-chosen per record"},
-		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling"},
-		Supports: caps(agentCore, []Capability{Advisories}),
-		Gates:    actionGates(),
+		RollingUpdate:       &RollingUpdateTooling{ArchiveURL: "https://archive.archlinux.org/repos/", Repositories: []string{"core", "extra", "multilib"}},
+		RequalificationDays: 14,
+		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling", Partial: "tracker omits historical and non-repository packages", Exports: map[Feed]AdvisoryExport{
+			FeedArchASA: {URL: "https://security.archlinux.org/issues/all.json", Format: "arch-json", MaxAgeSeconds: 86400},
+		}},
+		Quirks:  Quirks{SystemdFloor: 255, PAMManager: PAMManagerNative, Password: []PasswordPins{{Version: "", Quality: "1.4.5-7", PAM: "1.7.3-1", Manager: "20260616-1"}}},
+		FDE:     "LUKS2; systemd-cryptenroll with mkinitcpio sd-encrypt",
+		Desktop: Desktop{Name: "GNOME Wayland (maintained); owner-chosen bootloader", DisplayManager: "gdm", Lock: "GNOME Shell"},
+		Lab: Lab{
+			Lanes:              []LabLane{LaneUpdates, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
+			ResourcePackages:   []string{"gnupg", "openssl", "python", "attr", "acl", "curl", "libarchive", "zstd", "pacman-contrib", "nftables", "firewalld", "libpwquality", "pam", "pambase"},
+			Installer:          ArchISO,
+			OfflineRTCWaitUnit: "systemd-time-wait-sync.service",
+			InstallerPackages:  []string{"base", "linux", "linux-firmware", "mkinitcpio", "cryptsetup", "systemd", "tpm2-tss", "tpm2-tools", "openssh", "sudo", "networkmanager", "grub", "dosfstools"},
+			Session: LabSession{
+				Desktops:  map[string][]string{"gnome": {"gnome-shell", "gdm", "gnome-session", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gst-plugin-pipewire", "gst-plugins-good"}},
+				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
+				Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "gnome-shell", "mutter"},
+			},
+			Guest: LabGuest{
+				Kernel: "/boot/vmlinuz-linux", Initrd: "/boot/initramfs-linux.img",
+				Actions:      []string{"cryptsetup", "tpm2-tools", "tpm2-tss", "nftables", "iproute2", "iputils", "bind", "curl", "python", "libpwquality"},
+				OwnedBoot:    []string{"systemd", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+				MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
+			},
+		},
+		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
+		Gates: without(gates(string(RecoverySanitize), "official Arch media have no vendor Secure Boot trust; owner-key recovery and chosen bootloader require native qualification",
+			string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
 	},
 	{
 		Key: "omarchy-4.0.4", Name: "Omarchy 4.0.4", Distribution: "Omarchy", ID: "omarchy", Version: Exact("4.0.4"),
@@ -511,11 +575,38 @@ var registry = []*Release{
 	{
 		Key: "opensuse-tumbleweed", Name: "openSUSE Tumbleweed", Distribution: "openSUSE Tumbleweed", ID: "opensuse-tumbleweed", Version: Snapshot(),
 		Tier: Tier2, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
-		Desktop:  Desktop{Name: "KDE Plasma/GNOME"},
-		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse"},
-		Lab:      Lab{Installer: AutoYaST},
-		Supports: caps(agentCore, []Capability{Advisories}),
-		Gates:    actionGates(),
+		RollingUpdate:       &RollingUpdateTooling{ArchiveURL: "https://download.opensuse.org/history/", SnapshotCPEPrefix: "cpe:/o:opensuse:opensuse:"},
+		RequalificationDays: 14,
+		Advisory: Advisory{Feeds: []Feed{FeedSUSEOVAL, FeedSUSECSAF}, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse", OVALPlatform: "openSUSE Tumbleweed", OVALReleasePackage: "openSUSE-release", Partial: "vendor package assessments do not cover all rolling or third-party packages", Exports: map[Feed]AdvisoryExport{
+			FeedSUSEOVAL: {URL: "https://ftp.suse.com/pub/projects/security/oval/opensuse.tumbleweed.xml.gz", Format: "suse-oval", MaxAgeSeconds: 604800, MaxArchiveBytes: 67108864},
+		}},
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig, Password: []PasswordPins{
+			{Version: "20261007", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
+			{Version: "20261009", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
+		}},
+		FDE:     "LUKS2 (AutoYaST); systemd-cryptenroll with dracut",
+		Desktop: Desktop{Name: "GNOME Wayland (maintained); KDE separately qualified", DisplayManager: "gdm", Lock: "GNOME Shell"},
+		Lab: Lab{
+			Lanes:            []LabLane{LaneUpdates, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
+			ResourcePackages: []string{"rpm-build", "rpm", "createrepo_c", "gpg2", "openssl", "python313", "attr", "acl", "curl", "nftables", "firewalld", "pam_pwquality", "libpwquality1", "libpwquality-tools", "pam", "pam-config"},
+			Installer:        AutoYaST,
+			// YaST's NetworkManager readiness check executes /bin/ip, while
+			// NetworkManager only recommends iproute2. The offline bootstrap
+			// deliberately disables recommends, so this is a required input.
+			InstallerPackages: []string{"rpm", "zypper", "iproute2"},
+			TPM:               LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "udev", "tpm2.0-tools", "libtss2-esys0"}},
+			Session: LabSession{
+				Desktops:  map[string][]string{"gnome": {"patterns-gnome-gnome", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good"}},
+				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
+				Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good", "gnome-shell", "mutter"},
+			},
+			Guest: LabGuest{Initrd: "/boot/initrd-%s",
+				Actions: []string{"cryptsetup", "udev", "tpm2.0-tools", "libtss2-esys0", "nftables", "iproute2", "iputils", "bind-utils", "curl", "python313", "libpwquality-tools"},
+			},
+		},
+		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
+		Gates: without(gates(string(RecoverySanitize), "grub2-bls ESP topology: measured-GRUB one-shot/staging unimplemented; no Tumbleweed PCR 8/9 proof",
+			string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
 	},
 	{
 		Key: "opensuse-leap-16.0", Name: "openSUSE Leap 16.0", Distribution: "openSUSE Leap", ID: "opensuse-leap", Version: Exact("16.0"),

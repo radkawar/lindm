@@ -77,21 +77,21 @@ registry (`internal/platform`, `make generate`); the live per-capability matrix 
 
 <!-- BEGIN GENERATED platform-tiers -->
 
-| Tier   | Distribution        | Releases                        | Desktop edition                | Architectures   | Platform page                             |
-| ------ | ------------------- | ------------------------------- | ------------------------------ | --------------- | ----------------------------------------- |
-| 1      | Ubuntu              | 22.04 LTS, 24.04 LTS, 26.04 LTS | GNOME                          | x86_64, aarch64 | [ubuntu](platforms/ubuntu.md)             |
-| 1      | Debian              | 12, 13                          | GNOME/KDE                      | x86_64, aarch64 | [debian](platforms/debian.md)             |
-| 1      | Fedora              | 43, 44                          | Workstation GNOME; KDE edition | x86_64, aarch64 | [fedora](platforms/fedora.md)             |
-| 1      | RHEL                | 9, 10                           | GNOME                          | x86_64, aarch64 | [rhel](platforms/rhel.md)                 |
-| 1      | Rocky Linux         | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
-| 1      | AlmaLinux           | 9, 10                           | GNOME                          | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
-| 1      | Linux Mint          | 22.3                            | Cinnamon                       | x86_64          | [mint](platforms/mint.md)                 |
-| 1      | Pop!\_OS            | 24.04 LTS                       | COSMIC                         | x86_64          | [popos](platforms/popos.md)               |
-| 2      | Arch Linux          | rolling                         | owner-chosen per record        | x86_64          | [arch](platforms/arch.md)                 |
-| 2      | Omarchy             | 4.0.4                           | Hyprland                       | x86_64          | [omarchy](platforms/omarchy.md)           |
-| 2      | openSUSE Tumbleweed | pinned snapshot                 | KDE Plasma/GNOME               | x86_64, aarch64 | [opensuse](platforms/opensuse.md)         |
-| Future | Fedora Atomic       | Silverblue/Kinoite              | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
-| Future | NixOS               | any                             | —                              | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+| Tier   | Distribution        | Releases                        | Desktop edition                                      | Architectures   | Platform page                             |
+| ------ | ------------------- | ------------------------------- | ---------------------------------------------------- | --------------- | ----------------------------------------- |
+| 1      | Ubuntu              | 22.04 LTS, 24.04 LTS, 26.04 LTS | GNOME                                                | x86_64, aarch64 | [ubuntu](platforms/ubuntu.md)             |
+| 1      | Debian              | 12, 13                          | GNOME/KDE                                            | x86_64, aarch64 | [debian](platforms/debian.md)             |
+| 1      | Fedora              | 43, 44                          | Workstation GNOME; KDE edition                       | x86_64, aarch64 | [fedora](platforms/fedora.md)             |
+| 1      | RHEL                | 9, 10                           | GNOME                                                | x86_64, aarch64 | [rhel](platforms/rhel.md)                 |
+| 1      | Rocky Linux         | 9, 10                           | GNOME                                                | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | AlmaLinux           | 9, 10                           | GNOME                                                | x86_64, aarch64 | [alma-rocky](platforms/alma-rocky.md)     |
+| 1      | Linux Mint          | 22.3                            | Cinnamon                                             | x86_64          | [mint](platforms/mint.md)                 |
+| 1      | Pop!\_OS            | 24.04 LTS                       | COSMIC                                               | x86_64          | [popos](platforms/popos.md)               |
+| 2      | Arch Linux          | rolling                         | GNOME Wayland (maintained); owner-chosen bootloader  | x86_64          | [arch](platforms/arch.md)                 |
+| 2      | Omarchy             | 4.0.4                           | Hyprland                                             | x86_64          | [omarchy](platforms/omarchy.md)           |
+| 2      | openSUSE Tumbleweed | pinned snapshot                 | GNOME Wayland (maintained); KDE separately qualified | x86_64, aarch64 | [opensuse](platforms/opensuse.md)         |
+| Future | Fedora Atomic       | Silverblue/Kinoite              | —                                                    | —               | [atomic-nixos](platforms/atomic-nixos.md) |
+| Future | NixOS               | any                             | —                                                    | —               | [atomic-nixos](platforms/atomic-nixos.md) |
 
 <!-- END GENERATED platform-tiers -->
 

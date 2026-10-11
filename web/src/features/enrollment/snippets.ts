@@ -353,7 +353,10 @@ if ! grep -qxF 'Include = /etc/pacman.d/lindm.conf' /etc/pacman.conf; then
 fi
 # Refresh only the server repository, not distribution databases.
 printf '%s\\n' '[options]' 'Architecture = auto' 'SigLevel = PackageRequired DatabaseRequired TrustedOnly' ${shellQuote(archConfig)} > "$work/pacman.conf"
-pacman --config "$work/pacman.conf" --sync --refresh --noconfirm ${shellQuote(`${name}/lindm-agent`)}${trust}`;
+pacman --config "$work/pacman.conf" --sync --refresh --noconfirm
+# Resolve native dependencies from existing distribution databases without
+# refreshing them or hiding them behind the server-only refresh configuration.
+pacman --sync --noconfirm ${shellQuote(`${name}/lindm-agent`)}${trust}`;
   }
   const config = `[lindm]
 name=Lindm

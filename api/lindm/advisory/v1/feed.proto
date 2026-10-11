@@ -19,6 +19,7 @@ enum FeedFormat {
   FEED_FORMAT_ARCH_JSON = 7;
   FEED_FORMAT_DEBIAN_TRACKER_JSON = 8;
   FEED_FORMAT_REDHAT_CSAF_ARCHIVES = 9;
+  FEED_FORMAT_SUSE_OVAL = 10;
 }
 
 message FeedSource {
@@ -30,7 +31,7 @@ message FeedSource {
   option (buf.validate.message).cel = {
     id: "feed_source.format"
     message: "format must belong to the selected vendor ecosystem"
-    expression: "(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian')"
+    expression: "(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian') || (this.format == 10 && this.distro == 'opensuse-tumbleweed')"
   };
   option (buf.validate.message).cel = {
     id: "feed_source.platform_stream"
@@ -152,6 +153,28 @@ message Advisory {
   string platform_stream = 15 [(buf.validate.field).string.max_len = 128];
   string module_name = 16 [(buf.validate.field).string.max_len = 128];
   string module_stream = 17 [(buf.validate.field).string.max_len = 128];
+  // Native installed-product prerequisite, evaluated against the same snapshot.
+  string prerequisite_package = 19 [(buf.validate.field).string.max_len = 512];
+  string prerequisite_min_version = 20 [(buf.validate.field).string.max_len = 2048];
+  // OVAL check=all applies to every installed instance of package_name,
+  // including other architectures; it is not a per-row vulnerability claim.
+  bool all_installed_instances = 21;
+  // The complete architecture disjunction of a native all-instances test.
+  repeated string instance_architectures = 22 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "advisory.prerequisite"
+    message: "native prerequisite requires both package and minimum version"
+    expression: "(this.prerequisite_package == '') == (this.prerequisite_min_version == '')"
+  };
   option (buf.validate.message).cel = {
     id: "advisory.assessment"
     message: "an advisory cannot be both unknown and explicitly not affected"
@@ -167,7 +190,7 @@ message FeedDocument {
   // False for single OSV documents; absence must then remain UNKNOWN.
   bool complete_snapshot = 3;
   repeated FeedArtifact artifacts = 4;
-  // Verified vendor snapshot signing time, where available; bounds freshness.
+  // Authenticated vendor signing time or conservative generation-time bound.
   google.protobuf.Timestamp snapshot_at = 5;
   repeated RejectedRecord rejected_records = 6;
 }

@@ -22,14 +22,39 @@ func pinnedVersions(p *resourcev1.PlatformProduct) (platform.PasswordPins, bool)
 	return release.PasswordPins(p.GetVersion())
 }
 
-// authselectProduct reports products whose PAM stacks authselect owns; the
-// other qualified products use Debian's pam-auth-update.
+// authselectProduct reports products whose PAM stacks authselect owns.
 func authselectProduct(p *resourcev1.PlatformProduct) bool {
 	return platform.Of(p).Native().Quirks.PAMManager == platform.PAMManagerAuthselect
 }
+func nativePAMProduct(p *resourcev1.PlatformProduct) bool {
+	return platform.Of(p).Native().Quirks.PAMManager == platform.PAMManagerNative
+}
+func pamConfigProduct(p *resourcev1.PlatformProduct) bool {
+	return platform.Of(p).Native().Quirks.PAMManager == platform.PAMManagerPamConfig
+}
+func passwordBackend(p *resourcev1.PlatformProduct) resourcev1.Backend {
+	switch platform.Of(p).Native().Quirks.PAMManager {
+	case platform.PAMManagerAuthselect:
+		return resourcev1.Backend_BACKEND_AUTHSELECT
+	case platform.PAMManagerPamAuthUpdate:
+		return resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE
+	case platform.PAMManagerPamConfig:
+		return resourcev1.Backend_BACKEND_PAM_CONFIG
+	case platform.PAMManagerNative:
+		return resourcev1.Backend_BACKEND_NATIVE_PAM
+	default:
+		return resourcev1.Backend_BACKEND_UNSPECIFIED
+	}
+}
 
 func modulePackageName(platform *resourcev1.PlatformProduct, feature agentv1.PasswordNativeFeature) string {
-	if authselectProduct(platform) {
+	if pamConfigProduct(platform) {
+		if feature == 1 {
+			return "pam_pwquality"
+		}
+		return "pam"
+	}
+	if authselectProduct(platform) || nativePAMProduct(platform) {
 		if feature == 1 {
 			return "libpwquality"
 		}
@@ -40,30 +65,43 @@ func modulePackageName(platform *resourcev1.PlatformProduct, feature agentv1.Pas
 	}
 	return "libpam-modules"
 }
-func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, name string, run commandRunner) (string, error) {
+func packageVersion(ctx context.Context, product *resourcev1.PlatformProduct, name string, run commandRunner) (string, error) {
 	switch name {
-	case "authselect", "pam", "libpwquality", "libpam-runtime", "libpam-modules", "libpam-pwquality":
+	case "authselect", "pam", "libpwquality", "libpwquality1", "libpam-runtime", "libpam-modules", "libpam-pwquality", "pam-config", "pam_pwquality", "pambase":
 	default:
 		return "", ErrUnsupported
 	}
 	var output []byte
 	var err error
-	if authselectProduct(platform) {
-		output, err = run(ctx, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}\n", name+"."+nativePackageArchitecture(platform))
-	} else {
+	db := platform.Of(product).Native().Packages.Backend.PackageDB()
+	switch db {
+	case platform.PackageDBRPM:
+		output, err = run(ctx, "/usr/bin/rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}\n", name+"."+nativePackageArchitecture(product))
+	case platform.PackageDBPacman:
+		output, err = run(ctx, "/usr/bin/pacman", "-Q", name)
+	case platform.PackageDBDpkg:
 		query := name
 		if name != "libpam-runtime" {
-			query += ":" + nativePackageArchitecture(platform)
+			query += ":" + nativePackageArchitecture(product)
 		}
 		output, err = run(ctx, "/usr/bin/dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Version}\n", query)
+	default:
+		return "", ErrUnsupported
 	}
 	if err != nil {
 		return "", err
 	}
 	version := strings.TrimSuffix(string(output), "\n")
-	if !authselectProduct(platform) {
+	if db == platform.PackageDBDpkg {
 		status, value, ok := strings.Cut(version, "\t")
 		if !ok || (status != "ii " && status != "hi ") {
+			return "", ErrUnsupported
+		}
+		version = value
+	}
+	if db == platform.PackageDBPacman {
+		packageName, value, ok := strings.Cut(version, " ")
+		if !ok || packageName != name {
 			return "", ErrUnsupported
 		}
 		version = value
@@ -90,6 +128,14 @@ func moduleVersionSupported(platform *resourcev1.PlatformProduct, feature agentv
 	if !ok || feature < 1 || feature > 3 {
 		return false
 	}
+	// Rolling snapshots pin the complete native package release, not just
+	// an upstream version shared by differently patched distribution builds.
+	if nativePAMProduct(platform) || pamConfigProduct(platform) {
+		if feature == 1 {
+			return version == pinned.Quality
+		}
+		return version == pinned.PAM
+	}
 	if feature == 1 {
 		return upstreamVersion(version) == pinned.Quality
 	}
@@ -100,15 +146,24 @@ func managerVersion(ctx context.Context, platform *resourcev1.PlatformProduct, r
 	if !ok {
 		return "", ErrUnsupported
 	}
-	name := "authselect"
-	if !authselectProduct(platform) {
-		name = "libpam-runtime"
+	name := "libpam-runtime"
+	switch passwordBackend(platform) {
+	case resourcev1.Backend_BACKEND_AUTHSELECT:
+		name = "authselect"
+	case resourcev1.Backend_BACKEND_NATIVE_PAM:
+		name = "pambase"
+	case resourcev1.Backend_BACKEND_PAM_CONFIG:
+		name = "pam-config"
 	}
 	version, err := packageVersion(ctx, platform, name, run)
 	if err != nil {
 		return "", err
 	}
-	if upstreamVersion(version) != pinned.Manager {
+	matches := upstreamVersion(version) == pinned.Manager
+	if nativePAMProduct(platform) || pamConfigProduct(platform) {
+		matches = version == pinned.Manager
+	}
+	if !matches {
 		return "", fmt.Errorf("%w: unsupported PAM manager %s version", ErrUnsupported, name)
 	}
 	return version, nil

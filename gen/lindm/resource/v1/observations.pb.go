@@ -268,6 +268,10 @@ const (
 	OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC OSUpdateBackend = 2
 	// dnf-automatic(8) on DNF4.
 	OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC OSUpdateBackend = 3
+	// A dated Arch Linux Archive whole-system pacman transaction.
+	OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN OSUpdateBackend = 4
+	// A pinned Tumbleweed repository distribution upgrade.
+	OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER OSUpdateBackend = 5
 )
 
 // Enum value maps for OSUpdateBackend.
@@ -277,12 +281,16 @@ var (
 		1: "OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES",
 		2: "OS_UPDATE_BACKEND_DNF5_AUTOMATIC",
 		3: "OS_UPDATE_BACKEND_DNF4_AUTOMATIC",
+		4: "OS_UPDATE_BACKEND_PACMAN",
+		5: "OS_UPDATE_BACKEND_ZYPPER",
 	}
 	OSUpdateBackend_value = map[string]int32{
 		"OS_UPDATE_BACKEND_UNSPECIFIED":             0,
 		"OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES": 1,
 		"OS_UPDATE_BACKEND_DNF5_AUTOMATIC":          2,
 		"OS_UPDATE_BACKEND_DNF4_AUTOMATIC":          3,
+		"OS_UPDATE_BACKEND_PACMAN":                  4,
+		"OS_UPDATE_BACKEND_ZYPPER":                  5,
 	}
 )
 
@@ -5149,12 +5157,14 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\x19REPOSITORY_ECOSYSTEM_ALPM\x10\x03\x12 \n" +
 	"\x1cREPOSITORY_ECOSYSTEM_FLATPAK\x10\x04\x12\x1c\n" +
 	"\x18REPOSITORY_ECOSYSTEM_NIX\x10\x05\x12\x1f\n" +
-	"\x1bREPOSITORY_ECOSYSTEM_OSTREE\x10\x06*\xaf\x01\n" +
+	"\x1bREPOSITORY_ECOSYSTEM_OSTREE\x10\x06*\xeb\x01\n" +
 	"\x0fOSUpdateBackend\x12!\n" +
 	"\x1dOS_UPDATE_BACKEND_UNSPECIFIED\x10\x00\x12-\n" +
 	")OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES\x10\x01\x12$\n" +
 	" OS_UPDATE_BACKEND_DNF5_AUTOMATIC\x10\x02\x12$\n" +
-	" OS_UPDATE_BACKEND_DNF4_AUTOMATIC\x10\x03*\xf7\x01\n" +
+	" OS_UPDATE_BACKEND_DNF4_AUTOMATIC\x10\x03\x12\x1c\n" +
+	"\x18OS_UPDATE_BACKEND_PACMAN\x10\x04\x12\x1c\n" +
+	"\x18OS_UPDATE_BACKEND_ZYPPER\x10\x05*\xf7\x01\n" +
 	"\x12OSUpdateNativeFile\x12%\n" +
 	"!OS_UPDATE_NATIVE_FILE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cOS_UPDATE_NATIVE_FILE_POLICY\x10\x01\x12\x1f\n" +
