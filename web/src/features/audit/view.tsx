@@ -24,6 +24,10 @@ import { auditQueryOptions } from "./queries";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
 
+const ACTION_LABELS: Record<string, string> = {
+  "device_action.escrow_receipt": "Recovery secret storage confirmed",
+};
+
 export function AuditView({
   pageSize,
   pageToken,
@@ -110,11 +114,11 @@ export function AuditView({
                   </TableCell>
                   <TableCell>
                     {event.action.trim()
-                      ? // Recorded codes such as "device.agent_update.reported" read as text.
+                      ? (ACTION_LABELS[event.action.trim()] ??
                         event.action
                           .trim()
                           .replace(/[._]+/g, " ")
-                          .replace(/^./, (first) => first.toUpperCase())
+                          .replace(/^./, (first) => first.toUpperCase()))
                       : "Not recorded"}
                   </TableCell>
                   <TableCell>

@@ -154,6 +154,9 @@ patterns are in [`web/acceptance/copy-rules.json`](../web/acceptance/copy-rules.
 `lab console review` enforces them. Identifiers, sequences, hashes, protocol
 values and server/device clock distinctions live only in a collapsed `TechnicalDetails`
 disclosure (or `RpcError` "Details for support"), with values selectable for copy.
+Audit action captions translate the recorded event's meaning, not just its
+punctuation: `device_action.escrow_receipt` reads **Recovery secret storage confirmed**.
+Keep the original action code in `TechnicalDetails`, not in the primary caption.
 Exceptions are values the operator must type or copy to act, such as a shown-once
 secret or a confirmation ID. Title records by name: devices use the hostname and fall
 back to "Unnamed device"; lifecycle states read Waiting to enroll, Enrolled, Revoked
