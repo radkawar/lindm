@@ -110,6 +110,73 @@ message PreviewTargetAssignmentsRequest {
 message PreviewTargetAssignmentsResponse {
   lindm.policy.v1.TargetPreview preview = 1;
 }
+
+// A proposed assignment is evaluated without saving or activating it. The first
+// call creates a short-lived, actor-bound report; subsequent calls page its exact
+// rows. At most 10,000 candidate devices and 64 MiB of rows are retained. Counts
+// are lower bounds when complete is false; incomplete reports cannot be saved.
+message PreviewTargetAssignmentImpactRequest {
+  lindm.policy.v1.TargetAssignment assignment = 1 [(buf.validate.field).required = true];
+  uint64 expected_revision = 2 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  uint32 page_size = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 20
+  }];
+  optional string preview_id = 4 [(buf.validate.field).string.uuid = true];
+  optional string after_device_id = 5 [(buf.validate.field).string.uuid = true];
+  option (buf.validate.message).cel = {
+    id: "impact.cursor"
+    message: "a cursor requires a retained report"
+    expression: "!has(this.after_device_id) || has(this.preview_id)"
+  };
+}
+message TargetAssignmentDeviceImpact {
+  string device_id = 1;
+  string hostname = 2;
+  string os_id = 3;
+  string os_version = 4;
+  string architecture = 5;
+  string state = 6;
+  google.protobuf.Timestamp host_received_at = 7;
+  lindm.policy.v1.TargetMatch match = 8;
+  // Current effective server resource head, not native observation/proof.
+  lindm.policy.v1.TargetResolution current_resolution = 9;
+  // Canonical resolution after replacing this assignment in the saved catalog.
+  lindm.policy.v1.TargetResolution proposed_resolution = 10;
+  bool changed = 11;
+  repeated string reasons = 12;
+}
+message PreviewTargetAssignmentImpactResponse {
+  string preview_id = 1;
+  lindm.policy.v1.TargetAssignment assignment = 2;
+  uint64 expected_revision = 3;
+  google.protobuf.Timestamp evaluated_at = 4;
+  google.protobuf.Timestamp valid_until = 5;
+  repeated TargetAssignmentDeviceImpact devices = 6;
+  uint32 evaluated_device_count = 7;
+  uint32 target_count = 8;
+  uint32 included_count = 9;
+  uint32 excluded_count = 10;
+  uint32 unknown_count = 11;
+  bool complete = 12;
+  optional string next_after_device_id = 13;
+  bytes review_sha256 = 14;
+  uint32 candidate_count = 15;
+  repeated string reasons = 16;
+}
+// This operation saves only the exact reviewed assignment. Activation remains
+// the separate, approved ActivateTargetPreview operation. Legacy Put is unchanged.
+message SaveTargetAssignmentImpactRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string preview_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes review_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  lindm.policy.v1.TargetAssignment assignment = 4 [(buf.validate.field).required = true];
+  uint64 expected_revision = 5 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message SaveTargetAssignmentImpactResponse {
+  lindm.policy.v1.TargetCandidate assignment = 1;
+}
 message ActivateTargetPreviewRequest {
   string request_id = 1 [(buf.validate.field).string.uuid = true];
   string preview_id = 2 [(buf.validate.field).string.uuid = true];

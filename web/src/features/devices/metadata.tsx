@@ -33,7 +33,7 @@ export function DeviceMetadataCard({
 }: {
   deviceId: string;
   metadata: DeviceMetadata | undefined;
-  accountPicker?: PickerSlot;
+  accountPicker: PickerSlot;
 }) {
   const principal = usePrincipal();
   const [editing, setEditing] = useState<DeviceMetadata | null>(null);
@@ -110,7 +110,7 @@ function MetadataForm({
   deviceId: string;
   metadata: DeviceMetadata;
   onClose: () => void;
-  accountPicker?: PickerSlot;
+  accountPicker: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -211,16 +211,12 @@ function MetadataForm({
           />
         </div>
         {ownerKind === "ownerPrincipalId" ? (
-          accountPicker ? (
-            accountPicker({
-              label: "Owner account",
-              value: ownerPrincipalId,
-              onChange: setOwnerPrincipalId,
-              disabled: captured !== null,
-            })
-          ) : (
-            <p role="status">Account selection is unavailable.</p>
-          )
+          accountPicker({
+            label: "Owner account",
+            value: ownerPrincipalId,
+            onChange: setOwnerPrincipalId,
+            disabled: captured !== null,
+          })
         ) : ownerKind === "ownerText" ? (
           <div className="grid gap-1.5">
             <Label htmlFor="metadata-owner">Owner name</Label>
@@ -268,14 +264,7 @@ function MetadataForm({
       ) : null}
       {mutation.isSuccess ? <p role="status">Saved.</p> : null}
       <div className="flex gap-2">
-        <Button
-          type="submit"
-          disabled={
-            mutation.isPending ||
-            mutation.isSuccess ||
-            (!captured && ownerKind === "ownerPrincipalId" && !accountPicker)
-          }
-        >
+        <Button type="submit" disabled={mutation.isPending || mutation.isSuccess}>
           {mutation.isPending ? "Saving…" : captured ? "Retry" : "Save"}
         </Button>
         <Button

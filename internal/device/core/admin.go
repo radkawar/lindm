@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditfilter"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 )
@@ -248,29 +249,41 @@ func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1
 func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[adminv1.ListAuditEventsRequest]) (*connect.Response[adminv1.ListAuditEventsResponse], error) {
 	ctx, cancel := Bound(ctx)
 	defer cancel()
-	if _, err := s.RequireUnrestricted(ctx, identity.PermissionReadAudit); err != nil {
+	actor, err := s.RequireUnrestricted(ctx, identity.PermissionReadAudit)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.Acquire(ctx); err != nil {
 		return nil, MapErr(err)
 	}
 	defer s.Release()
-	if req.Msg == nil {
+	if req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
+		return nil, Invalid("invalid_argument")
+	}
+	selection, err := auditfilter.Normalize(req.Msg.GetFilter())
+	if err != nil {
 		return nil, Invalid("invalid_argument")
 	}
 	limit := PageLimit(req.Msg.GetPageSize())
 	q := devicedb.New(s.Pool)
-	params := devicedb.ListAuditEventsParams{RowLimit: limit + 1}
+	params := devicedb.ListAuditEventsParams{
+		RowLimit: limit + 1, ActorID: selection.ActorID, TargetDeviceID: selection.TargetDeviceID,
+		ActionCategory: int16(selection.Filter.GetActionCategory()),
+		OccurredFrom:   selection.OccurredFrom, OccurredUntil: selection.OccurredUntil,
+	}
 	if req.Msg.GetPageToken() != "" {
-		var when time.Time
-		var id uuid.UUID
-		var err error
-		when, id, err = DecodeCursor(req.Msg.GetPageToken())
+		cursor, err := decodeAuditCursor(req.Msg.GetPageToken(), actor.ID, selection.Digest)
+		if err != nil {
+			return nil, err
+		}
+		params.SnapshotSequence = cursor.Snapshot
+		params.CursorOccurredAt = Timestamptz(cursor.Occurred)
+		params.CursorID = &cursor.ID
+	} else {
+		params.SnapshotSequence, err = q.GetAuditSnapshot(ctx)
 		if err != nil {
 			return nil, MapErr(err)
 		}
-		params.CursorOccurredAt = Timestamptz(when)
-		params.CursorID = &id
 	}
 	rows, err := q.ListAuditEvents(ctx, params)
 	if err != nil {
@@ -282,11 +295,7 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 		if !ok {
 			return nil, ErrInternalState
 		}
-		token, err := EncodeCursor(occurred, rows[limit-1].ID)
-		if err != nil {
-			return nil, MapErr(err)
-		}
-		next = token
+		next = encodeAuditCursor(auditCursor{Snapshot: params.SnapshotSequence, Occurred: occurred, ID: rows[limit-1].ID}, actor.ID, selection.Digest)
 		rows = rows[:limit]
 	}
 	events := make([]*adminv1.AuditEvent, 0, len(rows))
@@ -304,15 +313,16 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 			targetDeviceID = new(row.TargetDeviceID.String())
 		}
 		events = append(events, &adminv1.AuditEvent{
-			Id:             row.ID.String(),
-			OccurredAt:     timestamppb.New(occurred),
-			ActorId:        GenerationString(row.ActorID),
-			Action:         row.Action,
-			ResourceId:     row.ResourceID,
-			Reason:         row.Reason,
-			TargetDeviceId: targetDeviceID,
-			DeviceHostname: row.DeviceHostname,
-			Details:        details,
+			Id:               row.ID.String(),
+			OccurredAt:       timestamppb.New(occurred),
+			ActorId:          GenerationString(row.ActorID),
+			ActorDisplayName: row.ActorDisplayName,
+			Action:           row.Action,
+			ResourceId:       row.ResourceID,
+			Reason:           row.Reason,
+			TargetDeviceId:   targetDeviceID,
+			DeviceHostname:   row.DeviceHostname,
+			Details:          details,
 		})
 	}
 	return connect.NewResponse(&adminv1.ListAuditEventsResponse{Events: events, NextPageToken: next}), nil

@@ -78,6 +78,7 @@ type evaluation struct {
 	input          inputs
 	metadata       *adminv1.DeviceMetadata
 	now, timeLimit time.Time
+	catalog        *impactCatalog
 }
 
 func loadEvaluation(ctx context.Context, q *targetingdb.Queries, p identity.Principal, perm identity.Permission, id uuid.UUID) (*evaluation, error) {
@@ -104,11 +105,15 @@ func loadInput(ctx context.Context, q *targetingdb.Queries, id uuid.UUID, u bool
 	if err != nil {
 		return nil, err
 	}
+	return evaluationFromDevice(q, d, now.Time)
+}
+
+func evaluationFromDevice(q *targetingdb.Queries, d targetingdb.TargetingDeviceRow, now time.Time) (*evaluation, error) {
 	m := new(adminv1.DeviceMetadata)
 	if err := protojson.Unmarshal(d.Metadata, m); err != nil {
 		return nil, err
 	}
-	return &evaluation{q: q, input: inputs{Device: d, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}, metadata: m, now: now.Time, timeLimit: now.Time.Add(15 * time.Minute)}, nil
+	return &evaluation{q: q, input: inputs{Device: d, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}, metadata: m, now: now, timeLimit: now.Add(15 * time.Minute)}, nil
 }
 func (e *evaluation) limit(t time.Time) {
 	if t.After(e.now) && t.Before(e.timeLimit) {
@@ -129,18 +134,15 @@ func (e *evaluation) target(ctx context.Context, t *policyv1.TargetRef) (policyv
 	if g, ok := e.input.Groups["dynamic:"+id]; ok {
 		return g.Match, nil
 	}
-	row, err := e.q.GetDynamicGroup(ctx, uuid.MustParse(id))
+	row, err := e.dynamicGroup(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return unknown, nil
 	}
 	if err != nil {
 		return unknown, err
 	}
-	g := new(adminv1.DynamicTargetGroup)
-	if err := proto.Unmarshal(row.Definition, g); err != nil {
-		return unknown, err
-	}
-	if err := validateExpression(g.Expression); err != nil {
+	g, err := e.decodeDynamicGroup(id, row.Definition)
+	if err != nil {
 		return unknown, err
 	}
 	usesLastSeen := false
@@ -152,7 +154,7 @@ func (e *evaluation) target(ctx context.Context, t *policyv1.TargetRef) (policyv
 			usesLastSeen = true
 		}
 	}
-	definitions, valid, err := expressionDefinitions(ctx, e.q, g.Expression)
+	definitions, valid, err := e.groupDefinitions(ctx, id, g.Expression)
 	if err != nil {
 		return unknown, err
 	}
@@ -188,72 +190,20 @@ func (s *Store) collect(ctx context.Context, e *evaluation) error {
 			if err := proto.Unmarshal(row.Definition, a); err != nil {
 				return err
 			}
-			item := *e
-			item.input = inputs{Device: e.input.Device, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}
-			match, err := item.target(ctx, a.Target)
+			item, candidate, err := s.matchAssignment(ctx, e, a, uint64(row.Revision), row.ActorID.String())
 			if err != nil {
 				return err
 			}
-			for _, x := range a.Exclusions {
-				m, err := item.target(ctx, x)
-				if err != nil {
-					return err
-				}
-				if m == included {
-					match = excluded
-					break
-				}
-				if m == unknown && match == included {
-					match = unknown
-				}
-			}
-			if a.ActivatesAt != nil {
-				item.limit(a.ActivatesAt.AsTime())
-				if item.now.Before(a.ActivatesAt.AsTime()) {
-					match = excluded
-				}
-			}
-			if a.ExpiresAt != nil {
-				item.limit(a.ExpiresAt.AsTime())
-				if !item.now.Before(a.ExpiresAt.AsTime()) {
-					match = excluded
-				}
-			}
-			if a.Disabled {
-				match = excluded
-			}
-			if a.RolloutId != nil {
-				state, err := item.q.GetRollout(ctx, uuid.MustParse(*a.RolloutId))
-				if err != nil {
-					return err
-				}
-				item.input.Rollouts[*a.RolloutId] = &rolloutInput{Revision: state.Revision, RingIndex: state.RingIndex, Paused: state.Paused}
-				if match != excluded {
-					if state.Paused {
-						match = unknown
-					} else {
-						m, err := item.q.GetRolloutMember(ctx, targetingdb.GetRolloutMemberParams{RolloutID: uuid.MustParse(*a.RolloutId), RingIndex: state.RingIndex, DeviceID: item.input.Device.ID})
-						if errors.Is(err, pgx.ErrNoRows) {
-							match = excluded
-						} else if err != nil {
-							return err
-						} else if m != int16(included) {
-							match = excluded
-						}
-					}
-				}
-			}
-			candidate := &policyv1.TargetCandidate{Assignment: a, Revision: uint64(row.Revision), ActorId: row.ActorID.String(), Match: match}
 			// Stream fixed-size entry digests, including excluded definitions, without
 			// loading the fleet-wide assignment catalog into the device preview.
 			item.input.Assignments = []*policyv1.TargetCandidate{candidate}
-			entry, err := inputDigest(&item)
+			entry, err := inputDigest(item)
 			if err != nil {
 				return err
 			}
 			_, _ = catalog.Write(entry)
 			e.limit(item.timeLimit)
-			if match != excluded {
+			if candidate.Match != excluded {
 				e.input.Assignments = append(e.input.Assignments, candidate)
 				if len(e.input.Assignments) > 128 {
 					return ErrCapacity
@@ -282,6 +232,69 @@ func (s *Store) collect(ctx context.Context, e *evaluation) error {
 		return strings.Compare(a.Assignment.AssignmentId, b.Assignment.AssignmentId)
 	})
 	return nil
+}
+
+// matchAssignment is shared by saved-state activation previews and proposed
+// assignment reports. Exclusions, windows and frozen rollout admission must not
+// acquire a second interpretation in the proposed-assignment path.
+func (s *Store) matchAssignment(ctx context.Context, e *evaluation, a *policyv1.TargetAssignment, revision uint64, actor string) (*evaluation, *policyv1.TargetCandidate, error) {
+	item := *e
+	item.input = inputs{Device: e.input.Device, Groups: make(map[string]groupInput), Rollouts: make(map[string]*rolloutInput)}
+	match, err := item.target(ctx, a.Target)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, x := range a.Exclusions {
+		m, err := item.target(ctx, x)
+		if err != nil {
+			return nil, nil, err
+		}
+		if m == included {
+			match = excluded
+			break
+		}
+		if m == unknown && match == included {
+			match = unknown
+		}
+	}
+	if a.ActivatesAt != nil {
+		item.limit(a.ActivatesAt.AsTime())
+		if item.now.Before(a.ActivatesAt.AsTime()) {
+			match = excluded
+		}
+	}
+	if a.ExpiresAt != nil {
+		item.limit(a.ExpiresAt.AsTime())
+		if !item.now.Before(a.ExpiresAt.AsTime()) {
+			match = excluded
+		}
+	}
+	if a.Disabled {
+		match = excluded
+	}
+	if a.RolloutId != nil {
+		state, err := s.assignmentRollout(ctx, &item, *a.RolloutId)
+		if err != nil {
+			return nil, nil, err
+		}
+		item.input.Rollouts[*a.RolloutId] = state
+		if match != excluded {
+			if state.Paused {
+				match = unknown
+			} else {
+				m, err := item.q.GetRolloutMember(ctx, targetingdb.GetRolloutMemberParams{RolloutID: uuid.MustParse(*a.RolloutId), RingIndex: int32(state.RingIndex), DeviceID: item.input.Device.ID})
+				if errors.Is(err, pgx.ErrNoRows) {
+					match = excluded
+				} else if err != nil {
+					return nil, nil, err
+				} else if m != int16(included) {
+					match = excluded
+				}
+			}
+		}
+	}
+	candidate := &policyv1.TargetCandidate{Assignment: a, Revision: revision, ActorId: actor, Match: match}
+	return &item, candidate, nil
 }
 func inputDigest(e *evaluation) ([]byte, error) {
 	d := &e.input.Device

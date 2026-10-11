@@ -203,7 +203,7 @@ func TestAuditCaptureRollbackSerialHeadAndImmutability(t *testing.T) {
 	if err != nil || !bytes.Equal(row.PreviousHash, before.RowHash) {
 		t.Fatalf("wrong predecessor: %v", err)
 	}
-	for _, statement := range []string{"UPDATE report_audit_rows SET payload='tamper' WHERE sequence=1", "DELETE FROM audit_events", "TRUNCATE report_audit_rows"} {
+	for _, statement := range []string{"UPDATE report_audit_rows SET payload='tamper' WHERE sequence=1", "DELETE FROM audit_events", "TRUNCATE report_audit_rows", "UPDATE audit_event_search SET action_category=0", "DELETE FROM audit_event_search", "TRUNCATE audit_event_search"} {
 		if _, err := pool.Exec(ctx, statement); err == nil {
 			t.Fatalf("append-only evidence allowed %q", statement)
 		}

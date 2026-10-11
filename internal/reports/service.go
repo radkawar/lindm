@@ -280,40 +280,7 @@ func (s *Service) CreateAuditExport(ctx context.Context, request *connect.Reques
 	defer cancel()
 	response := &integrationsv1.CreateAuditExportResponse{}
 	err := s.mutate(ctx, request.Msg, request.Msg.GetRequestId(), response, func(q *reportdb.Queries, actor uuid.UUID) error {
-		head, err := q.GetAuditHead(ctx)
-		if err != nil {
-			return err
-		}
-		after := int64(request.Msg.GetAfterSequence())
-		if after > head.Sequence {
-			return rpcreason.Error(connect.CodeFailedPrecondition, "audit_checkpoint_ahead")
-		}
-		previous := make([]byte, sha256.Size)
-		if after > 0 {
-			row, err := q.GetAuditRow(ctx, after)
-			if err != nil {
-				return err
-			}
-			previous = row.RowHash
-		}
-		if !bytes.Equal(previous, request.Msg.GetAfterHash()) {
-			return rpcreason.Error(connect.CodeFailedPrecondition, "audit_checkpoint_mismatch")
-		}
-		final := head.Sequence
-		if final-after > int64(request.Msg.GetMaxEvents()) {
-			final = after + int64(request.Msg.GetMaxEvents())
-		}
-		finalHash := previous
-		if final > after {
-			row, err := q.GetAuditRow(ctx, final)
-			if err != nil {
-				return err
-			}
-			finalHash = row.RowHash
-		}
-		row, err := q.CreateAuditArtifact(ctx, reportdb.CreateAuditArtifactParams{ID: uuid.New(), ActorID: actor,
-			RetentionDays: int32(request.Msg.GetRetentionDays()), AfterSequence: after, AfterHash: previous,
-			FinalSequence: final, FinalHash: finalHash, CapturedHeadSequence: head.Sequence, CapturedHeadHash: head.RowHash, ChainID: head.ChainID})
+		row, err := createAuditArtifact(ctx, q, request.Msg, actor)
 		if err != nil {
 			return err
 		}

@@ -14,7 +14,7 @@ const stateLabels: Record<AssistanceState, { label: string; tone: StatusTone }> 
   [AssistanceState.PROMPTED]: { label: "Waiting for user to accept", tone: "info" },
   [AssistanceState.OFFERED]: { label: "Accepted, ready to connect", tone: "warning" },
   [AssistanceState.ANSWERED]: { label: "Connecting", tone: "warning" },
-  [AssistanceState.ACTIVE]: { label: "Live", tone: "destructive" },
+  [AssistanceState.ACTIVE]: { label: "Live", tone: "info" },
   [AssistanceState.ENDED]: { label: "Ended", tone: "neutral" },
 };
 
@@ -59,6 +59,7 @@ export function endCauseText(session: AssistanceSession): string {
 export function localSessionText(session: AssistanceSession): string {
   const local = session.localSession;
   if (!local?.username) {
+    if (session.state === AssistanceState.ENDED) return session.targetUsername || "Not reported";
     return session.targetUsername ? `Waiting (${session.targetUsername})` : "Waiting";
   }
   const kind = [local.sessionType, local.desktop].filter(Boolean).join(", ");
@@ -66,6 +67,10 @@ export function localSessionText(session: AssistanceSession): string {
 }
 
 export function controlText(session: AssistanceSession): string {
+  if (session.state === AssistanceState.ENDED) {
+    if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
+    return session.controlGranted ? "Was granted; no longer active" : "Was not granted";
+  }
   if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
   if (session.controlGranted) return "Granted";
   if (session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED)

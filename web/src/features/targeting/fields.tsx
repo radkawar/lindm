@@ -6,114 +6,23 @@ import {
   type JsonValue,
 } from "@bufbuild/protobuf";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
-import { SearchPicker, type PickerSlot, type PickerProps } from "@/components/ui/search-picker";
-import { RpcError } from "@/components/ui/rpc-error";
-import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
-import { dynamicGroupsQueryOptions, rolloutsQueryOptions } from "./queries";
-
-export type TargetPickers = {
-  devicePicker: PickerSlot;
-  groupPicker: PickerSlot;
-  profileRevisionPicker: PickerSlot;
-};
-
-function DynamicGroupPicker(props: PickerProps) {
-  const [after, setAfter] = useState("");
-  const query = useQuery(dynamicGroupsQueryOptions(useAuthLifetime(), after));
-  return (
-    <SearchPicker
-      {...props}
-      options={(query.data ?? []).map((group) => ({ value: group.groupId, label: group.name }))}
-      note="Search within this page of up to 100 dynamic groups."
-    >
-      {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
-      {after ? (
-        <Button type="button" variant="outline" onClick={() => setAfter("")}>
-          First dynamic groups
-        </Button>
-      ) : null}
-      {query.data?.length === 100 ? (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setAfter(query.data?.at(-1)?.groupId ?? "")}
-        >
-          More dynamic groups
-        </Button>
-      ) : null}
-    </SearchPicker>
-  );
-}
-function RolloutPicker(props: PickerProps) {
-  const [after, setAfter] = useState("");
-  const query = useQuery(rolloutsQueryOptions(useAuthLifetime(), after));
-  return (
-    <SearchPicker
-      {...props}
-      options={(query.data ?? []).flatMap((state) =>
-        state.rollout
-          ? [
-              {
-                value: state.rollout.rolloutId,
-                label: state.rollout.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout",
-                description: state.paused ? "Paused" : "Running",
-              },
-            ]
-          : [],
-      )}
-      note="Search within this page of up to 100 rollouts."
-    >
-      {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
-      {after ? (
-        <Button type="button" variant="outline" onClick={() => setAfter("")}>
-          First rollouts
-        </Button>
-      ) : null}
-      {query.data?.length === 100 ? (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setAfter(query.data?.at(-1)?.rollout?.rolloutId ?? "")}
-        >
-          More rollouts
-        </Button>
-      ) : null}
-    </SearchPicker>
-  );
-}
+import type { TargetPickers } from "./pickers";
 
 const names: Record<string, string> = {
-  deviceId: "Device",
   staticGroupId: "Device group",
-  dynamicGroupId: "Dynamic group",
-  profileRevisionId: "Profile revision",
-  rolloutId: "Rollout",
   osId: "Operating system",
   osVersion: "Operating system version",
   namePrefix: "Hostname prefix",
   inventoryMaxAgeSeconds: "Maximum inventory age (seconds)",
-  cumulativeBasisPoints: "Cumulative share (basis points)",
-  minimumCanaries: "Minimum initial devices",
-  minimumObserved: "Minimum observed devices",
-  soakSeconds: "Observation period (seconds)",
-  failureBasisPoints: "Maximum failure share (basis points)",
-  unknownBasisPoints: "Maximum unknown share (basis points)",
-  unavailableBasisPoints: "Maximum unavailable share (basis points)",
-  healthMaxAgeSeconds: "Maximum observation age (seconds)",
   notIndex: "Negated node index",
   indices: "Child node indices",
   all: "All children",
   any: "Any children",
   predicate: "Inventory filter",
-  target: "Target",
-  cohort: "Stage devices",
-  rings: "Stages",
   nodes: "Conditions",
 };
 function labelFor(name: string) {
@@ -134,8 +43,7 @@ function defaultValue(field: DescField): JsonValue {
       : 0;
 }
 
-// Request identity and compare-and-swap fields come only from the captured request.
-// All reference fields have picker controls; protobuf remains the validation authority.
+// Dynamic-group expression editing only. Assignment and rollout tasks use authored controls.
 export function TargetFields({
   schema,
   value,
@@ -184,33 +92,10 @@ export function TargetFields({
       {schema.fields.map((field) => {
         const name = field.jsonName;
         const current = value[name];
-        if (
-          [
-            "requestId",
-            "expectedRevision",
-            "revision",
-            "groupId",
-            "assignmentId",
-            "salt",
-            "operation",
-          ].includes(name) ||
-          (name === "rolloutId" && schema.name !== "TargetAssignment")
-        )
-          return null;
+        if (["requestId", "expectedRevision", "revision", "groupId"].includes(name)) return null;
         if (field.oneof && current === undefined) return null;
         const label = labelFor(name);
-        const Picker =
-          name === "deviceId"
-            ? pickers.devicePicker
-            : name === "staticGroupId"
-              ? pickers.groupPicker
-              : name === "dynamicGroupId"
-                ? DynamicGroupPicker
-                : name === "profileRevisionId"
-                  ? pickers.profileRevisionPicker
-                  : name === "rolloutId"
-                    ? RolloutPicker
-                    : undefined;
+        const Picker = name === "staticGroupId" ? pickers.groupPicker : undefined;
         if (Picker)
           return (
             <Picker

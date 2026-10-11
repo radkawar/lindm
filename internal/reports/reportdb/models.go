@@ -32,6 +32,8 @@ type ReportArtifact struct {
 	CapturedHeadSequence int64
 	CapturedHeadHash     []byte
 	ChainID              uuid.UUID
+	AuditFilter          []byte
+	AuditMaxEvents       int32
 }
 
 type ReportAuditHead struct {

@@ -18,6 +18,9 @@ import {
 import { installProbes } from "./review-probes.mjs";
 import { contactSheet } from "./review-report.mjs";
 import { reviewEnrollmentFixtures } from "./review-enrollment.mjs";
+import { routeContracts, destructiveCoverage } from "./review-contracts.mjs";
+import { editManifest, editSheet, annotationTemplate } from "./review-edit-sheet.mjs";
+import { taskWalkthroughs, taskAuditSheet } from "./review-journeys.mjs";
 
 process.umask(0o077);
 
@@ -158,7 +161,11 @@ async function axe(page, selector) {
 
 async function screenshot(page, file, fullPage) {
   const path = join(config.evidenceDirectory, "screenshots", file);
-  const mask = [page.locator('[data-sensitive="true"]'), page.locator('input[type="password"]')];
+  const mask = [
+    page.locator('[data-sensitive="true"]'),
+    page.locator('input[type="password"]'),
+    page.locator('section[aria-label="One-time enrollment secret"] code'),
+  ];
   await writePrivate(
     path,
     await page.screenshot({ fullPage, animations: "disabled", mask, timeout: 30_000 }),
@@ -312,6 +319,9 @@ async function checkDialog(page, opener, restoreKey, label, evidence) {
   }
   await delay(100);
   await settleAnimations(page);
+  const impact = await probe(page, "destructive");
+  findings.push(...impact.findings);
+  evidence.destructive.push(...impact.observed);
   const current = await probe(page, "openDialog");
   if (!current?.focusInside)
     findings.push({
@@ -377,6 +387,7 @@ async function dialogs(page, prefix) {
   const findings = [];
   const evidence = [];
   evidence.prefix = prefix;
+  evidence.destructive = [];
   let count = 0;
   for (const trigger of await probe(page, "dialogTriggers")) {
     if ((count += 1) > maxDialogsPerPage) break;
@@ -425,7 +436,11 @@ async function dialogs(page, prefix) {
       );
     }
   }
-  return { findings, screenshots: evidence.slice() };
+  return {
+    findings,
+    screenshots: evidence.slice(),
+    destructive: [...new Set(evidence.destructive)],
+  };
 }
 
 async function palette(page) {
@@ -564,6 +579,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   entry.checks.copy = { findings: await probe(page, "copy") };
   entry.checks.forms = { findings: await probe(page, "forms") };
   entry.checks.idInputs = { findings: await probe(page, "idInputs") };
+  entry.checks.pov = await probe(page, "pov", routeContracts[route.path] ?? null);
   entry.checks.expected = { findings: [] };
   for (const name of expectedButtons) {
     const problem = await probe(page, "expectButton", name);
@@ -575,7 +591,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   };
   entry.checks.keyboard = await keyboard(page);
   const dialog = await dialogs(page, prefix);
-  entry.checks.dialogs = { findings: dialog.findings };
+  entry.checks.dialogs = { findings: dialog.findings, destructive: dialog.destructive };
   entry.screenshots.dialogs = dialog.screenshots;
   entry.passed = Object.values(entry.checks).every((check) => check.findings.length === 0);
   summarize(entry);
@@ -817,16 +833,30 @@ async function main() {
       );
       viewerRoute.visits += 1;
     }
+    // The route matrix owns this request. End it visibly before another job
+    // asks to help the same device; navigation cleanup is not an observed end.
     if (viewerUrl) {
-      // Leave no open session behind: stop it as the operator would.
       try {
-        await visit(requester, viewerUrl);
-        const stop = requester.getByRole("button", { name: "Stop session", exact: true });
-        await stop.click();
-        await stop.waitFor({ state: "detached", timeout: 30_000 });
+        await requester.getByRole("button", { name: "Stop session", exact: true }).click();
+        await requester
+          .getByRole("heading", { name: "Why this session ended", exact: true })
+          .waitFor({ state: "visible", timeout: 30_000 });
       } catch {
-        report.failures.push("assistance: could not stop the requested session from the viewer");
+        report.failures.push(
+          "assistance: route-review request did not visibly end before task walkthroughs",
+        );
+        await screenshot(requester, "assistance-stop.png", true);
       }
+    }
+    report.walkthroughs = await taskWalkthroughs({
+      page: requester,
+      config,
+      visit,
+      settle,
+      screenshot,
+    });
+    for (const job of report.walkthroughs.results) {
+      if (job.failure) report.failures.push(`task ${job.id}: ${job.failure}`);
     }
   } finally {
     await driver.close();
@@ -839,6 +869,17 @@ async function main() {
     else if (route.visits === 0) report.failures.push(`${route.path}: route not visited`);
     for (const error of route.errors) report.failures.push(`${route.path}: ${error}`);
   }
+  report.pov = {
+    contracts: routeContracts,
+    destructive: destructiveCoverage(report.results, themes, viewports),
+    limitation:
+      "DOM presence is not design approval. Unmarked metrics, unopened dialogs and unvisited states require human review.",
+  };
+  for (const coverage of report.pov.destructive)
+    if (!coverage.observed)
+      report.failures.push(
+        `POV coverage: destructive dialog ${coverage.id} not observed in ${coverage.theme} ${coverage.viewport}`,
+      );
   report.passed = report.failures.length === 0;
 }
 
@@ -859,6 +900,22 @@ try {
     const clean = redact(report);
     await writePrivateJSON(join(config.evidenceDirectory, "report.json"), clean);
     await writePrivate(join(config.evidenceDirectory, "index.html"), contactSheet(clean));
+    if (clean.walkthroughs) {
+      await writePrivateJSON(join(config.evidenceDirectory, "task-audit.json"), clean.walkthroughs);
+      await writePrivate(
+        join(config.evidenceDirectory, "task-audit.html"),
+        taskAuditSheet(clean.walkthroughs),
+      );
+    }
+    const manifest = editManifest(clean);
+    if (manifest.screens.length > 500 || Buffer.byteLength(JSON.stringify(manifest)) > 1024 * 1024)
+      throw new Error("edit_manifest_exceeds_import_bounds");
+    await writePrivateJSON(join(config.evidenceDirectory, "edit-sheet.json"), manifest);
+    await writePrivateJSON(
+      join(config.evidenceDirectory, "annotations-template.json"),
+      annotationTemplate(manifest),
+    );
+    await writePrivate(join(config.evidenceDirectory, "edit-sheet.html"), editSheet(manifest));
   }
   process.exitCode = exitCode;
 }

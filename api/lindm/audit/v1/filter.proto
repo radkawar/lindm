@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package lindm.audit.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/audit/v1;auditv1";
+
+// Categories are server-owned selections, not client guesses at action strings.
+enum AuditActionCategory {
+  // No category restriction: all actions.
+  AUDIT_ACTION_CATEGORY_UNSPECIFIED = 0;
+  AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS = 1;
+  AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS = 2;
+  AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS = 3;
+}
+
+// Every supplied field narrows the selection. Labels never establish authority.
+message AuditFilter {
+  option (buf.validate.message).cel = {
+    id: "audit_filter.time_range"
+    message: "occurred_from must precede occurred_until"
+    expression: "!has(this.occurred_from) || !has(this.occurred_until) || this.occurred_from < this.occurred_until"
+  };
+  optional string actor_id = 1 [(buf.validate.field).string.uuid = true];
+  optional string target_device_id = 2 [(buf.validate.field).string.uuid = true];
+  AuditActionCategory action_category = 3 [(buf.validate.field).enum.defined_only = true];
+  // Inclusive, in server-recorded event time.
+  google.protobuf.Timestamp occurred_from = 4 [(buf.validate.field).timestamp = {
+    gte: {seconds: -62135596800}
+    lte: {
+      seconds: 253402300799
+      nanos: 999999999
+    }
+  }];
+  // Exclusive, in server-recorded event time.
+  google.protobuf.Timestamp occurred_until = 5 [(buf.validate.field).timestamp = {
+    gte: {seconds: -62135596800}
+    lte: {
+      seconds: 253402300799
+      nanos: 999999999
+    }
+  }];
+}

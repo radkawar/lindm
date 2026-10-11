@@ -4,6 +4,7 @@ package lindm.integrations.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/audit/v1/filter.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/integrations/v1;integrationsv1";
@@ -22,6 +23,8 @@ enum ReportKind {
   REPORT_KIND_COMPLIANCE = 2;
   REPORT_KIND_FINDINGS = 3;
   REPORT_KIND_AUDIT = 4;
+  // Signed selection, not a contiguous chain or a continuity checkpoint.
+  REPORT_KIND_AUDIT_SELECTION = 5;
 }
 
 enum ReportFormat {
@@ -67,10 +70,17 @@ message ReportSchedule {
 }
 
 message CreateAuditExportRequest {
+  option (buf.validate.message).cel = {
+    id: "audit_selection.genesis"
+    message: "filtered selections do not accept continuation checkpoints"
+    expression: "!has(this.filter) || (this.after_sequence == 0u && this.after_hash == b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00')"
+  };
   string request_id = 1 [(buf.validate.field).string.uuid = true];
   uint64 after_sequence = 2 [(buf.validate.field).uint64.lte = 9223372036854775807];
   // Exactly 32 bytes; genesis uses all zero bytes. Pin the previous signed checkpoint.
   bytes after_hash = 3 [(buf.validate.field).bytes.len = 32];
+  // Chain mode: maximum contiguous events. Selection mode: maximum matching
+  // events; exceeding this bound fails the artifact, never truncates it.
   uint32 max_events = 4 [(buf.validate.field).uint32 = {
     gte: 1
     lte: 100000
@@ -80,6 +90,10 @@ message CreateAuditExportRequest {
     lte: 3650
   }];
   string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Absent: contiguous AUDIT checkpoint export. Present (including empty):
+  // AUDIT_SELECTION of matching rows at the captured head, with no continuity
+  // claim. Requires the zero genesis inputs above; use the same filter as list.
+  lindm.audit.v1.AuditFilter filter = 7;
 }
 message CreateAuditExportResponse {
   ReportArtifact artifact = 1;
@@ -143,6 +157,8 @@ message DownloadReportArtifactResponse {
 // A JSONL line. Hash exact decoded payload bytes, never reserialize the JSON payload.
 // SHA256("lindm-audit-v1\u0000" || UUID(chain_id)[16] || sequence_be64 ||
 //        previous_hash[32] || payload). Audit payload is PostgreSQL JSON, UTF-8.
+// AUDIT_SELECTION uses this envelope for individual row authenticity only:
+// sequences may have gaps and previous_hash does not refer to the previous line.
 message AuditChainRecord {
   uint64 sequence = 1;
   bytes previous_hash = 2;
@@ -170,6 +186,10 @@ message ReportManifest {
   bytes final_hash = 15;
   uint64 captured_head_sequence = 16;
   bytes captured_head_hash = 17;
+  // Present only for AUDIT_SELECTION. The signed server attests selection and
+  // content at captured_head; this is not an independently proven complete chain.
+  // after_sequence/after_hash/final_sequence/final_hash are unset in this mode.
+  lindm.audit.v1.AuditFilter audit_filter = 18;
 }
 message ReportSignedManifest {
   bytes manifest = 1;

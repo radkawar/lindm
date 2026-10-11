@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useExactRequest } from "@/hooks/use-exact-request";
@@ -164,7 +163,7 @@ export function AssistanceViewerPage({
   }, [lifetime, sessionId]);
 
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="grid min-w-0 gap-4" data-review-page="assistance">
       <nav aria-label="Remote assistance breadcrumbs" className="flex flex-wrap gap-2 text-sm">
         <Link to="/devices" className="underline">
           Devices
@@ -178,33 +177,55 @@ export function AssistanceViewerPage({
       </nav>
       <PageHeader
         title="Remote assistance"
-        description="The user on the device can stop sharing at any time. Leaving this page ends the session."
+        description={
+          ended
+            ? "Session record. Sharing and control have ended."
+            : creator
+              ? "The user chooses what to share. Leaving this page stops your session."
+              : "Only the requesting admin can connect. The user can stop sharing at any time."
+        }
         actions={
           session && !ended && allowed ? (
-            <StopButton sessionId={sessionId} deviceId={deviceId} />
-          ) : null
+            <div data-review-next-action>
+              <StopButton sessionId={sessionId} deviceId={deviceId} />
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              data-review-next-action
+              render={<Link to="/devices/$deviceId" params={{ deviceId }} />}
+            >
+              Return to device
+            </Button>
+          )
         }
       />
-      <TechnicalDetails
-        items={[
-          { label: "Device ID", value: deviceId },
-          { label: "Session ID", value: sessionId },
-          { label: "Operator ID", value: session?.operatorId },
-        ]}
-      />
       {query.error ? (
-        <RpcError failure={toRpcFailure(query.error)} title="Couldn't load session" />
+        <div data-review-state="blocked">
+          <RpcError failure={toRpcFailure(query.error)} title="Couldn't load session" />
+          <Button
+            variant="outline"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            Refresh session
+          </Button>
+        </div>
       ) : null}
-      {query.isPending ? <p role="status">Loading session…</p> : null}
+      {query.isPending ? (
+        <p role="status" data-review-state="blocked">
+          Loading session…
+        </p>
+      ) : null}
       {session ? (
         <>
           <SessionStatus session={session} />
-          {creator && allowed ? (
+          {creator && allowed && !ended ? (
             <AssistanceConnection
               key={`${lifetime.generation}:${sessionId}`}
               session={session}
               deviceId={deviceId}
-              armed={armed && !ended}
+              armed={armed}
             />
           ) : !ended ? (
             <Alert>
@@ -218,6 +239,13 @@ export function AssistanceViewerPage({
           ) : null}
         </>
       ) : null}
+      <TechnicalDetails
+        items={[
+          { label: "Device ID", value: deviceId },
+          { label: "Session ID", value: sessionId },
+          { label: "Operator ID", value: session?.operatorId },
+        ]}
+      />
     </section>
   );
 }
@@ -233,57 +261,70 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
   const waiting =
     session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-3">
-          <AssistanceStateBadge state={session.state} />
-          {live ? (
-            <StatusBadge status="destructive" dot role="status" aria-live="polite">
-              Session live
-              {Number.isFinite(endsAt) ? `, ${remainingLabel(endsAt - now)} remaining` : ""}
-            </StatusBadge>
-          ) : null}
-          {waiting && Number.isFinite(consentBy) ? (
-            <span className="text-sm font-normal text-muted-foreground">
-              User has {remainingLabel(consentBy - now)} to accept
-            </span>
-          ) : null}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Mode">{modeLabels[session.mode]}</Fact>
-          <Fact label="Admin">{session.operatorDisplay || "Unknown"}</Fact>
-          <Fact label="Device user">{localSessionText(session)}</Fact>
-          <Fact label="Control">{controlText(session)}</Fact>
+    <section
+      aria-label="Session situation"
+      className="grid gap-4 border-l-2 border-primary bg-muted/30 p-4"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <AssistanceStateBadge state={session.state} />
+        {live && Number.isFinite(endsAt) ? (
+          <span role="status" className="text-sm">
+            {remainingLabel(endsAt - now)} remaining
+          </span>
+        ) : null}
+        {waiting && Number.isFinite(consentBy) ? (
+          <span className="text-sm text-muted-foreground">
+            User has {remainingLabel(consentBy - now)} to accept
+          </span>
+        ) : null}
+      </div>
+      <div>
+        <h2 className="text-base font-semibold">
+          {ended ? "Why this session ended" : "Support request"}
+        </h2>
+        <p className="mt-1 text-sm">{ended ? endCauseText(session) : session.reason}</p>
+        {ended ? (
+          <p className="mt-1 text-sm text-muted-foreground" data-review-state="clear">
+            Ended <TimeCell value={session.endedAt} />. To help again, return to the device and
+            request a new session with fresh consent.
+          </p>
+        ) : waiting ? (
+          <p className="mt-1 text-sm text-muted-foreground" data-review-state="blocked">
+            No screen or input is shared yet. Wait for the user to accept, or stop the request.
+          </p>
+        ) : null}
+      </div>
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <Fact label={ended ? "Device user during the session" : "Person on the device"}>
+          {localSessionText(session)}
+        </Fact>
+        <Fact label="Requesting admin">{session.operatorDisplay || "Unknown"}</Fact>
+        <Fact label="Requested access">{modeLabels[session.mode]}</Fact>
+        <Fact label={ended ? "Control permission during the session" : "User's control permission"}>
+          {controlText(session)}
+        </Fact>
+      </dl>
+      <details className="border-t pt-3 text-sm">
+        <summary className="w-fit cursor-pointer font-medium">Session record</summary>
+        <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+          {ended ? <Fact label="Support reason">{session.reason}</Fact> : null}
           <Fact label="Requested">
             <TimeCell value={session.createdAt} />
           </Fact>
           <Fact label="Started">
             <TimeCell value={session.startedAt} />
           </Fact>
-          <Fact label="Ends by">
+          <Fact label={ended ? "Original time limit" : "Ends by"}>
             <TimeCell value={session.endsAt} />
           </Fact>
-          <Fact label="Ended">
-            <TimeCell value={session.endedAt} />
-          </Fact>
-          <Fact label="Reason" className="sm:col-span-2 lg:col-span-4">
-            {session.reason}
-          </Fact>
-          {ended ? (
-            <Fact label="End cause" className="sm:col-span-2 lg:col-span-4">
-              {endCauseText(session)}
-            </Fact>
-          ) : null}
         </dl>
-        {!ended ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Remaining time is an estimate from this browser&apos;s clock.
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+      </details>
+      {!ended ? (
+        <p className="text-xs text-muted-foreground">
+          Remaining time is an estimate from this browser&apos;s clock.
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -570,29 +611,25 @@ function AssistanceConnection({
   }, [capturing, channel]);
 
   const precondition = link.failure ? assistanceFailureMessage(link.failure) : "";
-  const ended = session.state === AssistanceState.ENDED;
   const attachedElsewhere =
-    !ended &&
     link.stage === "idle" &&
     (session.state === AssistanceState.ANSWERED || session.state === AssistanceState.ACTIVE);
   // Why Take control is unavailable; shown next to the disabled button.
   const controlBlocked = !controlRequested
     ? ""
-    : ended
-      ? "The session has ended, so control is no longer available."
-      : !session.controlGranted
-        ? session.state === AssistanceState.ACTIVE
-          ? "The user allowed viewing only, so you can't control this session."
-          : "Control is available after the user accepts and allows it."
-        : !controlAvailable
-          ? "Control is available once the screen connects."
-          : "";
+    : !session.controlGranted
+      ? session.state === AssistanceState.ACTIVE
+        ? "The user allowed viewing only, so you can't control this session."
+        : "Control is available after the user accepts and allows it."
+      : !controlAvailable
+        ? "Control is available once the screen connects."
+        : "";
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center justify-between gap-3">
-          <span>Screen</span>
+          <span>Shared screen</span>
           <span className="flex flex-wrap items-center gap-2 text-sm font-normal">
             <span className="text-muted-foreground">
               {link.stage === "answered"
@@ -601,7 +638,7 @@ function AssistanceConnection({
             </span>
             {controlRequested ? (
               <Button
-                disabled={!controlAvailable || ended}
+                disabled={!controlAvailable}
                 aria-describedby={controlBlocked ? controlReasonId : undefined}
                 onClick={() => setControlOn((current) => !current)}
               >
@@ -668,8 +705,8 @@ function AssistanceConnection({
           }
           className={
             capturing
-              ? "relative aspect-video w-full touch-none overflow-hidden rounded-lg bg-black outline-none ring-2 ring-destructive"
-              : "relative aspect-video w-full overflow-hidden rounded-lg bg-black"
+              ? "relative aspect-video w-full touch-none overflow-hidden bg-black outline-none ring-2 ring-destructive"
+              : "relative aspect-video w-full overflow-hidden bg-black"
           }
         >
           <video
@@ -682,10 +719,13 @@ function AssistanceConnection({
           />
           {!stream ? (
             <p className="absolute inset-0 grid place-items-center text-sm text-white/70">
-              {ended ? "Session ended" : "No video yet"}
+              {session.state === AssistanceState.REQUESTED ||
+              session.state === AssistanceState.PROMPTED
+                ? "Waiting for permission to share"
+                : "Waiting for the shared screen"}
             </p>
           ) : controlAvailable && !capturing ? (
-            <p className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit rounded-md bg-black/70 px-3 py-1.5 text-sm text-white">
+            <p className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit bg-black/70 px-3 py-1.5 text-sm text-white">
               Click Take control to use the mouse and keyboard
             </p>
           ) : null}

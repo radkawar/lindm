@@ -25,7 +25,7 @@ export function SignIn({ notice }: { notice: string }) {
           <CardTitle>
             <h1 className="text-2xl font-semibold tracking-tight">lindm console</h1>
           </CardTitle>
-          <CardDescription>Sign in to manage your devices.</CardDescription>
+          <CardDescription>Sign in to review devices and pending work.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {notice !== "" ? (

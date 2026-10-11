@@ -590,6 +590,56 @@ contact does not invalidate a reviewed snapshot unless an evaluated last-contact
 predicate used that timestamp; generation, native status, metadata, catalog,
 group definitions and execution/rollout heads remain fenced.
 
+`PreviewTargetAssignmentImpact` is a separate pre-save operation: it replaces the
+proposed assignment only in a transaction-local catalog and reuses canonical
+matching, exclusions, activation windows, frozen rollout admission and resource
+resolution. It does not save a temporary assignment, move an execution head or
+perform native work. Named device rows compare the actual current server resource
+head with the proposed catalog resolution. Neither is evidence of native state;
+server dispatch support is not device capability qualification, which remains
+explicitly unknown. Unknown membership and missing/stale host inventory remain
+visible, and conflicting resolutions are not presented as ready native plans.
+
+The report enumerates the union of the old and new target populations. Direct and
+static-group targets narrow the SQL scan; dynamic targets require bounded fleet
+evaluation. Reports retain at most 10,000 evaluated candidates and 64 MiB of
+individually stored device rows, never an unbounded whole-fleet response. The
+transaction-local assignment/group catalog is bounded to 10,000 assignments and
+16 MiB; profile and resolved-candidate caches avoid per-device catalog reloads.
+Pages contain at most 20 rows and shrink before the existing 1 MiB protobuf or JSON
+response ceiling; an individually unreviewable row fails with
+`targeting_capacity`, not a skipped row. Candidate/evaluated counts and
+included/excluded/unknown counts accompany every page. Target count includes
+unknown raw target matches before exclusions. Counts are lower bounds when
+incomplete; overflow or hidden device coverage is explicit and cannot be saved.
+Unrestricted assignment authority is required, while `fleet.read` device scopes
+still constrain row visibility. Neither a target nor a pagination cursor grants
+access to hidden devices. Pages recheck visibility and retain the same actor,
+proposal, digest and evaluation timestamp.
+
+`SaveTargetAssignmentImpact` binds the exact proposal, expected assignment revision
+and report digest. After fresh authorization it checks exact successful request
+replay before consulting report expiry or recomputing inputs. A new save rechecks
+the entire candidate population, membership/host inputs, saved catalog, referenced
+definitions and rollout state, current resource head and resulting server
+resolution, rejecting changes with `targeting_impact_stale`. The impact operations
+require READ COMMITTED and acquire the targeting fence and SHARE locks on relevant
+device, membership, inventory, profile and resource-head tables before reading
+inputs. Locks remain through mutation/receipt commit, including for initially
+empty cohorts, preventing concurrent membership insertion or enrollment from
+silently expanding the reviewed population. These bounded transactions can block
+fleet writes; they perform no network work and retain the request deadline and
+explicit deadlock/serialization conflict behavior. This is not a measured
+10,000-device latency qualification.
+
+Impact reports are immutable while retained, expire within 15 minutes (earlier at
+relevant freshness/window boundaries), and are capped at five reports per actor.
+Creation evicts older actor reports and prunes at most 100 expired report headers,
+cascading their device rows. Successful save receipts survive report eviction.
+Legacy `PutTargetAssignment` retains its existing mutation/replay semantics.
+Reviewed save changes only the assignment catalog; exact approved activation
+remains a separate operation with its existing authority and native-effect fences.
+
 Rollouts retain cohort membership, stable salted percentage buckets and ring
 state. Soak, minimum observations and failure/unknown/unavailable thresholds gate
 promotion; automatic pause is durable. Cohort evaluation admits at most 10,000
@@ -1920,10 +1970,34 @@ never become error messages.
 
 The audit-chain head is a transactional row lock, not a sequence whose gaps or
 commit ordering could hide dropped records. SHA-256 links bind chain UUID,
-big-endian sequence, previous hash and exact payload bytes. Audit exports capture
-an immutable head and caller checkpoint, retain both in a domain-separated signed
-manifest, and require external public-key pinning and checkpoint retention.
-Included keys are verification material, not self-authenticating trust.
+big-endian sequence, previous hash and exact payload bytes. Contiguous audit exports
+(absent request filter, `AUDIT`) capture an immutable head and caller checkpoint,
+retain both in a domain-separated signed manifest, and require external public-key
+pinning and checkpoint retention. Included keys are verification material, not
+self-authenticating trust.
+
+List and filtered exports share `lindm.audit.v1.AuditFilter`: actor and target UUID,
+server-owned action category, inclusive occurrence start and exclusive occurrence
+end. An immutable `audit_event_search` projection is backfilled without rewriting
+authenticated source rows, then captured after the chain trigger in the same
+transaction. It resolves legacy action targets/capabilities from `device_actions`
+and direct lifecycle targets through an explicit device/provisioning action
+allowlist. Existing structured targets take precedence, and unrelated resource
+UUIDs are not interpreted as device identities. The same resolver serves backfill
+and future capture. Indexes lead with actor, target or category followed by the descending
+occurrence/UUID keyset. A committed chain-sequence ceiling excludes later/backdated
+inserts. List cursors bind that ceiling, the normalized filter, caller and position;
+every page and minimal name lookup still requires unrestricted `audit.read`.
+
+A present export filter, including an empty message, creates `AUDIT_SELECTION`,
+not a chain checkpoint. Its signed manifest binds the normalized filter, captured
+head, content digest, length and row count; no final checkpoint is claimed.
+JSONL retains exact original payloads and per-row hash evidence, but sequence gaps
+are expected. The verifier authenticates the server's selection attestation and
+individual rows, not independent selection completeness, and rejects selections
+as chain checkpoints. Matching-row overflow fails atomically rather than emitting
+a successful truncated selection. Existing unrestricted `integrations.manage`
+and fresh authorization fences, idempotency, signing and retention apply unchanged.
 
 Small report artifacts are an explicit exception to the package-object storage
 boundary above: at most 32 MiB/100,000 rows are streamed into 256 KiB PostgreSQL

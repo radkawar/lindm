@@ -1,8 +1,7 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
@@ -13,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { adminClient, clearCsrfToken } from "@/lib/rpc";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -34,6 +35,7 @@ const KINDS: Record<ReportKind, string> = {
   [ReportKind.COMPLIANCE]: "Compliance",
   [ReportKind.FINDINGS]: "Advisory findings",
   [ReportKind.AUDIT]: "Audit log",
+  [ReportKind.AUDIT_SELECTION]: "Filtered audit evidence",
 };
 const FORMATS: Record<ReportFormat, string> = {
   [ReportFormat.UNSPECIFIED]: "unknown",
@@ -44,6 +46,7 @@ const FORMATS: Record<ReportFormat, string> = {
 
 export function Reports() {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const [page, setPage] = useState("");
   const list = useQuery(reportSchedulesQueryOptions(lifetime, page));
   return (
@@ -90,7 +93,24 @@ export function Reports() {
           Next page
         </Button>
       </div>
-      <AuditExport />
+      <div className="grid gap-2 border bg-card p-4">
+        <h3 className="font-semibold">Export audit evidence</h3>
+        {canPermission(principal, "audit.read", true) ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Choose an action, actor, device and time range in the audit log.
+            </p>
+            <Link to="/audit" className="w-fit underline underline-offset-4">
+              Choose audit evidence
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Choosing audit evidence also requires unrestricted audit access. Ask an owner to review
+            your access; existing reports remain available below.
+          </p>
+        )}
+      </div>
       <Artifacts />
     </section>
   );
@@ -204,88 +224,6 @@ function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
   );
 }
 
-function AuditExport() {
-  const lifetime = useAuthLifetime();
-  const action = useIntegrationAction();
-  const [sequence, setSequence] = useState("0");
-  const [hash, setHash] = useState("0".repeat(64));
-  const [maxEvents, setMaxEvents] = useState(10000);
-  const [retention, setRetention] = useState(30);
-  const [reason, setReason] = useState("");
-  const [inputError, setInputError] = useState("");
-  function queue(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setInputError("");
-    if (!/^[0-9a-fA-F]{64}$/.test(hash) || !/^\d+$/.test(sequence)) {
-      setInputError("Enter the last export's sequence number and its 64-character SHA-256 hash.");
-      return;
-    }
-    const afterHash = Uint8Array.from({ length: 32 }, (_, index) =>
-      Number.parseInt(hash.slice(index * 2, index * 2 + 2), 16),
-    );
-    const request = {
-      requestId: crypto.randomUUID(),
-      afterSequence: BigInt(sequence),
-      afterHash,
-      maxEvents,
-      retentionDays: retention,
-      reason,
-    };
-    action.perform(() => adminClient.createAuditExport(request, { signal: lifetime.signal }));
-  }
-  return (
-    <form onSubmit={queue} className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
-      <h3 className="text-lg font-semibold">Export audit log</h3>
-      <p className="text-sm">
-        Continue from your last export. For the first export, use sequence 0 and a hash of 64 zeros.
-      </p>
-      {action.feedback}
-      {inputError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Check the export details</AlertTitle>
-          <AlertDescription>{inputError}</AlertDescription>
-        </Alert>
-      ) : null}
-      <fieldset disabled={action.blocked} className="grid min-w-0 gap-3">
-        <Label htmlFor="audit-sequence">Last export sequence number</Label>
-        <Input
-          id="audit-sequence"
-          required
-          inputMode="numeric"
-          value={sequence}
-          onChange={(e) => setSequence(e.target.value)}
-        />
-        <Label htmlFor="audit-hash">Last export SHA-256 hash</Label>
-        <Input id="audit-hash" required value={hash} onChange={(e) => setHash(e.target.value)} />
-        <Label htmlFor="audit-events">Maximum events</Label>
-        <Input
-          id="audit-events"
-          required
-          type="number"
-          value={maxEvents}
-          onChange={(e) => setMaxEvents(Number(e.target.value))}
-        />
-        <Label htmlFor="audit-retention">Keep export for (days)</Label>
-        <Input
-          id="audit-retention"
-          required
-          type="number"
-          value={retention}
-          onChange={(e) => setRetention(Number(e.target.value))}
-        />
-        <Label htmlFor="audit-export-reason">Reason</Label>
-        <Input
-          id="audit-export-reason"
-          required
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-        <Button type="submit">Start export</Button>
-      </fieldset>
-    </form>
-  );
-}
-
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -379,7 +317,11 @@ function Artifacts() {
         />
       ) : null}
       {list.data?.artifacts.map((artifact) => (
-        <article key={artifact.id} className="grid min-w-0 gap-3 border bg-card p-4">
+        <article
+          id={`report-${artifact.id}`}
+          key={artifact.id}
+          className="grid min-w-0 gap-3 border bg-card p-4"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="font-semibold">
               {KINDS[artifact.kind]} · {FORMATS[artifact.format]}
@@ -401,14 +343,29 @@ function Artifacts() {
                 : "Unknown"}
             </StatusBadge>
           </div>
-          <TechnicalDetails items={[{ label: "Report ID", value: artifact.id }]} />
-          <p className="text-sm">
-            {artifact.rowCount.toString()} rows · {artifact.byteCount.toString()} bytes · expires{" "}
-            {formatTimestamp(artifact.expiresAt).local}
-          </p>
+          <TechnicalDetails
+            items={[
+              { label: "Report ID", value: artifact.id },
+              { label: "Failure reason", value: artifact.failureReason },
+            ]}
+          />
+          {artifact.state === "published" ? (
+            <p className="text-sm">
+              {artifact.rowCount.toString()} rows · {artifact.byteCount.toString()} bytes · expires{" "}
+              {formatTimestamp(artifact.expiresAt).local}
+            </p>
+          ) : artifact.state === "queued" || artifact.state === "building" ? (
+            <p className="text-sm text-muted-foreground">
+              Evidence is being prepared. Refresh reports to check for the signed download.
+            </p>
+          ) : null}
           {artifact.failureReason ? (
             <p role="alert" className="break-words text-sm text-destructive">
-              {artifact.failureReason}
+              {artifact.kind === ReportKind.AUDIT_SELECTION
+                ? artifact.failureReason === "report_limit_exceeded"
+                  ? "Too many matching events or too much evidence to export. Narrow the audit filters or time range and start another export. No partial evidence is available."
+                  : "The filtered evidence could not be exported. Review the details before trying again."
+                : artifact.failureReason}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">

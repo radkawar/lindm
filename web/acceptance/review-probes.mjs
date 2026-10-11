@@ -200,9 +200,115 @@ export function installProbes(rules) {
     })),
   ];
   const idInputPattern = new RegExp(rules.idInputPattern.pattern, rules.idInputPattern.flags);
+  const visibleText = (node) => rendered(node) && !srOnly(node) && normalize(node.innerText ?? "");
+  const enabledAction = (node) =>
+    rendered(node) &&
+    !srOnly(node) &&
+    !node.disabled &&
+    !node.closest("fieldset:disabled") &&
+    node.getAttribute("aria-disabled") !== "true" &&
+    !!normalize(node.innerText || node.getAttribute("aria-label") || "");
+  const actionsIn = (root) =>
+    [root, ...root.querySelectorAll("a[href],button,input,select,textarea,[role=button]")]
+      .filter((node) => node.matches("a[href],button,input,select,textarea,[role=button]"))
+      .filter(enabledAction);
+  const statesIn = (root) =>
+    [root, ...root.querySelectorAll("[data-review-state]")]
+      .filter((node) => ["clear", "blocked"].includes(node.dataset.reviewState))
+      .filter(visibleText);
 
   window.__review = {
     describe,
+    pov(contract) {
+      const findings = [];
+      const add = (message, nodes = []) =>
+        findings.push({ check: "pov-structure", message, elements: nodes.map(describe) });
+      if (!contract) {
+        add("Route has no explicit POV coverage contract");
+        return { findings, mode: "uncontracted" };
+      }
+      const main = document.querySelector("main, [role=main], #main");
+      if (!main) {
+        add("Page has no main-content region for action coverage");
+        return { findings, mode: contract.mode };
+      }
+      const page = contract.page
+        ? [main, ...main.querySelectorAll("[data-review-page]")].find(
+            (node) => node.dataset.reviewPage === contract.page && rendered(node),
+          )
+        : main;
+      if (!page) {
+        add(`Missing visible data-review-page="${contract.page}" region`);
+        return { findings, mode: contract.mode };
+      }
+      const states = statesIn(page);
+      const primary = [page, ...page.querySelectorAll("[data-review-next-action]")]
+        .filter((node) => node.hasAttribute("data-review-next-action"))
+        .flatMap(actionsIn);
+      const controls = actionsIn(page);
+      const candidates = contract.mode === "semantic" ? primary : controls;
+      if (!candidates.length && !states.length)
+        add(
+          contract.mode === "semantic"
+            ? "No marked enabled next action or explicit clear/blocked state"
+            : "No enabled main-content control or explicit clear/blocked state (structural only)",
+        );
+      const metrics = [...page.querySelectorAll("[data-review-metric]")].filter(rendered);
+      if (
+        metrics.length < contract.minimumMetrics &&
+        !states.some((node) => node.dataset.reviewState === "blocked")
+      )
+        add(`Expected at least ${contract.minimumMetrics} marked metric or explicit blocked state`);
+      for (const metric of metrics)
+        if (!actionsIn(metric).length && !statesIn(metric).length)
+          add("Marked metric has no enabled action or explicit clear/blocked state", [metric]);
+      return {
+        findings,
+        mode: contract.mode,
+        primaryActions: primary.length,
+        genericControls: controls.length,
+        explicitStates: states.length,
+        markedMetrics: metrics.length,
+        limitation: "Presence only; human review must judge relevance, completeness and truth.",
+      };
+    },
+    destructive() {
+      const dialog = document.querySelector('[data-review-dialog="open"]');
+      const findings = [];
+      const observed = [];
+      if (!dialog) return { findings, observed };
+      const summaries = [dialog, ...dialog.querySelectorAll("[data-review-destructive]")].filter(
+        (node) => node.hasAttribute("data-review-destructive") && rendered(node),
+      );
+      for (const summary of summaries) {
+        const id = summary.dataset.reviewDestructive;
+        if (id) observed.push(id);
+        const confirm = [...summary.querySelectorAll("[data-review-confirm]")].find(rendered);
+        if (!confirm)
+          findings.push({
+            check: "destructive-summary",
+            message: "Marked destructive dialog has no visible confirmation marker",
+            elements: [describe(summary)],
+          });
+        for (const field of ["targets", "count", "effects", "reversibility", "approval"]) {
+          const nodes = [...summary.querySelectorAll(`[data-review-impact="${field}"]`)];
+          if (
+            !nodes.some(
+              (node) =>
+                visibleText(node) &&
+                (!confirm ||
+                  !!(node.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING)),
+            )
+          )
+            findings.push({
+              check: "destructive-summary",
+              message: `Missing visible ${field} summary before destructive confirmation`,
+              elements: [describe(summary)],
+            });
+        }
+      }
+      return { findings, observed };
+    },
     layout(desktop) {
       const findings = [];
       const scroller = document.scrollingElement;

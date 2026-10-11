@@ -23,6 +23,7 @@ import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
 import "lindm/agent/v1/update.proto";
+import "lindm/audit/v1/filter.proto";
 import "lindm/inventory/v1/observation.proto";
 import "lindm/validation/v1/string_rules.proto";
 
@@ -56,6 +57,8 @@ service AdminService {
   rpc ApproveApproval(ApproveApprovalRequest) returns (ApproveApprovalResponse);
   rpc RejectApproval(RejectApprovalRequest) returns (RejectApprovalResponse);
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+  rpc ListAuditActors(ListAuditActorsRequest) returns (ListAuditActorsResponse);
+  rpc ListAuditDevices(ListAuditDevicesRequest) returns (ListAuditDevicesResponse);
   rpc GetExecutionAuthority(GetExecutionAuthorityRequest) returns (GetExecutionAuthorityResponse);
   rpc UpdateExecutionAuthority(UpdateExecutionAuthorityRequest) returns (UpdateExecutionAuthorityResponse);
   rpc PublishProfileRevision(PublishProfileRevisionRequest) returns (PublishProfileRevisionResponse);
@@ -70,6 +73,8 @@ service AdminService {
   rpc PutTargetAssignment(PutTargetAssignmentRequest) returns (PutTargetAssignmentResponse);
   rpc ListTargetAssignments(ListTargetAssignmentsRequest) returns (ListTargetAssignmentsResponse);
   rpc PreviewTargetAssignments(PreviewTargetAssignmentsRequest) returns (PreviewTargetAssignmentsResponse);
+  rpc PreviewTargetAssignmentImpact(PreviewTargetAssignmentImpactRequest) returns (PreviewTargetAssignmentImpactResponse);
+  rpc SaveTargetAssignmentImpact(SaveTargetAssignmentImpactRequest) returns (SaveTargetAssignmentImpactResponse);
   rpc ActivateTargetPreview(ActivateTargetPreviewRequest) returns (ActivateTargetPreviewResponse);
   rpc PutRollout(PutRolloutRequest) returns (PutRolloutResponse);
   rpc ControlRollout(ControlRolloutRequest) returns (ControlRolloutResponse);
@@ -316,14 +321,54 @@ message AuditEvent {
       string: {max_len: 4096}
     }
   }];
+  // Current account label, not immutable historical evidence or authority.
+  string actor_display_name = 10;
 }
 message ListAuditEventsRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
+  lindm.audit.v1.AuditFilter filter = 3;
 }
 message ListAuditEventsResponse {
   repeated AuditEvent events = 1;
   string next_page_token = 2;
+}
+
+// Audit-only name lookups never grant account administration or fleet access.
+// id is used alone by clients resolving a bookmarked selection.
+message ListAuditActorsRequest {
+  string name_prefix = 1 [(buf.validate.field).string.max_len = 128];
+  string after_id = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  uint32 page_size = 3 [(buf.validate.field).uint32.lte = 100];
+  optional string id = 4 [(buf.validate.field).string.uuid = true];
+}
+message AuditActor {
+  string id = 1;
+  string display_name = 2;
+}
+message ListAuditActorsResponse {
+  repeated AuditActor actors = 1;
+  string next_after_id = 2;
+}
+message ListAuditDevicesRequest {
+  string name_prefix = 1 [(buf.validate.field).string.max_len = 128];
+  string after_id = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  uint32 page_size = 3 [(buf.validate.field).uint32.lte = 100];
+  optional string id = 4 [(buf.validate.field).string.uuid = true];
+}
+message AuditDevice {
+  string id = 1;
+  string hostname = 2;
+}
+message ListAuditDevicesResponse {
+  repeated AuditDevice devices = 1;
+  string next_after_id = 2;
 }
 
 message GetExecutionAuthorityRequest {}

@@ -34,12 +34,13 @@ import (
 )
 
 var (
-	ErrRejected = errors.New("targeting_rejected")
-	ErrConflict = errors.New("targeting_revision_conflict")
-	ErrNotFound = errors.New("targeting_not_found")
-	ErrCapacity = errors.New("targeting_capacity")
-	ErrPaused   = errors.New("rollout_paused")
-	ErrNotReady = errors.New("rollout_not_ready")
+	ErrRejected    = errors.New("targeting_rejected")
+	ErrConflict    = errors.New("targeting_revision_conflict")
+	ErrNotFound    = errors.New("targeting_not_found")
+	ErrCapacity    = errors.New("targeting_capacity")
+	ErrImpactStale = errors.New("targeting_impact_stale")
+	ErrPaused      = errors.New("rollout_paused")
+	ErrNotReady    = errors.New("rollout_not_ready")
 )
 
 type Store struct {
@@ -58,6 +59,7 @@ func newStore(clock func() time.Time) (*Store, error) {
 		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{}, &adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{}, &adminv1.ActivateTargetPreviewRequest{},
+		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.SaveTargetAssignmentImpactRequest{},
 		&adminv1.PutRolloutRequest{}, &adminv1.ControlRolloutRequest{}, &adminv1.ListRolloutsRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
@@ -269,6 +271,13 @@ func (s *Store) PutAssignment(ctx context.Context, tx pgx.Tx, p identity.Princip
 	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.assignment.put", r, out); ok || err != nil {
 		return out, err
 	}
+	return s.putAssignment(ctx, q, p, r, "targeting.assignment.put", r)
+}
+
+// The reviewed and legacy APIs share mutation semantics, but retain distinct
+// receipt methods and the exact request bytes supplied to each API.
+func (s *Store) putAssignment(ctx context.Context, q *targetingdb.Queries, p identity.Principal, r *adminv1.PutTargetAssignmentRequest, method string, request proto.Message) (*adminv1.PutTargetAssignmentResponse, error) {
+	out := new(adminv1.PutTargetAssignmentResponse)
 	exists, err := q.TargetProfileRevisionExists(ctx, uuid.MustParse(r.Assignment.ProfileRevisionId))
 	if err != nil {
 		return nil, err
@@ -310,7 +319,7 @@ func (s *Store) PutAssignment(ctx context.Context, tx pgx.Tx, p identity.Princip
 		return nil, err
 	}
 	out.Assignment = &policyv1.TargetCandidate{Assignment: proto.CloneOf(r.Assignment), Revision: r.ExpectedRevision + 1, ActorId: p.ID.String()}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.assignment.put", id.String(), r.Reason, "", r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, method, id.String(), r.Reason, "", request, out)
 }
 func (s *Store) ListAssignments(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListTargetAssignmentsRequest) (*adminv1.ListTargetAssignmentsResponse, error) {
 	if err := s.validate(r); err != nil {

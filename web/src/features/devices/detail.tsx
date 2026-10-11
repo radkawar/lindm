@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
@@ -62,6 +63,7 @@ export function DeviceDetailView({
   compliance,
   revoke,
   assistance,
+  accountPicker,
 }: {
   deviceId: string;
   search: PackageSearch;
@@ -74,6 +76,7 @@ export function DeviceDetailView({
   revoke?: (device: Device) => ReactNode;
   // Optional remote assistance card, composed by the route; shown on the Actions tab.
   assistance?: ReactNode;
+  accountPicker: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -123,7 +126,11 @@ export function DeviceDetailView({
     root?.encryption?.status === CollectionStatus.SUCCESS ? root.encryption.value : "";
   const encrypted = ["luks", "dm-crypt", "inherited-dm-crypt"].includes(encryption);
   return (
-    <section className="flex min-w-0 flex-col gap-4" aria-busy={detail.isFetching}>
+    <section
+      data-review-page="device"
+      className="flex min-w-0 flex-col gap-4"
+      aria-busy={detail.isFetching}
+    >
       <Link
         to="/devices"
         search={{ pageSize: 50, pageToken: "" }}
@@ -164,13 +171,7 @@ export function DeviceDetailView({
               </Tooltip>
             </div>
           ) : null}
-          <TechnicalDetails
-            className="mt-3"
-            items={[
-              { label: "Device ID", value: deviceId },
-              { label: "Reported hostname", value: device?.hostname.trim() || "None" },
-            ]}
-          />
+          <TechnicalDetails className="mt-3" items={[{ label: "Device ID", value: deviceId }]} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -182,19 +183,77 @@ export function DeviceDetailView({
           </Button>
           {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
           {device && canPermission(principal, "resources.assign") ? (
-            <Button aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
-              <Plus aria-hidden="true" /> Assign profile
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                render={<Link to="/rollouts" search={{ device: deviceId }} />}
+              >
+                Preview settings
+              </Button>
+              <Button variant="outline" aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
+                <Plus aria-hidden="true" /> Assign profile
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
       {device && canPermission(principal, "resources.assign")
         ? assignDialog(assignOpen, setAssignOpen)
         : null}
-      {failure ? <RpcError failure={failure} /> : null}
-      {detail.isPending ? <p role="status">Loading device…</p> : null}
+      {failure ? (
+        <div data-review-state="blocked">
+          <RpcError failure={failure} />
+        </div>
+      ) : null}
+      {detail.isPending ? (
+        <p role="status" data-review-state="blocked">
+          Loading device…
+        </p>
+      ) : null}
+      {!detail.isPending && !failure && !device ? (
+        <p data-review-state="blocked">Device record unavailable. Return to the device list.</p>
+      ) : null}
       {device ? (
         <>
+          <section className="flex flex-wrap items-center justify-between gap-4 border-y py-4">
+            <div className="min-w-0 space-y-1">
+              <h2 className="text-base font-semibold">Latest observation</h2>
+              <p className="text-sm">
+                {data?.host ? (
+                  <>
+                    Inventory received <ObservedTime value={data.host.receivedAt} server relative />
+                    .
+                  </>
+                ) : (
+                  "No host inventory received."
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {encryption === "none"
+                  ? "The reported root disk is not encrypted. Review its evidence before acting."
+                  : "Inspect the reported evidence; enrollment and contact do not establish device health."}
+              </p>
+            </div>
+            <Button
+              data-review-next-action
+              onClick={() => {
+                const next =
+                  encryption === "none" && activeTab !== "encryption"
+                    ? "encryption"
+                    : activeTab === "inventory"
+                      ? "history"
+                      : "inventory";
+                activateTab(next);
+                tabButtons.current[detailTabs.findIndex((tab) => tab.id === next)]?.focus();
+              }}
+            >
+              {encryption === "none" && activeTab !== "encryption"
+                ? "Review encryption"
+                : activeTab === "inventory"
+                  ? "Review history"
+                  : "Inspect inventory"}
+            </Button>
+          </section>
           <DeviceLockRestriction deviceId={deviceId} />
           <div role="tablist" aria-label="Device details" className="flex overflow-x-auto border-b">
             {detailTabs.map((tab, index) => (
@@ -236,177 +295,174 @@ export function DeviceDetailView({
             hidden={activeTab !== "overview"}
             className="space-y-4"
           >
-            <Card>
-              <CardHeader>
-                <CardTitle>Machine summary</CardTitle>
-                <CardDescription>
-                  Latest inventory received <ObservedTime value={data?.host?.receivedAt} server />.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <Fact label="Hostname">
-                    <ObservedValue field={host?.hostname} />
-                  </Fact>
-                  <Fact label="Operating system">
-                    <ObservedValue field={host?.osId} />
-                  </Fact>
-                  <Fact label="OS version">
-                    <ObservedValue field={host?.osVersion} />
-                  </Fact>
-                  <Fact label="Kernel">
-                    <ObservedValue field={host?.kernelRelease} />
-                  </Fact>
-                  <Fact label="Hardware vendor">
-                    <ObservedValue field={host?.hardwareVendor} />
-                  </Fact>
-                  <Fact label="Model">
-                    <ObservedValue field={host?.hardwareModel} />
-                  </Fact>
-                  <Fact label="Serial number">
-                    <ObservedValue field={host?.hardwareSerial} />
-                  </Fact>
-                  <Fact label="CPU">
-                    <ObservedValue field={hardware?.cpu?.model} />
-                  </Fact>
-                  <Fact label="Logical cores">
-                    <NumberValue field={hardware?.cpu?.logicalCores} />
-                  </Fact>
-                  <Fact label="RAM">
-                    <NumberValue field={hardware?.memory?.totalBytes} unit="bytes" />
-                  </Fact>
-                  <Fact label="Disks">
-                    {storage?.status === CollectionStatus.SUCCESS ? (
-                      disks?.length ? (
-                        <ul className="space-y-1">
-                          {disks.map((disk) => (
-                            <li key={disk.name}>
-                              <code className="font-mono">{disk.name}</code>:{" "}
-                              <NumberValue field={disk.sizeBytes} unit="bytes" />
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span>No whole disks reported</span>
-                      )
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Access and reporting</h2>
+                <Button variant="link" onClick={() => activateTab("findings")}>
+                  Review findings
+                </Button>
+              </div>
+              <dl className="grid gap-6 sm:grid-cols-2">
+                <Fact label="Logged-in users">
+                  <NumberValue field={hardware?.sessions?.users} />
+                  {activeSessions?.status === CollectionStatus.SUCCESS ? (
+                    activeSessions.sessions.length ? (
+                      <ul className="mt-2 space-y-1">
+                        {activeSessions.sessions.map((session, index) => (
+                          <li key={index}>
+                            <ObservedValue field={session.userName} />
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
-                      <CollectionStatusBadge status={storage?.status} />
-                    )}
-                  </Fact>
-                  <Fact label="Root encryption">
-                    <ObservedValue field={root?.encryption} />
-                  </Fact>
-                  <Fact label="Logged-in users">
-                    <NumberValue field={hardware?.sessions?.users} />
-                    {activeSessions?.status === CollectionStatus.SUCCESS ? (
-                      activeSessions.sessions.length ? (
-                        <ul className="mt-2 space-y-1">
-                          {activeSessions.sessions.map((session, index) => (
-                            <li key={index}>
-                              <ObservedValue field={session.userName} />
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-2">No active sessions observed</p>
-                      )
-                    ) : (
-                      <p className="mt-2">
-                        Active session names:{" "}
-                        <CollectionStatusBadge status={activeSessions?.status} />
-                      </p>
-                    )}
-                  </Fact>
-                  <Fact label="Agent version">
-                    {device.agentVersionAcceptedAt && device.agentRelease ? (
-                      <div className="grid gap-1">
-                        <span>{device.agentRelease}</span>
-                        <span className="text-xs text-muted-foreground">
-                          Accepted <ObservedTime value={device.agentVersionAcceptedAt} server />
-                        </span>
-                      </div>
-                    ) : (
-                      <StatusBadge status="neutral">Not reported</StatusBadge>
-                    )}
-                  </Fact>
-                  <Fact label="Compliance">{compliance}</Fact>
-                  <Fact label="Last check-in">
-                    <ObservedTime value={device.lastSeenAt} server />
-                  </Fact>
-                  <Fact
-                    label={
-                      defaultInterfaces.length
-                        ? "Default-route IP and MAC"
-                        : "Observed network interfaces"
-                    }
-                  >
-                    {hardware?.network?.status === CollectionStatus.SUCCESS ? (
-                      hardware.network.interfaces.length ? (
-                        <ul className="space-y-3">
-                          {summaryInterfaces.slice(0, 4).map((network) => (
-                            <li key={network.name} className="grid gap-1">
-                              <span className="font-medium">{network.name}</span>
-                              <span className="text-xs">
-                                IPv4 default route:{" "}
-                                {network.defaultRouteIpv4?.status === CollectionStatus.SUCCESS ? (
-                                  network.defaultRouteIpv4.value ? (
-                                    "Yes"
-                                  ) : (
-                                    "No"
-                                  )
+                      <p className="mt-2">No active sessions observed</p>
+                    )
+                  ) : (
+                    <p className="mt-2">
+                      Active session names:{" "}
+                      <CollectionStatusBadge status={activeSessions?.status} />
+                    </p>
+                  )}
+                </Fact>
+                <Fact label="Agent version">
+                  {device.agentVersionAcceptedAt && device.agentRelease ? (
+                    <div className="grid gap-1">
+                      <span>{device.agentRelease}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Accepted <ObservedTime value={device.agentVersionAcceptedAt} server />
+                      </span>
+                    </div>
+                  ) : (
+                    <StatusBadge status="neutral">Not reported</StatusBadge>
+                  )}
+                </Fact>
+                <Fact
+                  label={
+                    defaultInterfaces.length
+                      ? "Default-route IP and MAC"
+                      : "Observed network interfaces"
+                  }
+                >
+                  {hardware?.network?.status === CollectionStatus.SUCCESS ? (
+                    hardware.network.interfaces.length ? (
+                      <ul className="space-y-3">
+                        {summaryInterfaces.slice(0, 4).map((network) => (
+                          <li key={network.name} className="grid gap-1">
+                            <span className="font-medium">{network.name}</span>
+                            <span className="text-xs">
+                              IPv4 default route:{" "}
+                              {network.defaultRouteIpv4?.status === CollectionStatus.SUCCESS ? (
+                                network.defaultRouteIpv4.value ? (
+                                  "Yes"
                                 ) : (
-                                  <CollectionStatusBadge
-                                    status={network.defaultRouteIpv4?.status}
-                                  />
-                                )}
-                              </span>
-                              <span className="text-xs">
-                                IPv6 default route:{" "}
-                                {network.defaultRouteIpv6?.status === CollectionStatus.SUCCESS ? (
-                                  network.defaultRouteIpv6.value ? (
-                                    "Yes"
-                                  ) : (
-                                    "No"
-                                  )
+                                  "No"
+                                )
+                              ) : (
+                                <CollectionStatusBadge status={network.defaultRouteIpv4?.status} />
+                              )}
+                            </span>
+                            <span className="text-xs">
+                              IPv6 default route:{" "}
+                              {network.defaultRouteIpv6?.status === CollectionStatus.SUCCESS ? (
+                                network.defaultRouteIpv6.value ? (
+                                  "Yes"
                                 ) : (
-                                  <CollectionStatusBadge
-                                    status={network.defaultRouteIpv6?.status}
-                                  />
-                                )}
-                              </span>
-                              <span>
-                                IP:{" "}
-                                {network.addresses?.status === CollectionStatus.SUCCESS ? (
-                                  network.addresses.values.join(", ") || "None observed"
-                                ) : (
-                                  <CollectionStatusBadge status={network.addresses?.status} />
-                                )}
-                              </span>
-                              <span>
-                                MAC: <ObservedValue field={network.mac} />
-                              </span>
-                            </li>
-                          ))}
-                          {summaryInterfaces.length > 4 || defaultInterfaces.length > 0 ? (
-                            <li>
-                              <Button variant="link" onClick={() => activateTab("inventory")}>
-                                View all {hardware.network.interfaces.length} interfaces in
-                                Inventory
-                              </Button>
-                            </li>
-                          ) : null}
-                        </ul>
-                      ) : (
-                        <span>No interfaces observed</span>
-                      )
+                                  "No"
+                                )
+                              ) : (
+                                <CollectionStatusBadge status={network.defaultRouteIpv6?.status} />
+                              )}
+                            </span>
+                            <span>
+                              IP:{" "}
+                              {network.addresses?.status === CollectionStatus.SUCCESS ? (
+                                network.addresses.values.join(", ") || "None observed"
+                              ) : (
+                                <CollectionStatusBadge status={network.addresses?.status} />
+                              )}
+                            </span>
+                            <span>
+                              MAC: <ObservedValue field={network.mac} />
+                            </span>
+                          </li>
+                        ))}
+                        {summaryInterfaces.length > 4 || defaultInterfaces.length > 0 ? (
+                          <li>
+                            <Button variant="link" onClick={() => activateTab("inventory")}>
+                              View all {hardware.network.interfaces.length} interfaces in Inventory
+                            </Button>
+                          </li>
+                        ) : null}
+                      </ul>
                     ) : (
-                      <CollectionStatusBadge status={hardware?.network?.status} />
-                    )}
-                  </Fact>
-                </dl>
-              </CardContent>
-            </Card>
-            <DeviceMetadataCard deviceId={deviceId} metadata={device.metadata} />
+                      <span>No interfaces observed</span>
+                    )
+                  ) : (
+                    <CollectionStatusBadge status={hardware?.network?.status} />
+                  )}
+                </Fact>
+              </dl>
+            </section>
+            <details className="border-y py-4">
+              <summary className="w-fit cursor-pointer text-base font-semibold">
+                Hardware and operating system
+              </summary>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Fact label="Operating system">
+                  <ObservedValue field={host?.osId} />
+                </Fact>
+                <Fact label="OS version">
+                  <ObservedValue field={host?.osVersion} />
+                </Fact>
+                <Fact label="Kernel">
+                  <ObservedValue field={host?.kernelRelease} />
+                </Fact>
+                <Fact label="Hardware vendor">
+                  <ObservedValue field={host?.hardwareVendor} />
+                </Fact>
+                <Fact label="Model">
+                  <ObservedValue field={host?.hardwareModel} />
+                </Fact>
+                <Fact label="Serial number">
+                  <ObservedValue field={host?.hardwareSerial} />
+                </Fact>
+                <Fact label="CPU">
+                  <ObservedValue field={hardware?.cpu?.model} />
+                </Fact>
+                <Fact label="Logical cores">
+                  <NumberValue field={hardware?.cpu?.logicalCores} />
+                </Fact>
+                <Fact label="RAM">
+                  <NumberValue field={hardware?.memory?.totalBytes} unit="bytes" />
+                </Fact>
+                <Fact label="Disks">
+                  {storage?.status === CollectionStatus.SUCCESS ? (
+                    disks?.length ? (
+                      <ul className="space-y-1">
+                        {disks.map((disk) => (
+                          <li key={disk.name}>
+                            <code className="font-mono">{disk.name}</code>:{" "}
+                            <NumberValue field={disk.sizeBytes} unit="bytes" />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span>No whole disks reported</span>
+                    )
+                  ) : (
+                    <CollectionStatusBadge status={storage?.status} />
+                  )}
+                </Fact>
+                <Fact label="Root encryption">
+                  <ObservedValue field={root?.encryption} />
+                </Fact>
+              </dl>
+            </details>
+            <DeviceMetadataCard
+              deviceId={deviceId}
+              metadata={device.metadata}
+              accountPicker={accountPicker}
+            />
             <details className="border p-4">
               <summary className="w-fit cursor-pointer font-medium">Details for support</summary>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

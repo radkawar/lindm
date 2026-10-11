@@ -2,15 +2,13 @@ import { create, toJsonString } from "@bufbuild/protobuf";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRightIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowUpRightIcon, RefreshCwIcon } from "lucide-react";
 import { DeviceState } from "../../../gen/lindm/admin/v1/admin_pb";
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
@@ -49,40 +47,27 @@ export function StaleDevices({
   const filter = toJsonString(DeviceFilterSchema, create(DeviceFilterSchema, { lastSeenUntil }));
 
   return (
-    <Card className="min-w-0" aria-busy={list.isFetching}>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>
-            <h2>Devices not seen recently</h2>
-          </CardTitle>
-          <Tooltip>
-            <TooltipTrigger
-              aria-label="About this list"
-              className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <InfoIcon className="size-3.5" aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm text-xs leading-relaxed">
-              Shows up to five devices. Devices that never checked in are not listed. Refresh the
-              dashboard to update the cutoff time.
-            </TooltipContent>
-          </Tooltip>
-        </div>
-        <CardDescription className="text-xs">
-          No check-in for over {staleAfterSeconds / 3600} hours.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
+    <section
+      className="grid min-w-0 gap-3 border-l pl-3"
+      aria-busy={list.isFetching}
+      data-review-metric=""
+    >
+      <h4 className="text-sm font-semibold">Stale contact preview</h4>
+      <p className="text-xs text-muted-foreground">
+        Up to five devices in enrollment order, not oldest first. This live list can differ from the
+        dashboard snapshot. Devices that never checked in are excluded.
+      </p>
+      <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground tabular-nums">
               {staleTotal.toString()}
             </span>{" "}
-            in total
+            devices at the dashboard snapshot, last seen over {staleAfterSeconds / 3600} hours ago.
+            Refresh the dashboard to update the cutoff.
           </p>
           <Button
             variant="outline"
-            size="sm"
             disabled={list.isFetching}
             onClick={() => {
               if (!lifetime.signal.aborted) void list.refetch();
@@ -100,14 +85,14 @@ export function StaleDevices({
               {data.devices.map((device) => (
                 <li
                   key={device.id}
-                  className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                  className="flex flex-wrap items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
                 >
-                  <div className="grid min-w-0 gap-1">
+                  <div className="grid min-w-0 flex-1 gap-1">
                     <Link
                       to="/devices/$deviceId"
                       params={{ deviceId: device.id }}
                       search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
-                      className="truncate text-sm font-medium underline-offset-4 hover:underline"
+                      className="break-words text-sm font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {device.hostname.trim() || "Unnamed device"}
                     </Link>
@@ -128,18 +113,18 @@ export function StaleDevices({
           </>
         ) : data ? (
           <EmptyState
-            title="All devices checked in recently"
-            description="No device has gone quiet past the cutoff."
+            title="No devices match this stale-contact cutoff"
+            description="This live preview excludes devices with no recorded check-in. It is not a fleet health assessment."
           />
         ) : null}
         <Link
           to="/devices"
           search={{ pageSize: 50, pageToken: "", filter }}
-          className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-4 hover:underline"
+          className="inline-flex min-h-8 items-center gap-1 text-sm font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          View all <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
+          Open filtered device list <ArrowUpRightIcon className="size-4" aria-hidden="true" />
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

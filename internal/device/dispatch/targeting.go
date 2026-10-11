@@ -51,7 +51,14 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 			return nil, err
 		}
 	}
-	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	isolation := pgx.RepeatableRead
+	switch any(req.Msg).(type) {
+	case *adminv1.PreviewTargetAssignmentImpactRequest, *adminv1.SaveTargetAssignmentImpactRequest:
+		// Impact takes SHARE input-table locks before reading membership. A
+		// pre-lock repeatable snapshot could miss a just-committed new member.
+		isolation = pgx.ReadCommitted
+	}
+	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: isolation})
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -109,6 +116,8 @@ func targetingError(err error) error {
 		return rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
 	}
 	switch {
+	case errors.Is(err, targeting.ErrImpactStale):
+		return rpcreason.Error(connect.CodeAborted, "targeting_impact_stale")
 	case errors.Is(err, targeting.ErrRejected):
 		return core.Invalid("invalid_targeting_request")
 	case errors.Is(err, targeting.ErrConflict):
@@ -152,6 +161,22 @@ func (s *Service) PreviewTargetAssignments(ctx context.Context, r *connect.Reque
 			return nil, err
 		}
 		return &adminv1.PreviewTargetAssignmentsResponse{Preview: p}, nil
+	})
+}
+
+func (s *Service) PreviewTargetAssignmentImpact(ctx context.Context, r *connect.Request[adminv1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[adminv1.PreviewTargetAssignmentImpactResponse], error) {
+	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.PreviewTargetAssignmentImpactRequest) (*adminv1.PreviewTargetAssignmentImpactResponse, error) {
+		return s.Targeting.Impact(ctx, tx, a.Principal(), r, s.targetImpactResolver())
+	})
+}
+
+func (s *Service) SaveTargetAssignmentImpact(ctx context.Context, r *connect.Request[adminv1.SaveTargetAssignmentImpactRequest]) (*connect.Response[adminv1.SaveTargetAssignmentImpactResponse], error) {
+	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.SaveTargetAssignmentImpactRequest) (*adminv1.SaveTargetAssignmentImpactResponse, error) {
+		saved, err := s.Targeting.SaveImpact(ctx, tx, a.Principal(), r, s.targetImpactResolver())
+		if err != nil {
+			return nil, err
+		}
+		return &adminv1.SaveTargetAssignmentImpactResponse{Assignment: saved.Assignment}, nil
 	})
 }
 func (s *Service) ActivateTargetPreview(ctx context.Context, r *connect.Request[adminv1.ActivateTargetPreviewRequest]) (*connect.Response[adminv1.ActivateTargetPreviewResponse], error) {

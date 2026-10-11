@@ -482,6 +482,41 @@ export function DevicesView({
   );
 }
 
+export function DeviceRevocationImpact({ device }: { device: Device }) {
+  return (
+    <dl className="grid gap-3 text-sm">
+      <div data-review-impact="targets">
+        <dt className="font-medium">Selected device</dt>
+        <dd className="break-words">{device.hostname.trim() || "Unnamed device"}</dd>
+      </div>
+      <div data-review-impact="count">
+        <dt className="font-medium">Scope</dt>
+        <dd>1 device</dd>
+      </div>
+      <div data-review-impact="effects">
+        <dt className="font-medium">Access and data</dt>
+        <dd>
+          Revokes this device&apos;s access to lindm. This is not a disk wipe or an account lock.
+        </dd>
+      </div>
+      <div data-review-impact="reversibility">
+        <dt className="font-medium">Recovery</dt>
+        <dd>
+          Existing device credentials are revoked; restoring management requires recovery
+          enrollment.
+        </dd>
+      </div>
+      <div data-review-impact="approval">
+        <dt className="font-medium">Approval required</dt>
+        <dd>
+          This requests approval, not immediate revocation. Another admin must approve within one
+          hour; then finish the revocation in Approvals.
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
 function DeviceRevokeDialog({ device, children }: { device: Device; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [visited, setVisited] = useState(false);
@@ -521,13 +556,19 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
         </DropdownMenuContent>
       </DropdownMenu>
       {visited ? (
-        <DialogContent keepMounted finalFocus={triggerRef} className="sm:max-w-lg">
+        <DialogContent
+          data-review-destructive="revoke-device"
+          keepMounted
+          finalFocus={triggerRef}
+          className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
+        >
           <DialogHeader>
             <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
             <DialogDescription>
-              Another admin must approve before this device is removed from lindm.
+              Review the access change before requesting approval.
             </DialogDescription>
           </DialogHeader>
+          <DeviceRevocationImpact device={device} />
           {children}
         </DialogContent>
       ) : null}

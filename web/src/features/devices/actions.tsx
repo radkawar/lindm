@@ -46,6 +46,7 @@ const closedReasonLabels: Record<string, string> = {
 
 export function DeviceLockRestriction({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, ""));
   if (query.isPending) return <p role="status">Loading lock status…</p>;
   if (query.error) {
@@ -57,13 +58,31 @@ export function DeviceLockRestriction({ deviceId }: { deviceId: string }) {
       <AlertTitle>Accounts on this device may be locked</AlertTitle>
       <AlertDescription>
         <p>
-          A lock action may have locked sessions or disabled local accounts. Use Undo account lock
-          to restore them. Screens stay locked until a user unlocks them.
+          A lock action may have locked sessions or disabled local accounts.{" "}
+          {canPermission(principal, actionPermissions.releaseLock)
+            ? "To restore accounts, choose Actions, then Undo account lock at the top of this page."
+            : "Ask an admin with account-unlock permission to undo the account lock."}{" "}
+          Screens stay locked until a user unlocks them.
         </p>
         <TechnicalDetails items={[{ label: "Lock action ID", value: query.data.lockActionId }]} />
-        <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          {query.data.lockActionId ? (
+            <Link
+              to="/devices/$deviceId/actions/$actionId"
+              params={{ deviceId, actionId: query.data.lockActionId }}
+              className="w-fit text-sm underline underline-offset-4"
+            >
+              Review the lock action
+            </Link>
+          ) : null}
+          <Button
+            variant="outline"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            Refresh lock status
+          </Button>
+        </div>
       </AlertDescription>
     </Alert>
   );

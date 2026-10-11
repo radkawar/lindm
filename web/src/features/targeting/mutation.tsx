@@ -8,7 +8,7 @@ import {
 } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -47,6 +47,7 @@ export function TargetMutation<S extends DescMessage>({
   initial,
   send,
   onAccepted,
+  fields,
 }: {
   title: string;
   formKey: string;
@@ -54,12 +55,19 @@ export function TargetMutation<S extends DescMessage>({
   initial: () => MessageShape<S>;
   send: (request: MessageShape<S>, signal: AbortSignal) => Promise<unknown>;
   onAccepted?: () => void;
+  fields?: (
+    request: MessageShape<S>,
+    change: (request: MessageShape<S>) => void,
+    disabled: boolean,
+  ) => ReactNode;
 }) {
   const lifetime = useAuthLifetime();
   const pickers = useTargetPickers();
   const client = useQueryClient();
   const [formGeneration, setFormGeneration] = useState(0);
   const attempt = useSyncExternalStore(subscribe, () => attempts.get(formKey));
+  const Container =
+    attempt?.status === "accepted" || attempt?.status === "rejected" ? "section" : "form";
   const [document, setDocument] = useState(() =>
     toJsonString(schema, initial(), { prettySpaces: 2 }),
   );
@@ -96,7 +104,7 @@ export function TargetMutation<S extends DescMessage>({
     },
   });
   return (
-    <form
+    <Container
       className="grid min-w-0 gap-3 border p-4"
       onSubmit={(event) => {
         event.preventDefault();
@@ -127,14 +135,22 @@ export function TargetMutation<S extends DescMessage>({
     >
       <h3 className="text-sm font-semibold">{title}</h3>
       <p className="text-sm text-muted-foreground">Once sent, edits are locked.</p>
-      <TargetFields
-        key={formGeneration}
-        schema={schema}
-        value={JSON.parse(attempt?.document ?? document) as JsonObject}
-        onChange={(value) => setDocument(JSON.stringify(value))}
-        pickers={pickers}
-        disabled={!!attempt}
-      />
+      {fields ? (
+        fields(
+          fromJsonString(schema, attempt?.document ?? document),
+          (request) => setDocument(toJsonString(schema, request)),
+          !!attempt,
+        )
+      ) : (
+        <TargetFields
+          key={formGeneration}
+          schema={schema}
+          value={JSON.parse(attempt?.document ?? document) as JsonObject}
+          onChange={(value) => setDocument(JSON.stringify(value))}
+          pickers={pickers}
+          disabled={!!attempt}
+        />
+      )}
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -158,8 +174,12 @@ export function TargetMutation<S extends DescMessage>({
         {!attempt || attempt.status === "ambiguous" ? (
           <Button type="submit">{attempt ? "Retry" : title}</Button>
         ) : null}
-        {attempt?.status === "pending" ? <Button disabled>Sending…</Button> : null}
-        {attempt && attempt.status !== "pending" ? (
+        {attempt?.status === "pending" ? (
+          <Button type="submit" disabled>
+            Sending…
+          </Button>
+        ) : null}
+        {attempt && (attempt.status === "accepted" || attempt.status === "rejected") ? (
           <Button
             type="button"
             variant="outline"
@@ -176,6 +196,6 @@ export function TargetMutation<S extends DescMessage>({
           </Button>
         ) : null}
       </div>
-    </form>
+    </Container>
   );
 }

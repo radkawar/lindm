@@ -145,8 +145,8 @@ destructive confirmation warnings visible. Long or multi-step forms on a detail 
 open in a dialog from the page action that names them (for example, Assign profile).
 
 Console copy is written for administrators, not for engineers. It is outcome-first,
-concise, sentence case and names the operator's next action ("Assignment saved. The
-device applies it at its next check-in."). Primary UI text (titles, descriptions,
+concise, sentence case and names the operator's next action ("Assignment saved. No
+device changes were activated."). Primary UI text (titles, descriptions,
 labels, badges, buttons, toasts and alerts) must not use internal model terms
 (for example desired state, generation or receipt) and never shows request IDs,
 record UUIDs or raw enum names. The maintained banned-term list and identifier
@@ -242,14 +242,18 @@ Boot and UKI capability. Missing, stale or insufficient observations block new
 approval/submission; exact ambiguous-request recovery remains available. Never
 treat locally configured artifact size as signed release metadata.
 
-Device Overview leads with the latest observed machine, hardware, network and
-encryption fields, compliance, ownership and last check-in. Keep collection states
+Device Overview leads with inventory receipt and the next safe inspection, then
+access/reporting evidence and ownership. Hardware and storage stay available in a
+disclosure; full Inventory is unchanged. Header contact, compliance and root
+encryption are not duplicated as a uniform field grid. Keep collection states
 visible; do not infer a primary network interface or agent version from unrelated
 fields. Protocol sequence counters belong in collapsed Diagnostics, not the summary.
 Agent version is the current generation's accepted signed-session release and
 receipt time, not inferred from installed packages. Network summaries use the
 reported per-family default-route markers, and active session names preserve each
 collection/field state. Inventory retains the full interface and session tables.
+The route supplies a named account picker for owner editing. **Preview settings**
+carries the selected device into Rollouts; the administrator never copies its UUID.
 
 `/dashboard` is the signed-in landing page. Its narrow `GetFleetSummary` admin RPC
 uses SQL aggregates across the caller's authorized device scopes, never page
@@ -273,13 +277,12 @@ response. Sections unavailable to a caller remain explicitly unavailable rather
 than reporting a misleading zero. Recorded actions are not proof of successful
 native execution. Principal-scoped query cancellation and invalidation remain
 in force.
-The dashboard presents exact distributions as an OS/version donut, service-resource
-stacked bar, and severity bars through official shadcn chart primitives and pinned
-Recharts, with the preset's neutral chart colors. Exact text legends remain
-available independently of the charts; animations are disabled and no trend is
-invented where historical aggregate data is absent. Chart custom properties are
-scoped using style attributes, not injected style elements, preserving the server's
-strict Content-Security-Policy without allowing inline style blocks.
+The dashboard leads with reviewable work and the consequence of each next action,
+then recent recorded activity. Exact distributions are supporting evidence, not
+equal-weight metric cards. Each metric group links to relevant evidence or action;
+unavailable counts are not zeros, and unchecked devices remain prominent beside
+finding counts. Fleet composition is optional detail. No trend or risk ranking is
+invented where the API supplies no history or exposure score.
 
 Device tables offer compact single-line rows, relative timestamps with absolute
 tooltips, status dots, current-page sorting, column visibility, and density.
@@ -304,6 +307,15 @@ Overview, Inventory, Services, Encryption, Actions, Findings and History.
 Inventory mounts on first activation (or an explicit package-search deep link),
 so opening Overview does not silently start an inventory cursor. Encryption and
 recovery secrets are cleared on navigation, blur and their existing expiry timers.
+
+Remote assistance leads with the support reason, person and consent state.
+The stop control remains prominent during open sessions. Waiting for consent
+does not imply screen sharing; disabled control explains its prerequisite.
+Ended sessions are records: show the end cause/time, explicitly historical control
+permission and a return-to-device action, not a dead screen/control panel.
+The request form asks for the user-visible reason before mode and duration.
+Session lifecycle, user consent, exact-request recovery and transport behavior
+remain unchanged; a UI-review fixture cannot qualify real screen or input transport.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;
@@ -644,7 +656,8 @@ intentionally drops a database. A named fixture retains it until explicit destro
 
 #### Console UI review
 
-`make ui-review` replaces the manual console review. It builds the embedded console
+`make ui-review` automates structural checks and emits an owner
+editing pass; it does not replace human design review. It builds the embedded console
 and runs `lab console review -lindmd artifacts/bin/lindmd -evidence NEW_DIR` from the
 checkout under review (needs running development PostgreSQL, protected dev trust
 and Playwright Chromium from `make browser-baseline`). The command opens the same
@@ -654,6 +667,10 @@ through the real password and WebAuthn flow (CDP virtual authenticator). Credent
 stay in a private 0600 file that is removed afterwards; the report is redacted and
 screenshots mask sensitive and password fields. `lab console -demo` serves the same
 seeded fleet interactively.
+For a private worktree, use `make ui-review UI_REVIEW_REPO=/path/to/shared-checkout`
+to read the shared fixture's protected trust without copying credentials. The
+embedded UI and browser runner still come from the current worktree; the default
+fixture repository is `.`.
 
 From a private worktree, use
 `make ui-review UI_REVIEW_REPO=/path/to/development-trust-checkout`.
@@ -715,6 +732,84 @@ sheet with each route's four captures side by side. Any finding exits nonzero an
 prints one line per finding. Fix findings in `web/src`; never relax a rule or exclude
 an element to get a pass. The only acceptable exception is a documented upstream
 library defect, recorded here with its cited reason.
+
+POV coverage is explicit in `web/acceptance/review-contracts.mjs`; a new route needs
+a contract as well as seed data. Dashboard, device detail (including every tab) and
+assistance viewer require a visible `data-review-page="dashboard|device|assistance"`
+region with an enabled, named `data-review-next-action` control (or a wrapper around
+one), or nonempty visible `data-review-state="clear|blocked"` copy. Other routes
+currently require only an enabled named main-content control or explicit state:
+**structural action coverage, not evidence of a well-chosen primary action**.
+Every visible `data-review-metric` needs an enabled action or explicit state inside
+it. Dashboard requires at least one marked metric unless explicitly blocked.
+Unmarked metrics are not inferred from numbers or card styling.
+
+Opened `data-review-destructive="ID"` dialogs require visible, nonempty
+`data-review-impact="targets|count|effects|reversibility|approval"` fields before a
+visible `data-review-confirm` control in DOM order. Use separate elements for each
+field, and truthful approval copy even when no further approval is required. The
+required `revoke-device` dialog must be observed on the device list or detail in
+every theme/viewport combination. Other marked dialogs are checked when opened;
+unopened dialogs, confirmation steps requiring form entry, unmarked workflows and
+unvisited permission/error states are **not** qualified. `report.json` includes
+the contracts, marker counts and observed destructive coverage. Humans must check
+all destructive workflows, exact targets/count, consequences, reversibility and
+approval before confirmation: markers do not establish accuracy or safety.
+Copy rules also reject “Manage your…”, “Welcome to…”, “Lorem” and “Click here”
+in the existing visible-copy scope; they do not detect every generic phrase or
+phrases split across text nodes.
+
+Every run also records seven seeded, authenticated administrator walkthroughs:
+Engineering laptop onboarding, a Finance baseline with impact preview, a lost
+laptop, critical-CVE exposure and patching, remote help, a limited-access helpdesk
+hire, and recovery-key reveals last week. `task-audit.html` and `task-audit.json`
+show each captured step, its task-shaped/partly/API-shaped assessment, generic
+material and proposed remedy. These are authored draft assessments for owner
+editing, not automated usability scores. Walkthrough screenshots join the owner
+edit sheet; each walkthrough uses the same UI as an administrator, not hidden RPC
+shortcuts. Any runner failure or unexpected administrator RPC HTTP error fails
+the review, even if a later read succeeds. Diagnostic records contain only bounded
+operation names, status codes and machine reasons, never request bodies or secrets.
+
+The seven walks run once in light desktop mode; they do not multiply the route
+matrix into seven claims of native end-to-end qualification. A walk reports
+**blocked**, not completed, when the actual UI cannot finish its job or a native
+installation, user consent, second approver or real device execution is required.
+An explicitly recorded product/prerequisite blocker is not itself a browser
+runner failure. Read the task outcomes alongside the machine gate: a green route
+review never means every administrator job succeeded. Fixture observations and
+provisioned accounts are synthetic; do not describe simulated device membership
+as a newly enrolled laptop or a queued action as a completed patch.
+
+The same run emits `edit-sheet.html`, linked from the contact sheet,
+`edit-sheet.json` (run-bound screen/evidence manifest) and
+`annotations-template.json` (empty, not owner feedback). Open the editing sheet
+locally, inspect its screenshot/dialog links and answer per-screen questions:
+what changed, what needs me, what acting does, and what is redundant. Complete a
+requested edit, observable acceptance criterion, assignee and priority for each
+screen needing a task. Leave other screens entirely blank; blank does not mean
+approved. Enter your own author identity and download `owner-annotations.json`.
+The sheet has no network writes, autosave or fabricated annotations; its file
+picker can resume a saved download from the same run.
+
+Import actual owner edits with the maintained local command:
+
+```sh
+chmod 600 /private/path/owner-annotations.json
+node web/acceptance/review-import.mjs \
+  EVIDENCE/edit-sheet.json /private/path/owner-annotations.json NEW_TASK_DIRECTORY
+```
+
+Inputs must be owner-held regular files with no group/other permissions, at most
+1 MiB each. The importer rejects unknown fields, mismatched run IDs, duplicate or
+unknown screens, blank required answers, invalid priorities and overlong text
+(120 characters for author/assignee; 2,000 for each answer/edit/criterion). It
+accepts 1–500 annotations, one task per screen, and requires a new output directory.
+It persists normalized `annotations.json` plus `tasks.json` with open actionable
+records, source author, assignee, acceptance criteria and screenshot references;
+it does not create tracker issues or infer owner approval. Keep the original
+evidence directory with those records. Reports and annotations may contain
+sensitive fleet information: keep them private and never enter credentials.
 
 Organize `web/src` around working product features:
 
@@ -2006,14 +2101,38 @@ retained revisions remain durable.
 The existing **Groups** page retains static authorization membership under
 unrestricted `accounts.manage`; its dynamic targeting section uses unrestricted
 `inventory.manage` and never creates RBAC membership from inventory predicates.
-**Rollouts** exposes real target-assignment and rollout administration, bounded
-100-record keyset pages, and typed ring/health policy documents. Global edits require
-unrestricted `resources.assign`; device preview and activation honor device scopes.
-Preview displays the immutable device-generation snapshot, input/resolution/preview
-digests, captured assignment revisions, resource conflicts, contributor revisions
-and explicitly unsupported dispatch capabilities. Dispatch support is not a native
-qualification claim. Activation pins the displayed device ID, preview ID and digest
-and never rebases automatically; the server rechecks freshness and authority.
+**Rollouts** starts with **Assign a baseline**: choose a named cohort and profile
+revision, review the actual affected devices, then acknowledge the evidence and
+save with a reason. The read-only report compares current recorded settings with
+the proposed resolution, including conflicts, unknown membership and stale inventory.
+It is bounded to 10,000 candidates and 64 MiB, pages at most 20 device rows, expires
+within 15 minutes, and refuses save when incomplete or changed. Saving an assignment
+does not activate it or prove native execution. Optional exclusions, priority,
+windows and staged-rollout association remain explicit controls, not JSON editors.
+Reviewed impact binds the rollout's durable revision, admitted stage and pause state,
+including empty-cohort dependencies. Fresh health receipts and elapsed soak alone
+do not invalidate that review; the cached input never hashes live health projections.
+Retained assignment/rollout lists use bounded 100-record keyset pages. Stage names,
+shares, evidence thresholds and manual promotion have task-specific controls.
+Reading or refreshing a rollout list never advances a stage. Automatic rings show
+**Waiting to advance** until a promotion is recorded; a final stage is not labelled
+completed, because entering it is not proof of device execution.
+System pause causes include a remedy, including loss of the creator's authorization;
+the exact recorded pause reason remains available in Details.
+While the staged-rollout disclosure is open in a visible tab, its retained state
+refreshes every ten seconds. Closing it or hiding the tab stops interval refreshes;
+server-side progression does not depend on this observer.
+Promotion evidence separates cumulative, deduplicated health counts from current-stage
+admission. Earliest soak completion is not a promised promotion time; passing health
+and soak still requires the server to reauthorize the creator before advancing.
+Only manual rings with a next stage offer an administrator's advance action.
+Passive refresh preserves the unsent control request and its captured revision;
+a concurrent stage change must conflict, not silently rewrite that decision.
+Global edits require unrestricted `resources.assign`; device inspection and
+activation honor device scopes. Inspecting current settings is a separate disclosure:
+its immutable evidence includes resource conflicts, contributors and unsupported
+dispatch capabilities. Dispatch support is not a native qualification claim.
+Activation pins the reviewed device and evidence; it never rebases automatically.
 When policy requires an independent human, the console submits that exact activation
 to the existing approval inbox; execution attaches its approval ID without changing
 the captured target. Mutations have no automatic retry, and ambiguous requests

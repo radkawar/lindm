@@ -113,6 +113,12 @@ const (
 	// AdminServiceListAuditEventsProcedure is the fully-qualified name of the AdminService's
 	// ListAuditEvents RPC.
 	AdminServiceListAuditEventsProcedure = "/lindm.admin.v1.AdminService/ListAuditEvents"
+	// AdminServiceListAuditActorsProcedure is the fully-qualified name of the AdminService's
+	// ListAuditActors RPC.
+	AdminServiceListAuditActorsProcedure = "/lindm.admin.v1.AdminService/ListAuditActors"
+	// AdminServiceListAuditDevicesProcedure is the fully-qualified name of the AdminService's
+	// ListAuditDevices RPC.
+	AdminServiceListAuditDevicesProcedure = "/lindm.admin.v1.AdminService/ListAuditDevices"
 	// AdminServiceGetExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
 	// GetExecutionAuthority RPC.
 	AdminServiceGetExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/GetExecutionAuthority"
@@ -155,6 +161,12 @@ const (
 	// AdminServicePreviewTargetAssignmentsProcedure is the fully-qualified name of the AdminService's
 	// PreviewTargetAssignments RPC.
 	AdminServicePreviewTargetAssignmentsProcedure = "/lindm.admin.v1.AdminService/PreviewTargetAssignments"
+	// AdminServicePreviewTargetAssignmentImpactProcedure is the fully-qualified name of the
+	// AdminService's PreviewTargetAssignmentImpact RPC.
+	AdminServicePreviewTargetAssignmentImpactProcedure = "/lindm.admin.v1.AdminService/PreviewTargetAssignmentImpact"
+	// AdminServiceSaveTargetAssignmentImpactProcedure is the fully-qualified name of the AdminService's
+	// SaveTargetAssignmentImpact RPC.
+	AdminServiceSaveTargetAssignmentImpactProcedure = "/lindm.admin.v1.AdminService/SaveTargetAssignmentImpact"
 	// AdminServiceActivateTargetPreviewProcedure is the fully-qualified name of the AdminService's
 	// ActivateTargetPreview RPC.
 	AdminServiceActivateTargetPreviewProcedure = "/lindm.admin.v1.AdminService/ActivateTargetPreview"
@@ -286,6 +298,8 @@ type AdminServiceClient interface {
 	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
 	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	ListAuditActors(context.Context, *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error)
+	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
 	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
@@ -300,6 +314,8 @@ type AdminServiceClient interface {
 	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
+	PreviewTargetAssignmentImpact(context.Context, *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error)
+	SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error)
 	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
 	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
@@ -511,6 +527,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListAuditEvents")),
 			connect.WithClientOptions(opts...),
 		),
+		listAuditActors: connect.NewClient[v1.ListAuditActorsRequest, v1.ListAuditActorsResponse](
+			httpClient,
+			baseURL+AdminServiceListAuditActorsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAuditActors")),
+			connect.WithClientOptions(opts...),
+		),
+		listAuditDevices: connect.NewClient[v1.ListAuditDevicesRequest, v1.ListAuditDevicesResponse](
+			httpClient,
+			baseURL+AdminServiceListAuditDevicesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAuditDevices")),
+			connect.WithClientOptions(opts...),
+		),
 		getExecutionAuthority: connect.NewClient[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse](
 			httpClient,
 			baseURL+AdminServiceGetExecutionAuthorityProcedure,
@@ -593,6 +621,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServicePreviewTargetAssignmentsProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignments")),
+			connect.WithClientOptions(opts...),
+		),
+		previewTargetAssignmentImpact: connect.NewClient[v1.PreviewTargetAssignmentImpactRequest, v1.PreviewTargetAssignmentImpactResponse](
+			httpClient,
+			baseURL+AdminServicePreviewTargetAssignmentImpactProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignmentImpact")),
+			connect.WithClientOptions(opts...),
+		),
+		saveTargetAssignmentImpact: connect.NewClient[v1.SaveTargetAssignmentImpactRequest, v1.SaveTargetAssignmentImpactResponse](
+			httpClient,
+			baseURL+AdminServiceSaveTargetAssignmentImpactProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SaveTargetAssignmentImpact")),
 			connect.WithClientOptions(opts...),
 		),
 		activateTargetPreview: connect.NewClient[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse](
@@ -831,6 +871,8 @@ type adminServiceClient struct {
 	approveApproval                      *connect.Client[v1.ApproveApprovalRequest, v1.ApproveApprovalResponse]
 	rejectApproval                       *connect.Client[v1.RejectApprovalRequest, v1.RejectApprovalResponse]
 	listAuditEvents                      *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	listAuditActors                      *connect.Client[v1.ListAuditActorsRequest, v1.ListAuditActorsResponse]
+	listAuditDevices                     *connect.Client[v1.ListAuditDevicesRequest, v1.ListAuditDevicesResponse]
 	getExecutionAuthority                *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
 	updateExecutionAuthority             *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
 	publishProfileRevision               *connect.Client[v1.PublishProfileRevisionRequest, v1.PublishProfileRevisionResponse]
@@ -845,6 +887,8 @@ type adminServiceClient struct {
 	putTargetAssignment                  *connect.Client[v1.PutTargetAssignmentRequest, v1.PutTargetAssignmentResponse]
 	listTargetAssignments                *connect.Client[v1.ListTargetAssignmentsRequest, v1.ListTargetAssignmentsResponse]
 	previewTargetAssignments             *connect.Client[v1.PreviewTargetAssignmentsRequest, v1.PreviewTargetAssignmentsResponse]
+	previewTargetAssignmentImpact        *connect.Client[v1.PreviewTargetAssignmentImpactRequest, v1.PreviewTargetAssignmentImpactResponse]
+	saveTargetAssignmentImpact           *connect.Client[v1.SaveTargetAssignmentImpactRequest, v1.SaveTargetAssignmentImpactResponse]
 	activateTargetPreview                *connect.Client[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse]
 	putRollout                           *connect.Client[v1.PutRolloutRequest, v1.PutRolloutResponse]
 	controlRollout                       *connect.Client[v1.ControlRolloutRequest, v1.ControlRolloutResponse]
@@ -1018,6 +1062,16 @@ func (c *adminServiceClient) ListAuditEvents(ctx context.Context, req *connect.R
 	return c.listAuditEvents.CallUnary(ctx, req)
 }
 
+// ListAuditActors calls lindm.admin.v1.AdminService.ListAuditActors.
+func (c *adminServiceClient) ListAuditActors(ctx context.Context, req *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error) {
+	return c.listAuditActors.CallUnary(ctx, req)
+}
+
+// ListAuditDevices calls lindm.admin.v1.AdminService.ListAuditDevices.
+func (c *adminServiceClient) ListAuditDevices(ctx context.Context, req *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error) {
+	return c.listAuditDevices.CallUnary(ctx, req)
+}
+
 // GetExecutionAuthority calls lindm.admin.v1.AdminService.GetExecutionAuthority.
 func (c *adminServiceClient) GetExecutionAuthority(ctx context.Context, req *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error) {
 	return c.getExecutionAuthority.CallUnary(ctx, req)
@@ -1086,6 +1140,16 @@ func (c *adminServiceClient) ListTargetAssignments(ctx context.Context, req *con
 // PreviewTargetAssignments calls lindm.admin.v1.AdminService.PreviewTargetAssignments.
 func (c *adminServiceClient) PreviewTargetAssignments(ctx context.Context, req *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error) {
 	return c.previewTargetAssignments.CallUnary(ctx, req)
+}
+
+// PreviewTargetAssignmentImpact calls lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact.
+func (c *adminServiceClient) PreviewTargetAssignmentImpact(ctx context.Context, req *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error) {
+	return c.previewTargetAssignmentImpact.CallUnary(ctx, req)
+}
+
+// SaveTargetAssignmentImpact calls lindm.admin.v1.AdminService.SaveTargetAssignmentImpact.
+func (c *adminServiceClient) SaveTargetAssignmentImpact(ctx context.Context, req *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error) {
+	return c.saveTargetAssignmentImpact.CallUnary(ctx, req)
 }
 
 // ActivateTargetPreview calls lindm.admin.v1.AdminService.ActivateTargetPreview.
@@ -1288,6 +1352,8 @@ type AdminServiceHandler interface {
 	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
 	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	ListAuditActors(context.Context, *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error)
+	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
 	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
@@ -1302,6 +1368,8 @@ type AdminServiceHandler interface {
 	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
+	PreviewTargetAssignmentImpact(context.Context, *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error)
+	SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error)
 	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
 	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
@@ -1509,6 +1577,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ListAuditEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListAuditActorsHandler := connect.NewUnaryHandler(
+		AdminServiceListAuditActorsProcedure,
+		svc.ListAuditActors,
+		connect.WithSchema(adminServiceMethods.ByName("ListAuditActors")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAuditDevicesHandler := connect.NewUnaryHandler(
+		AdminServiceListAuditDevicesProcedure,
+		svc.ListAuditDevices,
+		connect.WithSchema(adminServiceMethods.ByName("ListAuditDevices")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetExecutionAuthorityHandler := connect.NewUnaryHandler(
 		AdminServiceGetExecutionAuthorityProcedure,
 		svc.GetExecutionAuthority,
@@ -1591,6 +1671,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServicePreviewTargetAssignmentsProcedure,
 		svc.PreviewTargetAssignments,
 		connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignments")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePreviewTargetAssignmentImpactHandler := connect.NewUnaryHandler(
+		AdminServicePreviewTargetAssignmentImpactProcedure,
+		svc.PreviewTargetAssignmentImpact,
+		connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignmentImpact")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSaveTargetAssignmentImpactHandler := connect.NewUnaryHandler(
+		AdminServiceSaveTargetAssignmentImpactProcedure,
+		svc.SaveTargetAssignmentImpact,
+		connect.WithSchema(adminServiceMethods.ByName("SaveTargetAssignmentImpact")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceActivateTargetPreviewHandler := connect.NewUnaryHandler(
@@ -1853,6 +1945,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceRejectApprovalHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditEventsProcedure:
 			adminServiceListAuditEventsHandler.ServeHTTP(w, r)
+		case AdminServiceListAuditActorsProcedure:
+			adminServiceListAuditActorsHandler.ServeHTTP(w, r)
+		case AdminServiceListAuditDevicesProcedure:
+			adminServiceListAuditDevicesHandler.ServeHTTP(w, r)
 		case AdminServiceGetExecutionAuthorityProcedure:
 			adminServiceGetExecutionAuthorityHandler.ServeHTTP(w, r)
 		case AdminServiceUpdateExecutionAuthorityProcedure:
@@ -1881,6 +1977,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceListTargetAssignmentsHandler.ServeHTTP(w, r)
 		case AdminServicePreviewTargetAssignmentsProcedure:
 			adminServicePreviewTargetAssignmentsHandler.ServeHTTP(w, r)
+		case AdminServicePreviewTargetAssignmentImpactProcedure:
+			adminServicePreviewTargetAssignmentImpactHandler.ServeHTTP(w, r)
+		case AdminServiceSaveTargetAssignmentImpactProcedure:
+			adminServiceSaveTargetAssignmentImpactHandler.ServeHTTP(w, r)
 		case AdminServiceActivateTargetPreviewProcedure:
 			adminServiceActivateTargetPreviewHandler.ServeHTTP(w, r)
 		case AdminServicePutRolloutProcedure:
@@ -2066,6 +2166,14 @@ func (UnimplementedAdminServiceHandler) ListAuditEvents(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAuditEvents is not implemented"))
 }
 
+func (UnimplementedAdminServiceHandler) ListAuditActors(context.Context, *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAuditActors is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAuditDevices is not implemented"))
+}
+
 func (UnimplementedAdminServiceHandler) GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetExecutionAuthority is not implemented"))
 }
@@ -2120,6 +2228,14 @@ func (UnimplementedAdminServiceHandler) ListTargetAssignments(context.Context, *
 
 func (UnimplementedAdminServiceHandler) PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreviewTargetAssignments is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PreviewTargetAssignmentImpact(context.Context, *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SaveTargetAssignmentImpact is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error) {

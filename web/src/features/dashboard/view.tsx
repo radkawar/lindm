@@ -1,3 +1,4 @@
+import { create, toJsonString } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -9,33 +10,38 @@ import {
   Settings2Icon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis, YAxis } from "recharts";
 import type { FleetRecentAction } from "../../../gen/lindm/admin/v1/fleet_summary_pb";
+import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/time";
-import { fleetSummaryQueryOptions } from "./queries";
+import { fleetSummaryQueryOptions, staleContactUntil } from "./queries";
 import { StaleDevices } from "./stale-devices";
 
-const approvalHelp =
-  "Requests waiting in your approval inbox. Another admin must approve each one before it runs.";
+const actionLabels: Record<string, string> = {
+  "device.escrow-rotate.v1": "Rotate escrow recovery key",
+  "device.tpm2-bind.v1": "Bind TPM 2.0 unlock",
+  "device.lock-sessions.v1": "Lock sessions and local accounts",
+  "device.release-lock.v1": "Undo account lock",
+  "device.quarantine.v1": "Quarantine network",
+  "device.release-quarantine.v1": "Release quarantine",
+  "device.crypto-erase.v1": "Wipe encrypted storage",
+  "device.sanitize.v1": "Sanitize offline unencrypted disk",
+  "device.restart.v1": "Restart device",
+  "device.shutdown.v1": "Shut down device",
+  "device.refresh-inventory.v1": "Refresh inventory",
+  "device.local-admin-rotate.v1": "Rotate managed local-admin password",
+};
 
 const osNames: Record<string, string> = {
   almalinux: "AlmaLinux",
@@ -76,6 +82,15 @@ export function DashboardView() {
   const approvals = data?.approvals;
   const patch = data?.patchCompliance;
   const observed = formatTimestamp(data?.observedAt);
+  const staleFilter =
+    data?.observedAt && contact
+      ? toJsonString(
+          DeviceFilterSchema,
+          create(DeviceFilterSchema, {
+            lastSeenUntil: staleContactUntil(data.observedAt, contact.staleAfterSeconds),
+          }),
+        )
+      : undefined;
 
   const osRows = operatingSystems
     ? operatingSystems.groups.map(
@@ -94,13 +109,13 @@ export function DashboardView() {
         ["Unknown", compliance.unknownResources],
       ]
     : [];
-  const patchStaleHours = patch ? patch.staleAfterSeconds / 3600 : 0;
+
   const patchRows: [string, bigint][] = patch
     ? [
         ["Patched", patch.patchedDevices],
         ["Security pending", patch.securityPendingDevices],
         ["Reboot required", patch.rebootRequiredDevices],
-        [`Stale (over ${patchStaleHours} hours)`, patch.staleDevices],
+        [`Stale (over ${patch.staleAfterSeconds / 3600} hours)`, patch.staleDevices],
         ["Unknown", patch.unknownDevices],
       ]
     : [];
@@ -113,31 +128,57 @@ export function DashboardView() {
         ["Other", findings.otherFindings],
       ]
     : [];
+  // Workflow order, not a risk score. Never combine unlike populations.
+  const next =
+    approvals && approvals.pendingApprovals > 0n
+      ? "approvals"
+      : contact && contact.staleDevices > 0n && staleFilter
+        ? "contact"
+        : compliance &&
+            (compliance.attentionResources > 0n ||
+              compliance.staleResources > 0n ||
+              compliance.unknownResources > 0n)
+          ? "profiles"
+          : findings &&
+              (findings.unknownDevices > 0n ||
+                findings.partialDevices > 0n ||
+                findingRows.some(([, count]) => count > 0n))
+            ? "findings"
+            : patch &&
+                (patch.securityPendingDevices > 0n ||
+                  patch.rebootRequiredDevices > 0n ||
+                  patch.staleDevices > 0n ||
+                  patch.unknownDevices > 0n ||
+                  patch.failedRunDevices > 0n)
+              ? "patch"
+              : "devices";
 
   return (
-    <section className="grid min-w-0 gap-5" aria-busy={summary.isFetching}>
+    <section
+      className="grid min-w-0 gap-6"
+      aria-busy={summary.isFetching}
+      data-review-page="dashboard"
+    >
       <PageHeader
         title="Dashboard"
-        description="Your fleet at a glance."
+        description="Review work in your authorized scopes."
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canReadFleet || summary.isFetching}
-              onClick={() => {
-                if (!lifetime.signal.aborted) void summary.refetch();
-              }}
-            >
-              <RefreshCwIcon aria-hidden="true" />
-              {summary.isFetching ? "Refreshing…" : "Refresh"}
-            </Button>
-          </>
+          <Button
+            variant="outline"
+            disabled={!canReadFleet || summary.isFetching}
+            data-review-next-action={failure && !summary.isFetching ? "" : undefined}
+            onClick={() => {
+              if (!lifetime.signal.aborted) void summary.refetch();
+            }}
+          >
+            <RefreshCwIcon aria-hidden="true" />
+            {summary.isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
         }
       />
 
       {!canReadFleet ? (
-        <Alert>
+        <Alert data-review-state="blocked">
           <AlertTitle>You can't view the fleet overview</AlertTitle>
           <AlertDescription>
             Ask an owner for fleet read access. You can still check{" "}
@@ -148,223 +189,232 @@ export function DashboardView() {
           </AlertDescription>
         </Alert>
       ) : failure ? (
-        <RpcError failure={failure} title="Couldn't load the fleet overview" />
+        <div data-review-state="blocked">
+          <RpcError failure={failure} title="Couldn't load the fleet overview" />
+        </div>
       ) : summary.isPending ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading…
+        <p role="status" data-review-state="blocked" className="text-sm text-muted-foreground">
+          Loading the work queue. Wait for the current counts before deciding.
         </p>
       ) : null}
 
       {data ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric
-              title="Enrolled"
-              value={lifecycle?.activeDevices}
-              detail={
-                lifecycle
-                  ? `${lifecycle.totalDevices.toString()} devices in total.`
-                  : "Enrollment summary unavailable."
-              }
-              help="Devices that finished enrolling and can be managed. Being enrolled does not mean a device is healthy."
-            />
-            <Metric
-              title="Waiting to enroll"
-              value={lifecycle?.pendingDevices}
-              detail="Started enrolling but not finished yet."
-              help="These devices may be waiting for an admin to approve them. See Enrollment."
-            />
-            <Metric
-              title="Not seen recently"
-              value={contact?.staleDevices}
-              detail={
-                contact
-                  ? `No check-in for over ${contact.staleAfterSeconds / 3600} hours.`
-                  : "Check-in summary unavailable."
-              }
-              help="Devices that never checked in are counted as unknown, not here."
-            />
-            <Metric
-              title="Approval requests"
-              value={approvals?.pendingApprovals}
-              detail={approvals ? "Waiting in your inbox." : "Approval summary unavailable."}
-              help={approvalHelp}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              Updated{" "}
-              {observed.date ? (
-                <time dateTime={observed.utc}>{observed.local}</time>
-              ) : (
-                observed.local
-              )}
-            </span>
-            <Link to="/approvals" className={linkClass}>
-              Review approvals <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-
-          <div className="grid items-stretch gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-            <Panel
-              title="Operating systems"
-              description="Devices by operating system and version."
-              help="From each device's latest report. The twenty largest groups are shown; Other contains the rest."
-            >
-              {operatingSystems ? (
-                <DistributionChart
-                  kind="donut"
-                  rows={osRows}
-                  label="Devices"
-                  ariaLabel="Devices by operating system and version"
-                />
-              ) : (
-                <Unavailable section="Operating system" />
-              )}
-            </Panel>
-            <Panel
-              title="Service compliance"
-              description="Profile items assigned to devices."
-              help="Counts profile items, not devices. Devices without a profile are not counted as compliant. Open a device for details."
-            >
-              {compliance ? (
-                <>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-semibold tabular-nums">
-                      {compliance.totalResources.toString()}
-                    </span>
-                    <span className="text-xs text-muted-foreground">profile items</span>
-                  </div>
-                  <DistributionChart
-                    kind="stacked"
-                    rows={complianceRows}
-                    label="Resources"
-                    ariaLabel="Service resource compliance distribution"
-                  />
-                  <p className="mt-auto text-xs text-muted-foreground">
-                    {compliance.unassignedDevices.toString()} devices without a profile.
+          <section aria-labelledby="work-queue-title" className="grid gap-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="work-queue-title" className="text-base font-semibold">
+                Needs review
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Fleet snapshot{" "}
+                {observed.date ? (
+                  <time dateTime={observed.utc}>{observed.local}</time>
+                ) : (
+                  observed.local
+                )}
+              </p>
+            </div>
+            <div className="divide-y border-y">
+              <WorkItem
+                title="Approval requests"
+                primary={next === "approvals"}
+                action={
+                  <Link to="/approvals" className={queueLinkClass(next === "approvals")}>
+                    Review approvals <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {approvals ? (
+                  <p>
+                    <strong className="font-semibold tabular-nums">
+                      {approvals.pendingApprovals.toString()}
+                    </strong>{" "}
+                    pending requests in your inbox.
                   </p>
-                </>
-              ) : (
-                <Unavailable section="Service compliance" />
-              )}
-            </Panel>
-            <Panel
-              title="Patch compliance"
-              description="Active devices by latest OS patch status."
-              help={`Each active device's latest patch status, computed offline on the device from its native package cache (unattended-upgrades or DNF automatic) and published with host inventory. Categories are disjoint: security pending means one or more pending security updates; reboot required means none pending but the native reboot oracle is set; stale means computed over ${patchStaleHours} hours before the summary; unknown means no status or the device reported it unavailable. Pending security updates and failed runs count fresh statuses only. Device-reported telemetry, not native installation proof.`}
-            >
-              {patch ? (
-                <>
-                  <DistributionChart
-                    kind="donut"
-                    rows={patchRows}
-                    label="Devices"
-                    ariaLabel="Active devices by patch compliance"
-                  />
-                  <p className="mt-auto text-xs text-muted-foreground">
-                    {patch.pendingSecurityUpdates.toString()} pending security updates ·{" "}
-                    {patch.failedRunDevices.toString()} devices whose last update run failed
-                  </p>
-                </>
-              ) : (
-                <Unavailable section="Patch compliance" />
-              )}
-            </Panel>
-            <Panel
-              title="Open security findings"
-              description="Findings by severity."
-              help="Counts findings, not devices. Accepted findings are not included. Missing advisory data can hide findings, so zero does not guarantee no exposure."
-            >
-              {findings ? (
-                <>
-                  <DistributionChart
-                    kind="severity"
-                    rows={findingRows}
-                    label="Findings"
-                    ariaLabel="Open findings by severity"
-                  />
+                ) : (
+                  <Unavailable section="Approval summary" />
+                )}
+                <div className="flex items-center gap-1">
                   <p className="text-xs text-muted-foreground">
-                    Devices checked: {findings.evaluatedDevices.toString()} · partly checked:{" "}
-                    {findings.partialDevices.toString()} · not checked:{" "}
-                    {findings.unknownDevices.toString()}
+                    Review targets and effects before approving. Opening the inbox changes nothing.
                   </p>
-                </>
-              ) : (
-                <Unavailable section="Advisory" />
-              )}
-              <Link to="/advisories" className={`${linkClass} mt-auto`}>
-                Open advisories <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-              </Link>
-            </Panel>
-          </div>
-
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <Panel
-              title="Fleet status"
-              description="Enrollment and last check-in."
-              help="Last check-in is when the server last heard from each device."
-            >
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="grid content-start gap-3">
-                  <h3 className="text-xs font-medium text-muted-foreground">Enrollment</h3>
-                  {lifecycle ? (
-                    <CountList
-                      rows={[
-                        ["Waiting to enroll", lifecycle.pendingDevices],
-                        ["Enrolled", lifecycle.activeDevices],
-                        ["Revoked", lifecycle.revokedDevices],
-                        ["Recovery hold", lifecycle.recoveryHoldDevices],
-                      ]}
-                    />
-                  ) : (
-                    <Unavailable section="Enrollment state" />
-                  )}
+                  <Help label="About approval counts">
+                    Requests waiting in your approval inbox. Another admin must approve each one
+                    before it runs. Pending, unexpired records are counted separately from the fleet
+                    snapshot. A pending request is not a guarantee you can approve it; authority is
+                    checked again at approval.
+                  </Help>
                 </div>
-                <div className="grid content-start gap-3">
-                  <h3 className="text-xs font-medium text-muted-foreground">Last check-in</h3>
-                  {contact ? (
-                    <CountList
-                      rows={[
-                        [`Within ${contact.staleAfterSeconds / 3600} hours`, contact.recentDevices],
-                        [`Over ${contact.staleAfterSeconds / 3600} hours`, contact.staleDevices],
-                        ["Unknown", contact.unknownDevices],
-                      ]}
-                    />
+              </WorkItem>
+              <WorkItem
+                title="Stale contact"
+                primary={next === "contact"}
+                action={
+                  staleFilter ? (
+                    <Link
+                      to="/devices"
+                      search={{ pageSize: 50, pageToken: "", filter: staleFilter }}
+                      className={queueLinkClass(next === "contact")}
+                    >
+                      Review stale devices{" "}
+                      <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                    </Link>
                   ) : (
-                    <Unavailable section="Contact" />
-                  )}
-                </div>
+                    <Link to="/devices" className={linkClass}>
+                      Browse devices
+                    </Link>
+                  )
+                }
+              >
+                {contact ? (
+                  <>
+                    <p>
+                      <strong className="font-semibold tabular-nums">
+                        {contact.staleDevices.toString()}
+                      </strong>{" "}
+                      devices last seen over {contact.staleAfterSeconds / 3600} hours ago.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Devices with no recorded check-in: {contact.unknownDevices.toString()}.
+                      Excluded from the stale list. Review contact evidence before sending work.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Contact summary" />
+                )}
+                {data.observedAt && contact ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Preview stale devices
+                    </summary>
+                    <div className="mt-3">
+                      <StaleDevices
+                        observedAt={data.observedAt}
+                        staleAfterSeconds={contact.staleAfterSeconds}
+                        staleTotal={contact.staleDevices}
+                      />
+                    </div>
+                  </details>
+                ) : null}
+              </WorkItem>
+              <WorkItem
+                title="Profile items"
+                primary={next === "profiles"}
+                action={
+                  <Link to="/devices" className={queueLinkClass(next === "profiles")}>
+                    Inspect device services{" "}
+                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {compliance ? (
+                  <>
+                    <p>
+                      <strong className="font-semibold tabular-nums">
+                        {compliance.attentionResources.toString()}
+                      </strong>{" "}
+                      items need attention · {compliance.staleResources.toString()} not checked
+                      recently · {compliance.unknownResources.toString()} unknown.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Counts assigned items, not devices. Open a device's Services tab for the cause
+                      before changing its profile.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Profile item summary" />
+                )}
+              </WorkItem>
+              <WorkItem
+                title="Security findings and coverage"
+                primary={next === "findings"}
+                action={
+                  <Link to="/advisories" className={queueLinkClass(next === "findings")}>
+                    Review advisory evidence{" "}
+                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {findings ? (
+                  <>
+                    <p>
+                      <strong className="font-semibold tabular-nums">
+                        {findings.unknownDevices.toString()}
+                      </strong>{" "}
+                      active devices not checked · {findings.partialDevices.toString()} partly
+                      checked · {findings.evaluatedDevices.toString()} checked.
+                    </p>
+                    <p>
+                      {findings.criticalFindings.toString()} critical findings ·{" "}
+                      {findings.highFindings.toString()} high findings.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Advisory summary" />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Missing advisory coverage can hide exposure. Review sources and affected devices;
+                  zero findings does not mean no exposure.
+                </p>
+              </WorkItem>
+              <WorkItem
+                title="OS patch follow-up"
+                primary={next === "patch"}
+                action={
+                  <Link to="/devices" className={queueLinkClass(next === "patch")}>
+                    Inspect device patch status{" "}
+                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {patch ? (
+                  <>
+                    <p>
+                      {patch.securityPendingDevices.toString()} active devices with security updates
+                      pending · {patch.rebootRequiredDevices.toString()} requiring reboot.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {patch.staleDevices.toString()} stale · {patch.unknownDevices.toString()}{" "}
+                      unknown · {patch.failedRunDevices.toString()} whose last update run failed.
+                      Inspect device-reported status before choosing a maintenance action.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Patch compliance" />
+                )}
+              </WorkItem>
+            </div>
+            {next === "devices" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Review device evidence for enrollment, missing contact and any unavailable
+                  summaries. This queue is not a fleet health assessment.
+                </p>
+                <Link to="/devices" data-review-next-action="" className={queueLinkClass(true)}>
+                  Inspect device evidence <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                </Link>
               </div>
-              <Link to="/devices" className={linkClass}>
-                Browse devices <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
-              </Link>
-            </Panel>
-            {data.observedAt && contact ? (
-              <StaleDevices
-                observedAt={data.observedAt}
-                staleAfterSeconds={contact.staleAfterSeconds}
-                staleTotal={contact.staleDevices}
-              />
-            ) : (
-              <Unavailable section="Stale device list" />
-            )}
-          </div>
+            ) : null}
+          </section>
 
-          <Panel
-            title="Recent activity"
-            description="Latest actions sent to devices."
-            help="The ten most recent actions. A sent action is not proof the device carried it out; open the device for results."
-          >
+          <section aria-labelledby="recent-activity-title" className="grid gap-3">
+            <div>
+              <h2 id="recent-activity-title" className="text-base font-semibold">
+                Latest recorded activity
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Up to ten newest actions in your device scopes. Sent is not proof of completion;
+                open a device for results.
+              </p>
+            </div>
             {data.recentActions.length ? (
-              <ul className="divide-y">
+              <ul className="divide-y border-y">
                 {data.recentActions.map((action) => (
                   <li
                     key={`${action.kind}:${action.actionId}`}
-                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                    className="flex items-start gap-3 py-3"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <span className="flex size-8 shrink-0 items-center justify-center bg-muted text-muted-foreground">
                       {action.kind === "resource" ? (
                         <Settings2Icon className="size-4" aria-hidden="true" />
                       ) : action.kind === "device" ? (
@@ -375,31 +425,30 @@ export function DashboardView() {
                     </span>
                     <div className="grid min-w-0 flex-1 gap-1">
                       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                        <span className="break-all text-sm font-medium">
+                        <span className="break-words text-sm font-medium">
                           {action.kind === "resource"
                             ? `Profile item · ${action.unit || "Unnamed item"}`
-                            : action.kind === "device"
-                              ? action.capability || "Device action"
-                              : "Action"}
+                            : (actionLabels[action.capability] ?? "Device action")}
                         </span>
                         <ActionRecord action={action} />
-                        <TechnicalDetails
-                          items={[
-                            { label: "Action ID", value: action.actionId },
-                            { label: "Closed reason", value: action.closedReason },
-                          ]}
-                        />
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <Link
                           to="/devices/$deviceId"
                           params={{ deviceId: action.deviceId }}
                           search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
-                          className="inline-flex min-h-6 items-center underline-offset-4 hover:text-foreground hover:underline"
+                          className={linkClass}
                         >
                           Open device
                         </Link>
-                        <span>· {formatTimestamp(action.createdAt).local}</span>
+                        <span>{formatTimestamp(action.createdAt).local}</span>
+                        <TechnicalDetails
+                          items={[
+                            { label: "Action ID", value: action.actionId },
+                            { label: "Capability", value: action.capability },
+                            { label: "Closed reason", value: action.closedReason },
+                          ]}
+                        />
                       </div>
                     </div>
                   </li>
@@ -407,11 +456,164 @@ export function DashboardView() {
               </ul>
             ) : (
               <EmptyState
-                title="No recent actions"
-                description="Actions you send to devices appear here."
+                title="No recorded actions in your device scopes"
+                description="This is an action history, not confirmation that devices need no work."
               />
             )}
-          </Panel>
+          </section>
+
+          <section aria-labelledby="supporting-evidence-title" className="grid gap-3">
+            <div>
+              <h2 id="supporting-evidence-title" className="text-base font-semibold">
+                Supporting fleet evidence
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Exact counts in your authorized device scopes, not trends or a risk ranking.
+              </p>
+            </div>
+            <div className="divide-y border-y">
+              <Evidence
+                title="Enrollment and contact"
+                action={
+                  <Link to="/devices" className={linkClass}>
+                    Browse device records
+                  </Link>
+                }
+              >
+                {lifecycle ? (
+                  <>
+                    <p className="text-sm">
+                      {lifecycle.totalDevices.toString()} devices in total. Enrolled does not mean
+                      healthy.
+                    </p>
+                    <CountList
+                      rows={[
+                        ["Waiting to enroll", lifecycle.pendingDevices],
+                        ["Enrolled", lifecycle.activeDevices],
+                        ["Revoked", lifecycle.revokedDevices],
+                        ["Recovery hold", lifecycle.recoveryHoldDevices],
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <Unavailable section="Enrollment state" />
+                )}
+                {contact ? (
+                  <CountList
+                    rows={[
+                      [
+                        `Seen within ${contact.staleAfterSeconds / 3600} hours`,
+                        contact.recentDevices,
+                      ],
+                      [
+                        `Last seen over ${contact.staleAfterSeconds / 3600} hours ago`,
+                        contact.staleDevices,
+                      ],
+                      ["No recorded check-in", contact.unknownDevices],
+                    ]}
+                  />
+                ) : (
+                  <Unavailable section="Contact" />
+                )}
+              </Evidence>
+              <Evidence
+                title="Service compliance · profile items"
+                action={
+                  <Link to="/devices" className={linkClass}>
+                    Inspect device services
+                  </Link>
+                }
+              >
+                {compliance ? (
+                  <>
+                    <p className="text-sm">
+                      {compliance.totalResources.toString()} assigned profile items, not devices.
+                    </p>
+                    <CountList rows={complianceRows} />
+                    <p className="text-xs text-muted-foreground">
+                      {compliance.unassignedDevices.toString()} devices without a profile; not
+                      counted as compliant.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Service compliance" />
+                )}
+              </Evidence>
+              <Evidence
+                title="Patch compliance · active devices"
+                action={
+                  <Link to="/devices" className={linkClass}>
+                    Inspect device patch status
+                  </Link>
+                }
+              >
+                {patch ? (
+                  <>
+                    <CountList rows={patchRows} />
+                    <p className="text-sm">
+                      {patch.pendingSecurityUpdates.toString()} pending security updates ·{" "}
+                      {patch.failedRunDevices.toString()} devices whose last update run failed.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Categories are disjoint. Reboot required means no security updates pending.
+                      Pending updates and failed runs count fresh statuses only. Native
+                      package-cache telemetry, not proof of installation; unknown includes
+                      unavailable reports.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Patch compliance" />
+                )}
+              </Evidence>
+              <Evidence
+                title="Open findings · severity and coverage"
+                action={
+                  <Link to="/advisories" className={linkClass}>
+                    Review advisories and sources
+                  </Link>
+                }
+              >
+                {findings ? (
+                  <>
+                    <CountList rows={findingRows} />
+                    <p className="text-sm">
+                      Active devices checked: {findings.evaluatedDevices.toString()} · partly
+                      checked: {findings.partialDevices.toString()} · not checked:{" "}
+                      {findings.unknownDevices.toString()}.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Counts findings, not devices. Accepted findings are excluded. Missing coverage
+                      can hide exposure even when all severity counts are zero.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Advisory" />
+                )}
+              </Evidence>
+              <Evidence
+                title="Operating systems · devices by version"
+                action={
+                  <Link to="/devices" className={linkClass}>
+                    Browse and filter devices
+                  </Link>
+                }
+              >
+                {operatingSystems ? (
+                  osRows.length ? (
+                    <CountList rows={osRows} />
+                  ) : (
+                    <p className="text-sm">No devices in this OS summary.</p>
+                  )
+                ) : (
+                  <Unavailable section="Operating system" />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Latest reported OS and version. The twenty largest groups are shown; Other is the
+                  exact remainder.
+                </p>
+              </Evidence>
+            </div>
+          </section>
         </>
       ) : null}
     </section>
@@ -419,7 +621,61 @@ export function DashboardView() {
 }
 
 const linkClass =
-  "inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-4 hover:underline";
+  "inline-flex min-h-8 items-center gap-1 text-sm font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+function queueLinkClass(primary: boolean) {
+  return primary
+    ? buttonVariants({ className: "h-auto min-h-8 whitespace-normal text-left" })
+    : linkClass;
+}
+
+function WorkItem({
+  title,
+  primary,
+  action,
+  children,
+}: {
+  title: string;
+  primary: boolean;
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-review-metric=""
+      className={`grid gap-3 px-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] ${primary ? "border-l-2 border-l-primary bg-accent/40" : ""}`}
+    >
+      <div className="grid min-w-0 gap-1 text-sm">
+        {primary ? <p className="text-xs font-medium text-muted-foreground">Start here</p> : null}
+        <h3 className="font-semibold">{title}</h3>
+        {children}
+      </div>
+      <div className="self-start" data-review-next-action={primary ? "" : undefined}>
+        {action}
+      </div>
+    </div>
+  );
+}
+
+function Evidence({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div data-review-metric="" className="py-3">
+      <details>
+        <summary className="cursor-pointer text-sm font-medium">{title}</summary>
+        <div className="mt-3 grid max-w-2xl gap-3">{children}</div>
+      </details>
+      <div className="mt-1">{action}</div>
+    </div>
+  );
+}
 
 function Help({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -435,220 +691,9 @@ function Help({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Panel({
-  title,
-  description,
-  help,
-  children,
-}: {
-  title: string;
-  description: string;
-  help: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>
-            <h2>{title}</h2>
-          </CardTitle>
-          <Help label={`About ${title.toLowerCase()}`}>{help}</Help>
-        </div>
-        <CardDescription className="text-xs">{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">{children}</CardContent>
-    </Card>
-  );
-}
-
-function Metric({
-  title,
-  value,
-  detail,
-  help,
-}: {
-  title: string;
-  value: bigint | undefined;
-  detail: string;
-  help: string;
-}) {
-  return (
-    <Card size="sm" className="gap-1">
-      <CardHeader className="flex items-center justify-between gap-2">
-        <CardDescription className="text-xs font-medium">{title}</CardDescription>
-        <Help label={`About ${title.toLowerCase()}`}>{help}</Help>
-      </CardHeader>
-      <CardContent className="grid gap-1">
-        <p className="text-2xl font-semibold tracking-tight tabular-nums">
-          {value?.toString() ?? "Unavailable"}
-        </p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DistributionChart({
-  rows,
-  kind,
-  label,
-  ariaLabel,
-}: {
-  rows: [string, bigint][];
-  kind: "donut" | "stacked" | "severity";
-  label: string;
-  ariaLabel: string;
-}) {
-  const points = rows.map(([name, count], index) => ({
-    name,
-    count: Number(count),
-    exact: count.toString(),
-    key: `group${index}`,
-    fill: `var(--chart-${(index % 5) + 1})`,
-  }));
-  const config: ChartConfig = Object.fromEntries(
-    points.map((point) => [
-      point.key,
-      {
-        label: point.name,
-        color: point.fill,
-      },
-    ]),
-  );
-  const total = rows.reduce((sum, [, count]) => sum + count, 0n);
-  const tooltip = (
-    <ChartTooltipContent
-      hideLabel
-      formatter={(_value, name) => {
-        const point = points.find((item) => item.key === name || item.name === name);
-        return (
-          <span className="flex w-full items-center justify-between gap-4">
-            <span className="text-muted-foreground">{point?.name ?? name}</span>
-            <span className="font-mono font-medium tabular-nums">
-              {point?.exact ?? "Unavailable"}
-            </span>
-          </span>
-        );
-      }}
-    />
-  );
-
-  return (
-    <div className="grid gap-3">
-      {total === 0n ? (
-        <EmptyState title={`No ${label.toLowerCase()} in this summary`} />
-      ) : kind === "donut" ? (
-        <div className="relative">
-          <ChartContainer config={config} className="mx-auto h-44 w-full" aria-label={ariaLabel}>
-            <PieChart>
-              <ChartTooltip content={tooltip} />
-              <Pie
-                data={points}
-                dataKey="count"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={78}
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-            </PieChart>
-          </ChartContainer>
-          <div
-            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"
-            aria-hidden="true"
-          >
-            <span className="text-xl font-semibold tabular-nums">{total.toString()}</span>
-            <span className="text-xs text-muted-foreground">devices</span>
-          </div>
-        </div>
-      ) : kind === "stacked" ? (
-        <ChartContainer config={config} className="h-20 w-full" aria-label={ariaLabel}>
-          <BarChart
-            accessibilityLayer
-            layout="vertical"
-            data={[Object.fromEntries(points.map((point) => [point.key, point.count]))]}
-            margin={{ top: 12, right: 0, bottom: 12, left: 0 }}
-          >
-            <XAxis type="number" hide />
-            <YAxis type="category" hide />
-            <ChartTooltip content={tooltip} cursor={false} />
-            {points.map((point) => (
-              <Bar
-                key={point.key}
-                dataKey={point.key}
-                stackId="resources"
-                fill={`var(--color-${point.key})`}
-                barSize={36}
-                isAnimationActive={false}
-              />
-            ))}
-          </BarChart>
-        </ChartContainer>
-      ) : (
-        <ChartContainer config={config} className="h-44 w-full" aria-label={ariaLabel}>
-          <BarChart
-            accessibilityLayer
-            data={points}
-            margin={{ top: 8, right: 4, bottom: 0, left: -24 }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="name"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              interval={0}
-              fontSize={10}
-            />
-            <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={10} />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  hideLabel
-                  formatter={(_value, _name, item) => {
-                    const point = points.find((point) => point.name === item.payload.name);
-                    return (
-                      <span className="flex w-full items-center justify-between gap-4">
-                        <span className="text-muted-foreground">{point?.name}</span>
-                        <span className="font-mono font-medium tabular-nums">
-                          {point?.exact ?? "Unavailable"}
-                        </span>
-                      </span>
-                    );
-                  }}
-                />
-              }
-              cursor={false}
-            />
-            <Bar dataKey="count" maxBarSize={40} isAnimationActive={false} />
-          </BarChart>
-        </ChartContainer>
-      )}
-      <dl
-        className={`grid gap-x-4 gap-y-2 text-xs ${kind === "stacked" ? "" : "grid-cols-2"} ${kind === "donut" ? "max-h-32 overflow-y-auto" : ""}`}
-      >
-        {points.map((point) => (
-          <div key={point.key} className="flex min-w-0 items-center justify-between gap-2">
-            <dt className="flex min-w-0 items-center gap-1.5">
-              <span
-                className="size-2 shrink-0 rounded-sm"
-                style={{ backgroundColor: point.fill }}
-                aria-hidden="true"
-              />
-              <span className="break-words text-muted-foreground">{point.name}</span>
-            </dt>
-            <dd className="shrink-0 font-medium tabular-nums">{point.exact}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
 function CountList({ rows }: { rows: [string, bigint][] }) {
   return (
-    <dl className="grid gap-2 text-xs">
+    <dl className="grid gap-2 text-sm">
       {rows.map(([label, count]) => (
         <div key={label} className="flex items-center justify-between gap-3">
           <dt className="text-muted-foreground">{label}</dt>
@@ -660,7 +705,11 @@ function CountList({ rows }: { rows: [string, bigint][] }) {
 }
 
 function Unavailable({ section }: { section: string }) {
-  return <p className="text-xs text-muted-foreground">{section} unavailable.</p>;
+  return (
+    <p data-review-state="blocked" className="text-sm text-muted-foreground">
+      {section} unavailable. Review the linked evidence; no zero is assumed.
+    </p>
+  );
 }
 
 function ActionRecord({ action }: { action: FleetRecentAction }) {

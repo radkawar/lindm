@@ -76,6 +76,9 @@ func (s *Service) signManifest(manifest *integrationsv1.ReportManifest) ([]byte,
 // cross-chain substitution. A nil checkpoint accepts only the all-zero genesis.
 // TLS key rotation requires independently approving a new pin; an embedded key or
 // certificate never grants trust. Retain old pins alongside their signed archives.
+// Audit selections authenticate the server's signed selection and individual
+// original rows, not chain continuity or independent completeness. They cannot
+// consume or produce a continuation checkpoint.
 func VerifyReportArtifact(reader io.Reader, signed *integrationsv1.ReportSignedManifest, pin []byte, checkpoint *integrationsv1.ReportManifest) (*integrationsv1.ReportManifest, error) {
 	if signed == nil || len(pin) != sha256.Size {
 		return nil, errors.New("reports: trusted signing pin required")
@@ -116,12 +119,27 @@ func VerifyReportArtifact(reader io.Reader, signed *integrationsv1.ReportSignedM
 	limited := &io.LimitedReader{R: reader, N: int64(manifest.GetByteCount()) + 1}
 	hash := sha256.New()
 	stream := io.TeeReader(limited, hash)
-	if manifest.GetKind() == integrationsv1.ReportKind_REPORT_KIND_AUDIT {
+	switch manifest.GetKind() {
+	case integrationsv1.ReportKind_REPORT_KIND_AUDIT:
+		if manifest.GetAuditFilter() != nil {
+			return nil, errors.New("reports: selection is not an audit checkpoint")
+		}
 		if err := verifyAuditRows(stream, manifest, checkpoint); err != nil {
 			return nil, err
 		}
-	} else if _, err := io.Copy(io.Discard, stream); err != nil {
-		return nil, fmt.Errorf("read report archive: %w", err)
+	case integrationsv1.ReportKind_REPORT_KIND_AUDIT_SELECTION:
+		if checkpoint != nil {
+			return nil, errors.New("reports: selection cannot consume an audit checkpoint")
+		}
+		if err := verifyAuditSelection(stream, manifest); err != nil {
+			return nil, err
+		}
+	case integrationsv1.ReportKind_REPORT_KIND_INVENTORY, integrationsv1.ReportKind_REPORT_KIND_COMPLIANCE, integrationsv1.ReportKind_REPORT_KIND_FINDINGS:
+		if _, err := io.Copy(io.Discard, stream); err != nil {
+			return nil, fmt.Errorf("read report archive: %w", err)
+		}
+	default:
+		return nil, errors.New("reports: unsupported report kind")
 	}
 	if limited.N != 1 || !bytes.Equal(hash.Sum(nil), manifest.GetContentSha256()) {
 		return nil, errors.New("reports: archive length or digest mismatch")

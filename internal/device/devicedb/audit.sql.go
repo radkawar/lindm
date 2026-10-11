@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getAuditSnapshot = `-- name: GetAuditSnapshot :one
+SELECT sequence FROM report_audit_head WHERE singleton
+`
+
+func (q *Queries) GetAuditSnapshot(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getAuditSnapshot)
+	var sequence int64
+	err := row.Scan(&sequence)
+	return sequence, err
+}
+
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
 INSERT INTO audit_events (id, actor_id, action, resource_id, reason, target_device_id, details)
 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::jsonb, '{}'::jsonb))
@@ -40,36 +51,155 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 	return err
 }
 
+const listAuditActors = `-- name: ListAuditActors :many
+SELECT p.id, p.display_name FROM principals p
+WHERE p.id > $1::uuid
+  AND ($2::uuid IS NULL OR p.id = $2)
+  AND starts_with(lower(p.display_name), lower($3::text))
+  AND EXISTS (SELECT 1 FROM audit_event_search f WHERE f.actor_id = p.id)
+ORDER BY p.id LIMIT $4::int
+`
+
+type ListAuditActorsParams struct {
+	AfterID    uuid.UUID
+	ID         *uuid.UUID
+	NamePrefix string
+	RowLimit   int32
+}
+
+type ListAuditActorsRow struct {
+	ID          uuid.UUID
+	DisplayName string
+}
+
+func (q *Queries) ListAuditActors(ctx context.Context, arg ListAuditActorsParams) ([]ListAuditActorsRow, error) {
+	rows, err := q.db.Query(ctx, listAuditActors,
+		arg.AfterID,
+		arg.ID,
+		arg.NamePrefix,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAuditActorsRow{}
+	for rows.Next() {
+		var i ListAuditActorsRow
+		if err := rows.Scan(&i.ID, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAuditDevices = `-- name: ListAuditDevices :many
+SELECT d.id, d.hostname FROM devices d
+WHERE d.id > $1::uuid
+  AND ($2::uuid IS NULL OR d.id = $2)
+  AND starts_with(lower(d.hostname), lower($3::text))
+  AND EXISTS (SELECT 1 FROM audit_event_search f WHERE f.target_device_id = d.id)
+ORDER BY d.id LIMIT $4::int
+`
+
+type ListAuditDevicesParams struct {
+	AfterID    uuid.UUID
+	ID         *uuid.UUID
+	NamePrefix string
+	RowLimit   int32
+}
+
+type ListAuditDevicesRow struct {
+	ID       uuid.UUID
+	Hostname string
+}
+
+func (q *Queries) ListAuditDevices(ctx context.Context, arg ListAuditDevicesParams) ([]ListAuditDevicesRow, error) {
+	rows, err := q.db.Query(ctx, listAuditDevices,
+		arg.AfterID,
+		arg.ID,
+		arg.NamePrefix,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAuditDevicesRow{}
+	for rows.Next() {
+		var i ListAuditDevicesRow
+		if err := rows.Scan(&i.ID, &i.Hostname); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAuditEvents = `-- name: ListAuditEvents :many
-SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.target_device_id, a.details, COALESCE(d.hostname, '')::text AS device_hostname
-FROM audit_events a
-LEFT JOIN devices d ON d.id = a.target_device_id
-WHERE $1::uuid IS NULL
-   OR (a.occurred_at, a.id) < ($2::timestamptz, $1::uuid)
-ORDER BY a.occurred_at DESC, a.id DESC
-LIMIT $3::int
+SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.details,
+       f.target_device_id, COALESCE(d.hostname, '')::text AS device_hostname,
+       COALESCE(p.display_name, '')::text AS actor_display_name
+FROM audit_event_search f
+JOIN audit_events a ON a.id = f.event_id
+LEFT JOIN devices d ON d.id = f.target_device_id
+LEFT JOIN principals p ON p.id = f.actor_id
+WHERE f.sequence <= $1::bigint
+  AND ($2::uuid IS NULL OR f.actor_id = $2)
+  AND ($3::uuid IS NULL OR f.target_device_id = $3)
+  AND ($4::smallint = 0 OR f.action_category = $4)
+  AND ($5::timestamptz IS NULL OR f.occurred_at >= $5)
+  AND ($6::timestamptz IS NULL OR f.occurred_at < $6)
+  AND ($7::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < ($8::timestamptz, $7::uuid))
+ORDER BY f.occurred_at DESC, f.event_id DESC
+LIMIT $9::int
 `
 
 type ListAuditEventsParams struct {
+	SnapshotSequence int64
+	ActorID          *uuid.UUID
+	TargetDeviceID   *uuid.UUID
+	ActionCategory   int16
+	OccurredFrom     pgtype.Timestamptz
+	OccurredUntil    pgtype.Timestamptz
 	CursorID         *uuid.UUID
 	CursorOccurredAt pgtype.Timestamptz
 	RowLimit         int32
 }
 
 type ListAuditEventsRow struct {
-	ID             uuid.UUID
-	OccurredAt     pgtype.Timestamptz
-	ActorID        *uuid.UUID
-	Action         string
-	ResourceID     string
-	Reason         string
-	TargetDeviceID *uuid.UUID
-	Details        []byte
-	DeviceHostname string
+	ID               uuid.UUID
+	OccurredAt       pgtype.Timestamptz
+	ActorID          *uuid.UUID
+	Action           string
+	ResourceID       string
+	Reason           string
+	Details          []byte
+	TargetDeviceID   *uuid.UUID
+	DeviceHostname   string
+	ActorDisplayName string
 }
 
 func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error) {
-	rows, err := q.db.Query(ctx, listAuditEvents, arg.CursorID, arg.CursorOccurredAt, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listAuditEvents,
+		arg.SnapshotSequence,
+		arg.ActorID,
+		arg.TargetDeviceID,
+		arg.ActionCategory,
+		arg.OccurredFrom,
+		arg.OccurredUntil,
+		arg.CursorID,
+		arg.CursorOccurredAt,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +214,10 @@ func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams
 			&i.Action,
 			&i.ResourceID,
 			&i.Reason,
-			&i.TargetDeviceID,
 			&i.Details,
+			&i.TargetDeviceID,
 			&i.DeviceHostname,
+			&i.ActorDisplayName,
 		); err != nil {
 			return nil, err
 		}

@@ -158,8 +158,11 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Preview a device</CardTitle>
-        <CardDescription>See which settings a device will get, then activate them.</CardDescription>
+        <CardTitle>Inspect saved settings</CardTitle>
+        <CardDescription>
+          Review one device's saved assignments, then request approval or activate that exact
+          preview.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         <form

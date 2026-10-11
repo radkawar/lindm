@@ -90,6 +90,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         </p>
       ) : (
         <Button
+          data-review-confirm
           className="w-fit"
           type="submit"
           variant="default"

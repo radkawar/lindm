@@ -61,8 +61,7 @@ export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
       <CardHeader>
         <CardTitle>Remote assistance</CardTitle>
         <CardDescription>
-          Ask the signed-in local user to share their screen. Nothing is shown until they accept on
-          the device, and they can stop the session at any time.
+          The person on the device decides whether to share. They can stop at any time.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
@@ -135,8 +134,22 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
   }
 
   return (
-    <form className="grid gap-3 border p-3" onSubmit={submit} autoComplete="off">
-      <h3 className="font-semibold">Request a session</h3>
+    <form
+      className="grid gap-4 border-l-2 border-primary bg-muted/30 p-4"
+      onSubmit={submit}
+      autoComplete="off"
+    >
+      <h3 className="text-base font-semibold">Ask to help</h3>
+      <div className="grid gap-2">
+        <Label htmlFor={`${id}-reason`}>Reason (shown to the local user and audited)</Label>
+        <Textarea
+          id={`${id}-reason`}
+          value={reason}
+          readOnly={locked}
+          maxLength={REASON_MAX_UNITS}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor={`${id}-mode`}>Mode</Label>
@@ -168,20 +181,9 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
       </div>
       <p id={`${id}-mode-help`} className="text-sm text-muted-foreground">
         {mode === AssistanceMode.CONTROL
-          ? "Control lets you use the keyboard and mouse. The user on the device can allow viewing only."
-          : "View shares the screen only. You can't type or click."}{" "}
-        The session ends after this time. To continue, request a new session.
+          ? "The user can allow keyboard and mouse control, or choose viewing only."
+          : "View only: you can see the shared screen, but cannot type or click."}
       </p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-reason`}>Reason (shown to the local user and audited)</Label>
-        <Textarea
-          id={`${id}-reason`}
-          value={reason}
-          readOnly={locked}
-          maxLength={REASON_MAX_UNITS}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </div>
       {exact.invalid ? (
         <p role="alert" className="text-sm text-destructive">
           {exact.invalid}
@@ -193,6 +195,10 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
           {exact.ambiguous ? <p>Check the history below before trying again.</p> : null}
         </RpcError>
       ) : null}
+      <p className="text-sm text-muted-foreground">
+        Requesting asks for consent on this device; it does not start sharing. The session ends at
+        the time limit or when either person stops it.
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={exact.busy}>
           {exact.busy ? "Requesting…" : exact.ambiguous ? "Try again" : "Request remote assistance"}

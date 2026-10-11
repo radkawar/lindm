@@ -6,6 +6,7 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -18,9 +19,13 @@ import {
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
-import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
+import { PAGE_SIZES } from "@/lib/list-search";
+import { canPermission } from "@/lib/permissions";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { auditQueryOptions } from "./queries";
+import { AuditExport } from "./export";
+import { AuditFilters } from "./filters";
+import type { AuditSearch } from "./search";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
 
@@ -29,18 +34,22 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export function AuditView({
-  pageSize,
-  pageToken,
+  search,
   onSearch,
+  accountPicker,
+  devicePicker,
 }: {
-  pageSize: PageSize;
-  pageToken: string;
-  onSearch: (next: { pageSize: PageSize; pageToken: string }) => void;
+  search: AuditSearch;
+  onSearch: (next: AuditSearch) => void;
+  accountPicker: PickerSlot;
+  devicePicker: PickerSlot;
 }) {
+  const { pageSize, pageToken } = search;
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
-  const list = useQuery(auditQueryOptions(lifetime, pageSize, pageToken));
-  const pagination = useListPagination({ pageSize, pageToken }, onSearch);
+  const canOpenDevices = canPermission(principal, "fleet.read", true);
+  const list = useQuery(auditQueryOptions(lifetime, search));
+  const pagination = useListPagination(search, (page) => onSearch({ ...search, ...page }));
   const failure = list.error ? toRpcFailure(list.error) : null;
   const now = new Date();
 
@@ -50,12 +59,30 @@ export function AuditView({
         title="Audit log"
         description="Who changed what, and why. Secret values are never recorded."
         actions={
-          <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <AuditExport
+              search={search}
+              accountPicker={accountPicker}
+              devicePicker={devicePicker}
+              disabled={!list.isSuccess || list.isFetching}
+            />
+            <Button
+              variant="outline"
+              onClick={() => void list.refetch()}
+              disabled={list.isFetching}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
       {failure ? <RpcError failure={failure} /> : null}
+      <AuditFilters
+        search={search}
+        accountPicker={accountPicker}
+        devicePicker={devicePicker}
+        onChange={(next) => onSearch({ ...search, ...next, pageToken: "" })}
+      />
       <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="audit-page-size">Page size</Label>
         <SelectField
@@ -65,7 +92,7 @@ export function AuditView({
           onValueChange={(value) => {
             const next = Number(value);
             if (next === 50 || next === 100 || next === 200) {
-              onSearch({ pageSize: next, pageToken: "" });
+              onSearch({ ...search, pageSize: next, pageToken: "" });
             }
           }}
           options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
@@ -80,7 +107,14 @@ export function AuditView({
         </div>
       ) : null}
       {list.isSuccess && list.data.events.length === 0 ? (
-        <EmptyState title={pageToken === "" ? "Nothing recorded yet" : "No more entries"} />
+        <EmptyState
+          title="No matching events"
+          description={
+            pageToken
+              ? "No more events match the chosen scope and time range. Return to the previous page or change the filters."
+              : "No audit events match the chosen scope and time range. Choose another range or clear the filters."
+          }
+        />
       ) : null}
       {list.data && list.data.events.length > 0 ? (
         <Table>
@@ -91,8 +125,6 @@ export function AuditView({
               <TableHead>Who</TableHead>
               <TableHead>Reason</TableHead>
               <TableHead>Device</TableHead>
-              <TableHead>Mode</TableHead>
-              <TableHead>Duration</TableHead>
               <TableHead>
                 <span className="sr-only">Details</span>
               </TableHead>
@@ -101,6 +133,13 @@ export function AuditView({
           <TableBody>
             {list.data.events.map((event) => {
               const occurred = formatTimestamp(event.occurredAt);
+              const mode =
+                event.details.mode === "view"
+                  ? "View only"
+                  : event.details.mode === "control"
+                    ? "Control"
+                    : null;
+              const duration = auditDuration(event.details.duration_seconds);
               return (
                 <TableRow key={event.id}>
                   <TableCell>
@@ -113,26 +152,37 @@ export function AuditView({
                     )}
                   </TableCell>
                   <TableCell>
-                    {event.action.trim()
-                      ? (ACTION_LABELS[event.action.trim()] ??
-                        event.action
-                          .trim()
-                          .replace(/[._]+/g, " ")
-                          .replace(/^./, (first) => first.toUpperCase()))
-                      : "Not recorded"}
+                    <div>
+                      {event.action.trim()
+                        ? (ACTION_LABELS[event.action.trim()] ??
+                          event.action
+                            .trim()
+                            .replace(/[._]+/g, " ")
+                            .replace(/^./, (first) => first.toUpperCase()))
+                        : "Not recorded"}
+                    </div>
+                    {mode || duration ? (
+                      <p className="text-xs text-muted-foreground">
+                        {mode}
+                        {mode && duration ? " · " : null}
+                        {duration}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     {!event.actorId.trim()
                       ? "System"
-                      : event.actorId === principal.id
-                        ? "You"
-                        : "Another administrator"}
+                      : event.actorDisplayName.trim()
+                        ? `${event.actorDisplayName}${event.actorId === principal.id ? " (you)" : ""}`
+                        : event.actorId === principal.id
+                          ? "You"
+                          : "Account name unavailable"}
                   </TableCell>
                   <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
                     {event.reason.trim() || "Not recorded"}
                   </TableCell>
                   <TableCell>
-                    {event.targetDeviceId ? (
+                    {event.targetDeviceId && canOpenDevices ? (
                       <Link
                         to="/devices/$deviceId"
                         params={{ deviceId: event.targetDeviceId }}
@@ -140,18 +190,12 @@ export function AuditView({
                       >
                         {event.deviceHostname.trim() || "Unnamed device"}
                       </Link>
+                    ) : event.targetDeviceId ? (
+                      event.deviceHostname.trim() || "Unnamed device"
                     ) : (
                       "Not recorded"
                     )}
                   </TableCell>
-                  <TableCell>
-                    {event.details.mode === "view"
-                      ? "View"
-                      : event.details.mode === "control"
-                        ? "Control"
-                        : "Not recorded"}
-                  </TableCell>
-                  <TableCell>{auditDuration(event.details.duration_seconds)}</TableCell>
                   <TableCell>
                     <TechnicalDetails
                       items={[
@@ -179,7 +223,7 @@ export function AuditView({
         </Button>
         <Button
           variant="outline"
-          disabled={!list.data?.nextPageToken}
+          disabled={!list.isSuccess || !list.data.nextPageToken || list.isFetching}
           onClick={() => pagination.next(list.data?.nextPageToken ?? "")}
         >
           Next page
@@ -189,9 +233,9 @@ export function AuditView({
   );
 }
 
-function auditDuration(value: string | undefined): string {
+function auditDuration(value: string | undefined): string | null {
   const seconds = Number(value);
-  if (!value || !Number.isSafeInteger(seconds) || seconds <= 0) return "Not recorded";
+  if (!value || !Number.isSafeInteger(seconds) || seconds <= 0) return null;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   if (!minutes) return `${remainder} sec`;

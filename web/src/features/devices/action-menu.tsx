@@ -21,6 +21,7 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { DeviceActionForm } from "./action-form";
 import { actionLabels, actionPermissions, type DeviceActionKind } from "./action-display";
+import { DeviceRevocationImpact } from "./view";
 
 const simpleKinds: DeviceActionKind[] = [
   "restart",
@@ -127,6 +128,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
       <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
         {revokeVisited ? (
           <DialogContent
+            data-review-destructive="revoke-device"
             keepMounted
             finalFocus={trigger}
             className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
@@ -134,9 +136,10 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
             <DialogHeader>
               <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
               <DialogDescription>
-                Another admin must approve before this device is removed from lindm.
+                Review the access change before requesting approval.
               </DialogDescription>
             </DialogHeader>
+            <DeviceRevocationImpact device={device} />
             {revoke}
           </DialogContent>
         ) : null}

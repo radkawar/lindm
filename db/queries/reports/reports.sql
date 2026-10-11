@@ -9,6 +9,21 @@ SELECT * FROM report_audit_rows
 WHERE sequence > sqlc.arg('after_sequence') AND sequence <= sqlc.arg('final_sequence')
 ORDER BY sequence LIMIT 128;
 
+-- name: PageAuditSelection :many
+SELECT r.*, f.occurred_at
+FROM audit_event_search f
+JOIN report_audit_rows r ON r.sequence = f.sequence
+WHERE f.sequence <= sqlc.arg('snapshot_sequence')::bigint
+  AND (sqlc.narg('actor_id')::uuid IS NULL OR f.actor_id = sqlc.narg('actor_id'))
+  AND (sqlc.narg('target_device_id')::uuid IS NULL OR f.target_device_id = sqlc.narg('target_device_id'))
+  AND (sqlc.arg('action_category')::smallint = 0 OR f.action_category = sqlc.arg('action_category'))
+  AND (sqlc.narg('occurred_from')::timestamptz IS NULL OR f.occurred_at >= sqlc.narg('occurred_from'))
+  AND (sqlc.narg('occurred_until')::timestamptz IS NULL OR f.occurred_at < sqlc.narg('occurred_until'))
+  AND (sqlc.narg('cursor_id')::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < (sqlc.narg('cursor_occurred_at')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY f.occurred_at DESC, f.event_id DESC
+LIMIT 128;
+
 -- name: GetReportMutation :one
 SELECT * FROM report_mutations WHERE actor_id = $1 AND request_id = $2;
 
@@ -52,6 +67,11 @@ SELECT * FROM queued;
 INSERT INTO report_artifacts(id,actor_id,kind,format,expires_at,after_sequence,after_hash,final_sequence,final_hash,captured_head_sequence,captured_head_hash,chain_id)
 VALUES (sqlc.arg('id'),sqlc.arg('actor_id'),4,3,now()+sqlc.arg('retention_days')::int*interval '1 day',
 sqlc.arg('after_sequence'),sqlc.arg('after_hash'),sqlc.arg('final_sequence'),sqlc.arg('final_hash'),sqlc.arg('captured_head_sequence'),sqlc.arg('captured_head_hash'),sqlc.arg('chain_id')) RETURNING *;
+
+-- name: CreateAuditSelectionArtifact :one
+INSERT INTO report_artifacts(id,actor_id,kind,format,expires_at,captured_head_sequence,captured_head_hash,chain_id,audit_filter,audit_max_events)
+VALUES (sqlc.arg('id'),sqlc.arg('actor_id'),5,3,now()+sqlc.arg('retention_days')::int*interval '1 day',
+sqlc.arg('captured_head_sequence'),sqlc.arg('captured_head_hash'),sqlc.arg('chain_id'),sqlc.arg('audit_filter'),sqlc.arg('audit_max_events')) RETURNING *;
 
 -- name: ClaimReportArtifact :one
 WITH candidate AS (

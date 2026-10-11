@@ -1,6 +1,10 @@
 {
   "$comment": "Console copy rules enforced by `lab console review` on visible primary text. docs/engineering.md links here; this file is the maintained list. Patterns are JavaScript regular expressions matched case-insensitively unless flags say otherwise.",
   "bannedTerms": [
+    { "term": "Manage your", "pattern": "\\bmanage\\s+your\\b" },
+    { "term": "Welcome to", "pattern": "\\bwelcome\\s+to\\b" },
+    { "term": "Lorem", "pattern": "\\blorem\\b" },
+    { "term": "Click here", "pattern": "\\bclick\\s+here\\b" },
     { "term": "desired state", "pattern": "\\bdesired[ -]states?\\b" },
     { "term": "owned changes", "pattern": "\\bowned changes?\\b" },
     { "term": "ownership-safe release", "pattern": "\\bownership[ -]safe\\b" },

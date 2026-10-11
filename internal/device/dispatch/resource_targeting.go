@@ -24,9 +24,16 @@ import (
 )
 
 func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candidates []*policyv1.TargetCandidate) (*policyv1.TargetResolution, error) {
+	return s.resolveTargetCandidatesCached(ctx, tx, candidates, &targetRevisionCache{revisions: make(map[uuid.UUID]*adminv1.ProfileRevision)})
+}
+
+type targetRevisionCache struct {
+	revisions map[uuid.UUID]*adminv1.ProfileRevision
+	bytes     int
+}
+
+func (s *Service) resolveTargetCandidatesCached(ctx context.Context, tx pgx.Tx, candidates []*policyv1.TargetCandidate, cache *targetRevisionCache) (*policyv1.TargetResolution, error) {
 	assignments := make([]policy.Assignment, 0, len(candidates))
-	revisions := make(map[uuid.UUID]*adminv1.ProfileRevision, len(candidates))
-	retainedBytes := 0
 	for _, candidate := range candidates {
 		if candidate.GetMatch() != policyv1.TargetMatch_TARGET_MATCH_INCLUDED {
 			continue
@@ -35,17 +42,17 @@ func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candid
 		if err != nil {
 			return nil, err
 		}
-		revision := revisions[id]
+		revision := cache.revisions[id]
 		if revision == nil {
 			revision, err = s.Profiles.GetRevisionInTransaction(ctx, tx, id)
 			if err != nil {
 				return nil, err
 			}
-			retainedBytes += proto.Size(revision.GetSpec())
-			if retainedBytes > core.MaxMessageBytes {
+			cache.bytes += proto.Size(revision.GetSpec())
+			if cache.bytes > core.MaxMessageBytes {
 				return nil, rpcreason.Error(connect.CodeResourceExhausted, "target_resolution_capacity")
 			}
-			revisions[id] = revision
+			cache.revisions[id] = revision
 		}
 		assignments = append(assignments, policy.Assignment{ProfileID: revision.GetProfileId(), RevisionID: revision.GetRevisionId(), Priority: candidate.GetAssignment().GetPriority(), Spec: revision.GetSpec()})
 	}

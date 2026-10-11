@@ -196,20 +196,59 @@ execution time. Retention deletes expired artifacts; save required archives outs
 Lindm before expiration. CSV cells that could execute spreadsheet formulas are
 prefixed with an apostrophe; JSON preserves source values.
 
-For audit archives, save **both** the JSONL artifact and signed manifest. Verify
-the manifest signature against an independently pinned server signing public key,
+Audit supports server-side actor, action category, target device and time filters.
+Every supplied condition narrows the selection; account/device names are current
+display context, not authorization or immutable historical evidence. Unrestricted
+`audit.read` remains required, including the bounded audit-only name pickers; those
+lookups expose only IDs/names already referenced by audit history, not account
+administration or general fleet access. Unknown or deleted selections retain their
+bookmarked ID with an unavailable-name warning rather than clearing the filter.
+Pages contain at most 200 events, ordered by occurrence time and event UUID,
+descending. Continuations bind the caller, normalized filter and committed audit
+chain head, so new events, including backdated events, do not enter an existing
+walk. A different filter requires a new first page.
+
+The shared `lindm.audit.v1.AuditFilter` uses inclusive `occurred_from` and exclusive
+`occurred_until`; both are server-recorded event times. The console's From/Through
+calendar dates are inclusive UTC days: Through becomes the following UTC midnight.
+Last week is the previous Monday–Sunday UTC, saved as fixed dates. Named views
+Recovery key reveals, Destructive actions and Remote sessions, picker IDs and dates
+are bookmarkable. Recovery reveals mean `recovery_key.reveal`, not other secret
+reveals; destructive actions cover crypto-erase/sanitize admission and execution
+events, not every device action; remote sessions cover the assistance lifecycle.
+The database owns that classification for both list and export. Its indexed,
+immutable search projection reconstructs legacy action targets from action records
+and direct enrollment, revocation, recovery and provisioning lifecycle targets
+from their device-ID resources. Existing structured targets take precedence;
+unrelated resource UUIDs are never treated as devices. Backfill and future capture
+leave the original audit row and its authenticated payload bytes unchanged.
+
+Export from Audit reuses exactly that filter and creates a **signed selection**
+(`AUDIT_SELECTION`), downloaded from Reports. Save **both** its JSONL artifact and
+signed manifest. The server signs the filter, selected content and captured audit
+head. Individual records retain their original sequence, previous hash, row hash
+and payload; their sequences may have gaps. This attests the server's selection,
+not independently proven chain completeness. A selection never advances a
+continuity checkpoint. Limits count matching rows; `report_limit_exceeded` fails
+the artifact without publishing partial evidence. Narrow the filters or time
+range and create a new report. Existing report permissions, fresh authorization,
+same-request-ID binding, retention and signing-key trust requirements still apply.
+
+For continuous audit archives, the RPC's **absent** filter retains the original
+`AUDIT` checkpoint mode; a **present empty** filter means a selection of all events.
+Verify the manifest signature against an independently pinned server signing key,
 then the artifact SHA-256/byte count and every audit-chain link using the exact
-decoded payload bytes and the domain-separated format in
-`api/lindm/integrations/v1/reports.proto`. The manifest binds the chain UUID, prior
-checkpoint and captured head. Continue with its final sequence/hash; do not treat
-a bounded page as the complete head unless those checkpoints agree. Genesis is
-sequence zero and a 32-byte zero hash. Retain checkpoints externally to detect
-rollback or replacement of the database. Included certificates/public keys describe
-the signature but do not independently establish trust. TLS signing-key rotation
-requires archive operators to approve the new SPKI SHA-256 pin out of band; old
-artifacts retain their original verification material. This is tamper-evidence, not
-protection against a database administrator who also controls all trusted signing
-keys and external checkpoints.
+decoded payload bytes and domain-separated format in
+`api/lindm/integrations/v1/reports.proto`. The chain manifest binds its UUID, prior
+checkpoint and captured head. Continue with its final sequence/hash; a bounded
+page reaches the complete head only when those checkpoints agree. Genesis is
+sequence zero and a 32-byte zero hash. Selection requests require those genesis
+inputs but have no final checkpoint. Retain chain checkpoints externally to detect
+rollback or database replacement. Embedded certificates/keys never establish trust.
+TLS signing-key rotation requires approving the new SPKI SHA-256 pin out of band;
+retain old pins with their original artifacts. This is tamper-evidence, not
+protection against an administrator controlling the database, trusted signing keys
+and external checkpoints.
 
 ### Authentication modes
 

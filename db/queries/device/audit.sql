@@ -3,10 +3,39 @@ INSERT INTO audit_events (id, actor_id, action, resource_id, reason, target_devi
 VALUES (sqlc.arg('id'), sqlc.narg('actor_id'), sqlc.arg('action'), sqlc.arg('resource_id'), sqlc.arg('reason'), sqlc.narg('target_device_id'), COALESCE(sqlc.narg('details')::jsonb, '{}'::jsonb));
 
 -- name: ListAuditEvents :many
-SELECT a.*, COALESCE(d.hostname, '')::text AS device_hostname
-FROM audit_events a
-LEFT JOIN devices d ON d.id = a.target_device_id
-WHERE sqlc.narg('cursor_id')::uuid IS NULL
-   OR (a.occurred_at, a.id) < (sqlc.narg('cursor_occurred_at')::timestamptz, sqlc.narg('cursor_id')::uuid)
-ORDER BY a.occurred_at DESC, a.id DESC
+SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.details,
+       f.target_device_id, COALESCE(d.hostname, '')::text AS device_hostname,
+       COALESCE(p.display_name, '')::text AS actor_display_name
+FROM audit_event_search f
+JOIN audit_events a ON a.id = f.event_id
+LEFT JOIN devices d ON d.id = f.target_device_id
+LEFT JOIN principals p ON p.id = f.actor_id
+WHERE f.sequence <= sqlc.arg('snapshot_sequence')::bigint
+  AND (sqlc.narg('actor_id')::uuid IS NULL OR f.actor_id = sqlc.narg('actor_id'))
+  AND (sqlc.narg('target_device_id')::uuid IS NULL OR f.target_device_id = sqlc.narg('target_device_id'))
+  AND (sqlc.arg('action_category')::smallint = 0 OR f.action_category = sqlc.arg('action_category'))
+  AND (sqlc.narg('occurred_from')::timestamptz IS NULL OR f.occurred_at >= sqlc.narg('occurred_from'))
+  AND (sqlc.narg('occurred_until')::timestamptz IS NULL OR f.occurred_at < sqlc.narg('occurred_until'))
+  AND (sqlc.narg('cursor_id')::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < (sqlc.narg('cursor_occurred_at')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY f.occurred_at DESC, f.event_id DESC
 LIMIT sqlc.arg('row_limit')::int;
+
+-- name: GetAuditSnapshot :one
+SELECT sequence FROM report_audit_head WHERE singleton;
+
+-- name: ListAuditActors :many
+SELECT p.id, p.display_name FROM principals p
+WHERE p.id > sqlc.arg('after_id')::uuid
+  AND (sqlc.narg('id')::uuid IS NULL OR p.id = sqlc.narg('id'))
+  AND starts_with(lower(p.display_name), lower(sqlc.arg('name_prefix')::text))
+  AND EXISTS (SELECT 1 FROM audit_event_search f WHERE f.actor_id = p.id)
+ORDER BY p.id LIMIT sqlc.arg('row_limit')::int;
+
+-- name: ListAuditDevices :many
+SELECT d.id, d.hostname FROM devices d
+WHERE d.id > sqlc.arg('after_id')::uuid
+  AND (sqlc.narg('id')::uuid IS NULL OR d.id = sqlc.narg('id'))
+  AND starts_with(lower(d.hostname), lower(sqlc.arg('name_prefix')::text))
+  AND EXISTS (SELECT 1 FROM audit_event_search f WHERE f.target_device_id = d.id)
+ORDER BY d.id LIMIT sqlc.arg('row_limit')::int;

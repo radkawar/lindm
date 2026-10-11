@@ -95,7 +95,9 @@ export function ConsoleShell({
               </span>
               <span className="grid min-w-0 flex-1 gap-1 text-left group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-medium">{userLabel}</span>
-                <span className="truncate text-xs text-muted-foreground">{role || "No role"}</span>
+                <span className="truncate text-xs text-sidebar-foreground/80">
+                  {role || "No role"}
+                </span>
               </span>
               <ChevronsUpDownIcon className="size-4 group-data-[collapsible=icon]:hidden" />
             </Menu.Trigger>

@@ -14,8 +14,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	auditv1 "lindm/gen/lindm/audit/v1"
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	"lindm/internal/identity"
 	"lindm/internal/reports/reportdb"
@@ -129,9 +131,20 @@ func (s *Service) buildArtifact(ctx context.Context, q *reportdb.Queries, job re
 	writer := &chunkWriter{ctx: ctx, q: q, artifact: job.ID, buffer: make([]byte, 0, chunkBytes), hash: sha256.New()}
 	var count uint64
 	var err error
-	if integrationsv1.ReportKind(job.Kind) == integrationsv1.ReportKind_REPORT_KIND_AUDIT {
+	var selection *auditv1.AuditFilter
+	switch integrationsv1.ReportKind(job.Kind) {
+	case integrationsv1.ReportKind_REPORT_KIND_AUDIT:
 		count, err = writeAudit(ctx, q, writer, job)
-	} else {
+	case integrationsv1.ReportKind_REPORT_KIND_AUDIT_SELECTION:
+		selection = &auditv1.AuditFilter{}
+		if err := proto.Unmarshal(job.AuditFilter, selection); err != nil {
+			return err
+		}
+		if err := s.validator.Validate(selection); err != nil {
+			return err
+		}
+		count, err = writeAuditSelection(ctx, q, writer, job, selection)
+	default:
 		count, err = writeDomainReport(ctx, q, writer, integrationsv1.ReportKind(job.Kind), integrationsv1.ReportFormat(job.Format))
 	}
 	if err != nil {
@@ -148,6 +161,12 @@ func (s *Service) buildArtifact(ctx context.Context, q *reportdb.Queries, job re
 		manifest.AfterHash = job.AfterHash
 		manifest.FinalSequence = uint64(job.FinalSequence)
 		manifest.FinalHash = job.FinalHash
+		manifest.CapturedHeadSequence = uint64(job.CapturedHeadSequence)
+		manifest.CapturedHeadHash = job.CapturedHeadHash
+	}
+	if selection != nil {
+		manifest.AuditFilter = selection
+		manifest.ChainId = job.ChainID.String()
 		manifest.CapturedHeadSequence = uint64(job.CapturedHeadSequence)
 		manifest.CapturedHeadHash = job.CapturedHeadHash
 	}

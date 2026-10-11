@@ -19,7 +19,7 @@ WITH candidate AS (
  ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE report_artifacts a SET state = 'building', lease_token = $1::uuid,
-lease_until = now()+interval '60 seconds' FROM candidate c WHERE a.id = c.id RETURNING a.id, a.schedule_id, a.actor_id, a.kind, a.format, a.state, a.created_at, a.expires_at, a.lease_token, a.lease_until, a.byte_count, a.row_count, a.chunk_count, a.signed_manifest, a.failure_reason, a.after_sequence, a.after_hash, a.final_sequence, a.final_hash, a.captured_head_sequence, a.captured_head_hash, a.chain_id
+lease_until = now()+interval '60 seconds' FROM candidate c WHERE a.id = c.id RETURNING a.id, a.schedule_id, a.actor_id, a.kind, a.format, a.state, a.created_at, a.expires_at, a.lease_token, a.lease_until, a.byte_count, a.row_count, a.chunk_count, a.signed_manifest, a.failure_reason, a.after_sequence, a.after_hash, a.final_sequence, a.final_hash, a.captured_head_sequence, a.captured_head_hash, a.chain_id, a.audit_filter, a.audit_max_events
 `
 
 func (q *Queries) ClaimReportArtifact(ctx context.Context, leaseToken uuid.UUID) (ReportArtifact, error) {
@@ -48,6 +48,8 @@ func (q *Queries) ClaimReportArtifact(ctx context.Context, leaseToken uuid.UUID)
 		&i.CapturedHeadSequence,
 		&i.CapturedHeadHash,
 		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
 	)
 	return i, err
 }
@@ -94,7 +96,7 @@ func (q *Queries) ComplianceReportRows(ctx context.Context, afterCursor string) 
 const createAuditArtifact = `-- name: CreateAuditArtifact :one
 INSERT INTO report_artifacts(id,actor_id,kind,format,expires_at,after_sequence,after_hash,final_sequence,final_hash,captured_head_sequence,captured_head_hash,chain_id)
 VALUES ($1,$2,4,3,now()+$3::int*interval '1 day',
-$4,$5,$6,$7,$8,$9,$10) RETURNING id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id
+$4,$5,$6,$7,$8,$9,$10) RETURNING id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events
 `
 
 type CreateAuditArtifactParams struct {
@@ -147,6 +149,66 @@ func (q *Queries) CreateAuditArtifact(ctx context.Context, arg CreateAuditArtifa
 		&i.CapturedHeadSequence,
 		&i.CapturedHeadHash,
 		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
+	)
+	return i, err
+}
+
+const createAuditSelectionArtifact = `-- name: CreateAuditSelectionArtifact :one
+INSERT INTO report_artifacts(id,actor_id,kind,format,expires_at,captured_head_sequence,captured_head_hash,chain_id,audit_filter,audit_max_events)
+VALUES ($1,$2,5,3,now()+$3::int*interval '1 day',
+$4,$5,$6,$7,$8) RETURNING id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events
+`
+
+type CreateAuditSelectionArtifactParams struct {
+	ID                   uuid.UUID
+	ActorID              uuid.UUID
+	RetentionDays        int32
+	CapturedHeadSequence int64
+	CapturedHeadHash     []byte
+	ChainID              uuid.UUID
+	AuditFilter          []byte
+	AuditMaxEvents       int32
+}
+
+func (q *Queries) CreateAuditSelectionArtifact(ctx context.Context, arg CreateAuditSelectionArtifactParams) (ReportArtifact, error) {
+	row := q.db.QueryRow(ctx, createAuditSelectionArtifact,
+		arg.ID,
+		arg.ActorID,
+		arg.RetentionDays,
+		arg.CapturedHeadSequence,
+		arg.CapturedHeadHash,
+		arg.ChainID,
+		arg.AuditFilter,
+		arg.AuditMaxEvents,
+	)
+	var i ReportArtifact
+	err := row.Scan(
+		&i.ID,
+		&i.ScheduleID,
+		&i.ActorID,
+		&i.Kind,
+		&i.Format,
+		&i.State,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.LeaseToken,
+		&i.LeaseUntil,
+		&i.ByteCount,
+		&i.RowCount,
+		&i.ChunkCount,
+		&i.SignedManifest,
+		&i.FailureReason,
+		&i.AfterSequence,
+		&i.AfterHash,
+		&i.FinalSequence,
+		&i.FinalHash,
+		&i.CapturedHeadSequence,
+		&i.CapturedHeadHash,
+		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
 	)
 	return i, err
 }
@@ -308,7 +370,7 @@ func (q *Queries) GetAuditRow(ctx context.Context, sequence int64) (ReportAuditR
 }
 
 const getReportArtifact = `-- name: GetReportArtifact :one
-SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id FROM report_artifacts WHERE id = $1 AND expires_at > now()
+SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events FROM report_artifacts WHERE id = $1 AND expires_at > now()
 `
 
 func (q *Queries) GetReportArtifact(ctx context.Context, id uuid.UUID) (ReportArtifact, error) {
@@ -337,6 +399,8 @@ func (q *Queries) GetReportArtifact(ctx context.Context, id uuid.UUID) (ReportAr
 		&i.CapturedHeadSequence,
 		&i.CapturedHeadHash,
 		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
 	)
 	return i, err
 }
@@ -454,7 +518,7 @@ func (q *Queries) InventoryReportRows(ctx context.Context, afterID uuid.UUID) ([
 }
 
 const listReportArtifacts = `-- name: ListReportArtifacts :many
-SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id FROM report_artifacts WHERE id > $1::uuid AND expires_at > now()
+SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events FROM report_artifacts WHERE id > $1::uuid AND expires_at > now()
 ORDER BY id LIMIT $2::int
 `
 
@@ -495,6 +559,8 @@ func (q *Queries) ListReportArtifacts(ctx context.Context, arg ListReportArtifac
 			&i.CapturedHeadSequence,
 			&i.CapturedHeadHash,
 			&i.ChainID,
+			&i.AuditFilter,
+			&i.AuditMaxEvents,
 		); err != nil {
 			return nil, err
 		}
@@ -549,7 +615,7 @@ func (q *Queries) ListReportSchedules(ctx context.Context, arg ListReportSchedul
 }
 
 const lockReportArtifact = `-- name: LockReportArtifact :one
-SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id FROM report_artifacts WHERE id = $1 AND state = 'building'
+SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events FROM report_artifacts WHERE id = $1 AND state = 'building'
 AND lease_token = $2::uuid AND lease_until > clock_timestamp() AND expires_at > clock_timestamp()
 FOR UPDATE
 `
@@ -585,6 +651,8 @@ func (q *Queries) LockReportArtifact(ctx context.Context, arg LockReportArtifact
 		&i.CapturedHeadSequence,
 		&i.CapturedHeadHash,
 		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
 	)
 	return i, err
 }
@@ -615,6 +683,78 @@ func (q *Queries) PageAuditRows(ctx context.Context, arg PageAuditRowsParams) ([
 			&i.PreviousHash,
 			&i.RowHash,
 			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pageAuditSelection = `-- name: PageAuditSelection :many
+SELECT r.sequence, r.event_id, r.previous_hash, r.row_hash, r.payload, f.occurred_at
+FROM audit_event_search f
+JOIN report_audit_rows r ON r.sequence = f.sequence
+WHERE f.sequence <= $1::bigint
+  AND ($2::uuid IS NULL OR f.actor_id = $2)
+  AND ($3::uuid IS NULL OR f.target_device_id = $3)
+  AND ($4::smallint = 0 OR f.action_category = $4)
+  AND ($5::timestamptz IS NULL OR f.occurred_at >= $5)
+  AND ($6::timestamptz IS NULL OR f.occurred_at < $6)
+  AND ($7::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < ($8::timestamptz, $7::uuid))
+ORDER BY f.occurred_at DESC, f.event_id DESC
+LIMIT 128
+`
+
+type PageAuditSelectionParams struct {
+	SnapshotSequence int64
+	ActorID          *uuid.UUID
+	TargetDeviceID   *uuid.UUID
+	ActionCategory   int16
+	OccurredFrom     pgtype.Timestamptz
+	OccurredUntil    pgtype.Timestamptz
+	CursorID         *uuid.UUID
+	CursorOccurredAt pgtype.Timestamptz
+}
+
+type PageAuditSelectionRow struct {
+	Sequence     int64
+	EventID      uuid.UUID
+	PreviousHash []byte
+	RowHash      []byte
+	Payload      []byte
+	OccurredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) PageAuditSelection(ctx context.Context, arg PageAuditSelectionParams) ([]PageAuditSelectionRow, error) {
+	rows, err := q.db.Query(ctx, pageAuditSelection,
+		arg.SnapshotSequence,
+		arg.ActorID,
+		arg.TargetDeviceID,
+		arg.ActionCategory,
+		arg.OccurredFrom,
+		arg.OccurredUntil,
+		arg.CursorID,
+		arg.CursorOccurredAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PageAuditSelectionRow{}
+	for rows.Next() {
+		var i PageAuditSelectionRow
+		if err := rows.Scan(
+			&i.Sequence,
+			&i.EventID,
+			&i.PreviousHash,
+			&i.RowHash,
+			&i.Payload,
+			&i.OccurredAt,
 		); err != nil {
 			return nil, err
 		}
@@ -684,9 +824,9 @@ WITH candidate AS (
 ), queued AS (
  INSERT INTO report_artifacts(id,schedule_id,actor_id,kind,format,expires_at)
  SELECT $2::uuid,id,actor_id,kind,format,now()+retention_days*interval '1 day' FROM claimed
- RETURNING id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id
+ RETURNING id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events
 )
-SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id FROM queued
+SELECT id, schedule_id, actor_id, kind, format, state, created_at, expires_at, lease_token, lease_until, byte_count, row_count, chunk_count, signed_manifest, failure_reason, after_sequence, after_hash, final_sequence, final_hash, captured_head_sequence, captured_head_hash, chain_id, audit_filter, audit_max_events FROM queued
 `
 
 type QueueDueReportParams struct {
@@ -717,6 +857,8 @@ type QueueDueReportRow struct {
 	CapturedHeadSequence int64
 	CapturedHeadHash     []byte
 	ChainID              uuid.UUID
+	AuditFilter          []byte
+	AuditMaxEvents       int32
 }
 
 func (q *Queries) QueueDueReport(ctx context.Context, arg QueueDueReportParams) (QueueDueReportRow, error) {
@@ -745,6 +887,8 @@ func (q *Queries) QueueDueReport(ctx context.Context, arg QueueDueReportParams) 
 		&i.CapturedHeadSequence,
 		&i.CapturedHeadHash,
 		&i.ChainID,
+		&i.AuditFilter,
+		&i.AuditMaxEvents,
 	)
 	return i, err
 }
