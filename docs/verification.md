@@ -1870,6 +1870,17 @@ inventory` after the runs returned an empty list. The runner's deferred count is
 the two counts need not be equal. Earlier passing `s8` records (pre-rebase)
 for Ubuntu and both RHEL releases are superseded by these.
 
+The x86_64 record is from snapshot `s13`: main `4fb7678` with the run-lock fix
+below (landed as `b07301e`), tree SHA-256 `9a14f636…0779`, lab
+`2e3a73e9…268b`, lindmd `42007996…163b`, a local KVM/OVMF guest admitted
+through the FIFO lab queue. In this run no reconcile overlapped a window run,
+so it proves the fix causes no regression. The race itself is proven by the
+deterministic regressions:
+
+| Record                                    | Image / SELinux                         | Facts                                                                                                                                   | SHA-256                                                            |
+| ----------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `fedora44-x86_64-local-osupdate-s13.json` | `fedora-cloud-44-1.7-x86-64`, Enforcing | 71 pending security; 71 deferred; window installed 78; reboot executed; patch-now updated 127 (`policy_never`); fleet `reboot_required` | `f9f3701295a27eb3dcb96843ade841b399ed14ea038a6abc9ee84a42d380c8f0` |
+
 Native findings, each fixed with a regression before these records:
 
 - The helper's `NativeResourceTransactionRequest` kind allowlist lacked kind 15,
