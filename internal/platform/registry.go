@@ -309,8 +309,8 @@ var registry = []*Release{
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Natively qualified on RHEL 9.8 x86_64 (verification.md, RHEL encrypted device actions).
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss}),
-		Gates:    rhelGates(OSUpdate, Wipe, ReportLoss),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock}),
+		Gates:    rhelGates(OSUpdate, Wipe, ReportLoss, Lock),
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
