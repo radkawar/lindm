@@ -102,6 +102,19 @@ func TestLocateNotificationBannerIgnoresSmallChanges(t *testing.T) {
 	}
 }
 
+// debian12-arm64-dgx21-assistance-10: GNOME 43's action-less "Remote assistance
+// ended" banner is 499x77, so it was not a banner, waitNoBanner never nudged it
+// away on the idle seat, and the next consent prompt stayed queued behind it.
+func TestLocateNotificationBannerFindsActionlessGNOME43Banner(t *testing.T) {
+	reference := syntheticWallpaper(color.RGBA{0, 80, 90, 0xff})
+	ended := clone(reference)
+	bounds := image.Rect(390, 36, 889, 113)
+	fill(ended, bounds, color.RGBA{64, 64, 64, 0xff})
+	if banner, found := locateNotificationBanner(reference, ended); !found || banner != bounds {
+		t.Fatalf("ended banner = %v %t, want %v", banner, found, bounds)
+	}
+}
+
 // syntheticPortalDialog draws a GNOME 46/50 share dialog: the RemoteDesktop
 // switch, when present, sits first under the header.
 func syntheticPortalDialog(wallpaper color.RGBA, dialog image.Rectangle, accent bool) *image.RGBA {

@@ -82,13 +82,16 @@ func pointerHoverSettled(before, previous, current *image.RGBA, point image.Poin
 // locateNotificationBanner finds a GNOME notification banner in the top-centre
 // banner area by comparing with a clean reference of the same desktop. GNOME
 // draws light banners on Ubuntu's Yaru theme and dark ones on Fedora's Adwaita,
-// so luminance alone is not a portable signal.
+// so luminance alone is not a portable signal. A two-line banner without
+// actions is about 76 px tall on GNOME 43 and 48 (no header row), so the floor
+// sits below it: missing the "ended" notice let waitNoBanner pass while GNOME
+// kept it on the idle seat and queued the next consent prompt behind it.
 func locateNotificationBanner(reference, current *image.RGBA) (image.Rectangle, bool) {
 	display := current.Bounds()
 	centre := display.Min.X + display.Dx()/2
 	region := image.Rect(centre-420, display.Min.Y+gnomeTopBarHeight, centre+420, display.Min.Y+360)
 	bounds, count := screenDiffBounds(reference, current, region, screenDiffThreshold)
-	if count < 2000 || bounds.Dx() < 300 || bounds.Dx() > 760 || bounds.Dy() < 80 || bounds.Dy() > 320 {
+	if count < 2000 || bounds.Dx() < 300 || bounds.Dx() > 760 || bounds.Dy() < 64 || bounds.Dy() > 320 {
 		return image.Rectangle{}, false
 	}
 	return bounds, true
