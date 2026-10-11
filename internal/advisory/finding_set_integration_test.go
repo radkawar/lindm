@@ -3,6 +3,7 @@
 package advisory
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -95,5 +96,66 @@ convert_to($3::text,'UTF8')||'\x00'::bytea||convert_to($4::text,'UTF8')||'\x00':
 	mustExec(t, ctx, pool, "DELETE FROM advisory_evaluations WHERE device_id=$1", clear)
 	if pruned, err := advisorydb.New(pool).PruneAdvisoryFindingSets(ctx, findingSetPruneBatch); err != nil || pruned != 1 {
 		t.Fatalf("unbound set not pruned exactly: %d %v", pruned, err)
+	}
+}
+
+// A cold fleet of identical devices evaluated concurrently builds the missing
+// set once, outside device transactions, and every device binds it.
+func TestConcurrentColdEvaluationBuildsOneSet(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	ctx := t.Context()
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	vulnerable := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	devices := make([]uuid.UUID, 3*evaluationWorkers)
+	for i := range devices {
+		devices[i] = seedInventory(t, pool, "fedora", "44", vulnerable)
+	}
+	attempted, failures, err := s.evaluatePending(ctx, int32(len(devices)))
+	if err != nil || failures != 0 || attempted != len(devices) {
+		t.Fatalf("cold concurrent evaluation: attempted=%d failures=%d err=%v", attempted, failures, err)
+	}
+	var sets, bound int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM advisory_finding_sets").Scan(&sets); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM advisory_evaluations WHERE state='evaluated' AND finding_set_id IS NOT NULL").Scan(&bound); err != nil {
+		t.Fatal(err)
+	}
+	if sets != 1 || bound != len(devices) {
+		t.Fatalf("sets=%d bound=%d want 1/%d", sets, bound, len(devices))
+	}
+}
+
+// A device whose row is being updated is skipped without a serialization
+// failure and evaluated once the updater commits.
+func TestEvaluatorSkipsBusyDevice(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	ctx := t.Context()
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	device := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	updater, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := updater.Exec(ctx, "UPDATE devices SET last_seen_at=now() WHERE id=$1", device); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Evaluate(ctx, device); !errors.Is(err, ErrDeviceBusy) {
+		t.Fatalf("busy device: %v", err)
+	}
+	if attempted, failures, err := s.evaluatePending(ctx, evaluationBatch); err != nil || attempted != 1 || failures != 1 {
+		t.Fatalf("all-busy batch must be deferred without errors: attempted=%d failures=%d err=%v", attempted, failures, err)
+	}
+	if err := updater.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if evaluation, err := s.Evaluate(ctx, device); err != nil || evaluation.State != "evaluated" {
+		t.Fatalf("released device not evaluated: %+v %v", evaluation, err)
 	}
 }

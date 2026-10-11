@@ -206,6 +206,11 @@ func continueAfter(err error) bool {
 		return false
 	case connect.CodeFailedPrecondition:
 		return rpcreason.Get(err) == "open_upload"
+	case connect.CodeResourceExhausted:
+		// Server-wide admission backpressure: stop this flush and retry on
+		// the next cycle instead of offering more uploads to a saturated
+		// server. Per-device deferrals still let other evidence proceed.
+		return rpcreason.Get(err) != "admission_rejected"
 	default:
 		return true
 	}

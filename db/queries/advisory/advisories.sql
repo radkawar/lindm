@@ -140,6 +140,12 @@ SELECT * FROM advisory_evaluations WHERE device_id=$1;
 -- name: LockAdvisoryDevice :exec
 SELECT id FROM devices WHERE id=$1 FOR UPDATE;
 
+-- name: TryLockAdvisoryDevice :many
+-- The background evaluator skips a device whose row is being updated (session,
+-- heartbeat, inventory) instead of waiting: in its repeatable-read snapshot a
+-- wait ends in a serialization failure. A skipped device stays pending.
+SELECT id FROM devices WHERE id=$1 FOR UPDATE SKIP LOCKED;
+
 -- name: StoreAdvisoryEvaluation :exec
 INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,expires_at,state,reason,finding_digest,host_received_at,finding_set_id)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)

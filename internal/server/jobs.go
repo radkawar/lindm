@@ -26,6 +26,8 @@ func backgroundJobs(devices *device.Service, advisories *advisory.Service, deliv
 		{Name: "snapshot-cleanup", Key: jobKeySnapshotCleanup, Mode: jobs.Exclusive, Run: devices.RunSnapshotCleanup},
 		{Name: "advisory-maintenance", Key: jobKeyAdvisoryMaintenance, Mode: jobs.Exclusive, Run: advisories.RunMaintenance},
 		{Name: "advisory-evaluation", Key: jobKeyAdvisoryEvaluation, Mode: jobs.Exclusive, Run: advisories.RunEvaluations},
+		// Each instance keeps its own read-only unrestricted fleet aggregate.
+		{Name: "fleet-summary", Mode: jobs.Replicated, Run: devices.RunFleetSummary},
 	}
 	if deliveries != nil {
 		inventory = append(inventory,

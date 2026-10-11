@@ -1725,6 +1725,35 @@ Migration `00019` converts existing exceptions to finding keys from their
 materialized findings, removes (with an audit event) exceptions whose finding
 no longer exists, drops per-device findings and evaluations, and lets the
 background job rebuild sets; reads report `evaluation_pending` meanwhile.
+A missing set is never matched inside a device evaluation: the evaluation
+releases its transaction (and so its connection and device row lock), one
+single-flight build per (feed, generation, package digest) per process matches
+and commits the set in its own transaction with a two-minute budget, and the
+device is re-evaluated in a fresh snapshot that sees it. Matching under device
+transactions livelocked a cold mass enrollment. Four concurrent workers each
+matched the same 28,821-finding set in a 15 s budget and timed out, and
+waiting on a shared build while holding connections exhausted the pool. The
+evaluator runs four bounded workers per pass. A serialization or set-uniqueness
+conflict is retried up to eight times with jittered backoff: changed
+evaluations append to the serial audit chain, whose head row is updated
+`FOR UPDATE`. A pass continues past isolated device failures.
+
+`GetFleetSummary` serves unrestricted readers a population aggregate
+(lifecycle, contact, OS, compliance and advisory findings). A replicated
+read-only job on each instance recomputes it every 10 s in one repeatable-read
+snapshot. The response's `observed_at` is that snapshot's time, and a
+population older than 30 s is never served: the read falls back to a live
+computation. Scoped readers always compute live under their device scope.
+Recent actions and approval counts are always read live.
+
+Device-service RPC admission scales with the database pool: eight concurrent
+requests per configured connection, clamped to 64–512 (64 at the default pool
+of 8). Excess requests fail fast with retryable `resource_exhausted` /
+`admission_rejected` rather than queueing behind a saturated pool. The agent
+treats them as deferred: heartbeats keep their cadence, and the spooled
+inventory upload is flushed again on the next cycle. The outer per-listener
+guard of 256 in-flight HTTP requests is unchanged.
+
 RPM imported signing keys (`gpg-pubkey` rows without an architecture) are keyring
 entries, not packages: they neither match records nor make architecture coverage
 UNKNOWN; any other architecture-less package still does.

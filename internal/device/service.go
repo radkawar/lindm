@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -45,10 +46,16 @@ import (
 const (
 	maxMessageBytes    = 1 << 20
 	maxMessageOverhead = 16 << 10
-	maxInFlight        = 64
-	rpcTimeout         = 15 * time.Second
-	defaultPageSize    = 50
-	maxPageSize        = 200
+	// inFlightPerConnection admits this many concurrent device-service RPCs
+	// per configured database connection (64 at the default pool of 8);
+	// beyond it requests are rejected as retryable admission backpressure
+	// instead of queueing behind a saturated pool.
+	inFlightPerConnection = 8
+	minInFlight           = 64
+	maxInFlight           = 512
+	rpcTimeout            = 15 * time.Second
+	defaultPageSize       = 50
+	maxPageSize           = 200
 
 	// JSON base64 expands the maximum decoded batch to 1 MiB. Allow a
 	// bounded envelope only for PutPackageBatch; response limits stay fixed.
@@ -100,13 +107,18 @@ type Config struct {
 
 // Service implements the admin, enrollment, and device RPC surfaces.
 type Service struct {
-	pool                   *pgxpool.Pool
-	deploymentID           uuid.UUID
-	ca                     *x509.Certificate
-	caKey                  crypto.Signer
-	validator              *validate.Interceptor
-	rules                  protovalidate.Validator
-	slots                  chan struct{}
+	// fleetPopulation is the latest background unrestricted fleet aggregate.
+	fleetPopulation *atomic.Pointer[adminv1.GetFleetSummaryResponse]
+	pool            *pgxpool.Pool
+	deploymentID    uuid.UUID
+	ca              *x509.Certificate
+	caKey           crypto.Signer
+	validator       *validate.Interceptor
+	rules           protovalidate.Validator
+	// inFlight counts admitted RPCs; inFlightMax is the device/enrollment
+	// limit, and admin-console requests may use adminReserve more above it.
+	inFlight               atomic.Int64
+	inFlightMax            int64
 	clock                  func() time.Time
 	authority              *trust.Authority
 	inventoryBudget        int64
@@ -293,7 +305,8 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		caKey:                  cfg.CAKey,
 		validator:              validate.NewInterceptor(validate.WithValidator(compiled)),
 		rules:                  compiled,
-		slots:                  make(chan struct{}, maxInFlight),
+		inFlightMax:            int64(inFlightLimit(pool)),
+		fleetPopulation:        new(atomic.Pointer[adminv1.GetFleetSummaryResponse]),
 		clock:                  time.Now,
 		authority:              authority,
 		inventoryBudget:        budget,
@@ -317,7 +330,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 
 func (s *Service) AdminHandler() (string, http.Handler) {
 	path, handler := adminv1connect.NewAdminServiceHandler(s, s.handlerOptions()...)
-	return path, http.MaxBytesHandler(handler, maxMessageBytes+maxMessageOverhead)
+	return path, withAdminAdmission(http.MaxBytesHandler(handler, maxMessageBytes+maxMessageOverhead))
 }
 
 func (s *Service) EnrollmentHandler() (string, http.Handler) {
@@ -380,21 +393,34 @@ func (s *Service) acquire(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	select {
-	case s.slots <- struct{}{}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+	limit := s.inFlightMax
+	if limit == 0 {
+		limit = minInFlight
+	}
+	if ctx.Value(adminAdmissionKey{}) != nil {
+		limit += adminReserve
+	}
+	if s.inFlight.Add(1) > limit {
+		s.inFlight.Add(-1)
 		return rpcreason.Error(connect.CodeResourceExhausted, "admission_rejected")
 	}
+	return nil
+}
+func (s *Service) release() {
+	s.inFlight.Add(-1)
 }
 
-func (s *Service) release() {
-	select {
-	case <-s.slots:
-	default:
-	}
+// adminReserve is admission headroom only admin-console requests may use, so a
+// fleet saturating device admission cannot lock operators out of the console.
+const adminReserve = 16
+
+type adminAdmissionKey struct{}
+
+// withAdminAdmission marks requests arriving on the admin handler.
+func withAdminAdmission(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), adminAdmissionKey{}, true)))
+	})
 }
 
 func (s *Service) within(ctx context.Context, fn func(context.Context, *devicedb.Queries) error) error {
@@ -483,4 +509,11 @@ func writeRPCError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+}
+
+func inFlightLimit(pool *pgxpool.Pool) int {
+	if pool == nil {
+		return minInFlight
+	}
+	return min(max(int(pool.Config().MaxConns)*inFlightPerConnection, minInFlight), maxInFlight)
 }

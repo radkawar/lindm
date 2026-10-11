@@ -52,7 +52,10 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 			t.Fatalf("read-only database did not reject a write/row lock: %v", err)
 		}
 	}
-	reader := *f.service
+	// The service holds admission counters and must not be copied; poll
+	// through it with the read-only pool, then restore the writable pool.
+	reader := f.service
+	writable := reader.pool
 	reader.pool = pool
 	var before time.Time
 	if err := f.pool.QueryRow(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1 RETURNING last_seen_at", f.principal.DeviceID).Scan(&before); err != nil {
@@ -97,6 +100,7 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 	if err := lock.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	reader.pool = writable
 	var after time.Time
 	if err := f.pool.QueryRow(t.Context(), "SELECT last_seen_at FROM devices WHERE id=$1", f.principal.DeviceID).Scan(&after); err != nil || !after.Equal(before) {
 		t.Fatalf("read-only polling changed durable last seen: %v %v", after, err)

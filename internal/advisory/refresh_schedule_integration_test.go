@@ -3,6 +3,7 @@
 package advisory
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -43,5 +44,20 @@ func TestRefreshScheduleIsSharedAcrossReplicas(t *testing.T) {
 	second.clock = func() time.Time { return attempted.Add(second.refreshInterval) }
 	if due, err := second.refreshDue(t.Context()); err != nil || !due {
 		t.Fatalf("feed not due after its interval: %t %v", due, err)
+	}
+}
+
+// A refresh cut short by shutdown or lost leadership is not an attempt: the
+// next leader must still refresh instead of waiting a whole interval.
+func TestCancelledRefreshIsNotRecordedAsAttempt(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, _, _ := vendorService(t, pool, "ubuntu", "24.04", "ubuntu-USN-6859-1.json")
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := s.Refresh(cancelled); err == nil {
+		t.Fatal("cancelled refresh reported success")
+	}
+	if due, err := s.refreshDue(t.Context()); err != nil || !due {
+		t.Fatalf("cancelled refresh deferred the schedule: due=%t err=%v", due, err)
 	}
 }

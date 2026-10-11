@@ -705,6 +705,12 @@ func (r *runner) deviceLoop(ctx context.Context, d *simulatedDevice, index int, 
 		case inventory:
 			err = r.inventory(call, d, index)
 			inventory = time.Now().Add(jitter(random, 10*time.Minute))
+			if err != nil && d.inventoryUpload != nil {
+				// Like the agent's spool, an admitted-but-unfinished or
+				// deferred upload is flushed again on the next ~1 minute
+				// cycle, not held until the next collection.
+				inventory = time.Now().Add(jitter(random, time.Minute))
+			}
 		}
 		cancel()
 		if err != nil {

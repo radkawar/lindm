@@ -1221,3 +1221,30 @@ func (q *Queries) TouchAdvisoryEvaluation(ctx context.Context, arg TouchAdvisory
 	_, err := q.db.Exec(ctx, touchAdvisoryEvaluation, arg.DeviceID, arg.EvaluatedAt, arg.ID)
 	return err
 }
+
+const tryLockAdvisoryDevice = `-- name: TryLockAdvisoryDevice :many
+SELECT id FROM devices WHERE id=$1 FOR UPDATE SKIP LOCKED
+`
+
+// The background evaluator skips a device whose row is being updated (session,
+// heartbeat, inventory) instead of waiting: in its repeatable-read snapshot a
+// wait ends in a serialization failure. A skipped device stays pending.
+func (q *Queries) TryLockAdvisoryDevice(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, tryLockAdvisoryDevice, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

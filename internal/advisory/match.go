@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"math/rand/v2"
 	"slices"
 	"sort"
 	"strings"
@@ -34,11 +35,16 @@ const candidatePage = 500
 // truncated result.
 const maxFindings = 100000
 
+// ErrDeviceBusy reports that the device row is being updated; the device stays
+// pending and is evaluated by a later pass.
+var ErrDeviceBusy = errors.New("advisory_device_busy")
+
 // evaluationAttempts bounds retries of one device evaluation that lost a
-// serialization race: the device row is updated by heartbeats and inventory
-// while the repeatable-read evaluation waits for its row lock, and concurrent
-// workers may create the same finding set (the retry binds the committed one).
-const evaluationAttempts = 4
+// serialization race. Changed evaluations append to the serial audit chain
+// (report_audit_head FOR UPDATE), heartbeats/inventory update the device row,
+// and concurrent workers may create the same finding set (the retry binds the
+// committed one). Retries back off with jitter so workers do not re-collide.
+const evaluationAttempts = 8
 
 // Evaluate publishes one bounded, repeatable-read evaluation of the device's
 // current immutable snapshot. Publication of a new snapshot or feed immediately
@@ -47,8 +53,21 @@ const evaluationAttempts = 4
 func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.AdvisoryEvaluation, error) {
 	for attempt := 1; ; attempt++ {
 		evaluation, err := s.evaluateOnce(ctx, deviceID)
+		if missing, ok := errors.AsType[*missingFindingSet](err); ok && attempt < evaluationAttempts {
+			if err := s.buildFindingSet(ctx, missing.feedID, missing.snapshotID, missing.digest); err != nil {
+				return advisorydb.AdvisoryEvaluation{}, err
+			}
+			continue
+		}
 		var database *pgconn.PgError
 		if attempt < evaluationAttempts && errors.As(err, &database) && (database.Code == "40001" || database.Code == "40P01" || database.ConstraintName == "advisory_finding_sets_feed_id_feed_revision_package_digest_key") && ctx.Err() == nil {
+			backoff := time.NewTimer(time.Duration(attempt) * time.Duration(5+rand.IntN(20)) * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				backoff.Stop()
+				return advisorydb.AdvisoryEvaluation{}, ctx.Err()
+			case <-backoff.C:
+			}
 			continue
 		}
 		return evaluation, err
@@ -64,8 +83,12 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := advisorydb.New(tx)
-	if err := q.LockAdvisoryDevice(ctx, deviceID); err != nil {
+	locked, err := q.TryLockAdvisoryDevice(ctx, deviceID)
+	if err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
+	}
+	if len(locked) == 0 {
+		return advisorydb.AdvisoryEvaluation{}, ErrDeviceBusy
 	}
 	d, err := q.GetAdvisoryDevice(ctx, deviceID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -195,7 +218,10 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		}
 		set, err := q.GetAdvisoryFindingSet(ctx, advisorydb.GetAdvisoryFindingSetParams{FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: digest})
 		if errors.Is(err, pgx.ErrNoRows) {
-			set, err = matchFindingSet(ctx, q, selected, selectedSource, *d.CurrentSnapshotID, digest)
+			// Released before building: this transaction's snapshot cannot
+			// see the new set, and holding its connection and device row lock
+			// while waiting on a shared build would starve the pool.
+			return advisorydb.AdvisoryEvaluation{}, &missingFindingSet{feedID: selected.ID, snapshotID: *d.CurrentSnapshotID, digest: digest}
 		}
 		if err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
@@ -228,6 +254,60 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	return result, nil
+}
+
+// missingFindingSet ends a device evaluation whose finding set does not exist
+// yet; Evaluate builds it after the device transaction is released and
+// re-evaluates in a fresh snapshot that can see it.
+type missingFindingSet struct {
+	feedID     string
+	snapshotID uuid.UUID
+	digest     []byte
+}
+
+func (*missingFindingSet) Error() string { return "advisory finding set missing" }
+
+// findingSetBuildTimeout bounds one cold match of a full package set against a
+// feed generation; it is separate from the short per-device evaluation budget.
+const findingSetBuildTimeout = 2 * time.Minute
+
+// buildFindingSet matches and commits one missing finding set. Concurrent
+// workers needing the same (feed, generation, package digest) share a single
+// build instead of each matching identical content under row locks.
+func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID uuid.UUID, digest []byte) error {
+	key := feedID + "\x00" + string(digest)
+	_, err, _ := s.setBuilds.Do(key, func() (any, error) {
+		build, cancel := context.WithTimeout(context.WithoutCancel(ctx), findingSetBuildTimeout)
+		defer cancel()
+		tx, err := s.pool.BeginTx(build, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback(build) }()
+		q := advisorydb.New(tx)
+		selected, err := q.GetAdvisoryFeed(build, feedID)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := q.GetAdvisoryFindingSet(build, advisorydb.GetAdvisoryFindingSetParams{FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: digest}); err == nil {
+			return nil, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		var source advisoryv1.FeedSource
+		if err := proto.Unmarshal(selected.ConfigBytes, &source); err != nil {
+			return nil, err
+		}
+		if _, err := matchFindingSet(build, q, &selected, &source, snapshotID, digest); err != nil {
+			return nil, err
+		}
+		return nil, tx.Commit(build)
+	})
+	var database *pgconn.PgError
+	if errors.As(err, &database) && database.ConstraintName == "advisory_finding_sets_feed_id_feed_revision_package_digest_key" {
+		return nil // another instance committed the same content first
+	}
+	return err
 }
 
 func emptyFindingDigest() []byte {

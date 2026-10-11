@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -47,6 +48,8 @@ type Service struct {
 	clock           func() time.Time
 	inventoryAge    time.Duration
 	refreshInterval time.Duration
+	// setBuilds deduplicates concurrent cold builds of one finding set.
+	setBuilds singleflight.Group
 }
 
 func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, client *http.Client) (*Service, error) {
@@ -126,6 +129,12 @@ func (s *Service) Refresh(ctx context.Context) error {
 		err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 			return s.client.FetchStream(producerCtx, source, emit, progress)
 		})
+		if err != nil && ctx.Err() != nil {
+			// Shutdown or leadership loss, not a feed failure: recording it as
+			// an attempt would defer every instance's next refresh by the
+			// whole refresh interval.
+			return errors.Join(result, err)
+		}
 		if err != nil {
 			result = errors.Join(result, fmt.Errorf("refresh feed %s: %w", source.GetId(), err))
 			encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
@@ -310,6 +319,7 @@ func (s *Service) evaluatePending(ctx context.Context, limit int32) (attempted, 
 		mu   sync.Mutex
 		next atomic.Int64
 		wg   sync.WaitGroup
+		busy int
 	)
 	for range min(evaluationWorkers, len(ids)) {
 		wg.Go(func() {
@@ -324,7 +334,9 @@ func (s *Service) evaluatePending(ctx context.Context, limit int32) (attempted, 
 				}
 				mu.Lock()
 				attempted++
-				if err != nil {
+				if errors.Is(err, ErrDeviceBusy) {
+					busy++
+				} else if err != nil {
 					failures++
 					resultErr = errors.Join(resultErr, fmt.Errorf("evaluate device %s: %w", ids[i], err))
 				}
@@ -335,6 +347,10 @@ func (s *Service) evaluatePending(ctx context.Context, limit int32) (attempted, 
 	wg.Wait()
 	if err := ctx.Err(); err != nil {
 		return attempted, failures, err
+	}
+	// A batch of only busy devices is retried on the next tick, not spun on.
+	if busy == attempted {
+		failures = attempted
 	}
 	return attempted, failures, resultErr
 }

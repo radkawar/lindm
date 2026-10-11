@@ -270,7 +270,7 @@ func outcome(err error) agentv1.TransportOutcome {
 		return agentv1.TransportOutcome_TRANSPORT_OUTCOME_AUTHORITY_REJECTED
 	case "identity_expired":
 		return agentv1.TransportOutcome_TRANSPORT_OUTCOME_IDENTITY_EXPIRED
-	case "open_upload", "rate_limited", "inventory_budget", "snapshot_capacity":
+	case "open_upload", "rate_limited", "inventory_budget", "snapshot_capacity", "admission_rejected":
 		return agentv1.TransportOutcome_TRANSPORT_OUTCOME_SERVER_ADMISSION_DEFERRED
 	}
 	switch connect.CodeOf(err) {

@@ -575,3 +575,33 @@ SELECT $1,$2,$3,$4,resource_id,$5,intent_envelope,intent_document,$6,$7,$6,'expi
 		t.Fatalf("hidden actions leaked into an empty scope: %v", got.GetRecentActions())
 	}
 }
+
+// The background population serves unrestricted readers only while fresh;
+// scoped readers and an expired population always read live.
+func TestFleetSummaryBackgroundPopulationIsFreshUnrestrictedOnly(t *testing.T) {
+	f := newEnrolled(t, 0)
+	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
+	if err := f.svc.refreshFleetPopulation(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	before := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices()
+	fleetSummaryEnroll(t, f)
+	if cached := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices(); cached != before {
+		t.Fatalf("fresh unrestricted population not served: %d want cached %d", cached, before)
+	}
+	scoped := identity.WithPrincipal(f.ctx, scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}}))
+	if got := fleetSummary(t, f.svc, scoped, 0).GetLifecycle().GetTotalDevices(); got != 1 {
+		t.Fatalf("scoped reader used the unrestricted population: %d", got)
+	}
+	f.svc.clock = func() time.Time { return time.Now().Add(fleetSummaryMaxAge + time.Minute) }
+	if live := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices(); live != before+1 {
+		t.Fatalf("expired population served: %d want live %d", live, before+1)
+	}
+	f.svc.clock = time.Now
+	if err := f.svc.refreshFleetPopulation(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if refreshed := fleetSummary(t, f.svc, f.ownerCtx, 0).GetLifecycle().GetTotalDevices(); refreshed != before+1 {
+		t.Fatalf("refresh did not publish a new population: %d", refreshed)
+	}
+}
