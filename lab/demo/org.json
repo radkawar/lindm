@@ -132,7 +132,7 @@
         ]
       }
     ],
-    "approvalRequiredPermissions": ["actions.lock"]
+    "approvalRequiredPermissions": ["actions.lock", "advisory_exceptions.manage"]
   },
   "profiles": [
     {
@@ -1119,6 +1119,7 @@
       "hostname": "demo-engineering-01",
       "advisoryId": "CVE-2024-6387",
       "packageName": "openssh-server",
+      "proposeApproval": true,
       "request": {
         "reason": "Temporary acceptance while the Engineering compatibility test is completed; SSH limited to the approved management network outside this profile.",
         "expiresAt": "2026-11-25T00:00:00Z"
@@ -1128,6 +1129,7 @@
       "hostname": "demo-finance-01",
       "advisoryId": "CVE-2024-3094",
       "packageName": "xz-utils",
+      "proposeApproval": true,
       "request": {
         "reason": "Temporary Finance application compatibility review; no SSH access and replacement image scheduled before expiry.",
         "expiresAt": "2026-12-10T00:00:00Z"

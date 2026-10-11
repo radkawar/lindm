@@ -146,13 +146,17 @@ func (s *Service) AcceptAdvisoryFinding(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, core.ExecutionError(err)
 	}
+	consumption, err := s.PrepareActionApproval(ctx, actor, identity.PermissionManageAdvisoryExceptions, req.Msg.GetApprovalId(), req.Msg)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := s.Identity.LockAuthorization(ctx, tx, approval, identity.PermissionManageAdvisoryExceptions); err != nil {
-		return nil, core.ExecutionError(err)
+	if err := s.LockActionApproval(ctx, tx, consumption, approval, identity.PermissionManageAdvisoryExceptions); err != nil {
+		return nil, core.ApprovalError(err)
 	}
 	if _, err := core.LockDeviceScope(ctx, devicedb.New(tx), approval.Principal(), identity.PermissionManageAdvisoryExceptions, id); err != nil {
 		return nil, core.MapErr(err)
@@ -161,8 +165,8 @@ func (s *Service) AcceptAdvisoryFinding(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, advisoryError(err)
 	}
-	if err := s.Identity.LockAuthorization(ctx, tx, approval, identity.PermissionManageAdvisoryExceptions); err != nil {
-		return nil, core.ExecutionError(err)
+	if err := s.LockActionApproval(ctx, tx, consumption, approval, identity.PermissionManageAdvisoryExceptions); err != nil {
+		return nil, core.ApprovalError(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, core.MapErr(err)

@@ -27,7 +27,8 @@ import (
 	"lindm/internal/identity"
 )
 
-func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
+func advisoryAcceptanceFixture(t *testing.T) (*enrolledFixture, *adminv1.AcceptAdvisoryFindingRequest) {
+	t.Helper()
 	f := newEnrolled(t, 0)
 	raw, err := os.ReadFile("../advisory/feed/testdata/ubuntu-USN-6859-1.json")
 	if err != nil {
@@ -83,6 +84,11 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 		t.Fatalf("expected real vendor finding: %v", findings.Msg)
 	}
 	request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, FindingId: findings.Msg.Findings[0].Id, Reason: "Authorized expiring risk acceptance", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}
+	return f, request
+}
+
+func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
+	f, request := advisoryAcceptanceFixture(t)
 	restricted, actor, _ := dispatchIdentity(t, f.svc.Pool, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}})
 	f.svc.Identity = restricted
 	if _, err := f.svc.AcceptAdvisoryFinding(identity.WithPrincipal(f.ctx, actor), connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeNotFound {

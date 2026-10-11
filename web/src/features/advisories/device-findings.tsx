@@ -195,8 +195,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                       : finding.exception.actorId === principal.id
                         ? "you"
                         : "another administrator"}
-                    . {accepted ? "Acceptance expires" : "Acceptance expired"}{" "}
-                    {formatTimestamp(finding.exception.expiresAt).local}.
+                    . Acceptance expiry: {formatTimestamp(finding.exception.expiresAt).local}.
                   </p>
                   <p className="whitespace-pre-wrap break-words">
                     Reason: {finding.exception.reason}

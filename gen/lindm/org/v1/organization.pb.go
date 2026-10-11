@@ -426,9 +426,12 @@ type AdvisoryException struct {
 	PackageName string                 `protobuf:"bytes,3,opt,name=package_name,json=packageName,proto3" json:"package_name,omitempty"`
 	// The selector resolves device_id/finding_id. reason and expires_at are the
 	// existing product exception request, not a parallel acceptance schema.
-	Request       *v1.AcceptAdvisoryFindingRequest `protobuf:"bytes,4,opt,name=request,proto3" json:"request,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Request *v1.AcceptAdvisoryFindingRequest `protobuf:"bytes,4,opt,name=request,proto3" json:"request,omitempty"`
+	// Propose only; a different human reviews in the approval inbox. Applying this
+	// document never approves on behalf of another person.
+	ProposeApproval bool `protobuf:"varint,5,opt,name=propose_approval,json=proposeApproval,proto3" json:"propose_approval,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AdvisoryException) Reset() {
@@ -489,6 +492,13 @@ func (x *AdvisoryException) GetRequest() *v1.AcceptAdvisoryFindingRequest {
 	return nil
 }
 
+func (x *AdvisoryException) GetProposeApproval() bool {
+	if x != nil {
+		return x.ProposeApproval
+	}
+	return false
+}
+
 var File_lindm_org_v1_organization_proto protoreflect.FileDescriptor
 
 const file_lindm_org_v1_organization_proto_rawDesc = "" +
@@ -534,13 +544,15 @@ const file_lindm_org_v1_organization_proto_rawDesc = "" +
 	"\x0fEnrollmentGrant\x12\"\n" +
 	"\x04name\x18\x01 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00R\x04name\x12N\n" +
 	"\arequest\x18\x02 \x01(\v2,.lindm.admin.v1.CreateEnrollmentGrantRequestB\x06\xbaH\x03\xd8\x01\x03R\arequest:\xd3\x01\xbaH\xcf\x01\x1a\xcc\x01\n" +
-	"\x1borganization.grant_template\x12Arequest is required; request_id, name and reason are engine owned\x1ajhas(this.request) && this.request.request_id == '' && this.request.reason == '' && this.request.name == ''\"\xdd\x03\n" +
+	"\x1borganization.grant_template\x12Arequest is required; request_id, name and reason are engine owned\x1ajhas(this.request) && this.request.request_id == '' && this.request.reason == '' && this.request.name == ''\"\xc6\x05\n" +
 	"\x11AdvisoryException\x12*\n" +
 	"\bhostname\x18\x01 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\xfd\x01\xba\x01\x01\x00R\bhostname\x12/\n" +
 	"\vadvisory_id\x18\x02 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x02\xba\x01\x01\x00R\n" +
 	"advisoryId\x121\n" +
 	"\fpackage_name\x18\x03 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x02\xba\x01\x01\x00R\vpackageName\x12N\n" +
-	"\arequest\x18\x04 \x01(\v2,.lindm.admin.v1.AcceptAdvisoryFindingRequestB\x06\xbaH\x03\xd8\x01\x03R\arequest:\xe7\x01\xbaH\xe3\x01\x1a\xe0\x01\n" +
+	"\arequest\x18\x04 \x01(\v2,.lindm.admin.v1.AcceptAdvisoryFindingRequestB\x06\xbaH\x03\xd8\x01\x03R\arequest\x12)\n" +
+	"\x10propose_approval\x18\x05 \x01(\bR\x0fproposeApproval:\xa5\x03\xbaH\xa1\x03\x1a\xbb\x01\n" +
+	"\x1forganization.exception_approval\x12bapproval IDs belong to the retained request in the approval inbox, not an engine-resolved template\x1a4!has(this.request) || this.request.approval_id == ''\x1a\xe0\x01\n" +
 	"\x1forganization.exception_template\x12Hrequest is required; request, device and finding IDs are engine resolved\x1ashas(this.request) && this.request.request_id == '' && this.request.device_id == '' && this.request.finding_id == ''B\x1eZ\x1clindm/gen/lindm/org/v1;orgv1b\x06proto3"
 
 var (

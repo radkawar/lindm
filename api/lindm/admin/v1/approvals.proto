@@ -4,6 +4,7 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/advisories.proto";
 import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/device_actions.proto";
 import "lindm/admin/v1/enrollment_recovery.proto";
@@ -67,6 +68,7 @@ message Approval {
     ActivateTargetPreviewRequest activate_target_preview = 19;
     RevealSecretRequest reveal_secret = 23;
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 24;
+    AcceptAdvisoryFindingRequest accept_advisory_finding = 26;
   }
   // Current labels projected only for authorized approval responses.
   string requester_display_name = 20;
@@ -75,6 +77,8 @@ message Approval {
   // Exact retained evidence for an activate_target_preview payload, when present.
   // It is not a fresh membership evaluation or permission to execute.
   lindm.policy.v1.TargetPreview target_preview = 25;
+  // Exact finding identity when still retained; absence means evidence unavailable.
+  AdvisoryFinding advisory_finding = 27;
 }
 
 message CreateApprovalRequest {
@@ -94,6 +98,7 @@ message CreateApprovalRequest {
     ActivateTargetPreviewRequest activate_target_preview = 9;
     RevealSecretRequest reveal_secret = 10;
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 11;
+    AcceptAdvisoryFindingRequest accept_advisory_finding = 12;
   }
 }
 message CreateApprovalResponse {

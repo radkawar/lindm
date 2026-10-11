@@ -57,6 +57,7 @@ type VMDispatchOptions struct {
 	LocalAuthority        bool
 	PowerActions          bool
 	RuntimeAuthorization  bool
+	AdvisoryExceptions    bool
 	Resources             bool
 	ResourceExecutionOnly bool
 	// Advisories qualifies real vendor feeds against this enrolled guest.
@@ -118,6 +119,7 @@ type VMDispatchResult struct {
 	ReleaseUpgrade                   *VMReleaseUpgradeEvidence       `json:"release_upgrade,omitempty"`
 	RuntimeAuthorization             *VMRuntimeAuthorizationEvidence `json:"runtime_authorization,omitempty"`
 	Advisories                       *VMAdvisoryEvidence             `json:"advisories,omitempty"`
+	AdvisoryExceptions               *VMAdvisoryApprovalEvidence     `json:"advisory_exceptions,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -132,6 +134,9 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	if options.RuntimeAuthorization && (!options.LocalAuthority || options.Resources || options.PowerActions || options.Hold != 0 || options.ReleaseUpgrade) {
 		return nil, errors.New("runtime authorization requires local authority without another dispatch scenario")
+	}
+	if options.AdvisoryExceptions && (!options.LocalAuthority || options.Resources || options.PowerActions || options.Hold != 0 || options.ReleaseUpgrade || options.RuntimeAuthorization) {
+		return nil, errors.New("advisory exception qualification requires isolated local authority without other dispatch scenarios")
 	}
 	release := manifestRelease(manifest)
 	if options.Advisories {
@@ -488,6 +493,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	if options.RuntimeAuthorization {
 		err = exerciseRuntimeAuthorization(ctx, vm, fixture, result)
+		return result, err
+	}
+	if options.AdvisoryExceptions {
+		result.AdvisoryExceptions = new(VMAdvisoryApprovalEvidence)
+		err = exerciseAdvisoryApproval(ctx, vm, control, fixture, result, release, manifest.GetArchitecture(), filepath.Join(filepath.Dir(options.CacheDir), "advisory-feeds"))
 		return result, err
 	}
 	if options.Resources {

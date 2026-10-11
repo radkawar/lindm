@@ -138,6 +138,14 @@ message AdvisoryException {
   // The selector resolves device_id/finding_id. reason and expires_at are the
   // existing product exception request, not a parallel acceptance schema.
   lindm.admin.v1.AcceptAdvisoryFindingRequest request = 4 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  // Propose only; a different human reviews in the approval inbox. Applying this
+  // document never approves on behalf of another person.
+  bool propose_approval = 5;
+  option (buf.validate.message).cel = {
+    id: "organization.exception_approval"
+    message: "approval IDs belong to the retained request in the approval inbox, not an engine-resolved template"
+    expression: "!has(this.request) || this.request.approval_id == ''"
+  };
   option (buf.validate.message).cel = {
     id: "organization.exception_template"
     message: "request is required; request, device and finding IDs are engine resolved"

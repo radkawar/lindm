@@ -310,11 +310,12 @@ WHERE d.state='active' AND (e.device_id IS NULL
 ORDER BY e.evaluated_at NULLS FIRST,d.id
 LIMIT sqlc.arg('row_limit');
 
--- name: AcceptAdvisoryException :exec
+-- name: AcceptAdvisoryException :one
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
 VALUES($1,$2,$3,$4,$5,$6)
 ON CONFLICT(device_id,finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
- accepted_at=EXCLUDED.accepted_at,expires_at=EXCLUDED.expires_at;
+ accepted_at=EXCLUDED.accepted_at,expires_at=EXCLUDED.expires_at
+RETURNING actor_id, reason, accepted_at, expires_at;
 
 -- name: GetAdvisoryExceptionRequest :one
 SELECT request_digest,response_bytes FROM advisory_exception_requests WHERE actor_id=$1 AND request_id=$2;

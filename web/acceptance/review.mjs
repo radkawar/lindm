@@ -25,6 +25,7 @@ import { reviewAuthorization } from "./review-authorization.mjs";
 import { reviewDirectoryAuthorization } from "./review-directory-authorization.mjs";
 import { reviewSSHBanner } from "./review-ssh-banner.mjs";
 import { reviewOSUpdate } from "./review-os-update.mjs";
+import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
 
 process.umask(0o077);
 
@@ -557,6 +558,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
     screenshots: {},
     checks: {},
   };
+  entry.checks.advisory = { findings: await reviewAdvisoryControls(page, route.path) };
   const prefix =
     slug(
       `${route.path}${target.label ? `-${target.label}` : ""}${variant ? `-${variant}` : ""}-${theme}-${viewport.name}`,

@@ -149,6 +149,10 @@ func (f *fakeAdmin) ListApprovals(context.Context, *connect.Request[adminv1.List
 func (f *fakeAdmin) CreateApproval(_ context.Context, r *connect.Request[adminv1.CreateApprovalRequest]) (*connect.Response[adminv1.CreateApprovalResponse], error) {
 	f.requests = append(f.requests, proto.CloneOf(r.Msg))
 	a := &adminv1.Approval{Id: uuid.NewString(), RequesterId: f.principalID, State: adminv1.ApprovalState_APPROVAL_STATE_PENDING, ExpiresAt: timestamppb.New(f.preview.GetEvaluatedAt().AsTime().Add(900 * time.Second)), TargetPreview: proto.CloneOf(f.preview), Payload: &adminv1.Approval_ActivateTargetPreview{ActivateTargetPreview: proto.CloneOf(r.Msg.GetActivateTargetPreview())}}
+	if request := r.Msg.GetAcceptAdvisoryFinding(); request != nil {
+		a.Payload = &adminv1.Approval_AcceptAdvisoryFinding{AcceptAdvisoryFinding: proto.CloneOf(request)}
+		a.ExpiresAt = timestamppb.New(time.Now().Add(time.Hour))
+	}
 	f.approvals = append(f.approvals, a)
 	return connect.NewResponse(&adminv1.CreateApprovalResponse{Approval: a}), nil
 }
@@ -160,7 +164,7 @@ func (f *fakeAdmin) ListDeviceFindings(context.Context, *connect.Request[adminv1
 }
 func (f *fakeAdmin) AcceptAdvisoryFinding(_ context.Context, request *connect.Request[adminv1.AcceptAdvisoryFindingRequest]) (*connect.Response[adminv1.AcceptAdvisoryFindingResponse], error) {
 	f.requests = append(f.requests, proto.CloneOf(request.Msg))
-	exception := &adminv1.AdvisoryException{Reason: request.Msg.GetReason(), ExpiresAt: request.Msg.GetExpiresAt()}
+	exception := &adminv1.AdvisoryException{Reason: request.Msg.GetReason(), ExpiresAt: timestamppb.New(request.Msg.GetExpiresAt().AsTime().Truncate(time.Microsecond))}
 	for _, finding := range f.findings {
 		if finding.GetId() == request.Msg.GetFindingId() {
 			finding.Exception = exception

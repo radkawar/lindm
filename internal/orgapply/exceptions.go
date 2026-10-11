@@ -3,6 +3,7 @@ package orgapply
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -76,7 +77,10 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 			p.add("advisory_exception", name, "", "pending", detail, nil)
 			continue
 		}
-		if match.GetException() != nil && match.GetException().GetReason() == e.GetRequest().GetReason() && proto.Equal(match.GetException().GetExpiresAt(), e.GetRequest().GetExpiresAt()) {
+		// Compare the database's canonical microsecond expiry, not an arbitrary
+		// tolerance. The original desired payload remains exact for approval.
+		expires := e.GetRequest().GetExpiresAt().AsTime().Truncate(time.Microsecond)
+		if match.GetException() != nil && match.GetException().GetReason() == e.GetRequest().GetReason() && match.GetException().GetExpiresAt().AsTime().Equal(expires) {
 			p.add("advisory_exception", name, match.GetId(), "unchanged", "", nil)
 			continue
 		}
@@ -87,6 +91,13 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 		request := proto.CloneOf(e.GetRequest())
 		request.DeviceId = deviceID
 		request.FindingId = match.GetId()
+		if e.GetProposeApproval() {
+			p.add("advisory_exception", name, match.GetId(), "pending", "independent approval required; review and accept in the approval inbox", &adminv1.CreateApprovalRequest{
+				LifetimeSeconds: 3600,
+				Payload:         &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request},
+			})
+			continue
+		}
 		status := "created"
 		if match.GetException() != nil {
 			status = "updated"

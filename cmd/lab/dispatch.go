@@ -29,6 +29,7 @@ func runVMDispatch(ctx context.Context, args []string, stdout, stderr io.Writer)
 	localAuthority := flags.Bool("local-authority", false, "use isolated local password/WebAuthn authority instead of Keycloak")
 	powerActions := flags.Bool("power-actions", false, "qualify signed restart, refresh inventory and shutdown instead of service scenarios")
 	runtimeAuthorization := flags.Bool("runtime-authorization", false, "qualify runtime authorization and browser organization apply with two local humans on Ubuntu 24.04")
+	advisoryExceptions := flags.Bool("advisory-exceptions", false, "qualify native findings and exact two-human risk acceptance with refusal evidence; requires -local-authority")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -50,7 +51,7 @@ func runVMDispatch(ctx context.Context, args []string, stdout, stderr io.Writer)
 			return err
 		}
 	}
-	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, Hold: *hold, Progress: stderr, LocalAuthority: *localAuthority, PowerActions: *powerActions, RuntimeAuthorization: *runtimeAuthorization})
+	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, Hold: *hold, Progress: stderr, LocalAuthority: *localAuthority, PowerActions: *powerActions, RuntimeAuthorization: *runtimeAuthorization, AdvisoryExceptions: *advisoryExceptions})
 	if result != nil {
 		recordErr := writeLabEvidence(stdout, *record, result)
 		runErr = errors.Join(runErr, recordErr)

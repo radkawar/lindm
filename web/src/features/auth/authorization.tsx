@@ -40,6 +40,7 @@ const approvalPermissions = [
   "inventory.manage",
   "recovery_keys.read",
   "encryption.manage",
+  "advisory_exceptions.manage",
   "actions.lock",
   "actions.release-lock",
   "actions.quarantine",

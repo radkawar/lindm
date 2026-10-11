@@ -2985,6 +2985,92 @@ these source hashes; native lane records are independently authoritative.
 
 ### L11 distro advisory classification
 
+Advisory risk acceptance can require two independent humans via
+`approvalRequiredPermissions: ["advisory_exceptions.manage"]`. Focused regressions
+are `TestAdvisoryExceptionRequiresExactIndependentApproval`,
+`TestAdvisoryApprovalConsumptionRollsBackWithInvalidExpiry`,
+`TestAdvisoryApprovalBindsEveryAcceptanceField`,
+`TestAdvisoryExceptionReceiptMatchesPersistedPrecision`,
+`TestExceptionCanonicalExpiryDoesNotReissueApproval` and
+`TestExceptionProposalNeverAcceptsOrApproves`. These use controlled inventory or
+unit fixtures and are not native qualification.
+
+The maintained disposable native scenario is `lab vm dispatch
+-advisory-exceptions -local-authority`, with the normal image, signed-package,
+private-server and evidence flags. It uses installed-agent inventory, the current
+vendor feed, two independently authenticated local humans, missing/pending/self
+approval and payload-substitution refusals, exact retry and consumed approval
+evidence. It refuses to qualify when no affected real finding is available. Guest
+and control-plane host platforms are distinct evidence; no physical or
+cross-distribution claim follows from this lane.
+The runtime-policy scenario enables the gate only after the requester has signed
+in, retains the actual before/after policy revisions, and uses the original
+session for the missing-approval refusal and subsequent approval/acceptance flow.
+It does not substitute a restarted server's bootstrap policy for a runtime edit.
+
+The passing arm64 invocations used automatic native Spark admission, not TCG or
+a borrowed lease, with an immutable private source checkout containing built
+`web/dist` assets. Replay with a new private receipt path:
+
+```sh
+artifacts/bin/lab vm dispatch -arch arm64 -accelerator kvm \
+  -manifest "$SOURCE/lab/images/ubuntu-noble-arm64.json" \
+  -repo "$SOURCE" -lindmd "$SOURCE/artifacts/bin/lindmd" \
+  -local-authority -advisory-exceptions \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -record "$NEW_PRIVATE_RECEIPT"
+```
+
+The remote lane cross-builds from `SOURCE` and opens its own colocated database.
+Leave the outer orchestration deadline unset; the maintained admission and
+scenario deadlines remain enforced. A queued or interrupted run is not a pass.
+
+Ubuntu 24.04 native arm64 qualification at source `4823cb85` passed in
+`artifacts/org-exception-approval/ubuntu24-arm-native-precision.json` (SHA-256
+`fccaaf6a248e9e3fa189fd8802215bf9e7cd11919978ef2293dc6db3c3b29f38`).
+The disposable KVM guest was Ubuntu 24.04.5; the actual control-plane host was
+Ubuntu 24.04.4, with independently colocated PostgreSQL. The installed agent
+reported `linux-modules-6.8.0-142-generic` version `6.8.0-142.142` arm64;
+the complete held Ubuntu feed identified `UBUNTU-CVE-2026-68328` (USN-8876-1),
+source SHA-256 `c45c2791452b55990d08ae1ba4962a712081d6e0134bc5c5c6707d09adf50aba`.
+The receipt retains the affected and accepted finding, distinct human identities,
+missing/pending/self-approval and reason/expiry/finding-substitution refusals,
+consumption and exact retry. Approval binds the original expiry nanoseconds
+`147138212`; the returned and listed exception both retain the database's
+`147138000` microsecond precision, with exact protobuf equality. This is risk
+acceptance, not package remediation. The gate is shared server policy without
+distro-specific effects; no separate Fedora native pass is claimed.
+
+The combined runtime-authority checkpoint `7bfe853f` also passed:
+`artifacts/org-exception-approval/ubuntu24-arm-runtime-approval.json`, SHA-256
+`ab45a6f6bd21399d516789d5803d007e2b694316c0c12c103fea970a83245b6a`.
+It retains actual policy revision zero without the gate, then runtime revision
+one with the gate enabled through a separate owner session. The original
+authenticated requester is refused without approval and then completes the full
+independent review, exact acceptance, refusal, retry and consumption scenario
+against the same native package/feed on Ubuntu 24.04.5/24.04.4 guest/server.
+This checkpoint combines exception source `1c14a881` and runtime-authority source
+`e942b8ff`; it is not a claim that either independent feature had landed then.
+Its focused five-case advisory integration run passed with `-race`, including
+persisted response/list/retry precision and changed-human-authority refusals;
+the changed-package lint reported zero issues. Retained logs:
+`combined-focused-gates.log` SHA-256
+`3cc32c2999464cc788b517f5d099abce4e96a8e8365d1a04c43903111deccbd8`,
+and `combined-build.log` SHA-256
+`52cc275b599c8424017729425c5654732d89668a26896c01e6138461dd08deb8`,
+both under `artifacts/org-exception-approval/`.
+
+The preceding native record `ubuntu24-arm-native.json` (SHA-256
+`1badd7ab8ce23c696f758c5f5e9bbc15edaadc84634186f0d6044a92ee099b86`)
+is **failed**: the API returned input nanoseconds rather than the persisted
+exception timestamp. It is not superseded by weakening the equality oracle:
+the correction returns the actual stored row and the passing record keeps the
+exact response/list/retry checks. Declarative apply separately compares exact
+canonical database microseconds so unchanged desired expiry never reissues an
+approval; one-microsecond changes remain changes.
+
 `go test -race ./internal/advisory/...` checks 43 native dpkg, 91 RPM and 46 libalpm
 upstream comparison vectors plus genuine pinned vendor data. Source URLs, digests,
 licenses and extraction provenance accompany `internal/advisory/feed/testdata`.

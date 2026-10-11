@@ -139,6 +139,10 @@ message AcceptAdvisoryFindingRequest {
   string finding_id = 3 [(buf.validate.field).string.uuid = true];
   string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
   google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).required = true];
+  string approval_id = 6 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
 }
 message AcceptAdvisoryFindingResponse {
   AdvisoryException exception = 1;

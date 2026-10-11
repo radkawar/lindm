@@ -590,6 +590,36 @@ before use. These are illustrative selectors, not a claim that either host is
 vulnerable. Missing or ambiguous hosts/findings remain pending; no finding is
 fabricated and no unrelated finding is accepted.
 
+Set `authorization.approvalRequiredPermissions` to include
+`advisory_exceptions.manage` to require two-human risk acceptance. The policy is
+optional; it never makes a service account a human approver. An approval binds the
+requester, exact device and finding, request identity, reason and absolute exception
+expiry. A different human needs both scoped exception and approval permissions.
+Both people's authority is refreshed and fenced again when the requester creates
+the exception; approval consumption and the exception commit in one transaction.
+Changed payloads, self-approval, expired approvals and revoked authority are refused.
+An exact retry retains the same request and approval; it does not create a second
+exception or bypass fresh authority.
+Returned exceptions use the database's microsecond timestamp precision, so the
+acceptance receipt, later finding reads and declarative apply agree. Approval
+digests still bind the original exception payload, including expiry nanoseconds;
+normalizing the displayed/stored expiry never permits a changed request to reuse
+approval. Apply compares canonical microseconds exactly, not an expiry tolerance.
+Downgrade refuses while retained advisory approval records require the new action;
+it does not delete approval audit history.
+
+The console proposes from the selected finding, reviews its package/version,
+device, reason and expiry in the approval inbox, and lets the original requester
+accept the approved risk. Acceptance is not remediation and never overrides stale
+inventory/feed evidence. The finding card labels the recorded timestamp
+“Acceptance expiry” independently of finding freshness; unknown evidence does not
+mean the exception has expired. The demo's `proposeApproval: true` entries make
+`lindmctl apply` create proposals only, returning pending approval references;
+another human reviews and the requester accepts in the inbox. Apply never approves
+its own proposal. Omitting `proposeApproval` attempts the normal acceptance API,
+which still refuses when policy requires approval. Do not put an approval ID into
+an engine-resolved exception template.
+
 #### Runtime authorization and browser account import
 
 `GetAuthorization` and `UpdateAuthorization` require fresh unrestricted
@@ -697,7 +727,7 @@ by lindm; administrator edits prevent destructive restoration. A failed effect
 attempts custody-checked rollback and remains outcome-unknown rather than being
 blindly replayed. See [native records](verification.md#ssh-login-banner).
 
-#### Declarative organization gaps
+#### Declarative organization controls
 
 - USB-storage blocking uses the typed `managedFile.kernelModuleBlocklist` template,
   never arbitrary content at a forbidden path. The executor must explicitly enable
@@ -722,11 +752,20 @@ blindly replayed. See [native records](verification.md#ssh-login-banner).
   schedules remain separate from unresolved native attempts; reconciliation never
   replays a mutation. Assistance invalidates employee prompts.
   Native qualification and its limits are recorded in `docs/verification.md`.
-- Remote assistance has one permission for view and control, not separate grants.
-- Advisory exceptions have reason/expiry but no two-human approval workflow.
-- SSH banner text now has a dispatchable banner-only typed resource, drift repair
+- Advisory exception two-human approval is the optional `advisory_exceptions.manage`
+  approval gate described in the
+  [organization specification](#organization-specification); native qualification
+  is recorded in [verification](verification.md#l11-distro-advisory-classification).
+- SSH banner text has a dispatchable banner-only typed resource, drift repair
   and ownership-safe release; see [SSH login banner](#ssh-login-banner). The managed
   MOTD remains a separate post-login facility.
+
+#### Declarative organization gaps
+
+Every remaining item is either pending or an explicit gate with its closing
+condition.
+
+- Remote assistance has one permission for view and control, not separate grants.
 - **Gate: membership-safe static group rename.** The existing replacement API
   rewrites membership without compare-and-swap. Automatically repairing name drift
   could restore revoked RBAC access, so apply reports it as unsupported. Closing

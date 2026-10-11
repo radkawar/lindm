@@ -12,11 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acceptAdvisoryException = `-- name: AcceptAdvisoryException :exec
+const acceptAdvisoryException = `-- name: AcceptAdvisoryException :one
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
 VALUES($1,$2,$3,$4,$5,$6)
 ON CONFLICT(device_id,finding_id) DO UPDATE SET actor_id=EXCLUDED.actor_id,reason=EXCLUDED.reason,
  accepted_at=EXCLUDED.accepted_at,expires_at=EXCLUDED.expires_at
+RETURNING actor_id, reason, accepted_at, expires_at
 `
 
 type AcceptAdvisoryExceptionParams struct {
@@ -28,8 +29,15 @@ type AcceptAdvisoryExceptionParams struct {
 	ExpiresAt  pgtype.Timestamptz
 }
 
-func (q *Queries) AcceptAdvisoryException(ctx context.Context, arg AcceptAdvisoryExceptionParams) error {
-	_, err := q.db.Exec(ctx, acceptAdvisoryException,
+type AcceptAdvisoryExceptionRow struct {
+	ActorID    uuid.UUID
+	Reason     string
+	AcceptedAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+}
+
+func (q *Queries) AcceptAdvisoryException(ctx context.Context, arg AcceptAdvisoryExceptionParams) (AcceptAdvisoryExceptionRow, error) {
+	row := q.db.QueryRow(ctx, acceptAdvisoryException,
 		arg.FindingID,
 		arg.DeviceID,
 		arg.ActorID,
@@ -37,7 +45,14 @@ func (q *Queries) AcceptAdvisoryException(ctx context.Context, arg AcceptAdvisor
 		arg.AcceptedAt,
 		arg.ExpiresAt,
 	)
-	return err
+	var i AcceptAdvisoryExceptionRow
+	err := row.Scan(
+		&i.ActorID,
+		&i.Reason,
+		&i.AcceptedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const advisoryArchitectures = `-- name: AdvisoryArchitectures :many

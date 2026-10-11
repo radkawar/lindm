@@ -841,6 +841,28 @@ parent confirmation.
 
 ## Advisory feeds
 
+Two-human advisory exceptions use the shared control-plane approval mechanism;
+there is no Ubuntu-specific exception executor. The disposable
+`lab vm dispatch -advisory-exceptions -local-authority` lane requires a real
+affected vendor finding from the installed Ubuntu agent and records independent
+human approval, refusal and exact-retry evidence. It does not manufacture a
+finding when the installed package is already fixed. See the
+[L11 evidence ledger](../verification.md#l11-distro-advisory-classification) for
+qualification status; server-host and guest platforms are recorded separately.
+The source-`4823cb85` arm64 KVM run passed on an Ubuntu 24.04.5 guest and
+Ubuntu 24.04.4 control-plane host: receipt
+`artifacts/org-exception-approval/ubuntu24-arm-native-precision.json`, SHA-256
+`fccaaf6a248e9e3fa189fd8802215bf9e7cd11919978ef2293dc6db3c3b29f38`.
+It binds the actual installed kernel-module vendor finding to independent
+approval and a consumed, exactly retryable exception, including pre-effect
+refusals. It does not claim a physical installation or a corrected package.
+The combined runtime-authority checkpoint `7bfe853f` additionally passed enabling
+this gate after requester sign-in, with the same original session observing
+revision zero to one, refusing unapproved acceptance and completing independent
+review. Its receipt `ubuntu24-arm-runtime-approval.json` in the same directory has
+SHA-256 `ab45a6f6bd21399d516789d5803d007e2b694316c0c12c103fea970a83245b6a`;
+the ledger distinguishes this qualification checkpoint from independent landings.
+
 Ubuntu assessments use native dpkg versions and vendor backports, not upstream
 version ordering alone. The maintained full archive is
 `https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip`; a stale

@@ -373,6 +373,27 @@ func (s *Service) ListUncovered(ctx context.Context, req *adminv1.ListDeviceUnco
 	return response, nil
 }
 
+// ApprovalFinding projects the exact persisted finding under the caller's
+// fresh-authorization and device-scope transaction, never a replacement match.
+func (s *Service) ApprovalFinding(ctx context.Context, tx pgx.Tx, req *adminv1.AcceptAdvisoryFindingRequest) (*adminv1.AdvisoryFinding, error) {
+	deviceID, err := uuid.Parse(req.GetDeviceId())
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	findingID, err := uuid.Parse(req.GetFindingId())
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	row, err := advisorydb.New(tx).GetAdvisoryFinding(ctx, advisorydb.GetAdvisoryFindingParams{DeviceID: deviceID, ID: findingID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &adminv1.AdvisoryFinding{Id: row.ID.String(), AdvisoryId: row.AdvisoryID, Cves: row.Cves, PackageName: row.PackageName, InstalledVersion: row.InstalledVersion, FixedVersion: row.FixedVersion, Architecture: row.Architecture, Severity: row.Severity, PublishedAt: protoTime(row.PublishedAt), FeedId: row.FeedID, SourceUrl: row.SourceUrl}, nil
+}
+
 // Accept runs inside the caller's fresh-authorization and device-scope transaction.
 // Durable response receipts bind every retry to the exact actor/request payload.
 func (s *Service) Accept(ctx context.Context, tx pgx.Tx, actor uuid.UUID, req *adminv1.AcceptAdvisoryFindingRequest) (*adminv1.AcceptAdvisoryFindingResponse, error) {
@@ -448,10 +469,13 @@ func (s *Service) Accept(ctx context.Context, tx pgx.Tx, actor uuid.UUID, req *a
 	if !expires.After(now.Time) || expires.After(now.Time.Add(366*24*time.Hour)) {
 		return nil, ErrInvalid
 	}
-	out := &adminv1.AcceptAdvisoryFindingResponse{Exception: &adminv1.AdvisoryException{ActorId: actor.String(), Reason: req.GetReason(), AcceptedAt: protoTime(now), ExpiresAt: req.GetExpiresAt()}}
-	if err := q.AcceptAdvisoryException(ctx, advisorydb.AcceptAdvisoryExceptionParams{FindingID: finding, DeviceID: deviceID, ActorID: actor, Reason: req.GetReason(), AcceptedAt: now, ExpiresAt: timestamp(expires)}); err != nil {
+	stored, err := q.AcceptAdvisoryException(ctx, advisorydb.AcceptAdvisoryExceptionParams{FindingID: finding, DeviceID: deviceID, ActorID: actor, Reason: req.GetReason(), AcceptedAt: now, ExpiresAt: timestamp(expires)})
+	if err != nil {
 		return nil, err
 	}
+	// Receipt and subsequent findings project the same persisted timestamps,
+	// including PostgreSQL's microsecond precision, not the input's nanoseconds.
+	out := &adminv1.AcceptAdvisoryFindingResponse{Exception: &adminv1.AdvisoryException{ActorId: stored.ActorID.String(), Reason: stored.Reason, AcceptedAt: protoTime(stored.AcceptedAt), ExpiresAt: protoTime(stored.ExpiresAt)}}
 	payload, err := proto.Marshal(out)
 	if err != nil {
 		return nil, err

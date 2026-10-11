@@ -22,6 +22,7 @@ var approvalPayloadPermissions = map[protoreflect.FullName]Permission{
 	"lindm.admin.v1.RevealRecoveryKeyRequest":             PermissionReadRecoveryKeys,
 	"lindm.admin.v1.RevealSecretRequest":                  PermissionRevealSecrets,
 	"lindm.admin.v1.RevealLocalAdminPasswordRequest":      PermissionRevealSecrets,
+	"lindm.admin.v1.AcceptAdvisoryFindingRequest":         PermissionManageAdvisoryExceptions,
 }
 var deviceActionPermissions = map[protoreflect.Name]Permission{
 	"escrow_rotate":      PermissionManageEncryption,

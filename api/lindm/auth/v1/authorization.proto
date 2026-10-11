@@ -118,6 +118,7 @@ message AuthorizationPolicy {
         "remote_execution.run",
         "inventory.manage",
         "recovery_keys.read",
+        "advisory_exceptions.manage",
         "encryption.manage",
         "actions.lock",
         "actions.release-lock",

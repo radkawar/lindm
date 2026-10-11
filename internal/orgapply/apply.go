@@ -82,6 +82,12 @@ func Apply(ctx context.Context, client adminv1connect.AdminServiceClient, plan *
 }
 
 func completeRequest(org, kind, id string, request proto.Message) error {
+	if approval, ok := request.(*adminv1.CreateApprovalRequest); ok {
+		if err := completeRequest(org, kind, id, approval.GetAcceptAdvisoryFinding()); err != nil {
+			return err
+		}
+		return protovalidate.Validate(approval)
+	}
 	field := request.ProtoReflect().Descriptor().Fields().ByName("request_id")
 	if field == nil {
 		return errors.New("orgapply: mutation missing request identity")
@@ -103,6 +109,13 @@ func applyRequest(ctx context.Context, client adminv1connect.AdminServiceClient,
 	case *adminv1.UpdateAuthorizationRequest:
 		_, err := client.UpdateAuthorization(ctx, connect.NewRequest(r))
 		return err
+	case *adminv1.CreateApprovalRequest:
+		response, err := client.CreateApproval(ctx, connect.NewRequest(r))
+		if err != nil {
+			return err
+		}
+		outcome.ID = response.Msg.GetApproval().GetId()
+		return nil
 	case *adminv1.SetDeviceGroupRequest:
 		_, err := client.SetDeviceGroup(ctx, connect.NewRequest(r))
 		if err != nil {

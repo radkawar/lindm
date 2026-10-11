@@ -43,6 +43,13 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 	var payload proto.Message
 	var err error
 	switch request := message.(type) {
+	case *adminv1.AcceptAdvisoryFindingRequest:
+		if request == nil {
+			return b, ErrApprovalInvalid
+		}
+		copy := proto.CloneOf(request)
+		copy.ApprovalId = ""
+		payload, err = b.bindDevice("advisory_exception.accept", copy)
 	case *adminv1.CreateRecoveryEnrollmentGrantRequest:
 		return bindRecoveryApproval(request)
 	case *adminv1.ApprovePendingEnrollmentRequest:
@@ -150,6 +157,8 @@ func (b *approvalBinding) bindDevice(action string, request deviceScopedRequest)
 
 func approvalPayload(request *adminv1.CreateApprovalRequest) proto.Message {
 	switch request.GetPayload().(type) {
+	case *adminv1.CreateApprovalRequest_AcceptAdvisoryFinding:
+		return request.GetAcceptAdvisoryFinding()
 	case *adminv1.CreateApprovalRequest_ApprovePendingEnrollment:
 		return request.GetApprovePendingEnrollment()
 	case *adminv1.CreateApprovalRequest_RecoverDevice:
@@ -509,6 +518,10 @@ func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Ap
 	}
 	var payload proto.Message
 	switch row.Action {
+	case "advisory_exception.accept":
+		request := &adminv1.AcceptAdvisoryFindingRequest{}
+		payload = request
+		out.Payload = &adminv1.Approval_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}
 	case "enrollment.approve":
 		request := &adminv1.ApprovePendingEnrollmentRequest{}
 		payload = request

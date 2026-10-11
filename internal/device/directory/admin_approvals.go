@@ -64,6 +64,9 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 		return nil, core.ApprovalError(err)
 	}
 	approval.TargetPreview = targetPreview
+	if err := s.populateAdvisoryApproval(ctx, actor, approval); err != nil {
+		return nil, err
+	}
 	return core.NoStore(&adminv1.CreateApprovalResponse{Approval: approval}), nil
 }
 
@@ -91,6 +94,9 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 	var budget core.ResponsePageBudget
 	for i, item := range approvals {
 		if err := s.populateTargetApproval(ctx, actor, item); err != nil {
+			return nil, err
+		}
+		if err := s.populateAdvisoryApproval(ctx, actor, item); err != nil {
 			return nil, err
 		}
 		fits, err := budget.Take(item)

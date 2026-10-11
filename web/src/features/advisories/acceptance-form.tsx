@@ -3,6 +3,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AcceptAdvisoryFindingRequestSchema } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
@@ -28,6 +29,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
   const attempt = useAcceptanceAttempt(key);
   const [reason, setReason] = useState("");
   const [expiry, setExpiry] = useState("");
+  const [propose, setPropose] = useState(true);
   const [requestId, setRequestId] = useState(newRequestId);
   const [errors, setErrors] = useState<string[]>([]);
   const mutation = useMutation({
@@ -35,6 +37,17 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
     gcTime: 0,
     meta: { authGeneration: lifetime.generation },
     mutationFn: async (captured: AcceptanceAttempt) => {
+      if (captured.propose) {
+        const response = await adminClient.createApproval(
+          {
+            lifetimeSeconds: 3600,
+            payload: { case: "acceptAdvisoryFinding", value: captured.payload },
+          },
+          { signal: lifetime.signal },
+        );
+        lifetime.signal.throwIfAborted();
+        return response;
+      }
       const response = await adminClient.acceptAdvisoryFinding(captured.payload, {
         signal: lifetime.signal,
       });
@@ -44,7 +57,11 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
     onSuccess: (_response, captured) => {
       if (!setAcceptanceAttempt(lifetime, key, { ...captured, status: "succeeded", failure: null }))
         return;
-      toast.success("Risk accepted");
+      toast.success(captured.propose ? "Risk acceptance proposed" : "Risk accepted");
+      if (captured.propose) {
+        void queryClient.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
+        return;
+      }
       void queryClient.invalidateQueries({
         queryKey: ["advisory-findings", lifetime.generation, deviceId],
       });
@@ -99,7 +116,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
           return;
         }
         setErrors([]);
-        send({ payload, status: "inflight", failure: null });
+        send({ payload, propose, status: "inflight", failure: null });
       }}
     >
       <p className="text-sm">Accepting a risk doesn't fix the package. It expires automatically.</p>
@@ -110,12 +127,19 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
           <p>Expires: {formatTimestamp(attempt.payload.expiresAt).local}</p>
           <p role="status">
             {attempt.status === "succeeded"
-              ? "Risk accepted. Updating findings…"
+              ? attempt.propose
+                ? "Proposed. A different administrator must review before this risk can be accepted."
+                : "Risk accepted. Updating findings…"
               : attempt.status === "inflight"
                 ? "Saving…"
                 : "Not saved."}
           </p>
           {attempt.failure ? <RpcError failure={attempt.failure} /> : null}
+          {attempt.propose && attempt.status === "succeeded" ? (
+            <Link to="/approvals" className="underline underline-offset-4">
+              Open approval inbox
+            </Link>
+          ) : null}
           {attempt.status === "ambiguous" ? (
             <>
               <p>We couldn't confirm this was saved. Retry: it won't be recorded twice.</p>
@@ -155,8 +179,19 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
             value={expiry}
             onChange={(event) => setExpiry(event.target.value)}
           />
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={propose}
+              onChange={(event) => setPropose(event.target.checked)}
+            />
+            Request independent approval (valid for one hour)
+          </label>
+          <p className="text-sm text-muted-foreground">
+            Direct acceptance is refused when organisation policy requires approval.
+          </p>
           <Button type="submit" className="w-fit">
-            Accept risk
+            {propose ? "Propose risk acceptance" : "Accept risk"}
           </Button>
         </>
       )}

@@ -5,6 +5,7 @@ import type { RpcFailure } from "@/lib/errors";
 
 export type AcceptanceAttempt = {
   payload: AcceptAdvisoryFindingRequest;
+  propose?: boolean;
   status: "inflight" | "ambiguous" | "rejected" | "succeeded";
   failure: RpcFailure | null;
 };

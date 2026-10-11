@@ -49,6 +49,7 @@ const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> 
   activateTargetPreview: "Activate assignment rollout",
   revealSecret: "Reveal secret",
   revealLocalAdminPassword: "Reveal local-admin password",
+  acceptAdvisoryFinding: "Accept advisory risk",
 };
 
 // Revealed bytes stay in page memory only and are zeroized on dismissal.
@@ -198,6 +199,13 @@ function ApprovalCard({
       ? readiness.data?.recoveryReadiness
       : undefined;
   const recoveryReady = !recovery || currentReadiness?.ready === true;
+  const advisoryRequest =
+    approval.payload.case === "acceptAdvisoryFinding" ? approval.payload.value : undefined;
+  const exceptionUnexpired =
+    !advisoryRequest ||
+    (!!advisoryRequest.expiresAt &&
+      timestampDate(advisoryRequest.expiresAt).getTime() > Date.now());
+  const advisoryReady = !advisoryRequest || (!!approval.advisoryFinding && exceptionUnexpired);
   const unexpired =
     !!approval.expiresAt && timestampDate(approval.expiresAt).getTime() > Date.now();
   const decisionAllowed =
@@ -233,6 +241,12 @@ function ApprovalCard({
         );
       } else {
         switch (approval.payload.case) {
+          case "acceptAdvisoryFinding":
+            await adminClient.acceptAdvisoryFinding(
+              { ...approval.payload.value, approvalId: approval.id },
+              options,
+            );
+            break;
           case "revokeDevice":
             await adminClient.revokeDevice(
               { ...approval.payload.value, approvalId: approval.id },
@@ -337,11 +351,15 @@ function ApprovalCard({
           ? "Approved"
           : exact.action === "reject"
             ? "Rejected"
-            : "Action started",
+            : approval.payload.case === "acceptAdvisoryFinding"
+              ? "Risk accepted"
+              : "Action started",
       );
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
       if (exact.action === "execute") {
         await client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
+        await client.invalidateQueries({ queryKey: ["advisory-findings", lifetime.generation] });
+        await client.invalidateQueries({ queryKey: ["advisory-summary", lifetime.generation] });
         await client.invalidateQueries({ queryKey: ["device-resources", lifetime.generation] });
       }
       if (exact.action === "execute") {
@@ -451,6 +469,24 @@ function ApprovalCard({
           </div>
         ) : null}
       </dl>
+      {approval.payload.case === "acceptAdvisoryFinding" ? (
+        <div className="grid gap-2 border border-warning/30 bg-warning/10 p-3 text-sm">
+          <p>This accepts risk on this device only; it does not fix the package.</p>
+          {approval.advisoryFinding ? (
+            <p>
+              {approval.advisoryFinding.advisoryId}: {approval.advisoryFinding.packageName}{" "}
+              {approval.advisoryFinding.installedVersion} ({approval.advisoryFinding.architecture})
+            </p>
+          ) : (
+            <p role="alert">
+              Finding evidence is no longer available. Return to the device and investigate before
+              proposing a new exception.
+            </p>
+          )}
+          <p className="whitespace-pre-wrap">Reason: {approval.payload.value.reason}</p>
+          <p>Risk acceptance expires: {formatTimestamp(approval.payload.value.expiresAt).local}</p>
+        </div>
+      ) : null}
       {actionRequest ? <DeviceActionSpecView spec={actionSpec} /> : null}
       {recovery ? (
         readiness.error ? (
@@ -500,6 +536,7 @@ function ApprovalCard({
               disabled={
                 busy ||
                 (!recoveryReady && !(failure?.ambiguous && attempt?.action === "approve")) ||
+                (!advisoryReady && !(failure?.ambiguous && attempt?.action === "approve")) ||
                 reason.trim() === "" ||
                 (attempt !== null && attempt.action !== "approve")
               }
@@ -519,14 +556,24 @@ function ApprovalCard({
           </div>
         </div>
       ) : null}
+      {advisoryRequest && !exceptionUnexpired ? (
+        <p role="alert" className="text-sm">
+          The requested expiry has passed. Reject this request and propose a new expiry from the
+          device finding.
+        </p>
+      ) : null}
       {!completed && executionAllowed && approval.payload.case ? (
         <Button
           className="w-fit"
           variant="destructive"
-          disabled={busy || (!recoveryReady && !failure?.ambiguous)}
+          disabled={busy || ((!recoveryReady || !advisoryReady) && !failure?.ambiguous)}
           onClick={() => void act("execute")}
         >
-          {failure?.ambiguous ? "Try again" : "Run now"}
+          {failure?.ambiguous
+            ? "Try again"
+            : approval.payload.case === "acceptAdvisoryFinding"
+              ? "Accept approved risk"
+              : "Run now"}
         </Button>
       ) : null}
       {busy ? (

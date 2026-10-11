@@ -1186,6 +1186,7 @@ type AcceptAdvisoryFindingRequest struct {
 	FindingId     string                 `protobuf:"bytes,3,opt,name=finding_id,json=findingId,proto3" json:"finding_id,omitempty"`
 	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	ApprovalId    string                 `protobuf:"bytes,6,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1253,6 +1254,13 @@ func (x *AcceptAdvisoryFindingRequest) GetExpiresAt() *timestamppb.Timestamp {
 		return x.ExpiresAt
 	}
 	return nil
+}
+
+func (x *AcceptAdvisoryFindingRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
 }
 
 type AcceptAdvisoryFindingResponse struct {
@@ -1408,7 +1416,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"snapshotAt\x12L\n" +
 	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
-	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xfd\x01\n" +
+	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xab\x02\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
@@ -1417,7 +1425,9 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"finding_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tfindingId\x12!\n" +
 	"\x06reason\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12A\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\"`\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12,\n" +
+	"\vapproval_id\x18\x06 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\n" +
+	"approvalId\"`\n" +
 	"\x1dAcceptAdvisoryFindingResponse\x12?\n" +
 	"\texception\x18\x01 \x01(\v2!.lindm.admin.v1.AdvisoryExceptionR\texception*\xf2\x01\n" +
 	"\x14AdvisoryFindingState\x12&\n" +
