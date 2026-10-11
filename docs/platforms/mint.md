@@ -153,9 +153,11 @@ desktop-session lane).
 - **Assistance.** Gated `portal_screencast_unavailable`: xdg-desktop-portal
   1.20.0+ds-2ubuntu1 with `-xapp` 1.1.3+zena and `-gtk` 1.15.1-1build2 exposes no
   ScreenCast or RemoteDesktop portal, and lindm has no X11 capture path. VIEW and
-  CONTROL end `UNAVAILABLE` before any consent prompt. Cinnamon 6.6.4 also leaves
-  `graphical-session.target` inactive, so the packaged `lindm-session.service`
-  user unit would not start from that target.
+  CONTROL end `UNAVAILABLE` before any consent prompt. Cinnamon 6.6.4 leaves
+  `graphical-session.target` inactive; the agent package's
+  `/etc/xdg/autostart/lindm-session.desktop` starts `lindm-session.service`
+  through cinnamon-session's XDG autostart instead
+  (`session_unit_activation=xdg-autostart`).
 
 ## Lab records
 

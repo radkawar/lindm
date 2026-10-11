@@ -446,17 +446,14 @@ func (v *EncryptedVM) serial(ctx context.Context) (net.Conn, error) {
 	}
 }
 
+// encryptedUnlockPrompt matches only an initramfs prompt that reads the
+// passphrase now. Arch mkinitcpio's encrypt hook (Omarchy) first prints "A
+// password is required to access the root volume:" on its own line and only
+// then runs cryptsetup, whose "Enter passphrase for" prompt is the trigger;
+// answering the sentence would type the secret into an echoing console.
 func encryptedUnlockPrompt(text string) bool {
 	text = strings.ToLower(text)
-	if strings.Contains(text, "please unlock disk") || strings.Contains(text, "enter passphrase for") || strings.Contains(text, "please enter passphrase for disk") {
-		return true
-	}
-	// Arch mkinitcpio's encrypt hook (Omarchy) asks through plymouth with this
-	// sentence and then awaits input on the same line. Its plain-console
-	// fallback prints the sentence on its own line and then cryptsetup's own
-	// "Enter passphrase for" prompt, which must remain the single trigger.
-	i := strings.LastIndex(text, "a password is required to access the")
-	return i >= 0 && !strings.ContainsAny(text[i:], "\r\n") && strings.HasSuffix(strings.TrimRight(text[i:], " "), ":")
+	return strings.Contains(text, "please unlock disk") || strings.Contains(text, "enter passphrase for") || strings.Contains(text, "please enter passphrase for disk")
 }
 
 func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (bool, error) {

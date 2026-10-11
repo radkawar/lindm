@@ -9,6 +9,7 @@ import (
 	"image"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -83,10 +84,19 @@ func (v *guestVM) pointerMove(ctx context.Context, display image.Rectangle, poin
 	return nil
 }
 
-// sendKey presses and releases one QEMU key code on the guest's local seat.
-func (v *guestVM) sendKey(ctx context.Context, qcode string) error {
-	if err := v.qmpCommand(ctx, map[string]any{"execute": "send-key", "id": "key", "arguments": map[string]any{"keys": []map[string]any{{"type": "qcode", "data": qcode}}}}); err != nil {
-		return fmt.Errorf("guest key %s: %w", qcode, err)
+// sendKey presses QEMU key codes together, in order, on the guest's local
+// seat and releases them: one code is a key press, several are a chord such
+// as meta_l+esc.
+func (v *guestVM) sendKey(ctx context.Context, qcodes ...string) error {
+	if len(qcodes) == 0 {
+		return errors.New("guest key chord is empty")
+	}
+	keys := make([]map[string]any, 0, len(qcodes))
+	for _, qcode := range qcodes {
+		keys = append(keys, map[string]any{"type": "qcode", "data": qcode})
+	}
+	if err := v.qmpCommand(ctx, map[string]any{"execute": "send-key", "id": "key", "arguments": map[string]any{"keys": keys}}); err != nil {
+		return fmt.Errorf("guest key %s: %w", strings.Join(qcodes, "+"), err)
 	}
 	return nil
 }

@@ -233,19 +233,28 @@ func TestOmarchyConsoleCmdline(t *testing.T) {
 	}
 }
 
+// Observed on the Omarchy 4.0.4 lab initramfs without plymouth: the encrypt
+// hook's sentence can arrive in a serial read before its newline, and
+// answering it typed the passphrase into the echoing console before
+// cryptsetup's own prompt, which then read as a rejection.
 func TestEncryptedUnlockPromptMkinitcpioEncrypt(t *testing.T) {
 	for text, want := range map[string]bool{
-		// plymouth ask-for-password awaiting input on the serial console
-		"A password is required to access the root volume: ": true,
-		// a partial read must not trigger an early submission
-		"A password is required to access the ro": false,
-		// plain-console fallback: the sentence line alone is not the prompt
-		"\nA password is required to access the root volume:\n": false,
-		// ...cryptsetup's own prompt that follows it is
+		"\nA password is required to access the root volume:":                                   false,
+		"\nA password is required to access the root volume:\n":                                 false,
 		"\nA password is required to access the root volume:\nEnter passphrase for /dev/vda2: ": true,
 	} {
 		if got := encryptedUnlockPrompt(text); got != want {
 			t.Errorf("encryptedUnlockPrompt(%q) = %t, want %t", text, got, want)
+		}
+	}
+	for text, want := range map[string]bool{
+		// plymouth ask-for-password (bootstrap boot only)
+		"A password is required to access the root volume:": true,
+		// a partial read must not trigger an early submission
+		"A password is required to access the ro": false,
+	} {
+		if got := omarchyBootstrapPrompt(text); got != want {
+			t.Errorf("omarchyBootstrapPrompt(%q) = %t, want %t", text, got, want)
 		}
 	}
 }

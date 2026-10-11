@@ -705,7 +705,7 @@ func omarchyBootstrapUnlock(ctx context.Context, conn net.Conn, secret string) e
 			if len(pending) > 8192 {
 				pending = pending[len(pending)-8192:]
 			}
-			if encryptedUnlockPrompt(pending) {
+			if omarchyBootstrapPrompt(pending) {
 				if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 					return err
 				}
@@ -724,6 +724,14 @@ func omarchyBootstrapUnlock(ctx context.Context, conn net.Conn, secret string) e
 		return errors.New("encrypted golden booted without consuming its LUKS passphrase")
 	}
 	return nil
+}
+
+// omarchyBootstrapPrompt matches the vendor plymouth password display, which
+// reads input on the prompt's own line, as well as a console prompt.
+func omarchyBootstrapPrompt(text string) bool {
+	text = strings.ToLower(text)
+	i := strings.LastIndex(text, "a password is required to access the")
+	return encryptedUnlockPrompt(text) || (i >= 0 && strings.HasSuffix(strings.TrimRight(text[i:], " "), ":"))
 }
 
 func omarchyTail(data []byte) string {

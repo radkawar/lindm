@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/platform"
 )
 
@@ -99,5 +100,33 @@ func TestCinnamonLockExpectsLockerWithoutLockedHint(t *testing.T) {
 	}
 	if desktop, err := labDesktopFor("gnome", release); err != nil || desktop.name != "gnome" {
 		t.Fatalf("gnome profile = %v, %v", desktop, err)
+	}
+}
+
+// COSMIC locks through logind without LockedHint, locks on its own
+// Super+Escape shortcut in the lane, keeps live VIEW scenarios and refuses
+// CONTROL before consent for its missing RemoteDesktop portal.
+func TestCOSMICProfileLocksThroughLogindAndRefusesControl(t *testing.T) {
+	cosmic := mustLabDesktop(t, "cosmic")
+	if want := cosmic.expectedLock(true); want.hint || !want.locker {
+		t.Fatalf("cosmic lock expectation %+v", want)
+	}
+	if strings.Join(cosmic.lockKeys, "+") != "meta_l+esc" {
+		t.Fatalf("cosmic lock path %v is not its own shortcut", cosmic.lockKeys)
+	}
+	var names []string
+	for _, spec := range cosmic.assistance {
+		names = append(names, spec.name)
+		if spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL && spec.detail != "portal_remote_desktop_unavailable" {
+			t.Fatalf("cosmic runs a live control scenario: %+v", spec)
+		}
+	}
+	if strings.Join(names, ",") != "view,decline,portal-cancel,lock,control-unavailable" {
+		t.Fatalf("cosmic scenarios = %v", names)
+	}
+	want := cosmic.expectedLock(true)
+	fields := desktopFields(cosmic, "wayland", "COSMIC", want)
+	if _, err := parseActionDesktop(cosmic, []byte(strings.Join(fields, "\n")), want); err != nil {
+		t.Fatal(err)
 	}
 }

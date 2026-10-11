@@ -140,13 +140,15 @@ type assistanceClickEvidence struct {
 }
 
 type assistanceScenarioEvidence struct {
-	Name              string                       `json:"name"`
-	Mode              string                       `json:"mode"`
-	SessionID         string                       `json:"session_id"`
-	ExpectedCause     string                       `json:"expected_end_cause"`
-	EndCause          string                       `json:"end_cause"`
-	EndDetail         string                       `json:"end_detail,omitempty"`
-	ExpectedDetail    string                       `json:"expected_end_detail,omitempty"`
+	Name           string `json:"name"`
+	Mode           string `json:"mode"`
+	SessionID      string `json:"session_id"`
+	ExpectedCause  string `json:"expected_end_cause"`
+	EndCause       string `json:"end_cause"`
+	EndDetail      string `json:"end_detail,omitempty"`
+	ExpectedDetail string `json:"expected_end_detail,omitempty"`
+	// LockPath is how the lock scenario locked the desktop.
+	LockPath          string                       `json:"lock_path,omitempty"`
 	ConsoleEndCause   string                       `json:"console_end_cause_text,omitempty"`
 	ControlGranted    bool                         `json:"control_granted"`
 	LocalSession      *assistanceLocalEvidence     `json:"local_session,omitempty"`

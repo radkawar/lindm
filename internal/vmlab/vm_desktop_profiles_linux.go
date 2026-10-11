@@ -47,6 +47,10 @@ type labDesktop struct {
 	lockedHint bool
 	// logindLock: logind's Session.Lock reaches the locker.
 	logindLock bool
+	// lockKeys, when set, is the desktop's own lock-screen key chord (QEMU
+	// qcodes). The assistance lock scenario then presses it on the local seat
+	// instead of calling loginctl, proving the desktop's own lock path.
+	lockKeys []string
 	// assistance are the scenarios that natively hold on this desktop.
 	assistance []assistanceScenarioSpec
 }
@@ -145,6 +149,42 @@ if as omarchy-hyprland-session-locked; then echo locked; else case $? in 1) echo
 		// screencopy, so VIEW is refused for its unobservable lock and CONTROL
 		// for its missing portal, both before consent.
 		assistance: unavailableScenarios("session_lock_state_unreported", "portal_remote_desktop_unavailable"),
+	},
+	{
+		// greetd's initial_session autologin into start-cosmic (Pop!_OS 24.04).
+		// cosmic-greeter never sets LockedHint, but it locks on logind
+		// Session.Lock and PrepareForSleep, and Super+Escape runs `loginctl
+		// lock-session`; its own log lines are the native lock oracle.
+		name: "cosmic",
+		autologin: func(platform.LabSession) string {
+			return `config=/etc/greetd/cosmic-greeter.toml
+awk 'BEGIN{skip=0} /^\[/{skip=($0=="[initial_session]")} !skip' "$config" > "$config.lindm"
+printf '\n[initial_session]\ncommand = "start-cosmic"\nuser = "%s"\n' "$u" >> "$config.lindm"
+chmod --reference="$config" "$config.lindm"
+mv "$config.lindm" "$config"
+install -d -o "$u" -g "$u" -m 0700 /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1
+printf 'None' > /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1/screen_off_time
+printf 'None' > /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time
+chown -R "$u":"$u" /home/"$u"/.config/cosmic
+systemctl restart display-manager.service`
+		},
+		services:     []string{"cosmic-greeter"},
+		sessionTypes: []string{"wayland"},
+		userEnv:      `WAYLAND_DISPLAY=$(cd /run/user/$uid && ls -d wayland-? | head -1)`,
+		ready:        `pgrep -u "$uid" -x cosmic-comp >/dev/null && pgrep -u "$uid" -x cosmic-panel >/dev/null`,
+		quiet:        `pkill -u "$u" -f cosmic-initial-setup || true`,
+		// cosmic-greeter's locker logs "session locked" once its lock surfaces
+		// are shown and "session unlocked" when it releases them.
+		lockOracle: `pgrep -u "$uid" -x cosmic-comp >/dev/null
+last=$(journalctl -b _UID="$uid" -o cat --no-pager | grep -E 'session (locked|unlocked)' | tail -n 1 || true)
+case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) echo locked;; *) echo invalid;; esac`,
+		locker:     "cosmic-greeter locker journal (session locked/unlocked)",
+		lockedHint: false,
+		logindLock: true,
+		lockKeys:   []string{"meta_l", "esc"},
+		// xdg-desktop-portal-cosmic implements ScreenCast but, in the shipped
+		// 0.1.0pop1, no RemoteDesktop: CONTROL is refused before consent.
+		assistance: append(slices.Clone(assistanceScenarios[1:]), unavailableScenarios("", "portal_remote_desktop_unavailable")[1]),
 	},
 }
 
