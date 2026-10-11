@@ -1240,6 +1240,36 @@
       "verified": true,
       "scope": "Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup",
       "reference": "#bare-machine-console-enrollment-2026-10-11"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "assistance",
+      "architecture": "aarch64",
+      "manifest": "fedora-server-encrypted-44-1.7-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/fedora44-aarch64-assistance-03/assistance.json",
+      "sha256": "4298e63a70a0b2b1d745714be7dc944381b3ae71f5e17756e024205e136f1d72",
+      "recorded": "2026-10-11T14:46:02.991927218Z",
+      "revision": "54ad9413490d01b0225eda89db6111ac222eddb6-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME, Secure Boot off",
+      "reference": "#fedora-44-aarch64-gnome-assistance"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "encrypted",
+      "architecture": "aarch64",
+      "manifest": "fedora-server-encrypted-44-1.7-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/fedora44-aarch64-encryption-04.json",
+      "sha256": "b7b2c01b354bffb65beb0317b5c51d9865fcd12bd2af2e93590ee8d8a5ccfc6f",
+      "recorded": "2026-10-11T15:19:09.655437816Z",
+      "revision": "54ad9413490d01b0225eda89db6111ac222eddb6-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "Secure Boot off",
+      "reference": "#fedora-44-aarch64-encryption-and-tpm"
     }
   ]
 }

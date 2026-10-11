@@ -238,7 +238,18 @@ The later complete encryption run proved escrow/reveal, rotation and retired-key
 rejection, crash recovery, TPM bind, PCR7 mismatch and revealed-key recovery:
 `$HOME/.cache/lindm-encryptionqual-20261010/fedora44-encryption-11.json`, SHA-256
 `33ae1246cc71ec97a83e7b7ccf319103d0fc46513cd089760155285ad9eb71a5`.
-These exact tuples do not qualify physical TPMs or ARM.
+These x86_64 tuples do not qualify physical TPMs or ARM.
+
+The separate [Fedora 44 aarch64 encryption and TPM record](../verification.md#fedora-44-aarch64-encryption-and-tpm)
+passed the full product encryption lane on `dgx21` KVM: escrow/reveal, rotation,
+retired-key rejection, interrupted-rotation recovery, signed TPM bind and
+unattended cold boot, PCR7 mismatch and revealed-key recovery. It uses AAVMF
+`2024.02-2ubuntu0.10`, swtpm2 and **Secure Boot not enforced** (SetupMode).
+The vendor aarch64 installer kernel has no PE signature; the enrolled template
+correctly rejects it. PCR7 binding on this explicitly approved non-Secure-Boot
+tuple does not prove an authenticated boot chain or physical TPM security.
+The assistance and TPM results are separate runs, not a single post-bind
+assistance session.
 
 Fedora dracut 108 separates the `systemd-cryptsetup` module from `crypt`
 ([`encrypted_installer_linux.go:205-213`](../../internal/vmlab/encrypted_installer_linux.go#L205-L213)).
@@ -514,8 +525,19 @@ placement. Feed support does not qualify an ARM graphical desktop.
 Qualified: emulated x86_64 GNOME/Wayland consent, view, control, operator and local
 stop, decline, portal cancel and lock termination, with audit, in
 [`fedora44-assistance-03`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
-Not qualified: KDE Plasma spin, X11, Fedora 43, Atomic desktops, physical
-displays, multi-user seats and ARM desktops.
+The same five scenarios also passed on aarch64 KVM on `dgx21`, with GNOME
+Shell/Mutter 50.0, portal 1.21.1/portal-gnome 50.0, PipeWire 1.6.2 and
+GStreamer 1.28.1, through colocated relay-only TURN (console over TCP):
+[`fedora44-aarch64-assistance-03`](../verification.md#fedora-44-aarch64-gnome-assistance).
+Its AAVMF `2024.02-2ubuntu0.10` tuple has **Secure Boot not enforced**,
+SetupMode and swtpm2. The signed Fedora 44-1.7 aarch64 Server DVD contains an
+unsigned installer kernel: enrolled AAVMF loads shim and GRUB, but GRUB rejects
+the kernel with `bad shim signature`. This is not a missing firmware CA.
+The linked evidence preserves that failure and vendor PE inspection; no key
+enrollment, replacement kernel or capability-gate relaxation was used.
+Assistance starts from a passphrase-unlocked encrypted clone, not a prebound TPM
+token. Not qualified: aarch64 Secure Boot, KDE Plasma spin, X11, Fedora 43,
+Atomic desktops, physical displays and multi-user seats.
 
 ### Commercial assistance capability roadmap
 
@@ -658,9 +680,9 @@ and [`inventory_unavailable_linux.go`](../../internal/vmlab/inventory_unavailabl
 
 ## Gaps
 
-Full desktop/edition coverage, native aarch64, physical TPM/media, air-gap topology
-beyond the x86_64 offline-bundle lane (site DNS/NTP/IdP, server install/restore from
-a bundle)
+Full desktop/edition coverage, remaining aarch64 cells, physical TPM/media,
+enforced Secure Boot on the pinned aarch64 media, and air-gap topology beyond
+the x86_64 offline-bundle lane (site DNS/NTP/IdP, server install/restore from a bundle)
 and production signing custody remain separate obligations. Fedora 43
 inspection/signed-service lifecycle, Fedora 44 self-update and Fedora 44 encryption
 cover different cells. DNF5 package
