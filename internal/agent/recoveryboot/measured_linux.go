@@ -132,9 +132,9 @@ func measuredStageLayout(request StageRequest) (*measuredLayout, error) {
 		if err := unix.Stat(request.ESPPath, &boot); err != nil {
 			return nil, err
 		}
-		uuid, _, err := readinessESPIdentity(uint64(boot.Dev))
-		if err != nil || uuid == "" {
-			return nil, errors.Join(errors.New("recoveryboot: boot_filesystem_uuid_unavailable"), err)
+		uuid, err := bootFilesystemUUID(uint64(boot.Dev))
+		if err != nil {
+			return nil, err
 		}
 		layout.bootFSUUID = uuid
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -112,27 +113,74 @@ func readinessSecureBoot(read func(string) ([]byte, error)) (bool, error) {
 // The executor's PrivateDevices mount intentionally has no /dev/disk links.
 // Root-owned udev metadata indexes the mounted filesystem's kernel device
 // number without granting block access or relaxing the device sandbox.
-func readinessESPIdentity(device uint64) (_ string, _ string, err error) {
+func readinessESPIdentity(device uint64) (string, string, error) {
+	data, err := udevBlockData(device)
+	if err != nil {
+		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
+	}
+	return parseReadinessESPIdentity(data)
+}
+
+// bootFilesystemUUID returns the filesystem UUID of the separate /boot
+// (ext2/3/4, XFS or btrfs) that a grub.d entry locates with `search --fs-uuid`.
+func bootFilesystemUUID(device uint64) (string, error) {
+	data, err := udevBlockData(device)
+	if err != nil {
+		return "", errors.New("recoveryboot: boot_filesystem_uuid_unavailable")
+	}
+	return parseBootFilesystemUUID(data)
+}
+
+func udevBlockData(device uint64) (_ string, err error) {
 	const directory = "/run/udev/data"
 	if err := rootDirectory(directory); err != nil {
-		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
+		return "", err
 	}
 	name := fmt.Sprintf("%s/b%d:%d", directory, unix.Major(device), unix.Minor(device))
 	fd, err := unix.Open(name, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if err != nil {
-		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
+		return "", err
 	}
 	file := os.NewFile(uintptr(fd), name)
 	defer func() { err = errors.Join(err, file.Close()) }()
 	var info unix.Stat_t
 	if err := unix.Fstat(fd, &info); err != nil || info.Mode&unix.S_IFMT != unix.S_IFREG || info.Uid != 0 || info.Mode&0022 != 0 || info.Size > 64<<10 {
-		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
+		return "", errors.Join(errors.New("recoveryboot: unsafe_udev_data"), err)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	if err != nil || len(data) > 64<<10 {
-		return "", "", errors.New("recovery_readiness_esp_uuid_unavailable")
+		return "", errors.Join(errors.New("recoveryboot: unsafe_udev_data"), err)
 	}
-	return parseReadinessESPIdentity(string(data))
+	return string(data), nil
+}
+
+// parseBootFilesystemUUID requires exactly one supported filesystem type and
+// one canonical lowercase UUID, so the value is safe GRUB script text.
+func parseBootFilesystemUUID(data string) (string, error) {
+	var filesystem, filesystemUUID string
+	for line := range strings.SplitSeq(data, "\n") {
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		var destination *string
+		switch key {
+		case "E:ID_FS_TYPE":
+			destination = &filesystem
+		case "E:ID_FS_UUID":
+			destination = &filesystemUUID
+		default:
+			continue
+		}
+		if *destination != "" || value == "" {
+			return "", errors.New("recoveryboot: boot_filesystem_uuid_unavailable")
+		}
+		*destination = value
+	}
+	if !slices.Contains([]string{"ext2", "ext3", "ext4", "xfs", "btrfs"}, filesystem) || !uuidText(filesystemUUID) {
+		return "", errors.New("recoveryboot: boot_filesystem_uuid_unavailable")
+	}
+	return filesystemUUID, nil
 }
 
 func parseReadinessESPIdentity(data string) (string, string, error) {

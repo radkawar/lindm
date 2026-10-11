@@ -39,7 +39,8 @@ func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recover
 		}
 		call, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		units, err := open(call, "lindm-grubenv-"+id+".service")
+		unit := "lindm-grubenv-" + id + ".service"
+		units, err := open(call, unit)
 		if err != nil {
 			return nil, err
 		}
@@ -49,6 +50,12 @@ func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recover
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), rootInventoryCleanupTimeout)
 			stopErr := units.stop(cleanup)
 			stop()
+			// The unit's result, exit status and bounded stderr stay in the
+			// executor journal; grub-editenv output carries no secrets.
+			failure := &rootInventoryError{stage: "grub-editenv " + args[1], err: runErr, unit: unit, cleanup: stopErr}
+			if s.logger != nil {
+				s.logger.Warn("recovery grub-editenv unit failed", failure.logAttrs()...)
+			}
 			return nil, fmt.Errorf("recovery grub-editenv %s: %w", args[1], errors.Join(runErr, stopErr))
 		}
 		return output, nil
@@ -65,7 +72,15 @@ func grubEnvironmentProperties(editenv string, args []string, device string, wri
 		property("Description", "Lindm recovery GRUB environment"),
 		property("Type", "exec"), property("User", "root"), property("Group", "root"),
 		property("ExecStart", []systemdExec{{Path: editenv, Arguments: append([]string{editenv}, args...)}}),
-		property("PrivateDevices", false), property("DevicePolicy", "closed"),
+		// The natively proven layout: a private /dev holding only pseudo
+		// devices and this one node. GRUB's partition probing then finds no
+		// parent disk node to open instead of being denied it.
+		property("PrivateDevices", true),
+		property("BindPaths", []struct {
+			Source, Destination string
+			IgnoreMissing       bool
+			Flags               uint64
+		}{{device, device, false, 0}}),
 		property("DeviceAllow", []struct{ Path, Access string }{{device, access}}),
 		property("CapabilityBoundingSet", uint64(0)), property("AmbientCapabilities", uint64(0)),
 		property("NoNewPrivileges", true), property("ProtectSystem", "strict"), property("ProtectHome", "yes"),

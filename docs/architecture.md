@@ -1031,10 +1031,10 @@ Staging (root executor, after the existing durable BOOT consumption gate):
 3. Arms only GRUB's one-shot `next_entry`; GRUB clears it during that boot. An
    unrelated pending one-shot refuses; rollback removes only its own entry,
    initramfs and still-pending one-shot. The executor keeps `PrivateDevices`:
-   `grub-editenv` runs as a separate short-lived systemd unit with only the
-   `/boot` backing device allowed (writable only on btrfs, where GRUB keeps its
-   environment block in the bootloader area), no capabilities, and only the
-   GRUB directory writable.
+   `grub-editenv` runs as a separate short-lived systemd unit with its own
+   private `/dev` holding only pseudo devices and the bound `/boot` backing node
+   (writable only on btrfs, where GRUB keeps its environment block in the
+   bootloader area), no capabilities, and only the GRUB directory writable.
 
 The kernel options are a closed grammar, `rdinit=/init panic=10 quiet`, an
 optional qualified serial console and `lindm.recovery.action=<action>`. The

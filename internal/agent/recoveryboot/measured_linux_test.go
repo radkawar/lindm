@@ -139,3 +139,24 @@ func TestMeasuredInitramfsOmitsSignerAndMountsSecurityfs(t *testing.T) {
 		t.Fatal("measured archive embeds a UKI signer")
 	}
 }
+
+// A grub.d entry finds the separate /boot by its filesystem UUID, taken from
+// root-owned udev data for the mounted device number (Ubuntu's ext4 /boot).
+func TestBootFilesystemUUIDAcceptsOnlyCanonicalSupportedFilesystems(t *testing.T) {
+	const uuid = "5b886046-3262-4eca-a390-4cd88779a3c7"
+	got, err := parseBootFilesystemUUID("S:disk/by-uuid/" + uuid + "\nE:ID_FS_TYPE=ext4\nE:ID_FS_UUID=" + uuid + "\nE:ID_FS_LABEL=BOOT\n")
+	if err != nil || got != uuid {
+		t.Fatalf("boot UUID = %q, %v", got, err)
+	}
+	for _, invalid := range []string{
+		"E:ID_FS_TYPE=vfat\nE:ID_FS_UUID=ABCD-1234\n",
+		"E:ID_FS_TYPE=ext4\nE:ID_FS_UUID=5B886046-3262-4ECA-A390-4CD88779A3C7\n",
+		"E:ID_FS_TYPE=ext4\nE:ID_FS_UUID=" + uuid + "; reboot\n",
+		"E:ID_FS_TYPE=ext4\nE:ID_FS_UUID=" + uuid + "\nE:ID_FS_UUID=" + uuid + "\n",
+		"E:ID_FS_TYPE=ext4\n",
+	} {
+		if _, err := parseBootFilesystemUUID(invalid); err == nil {
+			t.Fatalf("unsafe boot filesystem identity accepted: %q", invalid)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -291,9 +292,13 @@ func TestRecoveryGrubEnvironmentIsClosedAndDeviceScoped(t *testing.T) {
 			allow, _ = property.Value.Value().([]struct{ Path, Access string })
 		case "ReadWritePaths":
 			writable, _ = property.Value.Value().([]string)
-		case "PrivateNetwork", "NoNewPrivileges":
+		case "PrivateNetwork", "NoNewPrivileges", "PrivateDevices":
 			if value, _ := property.Value.Value().(bool); !value {
 				t.Fatalf("%s disabled", property.Name)
+			}
+		case "BindPaths":
+			if fmt.Sprint(property.Value.Value()) != "[{/dev/vda3 /dev/vda3 false 0}]" {
+				t.Fatalf("grub-editenv unit binds more than its device: %v", property.Value.Value())
 			}
 		}
 	}
