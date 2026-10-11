@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Debian 11                                                                                               | Debian 12                                                                                               | Debian 13                                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| lifecycle         | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| dispatch          | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| packages          | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| accounts          | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| sysctl            | gated: not implemented for Debian 11                                                                    | implemented                                                                                             | implemented                                                                                             |
-| definitions       | gated: systemd 247 is below the definition provider floor 255                                           | implemented                                                                                             | implemented                                                                                             |
-| password          | gated: not implemented for Debian 11                                                                    | implemented                                                                                             | implemented                                                                                             |
-| firewall          | gated: not implemented for Debian 11                                                                    | implemented                                                                                             | implemented                                                                                             |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented                                                                                             |
-| self-update       | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
-| advisories        | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
-| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               |
+| Capability        | Debian 11                                                                                               | Debian 12                            | Debian 13                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| lifecycle         | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| dispatch          | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| packages          | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| accounts          | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| sysctl            | gated: not implemented for Debian 11                                                                    | implemented                          | implemented                                                                                             |
+| definitions       | gated: systemd 247 is below the definition provider floor 255                                           | implemented                          | implemented                                                                                             |
+| password          | gated: not implemented for Debian 11                                                                    | implemented                          | implemented                                                                                             |
+| firewall          | gated: not implemented for Debian 11                                                                    | implemented                          | implemented                                                                                             |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| self-update       | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                          | implemented                                                                                             |
+| advisories        | implemented                                                                                             | implemented                          | implemented                                                                                             |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: not implemented for Debian 12 | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
+| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: not implemented for Debian 12 | gated: release upgrade is not implemented                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -198,8 +198,8 @@ late script now applies that same `deb cdrom:` edit first and closes apt's stdin
 Debian's arm64 kernels build TPM CRB but not the TIS platform driver that QEMU's
 aarch64 `virt` TPM uses, so arm64 goldens are a separate TPM-absent tuple
 (`-tpm=false`); an attached-but-unobservable TPM is refused. The owned-boot
-recovery fixture needs `systemd-ukify` (systemd 253+), so bookworm's
-recovery-sanitize stays gated. A passing golden is not escrow, rotation, TPM
+recovery fixture needs `systemd-ukify` (systemd 253+), so bookworm recovers only
+through measured GRUB (below). A passing golden is not escrow, rotation, TPM
 unlock or wipe qualification; those are separate device-action records in
 [verification](../verification.md).
 
@@ -216,13 +216,15 @@ wipe remain separately gated by [verification](../verification.md).
 Debian 12/13 use the same grub.d `custom.cfg` flavor of
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` as Ubuntu
 ([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
-Debian 13 amd64 passed SATA and NVMe natively. The recovery guest was the
-netinst golden built from the signed 13.7.0 ISO, with `/boot` on the ext4
-root, shim+GRUB 2.12 and kernel 6.12. 10_linux's `echo` commands are skipped
-only when they are digest-bound
+Debian 13 and Debian 12 amd64 passed SATA and NVMe natively. The recovery guests
+were netinst goldens built from the signed 13.7.0 and 12.15.0 ISOs, with `/boot`
+on the ext4 root, shim+GRUB 2.12/2.06 and kernels 6.12/6.1. 10_linux's `echo`
+commands are skipped only when they are digest-bound
 ([verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains)).
-Debian 12 is not run and keeps its owned-boot gate. Debian arm64 has no TPM,
-because its kernel lacks the TIS driver.
+Debian 12 has no owned-boot fixture (`Lab.OwnedBootUnavailable`): the lab refuses
+that mode before boot and the matrix runs its recovery cell in measured mode.
+Debian arm64 has no recovery sanitize: its kernel lacks the TIS driver, so
+readiness has no TPM attestation.
 
 ## Device actions
 
@@ -243,6 +245,20 @@ has kernel expiry and reports lost management delivery as unknown
 None of those implementation paths supplies missing Debian GNOME/KDE/GDM or native
 action evidence. Preserve authorization, exact target identity and irreversible-effect
 warnings rather than using Ubuntu's action pass as a Debian substitute.
+
+On the encrypted GNOME goldens, Debian 12 and 13 passed these lanes natively on
+aarch64 (dgx20/dgx21) and on x86_64:
+
+- the encryption scenarios (escrow, audited reveal, rotation, cold-boot recovery)
+  and compliance;
+- live-root crypto-erase and report-loss;
+- GNOME lock with nftables quarantine and release;
+- five-scenario remote assistance.
+
+Debian 13 x86_64 also bound TPM2 and cold-booted unattended. The arm64 goldens are
+TPM-absent, so their TPM phase records the server's `tpm2_unavailable` denial.
+Records and hashes are in
+[verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
 
 ## Advisory feeds
 

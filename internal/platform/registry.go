@@ -324,9 +324,11 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
-			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), reasonNoUkify),
+			OwnedBootUnavailable: reasonNoUkify,
+			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
+		// Recovery sanitize is measured GRUB only, and amd64 only: the arm64
+		// kernel cannot bind QEMU virt's TPM, so readiness has no attestation.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",

@@ -62,11 +62,15 @@ func (m *Manifest) Encrypted() bool {
 	return strings.HasSuffix(m.Image.GetEdition(), "encrypted-lab")
 }
 
-func (m *Manifest) kind() labv1.MatrixImage {
-	if m.Encrypted() {
-		return labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+// serves reports whether the manifest's image can boot a lane of this kind.
+// A debian-installer netinst ISO is both: the lab installs the plain golden
+// for cloud lanes and the guided-LUKS golden for encrypted lanes from it.
+func (m *Manifest) serves(kind labv1.MatrixImage) bool {
+	netinst := m.Release.Lab.Installer == platform.DebianInstaller && m.Image.GetEdition() == "netinst"
+	if kind == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
+		return m.Encrypted() || netinst
 	}
-	return labv1.MatrixImage_MATRIX_IMAGE_CLOUD
+	return !m.Encrypted()
 }
 
 // Cell is one (platform, cell, architecture) of the matrix.
@@ -333,7 +337,7 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch string) *Manifest {
 	var selected *Manifest
 	for _, m := range in.Manifests {
-		if m.Release.Key != r.Key || m.Architecture != arch || m.kind() != kind {
+		if m.Release.Key != r.Key || m.Architecture != arch || !m.serves(kind) {
 			continue
 		}
 		if m.Image.GetId() == in.PreferredManifest {

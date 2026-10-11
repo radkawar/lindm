@@ -352,7 +352,19 @@ the server refuses it before signing with `device_action_tpm2_binding_unsupporte
 listing reports the same reason, and the root provider's native
 `systemd-cryptenroll --version` probe refuses it as
 `systemd_cryptenroll_tpm2_binding_unsupported`. The owned-boot recovery fixture needs
-`systemd-ukify` (253+), so recovery-sanitize stays gated on 22.04.
+`systemd-ukify` (253+), so 22.04 recovers only through measured GRUB (below).
+
+On the 22.04 GNOME 42 golden, these lanes passed natively on aarch64:
+
+- the encryption scenarios (escrow, reveal, rotation, cold-boot recovery, and the
+  explicit TPM2 refusal);
+- compliance;
+- live-root crypto-erase and report-loss;
+- lock/quarantine;
+- five-scenario assistance.
+
+Lock/quarantine and assistance also passed on x86_64. Records are in
+[verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
 
 Ubuntu 24.04.5 amd64 encrypted UEFI installation, Secure Boot with enrolled keys,
 swtpm and virtio-blk passed two passphrase cold boots and independent LUKS-header

@@ -111,6 +111,34 @@ func TestPlanHonoursLaneArchitectures(t *testing.T) {
 	}
 }
 
+// A Debian netinst ISO boots both the plain installed golden and the
+// guided-LUKS encrypted golden, so encrypted cells are not "no image".
+func TestDebianNetinstServesEncryptedCells(t *testing.T) {
+	debian, ubuntu := release(t, "debian-13"), release(t, "ubuntu-24.04")
+	encrypted := &labv1.MatrixCell{Name: "encrypted", Title: "Encryption", Capabilities: []string{"encryption"}, Image: labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, Lane: "encrypted"}
+	lifecycle := &labv1.MatrixCell{Name: "lifecycle", Title: "Lifecycle", Capabilities: []string{"lifecycle"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: "lifecycle"}
+	in := &Inputs{
+		Manifests: []*Manifest{
+			{Path: "lab/images/debian.json", Image: &labv1.ImageManifest{Id: "d", Edition: "netinst"}, Release: debian, Architecture: "x86_64"},
+			{Path: "lab/images/ubuntu.json", Image: &labv1.ImageManifest{Id: "u", Edition: "server-cloudimg"}, Release: ubuntu, Architecture: "x86_64"},
+		},
+		Ledger: &labv1.MatrixLedger{},
+	}
+	got := map[string]*Cell{}
+	for _, c := range in.Plan([]*platform.Release{debian, ubuntu}, []*labv1.MatrixCell{encrypted, lifecycle}) {
+		got[c.Release.Key+" "+c.Spec.GetName()+" "+c.Architecture] = c
+	}
+	if c := got["debian-13 encrypted x86_64"]; c.State != NotRun || c.Manifest == nil || c.Recovery == nil || c.Manifest != c.Recovery {
+		t.Fatalf("debian netinst must drive the encrypted cell and its recovery image: %+v", c)
+	}
+	if got["debian-13 lifecycle x86_64"].State != NotRun {
+		t.Fatal("debian netinst must still drive cloud cells")
+	}
+	if got["ubuntu-24.04 encrypted x86_64"].State != NoImage {
+		t.Fatal("a cloud image must not serve an encrypted-installer cell")
+	}
+}
+
 // Appends accumulate and the ledger stays strict protobuf JSON.
 func TestAppendKeepsEntries(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ledger.json")

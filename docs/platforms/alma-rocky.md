@@ -195,6 +195,15 @@ for that environment, not Workstation-product evidence. The terminal is
 keep their free vendor repositories, so action and owned-boot prerequisites
 install through DNF with vendor signature checking.
 
+Recovery sanitize uses the BLS flavor of `RECOVERY_BOOT_MODE_MEASURED_GRUB` on
+x86_64: AlmaLinux 10.2 amd64 passed NVMe and SATA from the vendor cloud image
+([verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains)).
+On aarch64 the signed `grubaa64.efi` of Rocky and AlmaLinux 9.8/10.2 records no
+PCR 8/9 event, so agent readiness refuses measured GRUB before approval. The
+owned-boot UKI fixture boots there but needs `systemd-ukify` on the Spark hosts,
+which they do not have yet. aarch64 SATA cannot boot at all, because AAVMF has no
+AHCI driver.
+
 ## Device actions
 
 The AlmaLinux service result below covers signed systemd service dispatch, not
@@ -203,6 +212,25 @@ Keep server/minimal and desktop rows separate and follow each action's native
 qualification record in [verification](../verification.md). An unavailable native
 capability must remain unavailable, not a compatibility fallback to an unrelated
 distribution or command.
+
+On the encrypted "Server with GUI" GNOME goldens, Rocky Linux and AlmaLinux
+9.8/10.2 passed these lanes natively on aarch64, with SELinux Enforcing:
+
+- the encryption scenarios, including TPM2 bind, unattended cold boot and
+  PCR-mismatch recovery;
+- compliance;
+- live-root crypto-erase and report-loss;
+- GNOME lock with nftables quarantine and release.
+
+AlmaLinux 10.2 repeated encryption, erase, report-loss and lock/quarantine on
+x86_64. Five-scenario remote assistance passed on Rocky and AlmaLinux 10.2
+(GNOME 49) on aarch64 and on AlmaLinux 10.2 x86_64.
+
+On 9.8 (GNOME 40), assistance ends with `UNAVAILABLE capture_no_frames`. The
+vendor PipeWire 1.4.11 sends damage-frame and keepalive timestamps that stall
+GStreamer's `pipewiresrc`; upstream PipeWire fixed this in `efd1526` and
+`49300d8`, and no capture fallback is added. Records and the diagnosis are in
+[verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
 
 ## Advisory feeds
 

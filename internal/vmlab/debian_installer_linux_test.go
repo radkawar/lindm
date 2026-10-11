@@ -213,3 +213,23 @@ func TestDebianSourceMarkerProbePreservesPrivateMarker(t *testing.T) {
 		t.Fatalf("probe changed source marker: %v", err)
 	}
 }
+
+// Debian 12's systemd 252 has no ukify for the owned-boot UKI fixture, so
+// its recovery sanitize runs only through measured GRUB.
+func TestDebianBookwormRecoveryIsMeasuredOnly(t *testing.T) {
+	bookworm, ok := platform.Lookup("debian-12")
+	if !ok {
+		t.Fatal("debian-12 missing from the registry")
+	}
+	for _, phase := range []string{"recovery-nvme", "recovery-sata"} {
+		if err := ownedBootFixtureAvailable(bookworm, "wipe", phase, ""); err == nil {
+			t.Fatalf("Debian 12 admitted the owned-boot %s fixture without ukify", phase)
+		}
+		if err := ownedBootFixtureAvailable(bookworm, "wipe", phase, recoveryBootMeasured); err != nil {
+			t.Fatalf("Debian 12 measured %s refused: %v", phase, err)
+		}
+	}
+	if err := bookworm.Gate(platform.RecoverySanitize); err != nil {
+		t.Fatalf("Debian 12 recovery sanitize must be supported through measured GRUB: %v", err)
+	}
+}
