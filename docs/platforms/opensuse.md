@@ -287,6 +287,8 @@ drop-ins by name with an `/etc` drop-in replacing the same-named vendor one
 (`loginDefinitions`). Password aging (`PASS_*`) still edits `/etc/login.defs`;
 creating that file on Tumbleweed would make shadow ignore the vendor file, so
 aging fields there remain unqualified (the password lane sets only pwquality).
+A minimum password age is refused outright: shadow 4.20 removed `PASS_MIN_DAYS`
+and its tools fail while it is set (registry `Quirks.NoPasswordMinAge`).
 
 Tumbleweed also keeps no `/etc/gshadow`; shadow's tools maintain it only when it
 exists, and `groupadd` never creates it. The accounts provider admits an absent

@@ -113,7 +113,7 @@ func (p *Provider) validateDesired(desired *resourcev1.ResourceDesiredState) err
 	if desired.GetPasswordPolicy() == nil {
 		return ErrUnsupported
 	}
-	return policySupported(desired.GetPasswordPolicy())
+	return policySupported(desired.GetPasswordPolicy(), p.config.Platform)
 }
 func (p *Provider) ledger(ctx context.Context) (*agentv1.ResourceOwnershipLedger, error) {
 	ledger, err := p.store.LoadResourceOwnership(ctx, p.config.DeploymentID, p.config.DeviceID, p.config.EnrollmentGeneration, passwordRef())

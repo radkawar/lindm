@@ -22,6 +22,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
@@ -116,11 +117,15 @@ func requested(d *resourcev1.PasswordPolicyDesired, field resourcev1.PasswordFie
 	}
 	return strconv.FormatUint(m.Get(fd).Uint(), 10)
 }
-func policySupported(d *resourcev1.PasswordPolicyDesired) error {
+func policySupported(d *resourcev1.PasswordPolicyDesired, product *resourcev1.PlatformProduct) error {
 	// libpwquality has an effective native lower bound of six. Credits are disabled
 	// when length is owned so min_length means actual characters, not score.
 	if d.MinLength != nil && d.GetMinLength() < 6 {
 		return fmt.Errorf("%w: libpwquality minimum length is six", ErrUnsupported)
+	}
+	// Shadow >= 4.20 tools fail while login.defs sets PASS_MIN_DAYS.
+	if d.MinAgeDays != nil && platform.Of(product).Native().Quirks.NoPasswordMinAge {
+		return fmt.Errorf("%w: shadow on this release has no minimum password age", ErrUnsupported)
 	}
 	return nil
 }

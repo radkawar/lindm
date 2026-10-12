@@ -182,6 +182,11 @@ type Quirks struct {
 	SystemdFloor int
 	PAMManager   PAMManager
 	Password     []PasswordPins
+	// NoPasswordMinAge: shadow 4.20 removed the minimum password age (sp_min,
+	// chage/passwd --mindays and login.defs PASS_MIN_DAYS), and its tools fail
+	// while PASS_MIN_DAYS is set, so password policy refuses min_age_days.
+	// Every release shipping shadow >= 4.20 sets it.
+	NoPasswordMinAge bool
 	// RecoveryGRUB is how measured original-device recovery adds a one-shot
 	// entry to the vendor shim+GRUB chain. Read from the release's own row,
 	// never a derivative's base: a derivative may ship another loader.

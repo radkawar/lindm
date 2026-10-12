@@ -322,6 +322,10 @@ Mixed owned and administrator-provided quality/history modules are refused:
 inserting history before a native quality module could let its retry replace a
 token after history checked it. Adopt the complete owned password-policy chain
 rather than changing the administrator's module order implicitly.
+A minimum password age is refused (`unsupported_native_policy`): shadow 4.20
+removed it ([release notes](https://github.com/shadow-maint/shadow/releases/tag/4.20.0):
+`sp_min`, `chage`/`passwd --mindays`, `PASS_MIN_DAYS`), and its tools fail while
+`/etc/login.defs` sets `PASS_MIN_DAYS` (registry `Quirks.NoPasswordMinAge`).
 The native modules live under `/usr/lib/security`. The implementation follows
 the maintained [pambase stack](https://gitlab.archlinux.org/archlinux/packaging/packages/pambase/-/blob/main/system-auth),
 but support is selected only by the registry's exact measured package pins,

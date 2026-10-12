@@ -41,7 +41,7 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 	if desired.GetPasswordPolicy() == nil {
 		return nil, ErrUnsupported
 	}
-	if err := policySupported(desired.GetPasswordPolicy()); err != nil {
+	if err := policySupported(desired.GetPasswordPolicy(), plan.GetBackend().GetProduct()); err != nil {
 		return nil, err
 	}
 	if !proto.Equal(request.GetOwnership().GetRef(), passwordRef()) || !sameObserved(request.GetBefore().GetObservation(), plan.GetBefore()) || request.GetOwnership().GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {

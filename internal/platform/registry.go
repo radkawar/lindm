@@ -652,7 +652,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling", Partial: "tracker omits historical and non-repository packages", Exports: map[Feed]AdvisoryExport{
 			FeedArchASA: {URL: "https://security.archlinux.org/issues/all.json", Format: "arch-json", MaxAgeSeconds: 86400},
 		}},
-		Quirks:  Quirks{SystemdFloor: 255, PAMManager: PAMManagerNative, RecoveryOwnerKey: true, Password: []PasswordPins{{Version: "", Quality: "1.4.5-7", PAM: "1.7.3-1", Manager: "20260616-1"}}},
+		Quirks:  Quirks{SystemdFloor: 255, PAMManager: PAMManagerNative, RecoveryOwnerKey: true, NoPasswordMinAge: true, Password: []PasswordPins{{Version: "", Quality: "1.4.5-7", PAM: "1.7.3-1", Manager: "20260616-1"}}},
 		FDE:     "LUKS2; systemd-cryptenroll with mkinitcpio sd-encrypt",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); owner-chosen bootloader", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
@@ -719,7 +719,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: []Feed{FeedSUSEOVAL, FeedSUSECSAF}, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse", OVALPlatform: "openSUSE Tumbleweed", OVALReleasePackage: "openSUSE-release", Partial: "vendor package assessments do not cover all rolling or third-party packages", Exports: map[Feed]AdvisoryExport{
 			FeedSUSEOVAL: {URL: "https://ftp.suse.com/pub/projects/security/oval/opensuse.tumbleweed.xml.gz", Format: "suse-oval", MaxAgeSeconds: 604800, MaxArchiveBytes: 67108864},
 		}},
-		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig,
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig, NoPasswordMinAge: true,
 			RecoveryGRUB: GRUBChain{Entries: GRUBBLSLoaderEntryOneShot, ConfigDirectory: "EFI/opensuse", BootDirectory: "/boot/efi"},
 			Password: []PasswordPins{
 				{Version: "20261007", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},

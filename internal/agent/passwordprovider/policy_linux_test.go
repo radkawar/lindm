@@ -148,8 +148,19 @@ func slicesEqualFeatures(a, b []agentv1.PasswordNativeFeature) bool {
 	return true
 }
 func TestUnsupportedControlsFailClosed(t *testing.T) {
-	if err := policySupported(&resourcev1.PasswordPolicyDesired{MinLength: proto.Uint32(5)}); !errors.Is(err, ErrUnsupported) {
+	ubuntu := &resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}
+	if err := policySupported(&resourcev1.PasswordPolicyDesired{MinLength: proto.Uint32(5)}, ubuntu); !errors.Is(err, ErrUnsupported) {
 		t.Fatal(err)
+	}
+	// shadow 4.20 removed PASS_MIN_DAYS and its tools fail while it is set.
+	minAge := &resourcev1.PasswordPolicyDesired{MinAgeDays: proto.Uint32(1)}
+	for _, product := range []*resourcev1.PlatformProduct{{OsId: "arch"}, {OsId: "opensuse-tumbleweed", Version: "20261009"}, {OsId: "omarchy", Version: "4.0.4"}} {
+		if err := policySupported(minAge, product); !errors.Is(err, ErrUnsupported) {
+			t.Fatalf("%s minimum age accepted: %v", product.GetOsId(), err)
+		}
+	}
+	if err := policySupported(minAge, ubuntu); err != nil {
+		t.Fatalf("shadow before 4.20 refused minimum age: %v", err)
 	}
 	for _, body := range []string{"enforcing = 0\n", "minlen = invalid\n"} {
 		s := policyFixture()
