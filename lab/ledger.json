@@ -10416,6 +10416,51 @@
       "scope": "signed DEB 0.7.0→0.7.1; control-plane trust; local authority",
       "reference": "#tier-1-parity-records-2026-10-11",
       "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
+    },
+    {
+      "platform": "fedora-43",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-43-1.6-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/fedora-act43b-x86-20261012T175315Z/fedora-43/assistance-x86_64/assistance.json",
+      "sha256": "d861375523fd28d22437027f069ef6015cf4863f39aff15df5469536d24e0c81",
+      "recorded": "2026-10-12T20:44:50.009177552Z",
+      "revision": "939f2fe8df519e25dadd47332dc548f5340712f7-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "9d3e253e911a7b4f830855ed49c93ff8dbec2da727e6afe99f36c9cd6c0ac7f2"
+    },
+    {
+      "platform": "fedora-43",
+      "cell": "provision-kickstart",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-43-1.6-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/fedora-prov6-x86-20261012T184712Z/fedora-43/provision-kickstart-x86_64.json",
+      "sha256": "43d53060ae2142b92584fcfd564a46b47b8db11d69b3991f41e62c21c98258c4",
+      "recorded": "2026-10-12T21:53:39.905602428Z",
+      "revision": "74c925914b8aaa9bc9889100e985bef7aefbea3a-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "9d3e253e911a7b4f830855ed49c93ff8dbec2da727e6afe99f36c9cd6c0ac7f2",
+      "mainlineRevision": "74c925914b8aaa9bc9889100e985bef7aefbea3a"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "recovery-sanitize",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-44-1.7-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/fedora-rec44-x86-20261012T193311Z/fedora-44/recovery-sanitize-x86_64.json",
+      "sha256": "7bba273a6ca0d24e7c5a323ce508980bed637401c5c76b312dfe5e8863a3cf8e",
+      "recorded": "2026-10-12T22:40:40.399187756Z",
+      "revision": "939f2fe8df519e25dadd47332dc548f5340712f7-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "d59c1259421c304c9674a3e991e188ce90e5b6012ad577d254fa85a7eac8514a",
+      "recoveryManifest": "fedora-cloud-44-1.7-x86-64",
+      "recoveryManifestSha256": "9a4370735711d45d829ac3f3fe5326d66b97450e4e8bc112dfd53755d2341f47"
     }
   ]
 }

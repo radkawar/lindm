@@ -76,7 +76,10 @@ Kickstart from the Server DVD 43-1.6
 (`$HOME/.cache/lindm-matrix/fedora-prov6-arm-20261012T183959Z/fedora-43/provision-kickstart-aarch64.json`,
 SHA-256 `b76ffe7657afa4e59590472614bec07f3a46c41512733546d671af2a7b7be848`);
 each ended Enrolled after independent approval with `lindm-provision.service`
-successful and the token removed. x86_64 is offered without a provisioning record.
+successful and the token removed. Fedora 43 x86_64 Kickstart passed the same way
+on local KVM
+(`$HOME/.cache/lindm-matrix/fedora-prov6-x86-20261012T184712Z/fedora-43/provision-kickstart-x86_64.json`,
+SHA-256 `43d53060ae2142b92584fcfd564a46b47b8db11d69b3991f41e62c21c98258c4`).
 
 Use native signed RPM delivery. The builder signs and independently verifies the
 RPM before publishing its digest
@@ -859,6 +862,10 @@ cancel and lock, with GNOME Shell/Mutter `49.1-1.fc43`, portal
 GStreamer good `1.26.6-1.fc43`:
 `$HOME/.cache/lindm-matrix/fedora-asst43-arm-20261012T175248Z/fedora-43/assistance-aarch64/assistance.json`,
 SHA-256 `0f4b6fc35fed597846adeda036648e115f8dc02fea570747142a60ea47de6248`.
+The same six scenarios passed on x86_64 local KVM with the x86_64 builds of those
+packages:
+`$HOME/.cache/lindm-matrix/fedora-act43b-x86-20261012T175315Z/fedora-43/assistance-x86_64/assistance.json`,
+SHA-256 `d861375523fd28d22437027f069ef6015cf4863f39aff15df5469536d24e0c81`.
 Not qualified: aarch64 Secure Boot, KDE Plasma spin, X11, Atomic desktops,
 physical displays and multi-user seats.
 
