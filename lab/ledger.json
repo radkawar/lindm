@@ -3632,6 +3632,34 @@
       "verified": true,
       "scope": "NVMe original-device recovery; owned systemd-boot UKI; Secure Boot on; registered",
       "reference": "#rhel-encrypted-device-actions-and-self-update"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "services",
+      "architecture": "aarch64",
+      "manifest": "rhel-10.2-kvm-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-arm-core-20261011T222544Z/rhel-10/services-aarch64.log",
+      "sha256": "df63f8bd6eb9fc0251b042410760ab3342dc66a5d2b7f75eb34bb2ce5a003c28",
+      "recorded": "2026-10-11T23:12:06.299004672Z",
+      "revision": "0a25c88ab05aa3d76b53c78a75101f1d898d483d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "1aa358494a5e9e6fd0982cf8f910ee5b7da951ee944850483b4f209ed996de7a"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "inventory",
+      "architecture": "aarch64",
+      "manifest": "rhel-10.2-kvm-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-arm-core-20261011T222544Z/rhel-10/inventory-aarch64.json",
+      "sha256": "7623243754e301cc1414ce26c922856327b8ed0c038c6aabc4275c3eec50a5d3",
+      "recorded": "2026-10-11T23:12:16.509793438Z",
+      "revision": "0a25c88ab05aa3d76b53c78a75101f1d898d483d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "1aa358494a5e9e6fd0982cf8f910ee5b7da951ee944850483b4f209ed996de7a"
     }
   ]
 }

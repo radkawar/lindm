@@ -369,3 +369,19 @@ func TestLaneGates(t *testing.T) {
 		t.Fatalf("gate leaked to ungated architecture: %q", got)
 	}
 }
+
+// RHEL's aarch64 DVDs carry no Workstation environment; the encrypted golden
+// installs Server with GUI there and keeps Workstation on x86_64.
+func TestRHELDesktopPackagesFollowArchitectureMedia(t *testing.T) {
+	for _, key := range []string{"rhel-9", "rhel-10"} {
+		r, ok := Lookup(key)
+		if !ok {
+			t.Fatalf("%s missing", key)
+		}
+		for architecture, want := range map[string]string{"x86_64": "@^workstation-product-environment", "amd64": "@^workstation-product-environment", "aarch64": "@^graphical-server-environment", "arm64": "@^graphical-server-environment"} {
+			if got := r.Lab.Session.DesktopPackages("gnome", architecture); !slices.Equal(got, []string{want}) {
+				t.Errorf("%s %s gnome packages = %v, want %s", key, architecture, got, want)
+			}
+		}
+	}
+}

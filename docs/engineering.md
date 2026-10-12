@@ -2265,7 +2265,11 @@ packages or bootstrap trust into the machine under test. The copied command must
 perform those steps. Rolling guests first bind only their separate vendor
 repositories to the manifest's dated snapshot; Arch establishes that whole-system
 snapshot before enrollment instead of refreshing databases for a partial upgrade.
-Fixture loopback ports can be forwarded without changing
+An entitled RHEL guest is first registered through the maintained Red Hat path
+(`-redhat-token-file`), as a customer's subscribed host is, so the copied DNF
+command reaches its vendor repositories; the registration probe is removed before
+that command runs, and unregistration with activation-key deletion follows the
+server-side check. Fixture loopback ports can be forwarded without changing
 their signed HTTPS origins. Keep browser capture inputs and command files private,
 retain redacted light/dark desktop/mobile dialog screenshots separately, and link
 completed native records in [verification](verification.md).
@@ -2293,7 +2297,9 @@ cell, registry architecture). Edition suffix `encrypted-lab` marks an
 encrypted-installer manifest; every other manifest is a cloud/installed image.
 Per-release lane inputs are derived in `cmd/lab/matrix.go`, never written per
 distribution: lifecycle package formats and repositories from the row's native
-package backend, `-redhat-token-file` from the row's lab entitlement, resource
+package backend, `-redhat-token-file` (plus explicit guest egress for the
+registration, except in device-actions, which grants its own) from the row's lab
+entitlement, resource
 `-kinds` from the row's implemented resource capabilities, and the device-action
 recovery image from the same release's cloud manifest. `architectureArgs` holds
 execution-host arguments every hardware-selecting lane receives for a guest

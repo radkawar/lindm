@@ -684,6 +684,25 @@ Dispatch contains nine native scenarios; unstarted supersession is explicitly
 integration-only, not a tenth native scenario. These records do not qualify aarch64,
 physical hardware or disconnected vendor content.
 
+The aarch64 Binary DVDs are pinned as
+[`rhel-9.8-encrypted-aarch64.json`](../../lab/images/rhel-9.8-encrypted-aarch64.json)
+(SHA-256 `1da7c7f9…df275fa92`, 13,307,215,872 bytes) and
+[`rhel-10.2-encrypted-aarch64.json`](../../lab/images/rhel-10.2-encrypted-aarch64.json)
+(`63b6c005…9cf52f60`, 10,413,670,400 bytes), acquired with `lab images redhat
+fetch -edition dvd -arch aarch64` (vendor-authenticated checksum, edition
+`dvd-encrypted-lab`). Their
+AppStream comps define only `graphical-server-environment` and
+`server-product-environment`, so the aarch64 encrypted golden installs Server with
+GUI (registry `LabSession.ArchitectureDesktops`); x86_64 keeps Workstation.
+
+The air-gap matrix lane is gated (`Lab.LaneGates`): RHEL CSAF matching requires a
+corroborated servicing stream, which the host proves only with its entitled
+BaseOS repository ID ([stream evidence](../../internal/advisory/platform.go)). The
+air-gap guest has no route to Red Hat from boot and the lab has no disconnected
+Satellite, so evaluation would remain `rhel_platform_stream_unavailable` and never
+bind the bundle's feed. Connected console enrollment and advisory lanes register
+the guest first, as a subscribed customer host is.
+
 ## Gaps
 
 RHEL 8, native aarch64, physical TPM/media, entitled air-gap lifecycle, the

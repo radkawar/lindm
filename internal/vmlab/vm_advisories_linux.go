@@ -120,7 +120,9 @@ func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPl
 	if err != nil {
 		return evidence, err
 	}
-	evidence.Refresh, err = fixture.RefreshVendorFeeds(ctx, filepath.Join(cacheDir, "advisories"), 512<<20, 10*time.Minute, []*advisoryv1.FeedSource{source})
+	// The paired RHEL CSAF archives are the largest export: 480,655,133 bytes
+	// on 2026-10-11, with a measured 7.5-minute full publication.
+	evidence.Refresh, err = fixture.RefreshVendorFeeds(ctx, filepath.Join(cacheDir, "advisories"), 1<<30, 30*time.Minute, []*advisoryv1.FeedSource{source})
 	if err != nil {
 		evidence.Outcome = "feed_refresh_failed"
 		return evidence, err

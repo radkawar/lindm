@@ -233,7 +233,7 @@ LINDM_GRUB
 		extra = "firstboot --disable\n"
 		packages += strings.Join(lab.Guest.Actions, "\n") + "\n"
 		if desktop != "" {
-			packages = strings.Join(lab.Session.Desktops[desktop], "\n") + "\n" + packages
+			packages = strings.Join(lab.Session.DesktopPackages(desktop, architecture), "\n") + "\n" + packages
 		}
 		if tpmBoot {
 			packages += strings.Join(lab.TPM.Packages, "\n") + "\n"

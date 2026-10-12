@@ -24,6 +24,7 @@ func runVMAdvisories(ctx context.Context, args []string, stdout, stderr io.Write
 	work := flags.String("work-dir", "", "parent for disposable VM and signed packages")
 	diagnostics := flags.String("diagnostics", "", "private failure diagnostics parent")
 	record := flags.String("record", "", "new private evidence file, including unsupported feed outcomes")
+	redhatToken := flags.String("redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL, whose CSAF stream matching needs the registered BaseOS/AppStream repositories")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -44,7 +45,7 @@ func runVMAdvisories(ctx context.Context, args []string, stdout, stderr io.Write
 	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{
 		Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work,
 		DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: *probe, LindmdBinary: *server,
-		LocalAuthority: true, Advisories: true,
+		RedHatTokenFile: *redhatToken, LocalAuthority: true, Advisories: true,
 	})
 	if result != nil {
 		runErr = errors.Join(runErr, writeLabEvidence(stdout, *record, result))

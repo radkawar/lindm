@@ -370,9 +370,9 @@ var laneInputs = map[string][]string{
 	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "record"},
 	"updates":             {"repo", "build-repo", "lab", "record"},
 	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
-	"enroll-from-console": {"console-browser", "record"},
+	"enroll-from-console": {"console-browser", "redhat-token-file", "record"},
 	"services":            {"record"},
-	"advisories":          {"repo", "build-repo", "lab", "lindmd", "record"},
+	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "record"},
 	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "record"},
 }
 
@@ -800,6 +800,11 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		case "redhat-token-file":
 			if native.Lab.Entitlement {
 				args = append(args, "-redhat-token-file", r.redhatToken)
+				// Registration reaches the vendor, so a registered lane needs
+				// explicit guest egress; device-actions grants its own.
+				if lane != "device-actions" && !slices.Contains(args, "-allow-network") {
+					args = append(args, "-allow-network")
+				}
 			}
 		case "recovery-manifest":
 			if c.Recovery == nil {

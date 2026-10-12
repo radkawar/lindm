@@ -186,8 +186,10 @@ var (
 	// become kickstart %packages. An unregistered installed system has no other
 	// repository, so the action prerequisites also carry the recovery helpers.
 	rhelSession = LabSession{
-		Desktops:  map[string][]string{"gnome": {"@^workstation-product-environment"}},
-		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+		Desktops: map[string][]string{"gnome": {"@^workstation-product-environment"}},
+		// The aarch64 DVDs' comps have only Server with GUI and Server.
+		ArchitectureDesktops: map[string]map[string][]string{"aarch64": {"gnome": {"@^graphical-server-environment"}}},
+		GDMConfig:            "/etc/gdm/custom.conf", Name: "gnome",
 	}
 	rhelGuest = LabGuest{
 		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true, OwnedBootHostonly: true,
@@ -196,6 +198,16 @@ var (
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	rhelTPMPackages = []string{"tpm2-tools", "tpm2-tss"}
+	rhelLanes       = []LabLane{LaneResources, LaneUpdates, LaneServices}
+	// RHEL CSAF matching applies only to a corroborated servicing stream, which
+	// the host proves with its entitled BaseOS repository ID (internal/advisory
+	// rhelStream). The air-gap lane's guest has no route to Red Hat from boot,
+	// and the lab has no disconnected Satellite, so evaluation stays
+	// rhel_platform_stream_unavailable and never binds the bundle's feed.
+	rhelLaneGates  = map[LabLane]LaneGate{LaneAirgap: {Reason: "air-gapped RHEL proves its CSAF servicing stream only through entitled BaseOS repositories (CDN registration or a disconnected Satellite), which the offline lab cannot provide"}}
+	rhelCSAFExport = map[Feed]AdvisoryExport{FeedRedHatCSAF: {
+		URL: "https://security.access.redhat.com/data/csaf/v2/", Format: "redhat-csaf-archives", MaxAgeSeconds: 604800, PlatformStream: "standard",
+	}}
 	// Rocky Linux and AlmaLinux 9.8/10.2 also install only from their vendor
 	// DVD, but their unregistered systems keep the free vendor repositories,
 	// so the lanes install action and owned-boot prerequisites with DNF. Only
@@ -394,12 +406,9 @@ var registry = []*Release{
 		Key: "rhel-9", Name: "RHEL 9", Distribution: "RHEL", ID: "rhel", Version: Major("9"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true,
-			Exports: map[Feed]AdvisoryExport{FeedRedHatCSAF: {
-				URL: "https://security.access.redhat.com/data/csaf/v2/", Format: "redhat-csaf-archives", MaxAgeSeconds: 604800, PlatformStream: "standard",
-			}}},
-		Quirks: withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, LaneArchitectures: updatesX86, Entitlement: true,
+		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
+		Quirks:   withPins(elQuirks9, el9Pins),
+		Lab: Lab{Lanes: rhelLanes, LaneArchitectures: updatesX86, LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
@@ -415,7 +424,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, LaneArchitectures: updatesX86, Entitlement: true,
+		Lab: Lab{Lanes: rhelLanes, LaneArchitectures: updatesX86, LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},

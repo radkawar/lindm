@@ -17,6 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
 	labv1 "lindm/gen/lindm/lab/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/platform"
@@ -54,6 +57,80 @@ type VMServiceStep struct {
 	NativeAfter          *VMServiceNativeState            `json:"native_after"`
 	Rejection            string                           `json:"rejection,omitempty"`
 	UnreportedDefinition *VMServiceDefinitionLength       `json:"unreported_definition,omitempty"`
+}
+
+// vmServiceStepJSON carries the provider messages as protojson: encoding/json
+// writes a oneof as its Go wrapper and cannot decode it back, so the guest's
+// evidence would never reach validation.
+type vmServiceStepJSON struct {
+	Name                 string                     `json:"name"`
+	Target               string                     `json:"target"`
+	Plan                 json.RawMessage            `json:"plan,omitempty"`
+	Before               json.RawMessage            `json:"before,omitempty"`
+	After                json.RawMessage            `json:"after"`
+	Verification         json.RawMessage            `json:"verification,omitempty"`
+	NativeBefore         *VMServiceNativeState      `json:"native_before"`
+	NativeAfter          *VMServiceNativeState      `json:"native_after"`
+	Rejection            string                     `json:"rejection,omitempty"`
+	UnreportedDefinition *VMServiceDefinitionLength `json:"unreported_definition,omitempty"`
+}
+
+func (s VMServiceStep) MarshalJSON() ([]byte, error) {
+	out := vmServiceStepJSON{Name: s.Name, Target: s.Target, NativeBefore: s.NativeBefore, NativeAfter: s.NativeAfter, Rejection: s.Rejection, UnreportedDefinition: s.UnreportedDefinition}
+	for _, field := range []struct {
+		message proto.Message
+		present bool
+		into    *json.RawMessage
+	}{{s.Plan, s.Plan != nil, &out.Plan}, {s.Before, s.Before != nil, &out.Before}, {s.After, s.After != nil, &out.After}, {s.Verification, s.Verification != nil, &out.Verification}} {
+		if !field.present {
+			continue
+		}
+		data, err := protojson.Marshal(field.message)
+		if err != nil {
+			return nil, err
+		}
+		*field.into = data
+	}
+	if out.After == nil {
+		out.After = json.RawMessage("null")
+	}
+	return json.Marshal(out)
+}
+
+func (s *VMServiceStep) UnmarshalJSON(data []byte) error {
+	var in vmServiceStepJSON
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&in); err != nil {
+		return err
+	}
+	*s = VMServiceStep{Name: in.Name, Target: in.Target, NativeBefore: in.NativeBefore, NativeAfter: in.NativeAfter, Rejection: in.Rejection, UnreportedDefinition: in.UnreportedDefinition}
+	decode := func(raw json.RawMessage, message proto.Message) (bool, error) {
+		if len(raw) == 0 || string(raw) == "null" {
+			return false, nil
+		}
+		return true, protojson.Unmarshal(raw, message)
+	}
+	plan, before, after, verification := new(resourcev1.ResourcePlan), new(resourcev1.ResourceObservation), new(resourcev1.ResourceObservation), new(resourcev1.ResourceVerification)
+	for _, field := range []struct {
+		raw     json.RawMessage
+		message proto.Message
+		assign  func()
+	}{
+		{in.Plan, plan, func() { s.Plan = plan }},
+		{in.Before, before, func() { s.Before = before }},
+		{in.After, after, func() { s.After = after }},
+		{in.Verification, verification, func() { s.Verification = verification }},
+	} {
+		present, err := decode(field.raw, field.message)
+		if err != nil {
+			return err
+		}
+		if present {
+			field.assign()
+		}
+	}
+	return nil
 }
 
 type VMServiceDefinitionLength struct {

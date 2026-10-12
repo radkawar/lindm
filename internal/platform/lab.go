@@ -247,6 +247,9 @@ type LabSession struct {
 	// Desktops maps a lab desktop ("gnome", "kde") to the packages that install
 	// it (DNF groups under Anaconda).
 	Desktops map[string][]string
+	// ArchitectureDesktops replaces a Desktops entry on one guest architecture
+	// (x86_64, aarch64) whose vendor media lack that environment.
+	ArchitectureDesktops map[string]map[string][]string
 	// GDMConfig is the GDM daemon file that enables autologin, and Name the
 	// lab user's AccountsService session. The GDM service is the release's
 	// Desktop.DisplayManager.
@@ -261,6 +264,15 @@ type LabSession struct {
 	FirstLoginMarkers []string
 	// Capture are the assistance capture-stack packages recorded as evidence.
 	Capture []string
+}
+
+// DesktopPackages returns the packages that install the lab desktop on the
+// guest architecture.
+func (s LabSession) DesktopPackages(desktop, architecture string) []string {
+	if packages, ok := s.ArchitectureDesktops[kernelArchitecture(architecture)][desktop]; ok {
+		return packages
+	}
+	return s.Desktops[desktop]
 }
 
 // LabGuest are the native guest facts of the device-action lanes.

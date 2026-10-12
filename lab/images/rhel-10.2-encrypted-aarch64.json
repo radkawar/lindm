@@ -1,0 +1,15 @@
+{
+  "id": "rhel-10.2-dvd-aarch64",
+  "distribution": "rhel",
+  "version": "10.2",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "2026-05-12T15:08:52Z",
+  "imageFilename": "rhel-10.2-aarch64-dvd.iso",
+  "imageUrl": "https://api.access.redhat.com/management/v1/images/63b6c005a55d8a1a89245732e4ed4af156c7e6825344a7ab68e691a09cf52f60/download",
+  "checksumUrl": "https://api.access.redhat.com/management/v1/images/rhel/10.2/aarch64",
+  "sha256": "63b6c005a55d8a1a89245732e4ed4af156c7e6825344a7ab68e691a09cf52f60",
+  "imageSizeBytes": "10413670400",
+  "checksumMode": "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl": "https://api.access.redhat.com/management/v1/images/rhel/10.2/aarch64"
+}

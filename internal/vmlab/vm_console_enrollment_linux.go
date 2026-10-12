@@ -28,9 +28,13 @@ import (
 type VMConsoleEnrollmentOptions struct {
 	CacheDir, WorkDir, LabBinary, CommandFile string
 	AdminAddress, DeviceAddress               string
-	Hardware                                  *VMHardwareOptions
-	Ready                                     func() error
-	VerifyEnrollment                          func(context.Context, *VMConsoleEnrollmentResult) error
+	// RedHatTokenFile registers an entitled (RHEL) guest, as a customer's
+	// subscribed host is, so the copied DNF command reaches its vendor
+	// repositories. Required for entitled releases, refused otherwise.
+	RedHatTokenFile  string
+	Hardware         *VMHardwareOptions
+	Ready            func() error
+	VerifyEnrollment func(context.Context, *VMConsoleEnrollmentResult) error
 }
 
 // VMConsoleEnrollmentResult contains only independent native observations. A
@@ -46,6 +50,7 @@ type VMConsoleEnrollmentResult struct {
 	Package              string             `json:"package"`
 	BinarySHA256         string             `json:"binary_sha256"`
 	OwnedCleanupComplete bool               `json:"owned_cleanup_complete"`
+	RedHat               *VMRedHatEvidence  `json:"redhat,omitempty"`
 }
 
 // EnrollFromConsoleVM never stages a lindm agent, repository, CA or bootstrap
@@ -64,8 +69,15 @@ func EnrollFromConsoleVM(ctx context.Context, manifest *labv1.ImageManifest, opt
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if err := manifestRelease(manifest).LabLane(platform.LaneEnrollFromConsole); err != nil {
+	release := manifestRelease(manifest)
+	if err := release.LabLane(platform.LaneEnrollFromConsole); err != nil {
 		return nil, err
+	}
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
+		return nil, err
+	}
+	if release.Lab.Entitlement && options.RedHatTokenFile == "" {
+		return nil, errors.New("console enrollment of an entitled guest requires -redhat-token-file: the unregistered vendor image has no repository for the copied DNF command")
 	}
 	if options.CommandFile == "" || options.LabBinary == "" || options.Ready == nil || options.VerifyEnrollment == nil {
 		return nil, errors.New("console enrollment requires private clipboard capture, matching guest lab binary and server-side enrollment verification")
@@ -124,6 +136,16 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 	result.Runtime, err = vm.runtimeEvidence(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if release.Lab.Entitlement {
+		result.RedHat = new(VMRedHatEvidence)
+		var registration *vmRedHatRegistration
+		if registration, err = registerConsoleEnrollmentRedHat(ctx, vm, options, result.RedHat); err != nil {
+			return nil, err
+		}
+		defer func() {
+			err = errors.Join(err, releaseConsoleEnrollmentRedHat(ctx, vm, options.LabBinary, registration))
+		}()
 	}
 	var forwards []*guestForward
 	defer func() { err = errors.Join(err, closeLifecycleForwards(forwards)) }()
@@ -204,6 +226,41 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 		return nil, fmt.Errorf("server-side enrollment was not confirmed before guest teardown: %w", err)
 	}
 	return result, nil
+}
+
+// registerConsoleEnrollmentRedHat registers the fresh entitled guest through
+// the maintained hosted path, standing in for the customer's subscription. The
+// registration probe is removed again before the copied command runs, so the
+// read-only observer is still present only after that command.
+func registerConsoleEnrollmentRedHat(ctx context.Context, vm *guestVM, options VMConsoleEnrollmentOptions, evidence *VMRedHatEvidence) (*vmRedHatRegistration, error) {
+	if err := lifecycleCommand(ctx, vm, "stage registration probe directory", "test ! -e "+nativeGuestDir+"; install -d -m 0755 "+nativeGuestDir); err != nil {
+		return nil, err
+	}
+	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
+		return nil, err
+	}
+	registration, err := registerVMRedHat(ctx, vm, options.RedHatTokenFile, evidence)
+	if err != nil {
+		return nil, err
+	}
+	if err := lifecycleCommand(ctx, vm, "remove registration probe before the console command", "rm -f -- "+guestLifecycleProbe); err != nil {
+		return nil, errors.Join(err, registration.Close())
+	}
+	return registration, nil
+}
+
+// releaseConsoleEnrollmentRedHat unregisters and deletes the activation key.
+// Unregistration runs through the observer probe, which the lane uploads only
+// after a successful command; it is restored when the lane stopped earlier.
+func releaseConsoleEnrollmentRedHat(ctx context.Context, vm *guestVM, labBinary string, registration *vmRedHatRegistration) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+	defer cancel()
+	if _, err := vm.run(ctx, "test -x "+guestLifecycleProbe, nil, 1024, time.Minute); err != nil {
+		if err := uploadLifecycleProbe(ctx, vm, labBinary); err != nil {
+			return errors.Join(err, registration.Close())
+		}
+	}
+	return registration.Close()
 }
 
 func consoleEnrollmentPackageQuery(backend platform.Backend) (tool, query string, err error) {

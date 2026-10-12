@@ -1,0 +1,15 @@
+{
+  "id": "rhel-9.8-dvd-aarch64",
+  "distribution": "rhel",
+  "version": "9.8",
+  "architecture": "aarch64",
+  "edition": "dvd-encrypted-lab",
+  "release": "2026-05-12T14:42:29Z",
+  "imageFilename": "rhel-9.8-aarch64-dvd.iso",
+  "imageUrl": "https://api.access.redhat.com/management/v1/images/1da7c7f9b30f2587d44f8ef6b34b2a27f2f0571bf09da6046195a74df275fa92/download",
+  "checksumUrl": "https://api.access.redhat.com/management/v1/images/rhel/9.8/aarch64",
+  "sha256": "1da7c7f9b30f2587d44f8ef6b34b2a27f2f0571bf09da6046195a74df275fa92",
+  "imageSizeBytes": "13307215872",
+  "checksumMode": "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl": "https://api.access.redhat.com/management/v1/images/rhel/9.8/aarch64"
+}
