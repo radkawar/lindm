@@ -34,10 +34,11 @@ var (
 )
 
 // BuildCache removes Go build cache entries (<cache>/xx/<hash>-a|-d) whose
-// mtime is older than age. The go command refreshes the mtime of an entry it
-// uses once it is an hour old and treats a missing entry as a cache miss, so a
-// concurrent build at worst recomputes an entry; this is the go command's own
-// trim with a shorter horizon.
+// mtime is older than age; an entry that is a directory (go test's fuzz and
+// expansion data) goes when nothing in it changed within age. The go command
+// refreshes the mtime of an entry it uses once it is an hour old and treats a
+// missing entry as a cache miss, so a concurrent build at worst recomputes an
+// entry; this is the go command's own trim with a shorter horizon.
 func BuildCache(ctx context.Context, dir string, age time.Duration, dryRun bool) (Result, error) {
 	result := Result{Class: "go-build-cache"}
 	if age < time.Hour {
@@ -72,16 +73,22 @@ func BuildCache(ctx context.Context, dir string, age time.Duration, dryRun bool)
 			if err != nil {
 				continue // removed concurrently
 			}
-			if info.ModTime().After(cutoff) {
+			path := filepath.Join(dir, shard.Name(), entry.Name())
+			recent := info.ModTime().After(cutoff)
+			if !recent && info.IsDir() {
+				if recent, err = changedSince(path, cutoff, false); err != nil {
+					failures = append(failures, err)
+					continue
+				}
+			}
+			if recent {
 				result.Kept++
 				continue
 			}
-			bytes := allocated(filepath.Join(dir, shard.Name(), entry.Name()))
+			bytes := allocated(path)
 			if !dryRun {
-				if err := os.Remove(filepath.Join(dir, shard.Name(), entry.Name())); err != nil {
-					if !errors.Is(err, fs.ErrNotExist) {
-						failures = append(failures, err)
-					}
+				if err := removeTree(path); err != nil {
+					failures = append(failures, err)
 					continue
 				}
 			}
@@ -193,7 +200,7 @@ func idle(procs *uses, dir string, cutoff time.Time) string {
 	if user := procs.user(dir); user != "" {
 		return user
 	}
-	recent, err := changedSince(dir, cutoff)
+	recent, err := changedSince(dir, cutoff, true)
 	if err != nil {
 		return "unreadable: " + err.Error()
 	}

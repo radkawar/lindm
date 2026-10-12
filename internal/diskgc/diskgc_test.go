@@ -5,6 +5,7 @@ package diskgc
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -222,5 +223,86 @@ func TestHostReportsEachClass(t *testing.T) {
 	}
 	if free, err := Free(work); err != nil || free <= 0 {
 		t.Fatalf("free %d, %v", free, err)
+	}
+}
+
+// readOnly removes every write bit beneath path, as lab caches publish
+// entries, and restores them when the test ends so its cleanup succeeds.
+func readOnly(t *testing.T, path string) {
+	t.Helper()
+	var dirs []string
+	err := filepath.WalkDir(path, func(name string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			dirs = append(dirs, name)
+			return nil
+		}
+		return os.Chmod(name, 0o444)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := len(dirs) - 1; i >= 0; i-- {
+		if err := os.Chmod(dirs[i], 0o555); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(path, func(name string, d fs.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				_ = os.Chmod(name, 0o755)
+			}
+			return nil
+		})
+	})
+}
+
+func TestBuildCacheRemovesStaleDirectoryEntries(t *testing.T) {
+	cache := t.TempDir()
+	stale := filepath.Join(cache, "cd", strings.Repeat("c", 64)+"-d")
+	fresh := filepath.Join(cache, "cd", strings.Repeat("d", 64)+"-d")
+	for _, entry := range []string{stale, fresh} {
+		write(t, filepath.Join(entry, "corpus", "seed"), "x")
+	}
+	old := time.Now().Add(-3 * time.Hour)
+	for _, path := range []string{filepath.Join(stale, "corpus", "seed"), filepath.Join(stale, "corpus"), stale, filepath.Join(fresh, "corpus"), fresh} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	readOnly(t, stale)
+	// The go command dates entries by mtime (the chmod above changed only
+	// ctime). A file used recently keeps its directory entry even though the
+	// directory itself is old.
+	result, err := BuildCache(t.Context(), cache, 2*time.Hour, false)
+	if err != nil || result.Removed != 1 || result.Kept != 1 {
+		t.Fatalf("result %+v, %v", result, err)
+	}
+	if exists(stale) || !exists(filepath.Join(fresh, "corpus", "seed")) {
+		t.Fatal("wrong directory entry removed")
+	}
+}
+
+func TestImagesRemoveReadOnlyEntriesAndFinishLeftovers(t *testing.T) {
+	cache := t.TempDir()
+	write(t, filepath.Join(cache, imageCacheMarker), "lindm verified image cache v1\n")
+	closures := filepath.Join(cache, "repository-snapshots", "sha256")
+	closure := filepath.Join(closures, strings.Repeat("9", 64))
+	write(t, filepath.Join(closure, "manifest.json"), "{}")
+	write(t, filepath.Join(closure, "repository", "repodata", "repomd.xml"), "<repomd/>")
+	readOnly(t, closure)
+	// What an interrupted gc that could not remove a read-only tree left.
+	leftover := filepath.Join(closures, ".gc-"+strings.Repeat("8", 64)+"-1")
+	write(t, filepath.Join(leftover, "manifest.json"), "{}")
+	readOnly(t, leftover)
+	result, err := Images(t.Context(), []string{cache}, map[string]bool{strings.Repeat("a", 64): true}, false)
+	if err != nil || result.Removed != 2 || result.Reclaimed <= 0 {
+		t.Fatalf("result %+v, %v", result, err)
+	}
+	entries, err := os.ReadDir(closures)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("left %v, %v", entries, err)
 	}
 }

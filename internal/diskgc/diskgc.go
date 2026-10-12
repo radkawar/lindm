@@ -137,8 +137,9 @@ func allocated(path string) int64 {
 }
 
 // changedSince reports whether anything at or beneath path changed after
-// cutoff (mtime or ctime: a rename or chmod is activity too).
-func changedSince(path string, cutoff time.Time) (bool, error) {
+// cutoff: its mtime and, with ctime, its inode change time (a rename or chmod
+// is activity too).
+func changedSince(path string, cutoff time.Time, ctime bool) (bool, error) {
 	recent := false
 	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -155,9 +156,9 @@ func changedSince(path string, cutoff time.Time) (bool, error) {
 			return err
 		}
 		changed := info.ModTime()
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-			if ctime := time.Unix(stat.Ctim.Unix()); ctime.After(changed) {
-				changed = ctime
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok && ctime {
+			if changedAt := time.Unix(stat.Ctim.Unix()); changedAt.After(changed) {
+				changed = changedAt
 			}
 		}
 		if changed.After(cutoff) {
@@ -184,7 +185,25 @@ func remove(path string, dryRun bool) (int64, error) {
 		}
 		return 0, err
 	}
-	return bytes, os.RemoveAll(trash)
+	return bytes, removeTree(trash)
+}
+
+// removeTree removes path and everything beneath it, first giving the owner
+// write and search permission on every directory in it: lab caches publish
+// read-only trees (a-w), whose entries cannot otherwise be unlinked.
+func removeTree(path string) error {
+	err := filepath.WalkDir(path, func(name string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil // RemoveAll reports what stays unremovable
+		}
+		info, err := d.Info()
+		if err != nil || info.Mode().Perm()&0o700 == 0o700 {
+			return nil
+		}
+		// Before the walk reads the directory, so an unreadable one opens.
+		return os.Chmod(name, info.Mode().Perm()|0o700)
+	})
+	return errors.Join(err, os.RemoveAll(path))
 }
 
 // sweepTrash removes what interrupted runs claimed in dir but left behind.
@@ -204,7 +223,7 @@ func sweepTrash(dir string, result *Result, dryRun bool) error {
 		path := filepath.Join(dir, entry.Name())
 		bytes := allocated(path)
 		if !dryRun {
-			if err := os.RemoveAll(path); err != nil {
+			if err := removeTree(path); err != nil {
 				failures = append(failures, err)
 				continue
 			}
