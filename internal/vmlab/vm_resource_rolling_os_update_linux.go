@@ -21,8 +21,10 @@ import (
 // durable journal and reboot boundary as the fixed-release policy lane. It never
 // substitutes security package selection for a rolling whole-system upgrade.
 func exerciseRollingOSUpdate(ctx context.Context, r *resourceDispatch, packages resourcePackaging, evidence *VMResourceKindEvidence) error {
-	if r.awaitReboot == nil || r.rollingSnapshot == nil {
-		return errors.New("rolling update qualification requires a repository snapshot pin and reboot boundary")
+	// Prerequisites were provisioned at the image's snapshot; the policy must
+	// target a later registry pin or the window transaction changes nothing.
+	if r.awaitReboot == nil || r.rollingSnapshot == nil || r.osUpdateTarget == nil {
+		return errors.New("rolling update qualification requires a later os-update target snapshot pin and reboot boundary")
 	}
 	zone, err := time.LoadLocation(osUpdateLabZone)
 	if err != nil {
@@ -45,7 +47,7 @@ func exerciseRollingOSUpdate(ctx context.Context, r *resourceDispatch, packages 
 	r.fresh()
 	start := osUpdateWindowStart(time.Now())
 	desired := osUpdateDesired(zone, resourcev1.UpdateSelection_UPDATE_SELECTION_ALL, start, 0)
-	desired.GetOsUpdate().RollingSnapshot = proto.CloneOf(r.rollingSnapshot)
+	desired.GetOsUpdate().RollingSnapshot = proto.CloneOf(r.osUpdateTarget)
 	if err := resourceStep(ctx, r, evidence, names[1], desired, resourceCreatePolicy(), false, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
 		return err
 	}
@@ -59,7 +61,7 @@ func exerciseRollingOSUpdate(ctx context.Context, r *resourceDispatch, packages 
 	// window. Open a fresh, signed window for the recovery-hold probe.
 	start = time.Now().Add(-time.Minute).Truncate(time.Minute)
 	desired = osUpdateDesired(zone, resourcev1.UpdateSelection_UPDATE_SELECTION_ALL, start, 0)
-	desired.GetOsUpdate().RollingSnapshot = proto.CloneOf(r.rollingSnapshot)
+	desired.GetOsUpdate().RollingSnapshot = proto.CloneOf(r.osUpdateTarget)
 	if err := resourceStep(ctx, r, evidence, "policy-reconciles-recovery-window", desired, resourceCreatePolicy(), false, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
 		return err
 	}
@@ -107,7 +109,7 @@ func rollingWindowAndReboot(ctx context.Context, r *resourceDispatch, packages r
 	}
 	status, receipt, err := serverPatchStatus(ctx, r, s, "rolling-installed", func(p *agentv1.PatchStatusObservation) error {
 		last := p.GetLastRun()
-		if p.GetAvailable() || p.GetReason() != "rolling_security_classification_unavailable" || last.GetResult() != agentv1.PatchRunResult_PATCH_RUN_RESULT_SUCCEEDED || last.GetSelection() != resourcev1.UpdateSelection_UPDATE_SELECTION_ALL || last.GetUpdatedPackages() == 0 || last.GetStartedAt().AsTime().Before(start) || last.GetRepositorySnapshotDate() != r.rollingSnapshot.GetDate() || last.GetRebootScheduledFor() == nil {
+		if p.GetAvailable() || p.GetReason() != "rolling_security_classification_unavailable" || last.GetResult() != agentv1.PatchRunResult_PATCH_RUN_RESULT_SUCCEEDED || last.GetSelection() != resourcev1.UpdateSelection_UPDATE_SELECTION_ALL || last.GetUpdatedPackages() == 0 || last.GetStartedAt().AsTime().Before(start) || last.GetRepositorySnapshotDate() != r.osUpdateTarget.GetDate() || last.GetRebootScheduledFor() == nil {
 			return fmt.Errorf("missing successful whole-system snapshot receipt: %v", p)
 		}
 		if last.GetRollbackStatus() != "unavailable" && last.GetRollbackStatus() != "snapper_pre_snapshot" {

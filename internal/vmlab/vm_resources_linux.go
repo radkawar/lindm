@@ -39,6 +39,8 @@ type resourceDispatch struct {
 	// boot ID within timeout and reopens the forwards; nil like reboot.
 	awaitReboot     func(ctx context.Context, previousBoot string, timeout time.Duration) error
 	rollingSnapshot *resourcev1.RollingUpdateSnapshot
+	// osUpdateTarget is the later snapshot the os-update policy installs.
+	osUpdateTarget *resourcev1.RollingUpdateSnapshot
 	// updater is the release's vendor background updater, if any; the
 	// connected package kind collides with it on purpose.
 	updater platform.LabUpdater
@@ -321,7 +323,7 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
 	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot, awaitReboot: awaitReboot, updater: updater}
-	r.rollingSnapshot = packages.rollingSnapshot
+	r.rollingSnapshot, r.osUpdateTarget = packages.rollingSnapshot, packages.osUpdateTarget
 	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	kinds := result.Resources.Kinds
 	if selected["packages"] {

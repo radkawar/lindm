@@ -611,7 +611,10 @@ var registry = []*Release{
 			ResourcePackages:   []string{"gnupg", "openssl", "python", "attr", "acl", "curl", "libarchive", "zstd", "pacman-contrib", "nftables", "firewalld", "libpwquality", "pam", "pambase"},
 			Installer:          ArchISO,
 			OfflineRTCWaitUnit: "systemd-time-wait-sync.service",
-			InstallerPackages:  []string{"base", "linux", "linux-firmware", "mkinitcpio", "cryptsetup", "systemd", "tpm2-tss", "tpm2-tools", "openssh", "sudo", "networkmanager", "grub", "dosfstools"},
+			// Archive 2026-10-09 (core.db 130,342 bytes vs 129,310 on the
+			// images' 2026-10-02 pin) is the os-update policy's later target.
+			OSUpdateTargets:   map[string]RollingTarget{"x86_64": {Date: "2026-10-09"}},
+			InstallerPackages: []string{"base", "linux", "linux-firmware", "mkinitcpio", "cryptsetup", "systemd", "tpm2-tss", "tpm2-tools", "openssh", "sudo", "networkmanager", "grub", "dosfstools"},
 			Session: LabSession{
 				Desktops:  map[string][]string{"gnome": {"gnome-shell", "gdm", "gnome-session", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gst-plugin-pipewire", "gst-plugins-good"}},
 				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},

@@ -64,6 +64,18 @@ type Lab struct {
 	// for stable package truth, and the resources lane drives it on purpose
 	// to hold the native package lock while a package change arrives.
 	Updater LabUpdater
+	// OSUpdateTargets pins, per guest architecture (x86_64, aarch64), the
+	// later rolling snapshot the os-update lane's whole-system policy installs.
+	// Lane prerequisites are provisioned at the image's own snapshot, so a
+	// policy targeting that same snapshot could never change a package.
+	OSUpdateTargets map[string]RollingTarget
+}
+
+// RollingTarget is one immutable later repository snapshot: an Arch Linux
+// Archive date, or a dated content-addressed closure (Tumbleweed) with its
+// signed repomd digest, served by the lab like the image's own closure.
+type RollingTarget struct {
+	Date, ClosureSHA256, RepomdSHA256 string
 }
 
 // LabUpdater names a vendor updater service and the root command that makes

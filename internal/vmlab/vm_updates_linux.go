@@ -366,6 +366,16 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := lifecycleCommand(ctx, vm, "bound owned update slice disk throughput", "systemctl start lindm-updates.slice; systemctl set-property --runtime lindm-updates.slice 'IOWriteBandwidthMax=/dev/vda 1048576'; grep -Eq ' wbps=1048576([[:space:]]|$)' /sys/fs/cgroup/lindm.slice/lindm-updates.slice/io.max"); err != nil {
 		return result, err
 	}
+	// libalpm writes the replacement binary through the page cache without
+	// fsync, so 2 GiB of guest memory absorbed the whole agent before the
+	// slice's write bound applied and the update finished in ~100 ms (Arch r8).
+	// A tiny dirty threshold makes the writer wait in writeback, which the
+	// bound slice paces, exposing the in-place partial binary to the witness.
+	if packages.backend == platform.BackendPacman {
+		if err := lifecycleCommand(ctx, vm, "pace pacman buffered writes through the bounded slice", "sysctl -q -w vm.dirty_background_bytes=262144 vm.dirty_bytes=524288"); err != nil {
+			return result, err
+		}
+	}
 	boot, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id", nil, 128, 5*time.Second)
 	if err != nil {
 		return result, err

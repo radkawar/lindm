@@ -341,6 +341,14 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
 	packages.rollingSnapshot = rollingSnapshotDesired(manifest, snapshot)
+	target, osUpdateTarget, err := prepareGuestOSUpdateTarget(ctx, vm, manifest, options.CacheDir)
+	if err != nil {
+		return result, err
+	}
+	if target != nil {
+		defer func() { err = errors.Join(err, target.Close()) }()
+	}
+	packages.osUpdateTarget = osUpdateTarget
 	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
 		return result, err
 	}
@@ -524,7 +532,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			if forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress}); err != nil {
 				return err
 			}
-			return snapshot.reconnect(ctx)
+			return errors.Join(snapshot.reconnect(ctx), target.reconnect(ctx))
 		}
 		// The update policy's own logind reboot is awaited, never triggered.
 		awaitReboot := func(ctx context.Context, previousBoot string, timeout time.Duration) error {
@@ -543,7 +551,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			if forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress}); err != nil {
 				return err
 			}
-			return snapshot.reconnect(ctx)
+			return errors.Join(snapshot.reconnect(ctx), target.reconnect(ctx))
 		}
 		if firewall != nil {
 			firewall.rebootDevice = reboot

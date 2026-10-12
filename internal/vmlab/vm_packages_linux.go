@@ -44,6 +44,8 @@ type nativeGuestPackages struct {
 	account         string
 	installed       bool
 	rollingSnapshot *resourcev1.RollingUpdateSnapshot
+	// osUpdateTarget is the registry's later os-update policy snapshot.
+	osUpdateTarget *resourcev1.RollingUpdateSnapshot
 }
 
 func nativeQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
