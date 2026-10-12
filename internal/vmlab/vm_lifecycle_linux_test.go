@@ -1,6 +1,9 @@
 package vmlab
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Remote hosts cannot reach the shared development console, so manual
 // trust/service lifecycle variants must be admissible against a private
@@ -35,5 +38,14 @@ func TestLifecycleControlPlaneSelection(t *testing.T) {
 				t.Fatalf("lifecycleControlPlane() = %q, %v; want %q", got, err, tc.want)
 			}
 		})
+	}
+}
+
+// The Omarchy executor resources lane failed preparation with only the
+// executor's reason code; the native manager's diagnostic lives in the
+// transient package helper unit's journal, which diagnostics must include.
+func TestLifecycleFailureCollectsPackageHelperJournal(t *testing.T) {
+	if !strings.Contains(lifecycleFailureCommand, "journalctl --no-pager -n 120 -u 'lindm-package-*'") {
+		t.Fatalf("lifecycle diagnostics omit package helper units: %s", lifecycleFailureCommand)
 	}
 }

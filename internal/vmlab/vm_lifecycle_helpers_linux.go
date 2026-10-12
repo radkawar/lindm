@@ -292,6 +292,12 @@ func lifecycleDelay(ctx context.Context, duration time.Duration) error {
 	}
 }
 
+// lifecycleFailureCommand collects the installed units' state. Package
+// preparation and apply run in transient lindm-package-* helper units whose
+// journal alone carries the native manager's diagnostic; the executor logs
+// only the reason code (package_staging_native_failed).
+const lifecycleFailureCommand = "systemctl status --no-pager --full lindm-executor.service lindm-agent.service; journalctl --no-pager -n 120 -u lindm-executor.service -u lindm-agent.service; journalctl --no-pager -n 120 -u 'lindm-package-*'; systemctl show lindm-agent.service -p MainPID -p RestrictAddressFamilies -p SystemCallFilter -p SystemCallErrorNumber -p IPAddressDeny; ls -ldZ / /etc /etc/lindm /etc/lindm/agent.json /etc/lindm/executor.json /var /var/lib /var/lib/lindm " + packaging.BinaryPath + " /var/lib/lindm/agent; namei -l /etc/lindm/agent.json /etc/lindm/executor.json; ps -eo pid,label,comm; journalctl --no-pager -k -n 120; journalctl --no-pager -n 80 _TRANSPORT=audit"
+
 func saveLifecycleFailure(ctx context.Context, vm *guestVM, directory string) error {
 	if vm.client == nil || vm.processError() != nil {
 		return nil
@@ -299,7 +305,7 @@ func saveLifecycleFailure(ctx context.Context, vm *guestVM, directory string) er
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	previous := vm.lastOperation
-	result, err := vm.runResult(ctx, "sudo -n sh -c 'systemctl status --no-pager --full lindm-executor.service lindm-agent.service; journalctl --no-pager -n 120 -u lindm-executor.service -u lindm-agent.service; systemctl show lindm-agent.service -p MainPID -p RestrictAddressFamilies -p SystemCallFilter -p SystemCallErrorNumber -p IPAddressDeny; ls -ldZ / /etc /etc/lindm /etc/lindm/agent.json /etc/lindm/executor.json /var /var/lib /var/lib/lindm "+packaging.BinaryPath+" /var/lib/lindm/agent; namei -l /etc/lindm/agent.json /etc/lindm/executor.json; ps -eo pid,label,comm; journalctl --no-pager -k -n 120; journalctl --no-pager -n 80 _TRANSPORT=audit'", nil, 2<<20, 8*time.Second)
+	result, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote(lifecycleFailureCommand), nil, 2<<20, 8*time.Second)
 	if err != nil {
 		return fmt.Errorf("collect private lifecycle diagnostics: %w", err)
 	}
