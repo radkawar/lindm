@@ -204,7 +204,7 @@ func (s *Service) applyResourceAssignment(ctx context.Context, tx pgx.Tx, q *dev
 	if req.Msg.GetClear() {
 		auditAction = auditkind.ResourceAssignmentClear
 	}
-	if err := core.DispatchAudit(ctx, q, &actor.ID, auditAction, id, req.Msg.GetReason()); err != nil {
+	if err := core.DeviceAudit(ctx, q, &actor.ID, auditAction, id.String(), deviceID, req.Msg.GetReason()); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := s.LockActionApproval(ctx, tx, consumption, approval, identity.PermissionAssignResources); err != nil {
@@ -502,5 +502,5 @@ func (s *Service) ActivateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	if err := q.SetResourceAssignmentHead(ctx, devicedb.SetResourceAssignmentHeadParams{GenerationID: receipt.GenerationID, AssignmentID: id}); err != nil {
 		return err
 	}
-	return core.InsertAudit(ctx, q, &token.CreatedBy, auditkind.ResourceAssignmentAssign, id.String(), token.Reason)
+	return core.DeviceAudit(ctx, q, &token.CreatedBy, auditkind.ResourceAssignmentAssign, id.String(), receipt.DeviceID, token.Reason)
 }

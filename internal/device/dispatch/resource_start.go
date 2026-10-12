@@ -242,7 +242,7 @@ func (k *resourceStart) persist(ctx context.Context, s *Service, st *startState[
 	}
 	// The audit append holds the deployment-wide chain head until commit, so it
 	// is the transaction's last statement.
-	if err := core.DispatchSystemAudit(ctx, st.q, &k.head.ActorID, auditkind.ResourceActionStart, st.id, "authority", "fresh_actor_authorization"); err != nil {
+	if err := core.DeviceAudit(ctx, st.q, &k.head.ActorID, auditkind.ResourceActionStart, st.id.String(), st.principal.DeviceID, "", "authority", "fresh_actor_authorization"); err != nil {
 		return core.MapErr(err)
 	}
 	return nil

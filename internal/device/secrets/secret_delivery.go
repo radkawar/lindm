@@ -142,8 +142,8 @@ func SecretDeliveryAuthority(ctx context.Context, q *devicedb.Queries, approval 
 }
 
 // storeResourceSecrets persists the exact sealed bytes beside the inserted
-// action and audits each delivery by identifiers only.
-func StoreResourceSecrets(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action uuid.UUID, deliveries []ResourceSecretDelivery) error {
+// action and audits each delivery to the device by identifiers only.
+func StoreResourceSecrets(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action, device uuid.UUID, deliveries []ResourceSecretDelivery) error {
 	for i, delivery := range deliveries {
 		binding := delivery.Manifest.GetBinding()
 		secret, err := core.ParseUUID(binding.GetSecret().GetSecretId())
@@ -154,7 +154,7 @@ func StoreResourceSecrets(ctx context.Context, q *devicedb.Queries, actor *uuid.
 		if err := q.InsertResourceActionSecret(ctx, devicedb.InsertResourceActionSecretParams{ActionID: action, Ordinal: int16(i), SecretID: secret, Version: int64(version), RecipientKeySha256: binding.GetRecipientKeySha256(), Sealed: delivery.sealed}); err != nil {
 			return err
 		}
-		if err := core.DispatchSystemAudit(ctx, q, actor, auditkind.SecretDelivered, action, "secret_id", secret.String(), "version", strconv.FormatUint(version, 10)); err != nil {
+		if err := core.DeviceAudit(ctx, q, actor, auditkind.SecretDelivered, action.String(), device, "", "secret_id", secret.String(), "version", strconv.FormatUint(version, 10)); err != nil {
 			return err
 		}
 	}

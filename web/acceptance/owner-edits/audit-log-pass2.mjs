@@ -10,7 +10,7 @@ export const task = {
   route: "/audit",
   priority: "normal",
   acceptance:
-    "At 1440x900 the first audit row starts within 250 px of the filters' top; no stray 'All time' text outside the time-range control; every row's Details control lies inside the viewport at 1440 and 390 px; at 390x844 the page does not scroll sideways and a row is visible on the first screen; every action caption is a human name from action-names.json (no 'Device action create'/'Identity local enrolled'); device-action rows name their kind ('Requested device action: Restart'); Human actions shows no 'Signed out'/'Signed in' rows.",
+    "At 1440x900 the first audit row starts within 250 px of the filters' top; no stray 'All time' text outside the time-range control; every row's Details control lies inside the viewport at 1440 and 390 px; at 390x844 the page does not scroll sideways and a row is visible on the first screen; every action caption is a human name from action-names.json (no 'Device action create'/'Identity local enrolled'); device-action rows name their kind ('Requested device action: Restart'); 'Changed device details' rows name the device; Human actions shows no 'Signed out'/'Signed in' rows.",
 };
 
 const names = Object.values(
@@ -107,6 +107,23 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     const isDeviceAction = (caption) =>
       DEVICE_ACTION_NAMES.some((name) => caption.startsWith(name));
     const all = await captions(main);
+    // The seed's bulk device-details edits fill this page; each is about one
+    // device, so its Device cell (When, Action, Who, Device, Reason) names it.
+    const details = main
+      .getByRole("table")
+      .first()
+      .locator("tbody tr")
+      .filter({ hasText: "Changed device details" });
+    const detailCount = await details.count();
+    require(detailCount > 0, "All actions shows no 'Changed device details' rows to assess");
+    const unnamedDevices = [];
+    for (const row of await details.all()) {
+      if (!(await row.getByRole("cell").nth(3).innerText()).trim()) {
+        unnamedDevices.push((await row.getByRole("cell").nth(4).innerText()).trim());
+      }
+    }
+    require(unnamedDevices.length ===
+      0, `${unnamedDevices.length} of ${detailCount} 'Changed device details' rows name no device (e.g. ${unnamedDevices.slice(0, 2).join("; ")})`);
     await capture("audit-pass2-all-desktop");
 
     // Bulk seed edits can fill the first All actions pages, so device actions

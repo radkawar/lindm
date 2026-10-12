@@ -412,8 +412,8 @@ SELECT request_digest,response_bytes FROM advisory_exception_requests WHERE acto
 INSERT INTO advisory_exception_requests(actor_id,request_id,request_digest,response_bytes) VALUES($1,$2,$3,$4);
 
 -- name: InsertAdvisoryAudit :exec
-INSERT INTO audit_events(id,actor_id,action,resource_id,reason,details)
-VALUES(sqlc.arg('id'),sqlc.narg('actor_id'),sqlc.arg('action'),sqlc.arg('resource_id'),sqlc.arg('reason'),
+INSERT INTO audit_events(id,actor_id,action,resource_id,reason,target_device_id,details)
+VALUES(sqlc.arg('id'),sqlc.narg('actor_id'),sqlc.arg('action'),sqlc.arg('resource_id'),sqlc.arg('reason'),sqlc.narg('target_device_id'),
   jsonb_strip_nulls(jsonb_build_object('context', NULLIF(sqlc.arg('context')::text, ''))));
 
 -- name: AdvisoryDatabaseTime :one

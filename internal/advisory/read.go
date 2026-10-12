@@ -544,7 +544,7 @@ func (s *Service) Accept(ctx context.Context, tx pgx.Tx, actor uuid.UUID, req *a
 	if err := q.InsertAdvisoryExceptionRequest(ctx, advisorydb.InsertAdvisoryExceptionRequestParams{ActorID: actor, RequestID: requestID, RequestDigest: digest[:], ResponseBytes: payload}); err != nil {
 		return nil, err
 	}
-	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), ActorID: &actor, Action: auditkind.AdvisoryExceptionAccepted.String(), ResourceID: deviceID.String(), Reason: req.GetReason()}); err != nil {
+	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), ActorID: &actor, Action: auditkind.AdvisoryExceptionAccepted.String(), ResourceID: deviceID.String(), Reason: req.GetReason(), TargetDeviceID: &deviceID}); err != nil {
 		return nil, err
 	}
 	return out, nil

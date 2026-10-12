@@ -440,7 +440,7 @@ func reportSignedResult[S signedStatus, A signedAttestation[S]](ctx context.Cont
 	if err := k.persist(ctx, s, st, status); err != nil {
 		return nil, err
 	}
-	if err := core.DispatchSystemAudit(ctx, st.q, nil, reasons.resultAudit, id, "proof", "verified_device_attestation"); err != nil {
+	if err := core.DeviceAudit(ctx, st.q, nil, reasons.resultAudit, id.String(), st.principal.DeviceID, "", "proof", "verified_device_attestation"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

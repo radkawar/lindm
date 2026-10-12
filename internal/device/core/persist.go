@@ -78,6 +78,16 @@ func DispatchSystemAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.U
 	}, AuditDetails(pairs...))
 }
 
+// DeviceAudit records an event about exactly one device and names it as the
+// event's target, so the console's Device column and device filter find it.
+// Device actions (resolved from device_actions) and the kinds in
+// audit_direct_device_target are found without it.
+func DeviceAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action auditkind.Kind, resourceID string, device uuid.UUID, reason string, pairs ...string) error {
+	return InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
+		ID: uuid.New(), ActorID: actor, Action: action.String(), ResourceID: resourceID, Reason: reason, TargetDeviceID: &device,
+	}, AuditDetails(pairs...))
+}
+
 func (s *Service) storeCertificate(ctx context.Context, q *devicedb.Queries, deviceID, generation uuid.UUID, pub crypto.PublicKey, now time.Time) (*issuedCert, error) {
 	issued, err := IssueCertificate(s.CA, s.CAKey, pub, s.DeploymentID, deviceID, generation, now)
 	if err != nil {

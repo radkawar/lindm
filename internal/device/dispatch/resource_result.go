@@ -419,7 +419,7 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, fe
 			return nil, core.MapErr(err)
 		}
 	}
-	if err := core.DispatchSystemAudit(ctx, q, nil, auditkind.ResourceActionPreparationCancel, action.ID, "status", "executor_never_prepared"); err != nil {
+	if err := core.DeviceAudit(ctx, q, nil, auditkind.ResourceActionPreparationCancel, action.ID.String(), action.DeviceID, "", "status", "executor_never_prepared"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

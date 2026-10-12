@@ -200,7 +200,11 @@ the preset's zero radius, bundled font and theme parity.
 Audit reasons contain only the operator's supplied explanation, unchanged; events
 without an operator reason store an empty string. Server-generated context belongs
 in the audit row's structured `details` object, with the device UUID in
-`target_device_id`. Assistance records `mode` (`view` or `control`) and
+`target_device_id`. An event about exactly one device names it there at the write
+site (`core.DeviceAudit`, or `TargetDeviceID` on the insert): device details,
+local-admin policy and escrow, resource assignments and actions, secret delivery,
+advisory exceptions and findings. Only device actions, reveals and the kinds in
+`audit_direct_device_target` are resolved at capture. Assistance records `mode` (`view` or `control`) and
 `duration_seconds` separately from consent, fingerprint and end-cause details.
 The audit console resolves the device's current hostname server-side and links it
 to the device page, falling back to "Unnamed device"; mode and duration read

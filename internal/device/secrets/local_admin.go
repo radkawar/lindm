@@ -209,7 +209,7 @@ func (s *Service) SetLocalAdminPasswordPolicy(ctx context.Context, req *connect.
 		if err := q.UpsertLocalAdminPolicy(ctx, devicedb.UpsertLocalAdminPolicyParams{DeviceID: deviceID, AccountName: policy.GetAccountName(), RotationIntervalSeconds: int32(interval / time.Second), PostRevealDelaySeconds: int32(policy.GetPostRevealRotationDelay().AsDuration() / time.Second), ActorID: authorization.ActorID(), AuthorizationVersion: int64(authorization.Version()), RequestID: requestID, RotateDueAt: core.Timestamptz(due), UpdatedAt: core.Timestamptz(now)}); err != nil {
 			return err
 		}
-		return core.DispatchAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminPolicySet, deviceID, req.Msg.GetReason())
+		return core.DeviceAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminPolicySet, deviceID.String(), deviceID, req.Msg.GetReason())
 	})
 	if err != nil {
 		return nil, err
@@ -235,7 +235,7 @@ func (s *Service) RemoveLocalAdminPasswordPolicy(ctx context.Context, req *conne
 		if removed == 0 {
 			return core.ErrNotFound
 		}
-		return core.DispatchAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminPolicyRemoved, deviceID, req.Msg.GetReason())
+		return core.DeviceAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminPolicyRemoved, deviceID.String(), deviceID, req.Msg.GetReason())
 	})
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func (s *Service) RequestLocalAdminPasswordRotation(ctx context.Context, req *co
 		if err := q.SetLocalAdminPolicyDue(ctx, devicedb.SetLocalAdminPolicyDueParams{DeviceID: deviceID, RotateDueAt: core.Timestamptz(now), ClearBlock: true, UpdatedAt: core.Timestamptz(now)}); err != nil {
 			return err
 		}
-		return core.DispatchAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminRotationRequested, deviceID, req.Msg.GetReason())
+		return core.DeviceAudit(ctx, q, new(authorization.ActorID()), auditkind.LocalAdminRotationRequested, deviceID.String(), deviceID, req.Msg.GetReason())
 	})
 	if err != nil {
 		return nil, err
@@ -537,7 +537,7 @@ func (s *Service) IngestLocalAdminEscrow(ctx context.Context, q *devicedb.Querie
 	if err := q.InsertLocalAdminPassword(ctx, devicedb.InsertLocalAdminPasswordParams{ActionID: action.ID, DeviceID: action.DeviceID, GenerationID: action.GenerationID, AccountName: planned.GetAccountName(), AccountUid: int64(planned.GetAccountUid())}); err != nil {
 		return err
 	}
-	return core.DispatchSystemAudit(ctx, q, nil, auditkind.LocalAdminEscrowStore, action.ID, "proof", "verified_encrypted_local_admin_password")
+	return core.DeviceAudit(ctx, q, nil, auditkind.LocalAdminEscrowStore, action.ID.String(), action.DeviceID, "", "proof", "verified_encrypted_local_admin_password")
 }
 
 // settleLocalAdminPassword records whether the escrowed password is in effect

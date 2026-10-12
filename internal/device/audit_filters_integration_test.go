@@ -247,6 +247,33 @@ func TestAuditEventsNameTheDeviceActionCapability(t *testing.T) {
 	}
 }
 
+// A device-details change is about one device, so its row names that device
+// and the device filter finds it; resource_id alone names nothing.
+func TestDeviceMetadataAuditNamesTheDevice(t *testing.T) {
+	f := newEnrolled(t, 0)
+	setInventoryMetadata(t, f, f.deviceID, &adminv1.DeviceMetadata{Labels: []string{"audit-target"}})
+	var target *uuid.UUID
+	if err := f.conn.QueryRow(f.ctx, `SELECT target_device_id FROM audit_events WHERE action=$1 AND resource_id=$2`, auditkind.InventorySetDeviceMetadata.String(), f.deviceID).Scan(&target); err != nil {
+		t.Fatal(err)
+	}
+	if target == nil || target.String() != f.deviceID {
+		t.Fatalf("inventory.SetDeviceMetadata target_device_id = %v, want %s", target, f.deviceID)
+	}
+	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{TargetDeviceId: &f.deviceID}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range page.Msg.Events {
+		if event.GetAction() == auditkind.InventorySetDeviceMetadata.String() {
+			if event.GetTargetDeviceId() != f.deviceID {
+				t.Fatalf("device details row names device %q, want %s", event.GetTargetDeviceId(), f.deviceID)
+			}
+			return
+		}
+	}
+	t.Fatalf("device filter for %s does not list the device details change: %v", f.deviceID, page.Msg.Events)
+}
+
 func TestAuditTargetListAndPickerIncludeActualEnrollment(t *testing.T) {
 	f := newEnrolled(t, 0)
 	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{TargetDeviceId: &f.deviceID}}))

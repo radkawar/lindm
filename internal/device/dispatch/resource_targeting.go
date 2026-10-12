@@ -180,5 +180,5 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	return core.DispatchSystemAudit(ctx, q, &actor, auditkind.ResourceAssignmentAssign, id, "source", "target_preview_activation")
+	return core.DeviceAudit(ctx, q, &actor, auditkind.ResourceAssignmentAssign, id.String(), deviceID, "", "source", "target_preview_activation")
 }

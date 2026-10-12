@@ -68,8 +68,14 @@ func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, 
 		if err := apply(ctx, q, authorized); err != nil {
 			return err
 		}
-		if err := core.InsertAudit(ctx, q, &actor.ID, kind, resource, reason); err != nil {
-			return err
+		var audit error
+		if deviceID != nil {
+			audit = core.DeviceAudit(ctx, q, &actor.ID, kind, resource, *deviceID, reason)
+		} else {
+			audit = core.InsertAudit(ctx, q, &actor.ID, kind, resource, reason)
+		}
+		if audit != nil {
+			return audit
 		}
 		id := uuid.Nil
 		if deviceID != nil {

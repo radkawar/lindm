@@ -409,7 +409,7 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	} else if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: head.ID, ResourceID: resourceID, Disposition: 2}); err != nil {
 		return nil, nil, err
 	}
-	if err := secrets.StoreResourceSecrets(ctx, q, &head.ActorID, id, deliveries); err != nil {
+	if err := secrets.StoreResourceSecrets(ctx, q, &head.ActorID, id, principal.DeviceID, deliveries); err != nil {
 		return nil, nil, err
 	}
 	action, err := q.LockResourceAction(ctx, id)
@@ -425,7 +425,7 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	}
 	// The audit append holds the deployment-wide chain head until commit, so it
 	// is the transaction's last statement.
-	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, auditkind.ResourceActionMint, id, "source", "resource_assignment"); err != nil {
+	if err := core.DeviceAudit(ctx, q, &head.ActorID, auditkind.ResourceActionMint, id.String(), principal.DeviceID, "", "source", "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

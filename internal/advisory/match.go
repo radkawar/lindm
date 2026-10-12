@@ -274,7 +274,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	// The audit append takes the deployment-wide chain head lock until commit,
 	// so it is the transaction's last statement.
 	if previousErr != nil || !bytes.Equal(previous.FindingDigest, e.FindingDigest) || previous.State != e.State || previous.Reason != e.Reason {
-		if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: auditkind.AdvisoryFindingsChanged.String(), ResourceID: deviceID.String(), Context: "Device advisory evidence changed"}); err != nil {
+		if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: auditkind.AdvisoryFindingsChanged.String(), ResourceID: deviceID.String(), Context: "Device advisory evidence changed", TargetDeviceID: &deviceID}); err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
 	}
