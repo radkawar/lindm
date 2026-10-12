@@ -395,7 +395,9 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition
 	}
 	c.Manifest = in.manifest(r, spec.GetImage(), arch, primaryEdition)
-	if spec.GetLane() == "device-actions" || spec.GetImage() == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
+	// Only the device-actions lane takes -recovery-manifest; assistance and
+	// provision-* also boot encrypted installers but reject the flag.
+	if spec.GetLane() == "device-actions" {
 		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch, recoveryEdition)
 	}
 	var superseded bool

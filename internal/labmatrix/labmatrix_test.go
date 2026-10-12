@@ -163,7 +163,7 @@ func TestPlanGatesTPMCellsWhereTPMIsUnobservable(t *testing.T) {
 // guided-LUKS encrypted golden, so encrypted cells are not "no image".
 func TestDebianNetinstServesEncryptedCells(t *testing.T) {
 	debian, ubuntu := release(t, "debian-13"), release(t, "ubuntu-24.04")
-	encrypted := &labv1.MatrixCell{Name: "encrypted", Title: "Encryption", Capabilities: []string{"encryption"}, Image: labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, Lane: "encrypted"}
+	encrypted := &labv1.MatrixCell{Name: "encrypted", Title: "Encryption", Capabilities: []string{"encryption"}, Image: labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, Lane: "device-actions"}
 	lifecycle := &labv1.MatrixCell{Name: "lifecycle", Title: "Lifecycle", Capabilities: []string{"lifecycle"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: "lifecycle"}
 	in := &Inputs{
 		Manifests: []*Manifest{
@@ -293,6 +293,10 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 			}
 			if got.Manifest.Image.GetId() != want {
 				t.Fatalf("%s %s boots %s, want %s", key, tc.lane, got.Manifest.Image.GetId(), want)
+			}
+			// The provision lanes do not define -recovery-manifest.
+			if got.Recovery != nil {
+				t.Fatalf("%s %s selects recovery image %s, which its lane rejects", key, tc.lane, got.Recovery.Image.GetId())
 			}
 		}
 		for _, key := range tc.noRecipe {
