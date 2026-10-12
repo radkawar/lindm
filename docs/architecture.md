@@ -2040,7 +2040,16 @@ kind, plus display facts, generation, host sequence and collection/receipt times
 Only complete identities are selectable. Stale observations remain distinguishable
 from missing or historical identity fields. Creation and start revalidate against
 the latest published five-minute-fresh inventory and reject mismatched tuples;
-live-root crypto erase must cover the complete observed encrypted set. Native
+live-root crypto erase must cover the complete observed encrypted set. A plain
+dm-crypt mapping the agent proves keyed from the kernel RNG at every activation
+(`StorageIdentity.ephemeral_key`: sysfs dm UUID `CRYPT-PLAIN-<name>`, a single
+kernel slave equal to its observed parent, a single crypttab entry keyed from
+`/dev/urandom` or `/dev/random` in plain mode with no null cipher, and no LUKS
+magic on the backing device) is exempt from that set and named as not erased:
+its key is never stored and is gone at power-off. The proof is read by the
+capability-free root inventory helper, so it cannot read the live dm table; the
+crypttab key source is read at observation time and is assumed, not proven, to
+be the one the mapping was created with. Native
 qualification, signed approval and destructive preflight remain independent
 requirements. `controller_wide` is an explicit signed human choice, not an
 inventory assertion; namespace ID and every native identity field still match.

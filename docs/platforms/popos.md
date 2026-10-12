@@ -197,7 +197,10 @@ installation time.
   `CAP_SYS_ADMIN`, so the live `dmsetup table` is not part of the agent's proof
   (the first version used it and was refused the same way on Pop!\_OS,
   `device-actions-wipe-live-erase-01-snap11-failed.json`); the wipe lane's
-  independent oracle still reads it as root. The console's storage table and the
+  independent oracle still reads it as root. Residual assumption: crypttab is
+  read at observation time; nothing proves it is the configuration the mapping
+  was created from at boot (a root user who edited crypttab after activation, or
+  created the mapping by hand, would be believed). The console's storage table and the
   crypto-erase form name the mappings ("ephemeral random-key swap; destroyed at
   power-off"), as does the wipe lane's record. An observation from an older agent
   carries no proof, so a fresh inventory from an updated agent is required first.
