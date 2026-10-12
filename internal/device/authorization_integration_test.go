@@ -3,12 +3,13 @@
 package device
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -206,7 +207,7 @@ func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := splitExportTokens(response.Msg.GetContent()); !slices.Equal(got, want) {
+		if got := splitExportTokens(t, response.Msg.GetContent()); !slices.Equal(got, want) {
 			t.Fatalf("export format %s scope: got=%v want=%v", format, got, want)
 		}
 	}
@@ -222,7 +223,10 @@ func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 	}
 }
 
-func splitExportTokens(data []byte) []string {
+// splitExportTokens returns the exported device IDs. A CSV export must start
+// with its human header row (Device ID first); every later row is one device.
+func splitExportTokens(t *testing.T, data []byte) []string {
+	t.Helper()
 	var rows []map[string]json.RawMessage
 	if json.Unmarshal(data, &rows) == nil {
 		result := make([]string, 0, len(rows))
@@ -234,14 +238,13 @@ func splitExportTokens(data []byte) []string {
 		}
 		return result
 	}
-	// CSV IDs are the first column and cannot contain delimiters.
-	var result []string
-	for _, line := range strings.Split(string(data), "\n") {
-		id, _, _ := strings.Cut(line, ",")
-		if id == "" || id == "id" {
-			continue
-		}
-		result = append(result, id)
+	records, err := csv.NewReader(bytes.NewReader(data)).ReadAll()
+	if err != nil || len(records) == 0 || len(records[0]) == 0 || records[0][0] != "Device ID" {
+		t.Fatalf("CSV export lacks its header row: %v %q", err, records)
+	}
+	result := make([]string, 0, len(records)-1)
+	for _, record := range records[1:] {
+		result = append(result, record[0])
 	}
 	return result
 }
