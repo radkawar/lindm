@@ -27,6 +27,71 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Why revealing custody material does or does not need a second human's
+// approval. The server decides this for the caller at request time and decides
+// again on every reveal; this projection never authorizes a reveal by itself.
+type RevealApprovalRule int32
+
+const (
+	RevealApprovalRule_REVEAL_APPROVAL_RULE_UNSPECIFIED RevealApprovalRule = 0
+	// Another enabled human who may reveal the same material in the same scope
+	// can approve, so a reveal needs that independent approval.
+	RevealApprovalRule_REVEAL_APPROVAL_RULE_ANOTHER_APPROVER RevealApprovalRule = 1
+	// The caller is the only enabled human who may reveal it: no one could
+	// approve, so the caller reveals alone.
+	RevealApprovalRule_REVEAL_APPROVAL_RULE_ONLY_APPROVER RevealApprovalRule = 2
+	// escrow.reveal_approval_required: every reveal needs approval.
+	RevealApprovalRule_REVEAL_APPROVAL_RULE_SERVER_SETTING RevealApprovalRule = 3
+	// The authorization policy lists the reveal permission in
+	// approval_required_permissions.
+	RevealApprovalRule_REVEAL_APPROVAL_RULE_AUTHORIZATION_POLICY RevealApprovalRule = 4
+)
+
+// Enum value maps for RevealApprovalRule.
+var (
+	RevealApprovalRule_name = map[int32]string{
+		0: "REVEAL_APPROVAL_RULE_UNSPECIFIED",
+		1: "REVEAL_APPROVAL_RULE_ANOTHER_APPROVER",
+		2: "REVEAL_APPROVAL_RULE_ONLY_APPROVER",
+		3: "REVEAL_APPROVAL_RULE_SERVER_SETTING",
+		4: "REVEAL_APPROVAL_RULE_AUTHORIZATION_POLICY",
+	}
+	RevealApprovalRule_value = map[string]int32{
+		"REVEAL_APPROVAL_RULE_UNSPECIFIED":          0,
+		"REVEAL_APPROVAL_RULE_ANOTHER_APPROVER":     1,
+		"REVEAL_APPROVAL_RULE_ONLY_APPROVER":        2,
+		"REVEAL_APPROVAL_RULE_SERVER_SETTING":       3,
+		"REVEAL_APPROVAL_RULE_AUTHORIZATION_POLICY": 4,
+	}
+)
+
+func (x RevealApprovalRule) Enum() *RevealApprovalRule {
+	p := new(RevealApprovalRule)
+	*p = x
+	return p
+}
+
+func (x RevealApprovalRule) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RevealApprovalRule) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_secrets_proto_enumTypes[0].Descriptor()
+}
+
+func (RevealApprovalRule) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_secrets_proto_enumTypes[0]
+}
+
+func (x RevealApprovalRule) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RevealApprovalRule.Descriptor instead.
+func (RevealApprovalRule) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{0}
+}
+
 type LocalAdminPasswordState int32
 
 const (
@@ -74,11 +139,11 @@ func (x LocalAdminPasswordState) String() string {
 }
 
 func (LocalAdminPasswordState) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_secrets_proto_enumTypes[0].Descriptor()
+	return file_lindm_admin_v1_secrets_proto_enumTypes[1].Descriptor()
 }
 
 func (LocalAdminPasswordState) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_secrets_proto_enumTypes[0]
+	return &file_lindm_admin_v1_secrets_proto_enumTypes[1]
 }
 
 func (x LocalAdminPasswordState) Number() protoreflect.EnumNumber {
@@ -87,7 +152,60 @@ func (x LocalAdminPasswordState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LocalAdminPasswordState.Descriptor instead.
 func (LocalAdminPasswordState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{1}
+}
+
+type RevealApproval struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// True when a reveal without an approved request is refused.
+	Required      bool               `protobuf:"varint,1,opt,name=required,proto3" json:"required,omitempty"`
+	Rule          RevealApprovalRule `protobuf:"varint,2,opt,name=rule,proto3,enum=lindm.admin.v1.RevealApprovalRule" json:"rule,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevealApproval) Reset() {
+	*x = RevealApproval{}
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevealApproval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevealApproval) ProtoMessage() {}
+
+func (x *RevealApproval) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevealApproval.ProtoReflect.Descriptor instead.
+func (*RevealApproval) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *RevealApproval) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *RevealApproval) GetRule() RevealApprovalRule {
+	if x != nil {
+		return x.Rule
+	}
+	return RevealApprovalRule_REVEAL_APPROVAL_RULE_UNSPECIFIED
 }
 
 // Metadata only. Material, ciphertext and digests are never projected.
@@ -109,7 +227,7 @@ type SecretSummary struct {
 
 func (x *SecretSummary) Reset() {
 	*x = SecretSummary{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[0]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -121,7 +239,7 @@ func (x *SecretSummary) String() string {
 func (*SecretSummary) ProtoMessage() {}
 
 func (x *SecretSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[0]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,7 +252,7 @@ func (x *SecretSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretSummary.ProtoReflect.Descriptor instead.
 func (*SecretSummary) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{0}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SecretSummary) GetSecretId() string {
@@ -213,7 +331,7 @@ type SecretVersionSummary struct {
 
 func (x *SecretVersionSummary) Reset() {
 	*x = SecretVersionSummary{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[1]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -225,7 +343,7 @@ func (x *SecretVersionSummary) String() string {
 func (*SecretVersionSummary) ProtoMessage() {}
 
 func (x *SecretVersionSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[1]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -238,7 +356,7 @@ func (x *SecretVersionSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretVersionSummary.ProtoReflect.Descriptor instead.
 func (*SecretVersionSummary) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{1}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SecretVersionSummary) GetVersion() uint64 {
@@ -290,7 +408,7 @@ type CreateSecretRequest struct {
 
 func (x *CreateSecretRequest) Reset() {
 	*x = CreateSecretRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[2]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -302,7 +420,7 @@ func (x *CreateSecretRequest) String() string {
 func (*CreateSecretRequest) ProtoMessage() {}
 
 func (x *CreateSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[2]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -315,7 +433,7 @@ func (x *CreateSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSecretRequest.ProtoReflect.Descriptor instead.
 func (*CreateSecretRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{2}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateSecretRequest) GetRequestId() string {
@@ -362,7 +480,7 @@ type CreateSecretResponse struct {
 
 func (x *CreateSecretResponse) Reset() {
 	*x = CreateSecretResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +492,7 @@ func (x *CreateSecretResponse) String() string {
 func (*CreateSecretResponse) ProtoMessage() {}
 
 func (x *CreateSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +505,7 @@ func (x *CreateSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSecretResponse.ProtoReflect.Descriptor instead.
 func (*CreateSecretResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{3}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateSecretResponse) GetSecret() *SecretSummary {
@@ -411,7 +529,7 @@ type RotateSecretRequest struct {
 
 func (x *RotateSecretRequest) Reset() {
 	*x = RotateSecretRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -423,7 +541,7 @@ func (x *RotateSecretRequest) String() string {
 func (*RotateSecretRequest) ProtoMessage() {}
 
 func (x *RotateSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,7 +554,7 @@ func (x *RotateSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateSecretRequest.ProtoReflect.Descriptor instead.
 func (*RotateSecretRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{4}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RotateSecretRequest) GetRequestId() string {
@@ -483,7 +601,7 @@ type RotateSecretResponse struct {
 
 func (x *RotateSecretResponse) Reset() {
 	*x = RotateSecretResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -495,7 +613,7 @@ func (x *RotateSecretResponse) String() string {
 func (*RotateSecretResponse) ProtoMessage() {}
 
 func (x *RotateSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -508,7 +626,7 @@ func (x *RotateSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateSecretResponse.ProtoReflect.Descriptor instead.
 func (*RotateSecretResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{5}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RotateSecretResponse) GetSecret() *SecretSummary {
@@ -528,7 +646,7 @@ type ListSecretsRequest struct {
 
 func (x *ListSecretsRequest) Reset() {
 	*x = ListSecretsRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -540,7 +658,7 @@ func (x *ListSecretsRequest) String() string {
 func (*ListSecretsRequest) ProtoMessage() {}
 
 func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -553,7 +671,7 @@ func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSecretsRequest.ProtoReflect.Descriptor instead.
 func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{6}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListSecretsRequest) GetPageSize() uint32 {
@@ -580,7 +698,7 @@ type ListSecretsResponse struct {
 
 func (x *ListSecretsResponse) Reset() {
 	*x = ListSecretsResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +710,7 @@ func (x *ListSecretsResponse) String() string {
 func (*ListSecretsResponse) ProtoMessage() {}
 
 func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +723,7 @@ func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSecretsResponse.ProtoReflect.Descriptor instead.
 func (*ListSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{7}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListSecretsResponse) GetSecrets() []*SecretSummary {
@@ -631,7 +749,7 @@ type GetSecretRequest struct {
 
 func (x *GetSecretRequest) Reset() {
 	*x = GetSecretRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -643,7 +761,7 @@ func (x *GetSecretRequest) String() string {
 func (*GetSecretRequest) ProtoMessage() {}
 
 func (x *GetSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -656,7 +774,7 @@ func (x *GetSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSecretRequest.ProtoReflect.Descriptor instead.
 func (*GetSecretRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{8}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetSecretRequest) GetSecretId() string {
@@ -670,14 +788,16 @@ type GetSecretResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Secret *SecretSummary         `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
 	// Newest first, at most 100.
-	Versions      []*SecretVersionSummary `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Versions []*SecretVersionSummary `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
+	// Absent when the caller may not reveal secrets.
+	RevealApproval *RevealApproval `protobuf:"bytes,3,opt,name=reveal_approval,json=revealApproval,proto3" json:"reveal_approval,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetSecretResponse) Reset() {
 	*x = GetSecretResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +809,7 @@ func (x *GetSecretResponse) String() string {
 func (*GetSecretResponse) ProtoMessage() {}
 
 func (x *GetSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +822,7 @@ func (x *GetSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSecretResponse.ProtoReflect.Descriptor instead.
 func (*GetSecretResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{9}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetSecretResponse) GetSecret() *SecretSummary {
@@ -715,6 +835,13 @@ func (x *GetSecretResponse) GetSecret() *SecretSummary {
 func (x *GetSecretResponse) GetVersions() []*SecretVersionSummary {
 	if x != nil {
 		return x.Versions
+	}
+	return nil
+}
+
+func (x *GetSecretResponse) GetRevealApproval() *RevealApproval {
+	if x != nil {
+		return x.RevealApproval
 	}
 	return nil
 }
@@ -733,7 +860,7 @@ type RevealSecretRequest struct {
 
 func (x *RevealSecretRequest) Reset() {
 	*x = RevealSecretRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -745,7 +872,7 @@ func (x *RevealSecretRequest) String() string {
 func (*RevealSecretRequest) ProtoMessage() {}
 
 func (x *RevealSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -758,7 +885,7 @@ func (x *RevealSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealSecretRequest.ProtoReflect.Descriptor instead.
 func (*RevealSecretRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{10}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RevealSecretRequest) GetRequestId() string {
@@ -806,7 +933,7 @@ type RevealSecretResponse struct {
 
 func (x *RevealSecretResponse) Reset() {
 	*x = RevealSecretResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +945,7 @@ func (x *RevealSecretResponse) String() string {
 func (*RevealSecretResponse) ProtoMessage() {}
 
 func (x *RevealSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +958,7 @@ func (x *RevealSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealSecretResponse.ProtoReflect.Descriptor instead.
 func (*RevealSecretResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{11}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RevealSecretResponse) GetMaterial() *v11.SecretMaterial {
@@ -859,7 +986,7 @@ type LocalAdminPasswordPolicy struct {
 
 func (x *LocalAdminPasswordPolicy) Reset() {
 	*x = LocalAdminPasswordPolicy{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -871,7 +998,7 @@ func (x *LocalAdminPasswordPolicy) String() string {
 func (*LocalAdminPasswordPolicy) ProtoMessage() {}
 
 func (x *LocalAdminPasswordPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -884,7 +1011,7 @@ func (x *LocalAdminPasswordPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAdminPasswordPolicy.ProtoReflect.Descriptor instead.
 func (*LocalAdminPasswordPolicy) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{12}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *LocalAdminPasswordPolicy) GetAccountName() string {
@@ -920,7 +1047,7 @@ type SetLocalAdminPasswordPolicyRequest struct {
 
 func (x *SetLocalAdminPasswordPolicyRequest) Reset() {
 	*x = SetLocalAdminPasswordPolicyRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1059,7 @@ func (x *SetLocalAdminPasswordPolicyRequest) String() string {
 func (*SetLocalAdminPasswordPolicyRequest) ProtoMessage() {}
 
 func (x *SetLocalAdminPasswordPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1072,7 @@ func (x *SetLocalAdminPasswordPolicyRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use SetLocalAdminPasswordPolicyRequest.ProtoReflect.Descriptor instead.
 func (*SetLocalAdminPasswordPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{13}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SetLocalAdminPasswordPolicyRequest) GetRequestId() string {
@@ -985,7 +1112,7 @@ type SetLocalAdminPasswordPolicyResponse struct {
 
 func (x *SetLocalAdminPasswordPolicyResponse) Reset() {
 	*x = SetLocalAdminPasswordPolicyResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -997,7 +1124,7 @@ func (x *SetLocalAdminPasswordPolicyResponse) String() string {
 func (*SetLocalAdminPasswordPolicyResponse) ProtoMessage() {}
 
 func (x *SetLocalAdminPasswordPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1010,7 +1137,7 @@ func (x *SetLocalAdminPasswordPolicyResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use SetLocalAdminPasswordPolicyResponse.ProtoReflect.Descriptor instead.
 func (*SetLocalAdminPasswordPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{14}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SetLocalAdminPasswordPolicyResponse) GetStatus() *LocalAdminPasswordStatus {
@@ -1032,7 +1159,7 @@ type RemoveLocalAdminPasswordPolicyRequest struct {
 
 func (x *RemoveLocalAdminPasswordPolicyRequest) Reset() {
 	*x = RemoveLocalAdminPasswordPolicyRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1044,7 +1171,7 @@ func (x *RemoveLocalAdminPasswordPolicyRequest) String() string {
 func (*RemoveLocalAdminPasswordPolicyRequest) ProtoMessage() {}
 
 func (x *RemoveLocalAdminPasswordPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1057,7 +1184,7 @@ func (x *RemoveLocalAdminPasswordPolicyRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use RemoveLocalAdminPasswordPolicyRequest.ProtoReflect.Descriptor instead.
 func (*RemoveLocalAdminPasswordPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{15}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RemoveLocalAdminPasswordPolicyRequest) GetRequestId() string {
@@ -1089,7 +1216,7 @@ type RemoveLocalAdminPasswordPolicyResponse struct {
 
 func (x *RemoveLocalAdminPasswordPolicyResponse) Reset() {
 	*x = RemoveLocalAdminPasswordPolicyResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[16]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1101,7 +1228,7 @@ func (x *RemoveLocalAdminPasswordPolicyResponse) String() string {
 func (*RemoveLocalAdminPasswordPolicyResponse) ProtoMessage() {}
 
 func (x *RemoveLocalAdminPasswordPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[16]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1114,7 +1241,7 @@ func (x *RemoveLocalAdminPasswordPolicyResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use RemoveLocalAdminPasswordPolicyResponse.ProtoReflect.Descriptor instead.
 func (*RemoveLocalAdminPasswordPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{16}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{17}
 }
 
 type RequestLocalAdminPasswordRotationRequest struct {
@@ -1128,7 +1255,7 @@ type RequestLocalAdminPasswordRotationRequest struct {
 
 func (x *RequestLocalAdminPasswordRotationRequest) Reset() {
 	*x = RequestLocalAdminPasswordRotationRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[17]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1140,7 +1267,7 @@ func (x *RequestLocalAdminPasswordRotationRequest) String() string {
 func (*RequestLocalAdminPasswordRotationRequest) ProtoMessage() {}
 
 func (x *RequestLocalAdminPasswordRotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[17]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,7 +1280,7 @@ func (x *RequestLocalAdminPasswordRotationRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use RequestLocalAdminPasswordRotationRequest.ProtoReflect.Descriptor instead.
 func (*RequestLocalAdminPasswordRotationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{17}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RequestLocalAdminPasswordRotationRequest) GetRequestId() string {
@@ -1186,7 +1313,7 @@ type RequestLocalAdminPasswordRotationResponse struct {
 
 func (x *RequestLocalAdminPasswordRotationResponse) Reset() {
 	*x = RequestLocalAdminPasswordRotationResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[18]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1198,7 +1325,7 @@ func (x *RequestLocalAdminPasswordRotationResponse) String() string {
 func (*RequestLocalAdminPasswordRotationResponse) ProtoMessage() {}
 
 func (x *RequestLocalAdminPasswordRotationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[18]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1211,7 +1338,7 @@ func (x *RequestLocalAdminPasswordRotationResponse) ProtoReflect() protoreflect.
 
 // Deprecated: Use RequestLocalAdminPasswordRotationResponse.ProtoReflect.Descriptor instead.
 func (*RequestLocalAdminPasswordRotationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{18}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RequestLocalAdminPasswordRotationResponse) GetStatus() *LocalAdminPasswordStatus {
@@ -1236,7 +1363,7 @@ type LocalAdminPasswordEscrow struct {
 
 func (x *LocalAdminPasswordEscrow) Reset() {
 	*x = LocalAdminPasswordEscrow{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[19]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1248,7 +1375,7 @@ func (x *LocalAdminPasswordEscrow) String() string {
 func (*LocalAdminPasswordEscrow) ProtoMessage() {}
 
 func (x *LocalAdminPasswordEscrow) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[19]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1261,7 +1388,7 @@ func (x *LocalAdminPasswordEscrow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAdminPasswordEscrow.ProtoReflect.Descriptor instead.
 func (*LocalAdminPasswordEscrow) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{19}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *LocalAdminPasswordEscrow) GetActionId() string {
@@ -1333,7 +1460,7 @@ type LocalAdminPasswordStatus struct {
 
 func (x *LocalAdminPasswordStatus) Reset() {
 	*x = LocalAdminPasswordStatus{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[20]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1472,7 @@ func (x *LocalAdminPasswordStatus) String() string {
 func (*LocalAdminPasswordStatus) ProtoMessage() {}
 
 func (x *LocalAdminPasswordStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[20]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1485,7 @@ func (x *LocalAdminPasswordStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAdminPasswordStatus.ProtoReflect.Descriptor instead.
 func (*LocalAdminPasswordStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{20}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LocalAdminPasswordStatus) GetDeviceId() string {
@@ -1426,7 +1553,7 @@ type GetLocalAdminPasswordStatusRequest struct {
 
 func (x *GetLocalAdminPasswordStatusRequest) Reset() {
 	*x = GetLocalAdminPasswordStatusRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1438,7 +1565,7 @@ func (x *GetLocalAdminPasswordStatusRequest) String() string {
 func (*GetLocalAdminPasswordStatusRequest) ProtoMessage() {}
 
 func (x *GetLocalAdminPasswordStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1578,7 @@ func (x *GetLocalAdminPasswordStatusRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetLocalAdminPasswordStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetLocalAdminPasswordStatusRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{21}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetLocalAdminPasswordStatusRequest) GetDeviceId() string {
@@ -1462,15 +1589,17 @@ func (x *GetLocalAdminPasswordStatusRequest) GetDeviceId() string {
 }
 
 type GetLocalAdminPasswordStatusResponse struct {
-	state         protoimpl.MessageState    `protogen:"open.v1"`
-	Status        *LocalAdminPasswordStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState    `protogen:"open.v1"`
+	Status *LocalAdminPasswordStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	// Absent when the caller may not reveal this device's local-admin passwords.
+	RevealApproval *RevealApproval `protobuf:"bytes,2,opt,name=reveal_approval,json=revealApproval,proto3" json:"reveal_approval,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetLocalAdminPasswordStatusResponse) Reset() {
 	*x = GetLocalAdminPasswordStatusResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1611,7 @@ func (x *GetLocalAdminPasswordStatusResponse) String() string {
 func (*GetLocalAdminPasswordStatusResponse) ProtoMessage() {}
 
 func (x *GetLocalAdminPasswordStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,12 +1624,19 @@ func (x *GetLocalAdminPasswordStatusResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GetLocalAdminPasswordStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetLocalAdminPasswordStatusResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{22}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetLocalAdminPasswordStatusResponse) GetStatus() *LocalAdminPasswordStatus {
 	if x != nil {
 		return x.Status
+	}
+	return nil
+}
+
+func (x *GetLocalAdminPasswordStatusResponse) GetRevealApproval() *RevealApproval {
+	if x != nil {
+		return x.RevealApproval
 	}
 	return nil
 }
@@ -1519,7 +1655,7 @@ type RevealLocalAdminPasswordRequest struct {
 
 func (x *RevealLocalAdminPasswordRequest) Reset() {
 	*x = RevealLocalAdminPasswordRequest{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1531,7 +1667,7 @@ func (x *RevealLocalAdminPasswordRequest) String() string {
 func (*RevealLocalAdminPasswordRequest) ProtoMessage() {}
 
 func (x *RevealLocalAdminPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1544,7 +1680,7 @@ func (x *RevealLocalAdminPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealLocalAdminPasswordRequest.ProtoReflect.Descriptor instead.
 func (*RevealLocalAdminPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{23}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RevealLocalAdminPasswordRequest) GetRequestId() string {
@@ -1595,7 +1731,7 @@ type RevealLocalAdminPasswordResponse struct {
 
 func (x *RevealLocalAdminPasswordResponse) Reset() {
 	*x = RevealLocalAdminPasswordResponse{}
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[24]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1607,7 +1743,7 @@ func (x *RevealLocalAdminPasswordResponse) String() string {
 func (*RevealLocalAdminPasswordResponse) ProtoMessage() {}
 
 func (x *RevealLocalAdminPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[24]
+	mi := &file_lindm_admin_v1_secrets_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1620,7 +1756,7 @@ func (x *RevealLocalAdminPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealLocalAdminPasswordResponse.ProtoReflect.Descriptor instead.
 func (*RevealLocalAdminPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{24}
+	return file_lindm_admin_v1_secrets_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RevealLocalAdminPasswordResponse) GetPassword() []byte {
@@ -1648,7 +1784,10 @@ var File_lindm_admin_v1_secrets_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_secrets_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/admin/v1/secrets.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/secret_delivery.proto\x1a\x1elindm/resource/v1/common.proto\x1a&lindm/validation/v1/string_rules.proto\"\xae\x03\n" +
+	"\x1clindm/admin/v1/secrets.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/secret_delivery.proto\x1a\x1elindm/resource/v1/common.proto\x1a&lindm/validation/v1/string_rules.proto\"d\n" +
+	"\x0eRevealApproval\x12\x1a\n" +
+	"\brequired\x18\x01 \x01(\bR\brequired\x126\n" +
+	"\x04rule\x18\x02 \x01(\x0e2\".lindm.admin.v1.RevealApprovalRuleR\x04rule\"\xae\x03\n" +
 	"\rSecretSummary\x12\x1b\n" +
 	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12:\n" +
 	"\apurpose\x18\x02 \x01(\x0e2 .lindm.resource.v1.SecretPurposeR\apurpose\x12!\n" +
@@ -1698,10 +1837,11 @@ const file_lindm_admin_v1_secrets_proto_rawDesc = "" +
 	"\asecrets\x18\x01 \x03(\v2\x1d.lindm.admin.v1.SecretSummaryR\asecrets\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"9\n" +
 	"\x10GetSecretRequest\x12%\n" +
-	"\tsecret_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bsecretId\"\x8c\x01\n" +
+	"\tsecret_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bsecretId\"\xd5\x01\n" +
 	"\x11GetSecretResponse\x125\n" +
 	"\x06secret\x18\x01 \x01(\v2\x1d.lindm.admin.v1.SecretSummaryR\x06secret\x12@\n" +
-	"\bversions\x18\x02 \x03(\v2$.lindm.admin.v1.SecretVersionSummaryR\bversions\"\xd9\x01\n" +
+	"\bversions\x18\x02 \x03(\v2$.lindm.admin.v1.SecretVersionSummaryR\bversions\x12G\n" +
+	"\x0freveal_approval\x18\x03 \x01(\v2\x1e.lindm.admin.v1.RevealApprovalR\x0erevealApproval\"\xd9\x01\n" +
 	"\x13RevealSecretRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
@@ -1759,9 +1899,10 @@ const file_lindm_admin_v1_secrets_proto_rawDesc = "" +
 	"\aescrows\x18\a \x03(\v2(.lindm.admin.v1.LocalAdminPasswordEscrowR\aescrows\x12\"\n" +
 	"\rescrow_key_id\x18\b \x01(\tR\vescrowKeyId\"K\n" +
 	"\"GetLocalAdminPasswordStatusRequest\x12%\n" +
-	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\"g\n" +
+	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\"\xb0\x01\n" +
 	"#GetLocalAdminPasswordStatusResponse\x12@\n" +
-	"\x06status\x18\x01 \x01(\v2(.lindm.admin.v1.LocalAdminPasswordStatusR\x06status\"\xe9\x01\n" +
+	"\x06status\x18\x01 \x01(\v2(.lindm.admin.v1.LocalAdminPasswordStatusR\x06status\x12G\n" +
+	"\x0freveal_approval\x18\x02 \x01(\v2\x1e.lindm.admin.v1.RevealApprovalR\x0erevealApproval\"\xe9\x01\n" +
 	"\x1fRevealLocalAdminPasswordRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
@@ -1773,7 +1914,13 @@ const file_lindm_admin_v1_secrets_proto_rawDesc = "" +
 	" RevealLocalAdminPasswordResponse\x12\x1a\n" +
 	"\bpassword\x18\x01 \x01(\fR\bpassword\x12@\n" +
 	"\x06escrow\x18\x02 \x01(\v2(.lindm.admin.v1.LocalAdminPasswordEscrowR\x06escrow\x12B\n" +
-	"\x0frotation_due_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rrotationDueAt*\x90\x02\n" +
+	"\x0frotation_due_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rrotationDueAt*\xe5\x01\n" +
+	"\x12RevealApprovalRule\x12$\n" +
+	" REVEAL_APPROVAL_RULE_UNSPECIFIED\x10\x00\x12)\n" +
+	"%REVEAL_APPROVAL_RULE_ANOTHER_APPROVER\x10\x01\x12&\n" +
+	"\"REVEAL_APPROVAL_RULE_ONLY_APPROVER\x10\x02\x12'\n" +
+	"#REVEAL_APPROVAL_RULE_SERVER_SETTING\x10\x03\x12-\n" +
+	")REVEAL_APPROVAL_RULE_AUTHORIZATION_POLICY\x10\x04*\x90\x02\n" +
 	"\x17LocalAdminPasswordState\x12*\n" +
 	"&LOCAL_ADMIN_PASSWORD_STATE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#LOCAL_ADMIN_PASSWORD_STATE_ESCROWED\x10\x01\x12&\n" +
@@ -1794,75 +1941,80 @@ func file_lindm_admin_v1_secrets_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_secrets_proto_rawDescData
 }
 
-var file_lindm_admin_v1_secrets_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_secrets_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_lindm_admin_v1_secrets_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_lindm_admin_v1_secrets_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_lindm_admin_v1_secrets_proto_goTypes = []any{
-	(LocalAdminPasswordState)(0),                      // 0: lindm.admin.v1.LocalAdminPasswordState
-	(*SecretSummary)(nil),                             // 1: lindm.admin.v1.SecretSummary
-	(*SecretVersionSummary)(nil),                      // 2: lindm.admin.v1.SecretVersionSummary
-	(*CreateSecretRequest)(nil),                       // 3: lindm.admin.v1.CreateSecretRequest
-	(*CreateSecretResponse)(nil),                      // 4: lindm.admin.v1.CreateSecretResponse
-	(*RotateSecretRequest)(nil),                       // 5: lindm.admin.v1.RotateSecretRequest
-	(*RotateSecretResponse)(nil),                      // 6: lindm.admin.v1.RotateSecretResponse
-	(*ListSecretsRequest)(nil),                        // 7: lindm.admin.v1.ListSecretsRequest
-	(*ListSecretsResponse)(nil),                       // 8: lindm.admin.v1.ListSecretsResponse
-	(*GetSecretRequest)(nil),                          // 9: lindm.admin.v1.GetSecretRequest
-	(*GetSecretResponse)(nil),                         // 10: lindm.admin.v1.GetSecretResponse
-	(*RevealSecretRequest)(nil),                       // 11: lindm.admin.v1.RevealSecretRequest
-	(*RevealSecretResponse)(nil),                      // 12: lindm.admin.v1.RevealSecretResponse
-	(*LocalAdminPasswordPolicy)(nil),                  // 13: lindm.admin.v1.LocalAdminPasswordPolicy
-	(*SetLocalAdminPasswordPolicyRequest)(nil),        // 14: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
-	(*SetLocalAdminPasswordPolicyResponse)(nil),       // 15: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
-	(*RemoveLocalAdminPasswordPolicyRequest)(nil),     // 16: lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
-	(*RemoveLocalAdminPasswordPolicyResponse)(nil),    // 17: lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
-	(*RequestLocalAdminPasswordRotationRequest)(nil),  // 18: lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
-	(*RequestLocalAdminPasswordRotationResponse)(nil), // 19: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
-	(*LocalAdminPasswordEscrow)(nil),                  // 20: lindm.admin.v1.LocalAdminPasswordEscrow
-	(*LocalAdminPasswordStatus)(nil),                  // 21: lindm.admin.v1.LocalAdminPasswordStatus
-	(*GetLocalAdminPasswordStatusRequest)(nil),        // 22: lindm.admin.v1.GetLocalAdminPasswordStatusRequest
-	(*GetLocalAdminPasswordStatusResponse)(nil),       // 23: lindm.admin.v1.GetLocalAdminPasswordStatusResponse
-	(*RevealLocalAdminPasswordRequest)(nil),           // 24: lindm.admin.v1.RevealLocalAdminPasswordRequest
-	(*RevealLocalAdminPasswordResponse)(nil),          // 25: lindm.admin.v1.RevealLocalAdminPasswordResponse
-	(v1.SecretPurpose)(0),                             // 26: lindm.resource.v1.SecretPurpose
-	(*timestamppb.Timestamp)(nil),                     // 27: google.protobuf.Timestamp
-	(*v11.SecretMaterial)(nil),                        // 28: lindm.agent.v1.SecretMaterial
-	(*durationpb.Duration)(nil),                       // 29: google.protobuf.Duration
+	(RevealApprovalRule)(0),                           // 0: lindm.admin.v1.RevealApprovalRule
+	(LocalAdminPasswordState)(0),                      // 1: lindm.admin.v1.LocalAdminPasswordState
+	(*RevealApproval)(nil),                            // 2: lindm.admin.v1.RevealApproval
+	(*SecretSummary)(nil),                             // 3: lindm.admin.v1.SecretSummary
+	(*SecretVersionSummary)(nil),                      // 4: lindm.admin.v1.SecretVersionSummary
+	(*CreateSecretRequest)(nil),                       // 5: lindm.admin.v1.CreateSecretRequest
+	(*CreateSecretResponse)(nil),                      // 6: lindm.admin.v1.CreateSecretResponse
+	(*RotateSecretRequest)(nil),                       // 7: lindm.admin.v1.RotateSecretRequest
+	(*RotateSecretResponse)(nil),                      // 8: lindm.admin.v1.RotateSecretResponse
+	(*ListSecretsRequest)(nil),                        // 9: lindm.admin.v1.ListSecretsRequest
+	(*ListSecretsResponse)(nil),                       // 10: lindm.admin.v1.ListSecretsResponse
+	(*GetSecretRequest)(nil),                          // 11: lindm.admin.v1.GetSecretRequest
+	(*GetSecretResponse)(nil),                         // 12: lindm.admin.v1.GetSecretResponse
+	(*RevealSecretRequest)(nil),                       // 13: lindm.admin.v1.RevealSecretRequest
+	(*RevealSecretResponse)(nil),                      // 14: lindm.admin.v1.RevealSecretResponse
+	(*LocalAdminPasswordPolicy)(nil),                  // 15: lindm.admin.v1.LocalAdminPasswordPolicy
+	(*SetLocalAdminPasswordPolicyRequest)(nil),        // 16: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
+	(*SetLocalAdminPasswordPolicyResponse)(nil),       // 17: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
+	(*RemoveLocalAdminPasswordPolicyRequest)(nil),     // 18: lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
+	(*RemoveLocalAdminPasswordPolicyResponse)(nil),    // 19: lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
+	(*RequestLocalAdminPasswordRotationRequest)(nil),  // 20: lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
+	(*RequestLocalAdminPasswordRotationResponse)(nil), // 21: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
+	(*LocalAdminPasswordEscrow)(nil),                  // 22: lindm.admin.v1.LocalAdminPasswordEscrow
+	(*LocalAdminPasswordStatus)(nil),                  // 23: lindm.admin.v1.LocalAdminPasswordStatus
+	(*GetLocalAdminPasswordStatusRequest)(nil),        // 24: lindm.admin.v1.GetLocalAdminPasswordStatusRequest
+	(*GetLocalAdminPasswordStatusResponse)(nil),       // 25: lindm.admin.v1.GetLocalAdminPasswordStatusResponse
+	(*RevealLocalAdminPasswordRequest)(nil),           // 26: lindm.admin.v1.RevealLocalAdminPasswordRequest
+	(*RevealLocalAdminPasswordResponse)(nil),          // 27: lindm.admin.v1.RevealLocalAdminPasswordResponse
+	(v1.SecretPurpose)(0),                             // 28: lindm.resource.v1.SecretPurpose
+	(*timestamppb.Timestamp)(nil),                     // 29: google.protobuf.Timestamp
+	(*v11.SecretMaterial)(nil),                        // 30: lindm.agent.v1.SecretMaterial
+	(*durationpb.Duration)(nil),                       // 31: google.protobuf.Duration
 }
 var file_lindm_admin_v1_secrets_proto_depIdxs = []int32{
-	26, // 0: lindm.admin.v1.SecretSummary.purpose:type_name -> lindm.resource.v1.SecretPurpose
-	27, // 1: lindm.admin.v1.SecretSummary.created_at:type_name -> google.protobuf.Timestamp
-	27, // 2: lindm.admin.v1.SecretSummary.updated_at:type_name -> google.protobuf.Timestamp
-	27, // 3: lindm.admin.v1.SecretVersionSummary.created_at:type_name -> google.protobuf.Timestamp
-	26, // 4: lindm.admin.v1.CreateSecretRequest.purpose:type_name -> lindm.resource.v1.SecretPurpose
-	28, // 5: lindm.admin.v1.CreateSecretRequest.material:type_name -> lindm.agent.v1.SecretMaterial
-	1,  // 6: lindm.admin.v1.CreateSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
-	28, // 7: lindm.admin.v1.RotateSecretRequest.material:type_name -> lindm.agent.v1.SecretMaterial
-	1,  // 8: lindm.admin.v1.RotateSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
-	1,  // 9: lindm.admin.v1.ListSecretsResponse.secrets:type_name -> lindm.admin.v1.SecretSummary
-	1,  // 10: lindm.admin.v1.GetSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
-	2,  // 11: lindm.admin.v1.GetSecretResponse.versions:type_name -> lindm.admin.v1.SecretVersionSummary
-	28, // 12: lindm.admin.v1.RevealSecretResponse.material:type_name -> lindm.agent.v1.SecretMaterial
-	26, // 13: lindm.admin.v1.RevealSecretResponse.purpose:type_name -> lindm.resource.v1.SecretPurpose
-	29, // 14: lindm.admin.v1.LocalAdminPasswordPolicy.rotation_interval:type_name -> google.protobuf.Duration
-	29, // 15: lindm.admin.v1.LocalAdminPasswordPolicy.post_reveal_rotation_delay:type_name -> google.protobuf.Duration
-	13, // 16: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest.policy:type_name -> lindm.admin.v1.LocalAdminPasswordPolicy
-	21, // 17: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
-	21, // 18: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
-	0,  // 19: lindm.admin.v1.LocalAdminPasswordEscrow.state:type_name -> lindm.admin.v1.LocalAdminPasswordState
-	27, // 20: lindm.admin.v1.LocalAdminPasswordEscrow.escrowed_at:type_name -> google.protobuf.Timestamp
-	27, // 21: lindm.admin.v1.LocalAdminPasswordEscrow.settled_at:type_name -> google.protobuf.Timestamp
-	27, // 22: lindm.admin.v1.LocalAdminPasswordEscrow.last_revealed_at:type_name -> google.protobuf.Timestamp
-	13, // 23: lindm.admin.v1.LocalAdminPasswordStatus.policy:type_name -> lindm.admin.v1.LocalAdminPasswordPolicy
-	27, // 24: lindm.admin.v1.LocalAdminPasswordStatus.rotation_due_at:type_name -> google.protobuf.Timestamp
-	20, // 25: lindm.admin.v1.LocalAdminPasswordStatus.escrows:type_name -> lindm.admin.v1.LocalAdminPasswordEscrow
-	21, // 26: lindm.admin.v1.GetLocalAdminPasswordStatusResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
-	20, // 27: lindm.admin.v1.RevealLocalAdminPasswordResponse.escrow:type_name -> lindm.admin.v1.LocalAdminPasswordEscrow
-	27, // 28: lindm.admin.v1.RevealLocalAdminPasswordResponse.rotation_due_at:type_name -> google.protobuf.Timestamp
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	0,  // 0: lindm.admin.v1.RevealApproval.rule:type_name -> lindm.admin.v1.RevealApprovalRule
+	28, // 1: lindm.admin.v1.SecretSummary.purpose:type_name -> lindm.resource.v1.SecretPurpose
+	29, // 2: lindm.admin.v1.SecretSummary.created_at:type_name -> google.protobuf.Timestamp
+	29, // 3: lindm.admin.v1.SecretSummary.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 4: lindm.admin.v1.SecretVersionSummary.created_at:type_name -> google.protobuf.Timestamp
+	28, // 5: lindm.admin.v1.CreateSecretRequest.purpose:type_name -> lindm.resource.v1.SecretPurpose
+	30, // 6: lindm.admin.v1.CreateSecretRequest.material:type_name -> lindm.agent.v1.SecretMaterial
+	3,  // 7: lindm.admin.v1.CreateSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
+	30, // 8: lindm.admin.v1.RotateSecretRequest.material:type_name -> lindm.agent.v1.SecretMaterial
+	3,  // 9: lindm.admin.v1.RotateSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
+	3,  // 10: lindm.admin.v1.ListSecretsResponse.secrets:type_name -> lindm.admin.v1.SecretSummary
+	3,  // 11: lindm.admin.v1.GetSecretResponse.secret:type_name -> lindm.admin.v1.SecretSummary
+	4,  // 12: lindm.admin.v1.GetSecretResponse.versions:type_name -> lindm.admin.v1.SecretVersionSummary
+	2,  // 13: lindm.admin.v1.GetSecretResponse.reveal_approval:type_name -> lindm.admin.v1.RevealApproval
+	30, // 14: lindm.admin.v1.RevealSecretResponse.material:type_name -> lindm.agent.v1.SecretMaterial
+	28, // 15: lindm.admin.v1.RevealSecretResponse.purpose:type_name -> lindm.resource.v1.SecretPurpose
+	31, // 16: lindm.admin.v1.LocalAdminPasswordPolicy.rotation_interval:type_name -> google.protobuf.Duration
+	31, // 17: lindm.admin.v1.LocalAdminPasswordPolicy.post_reveal_rotation_delay:type_name -> google.protobuf.Duration
+	15, // 18: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest.policy:type_name -> lindm.admin.v1.LocalAdminPasswordPolicy
+	23, // 19: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
+	23, // 20: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
+	1,  // 21: lindm.admin.v1.LocalAdminPasswordEscrow.state:type_name -> lindm.admin.v1.LocalAdminPasswordState
+	29, // 22: lindm.admin.v1.LocalAdminPasswordEscrow.escrowed_at:type_name -> google.protobuf.Timestamp
+	29, // 23: lindm.admin.v1.LocalAdminPasswordEscrow.settled_at:type_name -> google.protobuf.Timestamp
+	29, // 24: lindm.admin.v1.LocalAdminPasswordEscrow.last_revealed_at:type_name -> google.protobuf.Timestamp
+	15, // 25: lindm.admin.v1.LocalAdminPasswordStatus.policy:type_name -> lindm.admin.v1.LocalAdminPasswordPolicy
+	29, // 26: lindm.admin.v1.LocalAdminPasswordStatus.rotation_due_at:type_name -> google.protobuf.Timestamp
+	22, // 27: lindm.admin.v1.LocalAdminPasswordStatus.escrows:type_name -> lindm.admin.v1.LocalAdminPasswordEscrow
+	23, // 28: lindm.admin.v1.GetLocalAdminPasswordStatusResponse.status:type_name -> lindm.admin.v1.LocalAdminPasswordStatus
+	2,  // 29: lindm.admin.v1.GetLocalAdminPasswordStatusResponse.reveal_approval:type_name -> lindm.admin.v1.RevealApproval
+	22, // 30: lindm.admin.v1.RevealLocalAdminPasswordResponse.escrow:type_name -> lindm.admin.v1.LocalAdminPasswordEscrow
+	29, // 31: lindm.admin.v1.RevealLocalAdminPasswordResponse.rotation_due_at:type_name -> google.protobuf.Timestamp
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_secrets_proto_init() }
@@ -1875,8 +2027,8 @@ func file_lindm_admin_v1_secrets_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_secrets_proto_rawDesc), len(file_lindm_admin_v1_secrets_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   25,
+			NumEnums:      2,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -399,6 +399,11 @@ export type EscrowConfig = Message<"lindm.config.v1.EscrowConfig"> & {
   wrappingKeyFile: string;
 
   /**
+   * Always require a second human's approval for recovery-key, local-admin
+   * password and secret reveals. When false, a reveal still needs approval
+   * whenever another enabled human could approve it; only a sole eligible
+   * admin reveals alone.
+   *
    * @generated from field: bool reveal_approval_required = 3;
    */
   revealApprovalRequired: boolean;

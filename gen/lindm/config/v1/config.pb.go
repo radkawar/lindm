@@ -655,8 +655,12 @@ type EscrowConfig struct {
 	// One protected PKCS#8 RSA private key, at least 3072 bits.
 	TransportKeyFile string `protobuf:"bytes,1,opt,name=transport_key_file,json=transportKeyFile,proto3" json:"transport_key_file,omitempty"`
 	// Exactly 32 random raw bytes. Never reuse another domain's encryption key.
-	WrappingKeyFile        string `protobuf:"bytes,2,opt,name=wrapping_key_file,json=wrappingKeyFile,proto3" json:"wrapping_key_file,omitempty"`
-	RevealApprovalRequired bool   `protobuf:"varint,3,opt,name=reveal_approval_required,json=revealApprovalRequired,proto3" json:"reveal_approval_required,omitempty"`
+	WrappingKeyFile string `protobuf:"bytes,2,opt,name=wrapping_key_file,json=wrappingKeyFile,proto3" json:"wrapping_key_file,omitempty"`
+	// Always require a second human's approval for recovery-key, local-admin
+	// password and secret reveals. When false, a reveal still needs approval
+	// whenever another enabled human could approve it; only a sole eligible
+	// admin reveals alone.
+	RevealApprovalRequired bool `protobuf:"varint,3,opt,name=reveal_approval_required,json=revealApprovalRequired,proto3" json:"reveal_approval_required,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }

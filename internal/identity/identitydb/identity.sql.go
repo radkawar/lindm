@@ -461,6 +461,76 @@ func (q *Queries) InvalidatePolicyAuthorizations(ctx context.Context) error {
 	return err
 }
 
+const listApproverCandidates = `-- name: ListApproverCandidates :many
+SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
+FROM principals
+WHERE id > $1
+  AND id <> $2
+  AND issuer = ANY($3::text[])
+  AND (issuer = $4 OR directory_enabled)
+  AND deactivated_at IS NULL
+  AND NOT service_account
+ORDER BY id
+LIMIT $5
+`
+
+type ListApproverCandidatesParams struct {
+	After       uuid.UUID
+	Requester   uuid.UUID
+	Issuers     []string
+	LocalIssuer string
+	PageSize    int32
+}
+
+// Keyset page of principals that might hold standing approval authority. It
+// only skips rows that can never approve (a directory principal's last
+// observation must have been enabled; local accounts keep their own flag); the
+// caller re-derives authority from each principal's own snapshot. Roles are not
+// filtered here: a policy change can grant a role before the next observation.
+func (q *Queries) ListApproverCandidates(ctx context.Context, arg ListApproverCandidatesParams) ([]Principal, error) {
+	rows, err := q.db.Query(ctx, listApproverCandidates,
+		arg.After,
+		arg.Requester,
+		arg.Issuers,
+		arg.LocalIssuer,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Principal{}
+	for rows.Next() {
+		var i Principal
+		if err := rows.Scan(
+			&i.ID,
+			&i.Issuer,
+			&i.Subject,
+			&i.DisplayName,
+			&i.PinnedRole,
+			&i.CreatedAt,
+			&i.DeactivatedAt,
+			&i.DeactivationSource,
+			&i.DirectoryEnabled,
+			&i.DirectoryObservedAt,
+			&i.AuthorizationVersion,
+			&i.AuthorizationRole,
+			&i.AuthorizationDigest,
+			&i.ServiceAccount,
+			&i.LifecycleNotBefore,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPrincipalGroupPaths = `-- name: ListPrincipalGroupPaths :many
 SELECT group_path
 FROM principal_groups

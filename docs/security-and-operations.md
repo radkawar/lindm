@@ -426,10 +426,8 @@ authorizing any new cleanup. An unknown outcome is not a failed transaction whos
 effects may safely be repeated.
 
 Recovery reveal requires `recovery_keys.read`, a reason and recent verified
-step-up. Set `escrow.reveal_approval_required` when a second authorized human
-must approve the exact reveal request; the device Encryption tab then marks Reveal
-as requiring approval, as it does when the authorization policy requires approval
-for `recovery_keys.read`. The returned 64 hexadecimal characters are
+step-up, and follows the reveal approval rule below. The device Encryption tab
+states the rule that applies next to Reveal. The returned 64 hexadecimal characters are
 the literal unlock passphrase, not a hex encoding to decode into binary. Reveal
 responses are no-store; the console dismisses its memory-only display and never
 caches secrets. Record the actual cold-boot unlock separately from escrow status.
@@ -453,10 +451,8 @@ sets per-device local-admin policies; `secrets.reveal` (owner, admin) reveals
 them. Secret create, rotate and reveal need an unrestricted principal because a
 secret is not device-scoped. Reveal additionally needs a reason and a local
 browser session younger than five minutes (password plus passkey); OIDC and CLI
-sessions never satisfy step-up. A second human must approve the exact reveal
-request when `escrow.reveal_approval_required` is set or when the authorization
-policy lists `secrets.reveal` in `approval_required_permissions`. Every attempt is
-audited before any plaintext leaves the server, and responses are `no-store`.
+sessions never satisfy step-up. Every attempt is audited before any plaintext
+leaves the server, and responses are `no-store`.
 
 Enter a password-hash secret as a crypt(3) string, never the password: for
 example `mkpasswd -m yescrypt` (Debian/Ubuntu `whois`) or
@@ -491,6 +487,46 @@ repository), rotation at that service. Suspected disclosure of a local-admin
 password requires `RequestLocalAdminPasswordRotation`. Devices that received a
 secret keep its native effect (for example a shadow hash) until a later
 revision or release changes it.
+
+### Reveal approval rule
+
+Recovery-key (`recovery_keys.read`), local-admin password and managed-secret
+(`secrets.reveal`) reveals need a second human's approval of the exact reveal
+request whenever another human could give it. The server decides on every
+reveal request, from current database state, never from the console's copy:
+
+1. `escrow.reveal_approval_required: true` always requires approval. It is an
+   override for deployments that want two people even when only one admin can
+   reveal; with a single eligible admin, nobody can then approve.
+2. Listing the reveal permission in the authorization policy's
+   `approval_required_permissions` always requires approval.
+3. Otherwise approval is required exactly when at least one **other eligible
+   approver** exists; a deployment with one eligible admin reveals alone.
+
+An eligible approver is a principal other than the requester that could decide
+the request: enabled and not deactivated in its last committed state (local
+account setting or last directory observation, however old), holding both the
+same reveal permission and `approvals.manage`, with each grant reaching the
+device (recovery keys and local-admin passwords) or unrestricted
+(deployment-global secrets). These never count: service accounts; local accounts that have
+not enrolled a sign-in credential; break-glass accounts, including local accounts
+designated break-glass in local-primary mode, because they hold no standing
+authority outside an audited emergency session and routine reveals must not
+depend on unsealing one; and the requester's own browser or CLI sessions, which
+are the same principal. A break-glass account whose emergency allowlist grants the
+permission and `approvals.manage` may still decide a request during an active
+emergency session.
+
+The console shows the result beside Reveal: "Needs approval: another admin can
+approve" or "You're the only admin who can reveal this, so no approval is
+needed" (or that the server setting or role policy requires approval). Approval
+decisions are still fenced at decide and reveal time: an approver disabled, demoted
+or descoped after the request is created can no longer approve, and an approval they
+gave is refused at reveal. If that leaves the requester as the only eligible admin,
+a new reveal without approval succeeds. The requester can never approve their own
+request. There is no opt-out of the default rule; a single-admin deployment needs
+none. Disabling, demoting or descoping another admin so that one can reveal alone
+is an account or directory change, audited as such.
 
 ### Declarative organization apply
 

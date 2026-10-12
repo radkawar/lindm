@@ -140,7 +140,10 @@ func (s *Service) GetDeviceEncryption(ctx context.Context, req *connect.Request[
 	if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionReadFleet, id); err != nil {
 		return nil, core.MapErr(err)
 	}
-	response := &adminv1.GetDeviceEncryptionResponse{RecoveryKeyRevealApprovalRequired: s.RevealApproval || actor.ApprovalRequired(identity.PermissionReadRecoveryKeys)}
+	response := &adminv1.GetDeviceEncryptionResponse{}
+	if response.RecoveryKeyRevealApproval, err = s.CallerRevealApproval(ctx, q, actor, identity.PermissionReadRecoveryKeys, id); err != nil {
+		return nil, err
+	}
 	if s.Escrow != nil {
 		response.EscrowKeyId = s.Escrow.KeyID()
 		response.EscrowPublicKey = s.Escrow.PublicKey()
@@ -203,8 +206,9 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 	if err != nil {
 		return nil, core.ExecutionError(err)
 	}
-	if s.RevealApproval && req.Msg.GetApprovalId() == "" {
-		return nil, core.ApprovalError(identity.ErrApprovalRequired)
+	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
+	if err := s.RequireRevealApproval(ctx, authorization.Principal(), identity.PermissionReadRecoveryKeys, deviceID, req.Msg.GetApprovalId()); err != nil {
+		return nil, err
 	}
 	consumption, err := s.PrepareActionApproval(ctx, actor, identity.PermissionReadRecoveryKeys, req.Msg.GetApprovalId(), req.Msg)
 	if err != nil {
@@ -218,7 +222,6 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 	if err := s.LockActionApproval(ctx, tx, consumption, authorization, identity.PermissionReadRecoveryKeys); err != nil {
 		return nil, core.ApprovalError(err)
 	}
-	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
 	id, _ := uuid.Parse(req.Msg.GetActionId())
 	q := devicedb.New(tx)
 	if _, err := core.LockDeviceScope(ctx, q, authorization.Principal(), identity.PermissionReadRecoveryKeys, deviceID); err != nil {

@@ -36,6 +36,7 @@ import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { LocalAdminPasswordReveal } from "./local-admin-reveal";
+import { RevealApprovalNote } from "@/components/ui/reveal-approval-note";
 import { Fact, ObservedTime } from "./observations";
 import { localAdminPasswordQueryOptions } from "./queries";
 import { validateInventory } from "./validation";
@@ -217,7 +218,10 @@ export function DeviceLocalAdminPanel({ deviceId }: { deviceId: string }) {
                 key={revealActionId}
                 deviceId={deviceId}
                 actionId={revealActionId}
+                approval={query.data?.revealApproval}
               />
+            ) : reveal && status.escrows.length ? (
+              <RevealApprovalNote approval={query.data?.revealApproval} />
             ) : null}
           </>
         ) : null}

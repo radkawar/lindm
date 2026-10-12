@@ -98,6 +98,25 @@ SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_a
 FROM principals
 WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
 
+-- name: ListApproverCandidates :many
+-- Keyset page of principals that might hold standing approval authority. It
+-- only skips rows that can never approve (a directory principal's last
+-- observation must have been enabled; local accounts keep their own flag); the
+-- caller re-derives authority from each principal's own snapshot. Roles are not
+-- filtered here: a policy change can grant a role before the next observation.
+SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
+FROM principals
+WHERE id > sqlc.arg(after)
+  AND id <> sqlc.arg(requester)
+  AND issuer = ANY(sqlc.arg(issuers)::text[])
+  AND (issuer = sqlc.arg(local_issuer) OR directory_enabled)
+  AND deactivated_at IS NULL
+  AND NOT service_account
+ORDER BY id
+LIMIT sqlc.arg(page_size);
+
 
 -- name: GetLineageByPrincipalID :one
 SELECT principal_id, broker_issuer, broker_subject, upstream_provider, upstream_subject,

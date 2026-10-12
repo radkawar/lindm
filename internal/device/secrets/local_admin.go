@@ -316,10 +316,14 @@ func (s *Service) GetLocalAdminPasswordStatus(ctx context.Context, req *connect.
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
+	approval, err := s.CallerRevealApproval(ctx, q, actor, identity.PermissionRevealSecrets, deviceID)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, core.MapErr(err)
 	}
-	return core.NoStore(&adminv1.GetLocalAdminPasswordStatusResponse{Status: status}), nil
+	return core.NoStore(&adminv1.GetLocalAdminPasswordStatusResponse{Status: status, RevealApproval: approval}), nil
 }
 
 func localAdminAuthorityRejected(err error) bool {
@@ -601,8 +605,9 @@ func (s *Service) RevealLocalAdminPassword(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, core.ExecutionError(err)
 	}
-	if s.RevealApproval && req.Msg.GetApprovalId() == "" {
-		return nil, core.ApprovalError(identity.ErrApprovalRequired)
+	deviceID, id := uuid.MustParse(req.Msg.GetDeviceId()), uuid.MustParse(req.Msg.GetActionId())
+	if err := s.RequireRevealApproval(ctx, authorization.Principal(), permission, deviceID, req.Msg.GetApprovalId()); err != nil {
+		return nil, err
 	}
 	consumption, err := s.PrepareActionApproval(ctx, actor, permission, req.Msg.GetApprovalId(), req.Msg)
 	if err != nil {
@@ -616,7 +621,6 @@ func (s *Service) RevealLocalAdminPassword(ctx context.Context, req *connect.Req
 	if err := s.LockActionApproval(ctx, tx, consumption, authorization, permission); err != nil {
 		return nil, core.ApprovalError(err)
 	}
-	deviceID, id := uuid.MustParse(req.Msg.GetDeviceId()), uuid.MustParse(req.Msg.GetActionId())
 	q := devicedb.New(tx)
 	if _, err := core.LockDeviceScope(ctx, q, authorization.Principal(), permission, deviceID); err != nil {
 		return nil, core.MapErr(err)

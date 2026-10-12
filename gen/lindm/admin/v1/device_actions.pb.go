@@ -658,11 +658,10 @@ type GetDeviceEncryptionResponse struct {
 	Escrow          *DeviceRecoveryEscrow       `protobuf:"bytes,2,opt,name=escrow,proto3" json:"escrow,omitempty"`
 	EscrowKeyId     string                      `protobuf:"bytes,3,opt,name=escrow_key_id,json=escrowKeyId,proto3" json:"escrow_key_id,omitempty"`
 	EscrowPublicKey []byte                      `protobuf:"bytes,4,opt,name=escrow_public_key,json=escrowPublicKey,proto3" json:"escrow_public_key,omitempty"`
-	// True when revealing a recovery key needs a second human's approval for this
-	// caller: escrow.reveal_approval_required or the authorization policy.
-	RecoveryKeyRevealApprovalRequired bool `protobuf:"varint,5,opt,name=recovery_key_reveal_approval_required,json=recoveryKeyRevealApprovalRequired,proto3" json:"recovery_key_reveal_approval_required,omitempty"`
-	unknownFields                     protoimpl.UnknownFields
-	sizeCache                         protoimpl.SizeCache
+	// Absent when the caller may not reveal this device's recovery keys.
+	RecoveryKeyRevealApproval *RevealApproval `protobuf:"bytes,6,opt,name=recovery_key_reveal_approval,json=recoveryKeyRevealApproval,proto3" json:"recovery_key_reveal_approval,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *GetDeviceEncryptionResponse) Reset() {
@@ -723,11 +722,11 @@ func (x *GetDeviceEncryptionResponse) GetEscrowPublicKey() []byte {
 	return nil
 }
 
-func (x *GetDeviceEncryptionResponse) GetRecoveryKeyRevealApprovalRequired() bool {
+func (x *GetDeviceEncryptionResponse) GetRecoveryKeyRevealApproval() *RevealApproval {
 	if x != nil {
-		return x.RecoveryKeyRevealApprovalRequired
+		return x.RecoveryKeyRevealApproval
 	}
-	return false
+	return nil
 }
 
 // Requires dedicated permission, recent step-up, reason and audited custody access.
@@ -1222,7 +1221,7 @@ var File_lindm_admin_v1_device_actions_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\n" +
-	"#lindm/admin/v1/device_actions.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a&lindm/validation/v1/string_rules.proto\"\x86\x04\n" +
+	"#lindm/admin/v1/device_actions.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1clindm/admin/v1/secrets.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a&lindm/validation/v1/string_rules.proto\"\x86\x04\n" +
 	"\fDeviceAction\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1275,13 +1274,13 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\tluks_uuid\x18\x02 \x01(\tR\bluksUuid\x12\x18\n" +
 	"\akeyslot\x18\x03 \x01(\rR\akeyslot\x127\n" +
 	"\tstored_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x121\n" +
-	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\xc8\x02\n" +
+	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\x84\x03\n" +
 	"\x1bGetDeviceEncryptionResponse\x12I\n" +
 	"\vobservation\x18\x01 \x01(\v2'.lindm.agent.v1.DeviceActionObservationR\vobservation\x12<\n" +
 	"\x06escrow\x18\x02 \x01(\v2$.lindm.admin.v1.DeviceRecoveryEscrowR\x06escrow\x12\"\n" +
 	"\rescrow_key_id\x18\x03 \x01(\tR\vescrowKeyId\x12*\n" +
-	"\x11escrow_public_key\x18\x04 \x01(\fR\x0fescrowPublicKey\x12P\n" +
-	"%recovery_key_reveal_approval_required\x18\x05 \x01(\bR!recoveryKeyRevealApprovalRequired\"\xe2\x01\n" +
+	"\x11escrow_public_key\x18\x04 \x01(\fR\x0fescrowPublicKey\x12_\n" +
+	"\x1crecovery_key_reveal_approval\x18\x06 \x01(\v2\x1e.lindm.admin.v1.RevealApprovalR\x19recoveryKeyRevealApprovalJ\x04\b\x05\x10\x06R%recovery_key_reveal_approval_required\"\xe2\x01\n" +
 	"\x18RevealRecoveryKeyRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
@@ -1369,10 +1368,11 @@ var file_lindm_admin_v1_device_actions_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),            // 17: google.protobuf.Timestamp
 	(*v1.DeviceActionStatus)(nil),            // 18: lindm.agent.v1.DeviceActionStatus
 	(*v1.DeviceActionObservation)(nil),       // 19: lindm.agent.v1.DeviceActionObservation
-	(*v1.StorageTarget)(nil),                 // 20: lindm.agent.v1.StorageTarget
-	(*v1.NVMeSanitizeScope)(nil),             // 21: lindm.agent.v1.NVMeSanitizeScope
-	(*v1.RecoveryReadinessObservation)(nil),  // 22: lindm.agent.v1.RecoveryReadinessObservation
-	(v1.RecoveryBootMode)(0),                 // 23: lindm.agent.v1.RecoveryBootMode
+	(*RevealApproval)(nil),                   // 20: lindm.admin.v1.RevealApproval
+	(*v1.StorageTarget)(nil),                 // 21: lindm.agent.v1.StorageTarget
+	(*v1.NVMeSanitizeScope)(nil),             // 22: lindm.agent.v1.NVMeSanitizeScope
+	(*v1.RecoveryReadinessObservation)(nil),  // 23: lindm.agent.v1.RecoveryReadinessObservation
+	(v1.RecoveryBootMode)(0),                 // 24: lindm.agent.v1.RecoveryBootMode
 }
 var file_lindm_admin_v1_device_actions_proto_depIdxs = []int32{
 	16, // 0: lindm.admin.v1.DeviceAction.spec:type_name -> lindm.agent.v1.DeviceActionSpec
@@ -1388,19 +1388,20 @@ var file_lindm_admin_v1_device_actions_proto_depIdxs = []int32{
 	17, // 10: lindm.admin.v1.DeviceRecoveryEscrow.stored_at:type_name -> google.protobuf.Timestamp
 	19, // 11: lindm.admin.v1.GetDeviceEncryptionResponse.observation:type_name -> lindm.agent.v1.DeviceActionObservation
 	8,  // 12: lindm.admin.v1.GetDeviceEncryptionResponse.escrow:type_name -> lindm.admin.v1.DeviceRecoveryEscrow
-	20, // 13: lindm.admin.v1.DeviceStorageTarget.target:type_name -> lindm.agent.v1.StorageTarget
-	21, // 14: lindm.admin.v1.DeviceStorageTarget.nvme:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	12, // 15: lindm.admin.v1.ListDeviceStorageTargetsResponse.targets:type_name -> lindm.admin.v1.DeviceStorageTarget
-	17, // 16: lindm.admin.v1.ListDeviceStorageTargetsResponse.received_at:type_name -> google.protobuf.Timestamp
-	17, // 17: lindm.admin.v1.ListDeviceStorageTargetsResponse.observed_at:type_name -> google.protobuf.Timestamp
-	15, // 18: lindm.admin.v1.ListDeviceStorageTargetsResponse.recovery_readiness:type_name -> lindm.admin.v1.RecoveryReadiness
-	22, // 19: lindm.admin.v1.RecoveryReadiness.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	23, // 20: lindm.admin.v1.RecoveryReadiness.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	20, // 13: lindm.admin.v1.GetDeviceEncryptionResponse.recovery_key_reveal_approval:type_name -> lindm.admin.v1.RevealApproval
+	21, // 14: lindm.admin.v1.DeviceStorageTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	22, // 15: lindm.admin.v1.DeviceStorageTarget.nvme:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	12, // 16: lindm.admin.v1.ListDeviceStorageTargetsResponse.targets:type_name -> lindm.admin.v1.DeviceStorageTarget
+	17, // 17: lindm.admin.v1.ListDeviceStorageTargetsResponse.received_at:type_name -> google.protobuf.Timestamp
+	17, // 18: lindm.admin.v1.ListDeviceStorageTargetsResponse.observed_at:type_name -> google.protobuf.Timestamp
+	15, // 19: lindm.admin.v1.ListDeviceStorageTargetsResponse.recovery_readiness:type_name -> lindm.admin.v1.RecoveryReadiness
+	23, // 20: lindm.admin.v1.RecoveryReadiness.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
+	24, // 21: lindm.admin.v1.RecoveryReadiness.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_device_actions_proto_init() }
@@ -1408,6 +1409,7 @@ func file_lindm_admin_v1_device_actions_proto_init() {
 	if File_lindm_admin_v1_device_actions_proto != nil {
 		return
 	}
+	file_lindm_admin_v1_secrets_proto_init()
 	file_lindm_admin_v1_device_actions_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

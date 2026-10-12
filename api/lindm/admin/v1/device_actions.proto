@@ -4,6 +4,7 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/secrets.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/recovery_readiness.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -92,9 +93,10 @@ message GetDeviceEncryptionResponse {
   DeviceRecoveryEscrow escrow = 2;
   string escrow_key_id = 3;
   bytes escrow_public_key = 4;
-  // True when revealing a recovery key needs a second human's approval for this
-  // caller: escrow.reveal_approval_required or the authorization policy.
-  bool recovery_key_reveal_approval_required = 5;
+  reserved 5;
+  reserved "recovery_key_reveal_approval_required";
+  // Absent when the caller may not reveal this device's recovery keys.
+  RevealApproval recovery_key_reveal_approval = 6;
 }
 // Requires dedicated permission, recent step-up, reason and audited custody access.
 // Return bytes must remain memory-only, outside query caches, URLs and logs.

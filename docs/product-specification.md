@@ -118,6 +118,12 @@ derivative never inherits its base's evidence.
   Activation Lock, boot prevention, or resistance to a hostile root user.
 - **Wipe** means a named sanitization workflow and its evidence, not "device stopped
   checking in." A lost acknowledgment is an unknown outcome.
+- **Reveal approval** means revealing a recovery key, local-admin password or
+  managed secret needs an independent second human whenever another enabled human
+  admin could approve that exact reveal. The server decides at request time and
+  the console states which rule applied. A deployment with a single eligible admin
+  reveals alone; a server setting can require approval always. The requester never
+  approves their own reveal.
 
 ## 2. Users and critical journeys
 

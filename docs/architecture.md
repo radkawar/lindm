@@ -1041,7 +1041,9 @@ remove an independent owner slot. Escrow durability is not proof of cold-boot
 unlock, and neither fact alone establishes sanitization.
 
 Reveal is a separate permissioned, reason-bearing, audited, recent-step-up
-operation; deployment policy can additionally require two-person approval. Secrets
+operation. It needs an independent second approver whenever another enabled human
+could approve it, and always when deployment policy says so (see the
+[reveal approval rule](security-and-operations.md#reveal-approval-rule)). Secrets
 never appear in inventory, ordinary action listings, exports or query caches.
 The console keeps reveal material only in short-lived component memory. Missing
 custody configuration disables escrow instead of storing unencrypted recovery data.
@@ -1290,15 +1292,15 @@ after the server has durably stored it.
 
 Threats and required controls:
 
-| Threat                                   | Control                                                                                                                                                        | Residual limit                                                                             |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Database or backup theft                 | Per-version AES-256-GCM data key wrapped by the escrow KEK, record-bound AAD, no plaintext digest of low-entropy material, sealed deliveries need a device key | A live server holding the KEK can decrypt everything                                       |
-| Unprivileged agent/network compromise    | Only HPKE ciphertext crosses the spool-free relay; the X25519 private key stays in protected executor state                                                    | Root executor or kernel compromise reads delivered material                                |
-| Malicious enrolled device                | Seal per device generation key; AAD binds deployment, device, generation, action, resource and secret version; no secret-fetch RPC exists                      | A device legitimately assigned a secret can disclose it; rotate after suspected disclosure |
-| Replay or rebinding of a sealed secret   | Executor recomputes the binding from the signed intent and its own identity, checks the signed ciphertext digest and refuses any mismatch before use           | Exact replay of the same action is idempotent, never a second authority                    |
-| Profile editor exfiltrating a secret     | Minting requires the assigning actor to hold fresh `secrets.manage` for the device, purpose must match the referencing field, subject binding must match       | A holder of `secrets.manage` plus device root can read what they deliver                   |
-| Phished administrator revealing material | `secrets.reveal`, reason, recent step-up, optional exact two-person approval, audit committed before release, LAPS rotation after reveal                       | Colluding authorized administrators                                                        |
-| Logs, journal, errors and caches         | Typed redacted carriers; plaintext never journaled, logged, returned in errors, spooled, put in argv/env or cached by the console                              | Swap/core dumps on an unhardened host (executor unit disables both)                        |
+| Threat                                   | Control                                                                                                                                                              | Residual limit                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Database or backup theft                 | Per-version AES-256-GCM data key wrapped by the escrow KEK, record-bound AAD, no plaintext digest of low-entropy material, sealed deliveries need a device key       | A live server holding the KEK can decrypt everything                                       |
+| Unprivileged agent/network compromise    | Only HPKE ciphertext crosses the spool-free relay; the X25519 private key stays in protected executor state                                                          | Root executor or kernel compromise reads delivered material                                |
+| Malicious enrolled device                | Seal per device generation key; AAD binds deployment, device, generation, action, resource and secret version; no secret-fetch RPC exists                            | A device legitimately assigned a secret can disclose it; rotate after suspected disclosure |
+| Replay or rebinding of a sealed secret   | Executor recomputes the binding from the signed intent and its own identity, checks the signed ciphertext digest and refuses any mismatch before use                 | Exact replay of the same action is idempotent, never a second authority                    |
+| Profile editor exfiltrating a secret     | Minting requires the assigning actor to hold fresh `secrets.manage` for the device, purpose must match the referencing field, subject binding must match             | A holder of `secrets.manage` plus device root can read what they deliver                   |
+| Phished administrator revealing material | `secrets.reveal`, reason, recent step-up, exact two-person approval whenever another admin could approve, audit committed before release, LAPS rotation after reveal | Colluding authorized administrators; a deployment with one eligible admin                  |
+| Logs, journal, errors and caches         | Typed redacted carriers; plaintext never journaled, logged, returned in errors, spooled, put in argv/env or cached by the console                                    | Swap/core dumps on an unhardened host (executor unit disables both)                        |
 
 Key hierarchy:
 
@@ -1340,8 +1342,9 @@ purpose: a crypt(3) yescrypt, SHA-512 or bcrypt hash for `PASSWORD_HASH`, a
 WPA-PSK for `WIFI_PSK`, bounded bytes otherwise. Secrets are deployment-global, so
 create, rotate and reveal require an unrestricted principal. Listing returns
 metadata only. Reveal requires `secrets.reveal`, a reason, recent step-up, and an
-exact approval when `escrow.reveal_approval_required` or the authorization
-policy requires `secrets.reveal` approval; the audit row commits before
+exact approval under the request-time reveal approval rule (another eligible
+approver exists, `escrow.reveal_approval_required`, or the authorization policy
+requires `secrets.reveal` approval); the audit row commits before
 decryption, every attempt is audited and the response is `no-store`.
 Profiles pin explicit versions: rotation never silently re-delivers; a new
 profile revision referencing the new version is the delivery decision.
@@ -1395,7 +1398,7 @@ An interrupted set, or an executor restart before the receipt, is
 `OUTCOME_UNKNOWN` and the row `UNKNOWN`; it stays revealable as a candidate and
 is never reminted automatically. `RequestLocalAdminPasswordRotation` closes such
 an unknown action and mints a new one. Reveal (`secrets.reveal`, device scope,
-reason, step-up, optional approval) schedules a rotation after the configured
+reason, step-up, approval under the reveal approval rule) schedules a rotation after the configured
 delay. Policy changes themselves have no approval kind.
 
 Rotation summary: secret material rotates by version and profile revision;

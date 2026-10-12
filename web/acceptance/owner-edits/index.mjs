@@ -10,6 +10,7 @@ import * as deviceOverview from "./device-overview.mjs";
 import * as deviceEncryption from "./device-encryption.mjs";
 import * as deviceActions from "./device-actions.mjs";
 import * as assistanceRecord from "./assistance-record.mjs";
+import * as revealApproval from "./pass2-reveal-approval.mjs";
 import * as advisories from "./advisories.mjs";
 import * as enrollment from "./enrollment.mjs";
 import * as rollouts from "./rollouts.mjs";
@@ -33,6 +34,7 @@ export const ownerEdits = [
   deviceEncryption,
   deviceActions,
   assistanceRecord,
+  revealApproval,
   advisories,
   enrollment,
   pass2Bug5,

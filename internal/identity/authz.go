@@ -86,13 +86,20 @@ func decideAccess(now time.Time, configuredIssuer string, policy *authorizationP
 			AuditReason:    reasonDisabled,
 		}
 	}
+	return accessDecision{Kind: accessOK, Role: snapshotRole(policy, snap)}
+}
+
+// snapshotRole is the role an admitted snapshot's grants resolve to: a local
+// account's assigned role when the policy defines it, otherwise the directory
+// pin or group bindings. It does not admit the snapshot.
+func snapshotRole(policy *authorizationPolicy, snap directorySnapshot) string {
 	if snap.Local {
 		if policy.role(snap.AuthorizationRole) == nil {
-			return accessDecision{Kind: accessOK}
+			return ""
 		}
-		return accessDecision{Kind: accessOK, Role: snap.AuthorizationRole}
+		return snap.AuthorizationRole
 	}
-	return accessDecision{Kind: accessOK, Role: effectiveRole(snap.PinnedRole, snap.Groups, policy)}
+	return effectiveRole(snap.PinnedRole, snap.Groups, policy)
 }
 
 func fresh(now time.Time, snap directorySnapshot) bool {

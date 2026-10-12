@@ -53,8 +53,9 @@ func (f *AuthorityFixture) configureConsoleIntegrations(cfg *configv1.ServerConf
 }
 
 // Fresh per-fixture escrow transport and wrapping keys make managed secrets
-// and local-admin custody usable in the console. Reveal approval starts off so
-// the single console owner can reveal; RequireConsoleRevealApproval enables it.
+// and local-admin custody usable in the console. The always-require setting
+// starts off, so reveals follow the default rule: approval whenever another
+// enrolled admin could approve. RequireConsoleRevealApproval forces it on.
 func (f *AuthorityFixture) configureConsoleEscrow(cfg *configv1.ServerConfig) error {
 	transport, err := rsa.GenerateKey(rand.Reader, 3072)
 	if err != nil {
@@ -85,8 +86,9 @@ func (f *AuthorityFixture) configureConsoleEscrow(cfg *configv1.ServerConfig) er
 	return nil
 }
 
-// RequireConsoleRevealApproval restarts the console server with two-person
-// reveal required, preserving its database, accounts and escrow keys.
+// RequireConsoleRevealApproval restarts the console server with
+// escrow.reveal_approval_required set, preserving its database, accounts and
+// escrow keys.
 func (f *AuthorityFixture) RequireConsoleRevealApproval(ctx context.Context) error {
 	if f.connected != nil {
 		return errors.New("reveal approval configuration requires controller-owned authority fixture")

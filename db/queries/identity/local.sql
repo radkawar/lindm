@@ -12,6 +12,11 @@ SELECT id, username, role, enabled, break_glass, scope_binding,
   EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id) AS enrolled
 FROM local_accounts a ORDER BY username LIMIT 1000;
 
+-- name: GetLocalApproverAccount :one
+SELECT break_glass,
+  EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id) AS enrolled
+FROM local_accounts a WHERE id = sqlc.arg(id);
+
 -- name: InsertLocalAccount :exec
 INSERT INTO local_accounts (id, username, role, break_glass, scope_binding)
 VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(role), sqlc.arg(break_glass), sqlc.arg(scope_binding));

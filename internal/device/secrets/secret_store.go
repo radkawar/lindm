@@ -307,7 +307,8 @@ func (s *Service) ListSecrets(ctx context.Context, req *connect.Request[adminv1.
 func (s *Service) GetSecret(ctx context.Context, req *connect.Request[adminv1.GetSecretRequest]) (*connect.Response[adminv1.GetSecretResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	if _, err := s.Require(ctx, identity.PermissionManageSecrets); err != nil {
+	actor, err := s.Require(ctx, identity.PermissionManageSecrets)
+	if err != nil {
 		return nil, err
 	}
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
@@ -340,6 +341,9 @@ func (s *Service) GetSecret(ctx context.Context, req *connect.Request[adminv1.Ge
 		}
 		response.Versions = append(response.Versions, &adminv1.SecretVersionSummary{Version: uint64(row.Version), CreatedAt: timestamppb.New(created), CreatedBy: row.CreatedBy.String(), CreatedByDisplayName: row.CreatorDisplayName, Reason: row.Reason})
 	}
+	if response.RevealApproval, err = s.CallerRevealApproval(ctx, q, actor, identity.PermissionRevealSecrets, uuid.Nil); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -370,8 +374,8 @@ func (s *Service) RevealSecret(ctx context.Context, req *connect.Request[adminv1
 	if err != nil {
 		return nil, core.ExecutionError(err)
 	}
-	if s.RevealApproval && req.Msg.GetApprovalId() == "" {
-		return nil, core.ApprovalError(identity.ErrApprovalRequired)
+	if err := s.RequireRevealApproval(ctx, authorization.Principal(), identity.PermissionRevealSecrets, uuid.Nil, req.Msg.GetApprovalId()); err != nil {
+		return nil, err
 	}
 	consumption, err := s.PrepareActionApproval(ctx, actor, identity.PermissionRevealSecrets, req.Msg.GetApprovalId(), req.Msg)
 	if err != nil {

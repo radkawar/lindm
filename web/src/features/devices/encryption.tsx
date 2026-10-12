@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { DeviceActionObservation } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import type { DeviceRecoveryEscrow } from "../../../gen/lindm/admin/v1/device_actions_pb";
+import { RevealApprovalNote } from "@/components/ui/reveal-approval-note";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -197,11 +198,7 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
             ) : primary ? (
               <Button onClick={primary.open}>{primary.label}</Button>
             ) : null}
-            {canReveal && data.recoveryKeyRevealApprovalRequired ? (
-              <p className="text-sm text-muted-foreground">
-                Requires approval from another administrator.
-              </p>
-            ) : null}
+            {canReveal ? <RevealApprovalNote approval={data.recoveryKeyRevealApproval} /> : null}
             {menu.length ? (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="outline" />}>

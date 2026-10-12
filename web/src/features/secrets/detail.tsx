@@ -231,6 +231,7 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                   secretId={secret.secretId}
                   secretName={secret.displayName}
                   version={version}
+                  approval={detail.data?.revealApproval}
                 />
               </CardContent>
             </Card>

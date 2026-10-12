@@ -183,6 +183,24 @@ func (q *Queries) GetLocalAccountByUsername(ctx context.Context, username string
 	return i, err
 }
 
+const getLocalApproverAccount = `-- name: GetLocalApproverAccount :one
+SELECT break_glass,
+  EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id) AS enrolled
+FROM local_accounts a WHERE id = $1
+`
+
+type GetLocalApproverAccountRow struct {
+	BreakGlass bool
+	Enrolled   bool
+}
+
+func (q *Queries) GetLocalApproverAccount(ctx context.Context, id uuid.UUID) (GetLocalApproverAccountRow, error) {
+	row := q.db.QueryRow(ctx, getLocalApproverAccount, id)
+	var i GetLocalApproverAccountRow
+	err := row.Scan(&i.BreakGlass, &i.Enrolled)
+	return i, err
+}
+
 const hasEnrolledBreakGlassOwner = `-- name: HasEnrolledBreakGlassOwner :one
 SELECT EXISTS (
   SELECT 1 FROM local_accounts a

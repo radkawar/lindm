@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
 import {
   RevealSecretRequestSchema,
+  type RevealApproval,
   type RevealSecretRequest,
 } from "../../../gen/lindm/admin/v1/secrets_pb";
+import { RevealApprovalNote, revealApprovalRequired } from "@/components/ui/reveal-approval-note";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
@@ -32,11 +34,14 @@ export function SecretReveal({
   secretId,
   secretName,
   version,
+  approval,
 }: {
   secretId: string;
   secretName: string;
   version: bigint;
+  approval: RevealApproval | undefined;
 }) {
+  const approvalRequired = revealApprovalRequired(approval);
   const confirmationName = secretName.trim() || secretId;
   const lifetime = useAuthLifetime();
   const [reason, setReason] = useState("");
@@ -222,6 +227,7 @@ export function SecretReveal({
   }
 
   const shown = secret ? revealedText(secret) : null;
+  const awaitingApproval = approvalRequired === true && approvalState !== ApprovalState.APPROVED;
   return (
     <div className="grid gap-3 rounded-md border p-3">
       <p className="text-sm text-muted-foreground">
@@ -253,6 +259,7 @@ export function SecretReveal({
         autoComplete="off"
       />
       <p className="text-sm text-muted-foreground">Reveals version {version.toString()}.</p>
+      <RevealApprovalNote approval={approval} />
       {approvalState !== null ? (
         <p>
           Approval: {approvalStateLabels[approvalState] ?? "Unknown"}.{" "}
@@ -269,19 +276,21 @@ export function SecretReveal({
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="outline"
-          disabled={busy || secret !== null || ambiguous === "approval"}
+          variant={approvalRequired === null || awaitingApproval ? "outline" : "default"}
+          disabled={busy || secret !== null || ambiguous === "approval" || awaitingApproval}
           onClick={() => void reveal()}
         >
           {busy ? "Requesting…" : ambiguous === "reveal" ? "Try again" : "Reveal secret"}
         </Button>
-        <Button
-          variant="outline"
-          disabled={busy || secret !== null || ambiguous === "reveal"}
-          onClick={() => void requestApproval()}
-        >
-          {approvalState === null ? "Request approval" : "Check approval"}
-        </Button>
+        {approvalRequired === false ? null : (
+          <Button
+            variant={awaitingApproval ? "default" : "outline"}
+            disabled={busy || secret !== null || ambiguous === "reveal"}
+            onClick={() => void requestApproval()}
+          >
+            {approvalState === null ? "Request approval" : "Check approval"}
+          </Button>
+        )}
         {request.current && ambiguous === null ? (
           <Button
             variant="outline"

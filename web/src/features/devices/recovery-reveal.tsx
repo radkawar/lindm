@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import {
   type RevealRecoveryKeyRequest,
 } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
+import { RevealApprovalNote, revealApprovalRequired } from "@/components/ui/reveal-approval-note";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors"
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { validateInventory } from "./validation";
+import { deviceEncryptionQueryOptions } from "./action-queries";
 
 export function RecoveryKeyReveal({
   deviceId,
@@ -31,6 +34,10 @@ export function RecoveryKeyReveal({
 }) {
   const confirmationName = deviceName.trim() || deviceId;
   const lifetime = useAuthLifetime();
+  // The server re-decides on every reveal; this only routes the operator.
+  const approval = useQuery(deviceEncryptionQueryOptions(lifetime, deviceId)).data
+    ?.recoveryKeyRevealApproval;
+  const approvalRequired = revealApprovalRequired(approval);
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [approvalId, setApprovalId] = useState("");
@@ -216,6 +223,7 @@ export function RecoveryKeyReveal({
     }
   }
 
+  const awaitingApproval = approvalRequired === true && approvalState !== ApprovalState.APPROVED;
   return (
     <div className="grid gap-3 rounded-md border p-3">
       {secret ? (
@@ -255,6 +263,7 @@ export function RecoveryKeyReveal({
           { label: "Approval ID", value: approvalId },
         ]}
       />
+      <RevealApprovalNote approval={approval} />
       {approvalState !== null ? (
         <p>
           Approval: {ApprovalState[approvalState]?.toLowerCase()}.{" "}
@@ -271,19 +280,21 @@ export function RecoveryKeyReveal({
       ) : null}
       <div className="flex gap-2">
         <Button
-          variant="outline"
-          disabled={busy || secret !== null || ambiguous === "approval"}
+          variant={approvalRequired === null || awaitingApproval ? "outline" : "default"}
+          disabled={busy || secret !== null || ambiguous === "approval" || awaitingApproval}
           onClick={() => void reveal()}
         >
           {busy ? "Requesting…" : ambiguous === "reveal" ? "Retry" : "Reveal recovery key"}
         </Button>
-        <Button
-          variant="outline"
-          disabled={busy || secret !== null || ambiguous === "reveal"}
-          onClick={() => void requestApproval()}
-        >
-          {approvalState === null ? "Request approval" : "Refresh approval status"}
-        </Button>
+        {approvalRequired === false ? null : (
+          <Button
+            variant={awaitingApproval ? "default" : "outline"}
+            disabled={busy || secret !== null || ambiguous === "reveal"}
+            onClick={() => void requestApproval()}
+          >
+            {approvalState === null ? "Request approval" : "Refresh approval status"}
+          </Button>
+        )}
         {request.current && ambiguous === null ? (
           <Button
             variant="outline"

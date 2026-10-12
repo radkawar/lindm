@@ -181,6 +181,10 @@ message EscrowConfig {
   string transport_key_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   // Exactly 32 random raw bytes. Never reuse another domain's encryption key.
   string wrapping_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Always require a second human's approval for recovery-key, local-admin
+  // password and secret reveals. When false, a reveal still needs approval
+  // whenever another enabled human could approve it; only a sole eligible
+  // admin reveals alone.
   bool reveal_approval_required = 3;
   option (buf.validate.message).cel = {
     id: "escrow.distinct_files"

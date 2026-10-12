@@ -267,7 +267,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	for _, required := range []bool{false, true} {
 		f.svc.RevealApproval = required
 		state, err := f.svc.GetDeviceEncryption(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: f.deviceID}))
-		if err != nil || state.Msg.GetRecoveryKeyRevealApprovalRequired() != required {
+		if err != nil || state.Msg.GetRecoveryKeyRevealApproval().GetRequired() != required {
 			t.Fatalf("reveal approval requirement %v not reported: %v", required, err)
 		}
 	}
