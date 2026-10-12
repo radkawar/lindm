@@ -1,14 +1,22 @@
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { Destinations } from "./destinations";
 import { Deliveries } from "./deliveries";
 import { Reports } from "./reports";
 
 export function IntegrationsView() {
+  const lifetime = useAuthLifetime();
+  const client = useQueryClient();
+  const queryKey = ["integrations", lifetime.generation];
+  const fetching = useIsFetching({ queryKey }) > 0;
   return (
     <div className="grid min-w-0 gap-8">
       <PageHeader
         title="Integrations and reports"
         description="Send events to other systems, retry failed deliveries and download reports."
+        onRefresh={() => void client.invalidateQueries({ queryKey })}
+        refreshing={fetching}
       />
       <Destinations />
       <Deliveries />

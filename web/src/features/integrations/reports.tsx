@@ -7,17 +7,33 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { adminClient, clearCsrfToken } from "@/lib/rpc";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
-import { formatTimestamp } from "@/lib/time";
 import { formatBytes } from "@/lib/bytes";
 import {
   ReportFormat,
@@ -27,7 +43,7 @@ import {
   type ReportArtifact,
   type ReportSchedule,
 } from "../../../gen/lindm/integrations/v1/reports_pb";
-import { useIntegrationAction } from "./action";
+import { useIntegrationAction, type IntegrationAction } from "./action";
 import { reportArtifactsQueryOptions, reportSchedulesQueryOptions } from "./queries";
 
 const KINDS: Record<ReportKind, string> = {
@@ -44,11 +60,37 @@ const FORMATS: Record<ReportFormat, string> = {
   [ReportFormat.JSON]: "json",
   [ReportFormat.JSONL]: "jsonl",
 };
+const FORMAT_LABELS: Record<ReportFormat, string> = {
+  [ReportFormat.UNSPECIFIED]: "Unknown",
+  [ReportFormat.CSV]: "CSV",
+  [ReportFormat.JSON]: "JSON",
+  [ReportFormat.JSONL]: "JSON Lines",
+};
+
+const HOUR = 3600;
+const DAY = 24 * HOUR;
+// ReportSchedule.interval_seconds allows 300 to 31536000.
+const INTERVALS = [HOUR, 6 * HOUR, 12 * HOUR, DAY, 7 * DAY, 30 * DAY];
+
+function intervalLabel(seconds: number): string {
+  if (seconds % DAY === 0) {
+    const days = seconds / DAY;
+    return days === 1 ? "Daily" : days === 7 ? "Weekly" : `Every ${days} days`;
+  }
+  if (seconds % HOUR === 0) {
+    const hours = seconds / HOUR;
+    return hours === 1 ? "Hourly" : `Every ${hours} hours`;
+  }
+  const minutes = Math.round(seconds / 60);
+  return `Every ${minutes} minutes`;
+}
 
 export function Reports() {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const [page, setPage] = useState("");
+  const [adding, setAdding] = useState(false);
+  const addAction = useIntegrationAction();
   const list = useQuery(reportSchedulesQueryOptions(lifetime, page));
   return (
     <section
@@ -57,54 +99,95 @@ export function Reports() {
       aria-busy={list.isFetching}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">Scheduled reports</h2>
-        <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-          Refresh
-        </Button>
+        <div className="grid gap-1">
+          <h2 className="text-base font-semibold">Scheduled reports</h2>
+          <p className="text-sm text-muted-foreground">
+            Reports are built on a schedule and kept for their retention period.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setAdding(true)}>
+            {addAction.blocked ? "Review pending schedule" : "Add schedule"}
+          </Button>
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Build CSV or JSON reports on a schedule. Each report is kept for its retention period.
-      </p>
-      <ScheduleEditor />
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add report schedule</DialogTitle>
+            <DialogDescription>
+              When enabled, the first report is built shortly after you create the schedule.
+            </DialogDescription>
+          </DialogHeader>
+          <ScheduleForm action={addAction} onDone={() => setAdding(false)} />
+        </DialogContent>
+      </Dialog>
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading schedules…</span>
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-16 w-full" />
         </div>
       ) : null}
       {list.data?.schedules.length === 0 ? (
         <EmptyState
-          title="No scheduled reports yet"
-          description="Add a schedule to build reports automatically."
+          title={page ? "No more schedules" : "No scheduled reports yet"}
+          description={
+            page
+              ? "Return to the first page."
+              : "No reports are built automatically. Add a schedule for inventory, compliance or advisory findings."
+          }
+          action={
+            page ? (
+              <Button variant="outline" onClick={() => setPage("")}>
+                First page
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setAdding(true)}>
+                Add schedule
+              </Button>
+            )
+          }
         />
       ) : null}
-      {list.data?.schedules.map((schedule) => (
-        <ScheduleEditor key={`${schedule.id}:${schedule.revision}`} existing={schedule} />
-      ))}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!page} onClick={() => setPage("")}>
-          First page
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextAfterId}
-          onClick={() => setPage(list.data?.nextAfterId ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
-      <div className="grid gap-2 border bg-card p-4">
-        <h3 className="font-semibold">Export audit evidence</h3>
+      {list.data && list.data.schedules.length > 0 ? (
+        <Table aria-label="Report schedules">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Report</TableHead>
+              <TableHead>Runs</TableHead>
+              <TableHead>Kept for</TableHead>
+              <TableHead>Next run</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.data.schedules.map((schedule) => (
+              <ScheduleRow key={`${schedule.id}:${schedule.revision}`} schedule={schedule} />
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+      <ListPagination
+        label="Schedule pages"
+        previousLabel="First page"
+        onPrevious={page ? () => setPage("") : undefined}
+        onNext={list.data?.nextAfterId ? () => setPage(list.data?.nextAfterId ?? "") : undefined}
+        busy={list.isFetching}
+      />
+      <div className="grid gap-1 border-y py-3">
+        <h3 className="text-sm font-semibold">Export audit evidence</h3>
         {canPermission(principal, "audit.read", true) ? (
-          <>
-            <p className="text-sm text-muted-foreground">
-              Choose an action, actor, device and time range in the audit log.
-            </p>
-            <Link to="/audit" className="w-fit underline underline-offset-4">
-              Choose audit evidence
-            </Link>
-          </>
+          <p className="text-sm text-muted-foreground">
+            Filter the{" "}
+            <Link to="/audit" className="text-foreground underline underline-offset-4">
+              audit log
+            </Link>{" "}
+            by kind of action, actor, device and time range, then export the matching events.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">
             Choosing audit evidence also requires unrestricted audit access. Ask an owner to review
@@ -117,17 +200,69 @@ export function Reports() {
   );
 }
 
-function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
-  const lifetime = useAuthLifetime();
+function ScheduleRow({ schedule }: { schedule: ReportSchedule }) {
   const action = useIntegrationAction();
+  const [open, setOpen] = useState(false);
+  const name = schedule.name.trim() || "Unnamed schedule";
+  return (
+    <TableRow className="align-top">
+      <TableCell className="min-w-40 whitespace-normal break-words font-medium">{name}</TableCell>
+      <TableCell>
+        {KINDS[schedule.kind]} · {FORMAT_LABELS[schedule.format]}
+      </TableCell>
+      <TableCell>
+        {schedule.enabled ? (
+          intervalLabel(schedule.intervalSeconds)
+        ) : (
+          <StatusBadge status="neutral">Paused</StatusBadge>
+        )}
+      </TableCell>
+      <TableCell className="tabular-nums">
+        {schedule.retentionDays === 1 ? "1 day" : `${schedule.retentionDays} days`}
+      </TableCell>
+      <TableCell className="whitespace-nowrap">
+        {schedule.enabled ? <Timestamp value={schedule.nextRunAt} /> : "Not scheduled"}
+      </TableCell>
+      <TableCell className="text-right">
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          {action.blocked ? "Review pending change" : "Edit"}
+        </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto text-left sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="break-words">Edit {name}</DialogTitle>
+              <DialogDescription>
+                Saving an enabled schedule builds a report shortly, then runs at the chosen
+                interval. Reports already built keep their expiry.
+              </DialogDescription>
+            </DialogHeader>
+            <ScheduleForm existing={schedule} action={action} onDone={() => setOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ScheduleForm({
+  existing,
+  action,
+  onDone,
+}: {
+  existing?: ReportSchedule;
+  action: IntegrationAction;
+  onDone: () => void;
+}) {
+  const lifetime = useAuthLifetime();
   const [name, setName] = useState(existing?.name ?? "");
   const [kind, setKind] = useState(existing?.kind ?? ReportKind.INVENTORY);
   const [format, setFormat] = useState(existing?.format ?? ReportFormat.CSV);
-  const [interval, setInterval] = useState(existing?.intervalSeconds ?? 86400);
+  const [interval, setInterval] = useState(existing?.intervalSeconds ?? DAY);
   const [retention, setRetention] = useState(existing?.retentionDays ?? 30);
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
   const [reason, setReason] = useState("");
   const id = existing?.id ?? "new-report";
+  const intervals = INTERVALS.includes(interval) ? INTERVALS : [interval, ...INTERVALS];
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const schedule = create(ReportScheduleSchema, {
@@ -144,82 +279,101 @@ function ScheduleEditor({ existing }: { existing?: ReportSchedule }) {
     action.perform(async () => {
       const response = await adminClient.upsertReportSchedule(request, { signal: lifetime.signal });
       lifetime.signal.throwIfAborted();
-      if (!existing) {
-        setName("");
-        setReason("");
-      }
+      onDone();
       return response;
     });
   }
   return (
-    <form onSubmit={save} className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
-      <h3 className="break-words font-semibold">
-        {existing ? `Edit ${existing.name}` : "Add report schedule"}
-      </h3>
+    <form onSubmit={save} className="grid min-w-0 gap-4">
       {action.feedback}
       <fieldset disabled={action.blocked} className="grid min-w-0 gap-3">
-        <Label htmlFor={`${id}-name`}>Name</Label>
-        <Input id={`${id}-name`} required value={name} onChange={(e) => setName(e.target.value)} />
-        <Label htmlFor={`${id}-kind`}>Report</Label>
-        <SelectField
-          id={`${id}-kind`}
-          className="h-9 min-w-0"
-          value={kind}
-          onValueChange={(value) => setKind(Number(value) as ReportKind)}
-          options={[ReportKind.INVENTORY, ReportKind.COMPLIANCE, ReportKind.FINDINGS].map(
-            (value) => ({
-              value,
-              label: KINDS[value],
-            }),
-          )}
-        />
-        <Label htmlFor={`${id}-format`}>Format</Label>
-        <SelectField
-          id={`${id}-format`}
-          className="h-9 min-w-0"
-          value={format}
-          onValueChange={(value) => setFormat(Number(value) as ReportFormat)}
-          options={[
-            { value: ReportFormat.CSV, label: "CSV" },
-            { value: ReportFormat.JSON, label: "JSON" },
-          ]}
-        />
-        <Label htmlFor={`${id}-interval`}>Run every (seconds)</Label>
-        <Input
-          id={`${id}-interval`}
-          required
-          type="number"
-          value={interval}
-          onChange={(e) => setInterval(Number(e.target.value))}
-        />
-        <Label htmlFor={`${id}-retention`}>Keep reports for (days)</Label>
-        <Input
-          id={`${id}-retention`}
-          required
-          type="number"
-          value={retention}
-          onChange={(e) => setRetention(Number(e.target.value))}
-        />
-        <label className="flex gap-2">
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-name`}>Name</Label>
+          <Input
+            id={`${id}-name`}
+            data-freeform="new schedule name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor={`${id}-kind`}>Report</Label>
+            <SelectField
+              id={`${id}-kind`}
+              className="h-9 min-w-0"
+              value={kind}
+              onValueChange={(value) => setKind(Number(value) as ReportKind)}
+              options={[ReportKind.INVENTORY, ReportKind.COMPLIANCE, ReportKind.FINDINGS].map(
+                (value) => ({ value, label: KINDS[value] }),
+              )}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`${id}-format`}>Format</Label>
+            <SelectField
+              id={`${id}-format`}
+              className="h-9 min-w-0"
+              value={format}
+              onValueChange={(value) => setFormat(Number(value) as ReportFormat)}
+              options={[ReportFormat.CSV, ReportFormat.JSON].map((value) => ({
+                value,
+                label: FORMAT_LABELS[value],
+              }))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`${id}-interval`}>How often</Label>
+            <SelectField
+              id={`${id}-interval`}
+              className="h-9 min-w-0"
+              value={interval}
+              onValueChange={(value) => setInterval(Number(value))}
+              options={intervals.map((value) => ({ value, label: intervalLabel(value) }))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`${id}-retention`}>Keep reports for (days, 1 to 3650)</Label>
+            <Input
+              id={`${id}-retention`}
+              data-freeform="numeric retention period"
+              required
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={3650}
+              step={1}
+              value={retention}
+              onChange={(e) => setRetention(Number(e.target.value))}
+            />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Run on schedule
         </label>
-        <Label htmlFor={`${id}-reason`}>Reason</Label>
-        <Input
-          id={`${id}-reason`}
-          required
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-        {existing ? (
-          <p className="text-xs">
-            Revision {existing.revision.toString()} · next run{" "}
-            {formatTimestamp(existing.nextRunAt).local}
-          </p>
-        ) : null}
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-reason`}>Reason (audited)</Label>
+          <Input
+            id={`${id}-reason`}
+            data-freeform="audit reason"
+            required
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </div>
         <Button type="submit" className="w-fit">
           {existing ? "Save schedule" : "Create schedule"}
         </Button>
+        {existing ? (
+          <TechnicalDetails
+            items={[
+              { label: "Schedule ID", value: existing.id },
+              { label: "Revision", value: existing.revision.toString() },
+            ]}
+          />
+        ) : null}
       </fieldset>
     </form>
   );
@@ -293,120 +447,150 @@ function Artifacts() {
   }
   return (
     <section
-      className="grid min-w-0 gap-4 border-t pt-6"
+      className="grid min-w-0 gap-4 pt-2"
       aria-label="Report artifacts"
       aria-busy={list.isFetching}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold">Reports</h3>
-        <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-          Refresh reports
-        </Button>
-      </div>
-      {error ? <RpcError failure={error} /> : null}
+      <h3 className="text-base font-semibold">Reports</h3>
+      {error ? <RpcError failure={error} title="Report not downloaded" /> : null}
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading reports…</span>
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-16 w-full" />
         </div>
       ) : null}
       {list.data?.artifacts.length === 0 ? (
         <EmptyState
-          title="No reports yet"
-          description="Reports appear here after a scheduled run or an audit export."
+          title={page ? "No more reports" : "No reports yet"}
+          description={
+            page
+              ? "Return to the first page."
+              : "Reports appear here after a scheduled run or an audit export."
+          }
+          action={
+            page ? (
+              <Button variant="outline" onClick={() => setPage("")}>
+                First page
+              </Button>
+            ) : undefined
+          }
         />
       ) : null}
-      {list.data?.artifacts.map((artifact) => (
-        <article
-          id={`report-${artifact.id}`}
-          key={artifact.id}
-          className="grid min-w-0 gap-3 border bg-card p-4"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="font-semibold">
-              {KINDS[artifact.kind]} · {FORMATS[artifact.format]}
-            </h4>
-            <StatusBadge
-              status={
-                artifact.state === "failed" || artifact.failureReason
-                  ? "destructive"
-                  : artifact.state === "published"
-                    ? "success"
-                    : artifact.state === "building"
-                      ? "info"
-                      : "neutral"
-              }
-            >
-              {artifact.state
-                ? artifact.state.charAt(0).toUpperCase() +
-                  artifact.state.slice(1).replaceAll("_", " ")
-                : "Unknown"}
-            </StatusBadge>
-          </div>
-          <TechnicalDetails
-            items={[
-              { label: "Report ID", value: artifact.id },
-              { label: "Failure reason", value: artifact.failureReason },
-            ]}
-          />
-          {artifact.state === "published" ? (
-            <p className="text-sm">
-              {artifact.rowCount.toString()} rows · {formatBytes(artifact.byteCount)} · expires{" "}
-              {formatTimestamp(artifact.expiresAt).local}
-            </p>
-          ) : artifact.state === "queued" || artifact.state === "building" ? (
-            <p className="text-sm text-muted-foreground">
-              Evidence is being prepared. Refresh reports to check for the signed download.
-            </p>
-          ) : null}
-          {artifact.failureReason ? (
-            <p role="alert" className="break-words text-sm text-destructive">
-              {artifact.kind === ReportKind.AUDIT_SELECTION
-                ? artifact.failureReason === "report_limit_exceeded"
-                  ? "Too many matching events or too much evidence to export. Narrow the audit filters or time range and start another export. No partial evidence is available."
-                  : "The filtered evidence could not be exported. Review the details before trying again."
-                : artifact.failureReason}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={artifact.state !== "published" || !!downloading}
-              onClick={() => void download(artifact)}
-            >
-              {downloading === artifact.id ? "Downloading…" : "Download"}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!artifact.signedManifest}
-              onClick={() => {
-                if (!artifact.signedManifest) return;
-                saveBlob(
-                  new Blob([toJsonString(ReportSignedManifestSchema, artifact.signedManifest)], {
-                    type: "application/json",
-                  }),
-                  `${artifact.id}.manifest.json`,
-                );
-              }}
-            >
-              Download signature
-            </Button>
-          </div>
-        </article>
-      ))}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!page} onClick={() => setPage("")}>
-          First page
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextAfterId}
-          onClick={() => setPage(list.data?.nextAfterId ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
+      {list.data && list.data.artifacts.length > 0 ? (
+        <Table aria-label="Reports">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Report</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead>
+                <span className="sr-only">Downloads</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.data.artifacts.map((artifact) => (
+              <TableRow
+                id={`report-${artifact.id}`}
+                key={artifact.id}
+                className="align-top target:bg-muted/50"
+              >
+                <TableCell className="min-w-40 whitespace-normal">
+                  {KINDS[artifact.kind]} · {FORMAT_LABELS[artifact.format]}
+                  {artifact.state === "published" ? (
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {artifact.rowCount.toString()} rows · {formatBytes(artifact.byteCount)}
+                    </p>
+                  ) : null}
+                  <TechnicalDetails
+                    items={[
+                      { label: "Report ID", value: artifact.id },
+                      { label: "Schedule ID", value: artifact.scheduleId },
+                      { label: "Failure reason", value: artifact.failureReason },
+                    ]}
+                  />
+                </TableCell>
+                <TableCell className="min-w-32 max-w-sm whitespace-normal">
+                  <StatusBadge
+                    status={
+                      artifact.state === "failed" || artifact.failureReason
+                        ? "destructive"
+                        : artifact.state === "published"
+                          ? "success"
+                          : artifact.state === "building"
+                            ? "info"
+                            : "neutral"
+                    }
+                  >
+                    {artifact.state
+                      ? artifact.state.charAt(0).toUpperCase() +
+                        artifact.state.slice(1).replaceAll("_", " ")
+                      : "Unknown"}
+                  </StatusBadge>
+                  {artifact.state === "queued" || artifact.state === "building" ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Being prepared. Use Refresh at the top of the page to check for the download.
+                    </p>
+                  ) : null}
+                  {artifact.failureReason ? (
+                    <p role="alert" className="mt-1 break-words text-xs text-destructive">
+                      {artifact.kind === ReportKind.AUDIT_SELECTION
+                        ? artifact.failureReason === "report_limit_exceeded"
+                          ? "Too many matching events or too much evidence to export. Narrow the audit filters or time range and start another export. No partial evidence is available."
+                          : "The filtered evidence could not be exported. Review the details before trying again."
+                        : "This report failed and has no partial data. The failure reason is in Details."}
+                    </p>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  <Timestamp value={artifact.createdAt} />
+                </TableCell>
+                <TableCell>
+                  {artifact.state === "published" ? <Timestamp value={artifact.expiresAt} /> : null}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={artifact.state !== "published" || !!downloading}
+                      onClick={() => void download(artifact)}
+                    >
+                      {downloading === artifact.id ? "Downloading…" : "Download"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!artifact.signedManifest}
+                      onClick={() => {
+                        if (!artifact.signedManifest) return;
+                        saveBlob(
+                          new Blob(
+                            [toJsonString(ReportSignedManifestSchema, artifact.signedManifest)],
+                            { type: "application/json" },
+                          ),
+                          `${artifact.id}.manifest.json`,
+                        );
+                      }}
+                    >
+                      Download signature
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+      <ListPagination
+        label="Report pages"
+        previousLabel="First page"
+        onPrevious={page ? () => setPage("") : undefined}
+        onNext={list.data?.nextAfterId ? () => setPage(list.data?.nextAfterId ?? "") : undefined}
+        busy={list.isFetching}
+      />
     </section>
   );
 }

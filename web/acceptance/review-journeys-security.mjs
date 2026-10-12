@@ -745,7 +745,7 @@ async function recoveryAudit(ctx) {
       "recovery_audit_export_failed",
     );
     requireState(Date.now() < deadline, "recovery_audit_export_publication_timeout");
-    await main.getByRole("button", { name: "Refresh reports", exact: true }).click();
+    await main.getByRole("button", { name: "Refresh", exact: true }).click();
     await settled(page);
     // Deadline-bounded polling of the actual refresh control, not a mutation retry.
     if (!(await artifact.getByText("Published", { exact: true }).isVisible()))

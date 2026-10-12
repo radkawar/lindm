@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -9,9 +9,16 @@ import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { clearCsrfToken } from "@/lib/rpc";
 
+export type IntegrationAction = {
+  perform: (operation: () => Promise<unknown>) => void;
+  /** Busy, or an ambiguous outcome that must be retried before another change. */
+  blocked: boolean;
+  feedback: ReactNode;
+};
+
 // Pending requests (including write-only keys) stay only in component memory.
 // Ambiguous mutations retain the exact request closure for an explicit retry.
-export function useIntegrationAction() {
+export function useIntegrationAction(): IntegrationAction {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const navigate = useNavigate();

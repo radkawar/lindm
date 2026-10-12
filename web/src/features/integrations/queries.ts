@@ -26,7 +26,7 @@ export function deliveriesQueryOptions(
     queryFn: ({ signal }) =>
       adminClient.listDeliveries(
         {
-          pageSize: 50,
+          pageSize: 20,
           pageToken,
           status: deadLetters ? DeliveryStatus.DEAD_LETTER : DeliveryStatus.UNSPECIFIED,
         },
