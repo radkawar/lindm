@@ -61,25 +61,29 @@ export function accountsQueryOptions(lifetime: AuthLifetime) {
 export function Accounts({
   devicePicker,
   groupPicker,
+  creating,
+  onCreatingChange,
 }: {
   devicePicker: PickerSlot;
   groupPicker: PickerSlot;
+  // The Create account dialog lives in the URL, so the command palette can open it.
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const client = useQueryClient();
   const session = useQuery(sessionQueryOptions());
   const accounts = useQuery(accountsQueryOptions(lifetime));
-  const [dialog, setDialog] = useState<"create" | { edit: string } | null>(null);
+  const [dialog, setDialog] = useState<{ edit: string } | null>(null);
   const [enrollment, setEnrollment] = useState<AccountEnrollment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RpcFailure | null>(null);
   const csrf = session.data?.csrfToken ?? "";
   const roles = accounts.data?.roles ?? [];
-  const editing =
-    dialog !== null && dialog !== "create"
-      ? accounts.data?.accounts.find((account) => account.id === dialog.edit)
-      : undefined;
+  const editing = dialog
+    ? accounts.data?.accounts.find((account) => account.id === dialog.edit)
+    : undefined;
 
   async function perform(done: string, action: () => Promise<AccountEnrollment | void>) {
     if (busy || !csrf || lifetime.signal.aborted) return;
@@ -91,6 +95,7 @@ export function Accounts({
       lifetime.signal.throwIfAborted();
       if (result) setEnrollment(result);
       setDialog(null);
+      if (creating) onCreatingChange(false);
       toast.success(done, {
         description: result ? "Copy the enrollment secret shown on this page." : undefined,
       });
@@ -137,14 +142,14 @@ export function Accounts({
             disabled={!accounts.data}
             onClick={() => {
               setError(null);
-              setDialog("create");
+              onCreatingChange(true);
             }}
           >
             Create account
           </Button>
         }
       />
-      {dialog === null ? failure : null}
+      {dialog === null && !creating ? failure : null}
       {enrollment ? (
         <section
           className="grid min-w-0 gap-3 border-2 border-primary bg-primary/5 p-4 sm:p-6"
@@ -182,7 +187,7 @@ export function Accounts({
           title="No local accounts"
           description="Create an account to give someone console access."
           action={
-            <Button aria-haspopup="dialog" onClick={() => setDialog("create")}>
+            <Button aria-haspopup="dialog" onClick={() => onCreatingChange(true)}>
               Create account
             </Button>
           }
@@ -243,9 +248,9 @@ export function Accounts({
         </Table>
       ) : null}
       <Dialog
-        open={dialog === "create"}
+        open={creating}
         onOpenChange={(open) => {
-          if (!open && !busy) setDialog(null);
+          if (!open && !busy) onCreatingChange(false);
         }}
       >
         <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">

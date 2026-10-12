@@ -31,17 +31,23 @@ import { OfflineEnrollment } from "./offline";
 
 type GrantPayload = { requestId: string; lifetimeSeconds: number; reason: string };
 
+// The open issue dialog lives in the URL, so the command palette can open it.
+export type EnrollmentMethod = "grant" | "provisioning";
+
 export function EnrollmentView({
   accountPicker,
   groupPicker,
   profileRevisionPicker,
+  method,
+  onMethodChange: setMethod,
 }: {
   accountPicker: PickerSlot;
   groupPicker: PickerSlot;
   profileRevisionPicker: PickerSlot;
+  method: EnrollmentMethod | null;
+  onMethodChange: (method: EnrollmentMethod | null) => void;
 }) {
   const lifetime = useAuthLifetime();
-  const [method, setMethod] = useState<"grant" | "provisioning" | null>(null);
   const [credential, setCredential] = useState<EnrollmentCredential | null>(null);
   const [activeTab, setActiveTab] = useState<"grants" | "tokens">("grants");
   const [offline, setOffline] = useState(false);

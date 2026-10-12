@@ -124,9 +124,16 @@ The sidebar-07-derived shell groups authorized pages under Fleet, Security and
 Administration, with explicit device/profile breadcrumbs and a closable mobile drawer.
 Groups covers both account and device groups. The shell has collapsible navigation,
 a role/break-glass account menu, keyboard skip link, and a locally persisted
-light/dark toggle. Control/Command-K opens the official command palette with
-navigation and search within the first 200 authorized devices; it does not claim
-an unbounded fleet search. Dialog labels remain inside their accessible portal.
+light/dark toggle. Control/Command-K opens the official command palette: pages,
+actions and devices found by server-side hostname prefix search. Actions
+(`web/src/app/palette-actions.ts`) open the page or dialog where the job is done and
+are shown only when the session holds the permission that destination checks.
+Device actions (Wipe device…, Restart device…, Refresh inventory…, Request remote
+assistance…) first ask for the device, then open its wipe review, action dialog
+(`/devices/$deviceId?action=restart`) or Remote assistance tab; nothing is sent from
+the palette. Create commands open their dialog through a route search parameter
+(`/enrollment?create=code|token`, `/rollouts`, `/secrets`, `/groups` and
+`/accounts` with `?create=true`). Dialog labels remain inside their accessible portal.
 Feature pages use consistent headings, responsive controls, skeletons, and
 actionable empty/error states. Toasts report accepted mutations, not proof of
 native execution, and never contain enrollment/recovery secrets. Inline normalized

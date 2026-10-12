@@ -1,5 +1,7 @@
 import type { SearchSchemaInput } from "@tanstack/react-router";
 import { parseListSearch, type ListSearch } from "@/lib/list-search";
+import type { DeviceActionKind } from "./action-display";
+import { simpleActionKinds } from "./action-menu";
 
 export const deviceTabs = [
   "overview",
@@ -13,7 +15,13 @@ export const deviceTabs = [
 ] as const;
 export type DeviceTab = (typeof deviceTabs)[number];
 
-export type PackageSearch = ListSearch & { manager: string; namePrefix: string; tab: DeviceTab };
+// `action` names the simple device action whose dialog is open.
+export type PackageSearch = ListSearch & {
+  manager: string;
+  namePrefix: string;
+  tab: DeviceTab;
+  action?: DeviceActionKind;
+};
 
 // Defaults are stripped from the URL so a plain device link stays /devices/<id>.
 export const packageSearchDefaults: PackageSearch = {
@@ -31,11 +39,13 @@ export function parsePackageSearch(
   const manager = typeof search.manager === "string" ? search.manager : "";
   const namePrefix = typeof search.namePrefix === "string" ? search.namePrefix : "";
   const tab = deviceTabs.find((id) => id === search.tab);
+  const action = simpleActionKinds.find((kind) => kind === search.action);
   return {
     ...list,
     manager,
     namePrefix,
     // Package filters and pages only exist on Inventory; older links carry them alone.
     tab: tab ?? (list.pageToken || manager || namePrefix ? "inventory" : "overview"),
+    ...(action ? { action } : {}),
   };
 }

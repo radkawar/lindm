@@ -58,13 +58,17 @@ const ROLLOUT_REASON_MESSAGES: Record<string, string> = {
 export function RolloutsView({
   initialDevice = "",
   names,
+  creating,
+  onCreatingChange: setCreating,
 }: {
   initialDevice?: string;
   names: TargetNames;
+  // The New rollout form's visibility lives in the URL, so the command palette can open it.
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const principal = usePrincipal();
   const canAssign = canPermission(principal, "resources.assign", true);
-  const [creating, setCreating] = useState(false);
   const formHeading = useRef<HTMLHeadingElement>(null);
   const newRollout = useRef<HTMLButtonElement>(null);
   useEffect(() => {

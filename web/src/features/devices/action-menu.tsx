@@ -21,7 +21,7 @@ import { DeviceActionForm } from "./action-form";
 import { actionLabels, actionPermissions, type DeviceActionKind } from "./action-display";
 import { DeviceRevocationImpact } from "./view";
 
-const simpleKinds: DeviceActionKind[] = [
+export const simpleActionKinds: DeviceActionKind[] = [
   "restart",
   "shutdown",
   "refreshInventory",
@@ -36,20 +36,27 @@ export type ComplexActionKind = (typeof complexActionKinds)[number];
 
 // Entries follow the caller's permissions on this device (GetDevice
 // caller_permissions); with none left there is no Actions button, never an empty menu.
+// The open action dialog lives in the URL (?action=restart), so the command palette can open it.
 export function DeviceActionMenu({
   device,
   permissions,
   revoke,
+  action,
+  onActionChange,
 }: {
   device: Device;
   permissions: readonly string[];
   revoke?: ReactNode;
+  action: DeviceActionKind | null;
+  onActionChange: (action: DeviceActionKind | null) => void;
 }) {
   const navigate = useNavigate();
   const trigger = useRef<HTMLButtonElement>(null);
-  const [kind, setKind] = useState<DeviceActionKind | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
-  const simple = simpleKinds.filter((value) => permissions.includes(actionPermissions[value]));
+  const simple = simpleActionKinds.filter((value) =>
+    permissions.includes(actionPermissions[value]),
+  );
+  const kind = action && simple.includes(action) ? action : null;
   const complex = complexActionKinds.filter((value) =>
     permissions.includes(actionPermissions[value]),
   );
@@ -63,7 +70,11 @@ export function DeviceActionMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
           {simple.map((value) => (
-            <DropdownMenuItem key={value} aria-haspopup="dialog" onClick={() => setKind(value)}>
+            <DropdownMenuItem
+              key={value}
+              aria-haspopup="dialog"
+              onClick={() => onActionChange(value)}
+            >
               {actionLabels[value]}
             </DropdownMenuItem>
           ))}
@@ -101,7 +112,7 @@ export function DeviceActionMenu({
         deviceName={device.hostname.trim() || "Unnamed device"}
         kind={kind}
         finalFocus={trigger}
-        onClose={() => setKind(null)}
+        onClose={() => onActionChange(null)}
       />
       <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
         <DialogContent

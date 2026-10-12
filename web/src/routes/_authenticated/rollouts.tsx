@@ -12,11 +12,13 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/rollouts")({
-  validateSearch: (search: Record<string, unknown>): { device?: string } => {
-    if (search.device === undefined) return {};
+  // ?create=true opens the New rollout form.
+  validateSearch: (search: Record<string, unknown>): { device?: string; create?: true } => {
+    const create = search.create === true ? { create: true as const } : {};
+    if (search.device === undefined) return create;
     const device = typeof search.device === "string" ? canonicalUuid(search.device) : null;
     if (!device) throw new Error("Choose a valid device from the device list.");
-    return { device };
+    return { device, ...create };
   },
   beforeLoad: ({ context }) => {
     if (!canPermission(context.principal, "resources.assign"))
@@ -42,7 +44,8 @@ function GroupName({ value }: { value: string }) {
 }
 
 function RolloutsPage() {
-  const { device } = Route.useSearch();
+  const { device, create } = Route.useSearch();
+  const navigate = Route.useNavigate();
   return (
     <TargetPickerProvider
       pickers={{
@@ -53,6 +56,13 @@ function RolloutsPage() {
     >
       <RolloutsView
         initialDevice={device}
+        creating={create === true}
+        onCreatingChange={(next) =>
+          void navigate({
+            search: (previous) => ({ device: previous.device, ...(next ? { create: true } : {}) }),
+            replace: true,
+          })
+        }
         names={{
           deviceName: DeviceName,
           groupName: GroupName,

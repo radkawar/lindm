@@ -184,6 +184,10 @@ export function DeviceDetailView({
               device={device}
               permissions={data.callerPermissions}
               revoke={revoke?.(device)}
+              action={search.action ?? null}
+              onActionChange={(action) =>
+                onSearch({ ...search, action: action ?? undefined }, true)
+              }
             />
           ) : null}
           {device && device.lifecycleState !== DeviceState.REVOKED && canAssign ? (
