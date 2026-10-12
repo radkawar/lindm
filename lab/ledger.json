@@ -10477,6 +10477,22 @@
       "scope": "30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff",
       "reference": "#tier-1-parity-records-2026-10-11",
       "mainlineRevision": "696a48a66969e4dfef0966db44bb055f12e38569"
+    },
+    {
+      "platform": "arch",
+      "cell": "os-update",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r20/arch/os-update-x86_64.json",
+      "sha256": "9512995c2d40687e68d910785c27c1d18ea1fb3729bca9aa3022d598d8a60c61",
+      "recorded": "2026-10-12T23:41:19.585021114Z",
+      "revision": "187ebb80114f035b47ace0801a9f2c480989a17c",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "85767fc7119465e47bdc8b6637ff3cc8ac20047f"
     }
   ]
 }
