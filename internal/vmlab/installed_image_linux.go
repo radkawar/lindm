@@ -12,12 +12,22 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/diskgc"
 	"lindm/internal/platform"
 )
+
+// sourceProvenance is the content of diskgc.SourceFile inside every derived
+// image cache entry (installed images and encrypted goldens): the validated
+// lowercase-hex ImageManifest.sha256 of the source image it was built from,
+// so cache collection can tell entries whose source is no longer pinned.
+func sourceProvenance(m *labv1.ImageManifest) []byte {
+	return []byte(m.GetSha256() + "\n")
+}
 
 // installerImage describes a vendor installer whose authenticated media produce
 // a local immutable qcow2 golden disk, never a vendor-signed cloud image. Only
@@ -243,20 +253,25 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	if err := root.WriteFile(partial+"/sha256", []byte(result.SHA256+"\n"), 0600); err != nil {
 		return nil, err
 	}
+	if err := root.WriteFile(partial+"/"+diskgc.SourceFile, sourceProvenance(m), 0600); err != nil {
+		return nil, err
+	}
 	// Remastered media and recipe carry private SSH material; publish only the
-	// installed disk and its integrity pin, never installer staging or variables.
+	// installed disk, its integrity pin and its source provenance, never
+	// installer staging or variables.
+	published := []string{"image", "sha256", diskgc.SourceFile}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	for _, item := range entries {
-		if item.Name() != "image" && item.Name() != "sha256" {
+		if !slices.Contains(published, item.Name()) {
 			if err := root.RemoveAll(partial + "/" + item.Name()); err != nil {
 				return nil, err
 			}
 		}
 	}
-	if err := publishImageCache(root, partial, entry, []string{"image", "sha256"}); err != nil {
+	if err := publishImageCache(root, partial, entry, published); err != nil {
 		return nil, err
 	}
 	result.Path = filepath.Join(root.Name(), entry, "image")

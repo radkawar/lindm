@@ -58,10 +58,7 @@ func InspectHost(ctx context.Context, host *labv1.LabHost) Status {
 			}
 		}
 	} else {
-		work := QuoteShell(host.WorkDirectory)
-		if strings.HasPrefix(host.WorkDirectory, "~/") {
-			work = `"$HOME"/` + QuoteShell(strings.TrimPrefix(host.WorkDirectory, "~/"))
-		}
+		work := remoteShellPath(host.WorkDirectory)
 		script := `set -eu
 work=` + work + `
 active=0

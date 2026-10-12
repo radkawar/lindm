@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/diskgc"
 	"lindm/internal/platform"
 )
 
@@ -306,12 +307,17 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 			return nil, err
 		}
 	}
-	metadata, err := openRegular(filepath.Join(publish, "state.json"))
-	if err != nil {
+	if err = os.WriteFile(filepath.Join(publish, diskgc.SourceFile), sourceProvenance(m), 0400); err != nil {
 		return nil, err
 	}
-	if err = errors.Join(metadata.Sync(), metadata.Close()); err != nil {
-		return nil, err
+	for _, name := range []string{"state.json", diskgc.SourceFile} {
+		metadata, openErr := openRegular(filepath.Join(publish, name))
+		if openErr != nil {
+			return nil, openErr
+		}
+		if err = errors.Join(metadata.Sync(), metadata.Close()); err != nil {
+			return nil, err
+		}
 	}
 	if err = syncDirectory(root, filepath.Base(publish)); err != nil {
 		return nil, err

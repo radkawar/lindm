@@ -247,7 +247,11 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		clean = labhost.SetFlag(clean, "advisory-cache", filepath.Join(work, "advisory-cache"))
 	}
-	return slots.RunAdmitted(ctx, vmGuestCount(clean[1], clean), laneTiming(held), laneWaitReporter(stderr, chosen.Name), func(ctx context.Context) error {
+	guests := vmGuestCount(clean[1], clean)
+	if err := slots.AdmitDisk(ctx, guests, stderr); err != nil {
+		return err
+	}
+	return slots.RunAdmitted(ctx, guests, laneTiming(held), laneWaitReporter(stderr, chosen.Name), func(ctx context.Context) error {
 		return runUnscheduled(ctx, clean, stdout, stderr)
 	})
 }
@@ -360,13 +364,17 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 		run := func(ctx context.Context) error {
 			return runAdmittedHostExec(ctx, args, stdout, stderr, cfg.Hosts[0])
 		}
+		guests := vmGuestCount(args[2], args)
+		if err := slots.AdmitDisk(ctx, guests, stderr); err != nil {
+			return err
+		}
 		if credential, ok := ctx.Value(hostBatchCredentialKey{}).(string); ok {
-			if vmGuestCount(args[2], args) != 1 {
+			if guests != 1 {
 				return errors.New("a batch worker must use exactly one reserved guest")
 			}
 			return slots.RunBatchWorker(ctx, credential, run)
 		}
-		return slots.RunAdmitted(ctx, vmGuestCount(args[2], args), laneTiming(vmHolds(args[1:])), laneWaitReporter(stderr, cfg.Hosts[0].Name), run)
+		return slots.RunAdmitted(ctx, guests, laneTiming(vmHolds(args[1:])), laneWaitReporter(stderr, cfg.Hosts[0].Name), run)
 	})
 }
 

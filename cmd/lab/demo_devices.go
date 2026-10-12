@@ -124,6 +124,9 @@ func (r *demoRun) runDevice(ctx context.Context, bound *labv1.DemoBinding, crede
 	if err != nil {
 		return err
 	}
+	if err := slots.AdmitDisk(ctx, 1, r.stderr); err != nil {
+		return err
+	}
 	ctx = context.WithValue(ctx, demoDeviceHeldKey{}, ready)
 	return slots.RunBatchWorker(ctx, credential, func(ctx context.Context) error { return runVMAssistance(ctx, args[2:], r.stdout, r.stderr) })
 }

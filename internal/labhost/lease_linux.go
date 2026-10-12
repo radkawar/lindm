@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/diskgc"
 )
 
 // Slots is a local process-shared capacity pool. All users of a work directory
@@ -25,6 +27,11 @@ type Slots struct {
 	capacity    uint32
 	memoryMib   uint32
 	memoryProbe func(context.Context) (memoryAdmission, error)
+	// host and work name the executing host and its work directory, whose
+	// filesystem AdmitDisk measures with diskFree and collects with diskCollect.
+	host, work  string
+	diskFree    func(path string) (int64, error)
+	diskCollect func(ctx context.Context, workDirs []string, log io.Writer) ([]diskgc.Result, error)
 }
 
 // OpenSlots opens the executing host's capacity namespace without taking a slot.
@@ -50,7 +57,7 @@ func OpenSlots(host *labv1.LabHost) (*Slots, error) {
 			return nil, fmt.Errorf("lab hosts: slot directory is not owned by this user: %s", private)
 		}
 	}
-	return &Slots{directory: directory, capacity: host.MaxGuests, memoryMib: host.MaxMemoryMib, memoryProbe: observeMemory}, nil
+	return &Slots{directory: directory, capacity: host.MaxGuests, memoryMib: host.MaxMemoryMib, memoryProbe: observeMemory, host: host.Name, work: work, diskFree: diskgc.Free, diskCollect: diskgc.Host}, nil
 }
 
 func (s *Slots) open(index uint32) (*os.File, error) {

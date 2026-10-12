@@ -87,6 +87,11 @@ func runLand(args []string) (resultErr error) {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
+	// Collect before queueing for the lock, so a short disk never fails a
+	// gate halfway and no landing waits behind a collection.
+	if shared, err := worktree.Open(ctx, "."); err == nil {
+		collectIfLow(ctx, shared)
+	}
 	repo, unlock, err := lockedRepository(ctx)
 	if err != nil {
 		return err

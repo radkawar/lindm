@@ -2382,6 +2382,42 @@ file with its mtime and the private worktrees whose working copy holds the
 same change (an identical file, or every line it adds and none it removes),
 likeliest first, so the agent that wrote into the shared tree is named.
 
+`go run ./cmd/dev gc [-dry-run]` reclaims disk on the workstation and prints the
+bytes reclaimed per class: Go build cache entries untouched for 6 hours
+(`-build-cache-age`; the go command refreshes a used entry's mtime hourly and
+treats a missing one as a miss); the `inputs/` of finished `lab matrix` runs under
+`~/.cache/lindm-matrix` (`-matrix-root`), keeping every record, log and evidence
+directory; `dev worktree prune` with its defaults; stale lane scratch (`lindm-*`)
+and `runs/run-*` directories in local lab hosts' work directories, never `demos/`,
+caches or leases; and cached lab images, repository closures, installed images
+and goldens that no image manifest on `main` or any live worktree (every SHA-256
+in a manifest counts, whatever its schema) nor the platform registry's rolling
+targets references. Installed images and goldens record the image they were
+built from in `source-sha256`; entries without it are kept. A run directory is
+stale when no live process uses it (cwd, root, executable or open file beneath
+it) or names it on its command line and nothing in it changed within an hour
+(`-quiet`). Cache entries are removed while gc holds the per-entry flock lab
+readers and writers take, never while open or, for goldens, pinned by a
+persistent VM. Removal renames an entry aside first and a later run finishes
+any interrupted removal; a host-wide flock lets one gc run at a time, so it is
+idempotent and safe beside builds, lanes and other triggers. On SSH lab hosts
+(the Sparks, 4 TiB each) it removes stale `runs/run-*` directories only when
+their work directory has under 300 GiB free (`-spark-min-free`). `dev land`
+runs gc before queueing for the landing lock when the shared checkout's
+filesystem has under 200 GiB free; gc failures are reported and never fail the
+landing.
+
+Lab admission refuses a lane rather than letting it die with ENOSPC. Before
+slot admission, every local lane, every lane a Spark executes (`lab host-exec`)
+and every local demo or native acceptance guest must find guests × 32 GiB free
+on its host's work-directory filesystem (`labhost.LaneDiskBytes`: the 24 GiB
+installer and golden disks plus overlays, firmware and TPM state, serial logs
+and evidence). When it does not, admission runs the host classes of gc once
+(build cache and stale lab runs in that work directory) and measures again;
+still short, it refuses at once with `labhost.DiskRefusal`
+(`ErrInsufficientDisk`) naming the host, path, free and needed space. Disk is
+never queued on, and concurrent lanes do not reserve space against each other.
+
 `go run ./cmd/dev worktree audit [PATH...]` answers whether work is stranded,
 which ahead/dirty counts cannot because most work landed by copying. For every
 registered worktree (and extra PATHs) it snapshots the complete change set against

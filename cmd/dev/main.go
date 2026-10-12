@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|worktree|signoff|pre-push|land|gate-commit|status|protect|generate-docs> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|worktree|signoff|pre-push|land|gate-commit|status|protect|gc|generate-docs> [options]
 
   generate-docs  Rewrite Markdown blocks generated from internal/platform; -check
          fails instead when any block is stale (make generate / make lint).
@@ -52,6 +52,9 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   gate-commit -m MSG  Under the landing lock, make check, then commit if green.
   protect  Make the shared checkout's tracked files read-only (a-w) unless a
          landing holds the lock; see protect -h.
+  gc  Reclaim disk: stale Go build cache, finished matrix inputs, landed
+         worktrees, stale lab runs and unreferenced lab images; prints bytes
+         per class. dev land runs it under 200 GiB free; see gc -h.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
 for test-integration 40m, max 45m, counted only while it holds the integration lock;
@@ -102,6 +105,8 @@ func run() error {
 		return runGateCommit(os.Args[2:])
 	case "protect":
 		return runProtect(os.Args[2:])
+	case "gc":
+		return runGC(os.Args[2:])
 	}
 	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" && verb != "rotate-credentials" {
 		return fmt.Errorf("unknown command %q; use help", verb)
