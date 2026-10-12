@@ -165,8 +165,8 @@ SELECT id FROM devices WHERE id=$1 FOR UPDATE;
 
 -- name: TryLockAdvisoryDevice :many
 -- The background evaluator skips a device whose row is being updated (session,
--- heartbeat, inventory) instead of waiting: in its repeatable-read snapshot a
--- wait ends in a serialization failure. A skipped device stays pending.
+-- heartbeat, inventory) instead of holding a pool connection while it waits. A
+-- skipped device stays pending.
 SELECT id FROM devices WHERE id=$1 FOR UPDATE SKIP LOCKED;
 
 -- name: StoreAdvisoryEvaluation :exec
@@ -196,6 +196,13 @@ FROM snapshot_packages WHERE snapshot_id=$1;
 
 -- name: GetAdvisoryFindingSet :one
 SELECT * FROM advisory_finding_sets WHERE feed_id=$1 AND feed_revision=$2 AND package_digest=$3;
+
+-- name: TryLockAdvisoryFindingSetBuild :one
+-- One instance builds a missing finding set; others defer its devices instead
+-- of repeating the cold match. The two-key advisory lock space never collides
+-- with the job supervisor's single-key leadership locks. A hash collision only
+-- defers another set's devices until this build commits.
+SELECT pg_try_advisory_xact_lock(1818848877, hashtext(sqlc.arg('build_key')::text)) AS locked;
 
 -- name: InsertAdvisoryFindingSet :exec
 -- A concurrent creator of the same content is a serialization conflict in the
@@ -290,25 +297,45 @@ LEFT JOIN advisory_evaluations e ON e.device_id=d.id
 LEFT JOIN advisory_feeds af ON af.id=e.feed_id
 WHERE d.state='active' AND device_scope_matches(d.id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb);
 
--- name: ListAdvisoryEvaluationsPending :many
+-- name: ClaimAdvisoryEvaluations :many
 -- Evaluations are recomputed only when their bound evidence changes: a new
 -- published snapshot or host observation, a new feed generation, or a disabled
 -- bound feed. Feed selection depends only on enabled feed configuration, so a
 -- device evaluated without any applicable feed is rechecked once any process
 -- configures or re-enables a feed after that evaluation. Time-based expiry needs
 -- no worker: the read path and advisory_finding_status recheck it.
-SELECT d.id FROM devices d
-LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
-LEFT JOIN host_observations h ON h.generation_id=g.id
-LEFT JOIN advisory_evaluations e ON e.device_id=d.id
-LEFT JOIN advisory_feeds af ON af.id=e.feed_id
-WHERE d.state='active' AND (e.device_id IS NULL
- OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
- OR e.host_received_at IS DISTINCT FROM h.received_at
- OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
- OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
-ORDER BY e.evaluated_at NULLS FIRST,d.id
-LIMIT sqlc.arg('row_limit');
+-- Every replica claims a disjoint batch: unexpired claims are excluded, devices
+-- whose row another claimer, evaluator or session update holds are skipped, and
+-- a claim committed concurrently for the same device is never taken over before
+-- it expires. Oversampling keeps a concurrent claimer's batch full.
+WITH pending AS (
+ SELECT d.id, e.evaluated_at FROM devices d
+ LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+ LEFT JOIN host_observations h ON h.generation_id=g.id
+ LEFT JOIN advisory_evaluations e ON e.device_id=d.id
+ LEFT JOIN advisory_feeds af ON af.id=e.feed_id
+ WHERE d.state='active' AND (e.device_id IS NULL
+  OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
+  OR e.host_received_at IS DISTINCT FROM h.received_at
+  OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
+  OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
+  AND NOT EXISTS (SELECT 1 FROM advisory_evaluation_claims c WHERE c.device_id=d.id AND c.lease_until>clock_timestamp())
+ ORDER BY e.evaluated_at NULLS FIRST,d.id
+ LIMIT sqlc.arg('row_limit')::integer*4
+), available AS (
+ SELECT d.id FROM devices d JOIN pending p ON p.id=d.id
+ ORDER BY p.evaluated_at NULLS FIRST,d.id
+ LIMIT sqlc.arg('row_limit')::integer
+ FOR NO KEY UPDATE OF d SKIP LOCKED
+)
+INSERT INTO advisory_evaluation_claims(device_id,lease_token,lease_until)
+SELECT id,sqlc.arg('lease_token'),clock_timestamp()+sqlc.arg('lease_seconds')::integer*interval '1 second' FROM available
+ON CONFLICT(device_id) DO UPDATE SET lease_token=EXCLUDED.lease_token,lease_until=EXCLUDED.lease_until
+WHERE advisory_evaluation_claims.lease_until<=clock_timestamp()
+RETURNING device_id;
+
+-- name: ReleaseAdvisoryEvaluationClaims :exec
+DELETE FROM advisory_evaluation_claims WHERE lease_token=$1;
 
 -- name: AcceptAdvisoryException :one
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)

@@ -134,7 +134,20 @@ type haTopology struct {
 	statsPort         int
 	reservations      map[int]net.Listener
 	instances         [2]*haInstance
+	proxyBackends     []haProxyBackend
+	proxyBindAddress  string
 	replication       []HAReplication
+}
+
+type haProxyBackend struct {
+	name, admin, device string
+}
+
+func (t *haTopology) proxyAddress() string {
+	if t.proxyBindAddress != "" {
+		return t.proxyBindAddress
+	}
+	return "127.0.0.1"
 }
 
 func haSecret() (string, error) {
@@ -420,9 +433,15 @@ func (t *haTopology) writeInstanceConfigs(base *configv1.ServerConfig, directory
 
 func (t *haTopology) haproxyConfig() string {
 	var b strings.Builder
+	maxConnections := 4096
+	if len(t.proxyBackends) != 0 {
+		// The capacity fixture must admit 20k independently authenticated
+		// device connections plus admin traffic without a 4096-session cap.
+		maxConnections = 65536
+	}
 	fmt.Fprintf(&b, `global
   log stdout format iso local0
-  maxconn 4096
+  maxconn %d
   stats socket ipv4@127.0.0.1:%d level user
 defaults
   mode tcp
@@ -437,20 +456,29 @@ defaults
   option redispatch 1
   default-server inter 500ms fastinter 250ms downinter 1s fall 2 rise 2 check-ssl verify required ca-file /usr/local/etc/haproxy/transport-ca.crt check-sni localhost verifyhost localhost
 frontend admin
-  bind 127.0.0.1:%d
+  bind %s:%d
   default_backend admin
 frontend device
-  bind 127.0.0.1:%d
+  bind %s:%d
   default_backend device
-`, t.statsPort, t.lbAdmin, t.lbDevice)
+`, maxConnections, t.statsPort, t.proxyAddress(), t.lbAdmin, t.proxyAddress(), t.lbDevice)
+	backends := t.proxyBackends
+	if len(backends) == 0 {
+		for _, instance := range t.instances {
+			backends = append(backends, haProxyBackend{name: instance.name,
+				admin:  net.JoinHostPort("127.0.0.1", strconv.Itoa(instance.admin)),
+				device: net.JoinHostPort("127.0.0.1", strconv.Itoa(instance.device))})
+		}
+	}
 	for _, backend := range []string{"admin", "device"} {
 		fmt.Fprintf(&b, "backend %s\n  balance roundrobin\n  option httpchk\n  http-check send meth GET uri /readyz ver HTTP/1.1 hdr Host localhost\n  http-check expect status 204\n", backend)
-		for _, instance := range t.instances {
-			port := instance.admin
+		for _, instance := range backends {
+			address := instance.admin
 			if backend == "device" {
-				port = instance.device
+				address = instance.device
 			}
-			fmt.Fprintf(&b, "  server %s 127.0.0.1:%d check port %d\n", instance.name, port, instance.admin)
+			_, port, _ := net.SplitHostPort(instance.admin)
+			fmt.Fprintf(&b, "  server %s %s check port %s\n", instance.name, address, port)
 		}
 	}
 	return b.String()
@@ -499,7 +527,7 @@ func (t *haTopology) startProxy(ctx context.Context) error {
 	}
 	t.proxyVersion, _, _ = strings.Cut(string(version), "\n")
 	return pollUntil(ctx, time.Minute, func(ctx context.Context) (bool, error) {
-		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(t.lbAdmin)))
+		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp4", net.JoinHostPort(t.proxyAddress(), strconv.Itoa(t.lbAdmin)))
 		if err != nil {
 			return false, nil
 		}

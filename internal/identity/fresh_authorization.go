@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -100,6 +101,12 @@ func (a *Authorization) ExpiresAt() time.Time {
 // cache or an earlier singleflight. No transaction is held during that request.
 // A denial still commits the observed revocation, authorization version and audit.
 // Newer concurrently committed evidence wins over a delayed directory response.
+//
+// Concurrent calls for one actor join the next observation round, which begins
+// only after every member arrived; a round already in flight is never joined.
+// A rollout's device dispatches thus share one directory read and one principal
+// write per round instead of queueing a write each on the actor's row lock. A
+// break-glass principal keeps one observation and denial audit per call.
 func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permission Permission) (*Authorization, error) {
 	if s == nil || s.pool == nil {
 		return nil, errUnavailable
@@ -107,26 +114,168 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 	if actorID == uuid.Nil || !knownPermission(permission) {
 		return nil, ErrAuthorizationDenied
 	}
-	ctx, cancel := context.WithTimeout(ctx, directoryFetchTimeout)
+	// A caller waits for at most the round in flight plus its own round.
+	ctx, cancel := context.WithTimeout(ctx, 2*directoryFetchTimeout)
 	defer cancel()
+	round := s.freshRounds.join(s, actorID)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-round.done:
+	}
+	if round.err != nil {
+		return nil, round.err
+	}
+	if round.snapshot.BreakGlass {
+		return s.authorizeFreshAlone(ctx, actorID, permission)
+	}
+	snapshot := round.snapshot
+	decision := decideAccess(round.now, s.accessIssuer(snapshot), snapshot.policy, snapshot)
+	principal := s.snapshotPrincipal(snapshot, decision.Role)
+	if decision.Kind != accessOK || !Authorize(principal, permission) {
+		return nil, ErrAuthorizationDenied
+	}
+	if snapshot.AuthorizationVersion <= 0 || snapshot.AuthorizationRole != decision.Role {
+		return nil, ErrAuthorizationChanged
+	}
+	expires := snapshot.ObservedAt.Add(dispatchAuthorizationWindow)
+	if snapshot.ObservedAt.Before(round.acquiredAt) || round.now.Before(snapshot.ObservedAt) || !round.now.Before(expires) {
+		return nil, ErrAuthorizationExpired
+	}
+	digest, err := bindingsDigest(principal.Bindings)
+	if err != nil {
+		return nil, err
+	}
+	return &Authorization{
+		service: s, actorID: actorID, role: decision.Role, permission: permission,
+		version: snapshot.AuthorizationVersion, observedAt: snapshot.ObservedAt, expiresAt: expires,
+		monotonicDeadline: round.monotonicDeadline,
+		principal:         clonePrincipal(principal),
+		bindingsDigest:    digest,
+	}, nil
+}
+
+// freshRound is one shared observation and principal write for the callers
+// that arrived before it started. Fields are written before done is closed.
+type freshRound struct {
+	done              chan struct{}
+	members           int
+	snapshot          directorySnapshot
+	now, acquiredAt   time.Time
+	monotonicDeadline time.Time
+	err               error
+}
+
+// freshRoundGroup runs at most one round per actor at a time. An actor's
+// runner goroutine exits once no caller waits; each round is bounded by
+// directoryFetchTimeout.
+type freshRoundGroup struct {
+	mu      sync.Mutex
+	pending map[uuid.UUID]**freshRound
+}
+
+func (g *freshRoundGroup) join(s *Service, actorID uuid.UUID) *freshRound {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.pending == nil {
+		g.pending = make(map[uuid.UUID]**freshRound)
+	}
+	next, running := g.pending[actorID]
+	if !running {
+		next = new(*freshRound)
+		g.pending[actorID] = next
+	}
+	if *next == nil {
+		*next = &freshRound{done: make(chan struct{})}
+	}
+	round := *next
+	round.members++
+	if !running {
+		go g.run(s, actorID, next)
+	}
+	return round
+}
+
+func (g *freshRoundGroup) run(s *Service, actorID uuid.UUID, next **freshRound) {
+	for {
+		g.mu.Lock()
+		round := *next
+		if round == nil {
+			delete(g.pending, actorID)
+			g.mu.Unlock()
+			return
+		}
+		*next = nil
+		g.mu.Unlock()
+		s.observeFreshRound(actorID, round)
+		close(round.done)
+	}
+}
+
+// observeFreshRound commits one fresh observation of the actor. It is detached
+// from any one member's cancellation and bounded by directoryFetchTimeout.
+func (s *Service) observeFreshRound(actorID uuid.UUID, round *freshRound) {
+	ctx, cancel := context.WithTimeout(context.Background(), directoryFetchTimeout)
+	defer cancel()
+	observation, monotonicDeadline, err := s.observeActor(ctx, actorID)
+	if err != nil {
+		round.err = err
+		return
+	}
+	round.acquiredAt, round.monotonicDeadline = observation.AcquiredAt, monotonicDeadline
+	round.err = s.withTx(ctx, func(q *identitydb.Queries) error {
+		snapshot, err := s.writeObservation(ctx, q, actorID, observation)
+		if errors.Is(err, errStaleObservation) {
+			// writeObservation already acquired the principal lock. Read all
+			// components under that lock rather than assemble a mixed snapshot.
+			current, loadErr := q.GetPrincipalForUpdate(ctx, actorID)
+			if loadErr != nil {
+				return s.authorizationStoreError(loadErr)
+			}
+			snapshot, err = s.readSnapshot(ctx, q, current)
+		}
+		if err != nil {
+			return err
+		}
+		round.snapshot = snapshot
+		round.now, err = s.authorizationTime(ctx, q)
+		return err
+	})
+}
+
+// observeActor reads the directory for one actor. The returned deadline bounds
+// the authority's process-monotonic lifetime from before the observation.
+func (s *Service) observeActor(ctx context.Context, actorID uuid.UUID) (directoryObservation, time.Time, error) {
 	row, err := identitydb.New(s.pool).GetPrincipalByID(ctx, actorID)
 	if err != nil {
-		return nil, s.authorizationStoreError(err)
+		return directoryObservation{}, time.Time{}, s.authorizationStoreError(err)
 	}
 	subject := row.Subject
 	if subject == "" || (row.Issuer != s.issuer && row.Issuer != s.localIssuer) {
-		return nil, ErrAuthorizationDenied
+		return directoryObservation{}, time.Time{}, ErrAuthorizationDenied
 	}
 	monotonicDeadline := time.Now().Add(dispatchAuthorizationWindow)
 	observation, err := s.observePrincipal(ctx, row.Issuer, subject)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return directoryObservation{}, time.Time{}, ctx.Err()
 		}
 		if errors.Is(err, errStore) {
-			return nil, err
+			return directoryObservation{}, time.Time{}, err
 		}
-		return nil, ErrDirectoryUnavailable
+		return directoryObservation{}, time.Time{}, ErrDirectoryUnavailable
+	}
+	return observation, monotonicDeadline, nil
+}
+
+// authorizeFreshAlone is one caller's own observation and transaction; a
+// break-glass denial audit commits atomically with that observation.
+func (s *Service) authorizeFreshAlone(ctx context.Context, actorID uuid.UUID, permission Permission) (*Authorization, error) {
+	ctx, cancel := context.WithTimeout(ctx, directoryFetchTimeout)
+	defer cancel()
+	observation, monotonicDeadline, err := s.observeActor(ctx, actorID)
+	if err != nil {
+		return nil, err
 	}
 	var authorization *Authorization
 	var denied error
@@ -206,7 +355,20 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 // the domain caller's responsibility. The required operation permission must
 // match the approval; a read approval cannot gate a write. The lock remains held
 // on return.
-func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) (result error) {
+func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) error {
+	return s.lockAuthorization(ctx, tx, authorization, permission, false)
+}
+
+// LockAuthorizationShared is LockAuthorization for transactions that never
+// modify the actor's principal, lineage or groups. It holds the actor's
+// principal row FOR SHARE: every authority writer still waits for it (any
+// principal UPDATE conflicts), but concurrent fenced transactions of the same
+// actor, such as a rollout's device dispatches, no longer serialize on it.
+func (s *Service) LockAuthorizationShared(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) error {
+	return s.lockAuthorization(ctx, tx, authorization, permission, true)
+}
+
+func (s *Service) lockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission, shared bool) (result error) {
 	defer func() {
 		if result != nil && s != nil && authorization != nil && authorization.service == s && authorization.breakGlass {
 			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "", "worker authorization fence denied: "+string(permission)))
@@ -229,7 +391,11 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if !bytes.Equal(current.Digest, authorization.principal.policy.digest) {
 		return ErrAuthorizationChanged
 	}
-	row, err := q.GetPrincipalForUpdate(ctx, authorization.actorID)
+	lockPrincipal := q.GetPrincipalForUpdate
+	if shared {
+		lockPrincipal = q.GetPrincipalForShare
+	}
+	row, err := lockPrincipal(ctx, authorization.actorID)
 	if err != nil {
 		return s.authorizationStoreError(err)
 	}

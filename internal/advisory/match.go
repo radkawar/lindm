@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"slices"
 	"sort"
@@ -39,17 +41,14 @@ const maxFindings = 100000
 // pending and is evaluated by a later pass.
 var ErrDeviceBusy = errors.New("advisory_device_busy")
 
-// evaluationAttempts bounds retries of one device evaluation that lost a
-// serialization race. Changed evaluations append to the serial audit chain
-// (report_audit_head FOR UPDATE), heartbeats/inventory update the device row,
-// and concurrent workers may create the same finding set (the retry binds the
-// committed one). Retries back off with jitter so workers do not re-collide.
+// evaluationAttempts bounds retries of transaction conflicts and concurrent
+// finding-set creation. Retries back off with jitter so workers do not
+// re-collide; every attempt rereads the locked device's current inputs.
 const evaluationAttempts = 8
 
-// Evaluate publishes one bounded, repeatable-read evaluation of the device's
-// current immutable snapshot. Publication of a new snapshot or feed immediately
-// makes the previous evaluation UNKNOWN through the shared SQL view. A
-// serialization conflict retries from a fresh snapshot; nothing is reused.
+// Evaluate publishes one bounded evaluation of the device's current immutable
+// snapshot under its device-row lock. Publication of a new snapshot or feed
+// immediately makes the previous evaluation UNKNOWN through the shared SQL view.
 func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.AdvisoryEvaluation, error) {
 	for attempt := 1; ; attempt++ {
 		evaluation, err := s.evaluateOnce(ctx, deviceID)
@@ -77,7 +76,12 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisorydb.AdvisoryEvaluation, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	// Inventory publication and retention share this device lock. Finding sets
+	// bind an exact immutable package digest and feed revision. READ COMMITTED
+	// lets the audit-head lock observe its latest committed predecessor rather
+	// than aborting a coherent device binding when an unrelated audit commits.
+	// Cold matching keeps its separate REPEATABLE READ snapshot below.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
@@ -230,9 +234,8 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		}
 		set, err := q.GetAdvisoryFindingSet(ctx, advisorydb.GetAdvisoryFindingSetParams{FeedID: selected.ID, FeedRevision: selected.Revision, PackageDigest: digest})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Released before building: this transaction's snapshot cannot
-			// see the new set, and holding its connection and device row lock
-			// while waiting on a shared build would starve the pool.
+			// Release the connection and device row lock before waiting on a
+			// shared build; retaining them would starve the device pool.
 			return advisorydb.AdvisoryEvaluation{}, &missingFindingSet{feedID: selected.ID, snapshotID: *d.CurrentSnapshotID, digest: digest, coverage: coverage}
 		}
 		if err != nil {
@@ -263,14 +266,16 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	if err := q.StoreAdvisoryEvaluation(ctx, e); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
+	result, err := q.GetAdvisoryEvaluation(ctx, deviceID)
+	if err != nil {
+		return advisorydb.AdvisoryEvaluation{}, err
+	}
+	// The audit append takes the deployment-wide chain head lock until commit,
+	// so it is the transaction's last statement.
 	if previousErr != nil || !bytes.Equal(previous.FindingDigest, e.FindingDigest) || previous.State != e.State || previous.Reason != e.Reason {
 		if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.findings.changed", ResourceID: deviceID.String(), Context: "Device advisory evidence changed"}); err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
-	}
-	result, err := q.GetAdvisoryEvaluation(ctx, deviceID)
-	if err != nil {
-		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
@@ -298,7 +303,8 @@ const findingSetBuildTimeout = 2 * time.Minute
 
 // buildFindingSet matches and commits one missing finding set. Concurrent
 // workers needing the same (feed, generation, package digest) share a single
-// build instead of each matching identical content under row locks.
+// build instead of each matching identical content under row locks; another
+// instance's build in progress defers the device as busy.
 func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID uuid.UUID, digest []byte, coverage *originCoverage) error {
 	key := feedID + "\x00" + string(digest)
 	_, err, _ := s.setBuilds.Do(key, func() (any, error) {
@@ -310,6 +316,13 @@ func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID
 		}
 		defer func() { _ = tx.Rollback(build) }()
 		q := advisorydb.New(tx)
+		locked, err := q.TryLockAdvisoryFindingSetBuild(build, findingSetBuildKey(feedID, digest))
+		if err != nil {
+			return nil, err
+		}
+		if !locked {
+			return nil, fmt.Errorf("finding set built by another instance: %w", ErrDeviceBusy)
+		}
 		selected, err := q.GetAdvisoryFeed(build, feedID)
 		if err != nil {
 			return nil, err
@@ -333,6 +346,12 @@ func (s *Service) buildFindingSet(ctx context.Context, feedID string, snapshotID
 		return nil // another instance committed the same content first
 	}
 	return err
+}
+
+// findingSetBuildKey names one cross-instance build: the fixed-length hex digest
+// precedes the feed ID, so distinct (feed, digest) pairs never share a key.
+func findingSetBuildKey(feedID string, digest []byte) string {
+	return hex.EncodeToString(digest) + "/" + feedID
 }
 
 func emptyFindingDigest() []byte {

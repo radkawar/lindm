@@ -66,6 +66,17 @@ FROM principals
 WHERE id = sqlc.arg(id)
 FOR UPDATE;
 
+-- name: GetPrincipalForShare :one
+-- Fences an actor's authority for a transaction that never modifies the actor:
+-- every authority writer takes FOR UPDATE first and waits, while concurrent
+-- fenced dispatch transactions of the same actor proceed in parallel.
+SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
+FROM principals
+WHERE id = sqlc.arg(id)
+FOR SHARE;
+
 -- name: UpdatePrincipalAuthState :exec
 UPDATE principals
 SET display_name = sqlc.arg(display_name),

@@ -188,8 +188,8 @@ func (s *Service) Import(ctx context.Context, id string, input io.Reader) error 
 }
 
 const (
-	// evaluationBatch bounds one pending-device query; each device is matched
-	// in its own bounded transaction.
+	// evaluationBatch bounds one claimed batch of pending devices; each device
+	// is matched in its own bounded transaction.
 	evaluationBatch = 64
 	// evaluationPoll is the latency between a published snapshot/feed
 	// generation and its persisted evaluation; reads never match inline.
@@ -197,6 +197,10 @@ const (
 	// evaluationBudget bounds one evaluation pass before the loop yields to
 	// its ticker again.
 	evaluationBudget = 45 * time.Second
+	// evaluationClaimLease bounds how long a crashed instance's claimed batch
+	// stays hidden from other instances: one pass plus a cold finding-set
+	// build, which outlives its pass. Live instances release claims per batch.
+	evaluationClaimLease = evaluationBudget + findingSetBuildTimeout
 	// evaluationWorkers bounds concurrent device evaluations (and therefore
 	// database connections taken from the shared pool by this job).
 	evaluationWorkers = 4
@@ -280,10 +284,13 @@ func (s *Service) refreshDue(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// RunEvaluations is the exclusive evaluation job and returns only on
-// cancellation. It does not gate on this process's configured feeds: feeds are
-// configured and published in the shared database, possibly by another
-// process, and reads depend on this job alone for evaluation.
+// RunEvaluations is the replicated evaluation job and returns only on
+// cancellation. Every instance claims disjoint batches of pending devices, so
+// evaluation throughput scales with replicas; a claim only distributes work,
+// while each device's row lock and exact revision bindings keep a repeated or
+// overlapping evaluation coherent. It does not gate on this process's
+// configured feeds: feeds are configured and published in the shared database,
+// possibly by another process, and reads depend on this job alone.
 func (s *Service) RunEvaluations(ctx context.Context) error {
 	ticker := time.NewTicker(evaluationPoll)
 	defer ticker.Stop()
@@ -323,10 +330,24 @@ func (s *Service) EvaluatePending(ctx context.Context, limit int32) (int, error)
 }
 
 func (s *Service) evaluatePending(ctx context.Context, limit int32) (attempted, failures int, resultErr error) {
-	ids, err := advisorydb.New(s.pool).ListAdvisoryEvaluationsPending(ctx, limit)
+	q := advisorydb.New(s.pool)
+	token := uuid.New()
+	ids, err := q.ClaimAdvisoryEvaluations(ctx, advisorydb.ClaimAdvisoryEvaluationsParams{LeaseToken: token, LeaseSeconds: int32(evaluationClaimLease / time.Second), RowLimit: limit})
 	if err != nil {
-		return 0, 0, fmt.Errorf("list pending advisory evaluations: %w", err)
+		return 0, 0, fmt.Errorf("claim pending advisory evaluations: %w", err)
 	}
+	if len(ids) == 0 {
+		return 0, 0, nil
+	}
+	defer func() {
+		// Busy or failed devices become claimable again by any instance's next
+		// batch; an unreleased claim expires after evaluationClaimLease.
+		release, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := q.ReleaseAdvisoryEvaluationClaims(release, token); err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("release advisory evaluation claims: %w", err))
+		}
+	}()
 	var (
 		mu   sync.Mutex
 		next atomic.Int64

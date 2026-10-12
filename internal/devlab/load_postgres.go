@@ -47,6 +47,9 @@ type LoadAuthorityOptions struct {
 	// (default loopback) so a generator on another host can reach them. TLS
 	// names and signed origins are unchanged; clients dial this address.
 	ListenAddress string
+	// PostgresListenAddress exposes only the owned durable cluster on this
+	// specific local IPv4 address, with a matching verified TLS certificate.
+	PostgresListenAddress string
 	// Advisories enables real feed refresh/evaluation in the server under test.
 	Advisories *configv1.AdvisoryConfig
 	// PostgresSettings are allowlisted durable-safe server parameters for the
@@ -154,6 +157,14 @@ func (o LoadAuthorityOptions) validate() error {
 	if err := validateLoadPostgresSettings(o.PostgresSettings); err != nil {
 		return err
 	}
+	if o.PostgresListenAddress != "" {
+		if o.DatabaseStorage != "nvme" || o.networkContainer != "" {
+			return errors.New("direct PostgreSQL requires an owned durable nvme cluster")
+		}
+		if err := validateLoadListenAddress(o.PostgresListenAddress); err != nil {
+			return err
+		}
+	}
 	if o.ListenAddress != "" {
 		if err := validateLoadListenAddress(o.ListenAddress); err != nil {
 			return err
@@ -195,6 +206,7 @@ type loadPostgres struct {
 	containerID     string
 	storage         *loadPostgresStorage
 	environment     LoadExperimentEnvironment
+	listenAddress   string
 	createAttempted bool
 }
 
@@ -221,6 +233,9 @@ func loadDockerInto(ctx context.Context, output *nativeexec.Buffer, args ...stri
 
 func loadPostgresArgs(repository, shared, directory string, options LoadAuthorityOptions, storage *loadPostgresStorage) []string {
 	network := []string{"--publish", "127.0.0.1::5432"}
+	if options.PostgresListenAddress != "" {
+		network = []string{"--publish", options.PostgresListenAddress + "::5432"}
+	}
 	if options.networkContainer != "" {
 		network = []string{"--network", "container:" + options.networkContainer}
 	}
@@ -235,7 +250,11 @@ func loadPostgresArgs(repository, shared, directory string, options LoadAuthorit
 		args = append(args, "--mount", "type=bind,src="+storage.mountPath+",dst=/var/lib/postgresql")
 	}
 	for _, name := range []string{"server.crt", "server.key"} {
-		args = append(args, "--mount", "type=bind,src="+filepath.Join(shared, name)+",dst=/run/lindm-dev/"+name+",readonly")
+		source := filepath.Join(shared, name)
+		if options.PostgresListenAddress != "" {
+			source = filepath.Join(directory, "split-"+name)
+		}
+		args = append(args, "--mount", "type=bind,src="+source+",dst=/run/lindm-dev/"+name+",readonly")
 	}
 	for _, name := range []string{"postgres-password", "database-init.sql"} {
 		args = append(args, "--mount", "type=bind,src="+filepath.Join(directory, name)+",dst=/run/lindm-dev/"+name+",readonly")
@@ -260,6 +279,12 @@ func openLoadPostgres(ctx context.Context, repository, shared string, options Lo
 	cluster.directory, err = os.MkdirTemp("", "lindm-load-postgres-")
 	if err != nil {
 		return nil, err
+	}
+	cluster.listenAddress = options.PostgresListenAddress
+	if cluster.listenAddress != "" {
+		if err := writeFixtureCertificate(shared, cluster.directory, netip.MustParseAddr(cluster.listenAddress), 24*time.Hour); err != nil {
+			return nil, err
+		}
 	}
 	secrets := make(map[string]string, 3)
 	for _, name := range []string{"postgres-password", "migrator-password", "runtime-password"} {
@@ -314,15 +339,23 @@ func openLoadPostgres(ctx context.Context, repository, shared string, options Lo
 			return nil, errors.New("invalid dedicated PostgreSQL port mapping")
 		}
 		bindings := ports["5432/tcp"]
-		if len(bindings) != 1 || bindings[0].HostIP != "127.0.0.1" {
-			return nil, errors.New("dedicated PostgreSQL requires exactly one loopback port")
+		expectedAddress := "127.0.0.1"
+		if cluster.listenAddress != "" {
+			expectedAddress = cluster.listenAddress
+		}
+		if len(bindings) != 1 || bindings[0].HostIP != expectedAddress {
+			return nil, errors.New("dedicated PostgreSQL requires exactly one owned address binding")
 		}
 		port, err = strconv.Atoi(bindings[0].HostPort)
 		if err != nil || port < 1 || port > 65535 {
 			return nil, errors.New("invalid dedicated PostgreSQL loopback port")
 		}
 	}
-	migrationURL := url.URL{Scheme: "postgresql", User: url.UserPassword("lindm_migrator", secrets["migrator-password"]), Host: net.JoinHostPort("localhost", strconv.Itoa(port)), Path: "/lindm"}
+	host := "localhost"
+	if cluster.listenAddress != "" {
+		host = cluster.listenAddress
+	}
+	migrationURL := url.URL{Scheme: "postgresql", User: url.UserPassword("lindm_migrator", secrets["migrator-password"]), Host: net.JoinHostPort(host, strconv.Itoa(port)), Path: "/lindm"}
 	migrationURL.RawQuery = url.Values{"sslmode": {"verify-full"}, "sslrootcert": {filepath.Join(shared, "transport-ca.crt")}}.Encode()
 	if err := os.WriteFile(filepath.Join(cluster.directory, "migration-database-url"), []byte(migrationURL.String()), 0600); err != nil {
 		return nil, err

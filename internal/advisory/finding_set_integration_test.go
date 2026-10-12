@@ -130,7 +130,7 @@ func TestConcurrentColdEvaluationBuildsOneSet(t *testing.T) {
 }
 
 // A device whose row is being updated is skipped without a serialization
-// failure and evaluated once the updater commits.
+// failure, is not claimed while busy, and is evaluated once the updater commits.
 func TestEvaluatorSkipsBusyDevice(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
@@ -149,13 +149,20 @@ func TestEvaluatorSkipsBusyDevice(t *testing.T) {
 	if _, err := s.Evaluate(ctx, device); !errors.Is(err, ErrDeviceBusy) {
 		t.Fatalf("busy device: %v", err)
 	}
-	if attempted, failures, err := s.evaluatePending(ctx, evaluationBatch); err != nil || attempted != 1 || failures != 1 {
-		t.Fatalf("all-busy batch must be deferred without errors: attempted=%d failures=%d err=%v", attempted, failures, err)
+	if attempted, failures, err := s.evaluatePending(ctx, evaluationBatch); err != nil || attempted != 0 || failures != 0 {
+		t.Fatalf("busy device must not be claimed: attempted=%d failures=%d err=%v", attempted, failures, err)
 	}
 	if err := updater.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if evaluation, err := s.Evaluate(ctx, device); err != nil || evaluation.State != "evaluated" {
+	if attempted, failures, err := s.evaluatePending(ctx, evaluationBatch); err != nil || attempted != 1 || failures != 0 {
+		t.Fatalf("released device not claimed: attempted=%d failures=%d err=%v", attempted, failures, err)
+	}
+	if evaluation, err := advisorydb.New(pool).GetAdvisoryEvaluation(ctx, device); err != nil || evaluation.State != "evaluated" {
 		t.Fatalf("released device not evaluated: %+v %v", evaluation, err)
+	}
+	var claims int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM advisory_evaluation_claims").Scan(&claims); err != nil || claims != 0 {
+		t.Fatalf("claims not released: %d %v", claims, err)
 	}
 }

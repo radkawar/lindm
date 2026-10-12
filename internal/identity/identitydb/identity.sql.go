@@ -220,6 +220,41 @@ func (q *Queries) GetPrincipalByIssuerSubject(ctx context.Context, arg GetPrinci
 	return i, err
 }
 
+const getPrincipalForShare = `-- name: GetPrincipalForShare :one
+SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
+FROM principals
+WHERE id = $1
+FOR SHARE
+`
+
+// Fences an actor's authority for a transaction that never modifies the actor:
+// every authority writer takes FOR UPDATE first and waits, while concurrent
+// fenced dispatch transactions of the same actor proceed in parallel.
+func (q *Queries) GetPrincipalForShare(ctx context.Context, id uuid.UUID) (Principal, error) {
+	row := q.db.QueryRow(ctx, getPrincipalForShare, id)
+	var i Principal
+	err := row.Scan(
+		&i.ID,
+		&i.Issuer,
+		&i.Subject,
+		&i.DisplayName,
+		&i.PinnedRole,
+		&i.CreatedAt,
+		&i.DeactivatedAt,
+		&i.DeactivationSource,
+		&i.DirectoryEnabled,
+		&i.DirectoryObservedAt,
+		&i.AuthorizationVersion,
+		&i.AuthorizationRole,
+		&i.AuthorizationDigest,
+		&i.ServiceAccount,
+		&i.LifecycleNotBefore,
+	)
+	return i, err
+}
+
 const getPrincipalForUpdate = `-- name: GetPrincipalForUpdate :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,

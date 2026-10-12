@@ -265,6 +265,9 @@ func lockPersistentDirectory(path string, create bool) (dir string, lock *os.Fil
 }
 
 func (f *AuthorityFixture) writeConfig(data []byte) error {
+	if f.scaleOut != nil {
+		return errors.New("configure all replica settings before scale-out")
+	}
 	return writePersistentFile(f.configPath(), data)
 }
 

@@ -16,11 +16,12 @@ import (
 
 // RecordExecutionHealth derives health exclusively from accepted native evidence
 // for the current assignment and generation. Old-head results cannot overwrite a
-// newer campaign. Call Lock before acquiring device/action locks. Healthy evidence
+// newer campaign. Take the fence before acquiring device/action locks; recording
+// rollout health requires an exclusive fence. Healthy evidence
 // retains the oldest underlying verification receipt rather than being refreshed
 // by reading it, receiving a duplicate result, or updating another resource.
-func (s *Store) RecordExecutionHealth(ctx context.Context, tx pgx.Tx, device, generation, assignmentID uuid.UUID) error {
-	if err := s.Lock(ctx, tx); err != nil {
+func (s *Store) RecordExecutionHealth(ctx context.Context, tx pgx.Tx, fence DispatchFence, device, generation, assignmentID uuid.UUID) error {
+	if err := fence.held(tx); err != nil {
 		return err
 	}
 	q := targetingdb.New(tx)
@@ -40,6 +41,9 @@ func (s *Store) RecordExecutionHealth(ctx context.Context, tx pgx.Tx, device, ge
 	}
 	if preview.GenerationId != generation.String() {
 		return ErrConflict
+	}
+	if rolloutBound(preview) && !fence.exclusive {
+		return ErrDispatchFence
 	}
 	seen := make(map[string]bool)
 	for _, candidate := range preview.Candidates {

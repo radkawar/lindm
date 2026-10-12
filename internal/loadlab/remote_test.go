@@ -108,9 +108,31 @@ func TestGeneratorProtocolRequiresInitialization(t *testing.T) {
 		t.Fatalf("generator did not exit cleanly: %v", err)
 	}
 	if startRemoteGeneratorErr := func() error {
-		_, err := startRemoteGenerator(t.Context(), "bad host", "/bin/true", "", io.Discard)
+		_, err := startRemoteGenerator(t.Context(), "bad host", "/bin/true", "", "", io.Discard)
 		return err
 	}(); startRemoteGeneratorErr == nil {
 		t.Fatal("unsafe generator host accepted")
+	}
+}
+
+func TestRemoteGeneratorRejectsUnsafeAffinityBeforeLaunch(t *testing.T) {
+	for _, cpus := range []string{"0;echo unsafe", "0-2,1", "8192", "3-1"} {
+		if _, err := startRemoteGenerator(t.Context(), "unused", "/bin/true", "", cpus, io.Discard); err == nil {
+			t.Fatalf("unsafe CPU list %q accepted", cpus)
+		}
+	}
+}
+
+func TestGeneratorMetricsObserveCurrentProcess(t *testing.T) {
+	before, err := measureGenerator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := measureGenerator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.RSSBytes == 0 || after.RSSBytes == 0 || after.CPUSeconds < before.CPUSeconds {
+		t.Fatalf("invalid process counters before=%+v after=%+v", before, after)
 	}
 }

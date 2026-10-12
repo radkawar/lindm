@@ -305,6 +305,70 @@ func (q *Queries) AdvisorySourceMappingMissing(ctx context.Context, snapshotID u
 	return column_1, err
 }
 
+const claimAdvisoryEvaluations = `-- name: ClaimAdvisoryEvaluations :many
+WITH pending AS (
+ SELECT d.id, e.evaluated_at FROM devices d
+ LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+ LEFT JOIN host_observations h ON h.generation_id=g.id
+ LEFT JOIN advisory_evaluations e ON e.device_id=d.id
+ LEFT JOIN advisory_feeds af ON af.id=e.feed_id
+ WHERE d.state='active' AND (e.device_id IS NULL
+  OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
+  OR e.host_received_at IS DISTINCT FROM h.received_at
+  OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
+  OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
+  AND NOT EXISTS (SELECT 1 FROM advisory_evaluation_claims c WHERE c.device_id=d.id AND c.lease_until>clock_timestamp())
+ ORDER BY e.evaluated_at NULLS FIRST,d.id
+ LIMIT $3::integer*4
+), available AS (
+ SELECT d.id FROM devices d JOIN pending p ON p.id=d.id
+ ORDER BY p.evaluated_at NULLS FIRST,d.id
+ LIMIT $3::integer
+ FOR NO KEY UPDATE OF d SKIP LOCKED
+)
+INSERT INTO advisory_evaluation_claims(device_id,lease_token,lease_until)
+SELECT id,$1,clock_timestamp()+$2::integer*interval '1 second' FROM available
+ON CONFLICT(device_id) DO UPDATE SET lease_token=EXCLUDED.lease_token,lease_until=EXCLUDED.lease_until
+WHERE advisory_evaluation_claims.lease_until<=clock_timestamp()
+RETURNING device_id
+`
+
+type ClaimAdvisoryEvaluationsParams struct {
+	LeaseToken   uuid.UUID
+	LeaseSeconds int32
+	RowLimit     int32
+}
+
+// Evaluations are recomputed only when their bound evidence changes: a new
+// published snapshot or host observation, a new feed generation, or a disabled
+// bound feed. Feed selection depends only on enabled feed configuration, so a
+// device evaluated without any applicable feed is rechecked once any process
+// configures or re-enables a feed after that evaluation. Time-based expiry needs
+// no worker: the read path and advisory_finding_status recheck it.
+// Every replica claims a disjoint batch: unexpired claims are excluded, devices
+// whose row another claimer, evaluator or session update holds are skipped, and
+// a claim committed concurrently for the same device is never taken over before
+// it expires. Oversampling keeps a concurrent claimer's batch full.
+func (q *Queries) ClaimAdvisoryEvaluations(ctx context.Context, arg ClaimAdvisoryEvaluationsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, claimAdvisoryEvaluations, arg.LeaseToken, arg.LeaseSeconds, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var device_id uuid.UUID
+		if err := rows.Scan(&device_id); err != nil {
+			return nil, err
+		}
+		items = append(items, device_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const configureAdvisoryFeed = `-- name: ConfigureAdvisoryFeed :exec
 INSERT INTO advisory_feeds (id,distro,release,source_url,config_bytes,revision,platform_stream)
 VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -784,47 +848,6 @@ type InsertAdvisorySetFindingsParams struct {
 	SourceUrl        string
 }
 
-const listAdvisoryEvaluationsPending = `-- name: ListAdvisoryEvaluationsPending :many
-SELECT d.id FROM devices d
-LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
-LEFT JOIN host_observations h ON h.generation_id=g.id
-LEFT JOIN advisory_evaluations e ON e.device_id=d.id
-LEFT JOIN advisory_feeds af ON af.id=e.feed_id
-WHERE d.state='active' AND (e.device_id IS NULL
- OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
- OR e.host_received_at IS DISTINCT FROM h.received_at
- OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
- OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
-ORDER BY e.evaluated_at NULLS FIRST,d.id
-LIMIT $1
-`
-
-// Evaluations are recomputed only when their bound evidence changes: a new
-// published snapshot or host observation, a new feed generation, or a disabled
-// bound feed. Feed selection depends only on enabled feed configuration, so a
-// device evaluated without any applicable feed is rechecked once any process
-// configures or re-enables a feed after that evaluation. Time-based expiry needs
-// no worker: the read path and advisory_finding_status recheck it.
-func (q *Queries) ListAdvisoryEvaluationsPending(ctx context.Context, rowLimit int32) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listAdvisoryEvaluationsPending, rowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listAdvisoryFeeds = `-- name: ListAdvisoryFeeds :many
 SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
 `
@@ -1283,6 +1306,15 @@ func (q *Queries) QueueAdvisoryGenerationCleanup(ctx context.Context, arg QueueA
 	return err
 }
 
+const releaseAdvisoryEvaluationClaims = `-- name: ReleaseAdvisoryEvaluationClaims :exec
+DELETE FROM advisory_evaluation_claims WHERE lease_token=$1
+`
+
+func (q *Queries) ReleaseAdvisoryEvaluationClaims(ctx context.Context, leaseToken uuid.UUID) error {
+	_, err := q.db.Exec(ctx, releaseAdvisoryEvaluationClaims, leaseToken)
+	return err
+}
+
 const renewAdvisoryGeneration = `-- name: RenewAdvisoryGeneration :execrows
 UPDATE advisory_generation_cleanup SET cleanup_after=clock_timestamp()+interval '10 minutes'
 WHERE generation=$1 AND cleanup_after>clock_timestamp()
@@ -1380,8 +1412,8 @@ SELECT id FROM devices WHERE id=$1 FOR UPDATE SKIP LOCKED
 `
 
 // The background evaluator skips a device whose row is being updated (session,
-// heartbeat, inventory) instead of waiting: in its repeatable-read snapshot a
-// wait ends in a serialization failure. A skipped device stays pending.
+// heartbeat, inventory) instead of holding a pool connection while it waits. A
+// skipped device stays pending.
 func (q *Queries) TryLockAdvisoryDevice(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, tryLockAdvisoryDevice, id)
 	if err != nil {
@@ -1400,4 +1432,19 @@ func (q *Queries) TryLockAdvisoryDevice(ctx context.Context, id uuid.UUID) ([]uu
 		return nil, err
 	}
 	return items, nil
+}
+
+const tryLockAdvisoryFindingSetBuild = `-- name: TryLockAdvisoryFindingSetBuild :one
+SELECT pg_try_advisory_xact_lock(1818848877, hashtext($1::text)) AS locked
+`
+
+// One instance builds a missing finding set; others defer its devices instead
+// of repeating the cold match. The two-key advisory lock space never collides
+// with the job supervisor's single-key leadership locks. A hash collision only
+// defers another set's devices until this build commits.
+func (q *Queries) TryLockAdvisoryFindingSetBuild(ctx context.Context, buildKey string) (bool, error) {
+	row := q.db.QueryRow(ctx, tryLockAdvisoryFindingSetBuild, buildKey)
+	var locked bool
+	err := row.Scan(&locked)
+	return locked, err
 }

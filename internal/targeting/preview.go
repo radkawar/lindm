@@ -443,7 +443,12 @@ func (s *Store) Activate(ctx context.Context, tx pgx.Tx, p identity.Principal, p
 	if err = q.SetTargetExecutionHead(ctx, targetingdb.SetTargetExecutionHeadParams{DeviceID: row.DeviceID, PreviewID: uuid.MustParse(r.PreviewId)}); err != nil {
 		return nil, err
 	}
-	if err := s.RecordExecutionHealth(ctx, tx, row.DeviceID, uuid.MustParse(preview.GenerationId), uuid.MustParse(preview.PreviewId)); err != nil {
+	// Activation is a targeting writer: it holds (or here retakes) the
+	// exclusive fence, as RecordExecutionHealth formerly took it itself.
+	if err := s.Lock(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := s.RecordExecutionHealth(ctx, tx, DispatchFence{tx: tx, exclusive: true}, row.DeviceID, uuid.MustParse(preview.GenerationId), uuid.MustParse(preview.PreviewId)); err != nil {
 		return nil, err
 	}
 	out.Preview = preview
@@ -494,12 +499,78 @@ func (s *Store) Lock(ctx context.Context, tx pgx.Tx) error {
 	return targetingdb.New(tx).LockTargeting(ctx)
 }
 
+// ErrDispatchFence reports that a dispatch holding the shared fence reached a
+// rollout-bound assignment (its head moved after the fence was chosen). The
+// device retries; no rollout state was read or written under the shared fence.
+var ErrDispatchFence = errors.New("targeting_dispatch_fence_changed")
+
+// DispatchFence records which targeting fence one device-dispatch transaction
+// holds. Only LockDispatch constructs a usable value.
+type DispatchFence struct {
+	tx        pgx.Tx
+	exclusive bool
+}
+
+func (f DispatchFence) held(tx pgx.Tx) error {
+	if tx == nil || f.tx != tx {
+		return ErrRejected
+	}
+	return nil
+}
+
+// LockDispatch takes the targeting fence for one device dispatch of
+// assignmentID (uuid.Nil without a head) before any device lock. The immutable
+// target preview decides the mode: dispatch for an assignment with an included
+// rollout candidate may refresh or record rollout state and takes the
+// exclusive fence, as every targeting writer does. Any other dispatch changes
+// only its own device's rows and shares the fence, so dispatches to different
+// devices commit in parallel while every targeting writer still waits for them.
+func (s *Store) LockDispatch(ctx context.Context, tx pgx.Tx, assignmentID uuid.UUID) (DispatchFence, error) {
+	if tx == nil {
+		return DispatchFence{}, ErrRejected
+	}
+	q := targetingdb.New(tx)
+	exclusive := false
+	if assignmentID != uuid.Nil {
+		row, err := q.GetTargetPreview(ctx, assignmentID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return DispatchFence{}, err
+		}
+		if err == nil {
+			preview := new(policyv1.TargetPreview)
+			if err := proto.Unmarshal(row.Document, preview); err != nil {
+				return DispatchFence{}, err
+			}
+			exclusive = rolloutBound(preview)
+		}
+	}
+	lock := q.LockTargetingShared
+	if exclusive {
+		lock = q.LockTargeting
+	}
+	if err := lock(ctx); err != nil {
+		return DispatchFence{}, err
+	}
+	return DispatchFence{tx: tx, exclusive: exclusive}, nil
+}
+
+// rolloutBound reports whether dispatching the preview's assignment can refresh
+// or record rollout state.
+func rolloutBound(preview *policyv1.TargetPreview) bool {
+	for _, c := range preview.Candidates {
+		if c.Match == included && c.Assignment.RolloutId != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckExecution is exclusively a device-dispatch boundary: the caller must
 // authenticate device generation and freshly authorize the adopted actor using
 // its ordinary domain scope helpers. False is a gate result, not a transaction
 // error: commit any automatic pause before withholding new effect authority.
-func (s *Store) CheckExecution(ctx context.Context, tx pgx.Tx, deviceID, generationID, assignmentID uuid.UUID) (bool, error) {
-	if err := s.Lock(ctx, tx); err != nil {
+func (s *Store) CheckExecution(ctx context.Context, tx pgx.Tx, fence DispatchFence, deviceID, generationID, assignmentID uuid.UUID) (bool, error) {
+	if err := fence.held(tx); err != nil {
 		return false, err
 	}
 	q := targetingdb.New(tx)
@@ -519,6 +590,9 @@ func (s *Store) CheckExecution(ctx context.Context, tx pgx.Tx, deviceID, generat
 	}
 	if preview.GenerationId != generationID.String() {
 		return false, nil
+	}
+	if rolloutBound(preview) && !fence.exclusive {
+		return false, ErrDispatchFence
 	}
 	for _, c := range preview.Candidates {
 		if c.Match == included && c.Assignment.RolloutId != nil {

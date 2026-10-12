@@ -563,6 +563,19 @@ func (q *Queries) LockTargetingDevice(ctx context.Context, id uuid.UUID) (uuid.U
 	return id_2, err
 }
 
+const lockTargetingShared = `-- name: LockTargetingShared :exec
+SELECT singleton FROM targeting_lock WHERE singleton FOR SHARE
+`
+
+// Device dispatch that cannot change targeting or rollout state shares the
+// fence: every LockTargeting writer waits for it, while dispatches to other
+// devices proceed in parallel. It never advances the revision, so it forces no
+// REPEATABLE READ waiter to retry; such dispatch writes only per-device state.
+func (q *Queries) LockTargetingShared(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockTargetingShared)
+	return err
+}
+
 const putDynamicGroup = `-- name: PutDynamicGroup :execrows
 INSERT INTO dynamic_target_groups(id,revision,definition) SELECT $1,1,$2 WHERE $3::bigint=0
 ON CONFLICT(id) DO UPDATE SET revision=dynamic_target_groups.revision+1,definition=EXCLUDED.definition WHERE dynamic_target_groups.revision=$3::bigint

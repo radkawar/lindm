@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"lindm/internal/devlab"
 	"lindm/internal/loadlab"
 )
 
@@ -33,6 +34,14 @@ func runLoad(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	generatorHost := flags.String("generator-host", "", "SSH alias running simulated devices via `lab load-generator`; default in-process")
 	generatorBinary := flags.String("generator-binary", "", "absolute path of the prebuilt lab executable on -generator-host")
 	generatorSSH := flags.String("generator-ssh-config", "", "optional absolute ssh_config file (ssh -F) for -generator-host")
+	remoteGeneratorCPUs := flags.String("remote-generator-cpus", "", "remote generator taskset CPU list; isolate it from remote lindmd replicas")
+	replicaHost := flags.String("replica-host", "", "SSH host for an additional owned lindmd replica behind TLS passthrough HAProxy")
+	replicaSSH := flags.String("replica-ssh-config", "", "absolute ssh_config file for the remote replica")
+	replicaBinary := flags.String("replica-binary", "", "absolute prebuilt lindmd path on the replica host")
+	replicaAddress := flags.String("replica-address", "", "remote replica direct-link IPv4 address")
+	replicaCPUs := flags.String("replica-cpus", "", "remote lindmd CPU list")
+	replicas := flags.Int("replicas", 2, "scale-out replicas (2 or 3); requires -replica-host")
+	thirdReplicaCPUs := flags.String("third-replica-cpus", "", "third replica local CPU list, disjoint from local lindmd/PostgreSQL")
 	advisoryFeeds := flags.String("advisory-feeds", "", "strict protobuf JSON AdvisoryConfig of real feeds; enables server refresh/evaluation and the advisory freshness SLO")
 	packageBaseline := flags.String("package-baseline", "", "protobuf JSON PackageBatch of recorded native packages placed first in every snapshot")
 	postgresSettings := flags.String("postgres-settings", "", "comma-separated allowlisted name=value tuning for the dedicated nvme/tmpfs PostgreSQL (durability settings are rejected)")
@@ -57,9 +66,15 @@ func runLoad(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	if reexecuted, err := loadlab.ReexecWithGeneratorCPUs(ctx, loadlab.CPUConfig{GeneratorCPUs: *generatorCPUs, ServerCPUs: *serverCPUs, PostgresCPUs: *postgresCPUs}, stdout, stderr); reexecuted || err != nil {
 		return err
 	}
+	var scaleOut *devlab.ScaleOutOptions
+	if *replicaHost != "" {
+		scaleOut = &devlab.ScaleOutOptions{SSHHost: *replicaHost, SSHConfig: *replicaSSH, RemoteBinary: *replicaBinary, RemoteAddress: *replicaAddress, RemoteCPUs: *replicaCPUs, LocalReplicaCPUs: *thirdReplicaCPUs, Replicas: *replicas}
+	} else if *replicaSSH != "" || *replicaBinary != "" || *replicaAddress != "" || *replicaCPUs != "" || *thirdReplicaCPUs != "" || *replicas != 2 {
+		return errors.New("replica options require -replica-host")
+	}
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Hour)
 	defer cancel()
-	result, err := loadlab.Run(ctx, loadlab.Options{Repository: *repo, ServerBinary: *binary, Stages: counts, StageDuration: *duration, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, Seed: *seed, PoolSize: uint32(*pool), ProfileDir: *profiles, DatabaseStorage: *storage, GeneratorCPUs: *generatorCPUs, ServerCPUs: *serverCPUs, PostgresCPUs: *postgresCPUs, ListenAddress: *listen, GeneratorHost: *generatorHost, GeneratorBinary: *generatorBinary, GeneratorSSHConfig: *generatorSSH, AdvisoryFeeds: *advisoryFeeds, PackageBaseline: *packageBaseline, PostgresSettings: splitSettings(*postgresSettings)})
+	result, err := loadlab.Run(ctx, loadlab.Options{Repository: *repo, ServerBinary: *binary, Stages: counts, StageDuration: *duration, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, Seed: *seed, PoolSize: uint32(*pool), ProfileDir: *profiles, DatabaseStorage: *storage, GeneratorCPUs: *generatorCPUs, ServerCPUs: *serverCPUs, PostgresCPUs: *postgresCPUs, ListenAddress: *listen, GeneratorHost: *generatorHost, GeneratorBinary: *generatorBinary, GeneratorSSHConfig: *generatorSSH, AdvisoryFeeds: *advisoryFeeds, PackageBaseline: *packageBaseline, PostgresSettings: splitSettings(*postgresSettings), ScaleOut: scaleOut, RemoteGeneratorCPUs: *remoteGeneratorCPUs})
 	return errors.Join(err, writeLabEvidence(stdout, *record, result))
 }
 

@@ -2,6 +2,13 @@
 -- Updating the fence forces REPEATABLE READ waiters to reject a stale snapshot.
 UPDATE targeting_lock SET revision=revision+1 WHERE singleton;
 
+-- name: LockTargetingShared :exec
+-- Device dispatch that cannot change targeting or rollout state shares the
+-- fence: every LockTargeting writer waits for it, while dispatches to other
+-- devices proceed in parallel. It never advances the revision, so it forces no
+-- REPEATABLE READ waiter to retry; such dispatch writes only per-device state.
+SELECT singleton FROM targeting_lock WHERE singleton FOR SHARE;
+
 -- name: LockTargetingDevice :one
 SELECT id FROM devices WHERE id=$1 FOR UPDATE;
 

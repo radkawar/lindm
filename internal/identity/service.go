@@ -53,6 +53,7 @@ type Service struct {
 	verifier      *oidc.IDTokenVerifier
 	directory     DirectorySource
 	flights       flightGroup
+	freshRounds   freshRoundGroup
 	now           func() time.Time
 }
 

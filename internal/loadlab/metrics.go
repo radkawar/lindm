@@ -123,6 +123,12 @@ func breached(rpc map[string]RPCResult) bool {
 		if (name == "GetSyncState" || name == "GetResourceWork") && r.P99Milliseconds >= 1000 {
 			return true
 		}
+		if name == "GetFleetSummary" && (r.P95Milliseconds >= 500 || r.Errors > 0) {
+			return true
+		}
+		if name == "AuthorizeResourceStart" && r.P95Milliseconds >= 1000 {
+			return true
+		}
 	}
 	return false
 }

@@ -21,11 +21,12 @@ import (
 // grant, which the generator consumes immediately and never persists.
 
 type generatorRequest struct {
-	ID     uint64
-	Init   *generatorInit
-	Enroll *generatorEnroll
-	Stage  *generatorStage
-	Export bool
+	ID      uint64
+	Init    *generatorInit
+	Enroll  *generatorEnroll
+	Stage   *generatorStage
+	Export  bool
+	Measure bool
 }
 
 type generatorInit struct {
@@ -39,6 +40,7 @@ type generatorInit struct {
 	Baseline          []byte
 	Seed              uint64
 	AssignmentPercent int
+	CPUs              string
 }
 
 type generatorEnroll struct {
@@ -58,6 +60,7 @@ type generatorResponse struct {
 	Identity   *GeneratorIdentity
 	Counters   *generatorCounters
 	Histograms map[string]HistogramData
+	Metrics    *GeneratorMetrics
 }
 
 // GeneratorIdentity is the remote generator host and executable evidence.
@@ -65,6 +68,7 @@ type GeneratorIdentity struct {
 	Host     string
 	SHA256   string
 	Hardware map[string]string
+	Affinity ProcessAffinity
 }
 
 type generatorCounters struct {
@@ -89,9 +93,14 @@ type remoteGenerator struct {
 
 // startRemoteGenerator launches `lab load-generator` on an SSH alias. The
 // binary path is an absolute, pre-staged executable on that host.
-func startRemoteGenerator(ctx context.Context, host, binary, sshConfig string, stderr io.Writer) (*remoteGenerator, error) {
+func startRemoteGenerator(ctx context.Context, host, binary, sshConfig, cpus string, stderr io.Writer) (*remoteGenerator, error) {
 	if !generatorHostPattern.MatchString(host) || !generatorPathPattern.MatchString(binary) || (sshConfig != "" && !generatorPathPattern.MatchString(sshConfig)) {
 		return nil, errors.New("load: generator host must be an SSH alias and generator binary/SSH config absolute plain paths")
+	}
+	if cpus != "" {
+		if _, err := ParseCPUSet(cpus); err != nil {
+			return nil, fmt.Errorf("remote generator CPUs: %w", err)
+		}
 	}
 	args := []string{"-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=8", "-T"}
 	if sshConfig != "" {
@@ -99,7 +108,11 @@ func startRemoteGenerator(ctx context.Context, host, binary, sshConfig string, s
 	}
 	// Not labexec: one ssh process whose stdin and stdout carry the streaming
 	// generator protocol for the whole run.
-	command := exec.CommandContext(ctx, "ssh", append(args, host, "--", binary, "load-generator")...)
+	remote := []string{binary, "load-generator"}
+	if cpus != "" {
+		remote = append([]string{"taskset", "--cpu-list", cpus}, remote...)
+	}
+	command := exec.CommandContext(ctx, "ssh", append(append(args, host, "--"), remote...)...)
 	command.Stderr = stderr
 	command.WaitDelay = 30 * time.Second
 	stdin, err := command.StdinPipe()
@@ -298,6 +311,13 @@ func ServeGenerator(ctx context.Context, in io.Reader, out io.Writer) error {
 			case request.Export:
 				response.Histograms = r.metrics.export(true)
 				response.Counters = &generatorCounters{Completed: r.completed.Load(), CompletedDevices: r.completedDevices.Load(), InventoryCycles: r.inventoryCycles.Load()}
+			case request.Measure:
+				metrics, err := measureGenerator()
+				if err != nil {
+					response.Error = err.Error()
+				} else {
+					response.Metrics = &metrics
+				}
 			default:
 				response.Error = "unknown generator request"
 			}
@@ -316,6 +336,10 @@ func newGeneratorRunner(ctx context.Context, init *generatorInit) (*runner, *Gen
 		return nil, nil, err
 	}
 	identity := &GeneratorIdentity{}
+	identity.Affinity = GetProcessAffinity(os.Getpid(), init.CPUs)
+	if identity.Affinity.Error != "" || (init.CPUs != "" && !identity.Affinity.MatchesRequested) {
+		return nil, nil, fmt.Errorf("remote generator affinity: %+v", identity.Affinity)
+	}
 	identity.Hardware, err = hardware(ctx)
 	if err != nil {
 		return nil, nil, err

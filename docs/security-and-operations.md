@@ -1234,15 +1234,15 @@ PostgreSQL requirements:
 
 Background jobs (inventory in `internal/server/jobs.go`):
 
-| Job                      | Distribution                                 | Correctness fence under overlap or retry                                                                   |
-| ------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `snapshot-cleanup`       | Exclusive, advisory key `0x6c696e646d000001` | Per-device row lock; staging/receipt reservations released once                                            |
-| `advisory-maintenance`   | Exclusive, key `0x6c696e646d000002`          | Refresh schedule from durable per-feed `attempted_at`; leased publication generations; SKIP LOCKED cleanup |
-| `advisory-evaluation`    | Exclusive, key `0x6c696e646d000003`          | Per-device lock; a repeated evaluation replaces the stored result                                          |
-| `compliance-deadlines`   | Exclusive, key `0x6c696e646d000004`          | SKIP LOCKED assignment lock; events emitted only on state transitions                                      |
-| `rollout-promoter`       | Exclusive, key `0x6c696e646d000005`          | Scanned rollout revision CAS, targeting fence, unique revision event and current creator authorization     |
-| `integration-deliveries` | Replicated (four workers per replica)        | Random token + generation leases; receivers deduplicate the signed `event_id`                              |
-| `reports`                | Replicated                                   | SKIP LOCKED schedule and artifact leases with token and database time                                      |
+| Job                      | Distribution                                                            | Correctness fence under overlap or retry                                                                                                                                                                                                                                            |
+| ------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot-cleanup`       | Exclusive, advisory key `0x6c696e646d000001`                            | Per-device row lock; staging/receipt reservations released once                                                                                                                                                                                                                     |
+| `advisory-maintenance`   | Exclusive, key `0x6c696e646d000002`                                     | Refresh schedule from durable per-feed `attempted_at`; leased publication generations; SKIP LOCKED cleanup                                                                                                                                                                          |
+| `advisory-evaluation`    | Replicated (four workers per replica); key `0x6c696e646d000003` retired | Expiring per-device claims (`advisory_evaluation_claims`, SKIP LOCKED) distribute batches; per-device row lock and exact revision bindings make an overlapping evaluation coherent; one instance builds a missing finding set (transaction advisory lock), others defer its devices |
+| `compliance-deadlines`   | Exclusive, key `0x6c696e646d000004`                                     | SKIP LOCKED assignment lock; events emitted only on state transitions                                                                                                                                                                                                               |
+| `rollout-promoter`       | Exclusive, key `0x6c696e646d000005`                                     | Scanned rollout revision CAS, targeting fence, unique revision event and current creator authorization                                                                                                                                                                              |
+| `integration-deliveries` | Replicated (four workers per replica)                                   | Random token + generation leases; receivers deduplicate the signed `event_id`                                                                                                                                                                                                       |
+| `reports`                | Replicated                                                              | SKIP LOCKED schedule and artifact leases with token and database time                                                                                                                                                                                                               |
 
 Each replica opens one dedicated coordination session (never from the pool),
 refuses it if it reached a standby (`pg_is_in_recovery()`), and polls
@@ -1544,6 +1544,27 @@ accepted. Each device continues its inventory cadence from its own previous
 collection across plateaus (the server rejects collections closer than its
 admission interval).
 
+Scale-out mode adds `-replica-host ALIAS -replica-binary /abs/lindmd
+-replica-address DIRECT_IP [-replica-ssh-config FILE] -replica-cpus CPU_LIST`
+to the two-host command. It requires owned `-database-storage nvme` and a
+literal `-listen-address` for the PostgreSQL host. Two replicas share that
+durable database behind pinned HAProxy in TCP/TLS-passthrough mode; `-replicas 3
+-third-replica-cpus CPU_LIST` adds a third local replica. This capacity topology
+has **one PostgreSQL host**, not a qualified HA database pair. Configuration,
+keys and public origins are identical; normal exclusive-job coordination remains
+enabled. `-remote-generator-cpus CPU_LIST` pins the remote generator separately
+from the remote replica and records every thread's effective affinity.
+Thirty-second scale-out samples retain each replica's CPU/RSS, cumulative
+balancer connection counts and generator CPU/RSS. Connection counts prove
+backend distribution, not per-request round-robin routing through HTTP/2.
+
+The harness also enforces the published ordinary-read and durable-start latency
+budgets: `GetFleetSummary` p95 below 500 ms with no failed read, and
+`AuthorizeResourceStart` p95 below 1 s. These join the existing sync/work p99,
+non-retryable-error, snapshot-completion and advisory-freshness gates; earlier
+records that did not enforce these two percentiles must be interpreted against
+their retained RPC measurements.
+
 The default ramp is 500, 2,000, 5,000 and 10,000 freshly enrolled identities,
 11 minutes per plateau, eight enrollment workers, 2,000 packages per device and a
 5% service assignment. Every identity obtains a real one-use enrollment grant,
@@ -1827,7 +1848,7 @@ flight) the device protocol itself held: 100% snapshots, sync/work p99
 - `AuthorizeResourceStart` p50 was 3.6 s.
 
 The knee is therefore between 10,000 and 20,000. Above 10,000 use the
-replicated profile.
+scale-out profile below (measured to 20,000).
 
 Fixes, each with regressions:
 
@@ -1870,7 +1891,111 @@ defaults, `GetFleetSummary` exceeded 30 s at 5,000 devices on WAL contention.
 Size `max_connections` for both pools per replica. Budget about 3.3 GB of server
 RSS and about 16 GB of database at 10,000 devices with 2,000-package
 inventories. A cold enrollment of the whole fleet is evaluated within about
-four minutes at 10,000 devices. Above 10,000 devices use the replicated profile.
+four minutes at 10,000 devices. Above 10,000 devices use the scale-out profile.
+
+#### Measured scale-out limit: 20,000 devices (three replicas, two hosts, real feeds, 2026-10-12)
+
+**Published scale-out limit: 20,000 enrolled devices with three `lindmd`
+replicas and one PostgreSQL**, sized as below, for the same workload, feeds and
+SLO gates as the single-host limit. Each replica keeps the default device pool 8
+(admission 64) and console pool 4. This is a capacity topology, not database
+HA: the single PostgreSQL is a single point of failure, and failover under this
+load is not qualified (see the replicated failover laboratory below). Also not
+qualified: more than 20,000 devices, rollout-bound dispatch at this rate (it
+keeps the exclusive targeting fence; the workload used direct assignments), a
+24-hour soak, and the other exclusions of the single-host limit.
+
+| Devices | `lindmd` replicas                                    | Pools per replica                                                                              | PostgreSQL                                                                       | Measured                                                                                |
+| ------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 10,000  | 1 × 4 vCPU (single-host profile above)               | device 8, console 4                                                                            | 4 dedicated vCPU, tuned as above, durable NVMe                                   | `soak-v5`: 2 h pass                                                                     |
+| 20,000  | 3 × 4 vCPU on ≥2 hosts behind TCP/TLS-passthrough LB | device 8, console 4 (`max_connections` ≥ 3 × 13 plus admin); `inventory_budget_bytes` ≥ 20 GiB | 4 dedicated vCPU, same tuning, durable NVMe with ≥1,400 synced writes/s headroom | ramp + 2 h soak pass; ≤1.2 cores and ≤2.3 GB RSS per replica; ~33 GB database after 2 h |
+
+Topology: PostgreSQL 18.6 on dgx21 CPUs 15–18 on an owned NVMe-backed loop/XFS
+filesystem with durable fsync; replica1 on dgx21 CPUs 5–8 and replica3 on dgx21
+CPUs 9–12; replica2 on dgx20 CPUs 5–8, connected to PostgreSQL over the
+200 Gb/s direct link (verified TLS, `169.254.40.186`). Pinned HAProxy
+(`haproxy:3.2@sha256:89c31eab…`, 3.2.25) on dgx21 balances admin and device TLS
+connections without terminating them; backend connection counts stayed equal
+(15,667/15,666/15,666 at 20,000). Normal leader-only jobs remained exclusive. The
+generator ran on dgx20 CPUs 0–4,10–14. The `advisory-maintenance` leader
+refreshed the real Ubuntu OSV export of the single-host run and all replicas
+evaluated against it. Records are under
+`~/.cache/lindm-scaleout-20261011/records/` (copied from dgx21).
+
+| Run (record, SHA-256 prefix) | Server                                  | Result                                                                                                                                |
+| ---------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ramp-before-2r` `5f48cfe3`  | baseline `101460a8`, 2 replicas         | 10,000 fails: `AuthorizeResourceStart` p95 3.0 s; cold fleet evaluated 120 s into the plateau by the leader alone                     |
+| `ramp-after-3r` `88c4dd9b`   | + claimed replicated evaluation         | fleet evaluated before the plateau began; 10,000 still fails: start p95 1.9 s on the assigning actor's principal row and console pool |
+| `diag2-10k` `c55b4c3d`       | + shared authority fence (instrumented) | start p95 1.24 s; fresh directory observations still queued one principal write each                                                  |
+| `diag3-10k` `0eb55e5c`       | + observation rounds (instrumented)     | **10,000 passes**; start p95 382 ms                                                                                                   |
+| `ramp-final-3r` `8efc08c1`   | uninstrumented                          | 10,000 passes; 20,000 fails: start p95 1.9 s on the global targeting fence, one 10 s `GetFleetSummary` timeout                        |
+| `ramp-final2-3r` `804c66dd`  | + shared targeting fence                | 20,000 fails narrowly: start p95 1.22 s, audit-chain head held through relock statements                                              |
+| `ramp-final3-3r` `8e14dc9e`  | + audit last, `7ea79bab` (`9ec9c2e1`)   | **10,000 and 20,000 pass**                                                                                                            |
+
+Passing 20,000 plateau (`ramp-final3-3r`): sync/work p50/p95/p99 7/34/104 and
+1/21/95 ms; zero non-retryable errors; 21,903 of 21,903 recurring snapshots and
+all 1,000 signed service cycles; `AuthorizeResourceStart` p50/p95/p99
+473/870/1005 ms; `GetFleetSummary` p50/p95/p99 194/261/263 ms over 22 reads with
+no failure. The fleet's cold evaluations completed during enrollment (19,958 of
+20,000 at the first plateau sample) and coverage stayed ≥99.67%. Retryable
+`admission_rejected` affected 2.7% of syncs and 6% of start requests; agents
+defer as designed. At 10,000 the same run gave sync/work p99 20/11 ms and start
+p95 110 ms with no admission rejection.
+
+Two-hour soak at 20,000 (`soak-final3-3r`, same binary and topology, cold
+enrollment of all 20,000 devices in 690 s):
+
+- 233,757 of 234,652 recurring snapshots (99.62%), 8,000 signed cycles and zero
+  non-retryable errors.
+- Sync/work p50/p95/p99: 10/22/58 and 1/13/40 ms. `AuthorizeResourceStart`
+  p50/p95/p99: 117/705/952 ms over 8,137 calls.
+- `GetFleetSummary` p50/p95/p99: 255/432/2,244 ms over 240 reads (max 4.96 s),
+  with no failed read.
+- 19,969 of 20,000 devices were evaluated at the first plateau sample; coverage
+  stayed ≥99.30%.
+- Replica CPU averaged 0.64, 0.64 and 1.16 cores; RSS was flat over the second
+  hour (2.25–2.27 → 2.27–2.29 GB). The database grew from 31.9 to 32.7 GB over
+  the second hour.
+- The default 10 GiB `inventory_budget_bytes` filled: 62,714 snapshot starts
+  (21%) were deferred with retryable `inventory_budget` and completed later.
+  At 20,000 devices set the budget to at least 20 GiB; that larger value was not
+  measured.
+
+Record SHA-256 `69077bcdfbbd762f77d0db4c8fdebcf8d01777222ced407d8d6e8e25a472cb05`,
+ramp `ramp-final3-3r`
+`8e14dc9e1d93929b21a55925782f963dc326b07c0d981b6afed4838e8979ade6`, server
+`7ea79bab564af53aa3a7b5187655d45721a7a4001ceec33c6df108e9e1acc2be` (all three
+replicas), generator
+`3bf4b620731ab829062616a056d274b900881a71b577ac12e01df3387b1ed86b` (worktree
+commit `9ec9c2e1` on `101460a8`). dgx21 also ran other agents' work, with a load
+average up to 16 during the soak; host samples are in each record.
+
+Product fixes, each with regressions:
+
+1. Advisory evaluation is a replicated job (key `0x6c696e646d000003` retired).
+   Replicas claim disjoint batches in `advisory_evaluation_claims` (migration
+   `00032`, `FOR NO KEY UPDATE SKIP LOCKED`, 165 s expiry); claims only
+   distribute work. A transaction-scoped advisory lock lets one replica build a
+   missing finding set while others defer its devices.
+2. The evaluator's device binding runs `READ COMMITTED` and appends its audit as
+   the last statement, so a committed unrelated audit no longer aborts it with 40001. The hash chain and its head lock are unchanged.
+3. Fresh authorization joins only a later observation round per actor and
+   replica: one directory read and one principal write serve all callers that
+   arrived before the round started.
+4. Resource minting and starts hold the actor's principal `FOR SHARE`, and
+   unchanged observed groups are not rewritten.
+5. Non-rollout dispatch holds the targeting fence `FOR SHARE`; rollout-bound
+   dispatch and targeting writers stay exclusive.
+6. Mint and start append their audit as the last statement before commit.
+7. Harness: owned three-replica topology, remote replica custody without
+   reading a non-dumpable process's executable link, and IPv4 link-local direct
+   links.
+
+At 20,000 the next limits are visible: the NVMe loop device carried
+1,200–1,400 synced writes/s at 93–96% utilization, and the remaining lock waits
+are the global `inventory_reservation` row and the audit-chain head, both held
+through a WAL flush. More replicas do not raise this limit; faster durable WAL
+storage or sharding those two counters would.
 
 #### Advisory refresh sizing and reproducible measurement
 

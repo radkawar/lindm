@@ -476,6 +476,14 @@ The existing worker boundary is `identity.Service.AuthorizeFresh`, followed by
 `LockAuthorization(ctx, tx, authorization, requiredPermission)` in the mutation
 transaction. The source adapter performs a new authoritative read without using the
 browser cache or an earlier in-flight refresh; no transaction spans directory HTTP.
+Concurrent calls for one actor on one replica join the next observation round,
+which starts only after all its members arrived: a round in flight is never
+joined, so every caller still gets an observation acquired after its request.
+One round makes one directory read and one principal write. Without it, a 5%
+rollout's device dispatches each queued a principal write on the assigning
+actor's row and starved the console pool (diagnosed at 10,000 devices with
+three replicas). Break-glass principals keep one observation per call so each
+denial audit commits with its own observation.
 An observed denial still commits revocation, audit and the effective authority
 version. `principals.authorization_version` advances on effective role, permission
 or scope changes, including disable/re-enable and owner pinning, not unchanged
@@ -487,6 +495,12 @@ The opaque, process-local worker authorization is distinct from a durable two-pe
 approval. It binds its issuing service, actor, permission, scoped bindings and
 version. The transaction locks the principal before device/action rows and rechecks
 current qualified authority, exact required permission, version and database time.
+`LockAuthorizationShared` holds that principal row `FOR SHARE` instead of
+`FOR UPDATE` for transactions that never modify the actor (resource-work minting
+and resource starts). Every principal writer still waits for it, because any
+`UPDATE` conflicts with a share lock, but one actor's concurrent dispatches no
+longer serialize on each other. Unchanged observed groups are not rewritten, which
+shortens each observation's exclusive principal lock.
 Database and process-monotonic deadlines bound it to thirty seconds; future
 observations and clock rollback fail closed or shorten the exposed deadline.
 A start signer must clip its grant expiry to `Authorization.ExpiresAt()` as well as
@@ -667,6 +681,18 @@ promotion; automatic pause is durable. Cohort evaluation admits at most 10,000
 devices and fails visibly above that cap. Minting and granting execution recheck
 current targeting/exclusions/rollout pause without replacing already granted
 unknown effects. A historical result cannot refresh another generation or head.
+
+Device dispatch (work minting, start and result) takes the targeting fence
+before any device lock, in a mode chosen from the assignment's immutable target
+preview. Dispatch for an assignment whose included candidate belongs to a
+rollout may refresh or record rollout state and takes the exclusive fence, like
+every targeting writer. Any other dispatch writes only its own device's rows
+and holds the fence `FOR SHARE`: targeting writers still wait for it, but
+dispatches to different devices no longer commit one at a time. A shared fence
+that meets rollout state (the head moved after the mode was chosen) refuses with
+the retryable `resource_assignment_conflict` rather than upgrading the lock.
+Rollout-bound dispatch therefore remains serialized; the 20,000-device
+qualification used direct assignments.
 
 Automatic promotion is background work, not a side effect of opening the console.
 The exclusive `rollout-promoter` job assesses a keyset page of at most 100 active
@@ -1909,14 +1935,35 @@ A missing set is never matched inside a device evaluation: the evaluation
 releases its transaction (and so its connection and device row lock), one
 single-flight build per (feed, generation, package digest) per process matches
 and commits the set in its own transaction with a two-minute budget, and the
-device is re-evaluated in a fresh snapshot that sees it. Matching under device
+device is re-evaluated in a fresh snapshot that sees it. Across replicas the
+build takes a non-blocking transaction-scoped advisory lock keyed by feed and
+package digest; another replica's devices needing that set are deferred as busy
+rather than repeating the cold match. Matching under device
 transactions livelocked a cold mass enrollment. Four concurrent workers each
 matched the same 28,821-finding set in a 15 s budget and timed out, and
-waiting on a shared build while holding connections exhausted the pool. The
-evaluator runs four bounded workers per pass. A serialization or set-uniqueness
-conflict is retried up to eight times with jittered backoff: changed
-evaluations append to the serial audit chain, whose head row is updated
-`FOR UPDATE`. A pass continues past isolated device failures.
+waiting on a shared build while holding connections exhausted the pool.
+
+The evaluator is a replicated job: every replica runs four bounded workers per
+pass over batches it claims in `advisory_evaluation_claims` (migration `00032`).
+One claim statement selects the oldest pending devices without an unexpired
+claim, skips device rows locked by another claimer, an evaluator or a session
+update (`FOR NO KEY UPDATE SKIP LOCKED`), and inserts claims that never take over
+a concurrently committed unexpired claim. A batch releases its claims when it
+finishes; a crashed replica's claims expire after one pass plus one build budget
+(165 s). Claims only distribute work. Each device-binding transaction uses
+`READ COMMITTED` while owning the device row: inventory publication and
+retention take the same lock, and the selected finding set binds an exact
+immutable package digest and feed generation, so an overlapping or repeated
+evaluation (expired claim, rolling upgrade from the exclusive evaluator) stays
+coherent. A concurrent feed publication immediately invalidates the old binding
+through the freshness view. Cold finding-set matching retains its separate
+`REPEATABLE READ` transaction. Changed evaluations append atomically to the
+serial audit chain as the transaction's last statement; its head row is updated
+`FOR UPDATE`, and waiting binders read the newly committed predecessor instead
+of retrying the entire evaluation whenever an unrelated audit advances the head.
+No audit is skipped or detached from its domain transaction. Remaining
+transaction or set-uniqueness conflicts retry up to eight times with jittered
+backoff, and a pass continues past isolated device failures.
 
 Each replica opens two PostgreSQL pools from the same credential: the device
 pool (`database.max_connections`) for device/enrollment RPCs and background

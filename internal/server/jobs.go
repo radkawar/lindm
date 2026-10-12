@@ -11,11 +11,11 @@ import (
 
 // Advisory lock keys of exclusive jobs are a deployment-wide contract between
 // concurrently running releases during a rolling upgrade. Never renumber or
-// reuse a key; retire it with its job.
+// reuse a key; retire it with its job. Retired: 0x6c696e646d000003 (exclusive
+// advisory evaluation, now replicated with row claims).
 const (
 	jobKeySnapshotCleanup     int64 = 0x6c696e646d000001
 	jobKeyAdvisoryMaintenance int64 = 0x6c696e646d000002
-	jobKeyAdvisoryEvaluation  int64 = 0x6c696e646d000003
 	jobKeyComplianceDeadlines int64 = 0x6c696e646d000004
 	jobKeyRolloutPromoter     int64 = 0x6c696e646d000005
 )
@@ -27,7 +27,8 @@ func backgroundJobs(devices, consoleDevices *device.Service, advisories *advisor
 	inventory := []jobs.Job{
 		{Name: "snapshot-cleanup", Key: jobKeySnapshotCleanup, Mode: jobs.Exclusive, Run: devices.RunSnapshotCleanup},
 		{Name: "advisory-maintenance", Key: jobKeyAdvisoryMaintenance, Mode: jobs.Exclusive, Run: advisories.RunMaintenance},
-		{Name: "advisory-evaluation", Key: jobKeyAdvisoryEvaluation, Mode: jobs.Exclusive, Run: advisories.RunEvaluations},
+		// Every instance claims disjoint batches of pending devices.
+		{Name: "advisory-evaluation", Mode: jobs.Replicated, Run: advisories.RunEvaluations},
 		{Name: "rollout-promoter", Key: jobKeyRolloutPromoter, Mode: jobs.Exclusive, Run: promoter.Run},
 		// Each instance keeps its own read-only unrestricted fleet aggregate,
 		// read on the console pool that serves it.

@@ -2669,7 +2669,8 @@ total-claims limit bounds publication independently. Only materializing callers
 retain the 128 MiB/500,000-claim result cap. Eight logical requests (forty including
 redirects) and parsing share one five-minute deadline. Database insertion uses
 bounded COPY batches. The background evaluator polls every five seconds in
-batches of 32 devices; reads serve only persisted evaluations (see
+batches of 64 devices that every replica claims (four workers per replica);
+reads serve only persisted evaluations (see
 architecture: devices bind content-addressed finding sets, so only a new
 (feed generation, package set) pair is matched). Expiry is rechecked at read
 time independently of evaluation progress.

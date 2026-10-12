@@ -56,6 +56,7 @@ type AuthorityFixture struct {
 	local            *localAuthority
 	releasePublisher *releaseupdate.Publisher
 	ha               *haTopology
+	scaleOut         *scaleOutTopology
 	demo             *consoleDemoOrigin
 	connected        *connectedAuthority
 	exportedAccounts []string
@@ -417,7 +418,11 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: ownerDialContext(f.AdminAddress), ResponseHeaderTimeout: 3 * time.Second}
+	adminAddress := f.AdminAddress
+	if f.scaleOut != nil {
+		adminAddress = f.scaleOut.localAdmin
+	}
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: ownerDialContext(adminAddress), ResponseHeaderTimeout: 3 * time.Second}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	ready, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -452,6 +457,14 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 }
 
 func (f *AuthorityFixture) stop() error {
+	var err error
+	if f.scaleOut != nil {
+		err = f.scaleOut.stop()
+	}
+	return errors.Join(err, f.stopLocal())
+}
+
+func (f *AuthorityFixture) stopLocal() error {
 	if f.ha != nil {
 		return f.ha.stopInstances()
 	}
@@ -480,6 +493,9 @@ func (f *AuthorityFixture) stop() error {
 
 // Restart preserves the exact private database, config and listener addresses.
 func (f *AuthorityFixture) Restart(ctx context.Context) error {
+	if f.scaleOut != nil {
+		return errors.New("configure all replica settings before scale-out; a live topology cannot be restarted independently")
+	}
 	if f.connected != nil {
 		return errors.New("restart requires controller-owned authority fixture")
 	}
@@ -534,7 +550,7 @@ func (f *AuthorityFixture) Close() error {
 		}
 		return nil
 	}
-	if f.closed && f.process == nil && f.cluster == nil && f.ha == nil {
+	if f.closed && f.process == nil && f.cluster == nil && f.ha == nil && f.scaleOut == nil {
 		return nil
 	}
 	var err error
@@ -550,6 +566,12 @@ func (f *AuthorityFixture) Close() error {
 	if f.process != nil || f.ha != nil && f.ha.running() {
 		// Never drop a database or unlink credentials still used by a live child.
 		return errors.Join(err, fmt.Errorf("isolated lindmd has not exited; owned database %s and resources %s retained", f.DatabaseName, f.directory))
+	}
+	if f.scaleOut != nil {
+		if cleanupErr := f.scaleOut.close(); cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
+		f.scaleOut = nil
 	}
 	if f.local != nil {
 		f.local.close()

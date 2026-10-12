@@ -27,6 +27,7 @@ import (
 	"lindm/internal/identity"
 	"lindm/internal/resource"
 	"lindm/internal/rpcreason"
+	"lindm/internal/targeting"
 	"lindm/internal/trust"
 )
 
@@ -124,14 +125,17 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if approval != nil {
-		if err := s.Identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
+		// Minting never modifies the assigning actor: a rollout's concurrent
+		// dispatches share its authority fence instead of serializing on it.
+		if err := s.Identity.LockAuthorizationShared(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
 			if !assignmentAuthorizationDenied(err) {
 				return nil, nil, err
 			}
 			authorizationErr = err
 		}
 	}
-	if err := s.Targeting.Lock(ctx, tx); err != nil {
+	fence, err := s.lockGenerationDispatch(ctx, tx, principal.GenerationID)
+	if err != nil {
 		return nil, nil, err
 	}
 	var snapshot *executionauthority.Snapshot
@@ -201,9 +205,9 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 			case !now.Before(action.ExpiresAt.Time):
 				reason = "expired_unstarted"
 			case intent.GetPreparation() != nil:
-				eligible, err := s.Targeting.CheckExecution(ctx, tx, principal.DeviceID, principal.GenerationID, head.ID)
+				eligible, err := s.Targeting.CheckExecution(ctx, tx, fence, principal.DeviceID, principal.GenerationID, head.ID)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, dispatchFenceError(err)
 				}
 				if !eligible {
 					reason = "targeting_paused_or_changed"
@@ -236,19 +240,19 @@ func (s *Service) getResourceWork(ctx context.Context, principal core.DevicePrin
 		}
 		return work, nil, nil
 	}
-	return s.selectResourceWork(ctx, tx, q, principal, choice, approval, authorizationErr, snapshot, verifier, head, headErr, now)
+	return s.selectResourceWork(ctx, tx, q, fence, principal, choice, approval, authorizationErr, snapshot, verifier, head, headErr, now)
 }
 
-func (s *Service) selectResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, principal core.DevicePrincipal, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, head devicedb.ResourceAssignment, headErr error, now time.Time) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
+func (s *Service) selectResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, fence targeting.DispatchFence, principal core.DevicePrincipal, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, head devicedb.ResourceAssignment, headErr error, now time.Time) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
 	if err := core.RequireActionRestriction(ctx, q, principal.DeviceID, nil); err != nil {
 		return nil, nil, err
 	}
 	if errors.Is(headErr, pgx.ErrNoRows) || head.BlockedReason != "" {
 		return nil, nil, tx.Commit(ctx)
 	}
-	eligible, err := s.Targeting.CheckExecution(ctx, tx, principal.DeviceID, principal.GenerationID, head.ID)
+	eligible, err := s.Targeting.CheckExecution(ctx, tx, fence, principal.DeviceID, principal.GenerationID, head.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, dispatchFenceError(err)
 	}
 	if !eligible {
 		return nil, nil, tx.Commit(ctx)
@@ -293,6 +297,28 @@ func (s *Service) selectResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb
 		return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "execution_authority_unconfigured")
 	}
 	return s.mintResourceWork(ctx, tx, q, principal, approval, snapshot, verifier, head, source, resources, candidate, release, now)
+}
+
+// dispatchFenceError makes a head that became rollout-bound after the shared
+// fence was chosen the existing retryable assignment conflict.
+func dispatchFenceError(err error) error {
+	if errors.Is(err, targeting.ErrDispatchFence) {
+		return rpcreason.Error(connect.CodeAborted, "resource_assignment_conflict")
+	}
+	return err
+}
+
+// lockGenerationDispatch takes the targeting dispatch fence for the
+// generation's current head. The unlocked head read only selects the fence
+// mode; the locked head is checked against it before any rollout state is read.
+func (s *Service) lockGenerationDispatch(ctx context.Context, tx pgx.Tx, generation uuid.UUID) (targeting.DispatchFence, error) {
+	planned := uuid.Nil
+	if current, err := devicedb.New(tx).GetResourceAssignment(ctx, generation); err == nil {
+		planned = current.ID
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return targeting.DispatchFence{}, err
+	}
+	return s.Targeting.LockDispatch(ctx, tx, planned)
 }
 
 func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, principal core.DevicePrincipal, approval *identity.Authorization, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, head, source devicedb.ResourceAssignment, resources []devicedb.ResourceAssignmentResource, candidate *policyv1.ProfileResource, release *devicedb.ResourceRelease, now time.Time) (*devicev1.ResourceWork, *devicedb.ResourceAssignment, error) {
@@ -380,9 +406,6 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	if err := secrets.StoreResourceSecrets(ctx, q, &head.ActorID, id, deliveries); err != nil {
 		return nil, nil, err
 	}
-	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "source", "resource_assignment"); err != nil {
-		return nil, nil, err
-	}
 	action, err := q.LockResourceAction(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -391,7 +414,12 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.Identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
+	if err := s.Identity.LockAuthorizationShared(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
+		return nil, nil, err
+	}
+	// The audit append holds the deployment-wide chain head until commit, so it
+	// is the transaction's last statement.
+	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "source", "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

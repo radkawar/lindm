@@ -11,6 +11,7 @@ import (
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
@@ -21,6 +22,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/resource"
 	"lindm/internal/rpcreason"
+	"lindm/internal/targeting"
 	"lindm/internal/trust"
 )
 
@@ -47,6 +49,7 @@ type resourceResult struct {
 	action       devicedb.ResourceAction
 	intent       *agentv1.ResourceExecutionIntent
 	prior        *agentv1.ResourceExecutionStatus
+	fence        targeting.DispatchFence
 }
 
 var (
@@ -62,8 +65,18 @@ func (*resourceResult) newAttestation() *agentv1.ResourceExecutionAttestation {
 	return new(agentv1.ResourceExecutionAttestation)
 }
 
-func (*resourceResult) lock(ctx context.Context, s *Service, st *resourceResultState) error {
-	return core.MapErr(s.Targeting.Lock(ctx, st.tx))
+// lock takes the dispatch fence chosen by the action's immutable assignment
+// (read without a lock); an unknown action shares it and fails in lockAction.
+func (k *resourceResult) lock(ctx context.Context, s *Service, st *resourceResultState) error {
+	planned := uuid.Nil
+	if action, err := devicedb.New(st.tx).GetResourceAction(ctx, st.id); err == nil {
+		planned = action.AssignmentID
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return core.MapErr(err)
+	}
+	var err error
+	k.fence, err = s.Targeting.LockDispatch(ctx, st.tx, planned)
+	return core.MapErr(err)
 }
 
 func (k *resourceResult) lockAction(ctx context.Context, _ *Service, st *resourceResultState) (signedRow, error) {
@@ -84,7 +97,7 @@ func (k *resourceResult) preflight(ctx context.Context, s *Service, st *resource
 	if k.cancellation == nil {
 		return false, nil
 	}
-	if _, err := s.reportNeverPreparedResource(ctx, st.tx, st.q, k.action, k.cancellation, st.now); err != nil {
+	if _, err := s.reportNeverPreparedResource(ctx, st.tx, k.fence, st.q, k.action, k.cancellation, st.now); err != nil {
 		return true, err
 	}
 	st.closed = true
@@ -241,7 +254,7 @@ func (k *resourceResult) settleAssignment(ctx context.Context, s *Service, st *r
 			}
 		}
 	}
-	if err := s.Targeting.RecordExecutionHealth(ctx, st.tx, st.principal.DeviceID, st.principal.GenerationID, action.AssignmentID); err != nil {
+	if err := s.Targeting.RecordExecutionHealth(ctx, st.tx, k.fence, st.principal.DeviceID, st.principal.GenerationID, action.AssignmentID); err != nil {
 		return core.MapErr(err)
 	}
 	if disposition == 3 && len(action.StartGrantEnvelope) == 0 && status.GetStartedAt() == nil {
@@ -341,7 +354,7 @@ func ResourceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
 // The protected executor has durably tombstoned this exact action/intent before
 // returning never_prepared. Retain the nonce for exact lost-response retries,
 // without writing a fabricated status, observation, revision or verification.
-func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, action devicedb.ResourceAction, cancellation *devicev1.ResourcePreparationCancellation, now time.Time) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
+func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, fence targeting.DispatchFence, q *devicedb.Queries, action devicedb.ResourceAction, cancellation *devicev1.ResourcePreparationCancellation, now time.Time) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
 	digest := sha256.Sum256(action.IntentEnvelope)
 	if len(action.StartGrantEnvelope) != 0 || !bytes.Equal(cancellation.GetIntentSha256(), digest[:]) || !bytes.Equal(cancellation.GetResultNonce(), action.ResultNonce) {
 		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_cancellation_binding_rejected")
@@ -389,7 +402,7 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 		if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: 1, Reason: "no_effect"}); err != nil {
 			return nil, core.MapErr(err)
 		}
-		if err := s.Targeting.RecordExecutionHealth(ctx, tx, action.DeviceID, action.GenerationID, action.AssignmentID); err != nil {
+		if err := s.Targeting.RecordExecutionHealth(ctx, tx, fence, action.DeviceID, action.GenerationID, action.AssignmentID); err != nil {
 			return nil, core.MapErr(err)
 		}
 	}

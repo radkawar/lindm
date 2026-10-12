@@ -45,6 +45,24 @@ func TestSLOBreachBoundary(t *testing.T) {
 	}
 }
 
+func TestConsoleAndDurableStartSLOBudgets(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		result RPCResult
+		want   bool
+	}{
+		{"GetFleetSummary", RPCResult{P95Milliseconds: 499}, false},
+		{"GetFleetSummary", RPCResult{P95Milliseconds: 500}, true},
+		{"GetFleetSummary", RPCResult{P95Milliseconds: 1, Errors: 1}, true},
+		{"AuthorizeResourceStart", RPCResult{P95Milliseconds: 999}, false},
+		{"AuthorizeResourceStart", RPCResult{P95Milliseconds: 1000}, true},
+	} {
+		if got := breached(map[string]RPCResult{test.name: test.result}); got != test.want {
+			t.Errorf("%s %+v: breached=%v want=%v", test.name, test.result, got, test.want)
+		}
+	}
+}
+
 func TestSnapshotCompletionBoundary(t *testing.T) {
 	for _, test := range []struct {
 		completed, attempted, devices uint64

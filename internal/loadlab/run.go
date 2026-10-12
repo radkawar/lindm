@@ -68,6 +68,9 @@ type Options struct {
 	PackageBaseline string
 	// PostgresSettings are allowlisted dedicated-cluster tuning parameters.
 	PostgresSettings []string
+	// ScaleOut adds owned replicas sharing the dedicated PostgreSQL cluster.
+	ScaleOut            *devlab.ScaleOutOptions
+	RemoteGeneratorCPUs string
 }
 type Sample struct {
 	ElapsedSeconds float64
@@ -94,6 +97,13 @@ type Stage struct {
 	Profiles                   []ProfileArtifact
 	AdvisorySamples            []AdvisorySample
 	AdvisoryMinEvaluatedRatio  float64
+	ScaleOutSamples            []ScaleOutSample
+}
+
+type ScaleOutSample struct {
+	ElapsedSeconds float64
+	Replicas       []devlab.ScaleOutReplicaMetrics
+	Generator      *GeneratorMetrics
 }
 type Result struct {
 	StartedAt              time.Time
@@ -117,6 +127,7 @@ type Result struct {
 	AdvisoryFeedsSHA256    string
 	AdvisoryFeeds          []AdvisoryFeedStatus
 	Environment            devlab.LoadExperimentEnvironment
+	ScaleOut               *devlab.ScaleOutEnvironment
 	HostContention         HostContention
 	Stages                 []Stage
 	LargestPassingStage    int
@@ -254,6 +265,14 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 	if remote && (options.GeneratorHost == "" || options.GeneratorBinary == "" || options.GeneratorCPUs != "") {
 		return result, errors.New("load: remote generation requires -generator-host and -generator-binary and excludes -generator-cpus")
 	}
+	if options.RemoteGeneratorCPUs != "" {
+		if !remote {
+			return result, errors.New("remote generator CPUs require a remote generator")
+		}
+		if _, err := ParseCPUSet(options.RemoteGeneratorCPUs); err != nil {
+			return result, err
+		}
+	}
 	result = Result{StartedAt: time.Now().UTC(), Options: options, GoVersion: runtime.Version(), PoolLimit: int(options.PoolSize), HeartbeatSeconds: 60, ManagementSeconds: 20, InventorySeconds: 600, JitterPercent: 10, GeneratorColocated: !remote}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
@@ -297,7 +316,11 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 			return result, err
 		}
 	}
-	r.fixture, err = devlab.OpenLoadAuthorityFixture(ctx, options.Repository, options.ServerBinary, devlab.LoadAuthorityOptions{DatabaseStorage: options.DatabaseStorage, ServerCPUs: options.ServerCPUs, PostgresCPUs: options.PostgresCPUs, ListenAddress: options.ListenAddress, Advisories: advisories, PostgresSettings: options.PostgresSettings})
+	fixtureOptions := devlab.LoadAuthorityOptions{DatabaseStorage: options.DatabaseStorage, ServerCPUs: options.ServerCPUs, PostgresCPUs: options.PostgresCPUs, ListenAddress: options.ListenAddress, Advisories: advisories, PostgresSettings: options.PostgresSettings}
+	if options.ScaleOut != nil {
+		fixtureOptions.PostgresListenAddress = options.ListenAddress
+	}
+	r.fixture, err = devlab.OpenLoadAuthorityFixture(ctx, options.Repository, options.ServerBinary, fixtureOptions)
 	if err != nil {
 		return result, err
 	}
@@ -334,6 +357,12 @@ func Run(ctx context.Context, options Options) (result Result, resultErr error) 
 		defer cancel()
 		resultErr = errors.Join(resultErr, r.owner.Close(cleanup))
 	}()
+	if options.ScaleOut != nil {
+		if err := r.fixture.ConfigureScaleOut(ctx, *options.ScaleOut); err != nil {
+			return result, err
+		}
+		result.ScaleOut = r.fixture.ScaleOutEnvironment()
+	}
 	if advisories != nil {
 		result.AdvisoryFeeds, err = r.waitForAdvisoryPublication(ctx, len(advisories.GetFeeds()))
 		if err != nil {
@@ -497,13 +526,13 @@ func (r *runner) startGenerator(ctx context.Context) (*remoteGenerator, error) {
 	if err != nil {
 		return nil, err
 	}
-	g, err := startRemoteGenerator(ctx, r.options.GeneratorHost, r.options.GeneratorBinary, r.options.GeneratorSSHConfig, os.Stderr)
+	g, err := startRemoteGenerator(ctx, r.options.GeneratorHost, r.options.GeneratorBinary, r.options.GeneratorSSHConfig, r.options.RemoteGeneratorCPUs, os.Stderr)
 	if err != nil {
 		return nil, err
 	}
 	call, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	response, err := g.call(call, generatorRequest{Init: &generatorInit{ExecutionRootJSON: material.ExecutionRootJSON, BootstrapEnvelope: material.BootstrapEnvelope, AdminAddress: r.fixture.AdminAddress, DeviceAddress: r.fixture.DeviceAddress, AgentRelease: r.agentRelease, AgentProtocol: r.agentProtocol, Packages: r.options.Packages, Baseline: baseline, Seed: r.options.Seed, AssignmentPercent: r.options.AssignmentPercent}})
+	response, err := g.call(call, generatorRequest{Init: &generatorInit{ExecutionRootJSON: material.ExecutionRootJSON, BootstrapEnvelope: material.BootstrapEnvelope, AdminAddress: r.fixture.AdminAddress, DeviceAddress: r.fixture.DeviceAddress, AgentRelease: r.agentRelease, AgentProtocol: r.agentProtocol, Packages: r.options.Packages, Baseline: baseline, Seed: r.options.Seed, AssignmentPercent: r.options.AssignmentPercent, CPUs: r.options.RemoteGeneratorCPUs}})
 	if err == nil && response.Identity == nil {
 		err = errors.New("remote generator returned no identity")
 	}
@@ -593,6 +622,15 @@ func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, count in
 			}
 			return stage, nil
 		case <-advisoryTicker.C:
+			if r.options.ScaleOut != nil {
+				sample, err := r.sampleScaleOut(ctx, time.Since(start))
+				if err != nil {
+					cancel()
+					<-done
+					return stage, err
+				}
+				stage.ScaleOutSamples = append(stage.ScaleOutSamples, sample)
+			}
 			if !r.advisories {
 				continue
 			}

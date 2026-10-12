@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -361,6 +362,16 @@ func (s *Service) planEnabledObservation(w *authWrite, row identitydb.Principal,
 // replacePrincipalGroups replaces the stored directory groups with groups, which
 // is empty unless the observation grants access.
 func (s *Service) replacePrincipalGroups(ctx context.Context, q *identitydb.Queries, id uuid.UUID, groups []string) error {
+	// A routine fresh observation usually repeats the stored groups; rewriting
+	// them would lengthen every observation's exclusive principal lock.
+	current, err := q.ListPrincipalGroupPaths(ctx, id)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	slices.Sort(current) // database collation order may differ from byte order
+	if slices.Equal(current, slices.Sorted(slices.Values(groups))) {
+		return nil
+	}
 	if err := q.DeletePrincipalGroups(ctx, id); err != nil {
 		return s.dbErr(err)
 	}

@@ -21,6 +21,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
+	"lindm/internal/targeting"
 )
 
 var resourceReasons = signedReasons{
@@ -56,6 +57,7 @@ type resourceStart struct {
 	head       devicedb.ResourceAssignment
 	action     devicedb.ResourceAction
 	actionHead uuid.UUID
+	fence      targeting.DispatchFence
 }
 
 var _ startKind[*agentv1.ResourceExecutionChallenge] = (*resourceStart)(nil)
@@ -99,20 +101,26 @@ func (k *resourceStart) authorize(ctx context.Context, s *Service) error {
 // lock relocks fresh authority, then targeting, then execution authority.
 func (k *resourceStart) lock(ctx context.Context, s *Service, st *startState[*agentv1.ResourceExecutionChallenge]) error {
 	if k.approval != nil {
-		if err := s.Identity.LockAuthorization(ctx, st.tx, k.approval, identity.PermissionAssignResources); err != nil {
+		// A start never modifies the assigning actor; see getResourceWork.
+		if err := s.Identity.LockAuthorizationShared(ctx, st.tx, k.approval, identity.PermissionAssignResources); err != nil {
 			if !assignmentAuthorizationDenied(err) {
 				return core.ExecutionError(err)
 			}
 			k.denied = err
 		}
 	}
-	if err := s.Targeting.Lock(ctx, st.tx); err != nil {
+	// The action's head assignment and its target preview are immutable, so
+	// the captured row selects the same fence that admit later relies on.
+	planned, err := ResourceActionHead(k.captured, k.intent)
+	if err != nil {
+		return core.MapErr(err)
+	}
+	if k.fence, err = s.Targeting.LockDispatch(ctx, st.tx, planned); err != nil {
 		return core.MapErr(err)
 	}
 	if k.approval == nil || k.denied != nil {
 		return nil
 	}
-	var err error
 	if st.snapshot, st.verifier, err = s.Execution.CurrentInTransaction(ctx, st.tx); err != nil {
 		return core.ExecutionError(err)
 	}
@@ -169,7 +177,7 @@ func (k *resourceStart) admit(ctx context.Context, s *Service, st *startState[*a
 	if k.action.ClosedReason != "" {
 		return false, rpcreason.Error(connect.CodePermissionDenied, k.action.ClosedReason)
 	}
-	eligible, err := s.Targeting.CheckExecution(ctx, st.tx, st.principal.DeviceID, st.principal.GenerationID, k.actionHead)
+	eligible, err := s.Targeting.CheckExecution(ctx, st.tx, k.fence, st.principal.DeviceID, st.principal.GenerationID, k.actionHead)
 	if err != nil {
 		return false, core.MapErr(err)
 	}
@@ -228,11 +236,13 @@ func (k *resourceStart) persist(ctx context.Context, s *Service, st *startState[
 	if err := st.q.SetResourceGrant(ctx, devicedb.SetResourceGrantParams{ID: st.id, ChallengeProof: st.proof, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(st.now)}); err != nil {
 		return core.MapErr(err)
 	}
+	if err := s.Identity.LockAuthorizationShared(ctx, st.tx, k.approval, identity.PermissionAssignResources); err != nil {
+		return core.ExecutionError(err)
+	}
+	// The audit append holds the deployment-wide chain head until commit, so it
+	// is the transaction's last statement.
 	if err := core.DispatchSystemAudit(ctx, st.q, &k.head.ActorID, "resource_action.start", st.id, "authority", "fresh_actor_authorization"); err != nil {
 		return core.MapErr(err)
-	}
-	if err := s.Identity.LockAuthorization(ctx, st.tx, k.approval, identity.PermissionAssignResources); err != nil {
-		return core.ExecutionError(err)
 	}
 	return nil
 }
