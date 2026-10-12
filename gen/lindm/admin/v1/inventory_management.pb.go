@@ -79,6 +79,62 @@ func (AttributeType) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{0}
 }
 
+// Device list order across all pages. Unspecified: newest enrollment first.
+type DeviceSortField int32
+
+const (
+	DeviceSortField_DEVICE_SORT_FIELD_UNSPECIFIED DeviceSortField = 0
+	// Case-insensitive; devices without a hostname (pending) sort last.
+	DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME DeviceSortField = 1
+	// Last contact; never-seen devices sort last in either direction.
+	DeviceSortField_DEVICE_SORT_FIELD_LAST_SEEN DeviceSortField = 2
+	// Operating system then version, case-insensitive; unreported sort last.
+	DeviceSortField_DEVICE_SORT_FIELD_OPERATING_SYSTEM DeviceSortField = 3
+)
+
+// Enum value maps for DeviceSortField.
+var (
+	DeviceSortField_name = map[int32]string{
+		0: "DEVICE_SORT_FIELD_UNSPECIFIED",
+		1: "DEVICE_SORT_FIELD_HOSTNAME",
+		2: "DEVICE_SORT_FIELD_LAST_SEEN",
+		3: "DEVICE_SORT_FIELD_OPERATING_SYSTEM",
+	}
+	DeviceSortField_value = map[string]int32{
+		"DEVICE_SORT_FIELD_UNSPECIFIED":      0,
+		"DEVICE_SORT_FIELD_HOSTNAME":         1,
+		"DEVICE_SORT_FIELD_LAST_SEEN":        2,
+		"DEVICE_SORT_FIELD_OPERATING_SYSTEM": 3,
+	}
+)
+
+func (x DeviceSortField) Enum() *DeviceSortField {
+	p := new(DeviceSortField)
+	*p = x
+	return p
+}
+
+func (x DeviceSortField) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeviceSortField) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[1].Descriptor()
+}
+
+func (DeviceSortField) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[1]
+}
+
+func (x DeviceSortField) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeviceSortField.Descriptor instead.
+func (DeviceSortField) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{1}
+}
+
 type DeviceExportFormat int32
 
 const (
@@ -112,11 +168,11 @@ func (x DeviceExportFormat) String() string {
 }
 
 func (DeviceExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_inventory_management_proto_enumTypes[1].Descriptor()
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[2].Descriptor()
 }
 
 func (DeviceExportFormat) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[1]
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[2]
 }
 
 func (x DeviceExportFormat) Number() protoreflect.EnumNumber {
@@ -125,7 +181,7 @@ func (x DeviceExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceExportFormat.Descriptor instead.
 func (DeviceExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{1}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{2}
 }
 
 type AttributeValue struct {
@@ -402,6 +458,58 @@ func (*DeviceMetadata_OwnerPrincipalId) isDeviceMetadata_Owner() {}
 
 func (*DeviceMetadata_OwnerText) isDeviceMetadata_Owner() {}
 
+type DeviceSort struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Field         DeviceSortField        `protobuf:"varint,1,opt,name=field,proto3,enum=lindm.admin.v1.DeviceSortField" json:"field,omitempty"`
+	Descending    bool                   `protobuf:"varint,2,opt,name=descending,proto3" json:"descending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeviceSort) Reset() {
+	*x = DeviceSort{}
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceSort) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceSort) ProtoMessage() {}
+
+func (x *DeviceSort) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceSort.ProtoReflect.Descriptor instead.
+func (*DeviceSort) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DeviceSort) GetField() DeviceSortField {
+	if x != nil {
+		return x.Field
+	}
+	return DeviceSortField_DEVICE_SORT_FIELD_UNSPECIFIED
+}
+
+func (x *DeviceSort) GetDescending() bool {
+	if x != nil {
+		return x.Descending
+	}
+	return false
+}
+
 type DeviceFilter struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	OsId      string                 `protobuf:"bytes,1,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
@@ -422,7 +530,7 @@ type DeviceFilter struct {
 
 func (x *DeviceFilter) Reset() {
 	*x = DeviceFilter{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +542,7 @@ func (x *DeviceFilter) String() string {
 func (*DeviceFilter) ProtoMessage() {}
 
 func (x *DeviceFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +555,7 @@ func (x *DeviceFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceFilter.ProtoReflect.Descriptor instead.
 func (*DeviceFilter) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{3}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DeviceFilter) GetOsId() string {
@@ -518,7 +626,7 @@ type SetDeviceMetadataRequest struct {
 
 func (x *SetDeviceMetadataRequest) Reset() {
 	*x = SetDeviceMetadataRequest{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +638,7 @@ func (x *SetDeviceMetadataRequest) String() string {
 func (*SetDeviceMetadataRequest) ProtoMessage() {}
 
 func (x *SetDeviceMetadataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,7 +651,7 @@ func (x *SetDeviceMetadataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDeviceMetadataRequest.ProtoReflect.Descriptor instead.
 func (*SetDeviceMetadataRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{4}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SetDeviceMetadataRequest) GetRequestId() string {
@@ -582,7 +690,7 @@ type SetDeviceMetadataResponse struct {
 
 func (x *SetDeviceMetadataResponse) Reset() {
 	*x = SetDeviceMetadataResponse{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -594,7 +702,7 @@ func (x *SetDeviceMetadataResponse) String() string {
 func (*SetDeviceMetadataResponse) ProtoMessage() {}
 
 func (x *SetDeviceMetadataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -607,7 +715,7 @@ func (x *SetDeviceMetadataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDeviceMetadataResponse.ProtoReflect.Descriptor instead.
 func (*SetDeviceMetadataResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{5}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{6}
 }
 
 type SetAttributeDefinitionRequest struct {
@@ -621,7 +729,7 @@ type SetAttributeDefinitionRequest struct {
 
 func (x *SetAttributeDefinitionRequest) Reset() {
 	*x = SetAttributeDefinitionRequest{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -633,7 +741,7 @@ func (x *SetAttributeDefinitionRequest) String() string {
 func (*SetAttributeDefinitionRequest) ProtoMessage() {}
 
 func (x *SetAttributeDefinitionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -646,7 +754,7 @@ func (x *SetAttributeDefinitionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAttributeDefinitionRequest.ProtoReflect.Descriptor instead.
 func (*SetAttributeDefinitionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{6}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SetAttributeDefinitionRequest) GetRequestId() string {
@@ -678,7 +786,7 @@ type SetAttributeDefinitionResponse struct {
 
 func (x *SetAttributeDefinitionResponse) Reset() {
 	*x = SetAttributeDefinitionResponse{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -690,7 +798,7 @@ func (x *SetAttributeDefinitionResponse) String() string {
 func (*SetAttributeDefinitionResponse) ProtoMessage() {}
 
 func (x *SetAttributeDefinitionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -703,7 +811,7 @@ func (x *SetAttributeDefinitionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAttributeDefinitionResponse.ProtoReflect.Descriptor instead.
 func (*SetAttributeDefinitionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{7}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{8}
 }
 
 type ListAttributeDefinitionsRequest struct {
@@ -716,7 +824,7 @@ type ListAttributeDefinitionsRequest struct {
 
 func (x *ListAttributeDefinitionsRequest) Reset() {
 	*x = ListAttributeDefinitionsRequest{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +836,7 @@ func (x *ListAttributeDefinitionsRequest) String() string {
 func (*ListAttributeDefinitionsRequest) ProtoMessage() {}
 
 func (x *ListAttributeDefinitionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +849,7 @@ func (x *ListAttributeDefinitionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAttributeDefinitionsRequest.ProtoReflect.Descriptor instead.
 func (*ListAttributeDefinitionsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{8}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListAttributeDefinitionsRequest) GetPageSize() uint32 {
@@ -768,7 +876,7 @@ type ListAttributeDefinitionsResponse struct {
 
 func (x *ListAttributeDefinitionsResponse) Reset() {
 	*x = ListAttributeDefinitionsResponse{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -780,7 +888,7 @@ func (x *ListAttributeDefinitionsResponse) String() string {
 func (*ListAttributeDefinitionsResponse) ProtoMessage() {}
 
 func (x *ListAttributeDefinitionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -793,7 +901,7 @@ func (x *ListAttributeDefinitionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAttributeDefinitionsResponse.ProtoReflect.Descriptor instead.
 func (*ListAttributeDefinitionsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{9}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListAttributeDefinitionsResponse) GetDefinitions() []*AttributeDefinition {
@@ -811,18 +919,21 @@ func (x *ListAttributeDefinitionsResponse) GetNextAfterKey() string {
 }
 
 type ExportDevicesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Filter        *DeviceFilter          `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
-	Format        DeviceExportFormat     `protobuf:"varint,2,opt,name=format,proto3,enum=lindm.admin.v1.DeviceExportFormat" json:"format,omitempty"`
-	PageSize      uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Filter    *DeviceFilter          `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	Format    DeviceExportFormat     `protobuf:"varint,2,opt,name=format,proto3,enum=lindm.admin.v1.DeviceExportFormat" json:"format,omitempty"`
+	PageSize  uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	Sort      *DeviceSort            `protobuf:"bytes,5,opt,name=sort,proto3" json:"sort,omitempty"`
+	// Case-insensitive literal substring of the hostname; empty disables it.
+	HostnameSearch string `protobuf:"bytes,6,opt,name=hostname_search,json=hostnameSearch,proto3" json:"hostname_search,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExportDevicesRequest) Reset() {
 	*x = ExportDevicesRequest{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +945,7 @@ func (x *ExportDevicesRequest) String() string {
 func (*ExportDevicesRequest) ProtoMessage() {}
 
 func (x *ExportDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +958,7 @@ func (x *ExportDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ExportDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{10}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ExportDevicesRequest) GetFilter() *DeviceFilter {
@@ -878,6 +989,20 @@ func (x *ExportDevicesRequest) GetPageToken() string {
 	return ""
 }
 
+func (x *ExportDevicesRequest) GetSort() *DeviceSort {
+	if x != nil {
+		return x.Sort
+	}
+	return nil
+}
+
+func (x *ExportDevicesRequest) GetHostnameSearch() string {
+	if x != nil {
+		return x.HostnameSearch
+	}
+	return ""
+}
+
 type ExportDevicesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Each page is a standalone CSV (including header) or JSON array of Device.
@@ -890,7 +1015,7 @@ type ExportDevicesResponse struct {
 
 func (x *ExportDevicesResponse) Reset() {
 	*x = ExportDevicesResponse{}
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -902,7 +1027,7 @@ func (x *ExportDevicesResponse) String() string {
 func (*ExportDevicesResponse) ProtoMessage() {}
 
 func (x *ExportDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_inventory_management_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -915,7 +1040,7 @@ func (x *ExportDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ExportDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{11}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ExportDevicesResponse) GetContent() []byte {
@@ -970,7 +1095,13 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
 	"\x05value\x18\x02 \x01(\v2\x1e.lindm.admin.v1.AttributeValueR\x05value:\x028\x01B\a\n" +
-	"\x05owner\"\xa2\x06\n" +
+	"\x05owner\"m\n" +
+	"\n" +
+	"DeviceSort\x12?\n" +
+	"\x05field\x18\x01 \x01(\x0e2\x1f.lindm.admin.v1.DeviceSortFieldB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05field\x12\x1e\n" +
+	"\n" +
+	"descending\x18\x02 \x01(\bR\n" +
+	"descending\"\xa2\x06\n" +
 	"\fDeviceFilter\x12!\n" +
 	"\x05os_id\x18\x01 \x01(\tB\f\xbaH\tr\a\x18\x80 \xba\x01\x01\x00R\x04osId\x12+\n" +
 	"\n" +
@@ -1008,14 +1139,16 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\tafter_key\x18\x02 \x01(\tB\x1f\xbaH\x1cr\x1a\x18@2\x16^([a-z][a-z0-9_.-]*)?$R\bafterKey\"\x8f\x01\n" +
 	" ListAttributeDefinitionsResponse\x12E\n" +
 	"\vdefinitions\x18\x01 \x03(\v2#.lindm.admin.v1.AttributeDefinitionR\vdefinitions\x12$\n" +
-	"\x0enext_after_key\x18\x02 \x01(\tR\fnextAfterKey\"\xe4\x01\n" +
+	"\x0enext_after_key\x18\x02 \x01(\tR\fnextAfterKey\"\xcb\x02\n" +
 	"\x14ExportDevicesRequest\x124\n" +
 	"\x06filter\x18\x01 \x01(\v2\x1c.lindm.admin.v1.DeviceFilterR\x06filter\x12F\n" +
 	"\x06format\x18\x02 \x01(\x0e2\".lindm.admin.v1.DeviceExportFormatB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06format\x12%\n" +
 	"\tpage_size\x18\x03 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"x\n" +
+	"page_token\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12.\n" +
+	"\x04sort\x18\x05 \x01(\v2\x1a.lindm.admin.v1.DeviceSortR\x04sort\x125\n" +
+	"\x0fhostname_search\x18\x06 \x01(\tB\f\xbaH\tr\a\x18\xfd\x01\xba\x01\x01\x00R\x0ehostnameSearch\"x\n" +
 	"\x15ExportDevicesResponse\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\fR\acontent\x12\x1d\n" +
 	"\n" +
@@ -1026,7 +1159,12 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x15ATTRIBUTE_TYPE_STRING\x10\x01\x12\x16\n" +
 	"\x12ATTRIBUTE_TYPE_INT\x10\x02\x12\x17\n" +
 	"\x13ATTRIBUTE_TYPE_BOOL\x10\x03\x12\x17\n" +
-	"\x13ATTRIBUTE_TYPE_ENUM\x10\x04*w\n" +
+	"\x13ATTRIBUTE_TYPE_ENUM\x10\x04*\x9d\x01\n" +
+	"\x0fDeviceSortField\x12!\n" +
+	"\x1dDEVICE_SORT_FIELD_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aDEVICE_SORT_FIELD_HOSTNAME\x10\x01\x12\x1f\n" +
+	"\x1bDEVICE_SORT_FIELD_LAST_SEEN\x10\x02\x12&\n" +
+	"\"DEVICE_SORT_FIELD_OPERATING_SYSTEM\x10\x03*w\n" +
 	"\x12DeviceExportFormat\x12$\n" +
 	" DEVICE_EXPORT_FORMAT_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DEVICE_EXPORT_FORMAT_CSV\x10\x01\x12\x1d\n" +
@@ -1044,45 +1182,49 @@ func file_lindm_admin_v1_inventory_management_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_inventory_management_proto_rawDescData
 }
 
-var file_lindm_admin_v1_inventory_management_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_admin_v1_inventory_management_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_lindm_admin_v1_inventory_management_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_admin_v1_inventory_management_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lindm_admin_v1_inventory_management_proto_goTypes = []any{
 	(AttributeType)(0),                       // 0: lindm.admin.v1.AttributeType
-	(DeviceExportFormat)(0),                  // 1: lindm.admin.v1.DeviceExportFormat
-	(*AttributeValue)(nil),                   // 2: lindm.admin.v1.AttributeValue
-	(*AttributeDefinition)(nil),              // 3: lindm.admin.v1.AttributeDefinition
-	(*DeviceMetadata)(nil),                   // 4: lindm.admin.v1.DeviceMetadata
-	(*DeviceFilter)(nil),                     // 5: lindm.admin.v1.DeviceFilter
-	(*SetDeviceMetadataRequest)(nil),         // 6: lindm.admin.v1.SetDeviceMetadataRequest
-	(*SetDeviceMetadataResponse)(nil),        // 7: lindm.admin.v1.SetDeviceMetadataResponse
-	(*SetAttributeDefinitionRequest)(nil),    // 8: lindm.admin.v1.SetAttributeDefinitionRequest
-	(*SetAttributeDefinitionResponse)(nil),   // 9: lindm.admin.v1.SetAttributeDefinitionResponse
-	(*ListAttributeDefinitionsRequest)(nil),  // 10: lindm.admin.v1.ListAttributeDefinitionsRequest
-	(*ListAttributeDefinitionsResponse)(nil), // 11: lindm.admin.v1.ListAttributeDefinitionsResponse
-	(*ExportDevicesRequest)(nil),             // 12: lindm.admin.v1.ExportDevicesRequest
-	(*ExportDevicesResponse)(nil),            // 13: lindm.admin.v1.ExportDevicesResponse
-	nil,                                      // 14: lindm.admin.v1.DeviceMetadata.AttributesEntry
-	nil,                                      // 15: lindm.admin.v1.DeviceFilter.AttributesEntry
-	(*timestamppb.Timestamp)(nil),            // 16: google.protobuf.Timestamp
+	(DeviceSortField)(0),                     // 1: lindm.admin.v1.DeviceSortField
+	(DeviceExportFormat)(0),                  // 2: lindm.admin.v1.DeviceExportFormat
+	(*AttributeValue)(nil),                   // 3: lindm.admin.v1.AttributeValue
+	(*AttributeDefinition)(nil),              // 4: lindm.admin.v1.AttributeDefinition
+	(*DeviceMetadata)(nil),                   // 5: lindm.admin.v1.DeviceMetadata
+	(*DeviceSort)(nil),                       // 6: lindm.admin.v1.DeviceSort
+	(*DeviceFilter)(nil),                     // 7: lindm.admin.v1.DeviceFilter
+	(*SetDeviceMetadataRequest)(nil),         // 8: lindm.admin.v1.SetDeviceMetadataRequest
+	(*SetDeviceMetadataResponse)(nil),        // 9: lindm.admin.v1.SetDeviceMetadataResponse
+	(*SetAttributeDefinitionRequest)(nil),    // 10: lindm.admin.v1.SetAttributeDefinitionRequest
+	(*SetAttributeDefinitionResponse)(nil),   // 11: lindm.admin.v1.SetAttributeDefinitionResponse
+	(*ListAttributeDefinitionsRequest)(nil),  // 12: lindm.admin.v1.ListAttributeDefinitionsRequest
+	(*ListAttributeDefinitionsResponse)(nil), // 13: lindm.admin.v1.ListAttributeDefinitionsResponse
+	(*ExportDevicesRequest)(nil),             // 14: lindm.admin.v1.ExportDevicesRequest
+	(*ExportDevicesResponse)(nil),            // 15: lindm.admin.v1.ExportDevicesResponse
+	nil,                                      // 16: lindm.admin.v1.DeviceMetadata.AttributesEntry
+	nil,                                      // 17: lindm.admin.v1.DeviceFilter.AttributesEntry
+	(*timestamppb.Timestamp)(nil),            // 18: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_inventory_management_proto_depIdxs = []int32{
 	0,  // 0: lindm.admin.v1.AttributeDefinition.type:type_name -> lindm.admin.v1.AttributeType
-	14, // 1: lindm.admin.v1.DeviceMetadata.attributes:type_name -> lindm.admin.v1.DeviceMetadata.AttributesEntry
-	15, // 2: lindm.admin.v1.DeviceFilter.attributes:type_name -> lindm.admin.v1.DeviceFilter.AttributesEntry
-	16, // 3: lindm.admin.v1.DeviceFilter.last_seen_from:type_name -> google.protobuf.Timestamp
-	16, // 4: lindm.admin.v1.DeviceFilter.last_seen_until:type_name -> google.protobuf.Timestamp
-	4,  // 5: lindm.admin.v1.SetDeviceMetadataRequest.metadata:type_name -> lindm.admin.v1.DeviceMetadata
-	3,  // 6: lindm.admin.v1.SetAttributeDefinitionRequest.definition:type_name -> lindm.admin.v1.AttributeDefinition
-	3,  // 7: lindm.admin.v1.ListAttributeDefinitionsResponse.definitions:type_name -> lindm.admin.v1.AttributeDefinition
-	5,  // 8: lindm.admin.v1.ExportDevicesRequest.filter:type_name -> lindm.admin.v1.DeviceFilter
-	1,  // 9: lindm.admin.v1.ExportDevicesRequest.format:type_name -> lindm.admin.v1.DeviceExportFormat
-	2,  // 10: lindm.admin.v1.DeviceMetadata.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
-	2,  // 11: lindm.admin.v1.DeviceFilter.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	16, // 1: lindm.admin.v1.DeviceMetadata.attributes:type_name -> lindm.admin.v1.DeviceMetadata.AttributesEntry
+	1,  // 2: lindm.admin.v1.DeviceSort.field:type_name -> lindm.admin.v1.DeviceSortField
+	17, // 3: lindm.admin.v1.DeviceFilter.attributes:type_name -> lindm.admin.v1.DeviceFilter.AttributesEntry
+	18, // 4: lindm.admin.v1.DeviceFilter.last_seen_from:type_name -> google.protobuf.Timestamp
+	18, // 5: lindm.admin.v1.DeviceFilter.last_seen_until:type_name -> google.protobuf.Timestamp
+	5,  // 6: lindm.admin.v1.SetDeviceMetadataRequest.metadata:type_name -> lindm.admin.v1.DeviceMetadata
+	4,  // 7: lindm.admin.v1.SetAttributeDefinitionRequest.definition:type_name -> lindm.admin.v1.AttributeDefinition
+	4,  // 8: lindm.admin.v1.ListAttributeDefinitionsResponse.definitions:type_name -> lindm.admin.v1.AttributeDefinition
+	7,  // 9: lindm.admin.v1.ExportDevicesRequest.filter:type_name -> lindm.admin.v1.DeviceFilter
+	2,  // 10: lindm.admin.v1.ExportDevicesRequest.format:type_name -> lindm.admin.v1.DeviceExportFormat
+	6,  // 11: lindm.admin.v1.ExportDevicesRequest.sort:type_name -> lindm.admin.v1.DeviceSort
+	3,  // 12: lindm.admin.v1.DeviceMetadata.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
+	3,  // 13: lindm.admin.v1.DeviceFilter.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_inventory_management_proto_init() }
@@ -1105,8 +1247,8 @@ func file_lindm_admin_v1_inventory_management_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_inventory_management_proto_rawDesc), len(file_lindm_admin_v1_inventory_management_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   14,
+			NumEnums:      3,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -227,11 +227,11 @@ func TestInventorySearchCursorBindingAndScopedExports(t *testing.T) {
 			assertInventoryPageFits(t, response.Msg)
 			if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_CSV {
 				rows, err := csv.NewReader(bytes.NewReader(response.Msg.GetContent())).ReadAll()
-				if err != nil || len(rows) < 2 || rows[0][0] != "id" {
+				if err != nil || len(rows) < 2 || rows[0][0] != "Device ID" || rows[0][7] != "Labels" {
 					t.Fatalf("invalid CSV page: %v", err)
 				}
 				for _, row := range rows[1:] {
-					if row[8] != "allowed" {
+					if row[7] != "allowed" {
 						t.Fatal("CSV leaked unauthorized metadata")
 					}
 					if strings.HasPrefix(row[1], "'\t=") {

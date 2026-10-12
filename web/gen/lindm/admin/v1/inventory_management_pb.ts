@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/inventory_management.proto.
  */
 export const file_lindm_admin_v1_inventory_management: GenFile = /*@__PURE__*/
-  fileDesc("CilsaW5kbS9hZG1pbi92MS9pbnZlbnRvcnlfbWFuYWdlbWVudC5wcm90bxIObGluZG0uYWRtaW4udjEilwEKDkF0dHJpYnV0ZVZhbHVlEiQKDHN0cmluZ192YWx1ZRgBIAEoCUIMukgJcgcYgAi6AQEASAASEwoJaW50X3ZhbHVlGAIgASgDSAASFAoKYm9vbF92YWx1ZRgDIAEoCEgAEiQKCmVudW1fdmFsdWUYBCABKAlCDrpIC3IJEAEYgAG6AQEASABCDgoFdmFsdWUSBbpIAggBIrsCChNBdHRyaWJ1dGVEZWZpbml0aW9uEisKA2tleRgBIAEoCUIeukgbchkQARhAMhNeW2Etel1bYS16MC05Xy4tXSokEjcKBHR5cGUYAiABKA4yHS5saW5kbS5hZG1pbi52MS5BdHRyaWJ1dGVUeXBlQgq6SAeCAQQQASAAEiwKC2VudW1fdmFsdWVzGAMgAygJQhe6SBSSAREQQBgBIgtyCRABGIABugEBADqPAbpIiwEaiAEKIGF0dHJpYnV0ZV9kZWZpbml0aW9uLmVudW1fdmFsdWVzEjJPbmx5IGVudW0gZGVmaW5pdGlvbnMgcmVxdWlyZSBub25lbXB0eSBlbnVtIHZhbHVlcxowKHRoaXMudHlwZSA9PSA0KSA9PSAoc2l6ZSh0aGlzLmVudW1fdmFsdWVzKSA+IDApIukCCg5EZXZpY2VNZXRhZGF0YRJCCgZsYWJlbHMYASADKAlCMrpIL5IBLBAgGAEiJnIkEAEYQDIeXlthLXpBLVowLTldW2EtekEtWjAtOV8uOi8tXSokEiYKEm93bmVyX3ByaW5jaXBhbF9pZBgCIAEoCUIIukgFcgOwAQFIABIkCgpvd25lcl90ZXh0GAMgASgJQg66SAtyCRABGIACugEBAEgAEmkKCmF0dHJpYnV0ZXMYBCADKAsyLi5saW5kbS5hZG1pbi52MS5EZXZpY2VNZXRhZGF0YS5BdHRyaWJ1dGVzRW50cnlCJbpIIpoBHxAgIhtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQaUQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRItCgV2YWx1ZRgCIAEoCzIeLmxpbmRtLmFkbWluLnYxLkF0dHJpYnV0ZVZhbHVlOgI4AUIHCgVvd25lciK6BQoMRGV2aWNlRmlsdGVyEhsKBW9zX2lkGAEgASgJQgy6SAlyBxiAILoBAQASIAoKb3NfdmVyc2lvbhgCIAEoCUIMukgJcgcYgCC6AQEAEkIKBmxhYmVscxgDIAMoCUIyukgvkgEsECAYASImciQQARhAMh5eW2EtekEtWjAtOV1bYS16QS1aMC05Xy46Ly1dKiQSZwoKYXR0cmlidXRlcxgEIAMoCzIsLmxpbmRtLmFkbWluLnYxLkRldmljZUZpbHRlci5BdHRyaWJ1dGVzRW50cnlCJbpIIpoBHxAgIhtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQSMgoObGFzdF9zZWVuX2Zyb20YBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2xhc3Rfc2Vlbl91bnRpbBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASIQoLbmFtZV9wcmVmaXgYByABKAlCDLpICXIHGIAgugEBABIjCg1hZ2VudF9yZWxlYXNlGAggASgJQgy6SAlyBxiAAboBAQAaUQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRItCgV2YWx1ZRgCIAEoCzIeLmxpbmRtLmFkbWluLnYxLkF0dHJpYnV0ZVZhbHVlOgI4ATq5AbpItQEasgEKGGRldmljZV9maWx0ZXIuc2Vlbl9yYW5nZRIubGFzdF9zZWVuX2Zyb20gbXVzdCBub3QgZXhjZWVkIGxhc3Rfc2Vlbl91bnRpbBpmIWhhcyh0aGlzLmxhc3Rfc2Vlbl9mcm9tKSB8fCAhaGFzKHRoaXMubGFzdF9zZWVuX3VudGlsKSB8fCB0aGlzLmxhc3Rfc2Vlbl9mcm9tIDw9IHRoaXMubGFzdF9zZWVuX3VudGlsIqoBChhTZXREZXZpY2VNZXRhZGF0YVJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARI4CghtZXRhZGF0YRgDIAEoCzIeLmxpbmRtLmFkbWluLnYxLkRldmljZU1ldGFkYXRhQga6SAPIAQESGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiGwoZU2V0RGV2aWNlTWV0YWRhdGFSZXNwb25zZSKZAQodU2V0QXR0cmlidXRlRGVmaW5pdGlvblJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESPwoKZGVmaW5pdGlvbhgCIAEoCzIjLmxpbmRtLmFkbWluLnYxLkF0dHJpYnV0ZURlZmluaXRpb25CBrpIA8gBARIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASIgCh5TZXRBdHRyaWJ1dGVEZWZpbml0aW9uUmVzcG9uc2UicgofTGlzdEF0dHJpYnV0ZURlZmluaXRpb25zUmVxdWVzdBIbCglwYWdlX3NpemUYASABKA1CCLpIBSoDGMgBEjIKCWFmdGVyX2tleRgCIAEoCUIfukgcchoYQDIWXihbYS16XVthLXowLTlfLi1dKik/JCJ0CiBMaXN0QXR0cmlidXRlRGVmaW5pdGlvbnNSZXNwb25zZRI4CgtkZWZpbml0aW9ucxgBIAMoCzIjLmxpbmRtLmFkbWluLnYxLkF0dHJpYnV0ZURlZmluaXRpb24SFgoObmV4dF9hZnRlcl9rZXkYAiABKAkivwEKFEV4cG9ydERldmljZXNSZXF1ZXN0EiwKBmZpbHRlchgBIAEoCzIcLmxpbmRtLmFkbWluLnYxLkRldmljZUZpbHRlchI+CgZmb3JtYXQYAiABKA4yIi5saW5kbS5hZG1pbi52MS5EZXZpY2VFeHBvcnRGb3JtYXRCCrpIB4IBBBABIAASGwoJcGFnZV9zaXplGAMgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAQgASgJQgi6SAVyAxiABCJVChVFeHBvcnREZXZpY2VzUmVzcG9uc2USDwoHY29udGVudBgBIAEoDBISCgptZWRpYV90eXBlGAIgASgJEhcKD25leHRfcGFnZV90b2tlbhgDIAEoCSqUAQoNQXR0cmlidXRlVHlwZRIeChpBVFRSSUJVVEVfVFlQRV9VTlNQRUNJRklFRBAAEhkKFUFUVFJJQlVURV9UWVBFX1NUUklORxABEhYKEkFUVFJJQlVURV9UWVBFX0lOVBACEhcKE0FUVFJJQlVURV9UWVBFX0JPT0wQAxIXChNBVFRSSUJVVEVfVFlQRV9FTlVNEAQqdwoSRGV2aWNlRXhwb3J0Rm9ybWF0EiQKIERFVklDRV9FWFBPUlRfRk9STUFUX1VOU1BFQ0lGSUVEEAASHAoYREVWSUNFX0VYUE9SVF9GT1JNQVRfQ1NWEAESHQoZREVWSUNFX0VYUE9SVF9GT1JNQVRfSlNPThACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
+  fileDesc("CilsaW5kbS9hZG1pbi92MS9pbnZlbnRvcnlfbWFuYWdlbWVudC5wcm90bxIObGluZG0uYWRtaW4udjEilwEKDkF0dHJpYnV0ZVZhbHVlEiQKDHN0cmluZ192YWx1ZRgBIAEoCUIMukgJcgcYgAi6AQEASAASEwoJaW50X3ZhbHVlGAIgASgDSAASFAoKYm9vbF92YWx1ZRgDIAEoCEgAEiQKCmVudW1fdmFsdWUYBCABKAlCDrpIC3IJEAEYgAG6AQEASABCDgoFdmFsdWUSBbpIAggBIrsCChNBdHRyaWJ1dGVEZWZpbml0aW9uEisKA2tleRgBIAEoCUIeukgbchkQARhAMhNeW2Etel1bYS16MC05Xy4tXSokEjcKBHR5cGUYAiABKA4yHS5saW5kbS5hZG1pbi52MS5BdHRyaWJ1dGVUeXBlQgq6SAeCAQQQASAAEiwKC2VudW1fdmFsdWVzGAMgAygJQhe6SBSSAREQQBgBIgtyCRABGIABugEBADqPAbpIiwEaiAEKIGF0dHJpYnV0ZV9kZWZpbml0aW9uLmVudW1fdmFsdWVzEjJPbmx5IGVudW0gZGVmaW5pdGlvbnMgcmVxdWlyZSBub25lbXB0eSBlbnVtIHZhbHVlcxowKHRoaXMudHlwZSA9PSA0KSA9PSAoc2l6ZSh0aGlzLmVudW1fdmFsdWVzKSA+IDApIukCCg5EZXZpY2VNZXRhZGF0YRJCCgZsYWJlbHMYASADKAlCMrpIL5IBLBAgGAEiJnIkEAEYQDIeXlthLXpBLVowLTldW2EtekEtWjAtOV8uOi8tXSokEiYKEm93bmVyX3ByaW5jaXBhbF9pZBgCIAEoCUIIukgFcgOwAQFIABIkCgpvd25lcl90ZXh0GAMgASgJQg66SAtyCRABGIACugEBAEgAEmkKCmF0dHJpYnV0ZXMYBCADKAsyLi5saW5kbS5hZG1pbi52MS5EZXZpY2VNZXRhZGF0YS5BdHRyaWJ1dGVzRW50cnlCJbpIIpoBHxAgIhtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQaUQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRItCgV2YWx1ZRgCIAEoCzIeLmxpbmRtLmFkbWluLnYxLkF0dHJpYnV0ZVZhbHVlOgI4AUIHCgVvd25lciJaCgpEZXZpY2VTb3J0EjgKBWZpZWxkGAEgASgOMh8ubGluZG0uYWRtaW4udjEuRGV2aWNlU29ydEZpZWxkQgi6SAWCAQIQARISCgpkZXNjZW5kaW5nGAIgASgIIroFCgxEZXZpY2VGaWx0ZXISGwoFb3NfaWQYASABKAlCDLpICXIHGIAgugEBABIgCgpvc192ZXJzaW9uGAIgASgJQgy6SAlyBxiAILoBAQASQgoGbGFiZWxzGAMgAygJQjK6SC+SASwQIBgBIiZyJBABGEAyHl5bYS16QS1aMC05XVthLXpBLVowLTlfLjovLV0qJBJnCgphdHRyaWJ1dGVzGAQgAygLMiwubGluZG0uYWRtaW4udjEuRGV2aWNlRmlsdGVyLkF0dHJpYnV0ZXNFbnRyeUIlukgimgEfECAiG3IZEAEYQDITXlthLXpdW2EtejAtOV8uLV0qJBIyCg5sYXN0X3NlZW5fZnJvbRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoPbGFzdF9zZWVuX3VudGlsGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIhCgtuYW1lX3ByZWZpeBgHIAEoCUIMukgJcgcYgCC6AQEAEiMKDWFnZW50X3JlbGVhc2UYCCABKAlCDLpICXIHGIABugEBABpRCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEi0KBXZhbHVlGAIgASgLMh4ubGluZG0uYWRtaW4udjEuQXR0cmlidXRlVmFsdWU6AjgBOrkBuki1ARqyAQoYZGV2aWNlX2ZpbHRlci5zZWVuX3JhbmdlEi5sYXN0X3NlZW5fZnJvbSBtdXN0IG5vdCBleGNlZWQgbGFzdF9zZWVuX3VudGlsGmYhaGFzKHRoaXMubGFzdF9zZWVuX2Zyb20pIHx8ICFoYXModGhpcy5sYXN0X3NlZW5fdW50aWwpIHx8IHRoaXMubGFzdF9zZWVuX2Zyb20gPD0gdGhpcy5sYXN0X3NlZW5fdW50aWwiqgEKGFNldERldmljZU1ldGFkYXRhUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEjgKCG1ldGFkYXRhGAMgASgLMh4ubGluZG0uYWRtaW4udjEuRGV2aWNlTWV0YWRhdGFCBrpIA8gBARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYASIbChlTZXREZXZpY2VNZXRhZGF0YVJlc3BvbnNlIpkBCh1TZXRBdHRyaWJ1dGVEZWZpbml0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARI/CgpkZWZpbml0aW9uGAIgASgLMiMubGluZG0uYWRtaW4udjEuQXR0cmlidXRlRGVmaW5pdGlvbkIGukgDyAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBIiAKHlNldEF0dHJpYnV0ZURlZmluaXRpb25SZXNwb25zZSJyCh9MaXN0QXR0cmlidXRlRGVmaW5pdGlvbnNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoDUIIukgFKgMYyAESMgoJYWZ0ZXJfa2V5GAIgASgJQh+6SBxyGhhAMhZeKFthLXpdW2EtejAtOV8uLV0qKT8kInQKIExpc3RBdHRyaWJ1dGVEZWZpbml0aW9uc1Jlc3BvbnNlEjgKC2RlZmluaXRpb25zGAEgAygLMiMubGluZG0uYWRtaW4udjEuQXR0cmlidXRlRGVmaW5pdGlvbhIWCg5uZXh0X2FmdGVyX2tleRgCIAEoCSKQAgoURXhwb3J0RGV2aWNlc1JlcXVlc3QSLAoGZmlsdGVyGAEgASgLMhwubGluZG0uYWRtaW4udjEuRGV2aWNlRmlsdGVyEj4KBmZvcm1hdBgCIAEoDjIiLmxpbmRtLmFkbWluLnYxLkRldmljZUV4cG9ydEZvcm1hdEIKukgHggEEEAEgABIbCglwYWdlX3NpemUYAyABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YBCABKAlCCLpIBXIDGIAEEigKBHNvcnQYBSABKAsyGi5saW5kbS5hZG1pbi52MS5EZXZpY2VTb3J0EiUKD2hvc3RuYW1lX3NlYXJjaBgGIAEoCUIMukgJcgcY/QG6AQEAIlUKFUV4cG9ydERldmljZXNSZXNwb25zZRIPCgdjb250ZW50GAEgASgMEhIKCm1lZGlhX3R5cGUYAiABKAkSFwoPbmV4dF9wYWdlX3Rva2VuGAMgASgJKpQBCg1BdHRyaWJ1dGVUeXBlEh4KGkFUVFJJQlVURV9UWVBFX1VOU1BFQ0lGSUVEEAASGQoVQVRUUklCVVRFX1RZUEVfU1RSSU5HEAESFgoSQVRUUklCVVRFX1RZUEVfSU5UEAISFwoTQVRUUklCVVRFX1RZUEVfQk9PTBADEhcKE0FUVFJJQlVURV9UWVBFX0VOVU0QBCqdAQoPRGV2aWNlU29ydEZpZWxkEiEKHURFVklDRV9TT1JUX0ZJRUxEX1VOU1BFQ0lGSUVEEAASHgoaREVWSUNFX1NPUlRfRklFTERfSE9TVE5BTUUQARIfChtERVZJQ0VfU09SVF9GSUVMRF9MQVNUX1NFRU4QAhImCiJERVZJQ0VfU09SVF9GSUVMRF9PUEVSQVRJTkdfU1lTVEVNEAMqdwoSRGV2aWNlRXhwb3J0Rm9ybWF0EiQKIERFVklDRV9FWFBPUlRfRk9STUFUX1VOU1BFQ0lGSUVEEAASHAoYREVWSUNFX0VYUE9SVF9GT1JNQVRfQ1NWEAESHQoZREVWSUNFX0VYUE9SVF9GT1JNQVRfSlNPThACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AttributeValue
@@ -126,6 +126,28 @@ export const DeviceMetadataSchema: GenMessage<DeviceMetadata> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_inventory_management, 2);
 
 /**
+ * @generated from message lindm.admin.v1.DeviceSort
+ */
+export type DeviceSort = Message<"lindm.admin.v1.DeviceSort"> & {
+  /**
+   * @generated from field: lindm.admin.v1.DeviceSortField field = 1;
+   */
+  field: DeviceSortField;
+
+  /**
+   * @generated from field: bool descending = 2;
+   */
+  descending: boolean;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DeviceSort.
+ * Use `create(DeviceSortSchema)` to create a new message.
+ */
+export const DeviceSortSchema: GenMessage<DeviceSort> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_inventory_management, 3);
+
+/**
  * @generated from message lindm.admin.v1.DeviceFilter
  */
 export type DeviceFilter = Message<"lindm.admin.v1.DeviceFilter"> & {
@@ -182,7 +204,7 @@ export type DeviceFilter = Message<"lindm.admin.v1.DeviceFilter"> & {
  * Use `create(DeviceFilterSchema)` to create a new message.
  */
 export const DeviceFilterSchema: GenMessage<DeviceFilter> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 3);
+  messageDesc(file_lindm_admin_v1_inventory_management, 4);
 
 /**
  * @generated from message lindm.admin.v1.SetDeviceMetadataRequest
@@ -214,7 +236,7 @@ export type SetDeviceMetadataRequest = Message<"lindm.admin.v1.SetDeviceMetadata
  * Use `create(SetDeviceMetadataRequestSchema)` to create a new message.
  */
 export const SetDeviceMetadataRequestSchema: GenMessage<SetDeviceMetadataRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 4);
+  messageDesc(file_lindm_admin_v1_inventory_management, 5);
 
 /**
  * @generated from message lindm.admin.v1.SetDeviceMetadataResponse
@@ -227,7 +249,7 @@ export type SetDeviceMetadataResponse = Message<"lindm.admin.v1.SetDeviceMetadat
  * Use `create(SetDeviceMetadataResponseSchema)` to create a new message.
  */
 export const SetDeviceMetadataResponseSchema: GenMessage<SetDeviceMetadataResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 5);
+  messageDesc(file_lindm_admin_v1_inventory_management, 6);
 
 /**
  * @generated from message lindm.admin.v1.SetAttributeDefinitionRequest
@@ -254,7 +276,7 @@ export type SetAttributeDefinitionRequest = Message<"lindm.admin.v1.SetAttribute
  * Use `create(SetAttributeDefinitionRequestSchema)` to create a new message.
  */
 export const SetAttributeDefinitionRequestSchema: GenMessage<SetAttributeDefinitionRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 6);
+  messageDesc(file_lindm_admin_v1_inventory_management, 7);
 
 /**
  * @generated from message lindm.admin.v1.SetAttributeDefinitionResponse
@@ -267,7 +289,7 @@ export type SetAttributeDefinitionResponse = Message<"lindm.admin.v1.SetAttribut
  * Use `create(SetAttributeDefinitionResponseSchema)` to create a new message.
  */
 export const SetAttributeDefinitionResponseSchema: GenMessage<SetAttributeDefinitionResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 7);
+  messageDesc(file_lindm_admin_v1_inventory_management, 8);
 
 /**
  * @generated from message lindm.admin.v1.ListAttributeDefinitionsRequest
@@ -289,7 +311,7 @@ export type ListAttributeDefinitionsRequest = Message<"lindm.admin.v1.ListAttrib
  * Use `create(ListAttributeDefinitionsRequestSchema)` to create a new message.
  */
 export const ListAttributeDefinitionsRequestSchema: GenMessage<ListAttributeDefinitionsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 8);
+  messageDesc(file_lindm_admin_v1_inventory_management, 9);
 
 /**
  * @generated from message lindm.admin.v1.ListAttributeDefinitionsResponse
@@ -311,7 +333,7 @@ export type ListAttributeDefinitionsResponse = Message<"lindm.admin.v1.ListAttri
  * Use `create(ListAttributeDefinitionsResponseSchema)` to create a new message.
  */
 export const ListAttributeDefinitionsResponseSchema: GenMessage<ListAttributeDefinitionsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 9);
+  messageDesc(file_lindm_admin_v1_inventory_management, 10);
 
 /**
  * @generated from message lindm.admin.v1.ExportDevicesRequest
@@ -336,6 +358,18 @@ export type ExportDevicesRequest = Message<"lindm.admin.v1.ExportDevicesRequest"
    * @generated from field: string page_token = 4;
    */
   pageToken: string;
+
+  /**
+   * @generated from field: lindm.admin.v1.DeviceSort sort = 5;
+   */
+  sort?: DeviceSort | undefined;
+
+  /**
+   * Case-insensitive literal substring of the hostname; empty disables it.
+   *
+   * @generated from field: string hostname_search = 6;
+   */
+  hostnameSearch: string;
 };
 
 /**
@@ -343,7 +377,7 @@ export type ExportDevicesRequest = Message<"lindm.admin.v1.ExportDevicesRequest"
  * Use `create(ExportDevicesRequestSchema)` to create a new message.
  */
 export const ExportDevicesRequestSchema: GenMessage<ExportDevicesRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 10);
+  messageDesc(file_lindm_admin_v1_inventory_management, 11);
 
 /**
  * @generated from message lindm.admin.v1.ExportDevicesResponse
@@ -372,7 +406,7 @@ export type ExportDevicesResponse = Message<"lindm.admin.v1.ExportDevicesRespons
  * Use `create(ExportDevicesResponseSchema)` to create a new message.
  */
 export const ExportDevicesResponseSchema: GenMessage<ExportDevicesResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_inventory_management, 11);
+  messageDesc(file_lindm_admin_v1_inventory_management, 12);
 
 /**
  * @generated from enum lindm.admin.v1.AttributeType
@@ -411,6 +445,45 @@ export const AttributeTypeSchema: GenEnum<AttributeType> = /*@__PURE__*/
   enumDesc(file_lindm_admin_v1_inventory_management, 0);
 
 /**
+ * Device list order across all pages. Unspecified: newest enrollment first.
+ *
+ * @generated from enum lindm.admin.v1.DeviceSortField
+ */
+export enum DeviceSortField {
+  /**
+   * @generated from enum value: DEVICE_SORT_FIELD_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Case-insensitive; devices without a hostname (pending) sort last.
+   *
+   * @generated from enum value: DEVICE_SORT_FIELD_HOSTNAME = 1;
+   */
+  HOSTNAME = 1,
+
+  /**
+   * Last contact; never-seen devices sort last in either direction.
+   *
+   * @generated from enum value: DEVICE_SORT_FIELD_LAST_SEEN = 2;
+   */
+  LAST_SEEN = 2,
+
+  /**
+   * Operating system then version, case-insensitive; unreported sort last.
+   *
+   * @generated from enum value: DEVICE_SORT_FIELD_OPERATING_SYSTEM = 3;
+   */
+  OPERATING_SYSTEM = 3,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.DeviceSortField.
+ */
+export const DeviceSortFieldSchema: GenEnum<DeviceSortField> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_inventory_management, 1);
+
+/**
  * @generated from enum lindm.admin.v1.DeviceExportFormat
  */
 export enum DeviceExportFormat {
@@ -434,5 +507,5 @@ export enum DeviceExportFormat {
  * Describes the enum lindm.admin.v1.DeviceExportFormat.
  */
 export const DeviceExportFormatSchema: GenEnum<DeviceExportFormat> = /*@__PURE__*/
-  enumDesc(file_lindm_admin_v1_inventory_management, 1);
+  enumDesc(file_lindm_admin_v1_inventory_management, 2);
 

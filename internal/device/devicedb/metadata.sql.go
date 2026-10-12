@@ -243,15 +243,27 @@ func (q *Queries) LockInventoryMetadata(ctx context.Context) error {
 }
 
 const searchDevices = `-- name: SearchDevices :many
-WITH page AS MATERIALIZED (
-    SELECT d.id, d.state, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture, d.enrolled_at, d.last_seen_at, d.open_snapshot_id, d.reserved_inventory_bytes, d.published_sequence, d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.revoked_at, d.revoked_by, d.revoke_reason, d.metadata, d.owner_principal_id
+WITH keyed AS (
+    SELECT d.id, d.state, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture, d.enrolled_at, d.last_seen_at, d.open_snapshot_id, d.reserved_inventory_bytes, d.published_sequence, d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.revoked_at, d.revoked_by, d.revoke_reason, d.metadata, d.owner_principal_id,
+        (CASE $3::int
+            WHEN 1 THEN d.hostname = ''
+            WHEN 2 THEN d.last_seen_at IS NULL
+            WHEN 3 THEN d.os_id = ''
+            ELSE false
+        END)::boolean AS sort_last,
+        (CASE $3::int
+            WHEN 1 THEN left(lower(d.hostname), 80)
+            WHEN 2 THEN coalesce(lpad((extract(epoch FROM d.last_seen_at) * 1000000)::bigint::text, 20, '0'), '')
+            WHEN 3 THEN left(lower(d.os_id), 40) || chr(1) || left(lower(d.os_version), 39)
+            ELSE lpad((extract(epoch FROM d.enrolled_at) * 1000000)::bigint::text, 20, '0')
+        END)::text COLLATE "C" AS sort_key
     FROM devices d
-    WHERE device_scope_matches(d.id, $2::boolean, $3::jsonb)
-      AND d.enrolled_at <= $4::timestamptz
-      AND (NOT $5::boolean OR (d.enrolled_at, d.id) < ($6::timestamptz, $7::uuid))
-      AND ($8::text = '' OR d.os_id = $8)
-      AND ($9::text = '' OR d.os_version = $9)
-      AND starts_with(d.hostname, $10::text)
+    WHERE device_scope_matches(d.id, $4::boolean, $5::jsonb)
+      AND d.enrolled_at <= $6::timestamptz
+      AND ($7::text = '' OR d.os_id = $7)
+      AND ($8::text = '' OR d.os_version = $8)
+      AND starts_with(d.hostname, $9::text)
+      AND ($10::text = '' OR strpos(lower(d.hostname), lower($10::text)) > 0)
       AND ($11::text = '' OR EXISTS (
           SELECT 1 FROM device_release_reports r
           WHERE r.generation_id = d.current_generation_id AND r.agent_release = $11::text
@@ -259,11 +271,23 @@ WITH page AS MATERIALIZED (
       AND ($12::timestamptz IS NULL OR d.last_seen_at >= $12::timestamptz)
       AND ($13::timestamptz IS NULL OR d.last_seen_at <= $13::timestamptz)
       AND d.metadata @> $14::jsonb
-    ORDER BY d.enrolled_at DESC, d.id DESC
-    LIMIT $15::int
+), page AS MATERIALIZED (
+    SELECT k.id, k.state, k.current_generation_id, k.hostname, k.os_id, k.os_version, k.architecture, k.enrolled_at, k.last_seen_at, k.open_snapshot_id, k.reserved_inventory_bytes, k.published_sequence, k.host_received_at, k.package_attempt_received_at, k.snapshot_received_at, k.revoked_at, k.revoked_by, k.revoke_reason, k.metadata, k.owner_principal_id, k.sort_last, k.sort_key
+    FROM keyed k
+    WHERE NOT $15::boolean
+       OR k.sort_last > $16::boolean
+       OR (k.sort_last = $16::boolean AND (
+           (NOT $2::boolean AND (k.sort_key, k.id) > ($17::text COLLATE "C", $18::uuid))
+           OR ($2::boolean AND (k.sort_key, k.id) < ($17::text COLLATE "C", $18::uuid))))
+    ORDER BY k.sort_last,
+        CASE WHEN NOT $2::boolean THEN k.sort_key END COLLATE "C",
+        CASE WHEN $2::boolean THEN k.sort_key END COLLATE "C" DESC,
+        CASE WHEN NOT $2::boolean THEN k.id END,
+        CASE WHEN $2::boolean THEN k.id END DESC
+    LIMIT $19::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
-    d.state, d.enrolled_at, d.last_seen_at, d.published_sequence,
+    d.state, d.enrolled_at, d.last_seen_at, d.published_sequence, d.sort_last, d.sort_key::text AS sort_key,
     coalesce(g.host_sequence, 0)::bigint AS host_sequence,
     coalesce(g.package_sequence, 0)::bigint AS package_sequence,
     d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.metadata,
@@ -323,24 +347,32 @@ CROSS JOIN LATERAL (
     FROM integration_compliance_projection p
     WHERE p.device_id = d.id
 ) compliance
-ORDER BY d.enrolled_at DESC, d.id DESC
+ORDER BY d.sort_last,
+    CASE WHEN NOT $2::boolean THEN d.sort_key END COLLATE "C",
+    CASE WHEN $2::boolean THEN d.sort_key END COLLATE "C" DESC,
+    CASE WHEN NOT $2::boolean THEN d.id END,
+    CASE WHEN $2::boolean THEN d.id END DESC
 `
 
 type SearchDevicesParams struct {
 	PatchStaleAfterSeconds int32
+	Descending             bool
+	SortField              int32
 	ScopeUnrestricted      bool
 	Scopes                 []byte
 	UpperEnrolledAt        pgtype.Timestamptz
-	HasCursor              bool
-	CursorEnrolledAt       pgtype.Timestamptz
-	CursorID               uuid.UUID
 	OsID                   string
 	OsVersion              string
 	NamePrefix             string
+	HostnameSearch         string
 	AgentRelease           string
 	SeenFrom               pgtype.Timestamptz
 	SeenUntil              pgtype.Timestamptz
 	MetadataFilter         []byte
+	HasCursor              bool
+	CursorLast             bool
+	CursorKey              string
+	CursorID               uuid.UUID
 	RowLimit               int32
 }
 
@@ -355,6 +387,8 @@ type SearchDevicesRow struct {
 	EnrolledAt               pgtype.Timestamptz
 	LastSeenAt               pgtype.Timestamptz
 	PublishedSequence        int64
+	SortLast                 bool
+	SortKey                  string
 	HostSequence             int64
 	PackageSequence          int64
 	HostReceivedAt           pgtype.Timestamptz
@@ -382,22 +416,31 @@ type SearchDevicesRow struct {
 }
 
 // Restrict scope, filters and keyset before projecting bounded page resources.
+// Order: sort_last (rows without the sort value: never seen, no hostname, no OS)
+// always last, then sort_key in the requested direction, then id. sort_field 0
+// keys on enrolled_at (callers pass descending). Keys compare bytewise (C) and
+// hold at most 80 characters so the page token can carry them; longer values
+// sharing that prefix are ordered by id, which is still one total order.
 func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([]SearchDevicesRow, error) {
 	rows, err := q.db.Query(ctx, searchDevices,
 		arg.PatchStaleAfterSeconds,
+		arg.Descending,
+		arg.SortField,
 		arg.ScopeUnrestricted,
 		arg.Scopes,
 		arg.UpperEnrolledAt,
-		arg.HasCursor,
-		arg.CursorEnrolledAt,
-		arg.CursorID,
 		arg.OsID,
 		arg.OsVersion,
 		arg.NamePrefix,
+		arg.HostnameSearch,
 		arg.AgentRelease,
 		arg.SeenFrom,
 		arg.SeenUntil,
 		arg.MetadataFilter,
+		arg.HasCursor,
+		arg.CursorLast,
+		arg.CursorKey,
+		arg.CursorID,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -418,6 +461,8 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 			&i.EnrolledAt,
 			&i.LastSeenAt,
 			&i.PublishedSequence,
+			&i.SortLast,
+			&i.SortKey,
 			&i.HostSequence,
 			&i.PackageSequence,
 			&i.HostReceivedAt,

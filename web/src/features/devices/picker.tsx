@@ -36,12 +36,16 @@ export function DevicePicker({
   const [os, setOS] = useState("");
   const [group, setGroup] = useState("");
   const [cursor, setCursor] = useState({ filter: "", token: "" });
-  const filter = useDeferredValue(JSON.stringify({ namePrefix: search, osId: os }));
+  const hostnameSearch = useDeferredValue(search.trim().slice(0, 253));
+  const filter = useDeferredValue(JSON.stringify({ osId: os }));
+  // Paging restarts whenever the OS or the hostname text changes.
+  const key = `${filter}\n${hostnameSearch}`;
   const query = useQuery(
     devicesQueryOptions(lifetime, {
       pageSize: 100,
-      pageToken: cursor.filter === filter ? cursor.token : "",
+      pageToken: cursor.filter === key ? cursor.token : "",
       filter,
+      hostnameSearch,
     }),
   );
   const selected = useQuery({
@@ -118,7 +122,7 @@ export function DevicePicker({
             type="button"
             variant="outline"
             disabled={props.disabled || query.isFetching}
-            onClick={() => setCursor({ filter, token: "" })}
+            onClick={() => setCursor({ filter: key, token: "" })}
           >
             First devices
           </Button>
@@ -128,7 +132,7 @@ export function DevicePicker({
             type="button"
             variant="outline"
             disabled={props.disabled || query.isFetching}
-            onClick={() => setCursor({ filter, token: query.data?.nextPageToken ?? "" })}
+            onClick={() => setCursor({ filter: key, token: query.data?.nextPageToken ?? "" })}
           >
             More devices
           </Button>

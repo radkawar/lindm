@@ -2,6 +2,7 @@ import { create, toJsonString } from "@bufbuild/protobuf";
 import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Search, X } from "lucide-react";
 import {
   DeviceExportFormat,
@@ -20,7 +21,7 @@ import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
 import { adminClient } from "@/lib/rpc";
 import { AttributeFields, readAttributeInputs } from "./attributes";
-import { deviceFilter, type DeviceSearch } from "./search";
+import { deviceFilter, deviceSort, type DeviceSearch } from "./search";
 import { validateInventory } from "./validation";
 
 export function DeviceFilters({
@@ -78,7 +79,7 @@ function FilterForm({
           const from = String(data.get("seen-from") ?? "");
           const until = String(data.get("seen-until") ?? "");
           const next = create(DeviceFilterSchema, {
-            namePrefix: String(data.get("name-prefix") ?? ""),
+            namePrefix: filter.namePrefix,
             osId: String(data.get("os") ?? "").trim(),
             osVersion: String(data.get("version") ?? "").trim(),
             labels: String(data.get("labels") ?? "")
@@ -90,7 +91,13 @@ function FilterForm({
           });
           validateInventory(DeviceFilterSchema, next);
           setError("");
-          onSearch({ ...search, filter: toJsonString(DeviceFilterSchema, next), pageToken: "" });
+          const hostnameSearch = String(data.get("hostname-search") ?? "").trim();
+          onSearch({
+            ...search,
+            filter: toJsonString(DeviceFilterSchema, next),
+            hostnameSearch,
+            pageToken: "",
+          });
         } catch (failure) {
           setError(toRpcFailure(failure).message);
         }
@@ -106,11 +113,12 @@ function FilterForm({
             />
             <Input
               id="filter-name"
-              name="name-prefix"
+              name="hostname-search"
               type="search"
               className="pl-9"
-              defaultValue={filter.namePrefix}
-              placeholder="Hostname starts with…"
+              defaultValue={search.hostnameSearch}
+              placeholder="Part of a hostname, any case"
+              data-freeform="text searched within hostnames"
             />
           </div>
         </div>
@@ -131,18 +139,31 @@ function FilterForm({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => onSearch({ ...search, filter: "", pageToken: "" })}
+          onClick={() => onSearch({ ...search, filter: "", hostnameSearch: "", pageToken: "" })}
         >
           Clear
         </Button>
       </div>
-      {filter.namePrefix || filter.osId || filter.labels.length > 0 ? (
+      {search.hostnameSearch || filter.namePrefix || filter.osId || filter.labels.length > 0 ? (
         <div
           className="flex flex-wrap items-center gap-2"
           role="group"
           aria-label="Applied device filters"
         >
           <span className="text-xs text-muted-foreground">Applied</span>
+          {search.hostnameSearch ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 max-w-72 rounded-full bg-muted/40 px-2.5 text-xs"
+              aria-label={`Remove hostname filter: ${search.hostnameSearch}`}
+              onClick={() => onSearch({ ...search, hostnameSearch: "", pageToken: "" })}
+            >
+              <span className="truncate">Hostname contains: {search.hostnameSearch}</span>
+              <X className="size-3 shrink-0" aria-hidden="true" />
+            </Button>
+          ) : null}
           {filter.namePrefix ? (
             <Button
               type="button"
@@ -152,7 +173,7 @@ function FilterForm({
               aria-label={`Remove hostname prefix filter: ${filter.namePrefix}`}
               onClick={() => removeFacet({ namePrefix: "" })}
             >
-              <span className="truncate">Name: {filter.namePrefix}</span>
+              <span className="truncate">Hostname starts with: {filter.namePrefix}</span>
               <X className="size-3 shrink-0" aria-hidden="true" />
             </Button>
           ) : null}
@@ -271,16 +292,22 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
       return response;
     },
     onSuccess: (response, request) => {
+      const file = `devices-page-${pages + 1}.${request.format === DeviceExportFormat.CSV ? "csv" : "json"}`;
       const url = URL.createObjectURL(
         new Blob([new Uint8Array(response.content)], { type: response.mediaType }),
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = `devices-page-${pages + 1}.${request.format === DeviceExportFormat.CSV ? "csv" : "json"}`;
+      link.download = file;
       link.click();
       URL.revokeObjectURL(url);
       setPageToken(response.nextPageToken);
       setPages((value) => value + 1);
+      toast.success(`Downloaded ${file}`, {
+        description: response.nextPageToken
+          ? "More devices match. Use Download next file."
+          : "Export complete.",
+      });
     },
     onSettled: () => {
       inFlight.current = false;
@@ -314,6 +341,8 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
               const request = create(ExportDevicesRequestSchema, {
                 format,
                 filter: deviceFilter(search),
+                sort: deviceSort(search),
+                hostnameSearch: search.hostnameSearch ?? "",
                 pageSize: search.pageSize,
                 pageToken,
               });
@@ -342,7 +371,7 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
       </div>
       {pages ? (
         <p role="status" className="text-sm">
-          Downloaded {pages} file(s).{" "}
+          {pages === 1 ? "Downloaded 1 file." : `Downloaded ${pages} files.`}{" "}
           {pageToken ? "More devices are available." : "Export complete."}
         </p>
       ) : null}

@@ -2,9 +2,13 @@ package directory
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/csv"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +27,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/device/inventory"
 	"lindm/internal/identity"
+	"lindm/internal/platform"
 )
 
 func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
@@ -39,7 +44,7 @@ func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.
 		return nil, core.MapErr(err)
 	}
 	defer s.Release()
-	page, err := s.searchDevicePage(ctx, actor, req.Msg.GetFilter(), req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED)
+	page, err := s.searchDevicePage(ctx, actor, deviceQuery{filter: req.Msg.GetFilter(), sort: req.Msg.GetSort(), hostnameSearch: req.Msg.GetHostnameSearch()}, req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -60,7 +65,7 @@ func (s *Service) ExportDevices(ctx context.Context, req *connect.Request[adminv
 		return nil, core.MapErr(err)
 	}
 	defer s.Release()
-	page, err := s.searchDevicePage(ctx, actor, req.Msg.GetFilter(), req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), req.Msg.GetFormat())
+	page, err := s.searchDevicePage(ctx, actor, deviceQuery{filter: req.Msg.GetFilter(), sort: req.Msg.GetSort(), hostnameSearch: req.Msg.GetHostnameSearch()}, req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), req.Msg.GetFormat())
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -79,15 +84,28 @@ type deviceSearchPage struct {
 	expires *timestamppb.Timestamp
 }
 
+// deviceQuery is one device list or export request's filter, order and search.
+type deviceQuery struct {
+	filter         *adminv1.DeviceFilter
+	sort           *adminv1.DeviceSort
+	hostnameSearch string
+}
+
 // MaxDeviceSearchCursors bounds each actor's live search cursors.
 const MaxDeviceSearchCursors = 256
 
-// The opaque cursor binds the actor, filters, scope, purpose and fixed expiry.
-// Position is an immutable (enrolled_at,id) keyset, never an offset. Projections
-// may change between pages; new enrollments after the initial cutoff are excluded.
-func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal, filter *adminv1.DeviceFilter, token string, limit int32, format adminv1.DeviceExportFormat) (*deviceSearchPage, error) {
+// The opaque cursor binds the actor, filters, order, search, scope, purpose and
+// fixed expiry. Position is a (sort_last, sort_key, id) keyset, never an offset;
+// the default order keys on enrollment time. Projections may change between
+// pages; new enrollments after the initial cutoff are excluded.
+func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal, query deviceQuery, token string, limit int32, format adminv1.DeviceExportFormat) (*deviceSearchPage, error) {
+	filter := query.filter
 	if filter == nil {
 		filter = &adminv1.DeviceFilter{}
+	}
+	order, err := (proto.MarshalOptions{Deterministic: true}).Marshal(query.sort)
+	if err != nil {
+		return nil, err
 	}
 	unrestricted, scopes, err := core.DeviceScopeFilter(actor, identity.PermissionReadFleet)
 	if err != nil {
@@ -100,6 +118,11 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 	binding := sha256.New()
 	_, _ = binding.Write(encoded)
 	_, _ = binding.Write([]byte{byte(format)})
+	// Length-prefixed so filter, order and search bytes cannot alias.
+	for _, part := range [][]byte{order, []byte(query.hostnameSearch)} {
+		_, _ = binding.Write(binary.BigEndian.AppendUint32(nil, uint32(len(part))))
+		_, _ = binding.Write(part)
+	}
 	if unrestricted {
 		_, _ = binding.Write([]byte{1})
 	} else {
@@ -121,8 +144,11 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		params := devicedb.SearchDevicesParams{
 			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter, PatchStaleAfterSeconds: inventory.PatchStaleAfterSeconds,
 			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
-			AgentRelease:     filter.GetAgentRelease(),
-			CursorEnrolledAt: core.Timestamptz(now), CursorID: uuid.Nil,
+			AgentRelease: filter.GetAgentRelease(), HostnameSearch: query.hostnameSearch,
+			SortField: int32(query.sort.GetField()), Descending: query.sort.GetDescending(),
+		}
+		if query.sort.GetField() == adminv1.DeviceSortField_DEVICE_SORT_FIELD_UNSPECIFIED {
+			params.Descending = true // newest enrollment first
 		}
 		if filter.GetLastSeenFrom() != nil {
 			params.SeenFrom = core.Timestamptz(filter.GetLastSeenFrom().AsTime())
@@ -184,7 +210,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 				return core.ErrInternalState
 			}
 			last := rows[len(page.devices)-1]
-			position, err := core.EncodeCursor(last.EnrolledAt.Time, last.ID)
+			position, err := encodeSortCursor(last.SortLast, last.SortKey, last.ID)
 			if err != nil {
 				return err
 			}
@@ -227,12 +253,12 @@ func resumeDeviceSearchCursor(ctx context.Context, q *devicedb.Queries, cursor *
 		return core.ErrPageExpired
 	}
 	if position != "" {
-		when, deviceID, err := core.DecodeCursor(position)
+		last, key, deviceID, err := decodeSortCursor(position)
 		if err != nil {
 			return err
 		}
 		params.HasCursor = true
-		params.CursorEnrolledAt, params.CursorID = core.Timestamptz(when), deviceID
+		params.CursorLast, params.CursorKey, params.CursorID = last, key, deviceID
 	}
 	return nil
 }
@@ -243,7 +269,7 @@ func appendDeviceSearchRows(page *deviceSearchPage, rows []devicedb.SearchDevice
 	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON:
 		content.WriteByte('[')
 	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_CSV:
-		content.WriteString("id,hostname,os_id,os_version,architecture,state,enrolled_at,last_seen_at,labels,owner_principal_id,owner_text,attributes,compliance,last_verified_at,root_encryption,pending_updates,pending_security_updates,reboot_required,critical_findings,high_findings,medium_findings,low_findings,other_findings\n")
+		content.WriteString(deviceCSVHeader)
 	}
 	for i, row := range rows {
 		if len(page.devices) == int(limit) {
@@ -341,37 +367,99 @@ func searchDevice(row devicedb.SearchDevicesRow, encryption adminv1.DeviceRootEn
 	return item, nil
 }
 
+// deviceCSVHeader names spreadsheet columns in the console's words. Device ID and
+// Owner account ID are the only machine identifiers (stable join keys).
+const deviceCSVHeader = "Device ID,Hostname,Operating system,Architecture,State,Enrolled (UTC),Last contact (UTC),Labels,Owner,Owner account ID,Attributes,Compliance,Last verified (UTC),Root encryption,Pending updates,Pending security updates,Reboot required,Critical findings,High findings,Medium findings,Low findings,Other findings,Findings coverage\n"
+
+// csvTime is a spreadsheet-readable UTC time; empty when never recorded.
+func csvTime(value *timestamppb.Timestamp, never string) string {
+	if value == nil {
+		return never
+	}
+	return value.AsTime().UTC().Format(time.DateTime)
+}
+
+var deviceStateLabels = map[adminv1.DeviceState]string{
+	adminv1.DeviceState_DEVICE_STATE_PENDING:       "Pending approval",
+	adminv1.DeviceState_DEVICE_STATE_ACTIVE:        "Active",
+	adminv1.DeviceState_DEVICE_STATE_REVOKED:       "Revoked",
+	adminv1.DeviceState_DEVICE_STATE_RECOVERY_HOLD: "Recovery hold",
+}
+
+var deviceComplianceLabels = map[adminv1.DeviceCompliance]string{
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED:       "No profile",
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT:        "Compliant",
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_DRIFT_REMEDIATED: "Drift remediated",
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_STALE:            "Stale",
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNKNOWN:          "Unknown",
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION:        "Needs attention",
+}
+
+var rootEncryptionLabels = map[adminv1.DeviceRootEncryption]string{
+	adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_ENCRYPTED:     "Encrypted",
+	adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_NOT_ENCRYPTED: "Not encrypted",
+}
+
+// csvOperatingSystem names the registry release ("Ubuntu 24.04 LTS"), else the
+// reported os-release identity.
+func csvOperatingSystem(item *adminv1.Device) string {
+	if item.GetOsId() == "" {
+		return "Not reported"
+	}
+	if release := platform.Identify(platform.OSRelease{ID: item.GetOsId(), VersionID: item.GetOsVersion()}); release.Known() {
+		return release.Name
+	}
+	return strings.TrimSpace(item.GetOsId() + " " + item.GetOsVersion())
+}
+
+// csvAttributes renders custom attributes as "key: value; …" sorted by key.
+func csvAttributes(attributes map[string]*adminv1.AttributeValue) string {
+	keys := slices.Sorted(maps.Keys(attributes))
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		var value string
+		switch v := attributes[key].GetValue().(type) {
+		case *adminv1.AttributeValue_StringValue:
+			value = v.StringValue
+		case *adminv1.AttributeValue_IntValue:
+			value = strconv.FormatInt(v.IntValue, 10)
+		case *adminv1.AttributeValue_BoolValue:
+			value = map[bool]string{true: "Yes", false: "No"}[v.BoolValue]
+		case *adminv1.AttributeValue_EnumValue:
+			value = v.EnumValue
+		}
+		parts = append(parts, key+": "+value)
+	}
+	return strings.Join(parts, "; ")
+}
+
 func exportDeviceRow(item *adminv1.Device, format adminv1.DeviceExportFormat) ([]byte, error) {
 	if format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON {
 		return protojson.Marshal(item)
 	}
-	attributes, err := protojson.Marshal(&adminv1.DeviceMetadata{Attributes: item.GetMetadata().GetAttributes()})
-	if err != nil {
-		return nil, err
-	}
-	seen := ""
-	if item.GetLastSeenAt() != nil {
-		seen = item.GetLastSeenAt().AsTime().Format(time.RFC3339Nano)
-	}
-	verified := ""
-	if item.GetLastVerifiedAt() != nil {
-		verified = item.GetLastVerifiedAt().AsTime().Format(time.RFC3339Nano)
-	}
-	// Empty update and finding cells mean not reported / not checked, never zero.
-	var pending, security, reboot string
+	pending, security, reboot := "Not reported", "Not reported", "Not reported"
 	if updates := item.GetUpdates(); updates != nil {
 		pending, security = strconv.FormatUint(uint64(updates.GetPendingUpdates()), 10), strconv.FormatUint(uint64(updates.GetPendingSecurityUpdates()), 10)
-		reboot = strconv.FormatBool(updates.GetRebootRequired())
+		reboot = map[bool]string{true: "Yes", false: "No"}[updates.GetRebootRequired()]
 	}
-	findings := make([]string, 5)
+	// A checked device reports every count, including 0; an unchecked one never does.
+	findings := []string{"Not checked", "Not checked", "Not checked", "Not checked", "Not checked", "Not checked"}
 	if counts := item.GetFindings(); counts != nil {
 		for i, count := range []uint32{counts.GetCritical(), counts.GetHigh(), counts.GetMedium(), counts.GetLow(), counts.GetOther()} {
 			findings[i] = strconv.FormatUint(uint64(count), 10)
 		}
+		findings[5] = "Complete"
+		if counts.GetPartial() {
+			findings[5] = "Partial: only verified base packages checked"
+		}
 	}
-	fields := []string{item.GetId(), item.GetHostname(), item.GetOsId(), item.GetOsVersion(), item.GetArchitecture(), item.GetLifecycleState().String(), item.GetEnrolledAt().AsTime().Format(time.RFC3339Nano), seen,
-		strings.Join(item.GetMetadata().GetLabels(), ";"), item.GetMetadata().GetOwnerPrincipalId(), item.GetMetadata().GetOwnerText(), string(attributes),
-		item.GetCompliance().String(), verified, item.GetRootEncryption().String(), pending, security, reboot}
+	state := cmp.Or(deviceStateLabels[item.GetLifecycleState()], "Unknown")
+	fields := []string{item.GetId(), item.GetHostname(), csvOperatingSystem(item), item.GetArchitecture(), state,
+		csvTime(item.GetEnrolledAt(), ""), csvTime(item.GetLastSeenAt(), "Never"),
+		strings.Join(item.GetMetadata().GetLabels(), "; "), item.GetMetadata().GetOwnerText(), item.GetMetadata().GetOwnerPrincipalId(),
+		csvAttributes(item.GetMetadata().GetAttributes()),
+		cmp.Or(deviceComplianceLabels[item.GetCompliance()], "Unknown"), csvTime(item.GetLastVerifiedAt(), "Never"),
+		cmp.Or(rootEncryptionLabels[item.GetRootEncryption()], "Unknown"), pending, security, reboot}
 	fields = append(fields, findings...)
 	for i, value := range fields {
 		// Quoting CSV alone does not prevent spreadsheet formulas. Inspect after

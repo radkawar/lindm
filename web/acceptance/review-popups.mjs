@@ -83,9 +83,11 @@ export async function popupStability(page, settleAnimations) {
     await trigger.scrollIntoViewIfNeeded();
     await settleAnimations(page);
     const before = await page.evaluate(measure);
-    try {
-      await trigger.click({ timeout: 5_000 });
-    } catch {
+    // Press where the trigger is, as a user does: Playwright's click would first
+    // re-scroll the page (it honours scroll-padding-top even for the sticky
+    // header), and that scroll is not something opening the popup caused.
+    const box = await trigger.boundingBox();
+    if (!box) {
       findings.push({
         check: "popup-stability",
         message: "Popup trigger could not be opened",
@@ -93,6 +95,7 @@ export async function popupStability(page, settleAnimations) {
       });
       continue;
     }
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await settleAnimations(page);
     if (!description.includes("[aria-haspopup=") && !(await page.evaluate(revealsChoices))) {
       // A disclosure, not a popup: close it again and move on.

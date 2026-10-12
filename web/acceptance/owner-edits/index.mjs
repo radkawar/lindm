@@ -6,6 +6,7 @@
 // inventory) or move state run last.
 import * as dashboard from "./dashboard.mjs";
 import * as deviceList from "./device-list.mjs";
+import * as deviceListSearch from "./device-list-search.mjs";
 import * as deviceOverview from "./device-overview.mjs";
 import * as deviceEncryption from "./device-encryption.mjs";
 import * as deviceActions from "./device-actions.mjs";
@@ -34,6 +35,7 @@ import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 export const ownerEdits = [
   dashboard,
   deviceList,
+  deviceListSearch,
   deviceOverview,
   pass2SafetyUndo,
   deviceEncryption,

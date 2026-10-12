@@ -94,6 +94,21 @@ message DeviceMetadata {
   }];
 }
 
+// Device list order across all pages. Unspecified: newest enrollment first.
+enum DeviceSortField {
+  DEVICE_SORT_FIELD_UNSPECIFIED = 0;
+  // Case-insensitive; devices without a hostname (pending) sort last.
+  DEVICE_SORT_FIELD_HOSTNAME = 1;
+  // Last contact; never-seen devices sort last in either direction.
+  DEVICE_SORT_FIELD_LAST_SEEN = 2;
+  // Operating system then version, case-insensitive; unreported sort last.
+  DEVICE_SORT_FIELD_OPERATING_SYSTEM = 3;
+}
+message DeviceSort {
+  DeviceSortField field = 1 [(buf.validate.field).enum.defined_only = true];
+  bool descending = 2;
+}
+
 message DeviceFilter {
   option (buf.validate.message).cel = {
     id: "device_filter.seen_range"
@@ -185,6 +200,12 @@ message ExportDevicesRequest {
   }];
   uint32 page_size = 3 [(buf.validate.field).uint32.lte = 200];
   string page_token = 4 [(buf.validate.field).string.max_len = 512];
+  DeviceSort sort = 5;
+  // Case-insensitive literal substring of the hostname; empty disables it.
+  string hostname_search = 6 [(buf.validate.field).string = {
+    max_len: 253
+    not_contains: "\000"
+  }];
 }
 message ExportDevicesResponse {
   // Each page is a standalone CSV (including header) or JSON array of Device.

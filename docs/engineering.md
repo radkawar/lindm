@@ -297,9 +297,11 @@ finding counts. Fleet composition is optional detail. No trend or risk ranking i
 invented where the API supplies no history or exposure score.
 
 Device tables offer compact single-line rows, relative timestamps with absolute
-tooltips, status dots, current-page sorting, column visibility, and density.
-The always-visible hostname-prefix/OS/label toolbar retains advanced typed filters.
-Hostname prefix matching is literal and case-sensitive. Server SQL applies scope
+tooltips, status dots, server-side sorting, column visibility, and density.
+The always-visible hostname/OS/label toolbar retains advanced typed filters.
+The hostname box is `hostname_search`: a case-insensitive literal substring (no
+wildcards). `DeviceFilter.name_prefix` stays a literal, case-sensitive prefix
+because dynamic-group predicates share `DeviceFilter`. Server SQL applies scope
 and the bounded page before projecting the worst current-head service disposition;
 no per-row RPC fanout occurs. Last verification is the oldest resource proof only
 when every current resource has proof; no resources means unassigned, not compliant.
@@ -312,10 +314,18 @@ Findings are the fresh evaluation's finding set minus active exceptions, flagged
 when partial. A missing report is Unknown or Not checked, never a zero. Last
 inventory is the published snapshot's relative receipt time; the cursor expiry
 sentence is a pager tooltip. Custom attribute definitions are managed in Settings.
-The prefix participates in cursor filter binding. Sorting never changes server
-order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
-CSV exports append root encryption, update and per-severity finding columns; empty
-cells mean not reported or not checked.
+Search, order and filters participate in cursor binding. `sort` orders the whole
+result across pages by hostname (case-insensitive), last contact or operating system
+(id then version), either direction; rows without that value (pending, never seen,
+unreported) always come last; ties break by device ID; the default is newest
+enrollment first. The keyset is (missing-value flag, a sort key of at most 80
+characters, ID), carried in the page token, so Previous/Next, expiry and paged
+exports keep their meaning. CSV exports use the console's words: human column
+names, registry release names ("Ubuntu 24.04 LTS"), state/compliance/encryption
+labels, UTC `YYYY-MM-DD HH:MM:SS` times, `key: value; …` attributes, `0` counts
+for checked devices and "Not checked"/"Not reported"/"Never" for missing evidence.
+Device ID and Owner account ID are the only machine identifiers; JSON exports keep
+the protobuf `Device` form.
 Each administrator keeps at most 256 live search cursors (15 minutes each); a new
 search evicts that administrator's oldest, so browsing never locks the list. A page
 of an expired or evicted search fails as `page_expired` with a Start a new search action.

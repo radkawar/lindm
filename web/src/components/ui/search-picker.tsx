@@ -105,7 +105,8 @@ export function SearchPicker({
                   setOpen(false);
                 }}
               >
-                No selection
+                {/* An optional filter's placeholder ("Any device") names its empty choice. */}
+                {placeholder === "Choose…" ? "No selection" : placeholder}
               </CommandItem>
               {options.map((option) => (
                 <CommandItem

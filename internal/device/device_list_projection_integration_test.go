@@ -288,3 +288,117 @@ func TestListDevicesPrefixCursorCutoffAndPreviousReplay(t *testing.T) {
 		t.Fatalf("Previous replay extended the fixed cursor lifetime: %v", err)
 	}
 }
+
+func TestListDevicesHostnameSearchIsCaseInsensitiveLiteralSubstring(t *testing.T) {
+	f := newEnrolled(t, 0)
+	for _, hostname := range []string{"ubuntu-ws-01", "UBUNTU-SRV", "fedora-ws-03", "node%x", "nodeyx"} {
+		fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,hostname,os_id) VALUES($1,'active',$2,$3,'search-fixture')`, uuid.NewString(), f.now.Add(-time.Minute), hostname)
+	}
+	for _, test := range []struct {
+		search string
+		want   []string
+	}{
+		{"ws", []string{"fedora-ws-03", "ubuntu-ws-01"}},
+		{"UBUNTU", []string{"UBUNTU-SRV", "ubuntu-ws-01"}},
+		{"Srv", []string{"UBUNTU-SRV"}},
+		{"%", []string{"node%x"}},
+		{"", []string{"UBUNTU-SRV", "fedora-ws-03", "node%x", "nodeyx", "ubuntu-ws-01"}},
+	} {
+		page := deviceProjectionPage(t, f.svc, f.ownerCtx, &adminv1.ListDevicesRequest{PageSize: 200, HostnameSearch: test.search, Filter: &adminv1.DeviceFilter{OsId: "search-fixture"}})
+		var got []string
+		for _, row := range page.GetDevices() {
+			got = append(got, row.GetHostname())
+		}
+		slices.Sort(got)
+		if !slices.Equal(got, test.want) {
+			t.Fatalf("hostname search %q: got=%q want=%q", test.search, got, test.want)
+		}
+	}
+	if _, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(&adminv1.ListDevicesRequest{HostnameSearch: strings.Repeat("a", 254)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("oversized hostname search admitted: %v", err)
+	}
+}
+
+func TestListDevicesSortsAcrossPagesWithMissingValuesLast(t *testing.T) {
+	f := newEnrolled(t, 0)
+	type fixture struct {
+		hostname, osID, osVersion string
+		seen                      time.Duration // 0: never seen
+	}
+	devices := []fixture{
+		{"bravo", "ubuntu", "24.04", 3 * time.Minute},
+		{"Alpha", "fedora", "44", 5 * time.Minute},
+		{"charlie", "Debian", "12", 1 * time.Minute},
+		{"", "", "", 0}, // pending: no hostname, OS or contact
+		{"delta", "ubuntu", "22.04", 0},
+		{"echo", "rhel", "9.4", 2 * time.Minute},
+	}
+	for i, d := range devices {
+		var seen any
+		if d.seen != 0 {
+			seen = f.now.Add(-d.seen)
+		}
+		fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,hostname,os_id,os_version,last_seen_at) VALUES($1,'active',$2,$3,$4,$5,$6)`,
+			uuid.NewString(), f.now.Add(-time.Hour+time.Duration(i)*time.Second), d.hostname, d.osID, d.osVersion, seen)
+	}
+	filter := &adminv1.DeviceFilter{}
+	all := func(sort *adminv1.DeviceSort) []string {
+		t.Helper()
+		request := &adminv1.ListDevicesRequest{PageSize: 2, Sort: sort, Filter: filter}
+		var got []string
+		for pages := 0; ; pages++ {
+			if pages > 6 {
+				t.Fatal("sorted pagination did not terminate")
+			}
+			page := deviceProjectionPage(t, f.svc, f.ownerCtx, request)
+			for _, row := range page.GetDevices() {
+				if row.GetId() == f.deviceID {
+					continue // the fixture's own enrolled device
+				}
+				got = append(got, row.GetHostname())
+			}
+			if page.GetNextPageToken() == "" {
+				return got
+			}
+			request.PageToken = page.GetNextPageToken()
+		}
+	}
+	field := func(field adminv1.DeviceSortField, descending bool) *adminv1.DeviceSort {
+		return &adminv1.DeviceSort{Field: field, Descending: descending}
+	}
+	for _, test := range []struct {
+		name string
+		sort *adminv1.DeviceSort
+		want []string
+	}{
+		{"hostname ascending", field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME, false), []string{"Alpha", "bravo", "charlie", "delta", "echo", ""}},
+		{"hostname descending", field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME, true), []string{"echo", "delta", "charlie", "bravo", "Alpha", ""}},
+		{"last contact ascending", field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_LAST_SEEN, false), []string{"Alpha", "bravo", "echo", "charlie"}},
+		{"last contact descending", field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_LAST_SEEN, true), []string{"charlie", "echo", "bravo", "Alpha"}},
+		{"operating system ascending", field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_OPERATING_SYSTEM, false), []string{"charlie", "Alpha", "echo", "delta", "bravo", ""}},
+		{"newest enrollment default", nil, []string{"echo", "delta", "", "charlie", "Alpha", "bravo"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := all(test.sort)
+			if strings.HasPrefix(test.name, "last contact") {
+				// Never-seen rows (pending and delta) follow, in id order.
+				if len(got) != 6 || !slices.Equal(got[:4], test.want) || !slices.ContainsFunc(got[4:], func(h string) bool { return h == "" }) || !slices.Contains(got[4:], "delta") {
+					t.Fatalf("got=%q want %q then never-seen", got, test.want)
+				}
+				return
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("got=%q want=%q", got, test.want)
+			}
+		})
+	}
+	first := deviceProjectionPage(t, f.svc, f.ownerCtx, &adminv1.ListDevicesRequest{PageSize: 2, Filter: filter, Sort: field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME, false)})
+	for _, changed := range []*adminv1.ListDevicesRequest{
+		{PageSize: 2, Filter: filter, PageToken: first.GetNextPageToken(), Sort: field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME, true)},
+		{PageSize: 2, Filter: filter, PageToken: first.GetNextPageToken(), Sort: field(adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME, false), HostnameSearch: "a"},
+	} {
+		if _, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(changed)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("cursor accepted a changed order or search: %v", err)
+		}
+	}
+}

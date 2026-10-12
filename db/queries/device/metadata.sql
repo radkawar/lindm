@@ -65,15 +65,32 @@ WHERE id IN (
 
 -- name: SearchDevices :many
 -- Restrict scope, filters and keyset before projecting bounded page resources.
-WITH page AS MATERIALIZED (
-    SELECT d.*
+-- Order: sort_last (rows without the sort value: never seen, no hostname, no OS)
+-- always last, then sort_key in the requested direction, then id. sort_field 0
+-- keys on enrolled_at (callers pass descending). Keys compare bytewise (C) and
+-- hold at most 80 characters so the page token can carry them; longer values
+-- sharing that prefix are ordered by id, which is still one total order.
+WITH keyed AS (
+    SELECT d.*,
+        (CASE sqlc.arg('sort_field')::int
+            WHEN 1 THEN d.hostname = ''
+            WHEN 2 THEN d.last_seen_at IS NULL
+            WHEN 3 THEN d.os_id = ''
+            ELSE false
+        END)::boolean AS sort_last,
+        (CASE sqlc.arg('sort_field')::int
+            WHEN 1 THEN left(lower(d.hostname), 80)
+            WHEN 2 THEN coalesce(lpad((extract(epoch FROM d.last_seen_at) * 1000000)::bigint::text, 20, '0'), '')
+            WHEN 3 THEN left(lower(d.os_id), 40) || chr(1) || left(lower(d.os_version), 39)
+            ELSE lpad((extract(epoch FROM d.enrolled_at) * 1000000)::bigint::text, 20, '0')
+        END)::text COLLATE "C" AS sort_key
     FROM devices d
     WHERE device_scope_matches(d.id, sqlc.arg('scope_unrestricted')::boolean, sqlc.arg('scopes')::jsonb)
       AND d.enrolled_at <= sqlc.arg('upper_enrolled_at')::timestamptz
-      AND (NOT sqlc.arg('has_cursor')::boolean OR (d.enrolled_at, d.id) < (sqlc.arg('cursor_enrolled_at')::timestamptz, sqlc.arg('cursor_id')::uuid))
       AND (sqlc.arg('os_id')::text = '' OR d.os_id = sqlc.arg('os_id'))
       AND (sqlc.arg('os_version')::text = '' OR d.os_version = sqlc.arg('os_version'))
       AND starts_with(d.hostname, sqlc.arg('name_prefix')::text)
+      AND (sqlc.arg('hostname_search')::text = '' OR strpos(lower(d.hostname), lower(sqlc.arg('hostname_search')::text)) > 0)
       AND (sqlc.arg('agent_release')::text = '' OR EXISTS (
           SELECT 1 FROM device_release_reports r
           WHERE r.generation_id = d.current_generation_id AND r.agent_release = sqlc.arg('agent_release')::text
@@ -81,11 +98,23 @@ WITH page AS MATERIALIZED (
       AND (sqlc.narg('seen_from')::timestamptz IS NULL OR d.last_seen_at >= sqlc.narg('seen_from')::timestamptz)
       AND (sqlc.narg('seen_until')::timestamptz IS NULL OR d.last_seen_at <= sqlc.narg('seen_until')::timestamptz)
       AND d.metadata @> sqlc.arg('metadata_filter')::jsonb
-    ORDER BY d.enrolled_at DESC, d.id DESC
+), page AS MATERIALIZED (
+    SELECT k.*
+    FROM keyed k
+    WHERE NOT sqlc.arg('has_cursor')::boolean
+       OR k.sort_last > sqlc.arg('cursor_last')::boolean
+       OR (k.sort_last = sqlc.arg('cursor_last')::boolean AND (
+           (NOT sqlc.arg('descending')::boolean AND (k.sort_key, k.id) > (sqlc.arg('cursor_key')::text COLLATE "C", sqlc.arg('cursor_id')::uuid))
+           OR (sqlc.arg('descending')::boolean AND (k.sort_key, k.id) < (sqlc.arg('cursor_key')::text COLLATE "C", sqlc.arg('cursor_id')::uuid))))
+    ORDER BY k.sort_last,
+        CASE WHEN NOT sqlc.arg('descending')::boolean THEN k.sort_key END COLLATE "C",
+        CASE WHEN sqlc.arg('descending')::boolean THEN k.sort_key END COLLATE "C" DESC,
+        CASE WHEN NOT sqlc.arg('descending')::boolean THEN k.id END,
+        CASE WHEN sqlc.arg('descending')::boolean THEN k.id END DESC
     LIMIT sqlc.arg('row_limit')::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
-    d.state, d.enrolled_at, d.last_seen_at, d.published_sequence,
+    d.state, d.enrolled_at, d.last_seen_at, d.published_sequence, d.sort_last, d.sort_key::text AS sort_key,
     coalesce(g.host_sequence, 0)::bigint AS host_sequence,
     coalesce(g.package_sequence, 0)::bigint AS package_sequence,
     d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.metadata,
@@ -145,7 +174,11 @@ CROSS JOIN LATERAL (
     FROM integration_compliance_projection p
     WHERE p.device_id = d.id
 ) compliance
-ORDER BY d.enrolled_at DESC, d.id DESC;
+ORDER BY d.sort_last,
+    CASE WHEN NOT sqlc.arg('descending')::boolean THEN d.sort_key END COLLATE "C",
+    CASE WHEN sqlc.arg('descending')::boolean THEN d.sort_key END COLLATE "C" DESC,
+    CASE WHEN NOT sqlc.arg('descending')::boolean THEN d.id END,
+    CASE WHEN sqlc.arg('descending')::boolean THEN d.id END DESC;
 
 -- name: HostObservationDetails :batchone
 -- Native details of a generation's latest successful host observation. Batched

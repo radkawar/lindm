@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { adminClient } from "@/lib/rpc";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import type { PackageSearch } from "./package-search";
-import { deviceFilter, type DeviceSearch } from "./search";
+import { deviceFilter, deviceSort, type DeviceSearch } from "./search";
 
 export function devicesQueryOptions(lifetime: AuthLifetime, search: DeviceSearch) {
   return queryOptions({
@@ -12,7 +12,13 @@ export function devicesQueryOptions(lifetime: AuthLifetime, search: DeviceSearch
     staleTime: 0,
     queryFn: async ({ signal }) => {
       const response = await adminClient.listDevices(
-        { pageSize: search.pageSize, pageToken: search.pageToken, filter: deviceFilter(search) },
+        {
+          pageSize: search.pageSize,
+          pageToken: search.pageToken,
+          filter: deviceFilter(search),
+          sort: deviceSort(search),
+          hostnameSearch: search.hostnameSearch ?? "",
+        },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

@@ -10,7 +10,7 @@ import {
   MoreHorizontal,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DeviceCompliance,
   DeviceRootEncryption,
@@ -56,7 +56,7 @@ import { DeviceExport, DeviceFilters } from "./filters";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
 import { ObservedTime } from "./observations";
 import { devicesQueryOptions } from "./queries";
-import type { DeviceSearch } from "./search";
+import type { DeviceSearch, DeviceSortColumn } from "./search";
 
 const columns = [
   { id: "hostname", label: "Device", sortable: true },
@@ -70,33 +70,9 @@ const columns = [
   { id: "host", label: "Host received", sortable: false },
   { id: "inventory", label: "Last inventory", sortable: false },
   { id: "metadata", label: "Owner / labels / attributes", sortable: false },
-  { id: "id", label: "Device ID", sortable: true },
+  { id: "id", label: "Device ID", sortable: false },
 ] as const;
 type ColumnId = (typeof columns)[number]["id"];
-type Sort = { column: ColumnId; descending: boolean };
-
-function compareDevices(left: Device, right: Device, column: ColumnId) {
-  if (column === "contact") {
-    const a = left.lastSeenAt;
-    const b = right.lastSeenAt;
-    if (!a || !b) return a ? 1 : b ? -1 : 0;
-    if (a.seconds !== b.seconds) return a.seconds < b.seconds ? -1 : 1;
-    return a.nanos - b.nanos;
-  }
-  const a =
-    column === "hostname"
-      ? left.hostname
-      : column === "os"
-        ? `${left.osId} ${left.osVersion} ${left.architecture}`
-        : left.id;
-  const b =
-    column === "hostname"
-      ? right.hostname
-      : column === "os"
-        ? `${right.osId} ${right.osVersion} ${right.architecture}`
-        : right.id;
-  return a.localeCompare(b, undefined, { numeric: true });
-}
 
 const complianceLabels: Record<DeviceCompliance, string> = {
   [DeviceCompliance.UNSPECIFIED]: "Unknown",
@@ -326,7 +302,17 @@ export function DevicesView({
   const canRevoke = canPermission(principal, "device.revoke");
   const list = useQuery({ ...devicesQueryOptions(lifetime, search), enabled: canRead });
   const pagination = useListPagination(search, (next) => onSearch({ ...search, ...next }));
-  const [sort, setSort] = useState<Sort | null>(null);
+  // Server-side order across every page; kept in the URL.
+  const sort: { column: DeviceSortColumn; descending: boolean } | null = search.sort
+    ? { column: search.sort, descending: search.order === "desc" }
+    : null;
+  const setSort = (next: { column: DeviceSortColumn; descending: boolean } | null) =>
+    onSearch({
+      ...search,
+      sort: next?.column,
+      order: next ? (next.descending ? "desc" : "asc") : undefined,
+      pageToken: "",
+    });
   const [compact, setCompact] = useState(true);
   const [visible, setVisible] = useState<ColumnId[]>([
     "hostname",
@@ -341,15 +327,7 @@ export function DevicesView({
   ]);
   const failure = list.error ? toRpcFailure(list.error) : null;
   const data = failure ? undefined : list.data;
-  const rows = useMemo(
-    () =>
-      sort && data
-        ? [...data.devices].sort(
-            (a, b) => compareDevices(a, b, sort.column) * (sort.descending ? -1 : 1),
-          )
-        : (data?.devices ?? []),
-    [data, sort],
-  );
+  const rows = data?.devices ?? [];
   const visibleColumns = columns.filter((column) => visible.includes(column.id));
   const pageToken = data?.pageToken;
   const freshResponse = list.isFetchedAfterMount && !list.isFetching;
@@ -401,7 +379,12 @@ export function DevicesView({
                   ? `${data.devices.length} devices on this page`
                   : plural(data.devices.length, "device")}
             </span>
-            {sort ? <p className="text-xs text-muted-foreground">Sorted within this page</p> : null}
+            {sort ? (
+              <p className="text-xs text-muted-foreground">
+                Sorted by {columns.find((column) => column.id === sort.column)?.label.toLowerCase()}
+                , {sort.descending ? "descending" : "ascending"}, across all pages
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {sort ? (
@@ -477,9 +460,7 @@ export function DevicesView({
         ) : null}
         {rows.length > 0 ? (
           <Table className={compact ? "[&_td]:h-12 [&_td]:py-2" : "[&_td]:py-4"}>
-            <caption className="sr-only">
-              Enrolled devices. Sorting applies to the current page only.
-            </caption>
+            <caption className="sr-only">Enrolled devices.</caption>
             <TableHeader className="bg-muted/40">
               <TableRow>
                 {visibleColumns.map((column) => (
@@ -498,10 +479,10 @@ export function DevicesView({
                       <button
                         type="button"
                         className="flex items-center gap-2 py-2 text-xs font-medium focus-visible:outline focus-visible:outline-ring"
-                        aria-label={`Sort this page by ${column.label}`}
+                        aria-label={`Sort all devices by ${column.label}`}
                         onClick={() =>
                           setSort({
-                            column: column.id,
+                            column: column.id as DeviceSortColumn,
                             descending: sort?.column === column.id && !sort.descending,
                           })
                         }
