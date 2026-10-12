@@ -142,7 +142,8 @@ func rollingWindowAndReboot(ctx context.Context, r *resourceDispatch, packages r
 	if err := r.awaitReboot(ctx, previous, time.Until(when)+8*time.Minute); err != nil {
 		return failReboot(err)
 	}
-	if time.Now().Before(when.Add(-30 * time.Second)) {
+	booted := time.Now()
+	if booted.Before(when.Add(-30 * time.Second)) {
 		return failReboot(errors.New("guest rebooted before rolling policy schedule"))
 	}
 	if _, err := waitGuestExecutorReady(ctx, r.vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
@@ -152,7 +153,16 @@ func rollingWindowAndReboot(ctx context.Context, r *resourceDispatch, packages r
 	if err != nil {
 		return failReboot(err)
 	}
-	passScenario(rebooted, boot)
+	_, fresh, err := serverPatchStatus(ctx, r, rebooted, "after-reboot", func(p *agentv1.PatchStatusObservation) error {
+		if p.GetRebootRequired() || p.GetBootId() == previous || p.GetObservedAt().AsTime().Before(booted.Add(-time.Minute)) {
+			return fmt.Errorf("patch status %v is not a fresh post-reboot observation", p)
+		}
+		return nil
+	})
+	if err != nil {
+		return failReboot(err)
+	}
+	passScenario(rebooted, boot, fresh)
 	return nil
 }
 

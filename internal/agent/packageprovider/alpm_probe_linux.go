@@ -8,10 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"golang.org/x/sys/unix"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/custody"
@@ -27,8 +30,18 @@ func ProbeALPMNativeLock(ctx context.Context, product *resourcev1.PlatformProduc
 	if os.Geteuid() != 0 || platform.Of(product).Native().Packages.Backend != platform.BackendPacman || filepath.Dir(archive) != filepath.Join(fixtureRoot, "repo") {
 		return nil, ErrUnsupported
 	}
-	if err := custody.PrivateDirectory(fixtureRoot); err != nil {
+	// The fixture root also holds the lab's local-user homes, so it is
+	// traversable (0755); root protection of it and its whole ancestry keeps
+	// the probe's archive, keyring and log root-controlled.
+	root, stat, err := custody.OpenRoot(fixtureRoot, unix.O_PATH|unix.O_DIRECTORY)
+	if err != nil {
 		return nil, err
+	}
+	if err := root.Close(); err != nil {
+		return nil, err
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFDIR {
+		return nil, fmt.Errorf("%w: fixture root is not a directory: %s", custody.ErrUnsafe, fixtureRoot)
 	}
 	if _, err := artifactFor(archive); err != nil {
 		return nil, err
