@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,17 +78,40 @@ func newAuthorityDatabase(ctx context.Context, document *config.Document, shared
 	return database, nil
 }
 
+// An owned database drop has two separately bounded waits.
+//
+// Blockers fail visibly: a session holding a lock that DROP DATABASE needs
+// fails it after dropLockBudget through PostgreSQL's lock_timeout, and a
+// remaining target-database client fails it after PostgreSQL's own five-second
+// check. Neither is terminated.
+//
+// Once admitted, PostgreSQL marks the database invalid, then forces an immediate
+// cluster-wide checkpoint and waits for the checkpoint already in progress plus
+// a complete new one, then for every backend to release the files. That work
+// scales with every tenant's dirty files, not with the dropped database, and
+// cancelling it cannot keep the database: it leaves an invalid one that needs
+// another full checkpoint wait. On the shared development cluster during a full
+// integration run, consecutive forced checkpoints took 533 and 574 seconds
+// (fsyncing 77,251 and 83,614 files), so an admitted drop can need about
+// 18.5 minutes. dropBudget bounds the whole drop above that.
+const (
+	dropLockBudget = 3 * time.Minute
+	dropBudget     = 20 * time.Minute
+)
+
 func (d *authorityDatabase) Close() error {
-	// DROP may wait for PostgreSQL checkpoint/storage work: an exact owned
-	// database DROP took 127 seconds during the capacity lane without FORCE.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), dropBudget)
 	defer cancel()
-	return d.drop(ctx, false)
+	return d.drop(ctx, false, dropLockBudget)
 }
 
-func (d *authorityDatabase) drop(ctx context.Context, missingOK bool) (resultErr error) {
+// drop is bounded overall by ctx and, for lock waits only, by lockBudget.
+func (d *authorityDatabase) drop(ctx context.Context, missingOK bool, lockBudget time.Duration) (resultErr error) {
 	if !d.created {
 		return nil
+	}
+	if lockBudget < time.Millisecond {
+		return errors.New("owned database drop requires a positive lock budget")
 	}
 	connection, err := pgx.ConnectConfig(ctx, d.admin.Copy())
 	if err != nil {
@@ -98,6 +122,9 @@ func (d *authorityDatabase) drop(ctx context.Context, missingOK bool) (resultErr
 		defer stop()
 		resultErr = errors.Join(resultErr, connection.Close(cleanup))
 	}()
+	if _, err := connection.Exec(ctx, "SET lock_timeout = "+strconv.FormatInt(lockBudget.Milliseconds(), 10)); err != nil {
+		return fmt.Errorf("bound owned authority database %s drop lock waits: %w", d.name, err)
+	}
 	// No FORCE: a surviving client makes cleanup fail visibly, never terminates
 	// another process. The fixture stops and joins its server before this call.
 	statement := "DROP DATABASE "

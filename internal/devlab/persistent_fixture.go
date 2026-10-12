@@ -163,6 +163,7 @@ func openPersistentFixture(ctx context.Context, repository, binary, stateDir str
 
 // DestroyPersistentFixture refuses a running fixture and drops only its recorded
 // owned database, without FORCE. A failed drop retains all credentials and state.
+// The drop's own lock and storage budgets apply unless ctx ends first.
 func DestroyPersistentFixture(ctx context.Context, repository, stateDir string) (resultErr error) {
 	dir, lock, _, err := lockPersistentDirectory(stateDir, false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -209,9 +210,9 @@ func DestroyPersistentFixture(ctx context.Context, repository, stateDir string) 
 		return err
 	}
 	database := &authorityDatabase{name: name, admin: admin, created: true}
-	dropContext, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	dropContext, cancel := context.WithTimeout(ctx, dropBudget)
 	defer cancel()
-	if err := database.drop(dropContext, true); err != nil {
+	if err := database.drop(dropContext, true, dropLockBudget); err != nil {
 		return err
 	}
 	return os.RemoveAll(dir)

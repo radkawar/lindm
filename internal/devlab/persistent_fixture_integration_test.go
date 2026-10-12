@@ -272,11 +272,14 @@ func TestPersistentFixtureResumePreservesOwnerSession(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := DestroyPersistentFixture(ctx, repository, state); err != nil {
+			// Destroy is bounded by its own lock and storage budgets: the drop
+			// waits for cluster-wide checkpoints that the lifecycle deadline above
+			// must not truncate under integration load.
+			if err := DestroyPersistentFixture(t.Context(), repository, state); err != nil {
 				t.Fatal(err)
 			}
 			var present bool
-			if err := pool.QueryRow(ctx, "SELECT EXISTS (SELECT FROM pg_database WHERE datname=$1)", database).Scan(&present); err != nil || present {
+			if err := pool.QueryRow(t.Context(), "SELECT EXISTS (SELECT FROM pg_database WHERE datname=$1)", database).Scan(&present); err != nil || present {
 				t.Fatalf("destroy retained database: present=%t err=%v", present, err)
 			}
 			if _, err := os.Stat(state); !errors.Is(err, os.ErrNotExist) {

@@ -713,10 +713,19 @@ demos. The per-run evidence remains independent.
 Empty sibling lifecycle lock files remain to serialize future reuse of the name;
 they contain no credentials or VM/database state.
 
-Database destruction waits up to three minutes, without `FORCE`; PostgreSQL
-checkpoint/storage work can delay a drop even after every client has closed.
-Callers may supply a shorter deadline, but routine teardown must not accidentally
-truncate that storage-work budget. A failed drop retains private state and adds
+Database destruction never uses `FORCE` and has two separate bounds. Blockers
+fail visibly: a session holding a lock the drop needs fails it after three
+minutes (PostgreSQL `lock_timeout`), and a remaining target-database client
+fails it after PostgreSQL's own five-second check. An admitted drop then waits
+for PostgreSQL's storage work: it marks the database invalid, forces an immediate
+cluster-wide checkpoint and waits for the checkpoint already in progress plus a
+complete new one. That time scales with every tenant's dirty files on the shared
+cluster, not with the dropped database, so the whole drop is bounded at twenty
+minutes: during a full integration run consecutive forced checkpoints took 533
+and 574 seconds. Cancelling an admitted drop cannot keep the database; it leaves
+an invalid one that only a further full checkpoint wait removes. Callers may
+supply a shorter deadline, but routine teardown and test lifecycle deadlines must
+not truncate the storage budget. A failed drop retains private state and adds
 a separately bounded five-second activity snapshot: remaining target clients,
 the DROP backend if still present, and database-object lock holders, including
 their PID, application name, state and wait event. The snapshot is taken after

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"lindm/internal/testdb"
 )
@@ -117,13 +118,30 @@ func TestPersistentDestroyReportsRemainingSessions(t *testing.T) {
 				t.Fatalf("destroy terminated the retained connection: %v", err)
 			}
 			t.Logf("bounded destroy retained state and live blocker: %v", err)
+			// Routine teardown passes no short deadline, so the drop's storage
+			// budget must not hold a blocked drop: a lock holder fails it through
+			// the lock budget (55P03), a target client through PostgreSQL's own
+			// five-second check (55006). Neither is terminated.
+			code := map[string]string{"client": "55006", "database-lock": "55P03"}[kind]
+			owned := &authorityDatabase{name: fixture.DatabaseName, admin: fixture.database.admin.Copy(), created: true}
+			err = owned.drop(t.Context(), true, time.Second)
+			var refused *pgconn.PgError
+			if !errors.As(err, &refused) || refused.Code != code || !strings.Contains(err.Error(), fmt.Sprintf("%s pid=%d", kind, blocker.PgConn().PID())) {
+				t.Fatalf("drop without caller deadline and retained %s = %v, want SQLSTATE %s naming the blocker", kind, err, code)
+			}
+			if err := blocker.Ping(ctx); err != nil {
+				t.Fatalf("lock-bounded drop terminated the retained connection: %v", err)
+			}
+			t.Logf("drop without caller deadline refused the live blocker: %v", err)
 		})
 	}
-	if err := DestroyPersistentFixture(ctx, repository, state); err != nil {
+	// The final drop waits for cluster-wide checkpoints under its own budget;
+	// the five-minute setup deadline above must not truncate it under load.
+	if err := DestroyPersistentFixture(t.Context(), repository, state); err != nil {
 		t.Fatal(err)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, "SELECT EXISTS (SELECT FROM pg_database WHERE datname=$1)", fixture.DatabaseName).Scan(&exists); err != nil || exists {
+	if err := pool.QueryRow(t.Context(), "SELECT EXISTS (SELECT FROM pg_database WHERE datname=$1)", fixture.DatabaseName).Scan(&exists); err != nil || exists {
 		t.Fatalf("retry retained owned database: exists=%t err=%v", exists, err)
 	}
 	if _, err := os.Stat(state); !errors.Is(err, os.ErrNotExist) {

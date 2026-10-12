@@ -1824,7 +1824,8 @@ pool-size benchmark; it demonstrates that a larger pool alone is not a
 qualified remedy. The record includes a 15-second database-cleanup timeout;
 the exact owned database was subsequently dropped without FORCE. An unrelated
 owned lab database needed 126.87 seconds to drop under this pressure. Maintained
-cleanup now allows three minutes, still never terminating another client.
+cleanup bounds lock blockers at three minutes and the whole drop, including its
+forced checkpoint wait, at twenty minutes, still never terminating another client.
 
 The product correction makes execution-trust reads and no-assignment/no-open-
 action work polls `REPEATABLE READ, READ ONLY`, with the same database-backed

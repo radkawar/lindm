@@ -5837,6 +5837,38 @@ successfully retries destroy after their connections close. Captured output:
 `~/.cache/lindm-persistfix/cleanup-regression.log`, SHA-256
 `2e4e79de34f87a2ca7bd4ed1e73100b50b20b066cd0c3f29d235ee89e9c960aa`.
 
+A later full integration run on a loaded host failed
+`TestNativeApprovalFreshAuthentication` and
+`TestPersistentFixtureResumePreservesOwnerSession` only in teardown:
+`remove owned authority database …: timeout: context deadline exceeded; cleanup
+activity: … no remaining target clients, DROP backend or database-object lock
+holders`. The snapshot rules out blockers. `DROP DATABASE` marks the database
+invalid, then forces an immediate cluster-wide checkpoint and waits for the one in
+progress plus a complete new one. The shared cluster logged consecutive forced
+checkpoints of 533 and 574 seconds that fsynced 77,251 and 83,614 files, nearly
+all other tenants'. The single three-minute budget cancelled admitted drops
+mid-checkpoint and left invalid databases behind: 54 `lindm_authority_*`
+databases with `datconnlimit = -2` were present. A full `internal/devlab` package
+run of unchanged `main` reproduced both failures, plus the split subtest's
+explicit drop, while checkpoints took up to 277 seconds.
+
+Drops now bound lock waits at three minutes through `lock_timeout` and the whole
+drop, including its checkpoint wait, at twenty minutes; the lifecycle tests
+destroy under that budget rather than their fixture deadlines.
+`TestPersistentDestroyReportsRemainingSessions` also shows that without a caller
+deadline a retained object-lock holder fails the drop with SQLSTATE 55P03 and a
+retained client with 55006, both named and left connected.
+`TestOwnedDatabaseDropLockBudgetSparesCheckpointWork` drops an owned database
+with a 10 ms lock budget (72 seconds under load); bounding the whole drop by that
+budget reproduced the original failure message. With the fix, each target test
+passed five consecutive runs alone while a full `internal/devlab` package run
+shared the cluster, five more consecutive runs of both after rebasing, and two
+full package runs. One of those package runs separately failed
+`TestOrganizationApplyRealServer` with an `aborted` organization apply during
+device activation, unrelated to database teardown. Logs are under
+`~/.cache/lindm-devlab-dropbudget-20261012/`; `SHA256SUMS` has SHA-256
+`dc2ba5761d8c06ada39cf34125617eeec25dac9440fc6c6a35b64d569c0af54f`.
+
 Post-rebase architecture regressions cover the actual named VM resume path up to
 control-plane validation without building a package or booting a VM, and the
 split controller's native publication architecture selection. They pass for
