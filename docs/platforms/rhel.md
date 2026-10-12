@@ -738,12 +738,13 @@ the guest first, as a subscribed customer host is.
 
 ## Gaps
 
-RHEL 8, the aarch64 desktop lock, wipe and recovery-sanitize lanes, RHEL 10.2
-aarch64 encryption, physical TPM/media,
-entitled air-gap lifecycle, the RHEL GNOME assistance session and each gated
-resource/action in the table above remain independent work; the encrypted
-Workstation golden qualifies only the lab's GDM autologin session, not every
-vendor desktop configuration.
+RHEL 8, physical TPM/media, entitled air-gap lifecycle (the gated lane above), the
+RHEL GNOME assistance session and each gated resource/action in the table above
+remain independent work. The aarch64 encryption, lock, wipe and recovery
+matrix cells passed on the Server with GUI golden
+([verification](../verification.md#rhel-matrix-completion-2026-10-12)); the
+encrypted Workstation (x86_64) and Server with GUI (aarch64) goldens qualify only
+the lab's GDM autologin session, not every vendor desktop configuration.
 DNF4 repository observation is not package mutation qualification. Standard,
 EUS and E4S applicability must retain exact content provenance and cannot be
 borrowed from another vendor or minor release.

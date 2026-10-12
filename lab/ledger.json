@@ -6133,6 +6133,34 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "3499b90f1e57dfaf4a1cd92a8dc7e022e7c7496e09be258516f402ccc1700dd7"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "os-update",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-x86-core-20261011T222544Z/rhel-9/os-update-x86_64.json",
+      "sha256": "74531deeebf4539ab22c6b72ca77af3c3cee5375f9c992d6966277b5755f5fa4",
+      "recorded": "2026-10-12T05:33:23.168496903Z",
+      "revision": "0a25c88ab05aa3d76b53c78a75101f1d898d483d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "device-actions",
+      "architecture": "aarch64",
+      "manifest": "rhel-9.8-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-arm-enc9-20261012T000137Z/rhel-9/device-actions-aarch64.json",
+      "sha256": "d1c6c3844c0b42cb986b7f7e0445dad2c8434d8e4cd591ca9748ac2ef656aedb",
+      "recorded": "2026-10-12T05:42:10.556824698Z",
+      "revision": "e1d4e0c19b24296a1bf1b90d8b794786d6c6dd35-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "3499b90f1e57dfaf4a1cd92a8dc7e022e7c7496e09be258516f402ccc1700dd7"
     }
   ]
 }
