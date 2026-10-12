@@ -230,6 +230,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		_, cleanErr := runOutput(cleanup, r.Host.SshAlias, "rm -rf -- "+QuoteShell(remote))
 		err = errors.Join(err, cleanErr)
 	}()
+	// Staged credentials never outlive the run, even when its state is retained.
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer stop()
+		_, cleanErr := runOutput(cleanup, r.Host.SshAlias, removeRemoteSecretsCommand(remote))
+		err = errors.Join(err, cleanErr)
+	}()
 	stage := &remoteStage{ctx: ctx, alias: r.Host.SshAlias, local: local, remote: remote, stderr: r.Stderr, copied: make(map[string]string)}
 	if err := stage.mkdir(remote+"/bin", remote+"/inputs", remote+"/work", remote+"/records", remote+"/source", remote+"/images"); err != nil {
 		return err
@@ -380,9 +387,12 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			continue
 		}
 		var destination string
-		if strings.Contains(name, "build") || strings.Contains(name, "repository") || name == "rejections" {
+		switch {
+		case remoteSecretFlag(name):
+			destination, err = stage.secret(value)
+		case strings.Contains(name, "build") || strings.Contains(name, "repository") || name == "rejections":
 			destination, err = stage.record(value)
-		} else {
+		default:
 			destination, err = stage.input(value)
 		}
 		if err != nil {

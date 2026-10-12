@@ -245,6 +245,32 @@ func waitOSUpdateWindowRun(ctx context.Context, vm *guestVM, start time.Time, de
 	}
 }
 
+// waitOSUpdateRunsIdle waits until no window, patch-now or status run holds the
+// os-update run lock. A registered RHEL 9 guest's status run refreshes the full
+// vendor metadata for minutes, and the provider correctly refuses a policy
+// effect meanwhile (NATIVE_BUSY, os_update_run_in_progress).
+func waitOSUpdateRunsIdle(ctx context.Context, vm *guestVM) error {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+	defer cancel()
+	units := []string{resource.OSUpdateServiceUnit, resource.OSUpdateNowUnit, resource.OSUpdateStatusUnit}
+	for {
+		out, err := vm.run(ctx, "systemctl is-active "+strings.Join(units, " ")+" || true", nil, 4096, 15*time.Second)
+		if err == nil {
+			states := strings.Fields(string(out))
+			idle := len(states) == len(units)
+			for _, state := range states {
+				idle = idle && (state == "inactive" || state == "failed")
+			}
+			if idle {
+				return nil
+			}
+		}
+		if err := lifecycleDelay(ctx, 5*time.Second); err != nil {
+			return fmt.Errorf("os-update runs did not become idle (last %q): %w", out, err)
+		}
+	}
+}
+
 // freshHostInventory establishes the presence that device actions require: a
 // host observation received within the last 3 minutes. Hosts are admitted at
 // most every 5 minutes and collected every 10, so an older observation is
@@ -629,6 +655,9 @@ func exerciseResourceOSUpdate(ctx context.Context, r *resourceDispatch, rpm reso
 
 	// Policy with a deferral: install, outside-window skip, window deferral.
 	r.fresh()
+	if err := waitOSUpdateRunsIdle(ctx, vm); err != nil {
+		return err
+	}
 	start := osUpdateWindowStart(time.Now())
 	deferred := osUpdateDesired(zone, resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY, start, 7)
 	if err := resourceStep(ctx, r, evidence, "policy-installs-window-timer", deferred, resourceCreatePolicy(), false, withVM(vm, osUpdateInstalledOracle(rpm, zone, start))); err != nil {

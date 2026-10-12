@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -338,6 +339,11 @@ func vmGuestCount(lane string, args []string) uint32 {
 func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (err error) {
 	if len(args) < 4 || args[1] != "vm" {
 		return errors.New("invalid internal host-exec invocation")
+	}
+	// Credentials staged for this run live only while its lane runs; the
+	// lane's own cleanup (e.g. Red Hat unregistration) finishes before this.
+	if run := filepath.Dir(args[0]); strings.HasPrefix(filepath.Base(run), "run-") {
+		defer func() { err = errors.Join(err, os.RemoveAll(labhost.RemoteSecretDirectory(run))) }()
 	}
 	cfg, err := labhost.LoadFile(args[0])
 	if err != nil {

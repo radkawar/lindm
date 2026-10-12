@@ -1570,6 +1570,10 @@ run-directory cleanup. The record includes host/runtime,
 elapsed time, source revision and binary-diff SHA-256. Persistent image/golden caches
 and slot identities are retained. A lost transport or failed evidence copy reports
 the exact retained run path instead of deleting evidence or guessing at live state.
+Credential inputs (`-redhat-token-file`) are staged apart, under the run's
+`secret/` directory, and removed when the lane ends: by the remote host-exec
+(also when the controller's session closes) and again by the controller after
+success, failure or interruption, even when the rest of the run is retained.
 
 The arm64 hosts sit behind a management link that can drop briefly: on
 2026-10-11 dgx20 stopped answering SSH for several minutes without rebooting
