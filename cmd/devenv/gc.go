@@ -15,6 +15,7 @@ import (
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
 	"lindm/internal/devlab/worktree"
 	"lindm/internal/diskgc"
 	"lindm/internal/labhost"
@@ -36,6 +37,9 @@ Reclaim disk space on this workstation, printing the bytes reclaimed per class:
   lab-images      cached lab images, repository closures, installed images and
                   goldens no image manifest on main or a live worktree, nor the
                   registry, references, unless locked, open or pinned.
+  dev-databases   invalid lindm_* databases (pg_database.datconnlimit = -2,
+                  left by interrupted drops) on the shared checkout's
+                  development PostgreSQL; valid databases are never touched.
   remote-runs     stale runs/run-* on SSH lab hosts, only on a host whose work
                   directory has less than -spark-min-free (300 GiB) free.
 
@@ -123,6 +127,7 @@ func collect(ctx context.Context, repo *worktree.Repository, options gcOptions) 
 	}
 	report(diskgc.MatrixInputs(ctx, options.matrixRoot, options.quiet, options.dryRun))
 	report(pruneMerged(ctx, repo, options.dryRun))
+	report(invalidDatabases(ctx, repo.Main, options.dryRun))
 	config, err := labhost.Load()
 	if err != nil {
 		report(diskgc.Result{Class: "lab-runs"}, err)
@@ -271,4 +276,16 @@ func manifestDigests(dir string, referenced map[string]bool) error {
 		}
 	}
 	return nil
+}
+
+// invalidDatabases drops the development cluster's invalid databases. Their
+// files are already mostly gone, so it counts databases, not bytes.
+func invalidDatabases(ctx context.Context, root string, dryRun bool) (diskgc.Result, error) {
+	result := diskgc.Result{Class: "dev-databases"}
+	dropped, err := devlab.DropInvalidDatabases(ctx, root, dryRun)
+	if errors.Is(err, devlab.ErrNoFixture) {
+		return result, nil
+	}
+	result.Removed = len(dropped)
+	return result, err
 }

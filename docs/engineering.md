@@ -2522,7 +2522,11 @@ and `runs/run-*` directories in local lab hosts' work directories, never `demos/
 caches or leases; and cached lab images, repository closures, installed images
 and goldens that no image manifest on `main` or any live worktree (every SHA-256
 in a manifest counts, whatever its schema) nor the platform registry's rolling
-targets references. Installed images and goldens record the image they were
+targets references; and invalid `lindm_*` databases on the shared checkout's
+development PostgreSQL (`pg_database.datconnlimit = -2`, which PostgreSQL leaves
+when a `DROP DATABASE` such as an authority fixture's teardown is interrupted),
+dropped one by one with a 30-minute statement timeout and reported by count;
+valid databases, which may belong to held demos, are never touched. Installed images and goldens record the image they were
 built from in `source-sha256`; entries without it are kept. A run directory is
 stale when no live process uses it (cwd, root, executable or open file beneath
 it) or names it on its command line and nothing in it changed within an hour

@@ -69,7 +69,7 @@ make test-integration # dev-up, then go run ./cmd/devenv test-integration (real 
 make signoff          # local CI: clean worktree of the pushed HEAD runs check + test-integration (shared fixture), then gh signoff create --commit SHA unit integration
 go run ./cmd/dev worktree add NAME [-base REV]   # private worktree in ../lindm.worktrees/NAME; prints the path
 go run ./cmd/dev worktree list | prune -dry-run   # status; prune clean merged unused trees (-archive-dirty archives the rest first)
-go run ./cmd/devenv gc [-dry-run]   # reclaim disk (old build cache, finished matrix inputs, landed worktrees, stale lab runs, unreferenced lab images); dev land runs it under 200 GiB free
+go run ./cmd/devenv gc [-dry-run]   # reclaim disk (old build cache, finished matrix inputs, landed worktrees, stale lab runs, unreferenced lab images, invalid dev databases); dev land runs it under 200 GiB free
 make build            # artifacts/bin/{lindmd,lindm-agent,lab}
 make dev-up && go run ./cmd/lindmd serve -config .cache/dev/server.json   # console at https://localhost:18444
 make dev-down
