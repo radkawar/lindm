@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -177,130 +178,130 @@ export function IssueProvisioningToken({
   }
 
   return (
+    // The body scrolls; the header and the Create/Cancel footer stay in view.
     <form
-      className="grid gap-4"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         void issue(new FormData(event.currentTarget));
       }}
     >
-      <DialogHeader>
+      <DialogHeader className="p-4 pr-12">
         <DialogTitle>Create a provisioning token</DialogTitle>
         <DialogDescription>
           A reusable token that enrolls devices during installation, until it expires or runs out of
           uses.
         </DialogDescription>
       </DialogHeader>
-      <fieldset className="grid gap-4" disabled={busy || captured !== null || completed}>
-        <label className="grid gap-1.5 text-sm font-medium">
-          Purpose / audit reason
-          <Textarea name="reason" placeholder="For example, October laptop deployment" required />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="token-lifetime">Expires after</Label>
-            <SelectField
-              id="token-lifetime"
-              name="lifetime"
-              defaultValue="86400"
-              disabled={busy || captured !== null || completed}
-              required
-              options={[
-                { value: "3600", label: "1 hour" },
-                { value: "14400", label: "4 hours" },
-                { value: "43200", label: "12 hours" },
-                { value: "86400", label: "24 hours" },
-              ]}
-            />
-          </div>
+      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 pb-4">
+        <fieldset className="grid gap-4" disabled={busy || captured !== null || completed}>
           <label className="grid gap-1.5 text-sm font-medium">
-            Maximum uses
-            <Input name="maxUses" type="number" defaultValue="100" required />
+            Purpose / audit reason
+            <Textarea name="reason" placeholder="For example, October laptop deployment" required />
           </label>
-        </div>
-        <label className="flex items-start gap-2 text-sm">
-          <input name="approval" type="checkbox" defaultChecked />
-          Require another admin to approve each device
-        </label>
-        <details className="border p-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            Settings for enrolled devices (optional)
-          </summary>
-          <div className="mt-3 grid gap-3">
-            <p className="text-sm text-muted-foreground">
-              Applied to every device enrolled with this token. These can't be changed later.
-            </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="token-lifetime">Expires after</Label>
+              <SelectField
+                id="token-lifetime"
+                name="lifetime"
+                defaultValue="86400"
+                disabled={busy || captured !== null || completed}
+                required
+                options={[
+                  { value: "3600", label: "1 hour" },
+                  { value: "14400", label: "4 hours" },
+                  { value: "43200", label: "12 hours" },
+                  { value: "86400", label: "24 hours" },
+                ]}
+              />
+            </div>
             <label className="grid gap-1.5 text-sm font-medium">
-              Labels (space separated)
-              <Input name="labels" />
+              Maximum uses
+              <Input name="maxUses" type="number" defaultValue="100" required />
             </label>
-            <Label htmlFor="token-owner-kind">Assign owner</Label>
-            <SelectField
-              id="token-owner-kind"
-              value={ownerKind}
-              disabled={busy || captured !== null || completed}
-              onValueChange={setOwnerKind}
-              options={[
-                { value: "", label: "Unassigned" },
-                { value: "ownerText", label: "Owner name" },
-                { value: "ownerPrincipalId", label: "Owner account" },
-              ]}
-            />
-            {ownerKind === "ownerPrincipalId" ? (
-              <AccountPicker
-                label="Owner account"
-                value={ownerAccount}
-                onChange={setOwnerAccount}
+          </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input name="approval" type="checkbox" defaultChecked />
+            Require another admin to approve each device
+          </label>
+          <details className="border p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Settings for enrolled devices (optional)
+            </summary>
+            <div className="mt-3 grid gap-3">
+              <p className="text-sm text-muted-foreground">
+                Applied to every device enrolled with this token. These can't be changed later.
+              </p>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Labels (space separated)
+                <Input name="labels" />
+              </label>
+              <Label htmlFor="token-owner-kind">Assign owner</Label>
+              <SelectField
+                id="token-owner-kind"
+                value={ownerKind}
+                disabled={busy || captured !== null || completed}
+                onValueChange={setOwnerKind}
+                options={[
+                  { value: "", label: "Unassigned" },
+                  { value: "ownerText", label: "Owner name" },
+                  { value: "ownerPrincipalId", label: "Owner account" },
+                ]}
+              />
+              {ownerKind === "ownerPrincipalId" ? (
+                <AccountPicker
+                  label="Owner account"
+                  value={ownerAccount}
+                  onChange={setOwnerAccount}
+                  disabled={busy || captured !== null || completed}
+                />
+              ) : ownerKind === "ownerText" ? (
+                <label className="grid gap-1.5 text-sm font-medium">
+                  Owner name
+                  <Input name="owner" required />
+                </label>
+              ) : null}
+              <MultiPicker
+                label="Groups"
+                values={groupIds}
+                onChange={setGroupIds}
+                picker={groupPicker}
                 disabled={busy || captured !== null || completed}
               />
-            ) : ownerKind === "ownerText" ? (
-              <label className="grid gap-1.5 text-sm font-medium">
-                Owner name
-                <Input name="owner" required />
-              </label>
-            ) : null}
-            <MultiPicker
-              label="Groups"
-              values={groupIds}
-              onChange={setGroupIds}
-              picker={groupPicker}
-              disabled={busy || captured !== null || completed}
-            />
-            <MultiPicker
-              label="Profile versions"
-              values={profileRevisionIds}
-              onChange={setProfileRevisionIds}
-              picker={profileRevisionPicker}
-              disabled={busy || captured !== null || completed}
-            />
-            <label className="grid gap-1.5 text-sm font-medium">
-              Custom attributes (JSON)
-              <Textarea
-                name="metadata"
-                defaultValue={'{"attributes":{}}'}
-                spellCheck={false}
-                className="font-mono text-xs"
+              <MultiPicker
+                label="Profile versions"
+                values={profileRevisionIds}
+                onChange={setProfileRevisionIds}
+                picker={profileRevisionPicker}
+                disabled={busy || captured !== null || completed}
               />
-            </label>
-            <p className="text-sm text-muted-foreground">
-              Example: {`{"attributes":{"site":{"stringValue":"east"}}}`}
-            </p>
-          </div>
-        </details>
-      </fieldset>
-      {captured ? (
-        <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
-      ) : null}
-      {failure ? <RpcError failure={failure} /> : null}
-      {failure?.ambiguous ? (
-        <p className="text-sm text-muted-foreground">
-          The token may have been created. Try again to check. The secret can't be shown twice.
-        </p>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || completed}>
-          {busy ? "Creating…" : captured ? "Try again" : "Create provisioning token"}
-        </Button>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Custom attributes (JSON)
+                <Textarea
+                  name="metadata"
+                  defaultValue={'{"attributes":{}}'}
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                />
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Example: {`{"attributes":{"site":{"stringValue":"east"}}}`}
+              </p>
+            </div>
+          </details>
+        </fieldset>
+        {captured ? (
+          <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
+        ) : null}
+        {failure ? <RpcError failure={failure} /> : null}
+        {failure?.ambiguous ? (
+          <p className="text-sm text-muted-foreground">
+            The token may have been created. Try again to check. The secret can't be shown twice.
+          </p>
+        ) : null}
+      </div>
+      <DialogFooter className="m-0">
         {onCancel ? (
           <Button
             type="button"
@@ -311,7 +312,10 @@ export function IssueProvisioningToken({
             Cancel
           </Button>
         ) : null}
-      </div>
+        <Button type="submit" disabled={busy || completed}>
+          {busy ? "Creating…" : captured ? "Try again" : "Create provisioning token"}
+        </Button>
+      </DialogFooter>
     </form>
   );
 }

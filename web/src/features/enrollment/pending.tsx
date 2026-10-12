@@ -47,10 +47,21 @@ export function PendingEnrollments() {
   }
   const enrollments = list.data.enrollments;
   const waiting = enrollments.filter((enrollment) => enrollment.state === "pending_approval");
-  const closed = enrollments.filter((enrollment) => enrollment.state !== "pending_approval");
+  const approved = enrollments.filter((enrollment) => enrollment.state === "approved");
+  const closed = enrollments.filter(
+    (enrollment) => enrollment.state !== "pending_approval" && enrollment.state !== "approved",
+  );
+  const open = [...waiting, ...approved];
   const paged = pageToken !== "" || list.data.nextPageToken !== "";
-  const noun = waiting.length === 1 ? "device" : "devices";
-  const heading = `${waiting.length} ${noun} waiting for approval${paged ? " on this page" : ""}`;
+  const devices = (count: number) => `${count} ${count === 1 ? "device" : "devices"}`;
+  const waitingText = `${devices(waiting.length)} waiting for approval`;
+  const approvedText = `${waiting.length > 0 ? approved.length : devices(approved.length)} approved, waiting to finish enrolling`;
+  const heading =
+    (waiting.length === 0
+      ? approvedText
+      : approved.length === 0
+        ? waitingText
+        : `${waitingText}; ${approvedText}`) + (paged ? " on this page" : "");
   const closedToggle =
     closed.length > 0 ? (
       <Button
@@ -90,7 +101,7 @@ export function PendingEnrollments() {
       </Button>
     </div>
   ) : null;
-  if (waiting.length === 0) {
+  if (open.length === 0) {
     return (
       <section className="grid gap-3" aria-label="Devices waiting for approval">
         <p className="text-sm text-muted-foreground">
@@ -117,10 +128,19 @@ export function PendingEnrollments() {
           <Button render={<Link to="/approvals" />}>Open approval inbox</Button>
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Another admin must approve each device in the approval inbox before it can finish enrolling.
-      </p>
-      {waiting.map((enrollment) => (
+      {waiting.length > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Another admin must approve each device in the approval inbox before it can finish
+          enrolling.
+        </p>
+      ) : null}
+      {approved.length > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          An approved device finishes enrolling once the admin who created its provisioning token
+          runs the approval in the approval inbox.
+        </p>
+      ) : null}
+      {open.map((enrollment) => (
         <PendingRow key={enrollment.transactionId} enrollment={enrollment} />
       ))}
       {closedToggle}
@@ -132,6 +152,7 @@ export function PendingEnrollments() {
 
 function PendingRow({ enrollment }: { enrollment: PendingEnrollment }) {
   const waiting = enrollment.state === "pending_approval";
+  const approved = enrollment.state === "approved";
   return (
     <article className="grid gap-3 border p-4">
       <div className="flex flex-wrap justify-between gap-2">
@@ -142,10 +163,12 @@ function PendingRow({ enrollment }: { enrollment: PendingEnrollment }) {
         >
           Open device
         </Link>
-        <StatusBadge status={waiting ? "warning" : "neutral"}>
+        <StatusBadge status={waiting ? "warning" : approved ? "info" : "neutral"}>
           {waiting
             ? "Awaiting approval"
-            : (closedStateLabels[enrollment.state] ?? "No longer waiting")}
+            : approved
+              ? "Approved, not finished"
+              : (closedStateLabels[enrollment.state] ?? "No longer waiting")}
         </StatusBadge>
       </div>
       <dl className="grid gap-1 text-sm sm:grid-cols-2">

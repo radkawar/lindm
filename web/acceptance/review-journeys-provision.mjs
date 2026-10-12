@@ -214,10 +214,16 @@ async function onboard(ctx) {
   await result
     .getByText("Loading install command…", { exact: true })
     .waitFor({ state: "hidden", timeout });
-  const instructionsAvailable = await result
-    .getByRole("button", { name: "Copy install command", exact: true })
-    .isEnabled();
-  await visible(result.getByRole("textbox", { name: "Install and enroll command", exact: true }));
+  // An unavailable command is hidden and replaced by its blocking reason.
+  const copyCommand = result.getByRole("button", { name: "Copy install command", exact: true });
+  const blocked = result.getByRole("link", { name: /^Settings › Agent repository/ });
+  await copyCommand.or(blocked).first().waitFor({ timeout });
+  const instructionsAvailable = (await copyCommand.count()) === 1;
+  await visible(
+    instructionsAvailable
+      ? result.getByRole("textbox", { name: "Install and enroll command", exact: true })
+      : blocked,
+  );
   await shot(
     ctx,
     "onboard-install-instructions",

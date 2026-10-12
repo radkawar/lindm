@@ -1,6 +1,9 @@
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import type { EnrollmentPlatform } from "../../../gen/lindm/admin/v1/enrollment_instructions_pb";
+import type { FleetOSCount } from "../../../gen/lindm/admin/v1/fleet_summary_pb";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,9 +20,11 @@ import { SelectField } from "@/components/ui/select-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
+import { canPermission } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/time";
-import { enrollmentInstructionsQueryOptions } from "./queries";
+import { enrollmentInstructionsQueryOptions, fleetOperatingSystemsQueryOptions } from "./queries";
 import {
   enrollmentInstallScript,
   grantSnippet,
@@ -47,8 +52,75 @@ export function EnrollmentSecretDialog(props: SecretDialogProps) {
   return <SecretDialog key={`${props.credential.kind}:${props.credential.id}`} {...props} />;
 }
 
+// Whether devices reporting this OS ID and VERSION_ID fit the platform's
+// registry version rule. The fleet summary carries no VARIANT_ID.
+function platformMatches(platform: EnrollmentPlatform, group: FleetOSCount): boolean {
+  if (platform.osId !== group.osId) return false;
+  const version = group.osVersion;
+  switch (platform.versionRule) {
+    case "exact":
+      return platform.versionIds.includes(version);
+    case "major":
+      return platform.versionIds.some(
+        (major) => version === major || version.startsWith(`${major}.`),
+      );
+    case "absent":
+      return version === "";
+    case "snapshot":
+      return /^\d{8}$/.test(version);
+    case "any":
+      return true;
+    default:
+      return false;
+  }
+}
+
+// The most common OS among authorized devices that one of these platforms covers.
+function fleetDefaultPlatform(platforms: EnrollmentPlatform[], groups: FleetOSCount[]) {
+  for (const group of groups) {
+    if (!group.osId) continue;
+    const match = platforms.find((platform) => platformMatches(platform, group));
+    if (match) return match;
+  }
+  return undefined;
+}
+
+// One sentence naming what blocks the install command and where to act on it.
+// A platform's readiness carries the server-wide reason when that comes first.
+function UnavailableInstall({ platform }: { platform: EnrollmentPlatform }) {
+  const reason = platform.readiness?.reason ?? "";
+  if (reason === "platform_installation_gated") {
+    return (
+      <p className="text-sm">
+        lindm can't install the agent on {platform.label} yet. Choose another operating system.
+      </p>
+    );
+  }
+  const settings = (
+    <Link
+      to="/settings"
+      hash="agent-repository"
+      target="_blank"
+      rel="noreferrer"
+      className="underline underline-offset-4"
+    >
+      Settings › Agent repository
+      <span className="sr-only"> (opens in a new tab)</span>
+    </Link>
+  );
+  return (
+    <p className="text-sm">
+      {reason.startsWith("native_")
+        ? `The agent repository for ${platform.label} isn't set up yet; see `
+        : "Agent installation isn't set up on this server yet; see "}
+      {settings} to set it up.
+    </p>
+  );
+}
+
 function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const [generation] = useState(lifetime.generation);
   const [secret, setSecret] = useState(credential.deliveryUnknown ? null : credential.secret);
   const [open, setOpen] = useState(true);
@@ -61,6 +133,10 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   const instructions = useQuery({
     ...enrollmentInstructionsQueryOptions(lifetime),
     enabled: active && !!secret,
+  });
+  const fleet = useQuery({
+    ...fleetOperatingSystemsQueryOptions(lifetime),
+    enabled: active && !!secret && canPermission(principal, "fleet.read"),
   });
 
   useEffect(() => {
@@ -110,11 +186,11 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   const platforms = provisioning
     ? allPlatforms.filter((item) => item.provisioningFormats.includes(format))
     : allPlatforms;
-  const platform = platforms.find((item) => item.id === platformId) ?? platforms[0];
+  // Preselect the fleet's most common covered OS; otherwise the admin chooses.
+  const platform =
+    platforms.find((item) => item.id === platformId) ??
+    fleetDefaultPlatform(platforms, fleet.data ?? []);
   const installScript = enrollmentInstallScript(instructions.data, platform);
-  const readiness = !instructions.data?.readiness?.ready
-    ? instructions.data?.readiness
-    : platform?.readiness;
   const snippet =
     secret && instructions.isSuccess
       ? provisioning
@@ -188,6 +264,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 <SelectField
                   id="enrollment-platform"
                   value={platform?.id ?? ""}
+                  placeholder="Choose an OS"
                   options={platforms.map((item) => ({ value: item.id, label: item.label }))}
                   onValueChange={setPlatformId}
                 />
@@ -206,52 +283,51 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 </Button>
               </div>
             ) : null}
-            <p className="text-sm text-muted-foreground">
-              {instructions.isPending
-                ? "Loading install command…"
-                : instructions.isError
-                  ? "Couldn't load install instructions. Try again before copying."
-                  : snippet
-                    ? provisioning
-                      ? "Installs the signed agent from this server and enrolls this device on its first boot."
-                      : "Installs the signed agent from this server, then enrolls this device."
-                    : !platform
-                      ? "No supported operating system uses this installer format."
-                      : readiness?.remedy ||
-                        "Ask your server administrator to configure releaseRepository and publish signed packages and deployment trust."}
-            </p>
-            {!snippet && instructions.isSuccess ? (
-              <StatusBadge status="warning" className="w-fit">
-                Install command unavailable
-              </StatusBadge>
+            {instructions.isPending ? (
+              <p className="text-sm text-muted-foreground">Loading install command…</p>
+            ) : instructions.isError ? (
+              <p className="text-sm text-muted-foreground">
+                Couldn't load install instructions. Try again before copying.
+              </p>
+            ) : snippet ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {provisioning
+                    ? "Installs the signed agent from this server and enrolls this device on its first boot."
+                    : "Installs the signed agent from this server, then enrolls this device."}
+                </p>
+                <p className="text-sm">
+                  {provisioning
+                    ? "This installer input contains a reusable secret. Keep it out of images and logs."
+                    : "Run on the intended device with sudo access and shell history disabled. This command contains a single-use secret."}
+                </p>
+                <Textarea
+                  data-sensitive="true"
+                  aria-label={
+                    provisioning ? `${format} provisioning snippet` : "Install and enroll command"
+                  }
+                  readOnly
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="field-sizing-fixed h-48 min-h-48 font-mono text-xs"
+                  value={snippet}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="default"
+                    onClick={() =>
+                      void copy(snippet, provisioning ? `${format} snippet` : "Install command")
+                    }
+                  >
+                    Copy {provisioning ? `${format} snippet` : "install command"}
+                  </Button>
+                </div>
+              </>
+            ) : !platforms.length ? (
+              <p className="text-sm">No supported operating system uses this installer format.</p>
+            ) : platform ? (
+              <UnavailableInstall platform={platform} />
             ) : null}
-            <p className="text-sm">
-              {provisioning
-                ? "This installer input contains a reusable secret. Keep it out of images and logs."
-                : "Run on the intended device with sudo access and shell history disabled. This command contains a single-use secret."}
-            </p>
-            <Textarea
-              data-sensitive="true"
-              aria-label={
-                provisioning ? `${format} provisioning snippet` : "Install and enroll command"
-              }
-              readOnly
-              spellCheck={false}
-              autoComplete="off"
-              className="field-sizing-fixed h-48 min-h-48 font-mono text-xs"
-              value={snippet}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="default"
-                disabled={!snippet}
-                onClick={() =>
-                  void copy(snippet, provisioning ? `${format} snippet` : "Install command")
-                }
-              >
-                Copy {provisioning ? `${format} snippet` : "install command"}
-              </Button>
-            </div>
             {copyStatus ? (
               <p role={copyFailed ? "alert" : "status"} className="text-sm text-muted-foreground">
                 {copyStatus}
@@ -259,7 +335,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             ) : null}
           </div>
         )}
-        {!unavailable && !(provisioning && format === "nixos") ? (
+        {snippet && !(provisioning && format === "nixos") ? (
           <details className="text-sm">
             <summary className="cursor-pointer">What this does</summary>
             <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
@@ -336,9 +412,6 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                   <p className="break-all">
                     Execution root SHA-256: {instructions.data.executionRootSha256}
                   </p>
-                ) : null}
-                {readiness?.reason ? (
-                  <p className="break-all">Readiness: {readiness.reason}</p>
                 ) : null}
                 <p>
                   If enrollment times out, run /usr/libexec/lindm/lindm-agent resume -wait-seconds

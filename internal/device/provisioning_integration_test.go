@@ -397,6 +397,51 @@ func TestProvisioningPendingRejectionRevocationAndApprovalFences(t *testing.T) {
 	}
 }
 
+// An approved reservation is not enrolled until the requester runs it; the
+// pending list must say so instead of still asking for approval.
+func TestPendingEnrollmentsReportApprovalProgress(t *testing.T) {
+	f := newProvisioningFixture(t)
+	token := f.mint(t, 1, true)
+	request, _ := provisionIntent(t, token.Secret)
+	if _, err := f.service.Provision(t.Context(), connect.NewRequest(request)); err != nil {
+		t.Fatal(err)
+	}
+	states := func() []string {
+		t.Helper()
+		list, err := f.service.GetPendingEnrollments(f.ownerCtx, connect.NewRequest(&adminv1.GetPendingEnrollmentsRequest{PageSize: 10}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, item := range list.Msg.GetEnrollments() {
+			got = append(got, item.GetState())
+		}
+		return got
+	}
+	if got := states(); len(got) != 1 || got[0] != "pending_approval" {
+		t.Fatalf("before approval: %v", got)
+	}
+	inbox, err := f.service.ListApprovals(f.ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := inbox.Msg.Approvals[0]
+	if _, err := f.service.ApproveApproval(f.reviewerCtx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: entry.Id, Reason: "independent installation review"})); err != nil {
+		t.Fatal(err)
+	}
+	if got := states(); len(got) != 1 || got[0] != "approved" {
+		t.Fatalf("after approval, before the requester runs it: %v", got)
+	}
+	approve := proto.CloneOf(entry.GetApprovePendingEnrollment())
+	approve.ApprovalId = entry.Id
+	if _, err := f.service.ApprovePendingEnrollment(f.ownerCtx, connect.NewRequest(approve)); err != nil {
+		t.Fatal(err)
+	}
+	if got := states(); len(got) != 0 {
+		t.Fatalf("after the requester ran the approval: %v", got)
+	}
+}
+
 func TestProvisioningDoesNotBorrowScopeOrLabelPrivileges(t *testing.T) {
 	f := newProvisioningFixture(t)
 	helpdesk := insertPrincipal(t, t.Context(), f.conn, identity.RoleHelpdesk)

@@ -561,10 +561,12 @@ type PendingEnrollment struct {
 	ApprovalId           string                 `protobuf:"bytes,6,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
 	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	ExpiresAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	State                string                 `protobuf:"bytes,9,opt,name=state,proto3" json:"state,omitempty"`
-	Metadata             *DeviceMetadata        `protobuf:"bytes,10,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// pending_approval, approved (the requester must still run the approved
+	// payload in the approval inbox), rejected or expired.
+	State         string          `protobuf:"bytes,9,opt,name=state,proto3" json:"state,omitempty"`
+	Metadata      *DeviceMetadata `protobuf:"bytes,10,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PendingEnrollment) Reset() {

@@ -16,6 +16,9 @@ import * as rollouts from "./rollouts.mjs";
 import * as approvals from "./approvals.mjs";
 import * as audit from "./audit.mjs";
 import * as wipeForm from "./wipe-form.mjs";
+import * as pass2Bug4 from "./pass2-bug4-enrollment-stale.mjs";
+import * as pass2Bug5 from "./pass2-bug5-token-cancel.mjs";
+import * as pass2Bug6 from "./pass2-bug6-install-command.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -26,8 +29,12 @@ export const ownerEdits = [
   assistanceRecord,
   advisories,
   enrollment,
+  pass2Bug5,
   rollouts,
   approvals,
   audit,
   wipeForm,
+  // Creates a one-time code, then approves the seed's pending enrollment.
+  pass2Bug6,
+  pass2Bug4,
 ];

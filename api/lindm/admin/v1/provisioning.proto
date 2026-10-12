@@ -89,6 +89,8 @@ message PendingEnrollment {
   string approval_id = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp expires_at = 8;
+  // pending_approval, approved (the requester must still run the approved
+  // payload in the approval inbox), rejected or expired.
   string state = 9;
   DeviceMetadata metadata = 10;
 }

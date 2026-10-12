@@ -70,3 +70,21 @@ export function enrollmentInstructionsQueryOptions(lifetime: AuthLifetime) {
     retry: false,
   });
 }
+
+// OS ID/version groups across authorized devices, largest first; used only to
+// preselect the install command's operating system.
+export function fleetOperatingSystemsQueryOptions(lifetime: AuthLifetime) {
+  return queryOptions({
+    queryKey: ["enrollment-fleet-os", lifetime.generation] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.getFleetSummary(
+        { recentActionLimit: 1 },
+        { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      return result.operatingSystems?.groups ?? [];
+    },
+    retry: false,
+  });
+}

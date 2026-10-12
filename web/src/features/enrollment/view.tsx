@@ -127,7 +127,10 @@ export function EnrollmentView({
         open={method === "provisioning"}
         onOpenChange={(open) => setMethod(open ? "provisioning" : null)}
       >
-        <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent
+          keepMounted
+          className="flex max-h-[90svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        >
           <IssueProvisioningToken
             key={tokenFormVersion}
             accountPicker={accountPicker}

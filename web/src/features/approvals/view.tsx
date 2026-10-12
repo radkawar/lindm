@@ -466,6 +466,11 @@ function ApprovalCard({
               : "Action started",
       );
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
+      // Approving, rejecting and running all change what Enrollment shows.
+      if (approval.payload.case === "approvePendingEnrollment")
+        await client.invalidateQueries({
+          queryKey: ["pending-enrollments", lifetime.generation],
+        });
       if (exact.action === "execute") {
         await client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
         await client.invalidateQueries({ queryKey: ["advisory-findings", lifetime.generation] });

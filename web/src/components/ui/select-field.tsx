@@ -11,6 +11,7 @@ export function SelectField({
   required,
   className,
   options,
+  placeholder,
   onValueChange,
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
@@ -25,13 +26,21 @@ export function SelectField({
   "aria-label"?: string;
   "aria-describedby"?: string;
   options: readonly { value: string | number; label: ReactNode; disabled?: boolean }[];
+  // Shown while the controlled value is "", which then means nothing chosen yet.
+  placeholder?: string;
   onValueChange?: (value: string) => void;
 }) {
   const items = options.map((option) => ({ ...option, value: String(option.value) }));
   return (
     <Select
       name={name}
-      value={value === undefined ? undefined : String(value)}
+      value={
+        value === undefined
+          ? undefined
+          : placeholder !== undefined && value === ""
+            ? null
+            : String(value)
+      }
       defaultValue={defaultValue === undefined ? undefined : String(defaultValue)}
       disabled={disabled}
       required={required}
@@ -46,7 +55,7 @@ export function SelectField({
         aria-describedby={ariaDescribedBy}
         className={cn("w-full min-w-0", className)}
       >
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent align="start" alignItemWithTrigger={false}>
         {items.map((option) => (

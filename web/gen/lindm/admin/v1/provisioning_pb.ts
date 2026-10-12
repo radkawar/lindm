@@ -324,6 +324,9 @@ export type PendingEnrollment = Message<"lindm.admin.v1.PendingEnrollment"> & {
   expiresAt?: Timestamp | undefined;
 
   /**
+   * pending_approval, approved (the requester must still run the approved
+   * payload in the approval inbox), rejected or expired.
+   *
    * @generated from field: string state = 9;
    */
   state: string;

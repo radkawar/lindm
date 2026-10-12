@@ -11,7 +11,11 @@ export function RepositoryReadinessSection() {
   const query = useQuery(enrollmentInstructionsQueryOptions(lifetime));
   const instructions = query.data;
   return (
-    <section aria-labelledby="repository-readiness-heading" className="grid min-w-0 gap-4">
+    <section
+      id="agent-repository"
+      aria-labelledby="repository-readiness-heading"
+      className="grid min-w-0 scroll-mt-20 gap-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="repository-readiness-heading" className="text-base font-semibold">
           Agent repository

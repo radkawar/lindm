@@ -205,7 +205,17 @@ async function reviewEnrollment({
         "/enrollment",
         index === 0 ? "ubuntu-install" : "fedora-install",
         async (require, prefix, entry) => {
-          await dialog.getByLabel(contract.chooser, { exact: true }).click();
+          const chooser = dialog.getByLabel(contract.chooser, { exact: true });
+          if (ready && index === 0) {
+            // The published fixture has no devices, so no OS can be preselected.
+            await settle(page);
+            require((await chooser.innerText()).trim() ===
+              "Choose an OS", "An empty fleet preselects an operating system");
+            require((await dialog
+              .getByRole("button", { name: contract.copy, exact: true })
+              .count()) === 0, "An install command is offered before an OS is chosen");
+          }
+          await chooser.click();
           await page.getByRole("option", { name: label, exact: true }).waitFor();
           const options = await page.getByRole("option").allTextContents();
           for (const family of [
@@ -247,29 +257,35 @@ async function reviewEnrollment({
             });
             require(matches, "Copy install command did not reproduce the displayed command");
           } else {
-            await dialog.getByText("Install command unavailable", { exact: true }).waitFor();
-            require(await copy.isDisabled(), "Missing repository still enables an install command");
-            require((await command.inputValue()) ===
-              "", "Missing repository still supplies an executable command");
-            require((await dialog.innerText()).includes(
-              "releaseRepository.directory/repo",
-            ), "Missing repository does not name the configuration remedy");
+            const settings = dialog.getByRole("link", { name: /^Settings › Agent repository/ });
+            await settings.waitFor();
+            require((await settings.getAttribute("href")) ===
+              "/settings#agent-repository", "Missing repository does not link to Settings › Agent repository");
+            require((await copy.count()) ===
+              0, "Missing repository still offers an install command copy");
+            require((await command.count()) ===
+              0, "Missing repository still shows an install command field");
+            require(!(await dialog.innerText()).includes(
+              "releaseRepository",
+            ), "Missing repository shows server configuration keys");
           }
-          const details = dialog.locator("summary").filter({ hasText: contract.disclosure });
-          require(!(await details.evaluate(
-            (node) => node.parentElement.open,
-          )), "What this does is not collapsed initially");
           await dialog.evaluate((node) => {
             node.scrollTop = 0;
           });
           entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
-          await details.click();
-          require((await dialog.innerText()).includes(
-            "Authenticates the package signing key",
-          ), "What this does omits signer authentication");
-          await details.scrollIntoViewIfNeeded();
-          entry.screenshots.details = await screenshot(page, `${prefix}-details.png`, false);
-          await details.click();
+          if (ready) {
+            const details = dialog.locator("summary").filter({ hasText: contract.disclosure });
+            require(!(await details.evaluate(
+              (node) => node.parentElement.open,
+            )), "What this does is not collapsed initially");
+            await details.click();
+            require((await dialog.innerText()).includes(
+              "Authenticates the package signing key",
+            ), "What this does omits signer authentication");
+            await details.scrollIntoViewIfNeeded();
+            entry.screenshots.details = await screenshot(page, `${prefix}-details.png`, false);
+            await details.click();
+          }
         },
       );
     }

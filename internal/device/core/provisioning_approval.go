@@ -189,11 +189,18 @@ func (s *Service) GetPendingEnrollments(ctx context.Context, req *connect.Reques
 			if err != nil {
 				return nil, MapErr(err)
 			}
-			if decision.State == "rejected" {
+			// Approved is still not enrolled: the requester must run the
+			// approved payload. Report it so the console doesn't keep asking
+			// for an approval that was already given.
+			switch {
+			case decision.State == "rejected":
 				item.State = "rejected"
+			case !s.Now().Before(row.ExpiresAt.Time) || !s.Now().Before(decision.ExpiresAt.Time):
+				item.State = "expired"
+			case decision.State == "approved":
+				item.State = "approved"
 			}
-		}
-		if item.State == "pending_approval" && !s.Now().Before(row.ExpiresAt.Time) {
+		} else if !s.Now().Before(row.ExpiresAt.Time) {
 			item.State = "expired"
 		}
 		fits, err := budget.Take(item)
