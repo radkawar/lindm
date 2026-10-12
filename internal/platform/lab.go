@@ -78,6 +78,9 @@ type Lab struct {
 	// for stable package truth, and the resources lane drives it on purpose
 	// to hold the native package lock while a package change arrives.
 	Updater LabUpdater
+	// SysctlKey replaces the resources lane's vm.swappiness when a vendor
+	// boot service owns that key's live value (empty keeps vm.swappiness).
+	SysctlKey string
 	// OSUpdateTargets pins, per guest architecture (x86_64, aarch64), the
 	// later rolling snapshot the os-update lane's whole-system policy installs.
 	// Lane prerequisites are provisioned at the image's own snapshot, so a

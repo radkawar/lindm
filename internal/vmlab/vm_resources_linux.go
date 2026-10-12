@@ -41,9 +41,10 @@ type resourceDispatch struct {
 	rollingSnapshot *resourcev1.RollingUpdateSnapshot
 	// osUpdateTarget is the later snapshot the os-update policy installs.
 	osUpdateTarget *resourcev1.RollingUpdateSnapshot
-	// updater is the release's vendor background updater, if any; the
-	// connected package kind collides with it on purpose.
-	updater platform.LabUpdater
+	// lab is the release's lab recipe: its vendor background updater, if
+	// any, which the connected package kind collides with on purpose, and
+	// its lab sysctl key.
+	lab platform.Lab
 }
 
 func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.ResourceDesiredState, ownership *resourcev1.OwnershipPolicy) error {
@@ -316,13 +317,13 @@ func fileOracle(ctx context.Context, vm *guestVM, name, content string, exists b
 	return resourceOracle(ctx, vm, "native-file-content-mode-uid-gid-xattrs-selinux", command)
 }
 
-func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane, updater platform.LabUpdater, reboot func(context.Context) error, awaitReboot func(context.Context, string, time.Duration) error) error {
+func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane, lab platform.Lab, reboot func(context.Context) error, awaitReboot func(context.Context, string, time.Duration) error) error {
 	vm := packages.vm
 	if result.Resources == nil {
 		result.Resources = newVMResourceEvidence()
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
-	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot, awaitReboot: awaitReboot, updater: updater}
+	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot, awaitReboot: awaitReboot, lab: lab}
 	r.rollingSnapshot, r.osUpdateTarget = packages.rollingSnapshot, packages.osUpdateTarget
 	rpm := newResourcePackaging(packages.backend, result.Architecture)
 	kinds := result.Resources.Kinds
@@ -403,7 +404,7 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 		}
 		kinds[0].Unproven = nil
 		required := []string{"exact-v1-dependency-readiness", "wrong-signing-key-refused", "unavailable-exact-version-refused", "exact-v2-upgrade", "repeat-exact-v2", "owned-absence", "presence-after-absence", "release-retains-dependency", "external-pin-drift-release-refused", "interrupted-running-no-replay"}
-		if updater.Unit != "" {
+		if lab.Updater.Unit != "" {
 			required = append(required, packageVendorBusyScenario)
 		}
 		if err := qualifyResourceEvidence(&kinds[0], required); err != nil {
@@ -454,8 +455,8 @@ func exerciseResourcePackages(ctx context.Context, r *resourceDispatch, rpm reso
 			if err := exercisePackageRefusals(ctx, r, rpm, evidence); err != nil {
 				return err
 			}
-			if r.updater.Unit != "" {
-				if err := exercisePackageVendorBusy(ctx, r, rpm, r.updater, evidence); err != nil {
+			if r.lab.Updater.Unit != "" {
+				if err := exercisePackageVendorBusy(ctx, r, rpm, r.lab.Updater, evidence); err != nil {
 					return err
 				}
 			}

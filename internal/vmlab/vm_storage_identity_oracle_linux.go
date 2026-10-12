@@ -24,7 +24,10 @@ func storageTruthIdentity(fields map[string]string) *inventoryv1.StorageIdentity
 		LuksUuid: truthString(""), LuksVersion: truthString(""), LuksTokenTypes: truthString(""),
 		LuksKeyslotCount: &inventoryv1.ObservedUint64{Status: truthUnavailable}, LuksTokenCount: &inventoryv1.ObservedUint64{Status: truthUnavailable},
 		BackingDisk: truthString(""), RootBacking: &inventoryv1.ObservedBool{Status: truthUnavailable}, Nvme: &inventoryv1.ObservedNVMeScope{Status: truthUnavailable},
-		GptDiskGuid: truthString(""),
+		GptDiskGuid: truthString(""), EphemeralKey: truthBool(false),
+	}
+	if fields["TYPE"] == "crypt" {
+		id.EphemeralKey = &inventoryv1.ObservedBool{Status: truthUnavailable}
 	}
 	if fields["TYPE"] == "disk" && fields["PTTYPE"] == "gpt" {
 		id.GptDiskGuid = truthString(fields["PTUUID"])
@@ -87,6 +90,11 @@ func (o vmInventoryOracle) storageIdentities(storage *inventoryv1.StorageDetails
 		}
 		if device.Filesystem.Value == "crypto_LUKS" {
 			if err := o.storageLUKSIdentity(kernel[device.Name], id); err != nil {
+				return err
+			}
+		}
+		if device.Type.Value == "crypt" {
+			if err := o.storageEphemeralKey(kernel[device.Name], kernel[device.Parent.Value], id); err != nil {
 				return err
 			}
 		}
@@ -349,4 +357,45 @@ func (o vmInventoryOracle) storageNVMeIdentity(name string, id *inventoryv1.Stor
 	result.Status = truthSuccess
 	result.Scope = &agentv1.NVMeSanitizeScope{NamespaceId: uint32(n), Identity: &agentv1.NVMeSanitizeIdentity{Basis: basis, VendorId: controller.VID, SubsystemVendorId: controller.SSVID, ControllerSerial: serial, ControllerModel: model, ControllerFirmware: strings.TrimSpace(controller.Firmware), NamespaceSizeBytes: namespace.Size << shift, LbaDataSizeShift: shift}}
 	return result, nil
+}
+
+// storageEphemeralKeyScript independently classifies a dm-crypt mapping with
+// cryptsetup's own LUKS probe instead of the agent's header-magic read.
+const storageEphemeralKeyScript = `u=$(cat "/sys/class/block/$1/dm/uuid")
+n=$(cat "/sys/class/block/$1/dm/name")
+case $u in
+CRYPT-LUKS*) printf 'luks\n'; exit 0 ;;
+CRYPT-PLAIN-*) ;;
+*) printf 'unproven\n'; exit 0 ;;
+esac
+segments=$(sudo -n dmsetup table -- "$n" | awk '$3 == "crypt" && $4 != "" && $4 !~ /null/ { n++ } END { print NR + 0 " " n + 0 }')
+test "$segments" = "1 1" || { printf 'unproven\n'; exit 0; }
+keys=$(sudo -n awk -v n="$n" '$1 == n { print $3 }' /etc/crypttab)
+case $keys in
+/dev/urandom | /dev/random) ;;
+*) printf 'unproven\n'; exit 0 ;;
+esac
+if sudo -n cryptsetup isLuks -- "/dev/$2"; then printf 'header\n'; else printf 'ephemeral\n'; fi`
+
+func (o vmInventoryOracle) storageEphemeralKey(name, parent string, id *inventoryv1.StorageIdentity) error {
+	if name == "" || parent == "" || strings.ContainsAny(name+parent, "/\x00\r\n'") {
+		return errors.New("invalid dm-crypt kernel name oracle")
+	}
+	data, err := o.command("set -- " + nativeQuote(name) + " " + nativeQuote(parent) + "; " + storageEphemeralKeyScript)
+	if err != nil {
+		return err
+	}
+	switch strings.TrimSpace(string(data)) {
+	case "luks":
+		id.EphemeralKey = truthBool(false)
+	case "ephemeral":
+		id.EphemeralKey = truthBool(true)
+	case "header":
+		id.EphemeralKey = &inventoryv1.ObservedBool{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT}
+	case "unproven":
+		id.EphemeralKey = &inventoryv1.ObservedBool{Status: truthUnavailable}
+	default:
+		return errors.New("invalid dm-crypt ephemeral key oracle output")
+	}
+	return nil
 }

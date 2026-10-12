@@ -1179,6 +1179,10 @@ type ListDeviceStorageTargetsResponse struct {
 	Fresh             bool               `protobuf:"varint,6,opt,name=fresh,proto3" json:"fresh,omitempty"`
 	UnavailableReason string             `protobuf:"bytes,7,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
 	RecoveryReadiness *RecoveryReadiness `protobuf:"bytes,8,opt,name=recovery_readiness,json=recoveryReadiness,proto3" json:"recovery_readiness,omitempty"`
+	// crypto_erase only: names of proven ephemeral random-key dm-crypt mappings
+	// (for example a random-key swap) that are not erased because their key is
+	// never stored and is destroyed at power-off.
+	EphemeralMappings []string `protobuf:"bytes,9,rep,name=ephemeral_mappings,json=ephemeralMappings,proto3" json:"ephemeral_mappings,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1265,6 +1269,13 @@ func (x *ListDeviceStorageTargetsResponse) GetUnavailableReason() string {
 func (x *ListDeviceStorageTargetsResponse) GetRecoveryReadiness() *RecoveryReadiness {
 	if x != nil {
 		return x.RecoveryReadiness
+	}
+	return nil
+}
+
+func (x *ListDeviceStorageTargetsResponse) GetEphemeralMappings() []string {
+	if x != nil {
+		return x.EphemeralMappings
 	}
 	return nil
 }
@@ -1478,7 +1489,7 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\vaction_kind\x18\x02 \x01(\tB7\xbaH4r2R\rescrow_rotateR\ttpm2_bindR\fcrypto_eraseR\bsanitizeR\n" +
 	"actionKind\x12@\n" +
 	"\x15recovery_image_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h H\x00R\x13recoveryImageSha256\x88\x01\x01B\x18\n" +
-	"\x16_recovery_image_sha256\"\xcc\x03\n" +
+	"\x16_recovery_image_sha256\"\x85\x04\n" +
 	" ListDeviceStorageTargetsResponse\x12=\n" +
 	"\atargets\x18\x01 \x03(\v2#.lindm.admin.v1.DeviceStorageTargetR\atargets\x123\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12#\n" +
@@ -1489,7 +1500,8 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"observedAt\x12\x14\n" +
 	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12-\n" +
 	"\x12unavailable_reason\x18\a \x01(\tR\x11unavailableReason\x12P\n" +
-	"\x12recovery_readiness\x18\b \x01(\v2!.lindm.admin.v1.RecoveryReadinessR\x11recoveryReadiness\"\xde\x02\n" +
+	"\x12recovery_readiness\x18\b \x01(\v2!.lindm.admin.v1.RecoveryReadinessR\x11recoveryReadiness\x127\n" +
+	"\x12ephemeral_mappings\x18\t \x03(\tB\b\xbaH\x05\x92\x01\x02\x10@R\x11ephemeralMappings\"\xde\x02\n" +
 	"\x11RecoveryReadiness\x12N\n" +
 	"\vobservation\x18\x01 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationR\vobservation\x12\x14\n" +
 	"\x05ready\x18\x02 \x01(\bR\x05ready\x12\x16\n" +

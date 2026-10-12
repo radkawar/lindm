@@ -6,8 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 // Regression: on Pop!_OS 24.04 the boot-time com.system76.SystemUpdater ran
@@ -51,5 +55,22 @@ func TestLabQuiescePackageUnitsStopsPopUpdater(t *testing.T) {
 		"pgrep -x apt-get", "pgrep -x apt-get", "pgrep -x apt-get", "pgrep -x dpkg"}
 	if strings.Join(effects, "|") != strings.Join(want, "|") {
 		t.Fatalf("quiesce effects %q, want %q", effects, want)
+	}
+}
+
+// Pop!_OS's pop-zram-config rewrites vm.swappiness at every boot, so its
+// resources lane uses another key; every registry override needs a fixture
+// that records the key's prior value and a root approval.
+func TestRegistryLabSysctlKeysHaveFixtures(t *testing.T) {
+	config := new(agentv1.AgentConfig)
+	provisionHostResourceRoots(config)
+	for _, release := range platform.Releases() {
+		key, prior, err := labSysctlKey(release.Lab)
+		if err != nil {
+			t.Fatalf("%s: %v", release.Key, err)
+		}
+		if !strings.Contains(resourceHostFixtureScript, "sysctl -n "+key+" > "+prior+"\n") || !slices.Contains(config.GetSysctlProvider().GetAllowedKeys(), key) {
+			t.Fatalf("%s lab sysctl key %s lacks its fixture or approval", release.Key, key)
+		}
 	}
 }

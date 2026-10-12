@@ -618,7 +618,10 @@ var registry = []*Release{
 			// pop-system-updater c208318: UpdateSystem runs apt update and upgrade
 			// through apt-get, holding dpkg's frontend lock (daemon/src/dbus/server.rs).
 			Updater: LabUpdater{Unit: "com.system76.SystemUpdater.service",
-				Trigger: "busctl call com.system76.SystemUpdater /com/system76/SystemUpdater com.system76.SystemUpdater UpdateSystem"}},
+				Trigger: "busctl call com.system76.SystemUpdater /com/system76/SystemUpdater com.system76.SystemUpdater UpdateSystem"},
+			// pop-default-settings' pop-zram-config (pop-default-settings-zram.service)
+			// runs `sysctl -w vm.swappiness=180` at every boot after systemd-sysctl.
+			SysctlKey: "vm.vfs_cache_pressure"},
 		// apt.pop-os.org/release ("pop-os-release") and /proprietary
 		// ("system76") use codename noble and the Pop!_OS key; its Ubuntu mirror
 		// serves Ubuntu's own signed InRelease (observed 2026-10-11).

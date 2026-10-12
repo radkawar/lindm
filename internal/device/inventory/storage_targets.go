@@ -76,6 +76,9 @@ func (s *Service) ListDeviceStorageTargets(ctx context.Context, req *connect.Req
 				if req.Msg.GetActionKind() == "tpm2_bind" && response.UnavailableReason == "" && !core.TPM2BindSupported(host) {
 					response.Targets, response.UnavailableReason = nil, "device_action_tpm2_binding_unsupported"
 				}
+				if req.Msg.GetActionKind() == "crypto_erase" {
+					response.EphemeralMappings = EphemeralKeyMappings(details)
+				}
 			}
 			if !response.Fresh {
 				response.UnavailableReason = "device_action_inventory_stale"
@@ -303,12 +306,15 @@ func RequireObservedStorageTargets(details *inventoryv1.NativeDetails, spec *age
 				continue
 			}
 			// An encrypted mapping is covered only by its observed native LUKS
-			// ancestor. Plain dm-crypt and incomplete topology cannot disappear
-			// from a request claiming the complete encrypted volume set.
+			// ancestor, or by an ancestor the agent natively proved to be a
+			// plain mapping keyed from the kernel RNG on every activation (its
+			// key is never stored and is destroyed at power-off). Unproven plain
+			// dm-crypt and incomplete topology cannot disappear from a request
+			// claiming the complete encrypted volume set.
 			covered := false
 			current := device
 			for depth := 0; current != nil && depth < len(byName); depth++ {
-				if luksContainer(current) {
+				if luksContainer(current) || EphemeralKeyMapping(current) {
 					covered = true
 					break
 				}
@@ -323,4 +329,23 @@ func RequireObservedStorageTargets(details *inventoryv1.NativeDetails, spec *age
 		}
 	}
 	return nil
+}
+
+// EphemeralKeyMapping reports the agent's native proof that a dm-crypt mapping
+// is keyed from the kernel RNG on every activation; any other status, or an
+// observation from an agent that predates the field, is not proof.
+func EphemeralKeyMapping(device *inventoryv1.BlockDevice) bool {
+	key := device.GetIdentity().GetEphemeralKey()
+	return storageString(device.GetType()) == "crypt" && key.GetStatus() == inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS && key.GetValue()
+}
+
+// EphemeralKeyMappings names the proven ephemeral mappings of an observation.
+func EphemeralKeyMappings(details *inventoryv1.NativeDetails) []string {
+	var names []string
+	for _, device := range details.GetStorage().GetDevices() {
+		if EphemeralKeyMapping(device) {
+			names = append(names, device.GetName())
+		}
+	}
+	return names
 }

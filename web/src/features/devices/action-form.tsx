@@ -1259,6 +1259,14 @@ export function DeviceActionForm({
               disabled={busy}
             />
           ) : null}
+          {kind === "cryptoErase" &&
+          eligibleTargets &&
+          eligibleTargets.ephemeralMappings.length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Not erased: {eligibleTargets.ephemeralMappings.join(", ")} (ephemeral random-key swap;
+              destroyed at power-off).
+            </p>
+          ) : null}
           {kind === "sanitize" && eligibleTargets && !currentSelection ? (
             <div className="mt-3">
               <RecoveryReadinessView readiness={eligibleTargets.recoveryReadiness} />

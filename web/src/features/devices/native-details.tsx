@@ -440,7 +440,18 @@ export function DeviceNativeDetails({
                 { header: "Mountpoint", field: (row) => row.mountpoint, optional: true },
                 {
                   header: "Encryption",
-                  render: (row) => <ObservedWord field={row.encryption} words={blockEncryption} />,
+                  render: (row) => (
+                    <>
+                      <ObservedWord field={row.encryption} words={blockEncryption} />
+                      {row.identity?.ephemeralKey?.status === CollectionStatus.SUCCESS &&
+                      row.identity.ephemeralKey.value ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · ephemeral random-key swap; destroyed at power-off
+                        </span>
+                      ) : null}
+                    </>
+                  ),
                 },
               ]}
             />

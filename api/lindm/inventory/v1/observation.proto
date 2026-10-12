@@ -257,6 +257,13 @@ message StorageIdentity {
   // Native GPT PTUUID of the unique backing disk, never a partition UUID.
   // Absent on historical observations; unavailable without a unique GPT disk.
   ObservedString gpt_disk_guid = 18;
+  // True only for a plain dm-crypt mapping natively proven to be keyed from
+  // /dev/urandom or /dev/random on every activation (a random-key swap): live
+  // dm table target crypt with a CRYPT-PLAIN device-mapper UUID, a crypttab key
+  // source of /dev/urandom or /dev/random, and no LUKS header on the backing
+  // device. False on every other device; UNAVAILABLE when a proof step failed.
+  // Absent on historical observations.
+  ObservedBool ephemeral_key = 19;
 }
 
 message ObservedNVMeScope {

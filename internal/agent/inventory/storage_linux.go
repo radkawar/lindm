@@ -218,7 +218,11 @@ func (g *storageGraph) observation() *inventoryv1.StorageDetails {
 			LuksUuid: observed("", nil), LuksVersion: observed("", nil),
 			LuksKeyslotCount: number(0, fs.ErrNotExist), LuksTokenCount: number(0, fs.ErrNotExist), LuksTokenTypes: observed("", nil),
 			BackingDisk: observed("", nil), RootBacking: boolean(false, fs.ErrNotExist), Nvme: &inventoryv1.ObservedNVMeScope{Status: unavailable},
-			GptDiskGuid: observed("", nil),
+			GptDiskGuid: observed("", nil), EphemeralKey: boolean(false, nil),
+		}
+		// A dm-crypt mapping is ephemeral only with collectEphemeralKey's proof.
+		if n.Type == "crypt" {
+			identity.EphemeralKey = boolean(false, fs.ErrNotExist)
 		}
 		if n.Type == "disk" && n.PTType != nil && *n.PTType == "gpt" {
 			identity.GptDiskGuid = nullableText(n.PTUUID)
@@ -401,6 +405,9 @@ func collectStorage(ctx context.Context, s detailSources) *inventoryv1.StorageDe
 		}
 		if device.Filesystem.Value == "crypto_LUKS" {
 			collectLUKS(ctx, s, kernelName, device.Identity)
+		}
+		if device.Type.Value == "crypt" {
+			collectEphemeralKey(ctx, s, kernelName, graph, device)
 		}
 	}
 	inheritStorageIdentity(result)

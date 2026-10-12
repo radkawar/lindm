@@ -175,6 +175,28 @@ installation time.
   updater, calls its `UpdateSystem` D-Bus method, and assigns a package change
   while the updater holds the lock (registry `Lab.Updater`; needs
   `-allow-network`).
+- **Random-key swap.** distinst always adds
+  `cryptswap UUID=… /dev/urandom swap,plain,offset=1024,cipher=aes-xts-plain64,size=512`:
+  a plain dm-crypt swap whose key comes from the kernel RNG at each activation and
+  is never stored. The server's live-root crypto-erase set requires every
+  encrypted mapping to be covered, so every installer-encrypted Pop!\_OS machine
+  was refused `device_action_storage_target_set_mismatch` (observed natively,
+  `device-actions-wipe-live-erase-01.json`). The agent now reports
+  `StorageIdentity.ephemeral_key` only with native proof (kernel dm UUID
+  `CRYPT-PLAIN-`, one live `crypt` table segment with a real cipher, crypttab key
+  `/dev/urandom` or `/dev/random`, no LUKS1/LUKS2 header magic on the backing
+  device; any failed step leaves it UNAVAILABLE and the refusal stands), and the
+  server exempts exactly those mappings. The console's storage table and the
+  crypto-erase form name them ("ephemeral random-key swap; destroyed at
+  power-off"), as does the wipe lane's record. An observation from an older agent
+  carries no proof, so a fresh inventory from an updated agent is required first.
+  Linux Mint's Ubiquity LUKS layout puts swap inside its LVM on LUKS and has no
+  such mapping.
+- **zram swappiness.** `pop-default-settings-zram.service` (`pop-zram-config`)
+  runs `sysctl -w vm.swappiness=180` at every boot after `systemd-sysctl`, so a
+  managed `vm.swappiness` reverts at boot until lindm's next reconcile reapplies
+  it (observed: `reboot-persists` failed natively). The resources lane therefore
+  uses `vm.vfs_cache_pressure` on Pop!\_OS (registry `Lab.SysctlKey`).
 - **Identity.** `os-release` reports `ID=pop` with `ID_LIKE="ubuntu debian"`;
   behavior is selected by the registry row, never resemblance.
 

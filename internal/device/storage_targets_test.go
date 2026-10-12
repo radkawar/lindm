@@ -334,6 +334,48 @@ func TestObservedStorageTargetExactTupleAndLiveSet(t *testing.T) {
 	}
 }
 
+// Regression: Pop!_OS's distinst adds a plain dm-crypt swap keyed from
+// /dev/urandom beside the LUKS root, which refused every live-root erase. Only
+// the agent's native ephemeral-key proof exempts it; anything less is refused.
+func TestLiveRootSetExemptsOnlyProvenEphemeralMappings(t *testing.T) {
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	root := fixtureStorageTarget(uuid.NewString())
+	details := fixtureStorageDetails(fixtureStorageDevice("sda", root))
+	swapPart := fixtureStorageDevice("sdb", fixtureStorageTarget(""))
+	swap := fixtureStorageDevice("cryptswap", fixtureStorageTarget(""))
+	swap.Type.Value, swap.Encryption.Value = "crypt", "dm-crypt"
+	swap.Parent = observed(success, "sdb")
+	details.Storage.Devices = append(details.Storage.Devices, swapPart, swap)
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{root}}}}
+	for _, key := range []*inventoryv1.ObservedBool{
+		nil, // an agent that predates the proof
+		{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},
+		{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT},
+		{Status: success, Value: false},
+	} {
+		swap.Identity.EphemeralKey = key
+		if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
+			t.Fatalf("unproven plain mapping %v exempted from the live set: %v", key, err)
+		}
+		if names := inventory.EphemeralKeyMappings(details); len(names) != 0 {
+			t.Fatalf("unproven mapping named ephemeral: %v", names)
+		}
+	}
+	swap.Identity.EphemeralKey = &inventoryv1.ObservedBool{Status: success, Value: true}
+	if err := inventory.RequireObservedStorageTargets(details, spec); err != nil {
+		t.Fatalf("proven ephemeral swap refused: %v", err)
+	}
+	if names := inventory.EphemeralKeyMappings(details); len(names) != 1 || names[0] != "cryptswap" {
+		t.Fatalf("ephemeral mappings = %v", names)
+	}
+	// The proof belongs to a dm-crypt mapping; a disk claiming it is ignored.
+	swapPart.Type.Value, swapPart.Encryption.Value = "crypt", "dm-crypt"
+	swapPart.Parent = observed(success, "unobserved")
+	if err := inventory.RequireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_set_mismatch" {
+		t.Fatalf("unproven mapping beneath a proven one exempted: %v", err)
+	}
+}
+
 func fixtureNVMeScope() *agentv1.NVMeSanitizeScope {
 	return &agentv1.NVMeSanitizeScope{NamespaceId: 1, Identity: &agentv1.NVMeSanitizeIdentity{Basis: agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID, VendorId: 1, SubsystemVendorId: 2, ControllerSerial: "serial-", ControllerModel: "fixture storage", ControllerFirmware: "1", NamespaceSizeBytes: 1 << 30, LbaDataSizeShift: 9}}
 }

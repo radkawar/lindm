@@ -103,9 +103,12 @@ type actionLiveEraseEvidence struct {
 	PoweroffTimer             *actionPoweroffTimerEvidence       `json:"independent_poweroff_timer"`
 	ForcedPoweroffObservedAt  time.Time                          `json:"forced_poweroff_observed_at"`
 	AllHeadersAbsent          bool                               `json:"all_headers_absent"`
-	RejectedBoots             []actionRejectedBootEvidence       `json:"post_erase_boots"`
-	DestructiveDenials        []actionDenialEvidence             `json:"destructive_approval_denials"`
-	Boundary                  string                             `json:"boundary"`
+	// EphemeralMappings are proven random-key dm-crypt mappings (ephemeral
+	// random-key swap; destroyed at power-off) outside the erased set.
+	EphemeralMappings  []string                     `json:"ephemeral_random_key_mappings_destroyed_at_poweroff,omitempty"`
+	RejectedBoots      []actionRejectedBootEvidence `json:"post_erase_boots"`
+	DestructiveDenials []actionDenialEvidence       `json:"destructive_approval_denials"`
+	Boundary           string                       `json:"boundary"`
 }
 
 func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, approver *devlab.OwnerSession, delegation *agentv1.UpdateExecutionTrustRequest, reportBlocked bool) (_ *actionLiveEraseEvidence, err error) {
@@ -156,6 +159,13 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 	if err != nil {
 		return evidence, fmt.Errorf("publish formatted live-root target inventory: %w", err)
 	}
+	// The server names proven ephemeral random-key mappings (Pop!_OS's
+	// distinst cryptswap) that the live-root erase leaves to power-off.
+	listed, err := control.session.Admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: machine.deviceID, ActionKind: "crypto_erase"}))
+	if err != nil {
+		return evidence, fmt.Errorf("list live-root erase storage: %w", err)
+	}
+	evidence.EphemeralMappings = listed.Msg.GetEphemeralMappings()
 	custody, err := control.session.Admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: machine.deviceID}))
 	if err != nil {
 		return evidence, err

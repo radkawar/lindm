@@ -19,6 +19,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/platform"
 )
 
 // Fixed disposable account, kernel and unit identities. Account IDs lie in the
@@ -50,6 +51,10 @@ const (
 	resourceLabTimer           = "rlab-target.timer"
 	resourceLabSysctlPrior     = resourceFixtureRoot + "/sysctl-prior"
 	resourceLabNetPrior        = resourceFixtureRoot + "/sysctl-net-prior"
+	// resourceLabVendorSysctlKey stands in for vm.swappiness on releases whose
+	// vendor boot service owns that live value (platform Lab.SysctlKey).
+	resourceLabVendorSysctlKey   = "vm.vfs_cache_pressure"
+	resourceLabVendorSysctlPrior = resourceFixtureRoot + "/sysctl-vendor-prior"
 )
 
 // provisionHostResourceRoots adds the root-local account and sysctl approvals
@@ -59,7 +64,18 @@ func provisionHostResourceRoots(config *agentv1.AgentConfig) {
 		ApprovedHomeRoots: []*agentv1.NativeApprovedHomeRoot{{RootId: resourceLabHomeRootID, Path: resourceLabHomeRoot}},
 		MinUid:            24000, MaxUid: 24999, MinGid: 24000, MaxGid: 24999,
 	}
-	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabNetKey}}
+	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabVendorSysctlKey, resourceLabNetKey}}
+}
+
+// labSysctlKey selects the release's lab sysctl key and its recorded prior.
+func labSysctlKey(lab platform.Lab) (key, prior string, err error) {
+	switch lab.SysctlKey {
+	case "":
+		return resourceLabSysctlKey, resourceLabSysctlPrior, nil
+	case resourceLabVendorSysctlKey:
+		return resourceLabVendorSysctlKey, resourceLabVendorSysctlPrior, nil
+	}
+	return "", "", fmt.Errorf("no lab sysctl fixture for %s", lab.SysctlKey)
 }
 
 // The adopted user's password is random and never known to the lane; only the
@@ -86,6 +102,7 @@ chmod 0644 /etc/systemd/system/` + resourceLabTarget + `
 if command -v restorecon >/dev/null 2>&1; then restorecon -RF ` + resourceLabHomeRoot + ` /etc/systemd/system/` + resourceLabTarget + `; fi
 systemctl daemon-reload
 sysctl -n ` + resourceLabSysctlKey + ` > ` + resourceLabSysctlPrior + `
+sysctl -n ` + resourceLabVendorSysctlKey + ` > ` + resourceLabVendorSysctlPrior + `
 sysctl -n ` + resourceLabNetKey + ` > ` + resourceLabNetPrior + `
 `
 
@@ -568,7 +585,10 @@ func sysctlOracle(key, prior, value string) func(context.Context, *guestVM) (VMR
 }
 
 func exerciseResourceSysctl(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence) error {
-	key, prior := resourceLabSysctlKey, resourceLabSysctlPrior
+	key, prior, err := labSysctlKey(r.lab)
+	if err != nil {
+		return err
+	}
 	r.fresh()
 	if err := resourceStep(ctx, r, evidence, "set-persistent", resourceSysctlDesired(key, "17"), resourceAdoptionPolicy(), false, withVM(r.vm, sysctlOracle(key, prior, "17"))); err != nil {
 		return err
