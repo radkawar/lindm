@@ -17,6 +17,8 @@
   "assistance.request": "Requested remote assistance",
   "assistance.start": "Started remote assistance",
   "assistance.stop": "Stopped remote assistance",
+  "capability_policy.issue": "Issued device capability policy",
+  "capability_policy.set": "Changed device capabilities",
   "compliance.state.changed": "Changed compliance state",
   "device.activate": "Activated device",
   "device.agent_update.reported": "Reported agent update",

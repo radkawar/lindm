@@ -14,6 +14,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
@@ -298,7 +299,7 @@ func (s *Service) setCapabilityPolicy(ctx context.Context, q *devicedb.Queries, 
 	// The audit append holds the deployment-wide chain head until commit, so it
 	// is the transaction's last statement.
 	return response, InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
-		ID: uuid.New(), ActorID: &actorID, Action: "capability_policy.set", ResourceID: label, Reason: msg.GetReason(),
+		ID: uuid.New(), ActorID: &actorID, Action: auditkind.CapabilityPolicySet.String(), ResourceID: label, Reason: msg.GetReason(),
 	}, AuditDetails(
 		"scope", label,
 		"before", capabilityList(before),

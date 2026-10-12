@@ -71,6 +71,13 @@ var (
 	AssistanceStop    = kind("assistance.stop")
 )
 
+// Device management capability policies: an administrator's scope change and
+// the server's per-device signed issue.
+var (
+	CapabilityPolicyIssue = kind("capability_policy.issue")
+	CapabilityPolicySet   = kind("capability_policy.set")
+)
+
 // Written by the compliance_record_states database function.
 var ComplianceStateChanged = kind("compliance.state.changed")
 

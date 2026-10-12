@@ -21,6 +21,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/rpcreason"
@@ -352,7 +353,7 @@ func (s *Service) storeCapabilityPolicy(ctx context.Context, q *devicedb.Queries
 		return err
 	}
 	return InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
-		ID: uuid.New(), Action: "capability_policy.issue", ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID,
+		ID: uuid.New(), Action: auditkind.CapabilityPolicyIssue.String(), ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID,
 	}, AuditDetails("enrollment_generation", principal.GenerationID.String(), "version", strconv.FormatInt(row.Version, 10)))
 }
 
