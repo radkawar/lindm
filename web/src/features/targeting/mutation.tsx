@@ -3,12 +3,11 @@ import {
   fromJsonString,
   toJsonString,
   type DescMessage,
-  type JsonObject,
   type MessageShape,
 } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -17,8 +16,6 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { describeViolations } from "@/lib/validation";
-import { TargetFields } from "./fields";
-import { useTargetPickers } from "./pickers";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
 type Attempt = {
@@ -40,6 +37,15 @@ subscribeAuthLifetime(() => {
   notify();
 });
 
+// Lets a closed "create" form reopen blank once its last attempt has settled.
+// Pending and ambiguous attempts stay so the exact request can be retried.
+export function discardSettledAttempt(formKey: string) {
+  const current = attempts.get(formKey);
+  if (current?.status !== "accepted" && current?.status !== "rejected") return;
+  attempts.delete(formKey);
+  notify();
+}
+
 // Frozen requests survive route navigation in this principal's tab memory only.
 export function TargetMutation<S extends DescMessage>({
   title,
@@ -49,6 +55,7 @@ export function TargetMutation<S extends DescMessage>({
   send,
   onAccepted,
   fields,
+  validate,
 }: {
   title: string;
   formKey: string;
@@ -56,14 +63,15 @@ export function TargetMutation<S extends DescMessage>({
   initial: () => MessageShape<S>;
   send: (request: MessageShape<S>, signal: AbortSignal) => Promise<unknown>;
   onAccepted?: () => void;
-  fields?: (
+  fields: (
     request: MessageShape<S>,
     change: (request: MessageShape<S>) => void,
     disabled: boolean,
   ) => ReactNode;
+  // The administrator's own checks, in task language, before protobuf validation.
+  validate?: (request: MessageShape<S>) => string | undefined;
 }) {
   const lifetime = useAuthLifetime();
-  const pickers = useTargetPickers();
   const client = useQueryClient();
   const [formGeneration, setFormGeneration] = useState(0);
   const attempt = useSyncExternalStore(subscribe, () => attempts.get(formKey));
@@ -113,6 +121,11 @@ export function TargetMutation<S extends DescMessage>({
         if (current && current.status !== "ambiguous") return;
         try {
           const request = fromJsonString(schema, current?.document ?? document);
+          const problem = validate?.(request);
+          if (problem) {
+            setError(problem);
+            return;
+          }
           const validation = validator.validate(schema, request);
           if (validation.kind !== "valid") {
             setError(
@@ -136,22 +149,13 @@ export function TargetMutation<S extends DescMessage>({
     >
       <h3 className="text-sm font-semibold">{title}</h3>
       <p className="text-sm text-muted-foreground">Once sent, edits are locked.</p>
-      {fields ? (
-        fields(
+      <Fragment key={formGeneration}>
+        {fields(
           fromJsonString(schema, attempt?.document ?? document),
           (request) => setDocument(toJsonString(schema, request)),
           !!attempt,
-        )
-      ) : (
-        <TargetFields
-          key={formGeneration}
-          schema={schema}
-          value={JSON.parse(attempt?.document ?? document) as JsonObject}
-          onChange={(value) => setDocument(JSON.stringify(value))}
-          pickers={pickers}
-          disabled={!!attempt}
-        />
-      )}
+        )}
+      </Fragment>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

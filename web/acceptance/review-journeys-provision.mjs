@@ -117,11 +117,12 @@ async function createGroup(ctx, id, department, device) {
     `${id}-groups`,
     "Groups / create named membership",
     "partly",
-    "Named members replace UUID entry, but group creation still sits among all saved group editors.",
+    "Saved groups are compact rows; the new-group form waits behind its button.",
     "Keep the new department and its membership review together without unrelated editors competing.",
     "No group has been saved yet.",
   );
   const name = `${department} ui-review ${id} ${randomUUID().slice(0, 8)}`;
+  await page.getByRole("button", { name: "New group", exact: true }).first().click();
   const form = formWithHeading(page, "Create group");
   await form.getByRole("textbox", { name: "Group name", exact: true }).fill(name);
   const members = form.getByRole("group", { name: "Member devices", exact: true });
@@ -142,8 +143,12 @@ async function createGroup(ctx, id, department, device) {
     `Only ${device.Hostname} is selected for this new isolated group; no existing group is changed.`,
   );
   await form.getByRole("button", { name: "Save group", exact: true }).click();
-  const saved = formWithHeading(page, name);
-  await visible(saved);
+  const row = page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { name, exact: true }) });
+  await visible(row.getByText("1 device", { exact: true }));
+  await row.getByRole("button", { name: `Edit ${name}`, exact: true }).click();
+  const saved = page.getByRole("form", { name: `Edit ${name}`, exact: true });
   await visible(
     saved.getByRole("button", { name: `Member devices 1 ${device.Hostname}`, exact: true }),
   );

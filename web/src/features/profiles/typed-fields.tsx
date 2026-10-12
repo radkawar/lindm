@@ -8,11 +8,13 @@ import {
   type JsonValue,
 } from "@bufbuild/protobuf";
 import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { SearchPicker } from "@/components/ui/search-picker";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
@@ -93,7 +95,75 @@ const labels: Record<string, string> = {
   maxDelayMinutes: "Maximum reboot delay (minutes)",
   notice: "Reboot notice",
   deferralDays: "Defer each update (days)",
+  user: "Local user name",
+  group: "Local group name",
+  primaryGroup: "Primary local group name",
+  modules: "Kernel module names",
 };
+
+// Inventory managers report packages under their database's name.
+const packageManagers: Record<string, string> = {
+  PACKAGE_ECOSYSTEM_DEB: "dpkg",
+  PACKAGE_ECOSYSTEM_RPM: "rpm",
+  PACKAGE_ECOSYSTEM_ALPM: "pacman",
+};
+
+// Values the fleet already reports are suggested; a profile may still name one
+// that no device has yet, so typed values stay allowed.
+function suggestionFor(field: DescField, siblings: JsonObject) {
+  switch (`${field.parent.typeName}.${field.jsonName}`) {
+    case "lindm.resource.v1.PackageIdentity.nativeName":
+      return {
+        field: SuggestionField.PACKAGE_NAME,
+        manager: packageManagers[String(siblings.ecosystem ?? "")],
+      };
+    case "lindm.resource.v1.PlatformProduct.osId":
+      return { field: SuggestionField.OS_ID };
+    case "lindm.resource.v1.PlatformProduct.version":
+      return { field: SuggestionField.OS_VERSION, osId: String(siblings.osId ?? "") || undefined };
+    case "lindm.resource.v1.PlatformProduct.architecture":
+    case "lindm.resource.v1.FlatpakAppDesired.architecture":
+    case "lindm.resource.v1.AlpmRepository.architecture":
+      return { field: SuggestionField.ARCHITECTURE };
+    case "lindm.resource.v1.LocalUserDesired.name":
+    case "lindm.resource.v1.MemberSet.localUserNames":
+    case "lindm.resource.v1.SudoPrincipal.user":
+    case "lindm.resource.v1.NativeAccountBinding.name":
+      return { field: SuggestionField.LOCAL_USER_NAME };
+    case "lindm.resource.v1.LoginShell.installedShell":
+      return { field: SuggestionField.LOGIN_SHELL };
+    case "lindm.resource.v1.FlatpakAppDesired.appId":
+      return { field: SuggestionField.FLATPAK_APP };
+    case "lindm.resource.v1.SnapAppDesired.name":
+      return { field: SuggestionField.SNAP_NAME };
+    default:
+      return undefined;
+  }
+}
+
+// Why each remaining text field is typed: the value is new, external or only
+// known per device, so the server has no list to choose from.
+const freeform: Record<string, string> = {
+  unit: "systemd unit to manage; may not be installed yet",
+  name: "name this setting creates or manages; may not exist yet",
+  group: "local group name; may not exist yet",
+  primaryGroup: "local group name; may not exist yet",
+  names: "account or domain names for this setting",
+  homeDirectory: "home folder path to create",
+  path: "file path to write",
+  executable: "command path to allow",
+  key: "kernel setting name",
+  value: "value for this setting",
+  modules: "kernel module names; may not be loaded anywhere yet",
+  product: "platform product name",
+};
+function freeformReason(field: DescField) {
+  if (freeform[field.jsonName]) return freeform[field.jsonName];
+  if (field.fieldKind === "scalar" || field.fieldKind === "list")
+    if (field.scalar !== ScalarType.STRING && field.scalar !== ScalarType.BYTES)
+      return "numeric value for this setting";
+  return "configuration value for this setting, such as an address, version or key";
+}
 
 export function fieldLabel(name: string): string {
   const words = name
@@ -209,6 +279,7 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
             value={value[field.jsonName]}
             id={`${id}-${field.jsonName}`}
             references={references}
+            siblings={value}
             disabled={disabled}
             onChange={(next) => change(field, next)}
           />
@@ -223,6 +294,7 @@ function TypedField({
   onChange,
   id,
   references,
+  siblings,
   disabled,
 }: {
   field: DescField;
@@ -230,8 +302,10 @@ function TypedField({
   onChange: (value: JsonValue | undefined) => void;
   id: string;
   references: ReferenceChoice[];
+  siblings: JsonObject;
   disabled: boolean;
 }) {
+  const suggestion = suggestionFor(field, siblings);
   const pickers = useProfilePickers();
   const Picker =
     field.jsonName === "secretId"
@@ -283,9 +357,19 @@ function TypedField({
                   onChange(items.map((entry, i) => (i === index ? next : entry)))
                 }
               />
+            ) : suggestion ? (
+              <SuggestionPicker
+                label={`${label} ${index + 1}`}
+                {...suggestion}
+                allowTyped
+                disabled={disabled}
+                value={String(item)}
+                onChange={(next) => onChange(items.map((entry, i) => (i === index ? next : entry)))}
+              />
             ) : (
               <Input
                 aria-label={`${label} ${index + 1}`}
+                data-freeform={freeformReason(field)}
                 value={String(item)}
                 disabled={disabled}
                 onChange={(event) =>
@@ -332,7 +416,9 @@ function TypedField({
   return (
     <div className="grid min-w-0 gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {Picker ? null : <Label htmlFor={id}>{label}</Label>}
+        {(Picker || suggestion) && (!optional || managed) ? null : (
+          <Label htmlFor={id}>{label}</Label>
+        )}
         {optional ? (
           <Button
             type="button"
@@ -410,6 +496,15 @@ function TypedField({
         />
       ) : Picker ? (
         <Picker label={label} value={String(value ?? "")} onChange={onChange} disabled={disabled} />
+      ) : suggestion ? (
+        <SuggestionPicker
+          label={label}
+          {...suggestion}
+          allowTyped
+          disabled={disabled}
+          value={String(value ?? "")}
+          onChange={(next) => onChange(next === "" && optional ? undefined : next)}
+        />
       ) : recordReference && generatedReference ? (
         <>
           <p className="text-xs text-muted-foreground">Created automatically for this setting.</p>
@@ -420,6 +515,13 @@ function TypedField({
       ) : (
         <Input
           id={id}
+          data-freeform={
+            recordReference
+              ? "reference issued by another system; the server has no catalog"
+              : field.jsonName === "mode"
+                ? "file permissions in octal"
+                : freeformReason(field)
+          }
           disabled={disabled}
           value={
             field.jsonName === "mode" && typeof value === "number"
@@ -551,6 +653,7 @@ function MessageInput({
             <Label htmlFor={`${id}-approved`}>Approved source</Label>
             <Input
               id={`${id}-approved`}
+              data-freeform="approved repository reference copied from device configuration; no server catalog"
               disabled={disabled}
               spellCheck={false}
               aria-describedby={`${id}-approved-description`}
@@ -621,6 +724,7 @@ function FileContent({
     <Textarea
       id={id}
       rows={6}
+      data-freeform="file contents to write"
       spellCheck={false}
       disabled={disabled}
       value={text}

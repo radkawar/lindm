@@ -17,7 +17,8 @@ export function GroupPicker(props: PickerProps) {
       options={(query.data?.groups ?? []).map((group) => ({
         value: group.id,
         label: group.name,
-        description: `${group.deviceIds.length} devices`,
+        description:
+          group.deviceIds.length === 1 ? "1 device" : `${group.deviceIds.length} devices`,
       }))}
       note="Search within this page of up to 50 groups."
     >
@@ -47,4 +48,15 @@ export function GroupPicker(props: PickerProps) {
       </div>
     </SearchPicker>
   );
+}
+
+// Read-only name for a saved group reference. Groups are listed 50 per page;
+// a group past the first page is named as such rather than shown as an ID.
+export function GroupName({ value }: { value: string }) {
+  const query = useQuery(groupsQueryOptions(useAuthLifetime(), ""));
+  const group = query.data?.groups.find((item) => item.id === value);
+  if (group) return <>{group.name || "(unnamed group)"}</>;
+  if (query.isPending) return <>(loading name…)</>;
+  if (query.error) return <>(name unavailable)</>;
+  return <>(not among the first 50 device groups)</>;
 }

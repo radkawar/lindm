@@ -17,6 +17,23 @@ export function dynamicGroupsQueryOptions(lifetime: AuthLifetime, afterId: strin
   });
 }
 
+// Custom attribute vocabulary for dynamic-group conditions. One bounded page:
+// definitions are an administrator-curated list, not per-device data.
+export function attributeDefinitionsQueryOptions(lifetime: AuthLifetime) {
+  return queryOptions({
+    queryKey: ["targeting", lifetime.generation, "attribute-definitions"] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listAttributeDefinitions(
+        { pageSize: 200 },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}
+
 export function targetAssignmentsQueryOptions(lifetime: AuthLifetime, afterId: string) {
   return queryOptions({
     queryKey: ["targeting", lifetime.generation, "assignments", afterId] as const,

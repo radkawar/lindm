@@ -4,8 +4,7 @@ import { RolloutsView } from "@/features/targeting/rollouts";
 import { canPermission } from "@/lib/permissions";
 import { DevicePicker } from "@/features/devices/picker";
 import { deviceQueryOptions } from "@/features/devices/queries";
-import { GroupPicker } from "@/features/groups/picker";
-import { groupsQueryOptions } from "@/features/groups/view";
+import { GroupName, GroupPicker } from "@/features/groups/picker";
 import { ProfileRevisionPicker, ProfileVersionName } from "@/features/profiles/picker";
 import { TargetPickerProvider } from "@/features/targeting/pickers";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -32,15 +31,6 @@ function DeviceName({ value }: { value: string }) {
   if (query.data?.device) return <>{query.data.device.hostname.trim() || "Unnamed device"}</>;
   if (query.isPending) return <>(loading name…)</>;
   return <>(name unavailable)</>;
-}
-
-function GroupName({ value }: { value: string }) {
-  const query = useQuery(groupsQueryOptions(useAuthLifetime(), ""));
-  const group = query.data?.groups.find((item) => item.id === value);
-  if (group) return <>{group.name || "(unnamed)"}</>;
-  if (query.isPending) return <>(loading name…)</>;
-  if (query.error) return <>(name unavailable)</>;
-  return <>(not among the first 50 device groups)</>;
 }
 
 function RolloutsPage() {

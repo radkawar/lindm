@@ -13,7 +13,6 @@ import {
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,34 +43,55 @@ export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   });
 }
 
+function deviceCount(count: number) {
+  return count === 1 ? "1 device" : `${count} devices`;
+}
+
 export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
+  const [creating, setCreating] = useState(false);
   const [createGeneration, setCreateGeneration] = useState(0);
   const list = useQuery(groupsQueryOptions(lifetime, pageToken));
+  const groups = [...(list.data?.groups ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const startCreate = () => {
+    setCreateGeneration((value) => value + 1);
+    setCreating(true);
+  };
   return (
-    <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
-      <PageHeader
-        title="Device groups"
-        description="Group devices to limit what an account can manage. Only admins with access to all devices can edit groups."
-      />
-      <GroupEditor
-        key={createGeneration}
-        devicePicker={devicePicker}
-        onCreated={() => setCreateGeneration((value) => value + 1)}
-      />
-      <Button
-        className="w-fit"
-        variant="outline"
-        disabled={list.isFetching}
-        onClick={() => void list.refetch()}
-      >
-        Refresh
-      </Button>
+    <section
+      className="grid min-w-0 gap-4"
+      aria-labelledby="device-groups-title"
+      aria-busy={list.isFetching}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid max-w-3xl gap-1">
+          <h2 id="device-groups-title" className="text-base font-semibold">
+            Device groups
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Named sets of devices. Accounts limited to a group can manage only its devices. Only
+            admins with access to all devices can edit groups.
+          </p>
+        </div>
+        {creating ? null : <Button onClick={startCreate}>New group</Button>}
+      </div>
+      {creating ? (
+        <div className="grid min-w-0 gap-2">
+          <GroupEditor
+            key={createGeneration}
+            devicePicker={devicePicker}
+            onDone={() => setCreating(false)}
+          />
+          <Button variant="outline" className="w-fit" onClick={() => setCreating(false)}>
+            Close
+          </Button>
+        </div>
+      ) : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading groups…</span>
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
       ) : null}
       {list.error ? (
@@ -79,43 +99,85 @@ export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
           {list.data ? <p>Showing the groups from the last refresh.</p> : null}
         </RpcError>
       ) : null}
-      {list.data?.groups.map((group) => (
-        <GroupEditor
-          key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`}
-          group={group}
-          devicePicker={devicePicker}
-        />
-      ))}
-      {!list.error && list.data?.groups.length === 0 ? (
-        <EmptyState title="No device groups yet" description="Create one above." />
+      {groups.length > 0 ? (
+        <ul className="grid min-w-0 divide-y border" aria-label="Device groups">
+          {groups.map((group) => (
+            <GroupRow
+              key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`}
+              group={group}
+              devicePicker={devicePicker}
+            />
+          ))}
+        </ul>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      {!list.error && list.data?.groups.length === 0 ? (
+        pageToken ? (
+          <EmptyState title="No more device groups" description="Return to the first page." />
+        ) : (
+          <EmptyState
+            title="No device groups yet"
+            description="Create a group to limit an account to a set of devices."
+            action={creating ? null : <Button onClick={startCreate}>New group</Button>}
+          />
+        )
+      ) : null}
+      {pageToken || list.data?.nextPageToken ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={!pageToken || list.isFetching}
+            onClick={() => setPageToken("")}
+          >
+            First page
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!list.data?.nextPageToken || list.isFetching}
+            onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
+          >
+            Next page
+          </Button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function GroupRow({ group, devicePicker }: { group: DeviceGroup; devicePicker: PickerSlot }) {
+  const [editing, setEditing] = useState(false);
+  const name = group.name || "Unnamed group";
+  return (
+    <li className="grid min-w-0 gap-2 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="grid min-w-0 gap-0.5">
+          <h3 className="break-words font-medium">{name}</h3>
+          <p className="text-sm text-muted-foreground">{deviceCount(group.deviceIds.length)}</p>
+        </div>
         <Button
           variant="outline"
-          disabled={!pageToken || list.isFetching}
-          onClick={() => setPageToken("")}
+          size="sm"
+          aria-expanded={editing}
+          aria-label={`${editing ? "Close editor for" : "Edit"} ${name}`}
+          onClick={() => setEditing(!editing)}
         >
-          First page
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextPageToken || list.isFetching}
-          onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
-        >
-          Next page
+          {editing ? "Close" : "Edit"}
         </Button>
       </div>
-    </section>
+      <TechnicalDetails items={[{ label: "Group ID", value: group.id }]} />
+      {editing ? (
+        <GroupEditor group={group} devicePicker={devicePicker} onDone={() => setEditing(false)} />
+      ) : null}
+    </li>
   );
 }
 
 function GroupEditor({
   group,
-  onCreated,
+  onDone,
   devicePicker,
 }: {
   group?: DeviceGroup;
-  onCreated?: () => void;
+  onDone: () => void;
   devicePicker: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
@@ -178,7 +240,7 @@ function GroupEditor({
           : "Group saved",
       );
       await client.invalidateQueries({ queryKey: ["device-groups", lifetime.generation] });
-      if (!group) onCreated?.();
+      onDone();
     } catch (cause) {
       if (!lifetime.signal.aborted) {
         const normalized = toRpcFailure(cause);
@@ -195,19 +257,23 @@ function GroupEditor({
 
   return (
     <form
-      className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6"
+      aria-label={group ? `Edit ${group.name || "unnamed group"}` : undefined}
+      className={
+        group ? "grid min-w-0 gap-4 border-t pt-4" : "grid min-w-0 gap-4 border bg-card p-4 sm:p-6"
+      }
       onSubmit={(event) => {
         event.preventDefault();
         void save(false);
       }}
     >
-      <h2 className="break-words font-semibold">{group ? group.name : "Create group"}</h2>
-      <TechnicalDetails summary="Group ID" items={[{ label: "Group ID", value: groupId }]} />
+      {group ? null : <h3 className="font-semibold">Create group</h3>}
       <label className="grid gap-2 text-sm font-medium">
         Group name
         <Input
           aria-label="Group name"
+          data-freeform="new or renamed group name"
           required
+          maxLength={128}
           value={name}
           disabled={busy || attempt !== null}
           onChange={(event) => setName(event.target.value)}
@@ -221,9 +287,10 @@ function GroupEditor({
         disabled={busy || attempt !== null}
       />
       <label className="grid gap-2 text-sm font-medium">
-        Reason
+        Reason for this change
         <Input
           aria-label="Group change reason"
+          data-freeform="audit reason"
           required
           value={reason}
           disabled={busy || attempt !== null}
@@ -260,6 +327,7 @@ function GroupEditor({
             <Button
               type="button"
               variant="destructive"
+              aria-describedby={reason.trim() === "" ? `${groupId}-delete-help` : undefined}
               disabled={
                 busy ||
                 reason.trim() === "" ||
@@ -269,7 +337,7 @@ function GroupEditor({
                 if (
                   attempt ||
                   window.confirm(
-                    "Delete this group? Accounts limited to it will lose access to its devices.",
+                    `Delete the group “${group.name}” (${deviceCount(group.deviceIds.length)})? Accounts limited to this group lose access to these devices. The devices stay enrolled. This can't be undone.`,
                   )
                 )
                   void save(true);
@@ -277,6 +345,11 @@ function GroupEditor({
             >
               {attempt ? "Try deleting again" : "Delete group"}
             </Button>
+          ) : null}
+          {group && reason.trim() === "" ? (
+            <p id={`${groupId}-delete-help`} className="self-center text-xs text-muted-foreground">
+              Enter a reason to delete this group.
+            </p>
           ) : null}
         </div>
       )}
