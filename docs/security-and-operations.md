@@ -517,7 +517,12 @@ objects can be applied.
 
 The operation is not an atomic transaction. It stops on errors, returns a failing
 exit status and preserves outcomes and secrets from earlier successful operations.
-Mutations are never automatically retried. Audit reasons are derived as
+Mutations are never automatically retried. The one exception is a target preview
+the server rejected with `targeting_revision_conflict`: the transaction rolled back
+because a concurrent membership or head change committed first, and nothing was
+recorded. Apply requests a fresh preview up to five times, then fails with that
+conflict. Activation still consumes only the exact preview that was returned.
+Audit reasons are derived as
 `Apply organization NAME`; request IDs bind the organization, object identity and
 completed request, including observed compare-and-swap versions. Review current
 state before a fresh apply after a conflict or ambiguous transport failure.

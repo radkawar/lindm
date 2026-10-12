@@ -18,6 +18,7 @@ import (
 	orgv1 "lindm/gen/lindm/org/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/rpcreason"
 )
 
 func TestApplyIdempotencyAndProfileRevision(t *testing.T) {
@@ -405,4 +406,35 @@ func TestTargetApprovalReuseRejectsOtherActorsAndStaleInputs(t *testing.T) {
 	client.preview.PreviewId = uuid.NewString()
 	client.preview.PreviewSha256[0] ^= 1
 	applyPending(4)
+}
+
+func TestActivationRetriesConcurrentTargetingConflict(t *testing.T) {
+	spec := organizationFixture()
+	deviceID := uuid.NewString()
+	setup := func(conflicts int) *fakeAdmin {
+		client := newFakeAdmin()
+		client.fleet = []*adminv1.Device{{Id: deviceID, Hostname: "laptop", LifecycleState: adminv1.DeviceState_DEVICE_STATE_ACTIVE}}
+		client.preview = &policyv1.TargetPreview{PreviewId: uuid.NewString(), DeviceId: deviceID, GenerationId: uuid.NewString(), InputSha256: bytes.Repeat([]byte{1}, 32), PreviewSha256: bytes.Repeat([]byte{2}, 32), ResolutionSha256: bytes.Repeat([]byte{3}, 32), EvaluatedAt: timestamppb.New(time.Unix(1700000000, 0)), ValidUntil: timestamppb.New(time.Unix(1700000600, 0)), Resolution: &policyv1.TargetResolution{}, Candidates: []*policyv1.TargetCandidate{{Assignment: spec.Assignments[0].Assignment, Match: policyv1.TargetMatch_TARGET_MATCH_INCLUDED}}}
+		client.previewConflicts = conflicts
+		return client
+	}
+	apply := func(client *fakeAdmin) (*Result, error) {
+		plan, err := Plan(t.Context(), client, spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return Apply(t.Context(), client, plan, Options{})
+	}
+	client := setup(previewAttempts - 1)
+	result, err := apply(client)
+	if err != nil {
+		t.Fatalf("transient targeting conflicts must be retried: %v", err)
+	}
+	if last := result.Outcomes[len(result.Outcomes)-1]; last.Kind != "activation" || last.Status != "updated" || client.previewCalls != previewAttempts {
+		t.Fatalf("activation %+v after %d previews", last, client.previewCalls)
+	}
+	client = setup(previewAttempts)
+	if _, err := apply(client); connect.CodeOf(err) != connect.CodeAborted || rpcreason.Get(err) != "targeting_revision_conflict" || client.previewCalls != previewAttempts {
+		t.Fatalf("persistent conflict must surface after %d previews, got %v after %d", previewAttempts, err, client.previewCalls)
+	}
 }

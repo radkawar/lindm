@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -44,7 +45,7 @@ func activate(ctx context.Context, client adminv1connect.AdminServiceClient, pla
 		if err != nil {
 			return fmt.Errorf("get activation state: %w", err)
 		}
-		response, err := client.PreviewTargetAssignments(ctx, connect.NewRequest(&adminv1.PreviewTargetAssignmentsRequest{DeviceId: device.GetId()}))
+		response, err := previewTargets(ctx, client, device.GetId())
 		if err != nil {
 			return fmt.Errorf("preview target assignments: %w", err)
 		}
@@ -128,6 +129,28 @@ func activate(ctx context.Context, client adminv1connect.AdminServiceClient, pla
 		result.Outcomes = append(result.Outcomes, outcome)
 	}
 	return nil
+}
+
+// previewAttempts bounds retries of a preview the server aborted because a
+// concurrent membership or head change serialized ahead of it. A preview has no
+// effect besides producing a new fenced snapshot; activation still binds to the
+// exact preview digest, so a retried preview never widens what gets activated.
+const previewAttempts = 5
+
+func previewTargets(ctx context.Context, client adminv1connect.AdminServiceClient, deviceID string) (*connect.Response[adminv1.PreviewTargetAssignmentsResponse], error) {
+	for attempt := 1; ; attempt++ {
+		response, err := client.PreviewTargetAssignments(ctx, connect.NewRequest(&adminv1.PreviewTargetAssignmentsRequest{DeviceId: deviceID}))
+		if err == nil || attempt == previewAttempts || connect.CodeOf(err) != connect.CodeAborted || rpcreason.Get(err) != "targeting_revision_conflict" {
+			return response, err
+		}
+		timer := time.NewTimer(time.Duration(attempt) * 100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 func hasOwnedCandidate(preview *policyv1.TargetPreview, own map[string]bool) bool {

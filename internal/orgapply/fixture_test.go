@@ -44,6 +44,10 @@ type fakeAdmin struct {
 	approvals       []*adminv1.Approval
 	findings        []*adminv1.AdvisoryFinding
 	principalID     string
+	// previewConflicts makes the next N previews abort as a concurrent
+	// targeting revision would.
+	previewConflicts int
+	previewCalls     int
 }
 
 func newFakeAdmin() *fakeAdmin {
@@ -134,6 +138,11 @@ func (f *fakeAdmin) GetDeviceResourceState(context.Context, *connect.Request[adm
 	return connect.NewResponse(&adminv1.GetDeviceResourceStateResponse{ActiveTargetPreview: f.active}), nil
 }
 func (f *fakeAdmin) PreviewTargetAssignments(context.Context, *connect.Request[adminv1.PreviewTargetAssignmentsRequest]) (*connect.Response[adminv1.PreviewTargetAssignmentsResponse], error) {
+	f.previewCalls++
+	if f.previewConflicts > 0 {
+		f.previewConflicts--
+		return nil, rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
+	}
 	return connect.NewResponse(&adminv1.PreviewTargetAssignmentsResponse{Preview: f.preview}), nil
 }
 func (f *fakeAdmin) ActivateTargetPreview(_ context.Context, r *connect.Request[adminv1.ActivateTargetPreviewRequest]) (*connect.Response[adminv1.ActivateTargetPreviewResponse], error) {
