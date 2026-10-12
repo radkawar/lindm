@@ -77,14 +77,17 @@ symlink on every install and upgrade (except Apple Silicon). Selection is by
   only for encrypted installs.
 - **Lab provisioning** (documented in [engineering](../engineering.md)): host key,
   NOPASSWD sudo for `lindm-lab` and the source marker are written offline; signed
-  packages (`cloud-init`, and the device-action prerequisites `cryptsetup
-nftables iproute2 iputils tpm2-tools bind curl`) come only from the ISO's
-  offline repository with package signatures required; the encrypted golden adds
-  `console=tty0 console=ttyS0,115200`, virtio/AHCI/NVMe modules and removes the
-  `plymouth` initramfs hook (lab-only: plymouth's password display redraws the
-  prompt per keystroke and hides cryptsetup's wrong-key message on the serial
-  console) through the vendor `limine-entry-tool.d` and `mkinitcpio.conf.d`
-  drop-ins.
+  packages (`cloud-init`, the device-action prerequisites `cryptsetup nftables
+iproute2 iputils tpm2-tools bind curl`, and in the cloud golden the resource
+  lane's tools `gnupg openssl python attr acl curl libarchive zstd pacman-contrib
+nftables libpwquality pam pambase`) come only from the ISO's offline repository
+  with package signatures required. The resource lane only verifies these tools
+  (`Lab.Guest.FromInstaller`); Omarchy has no immutable online snapshot to refresh
+  against. The encrypted golden adds `console=tty0 console=ttyS0,115200`,
+  virtio/AHCI/NVMe modules and removes the `plymouth` initramfs hook (lab-only:
+  plymouth's password display redraws the prompt per keystroke and hides
+  cryptsetup's wrong-key message on the serial console) through the vendor
+  `limine-entry-tool.d` and `mkinitcpio.conf.d` drop-ins.
 
 ## Quirks observed
 
@@ -139,9 +142,17 @@ Arch packaging alone is not native Omarchy qualification.
 
 ## Updates
 
-Agent self-update uses the `pacman` native manager (`pacman -U` of the
-TUF-authenticated package). OS updates are the vendor's `omarchy-update`
-(whole-system); the OS patch policy provider is not landed (gated).
+Agent self-update uses the `pacman` native manager (the TUF-authenticated
+package and its adjacent detached `.sig` target). OS updates are gated: the
+`omarchy` package's ALPM pre-transaction hook
+(`/usr/share/libalpm/hooks/00-omarchy-update-guard.hook`,
+`omarchy-update-pacman-guard`) aborts any direct `pacman -Syu` that was not
+started by `omarchy update` (bypass only with `OMARCHY_UPDATE_PACMAN=1` or
+`OMARCHY_ALLOW_DIRECT_PACMAN=1`), and the vendor's stable mirrors
+(`stable-mirror.omarchy.org`, `pkgs.omarchy.org/stable`) move with releases and
+have no immutable dated snapshot for a pinned rolling update
+([update process at v4.0.4](https://raw.githubusercontent.com/omacom/omarchy/c668141e9c42b13c80c9ca4ea108e11708c5e8a5/docs/update-process.md)).
+The guard does not affect `pacman -S`, `-U` or `-Sw` of single packages.
 
 ## Encryption and recovery
 
@@ -173,12 +184,43 @@ confirmation.
 
 ## Records
 
-None yet.
+Private records under `~/.cache/lindm-desktopderiv-20261011/` (x86_64, KVM,
+Ubuntu `ovmf` 2024.02-2ubuntu0.10, Secure Boot off), each cited by SHA-256:
+
+| Lane                                  | Outcome | Record (SHA-256)                                                                                                                 |
+| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| inspect (967 packages matched)        | pass    | `omarchy/omarchy-x86_64-inspect-s2.json` (`126b1c842857812121b897e61d9da0cf14151afe84e4ae9df3f8d9a1e36964f8`)                    |
+| lifecycle (signed pacman 0.7.0→0.7.1) | pass    | `omarchy/omarchy-x86_64-lifecycle-s2b.json` (`552f689c0348ea9c48e57d7f06416652a05847dd59ffdca32cc757b42e1f61cd`)                 |
+| encrypted smoke (2 prompted unlocks)  | pass    | `omarchy/omarchy-x86_64-encrypted-s5.json` (`adca53b03e8a71868e10eca298bf77b2d660aded7062e82d4620383f6c7d5e4e`)                  |
+| dispatch (9 native scenarios)         | pass    | `omarchy/omarchy-x86_64-dispatch-s5.json` (`08fe06f8a3365a8be8438e039604c1a89b6edaf80aa9ebc6dfa8d24ae6b8f120`)                   |
+| dispatch power actions                | pass    | `omarchy/omarchy-x86_64-power-s5.json` (`be843e9473b34ab486c4f05ad5c9e647ae8d1fb797c509432ffdbcd4d0ee6bef`)                      |
+| device actions: encryption            | pass    | `omarchy/omarchy-x86_64-encryption-s8.json` (`972e18fed3a609c8e1b4ecb3869ab1604ed4dba9a6287bdfebe82c662079380b`)                 |
+| lock-quarantine                       | pass    | `sessions/omarchy/omarchy404-lock-quarantine-01.json` (`c5933f0fcdd35f5e54fa899d984f7a0e39901873a62d3f017259bf92080fe060`)       |
+| assistance refusals                   | pass    | `sessions/omarchy/omarchy404-assistance-03/assistance.json` (`68f21814beafbac0c9758b3f111378998ff51ef0ce23b461447de2ff5d2df2f0`) |
+| wipe live-erase                       | fail    | `omarchy/omarchy-x86_64-live-erase-s8.json` (`4ac010264027b6ee8989f54de58dae6d2f8f847b6cc1b0949521fb0e71fc0275`)                 |
+| wipe live-report-loss                 | fail    | `omarchy/omarchy-x86_64-live-report-loss-s8.json` (`561b7802a8b942191fba3f6075faaeefb200dede3c6d3c34c87b8e56fd790c5b`)           |
+| agent self-update                     | fail    | `omarchy/omarchy-x86_64-updates-s8.json` (`af73f1a29801dab8960b69989d40a9bb989c6a368590c6eead72c60fd47a53f5`)                    |
+| resources executor                    | fail    | `omarchy/omarchy-x86_64-resources-executor-s8.json` (`1827b6015b011da2efa3feb6c3126697c4dcab6d753ff655eb9e3cc660a180f9`)         |
+
+The encryption record covers escrow, server reveal, the retired key's rejected
+boot, committed and interrupted rotation, a real TPM2 bind (`systemd-tpm2`
+token) and the observed passphrase prompt that makes the unattended TPM boot
+unsupported. Failures: both wipe lanes stop before the erase because the server
+rejects the refreshed inventory with the formatted whole-disk LUKS data volume
+(`invalid_argument: constraint`, a PostgreSQL check/not-null/length violation).
+The self-update simulation at base 6f06a3b6 failed `pacman -U` with
+`required key missing from keyring` (fixed for lanes by 0ab02988, not rerun). The
+resources executor failed preparation with `package_staging_native_failed`, the
+fixture database's missing `%PGPSIG%` that Arch qualification diagnosed (not
+rerun).
 
 ## Known gaps
 
-- Host resource providers (packages, accounts, sysctl, definitions, password,
-  firewall) have no pacman/Arch implementation (gated).
+- Password is gated: Omarchy 4.0.4 ships `pam` 1.7.2-2 (the Arch pins were
+  measured on 1.7.3-1) and rewrites `system-auth` (`pam_faillock deny=10`), so its
+  own PAM stack has no measured pins.
+- Firewall is gated: the Arch provider manages firewalld zones; Omarchy runs `ufw`
+  active by default and its ISO carries no `firewalld`.
 - Recovery sanitize, assistance, advisories, OS update and release upgrade are
   gated with the reasons above.
 - VM results are not physical qualification.
