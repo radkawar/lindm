@@ -249,8 +249,9 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		}
 	}
 	// Prove the guest itself has no external path before it is given only the
-	// forwarded site listeners.
-	egress, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote("ip -o route show; ip -o -6 route show; if getent ahosts deb.debian.org; then echo dns-resolved; exit 3; fi; if timeout 8 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'; then echo tcp-connected; exit 4; fi; echo public-dns-and-tcp-failed"), nil, 64<<10, time.Minute)
+	// forwarded site listeners. Each probe is bounded: Arch's systemd-resolved
+	// kept retrying unreachable DNS past the whole operation deadline.
+	egress, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote("ip -o route show; ip -o -6 route show; if timeout 15 getent ahosts deb.debian.org; then echo dns-resolved; exit 3; fi; if timeout 8 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'; then echo tcp-connected; exit 4; fi; echo public-dns-and-tcp-failed"), nil, 64<<10, time.Minute)
 	if err != nil {
 		return result, err
 	}

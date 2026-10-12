@@ -224,7 +224,9 @@ elif [ -n "${ALPM_ARCH:-}" ]; then
  for version in 1.0 2.0; do
   mkdir "repo/$version"
   cp repo/*-"$version"-1-*.pkg.tar.zst* "repo/$version/"
-  repo-add --sign "repo/$version/lindm-resource-lab.db.tar.gz" repo/"$version"/*.pkg.tar.zst
+  # Arch's own sync databases carry %PGPSIG%, which the provider binds before
+  # download; pacman >= 6.1 repo-add embeds it only with --include-sigs.
+  repo-add --sign --include-sigs "repo/$version/lindm-resource-lab.db.tar.gz" repo/"$version"/*.pkg.tar.zst
  done
 else
  if [ "$LINDM_RESOURCE_BACKEND" = zypper ]; then

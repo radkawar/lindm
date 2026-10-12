@@ -183,7 +183,7 @@ func rollingRecoveryHoldScenario(ctx context.Context, r *resourceDispatch, packa
 	_, receipt, err := serverPatchStatus(ctx, r, s, "rolling-recovery-hold", func(p *agentv1.PatchStatusObservation) error {
 		last := p.GetLastRun()
 		if last.GetResult() != agentv1.PatchRunResult_PATCH_RUN_RESULT_FAILED || last.GetFinishedAt().AsTime().Before(s.StartedAt) || !strings.Contains(strings.Join(last.GetDiagnostic().GetErrorLines(), " "), "requires native recovery") {
-			return errors.New("missing recovery-hold receipt")
+			return fmt.Errorf("missing recovery-hold receipt (last run: result=%s finished=%s diagnostic=%q)", last.GetResult(), last.GetFinishedAt().AsTime().Format(time.RFC3339), last.GetDiagnostic().GetErrorLines())
 		}
 		return nil
 	})

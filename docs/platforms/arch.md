@@ -616,13 +616,15 @@ Keep raw account/network/journal diagnostics private.
 `lab matrix run -platform arch -architecture x86_64` from main, local KVM, with
 each record in the [ledger](../verification.md#1-launch-platform-qualification):
 
-| Cell       | Result | Record / SHA-256                                                                                                                             |
-| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory  | pass   | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
-| Lifecycle  | pass   | `~/.cache/lindm-arch-qualify/r8/arch/lifecycle-x86_64.json` / `58dc60279b56f5ae6fd0a1f0a6b9783394cbaf17e2e28d9e88c968021a8bd3d5`             |
-| Dispatch   | pass   | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
-| Assistance | pass   | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
-| Services   | pass   | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
+| Cell        | Result                          | Record / SHA-256                                                                                                                             |
+| ----------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory   | pass                            | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
+| Lifecycle   | pass                            | `~/.cache/lindm-arch-qualify/r8/arch/lifecycle-x86_64.json` / `58dc60279b56f5ae6fd0a1f0a6b9783394cbaf17e2e28d9e88c968021a8bd3d5`             |
+| Dispatch    | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
+| Assistance  | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
+| Services    | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
+| Self-update | pass                            | `~/.cache/lindm-arch-qualify/r10/arch/self-update-x86_64.json` / `2da464d722b05863dac4d481a65d9b3a29db35094c1b7d3c5c1789b73e2d6173`          |
+| Advisories  | pass (partial tracker coverage) | `~/.cache/lindm-arch-qualify/r11/arch/advisories-x86_64.json` / `7c47a9264f23f333dfce5d1dda4f631da102424f799a124c8050e86b8224b140`           |
 
 The os-update lane provisions its prerequisites at the image's Archive pin
 (2026-10-02) and gives the whole-system policy the registry's later
