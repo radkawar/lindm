@@ -265,7 +265,7 @@ function readCards(id) {
   return [...document.querySelectorAll("article")]
     .filter((node) => node.getClientRects().length > 0 && node.textContent.includes(id))
     .map((node) => ({
-      title: node.querySelector("h2")?.textContent.trim() ?? "",
+      title: node.querySelector("h2,h3")?.textContent.trim() ?? "",
       state: node.querySelector('[data-slot="badge"]')?.textContent.trim() ?? "",
       done: [...node.querySelectorAll('[role="status"]')].some(
         (status) => status.textContent.trim() === "Done.",
