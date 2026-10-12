@@ -12,10 +12,13 @@ import {
   profileRevisionsQueryOptions,
 } from "./queries";
 
+export type ProfileChoice = { profileId: string; revisionId: string; label: string };
+
+// Chooses a profile by name; onChoose receives its latest published version.
 export function ProfilePicker({
-  onRevisionChange,
+  onChoose,
   ...props
-}: PickerProps & { onRevisionChange?: (revisionId: string) => void }) {
+}: PickerProps & { onChoose?: (choice: ProfileChoice | null) => void }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const query = useQuery(profilesQueryOptions(lifetime, 100, pageToken));
@@ -39,38 +42,54 @@ export function ProfilePicker({
       {...props}
       onChange={(next) => {
         props.onChange(next);
-        onRevisionChange?.(
-          query.data?.profiles.find((profile) => profile.profileId === next)?.revisionId ?? "",
+        const profile = query.data?.profiles.find((entry) => entry.profileId === next);
+        onChoose?.(
+          profile
+            ? {
+                profileId: profile.profileId,
+                revisionId: profile.revisionId,
+                label: `${profile.name || "Unnamed profile"}, version ${profile.revisionNumber}`,
+              }
+            : null,
         );
       }}
       options={options}
       note="Search within this page of up to 100 profiles."
+      footer={
+        query.isPending || query.error || pageToken || query.data?.nextPageToken ? (
+          <>
+            {query.isPending ? <p role="status">Loading profiles…</p> : null}
+            {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
+            <div className="flex gap-2">
+              {pageToken ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={props.disabled || query.isFetching}
+                  onClick={() => setPageToken("")}
+                >
+                  First profiles
+                </Button>
+              ) : null}
+              {query.data?.nextPageToken ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={props.disabled || query.isFetching}
+                  onClick={() => setPageToken(query.data?.nextPageToken ?? "")}
+                >
+                  More profiles
+                </Button>
+              ) : null}
+            </div>
+          </>
+        ) : undefined
+      }
     >
-      {query.isPending ? <p role="status">Loading profiles…</p> : null}
-      {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
       {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
-      <div className="flex gap-2">
-        {pageToken ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setPageToken("")}
-          >
-            First profiles
-          </Button>
-        ) : null}
-        {query.data?.nextPageToken ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setPageToken(query.data?.nextPageToken ?? "")}
-          >
-            More profiles
-          </Button>
-        ) : null}
-      </div>
+      {query.data?.profiles.length === 0 && !pageToken ? (
+        <p className="text-sm text-muted-foreground">No profiles yet. Create one under Profiles.</p>
+      ) : null}
     </SearchPicker>
   );
 }
@@ -116,7 +135,7 @@ export function ProfileRevisionPicker({
           value={profileId}
           disabled={props.disabled}
           onChange={setChosenProfile}
-          onRevisionChange={props.onChange}
+          onChoose={(choice) => props.onChange(choice?.revisionId ?? "")}
         />
       ) : null}
       <SearchPicker

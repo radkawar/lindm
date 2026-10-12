@@ -64,6 +64,7 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 	}
 	defer func() { host.FinishedAt = timestamppb.Now() }()
 	r.attachPatchStatus(ctx, host)
+	r.attachApprovedConfiguration(ctx, host)
 	response, err := rpc(ctx, r.executor.GetRecoveryReadiness, &agentv1.GetRecoveryReadinessRequest{})
 	if err != nil {
 		failed("recovery_readiness_executor_unavailable")

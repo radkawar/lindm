@@ -26,19 +26,3 @@ export function resourceStateQueryOptions(lifetime: AuthLifetime, deviceId: stri
         : false,
   });
 }
-
-export function resourceProfileHeadsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
-  return queryOptions({
-    queryKey: ["resource-profile-heads", lifetime.generation, pageToken] as const,
-    meta: { authGeneration: lifetime.generation },
-    staleTime: 0,
-    queryFn: async ({ signal }) => {
-      const response = await adminClient.listProfiles(
-        { pageSize: 100, pageToken },
-        { signal: AbortSignal.any([signal, lifetime.signal]) },
-      );
-      lifetime.signal.throwIfAborted();
-      return response;
-    },
-  });
-}

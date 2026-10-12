@@ -471,54 +471,55 @@ export async function confirmEnrolledDevice(ui, config) {
 export async function assignProfile(ui, config) {
   await ui.driver.goto(`${config.origin}/devices/${encodeURIComponent(config.deviceId)}`);
   await ui.click({ role: "button", text: "Assign profile" });
-  await ui.wait({ label: "Profile version", enabled: true });
+  // The profile picker floats its choices in a popover; the form reports the
+  // chosen profile's latest version in a hidden input read before submitting.
+  const trigger = { css: '[role="dialog"] [data-slot="popover-trigger"]', enabled: true };
+  await ui.wait(trigger);
+  const chosen = (id) =>
+    ui.driver.observe(
+      (expected) => document.querySelector('input[name="profile-revision-id"]')?.value === expected,
+      id,
+    );
+  const openChoices = async () => {
+    await ui.click(trigger);
+    // The empty choice is always rendered; wait for the popover before reading.
+    await ui.wait({ role: "option", text: "No selection" });
+  };
   let label = "";
-  // Choose visible options with real input. Base UI's hidden form input
-  // reflects the exact selected server revision; read it before submitting.
+  await openChoices();
   for (let page = 0; page < 20 && !label; page++) {
-    await ui.click({ label: "Profile version" });
-    // The placeholder option is always rendered; wait for the popup to mount
-    // before reading the page's options once.
-    await ui.wait({ role: "option", text: "Select a profile" });
     const labels = await ui.driver.observe(() =>
-      [...document.querySelectorAll('[role="option"]')]
+      [
+        ...document.querySelectorAll(
+          '[data-slot="popover-content"]:not([data-closed]) [role="option"]',
+        ),
+      ]
         .filter(
           (node) => node.getClientRects().length && node.getAttribute("aria-disabled") !== "true",
         )
-        .map((node) => node.textContent.trim())
-        .filter((text) => text !== "Select a profile"),
+        .map((node) => (node.innerText ?? node.textContent).replace(/\s+/g, " ").trim())
+        .filter((text) => text !== "No selection"),
     );
     if (labels.length > 200) throw new Error("profile_catalog_page_limit");
     for (let index = 0; index < labels.length; index++) {
-      if (index) await ui.click({ label: "Profile version" });
+      if (index) await openChoices();
       await ui.click({ role: "option", text: labels[index] });
-      // Base UI commits the hidden input value asynchronously after input.
       let selected = false;
       for (let attempt = 0; attempt < 20 && !selected; attempt++) {
         if (attempt) await delay(100);
-        selected = await ui.driver.observe(
-          (id) =>
-            [...document.querySelectorAll('form input[aria-hidden="true"]')].some(
-              (input) => input.value === id,
-            ),
-          config.profileRevisionId,
-        );
+        selected = await chosen(config.profileRevisionId);
       }
       if (selected) {
         label = labels[index];
         break;
       }
     }
-    if (!labels.length) await ui.click({ label: "Profile version" });
     if (!label) {
-      const next = await ui.driver.find({
-        role: "button",
-        text: "Next profile page",
-        enabled: true,
-      });
+      if (labels.length) await openChoices();
+      const next = await ui.driver.find({ role: "button", text: "More profiles", enabled: true });
       if (!next) throw new Error("supplied_profile_revision_not_in_catalog");
       await ui.driver.click(next);
-      await ui.wait({ label: "Profile version", enabled: true });
+      await ui.wait({ role: "option", text: "No selection" });
     }
   }
   if (!label) throw new Error("profile_catalog_page_limit");

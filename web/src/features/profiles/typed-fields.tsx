@@ -8,12 +8,13 @@ import {
   type JsonValue,
 } from "@bufbuild/protobuf";
 import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import { ApprovedReferenceKind } from "../../../gen/lindm/admin/v1/approved_references_pb";
 import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
-import { SearchPicker } from "@/components/ui/search-picker";
+import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
 import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,12 @@ import { newRequestId } from "@/lib/ids";
 import { object, sameReference } from "./resource-draft";
 import { useProfilePickers } from "./field-pickers";
 import { OSUpdateFields } from "./os-update-fields";
+import { ApprovedReferencePicker } from "./approved-picker";
+
+// A local user's home folder must sit under a root its device approved.
+function HomeRootPicker(props: PickerProps) {
+  return <ApprovedReferencePicker kind={ApprovedReferenceKind.HOME_ROOT} {...props} />;
+}
 
 const labels: Record<string, string> = {
   nativeName: "Package name",
@@ -60,6 +67,9 @@ const labels: Record<string, string> = {
   deb: "DEB version",
   rpm: "RPM version",
   apt: "APT repository",
+  DEB: "DEB (Debian, Ubuntu)",
+  RPM: "RPM (Fedora, RHEL, openSUSE)",
+  ALPM: "pacman (Arch Linux)",
   dropIn: "Service drop-in",
   daily: "Daily, UTC",
   intervalSeconds: "Interval (seconds)",
@@ -173,14 +183,34 @@ export function fieldLabel(name: string): string {
   return labels[name] ?? words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function enumOptions(schema: DescEnum) {
+// Choices no lindm agent applies yet (no Nix, Flatpak or OSTree provider and no
+// person-desktop session scope). They are never offered; a saved value stays
+// visible, read-only, until the administrator chooses another option.
+const unavailableChoices: Record<string, true> = {
+  PACKAGE_ECOSYSTEM_NIX: true,
+  "lindm.resource.v1.NativeVersion.nix": true,
+  "lindm.resource.v1.RepositoryDesired.nix": true,
+  "lindm.resource.v1.RepositoryDesired.flatpak": true,
+  "lindm.resource.v1.RepositoryDesired.ostree": true,
+  "lindm.resource.v1.SessionScope.personDesktop": true,
+};
+const UNAVAILABLE_NOTE =
+  "No lindm agent can apply this yet. It is kept as saved; choose another option to change it.";
+
+function enumOptions(schema: DescEnum, current?: JsonValue) {
   const first = schema.values[0]?.name ?? "";
   const prefix = first.endsWith("UNSPECIFIED") ? first.slice(0, -"UNSPECIFIED".length) : "";
   return schema.values
-    .filter((value) => value.number !== 0)
+    .filter(
+      (value) =>
+        value.number !== 0 &&
+        (!unavailableChoices[value.name] || value.name === current || value.number === current),
+    )
     .map((value) => ({
       value: value.name,
-      label: fieldLabel(value.name.slice(prefix.length)),
+      label: unavailableChoices[value.name]
+        ? `${fieldLabel(value.name.slice(prefix.length))} (not available)`
+        : fieldLabel(value.name.slice(prefix.length)),
     }));
 }
 
@@ -221,6 +251,8 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
     <div className="grid min-w-0 gap-3">
       {oneofs.map((oneof) => {
         const selected = oneof.fields.find((field) => value[field.jsonName] !== undefined);
+        const unavailable =
+          !!selected && !!unavailableChoices[`${schema.typeName}.${selected.jsonName}`];
         return (
           <div className="grid gap-1.5" key={oneof.name}>
             <Label htmlFor={`${id}-${oneof.name}`}>{fieldLabel(oneof.name)}</Label>
@@ -228,12 +260,22 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
               id={`${id}-${oneof.name}`}
               disabled={disabled}
               value={selected?.jsonName ?? ""}
+              aria-describedby={unavailable ? `${id}-${oneof.name}-unavailable` : undefined}
               options={[
                 { value: "", label: "Choose an option" },
-                ...oneof.fields.map((field) => ({
-                  value: field.jsonName,
-                  label: fieldLabel(field.jsonName),
-                })),
+                ...oneof.fields
+                  .filter(
+                    (field) =>
+                      field === selected ||
+                      !unavailableChoices[`${schema.typeName}.${field.jsonName}`],
+                  )
+                  .map((field) => ({
+                    value: field.jsonName,
+                    label:
+                      field === selected && unavailable
+                        ? `${fieldLabel(field.jsonName)} (not available)`
+                        : fieldLabel(field.jsonName),
+                  })),
               ]}
               onValueChange={(name) => {
                 const updated = { ...value };
@@ -258,6 +300,11 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
                 onChange(updated);
               }}
             />
+            {unavailable ? (
+              <p id={`${id}-${oneof.name}-unavailable`} className="text-xs text-muted-foreground">
+                {UNAVAILABLE_NOTE}
+              </p>
+            ) : null}
           </div>
         );
       })}
@@ -280,7 +327,7 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
             id={`${id}-${field.jsonName}`}
             references={references}
             siblings={value}
-            disabled={disabled}
+            disabled={disabled || !!unavailableChoices[`${schema.typeName}.${field.jsonName}`]}
             onChange={(next) => change(field, next)}
           />
         ))}
@@ -314,7 +361,10 @@ function TypedField({
         ? pickers.device
         : ["personId", "principalId"].includes(field.jsonName)
           ? pickers.account
-          : undefined;
+          : field.parent.typeName === "lindm.resource.v1.HomePolicy" &&
+              field.jsonName === "approvedRootId"
+            ? HomeRootPicker
+            : undefined;
   const label =
     field.jsonName === "mode" && field.fieldKind === "scalar"
       ? "Permissions (octal)"
@@ -352,7 +402,7 @@ function TypedField({
                 aria-label={`${label} ${index + 1}`}
                 value={String(item)}
                 disabled={disabled}
-                options={enumOptions(field.enum)}
+                options={enumOptions(field.enum, item)}
                 onValueChange={(next) =>
                   onChange(items.map((entry, i) => (i === index ? next : entry)))
                 }
@@ -480,7 +530,7 @@ function TypedField({
               ? (field.enum.values.find((entry) => entry.number === value)?.name ?? "")
               : String(value ?? "")
           }
-          options={[{ value: "", label: "Choose an option" }, ...enumOptions(field.enum)]}
+          options={[{ value: "", label: "Choose an option" }, ...enumOptions(field.enum, value)]}
           onValueChange={onChange}
         />
       ) : field.scalar === ScalarType.BOOL ? (
@@ -510,17 +560,22 @@ function TypedField({
           <p className="text-xs text-muted-foreground">Created automatically for this setting.</p>
           <TechnicalDetails items={[{ label, value: String(value ?? "") }]} />
         </>
+      ) : recordReference ? (
+        // No list exists for this identity; it is never typed in, only kept.
+        <>
+          <p className="text-xs text-muted-foreground">
+            {value ? "Kept as saved." : "Not set."} This reference can't be chosen in the console
+            yet.
+          </p>
+          {value ? <TechnicalDetails items={[{ label, value: String(value) }]} /> : null}
+        </>
       ) : field.scalar === ScalarType.BYTES && field.jsonName === "content" ? (
         <FileContent id={id} value={String(value ?? "")} onChange={onChange} disabled={disabled} />
       ) : (
         <Input
           id={id}
           data-freeform={
-            recordReference
-              ? "reference issued by another system; the server has no catalog"
-              : field.jsonName === "mode"
-                ? "file permissions in octal"
-                : freeformReason(field)
+            field.jsonName === "mode" ? "file permissions in octal" : freeformReason(field)
           }
           disabled={disabled}
           value={
@@ -529,9 +584,7 @@ function TypedField({
               : String(value ?? "")
           }
           aria-describedby={
-            recordReference || ["uid", "gid"].includes(field.jsonName)
-              ? `${id}-description`
-              : undefined
+            ["uid", "gid"].includes(field.jsonName) ? `${id}-description` : undefined
           }
           type={
             field.scalar === ScalarType.STRING ||
@@ -562,11 +615,6 @@ function TypedField({
           }}
         />
       )}
-      {recordReference && !generatedReference && !Picker ? (
-        <p id={`${id}-description`} className="text-xs text-muted-foreground">
-          Copy this reference from the system that issued it.
-        </p>
-      ) : null}
       {["uid", "gid"].includes(field.jsonName) ? (
         <p id={`${id}-description`} className="text-xs text-muted-foreground">
           Leave unset to let the device assign the next free{" "}
@@ -633,49 +681,44 @@ function MessageInput({
     const repository = id.endsWith("-repository");
     return (
       <div className="grid gap-1.5">
-        <SearchPicker
-          label={label}
-          disabled={disabled}
-          value={current < 0 ? (value.canonicalKey ? "unavailable" : "") : String(current)}
-          options={choices}
-          onChange={(next) => {
-            if (next === "") onChange({});
-            else if (allowed[Number(next)]) onChange({ ...allowed[Number(next)].ref });
-          }}
-        />
-        <TechnicalDetails
-          items={[{ label: "Current reference", value: String(value.canonicalKey ?? "") }]}
-        />
+        {repository && allowed.length === 0 ? null : (
+          <SearchPicker
+            label={repository ? "Repository in this profile" : label}
+            disabled={disabled}
+            value={
+              current < 0
+                ? value.canonicalKey && !repository
+                  ? "unavailable"
+                  : ""
+                : String(current)
+            }
+            options={choices}
+            onChange={(next) => {
+              if (next === "") onChange({});
+              else if (allowed[Number(next)]) onChange({ ...allowed[Number(next)].ref });
+            }}
+          />
+        )}
         {repository ? (
-          <div className="grid gap-1.5">
-            <Label htmlFor={`${id}-approved`}>Approved source</Label>
-            <Input
-              id={`${id}-approved`}
-              data-freeform="approved repository reference copied from device configuration; no server catalog"
-              disabled={disabled}
-              spellCheck={false}
-              aria-describedby={`${id}-approved-description`}
-              value={current < 0 ? String(value.canonicalKey ?? "") : ""}
-              onChange={(event) =>
-                onChange(
-                  event.target.value === ""
-                    ? {}
-                    : {
-                        kind: "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                        canonicalKey: event.target.value.trim().toLowerCase(),
-                      },
-                )
-              }
-            />
-            <p id={`${id}-approved-description`} className="text-xs text-muted-foreground">
-              The package source the device already uses, as it names it (begins with apt/ or rpm/).
-            </p>
-          </div>
+          <ApprovedReferencePicker
+            kind={ApprovedReferenceKind.PACKAGE_SOURCE}
+            label={
+              allowed.length === 0 ? "Approved package source" : "Or an approved source on devices"
+            }
+            disabled={disabled}
+            value={current < 0 ? String(value.canonicalKey ?? "") : ""}
+            onChange={(next) =>
+              onChange(next ? { kind: "RESOURCE_KIND_PACKAGE_REPOSITORY", canonicalKey: next } : {})
+            }
+          />
         ) : allowed.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             Add the setting this depends on to this profile first.
           </p>
         ) : null}
+        <TechnicalDetails
+          items={[{ label: "Current reference", value: String(value.canonicalKey ?? "") }]}
+        />
       </div>
     );
   }

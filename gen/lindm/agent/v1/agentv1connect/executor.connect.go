@@ -78,6 +78,9 @@ const (
 	// ExecutorServiceGetPatchStatusProcedure is the fully-qualified name of the ExecutorService's
 	// GetPatchStatus RPC.
 	ExecutorServiceGetPatchStatusProcedure = "/lindm.agent.v1.ExecutorService/GetPatchStatus"
+	// ExecutorServiceGetApprovedConfigurationProcedure is the fully-qualified name of the
+	// ExecutorService's GetApprovedConfiguration RPC.
+	ExecutorServiceGetApprovedConfigurationProcedure = "/lindm.agent.v1.ExecutorService/GetApprovedConfiguration"
 	// ExecutorServicePrepareResourceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's PrepareResourceExecution RPC.
 	ExecutorServicePrepareResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareResourceExecution"
@@ -186,6 +189,9 @@ type ExecutorServiceClient interface {
 	// Reads the last offline patch status; a stale status starts the static
 	// lindm-os-update-status.service refresh without waiting for it.
 	GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error)
+	// Reads the root-local approved home roots and package sources that profiles
+	// reference, for publication with host inventory. Changes nothing.
+	GetApprovedConfiguration(context.Context, *connect.Request[v1.GetApprovedConfigurationRequest]) (*connect.Response[v1.GetApprovedConfigurationResponse], error)
 	// Verifies and journals intent before native preparation. Package staging is
 	// asynchronous; exact retries poll without extending its signed deadline.
 	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
@@ -322,6 +328,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("GetPatchStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		getApprovedConfiguration: connect.NewClient[v1.GetApprovedConfigurationRequest, v1.GetApprovedConfigurationResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetApprovedConfigurationProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetApprovedConfiguration")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareResourceExecution: connect.NewClient[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareResourceExecutionProcedure,
@@ -450,6 +462,7 @@ type executorServiceClient struct {
 	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	getRecoveryReadiness         *connect.Client[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse]
 	getPatchStatus               *connect.Client[v1.GetPatchStatusRequest, v1.GetPatchStatusResponse]
+	getApprovedConfiguration     *connect.Client[v1.GetApprovedConfigurationRequest, v1.GetApprovedConfigurationResponse]
 	prepareResourceExecution     *connect.Client[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse]
 	startResourceExecution       *connect.Client[v1.StartResourceExecutionRequest, v1.StartResourceExecutionResponse]
 	getResourceExecution         *connect.Client[v1.GetResourceExecutionRequest, v1.GetResourceExecutionResponse]
@@ -543,6 +556,11 @@ func (c *executorServiceClient) GetRecoveryReadiness(ctx context.Context, req *c
 // GetPatchStatus calls lindm.agent.v1.ExecutorService.GetPatchStatus.
 func (c *executorServiceClient) GetPatchStatus(ctx context.Context, req *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error) {
 	return c.getPatchStatus.CallUnary(ctx, req)
+}
+
+// GetApprovedConfiguration calls lindm.agent.v1.ExecutorService.GetApprovedConfiguration.
+func (c *executorServiceClient) GetApprovedConfiguration(ctx context.Context, req *connect.Request[v1.GetApprovedConfigurationRequest]) (*connect.Response[v1.GetApprovedConfigurationResponse], error) {
+	return c.getApprovedConfiguration.CallUnary(ctx, req)
 }
 
 // PrepareResourceExecution calls lindm.agent.v1.ExecutorService.PrepareResourceExecution.
@@ -688,6 +706,9 @@ type ExecutorServiceHandler interface {
 	// Reads the last offline patch status; a stale status starts the static
 	// lindm-os-update-status.service refresh without waiting for it.
 	GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error)
+	// Reads the root-local approved home roots and package sources that profiles
+	// reference, for publication with host inventory. Changes nothing.
+	GetApprovedConfiguration(context.Context, *connect.Request[v1.GetApprovedConfigurationRequest]) (*connect.Response[v1.GetApprovedConfigurationResponse], error)
 	// Verifies and journals intent before native preparation. Package staging is
 	// asynchronous; exact retries poll without extending its signed deadline.
 	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
@@ -818,6 +839,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		ExecutorServiceGetPatchStatusProcedure,
 		svc.GetPatchStatus,
 		connect.WithSchema(executorServiceMethods.ByName("GetPatchStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetApprovedConfigurationHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetApprovedConfigurationProcedure,
+		svc.GetApprovedConfiguration,
+		connect.WithSchema(executorServiceMethods.ByName("GetApprovedConfiguration")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServicePrepareResourceExecutionHandler := connect.NewUnaryHandler(
@@ -960,6 +987,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceGetRecoveryReadinessHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetPatchStatusProcedure:
 			executorServiceGetPatchStatusHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetApprovedConfigurationProcedure:
+			executorServiceGetApprovedConfigurationHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareResourceExecutionProcedure:
 			executorServicePrepareResourceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartResourceExecutionProcedure:
@@ -1063,6 +1092,10 @@ func (UnimplementedExecutorServiceHandler) GetRecoveryReadiness(context.Context,
 
 func (UnimplementedExecutorServiceHandler) GetPatchStatus(context.Context, *connect.Request[v1.GetPatchStatusRequest]) (*connect.Response[v1.GetPatchStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetPatchStatus is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetApprovedConfiguration(context.Context, *connect.Request[v1.GetApprovedConfigurationRequest]) (*connect.Response[v1.GetApprovedConfigurationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetApprovedConfiguration is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error) {

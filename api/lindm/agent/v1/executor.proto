@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/approved_configuration.proto";
 import "lindm/agent/v1/assistance.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
@@ -81,6 +82,9 @@ service ExecutorService {
   // Reads the last offline patch status; a stale status starts the static
   // lindm-os-update-status.service refresh without waiting for it.
   rpc GetPatchStatus(GetPatchStatusRequest) returns (GetPatchStatusResponse);
+  // Reads the root-local approved home roots and package sources that profiles
+  // reference, for publication with host inventory. Changes nothing.
+  rpc GetApprovedConfiguration(GetApprovedConfigurationRequest) returns (GetApprovedConfigurationResponse);
   // Verifies and journals intent before native preparation. Package staging is
   // asynchronous; exact retries poll without extending its signed deadline.
   rpc PrepareResourceExecution(PrepareResourceExecutionRequest) returns (PrepareResourceExecutionResponse);

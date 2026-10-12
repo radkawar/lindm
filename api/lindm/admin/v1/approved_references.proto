@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Root-local approvals that devices report in host inventory and profiles
+// reference by identity. Listed by name so administrators never copy an
+// identifier. Reports are observations, never authority: each executor still
+// enforces only its own local configuration.
+enum ApprovedReferenceKind {
+  APPROVED_REFERENCE_KIND_UNSPECIFIED = 0;
+  // Approved home folder roots. reference_id is the root ID a local user's
+  // home policy names; name is the root path, e.g. "/home".
+  APPROVED_REFERENCE_KIND_HOME_ROOT = 1;
+  // Approved package sources. reference_id is the repository resource key a
+  // package names as its source ("apt/<repository id>"); name is the native
+  // repository name (APT suite, RPM repository ID or pacman repository).
+  APPROVED_REFERENCE_KIND_PACKAGE_SOURCE = 2;
+}
+
+// Lists approved references of in-scope devices' latest accepted host
+// inventory. Requires fleet.read and honors its device scope. A reference whose
+// name differs between devices is listed once per distinct name.
+message ListApprovedReferencesRequest {
+  ApprovedReferenceKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // ASCII case-insensitive literal prefix of the name; empty lists every one.
+  string prefix = 2 [(buf.validate.field).string = {
+    max_len: 1024
+    not_contains: "\000"
+  }];
+  // Zero selects 50.
+  uint32 page_size = 3 [(buf.validate.field).uint32.lte = 100];
+  // The previous page's next_after_name and next_after_reference_id. Rows sort
+  // by lowercase name, exact name, then reference ID.
+  string after_name = 4 [(buf.validate.field).string = {
+    max_len: 1024
+    not_contains: "\000"
+  }];
+  string after_reference_id = 5 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
+  option (buf.validate.message).cel = {
+    id: "approved_references.cursor"
+    message: "a cursor names both the reference and its name"
+    expression: "(this.after_name == '') == (this.after_reference_id == '')"
+  };
+}
+
+message ApprovedReference {
+  string reference_id = 1;
+  string name = 2;
+  // Package sources only: "apt", "rpm" or "alpm", and the repository location
+  // (APT URI, first RPM base URL or metalink, pacman snapshot URI).
+  string format = 3;
+  string location = 4;
+  // In-scope devices currently reporting this reference with this name.
+  uint64 device_count = 5;
+}
+
+message ListApprovedReferencesResponse {
+  repeated ApprovedReference references = 1 [(buf.validate.field).repeated.max_items = 100];
+  // Both empty when no further references match.
+  string next_after_name = 2;
+  string next_after_reference_id = 3;
+}

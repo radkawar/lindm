@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { ApprovedReferenceKind } from "../../../gen/lindm/admin/v1/approved_references_pb";
 import { adminClient } from "@/lib/rpc";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 
@@ -76,6 +77,29 @@ export function qualifiedKindsQueryOptions(lifetime: AuthLifetime) {
       );
       lifetime.signal.throwIfAborted();
       return response.kinds;
+    },
+  });
+}
+
+// Approved home roots or package sources devices report, by name prefix.
+export function approvedReferencesQueryOptions(
+  lifetime: AuthLifetime,
+  kind: ApprovedReferenceKind,
+  prefix: string,
+  after: { name: string; referenceId: string },
+) {
+  return queryOptions({
+    queryKey: ["approved-references", lifetime.generation, kind, prefix, after] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listApprovedReferences(
+        { kind, prefix, pageSize: 50, afterName: after.name, afterReferenceId: after.referenceId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
     },
   });
 }

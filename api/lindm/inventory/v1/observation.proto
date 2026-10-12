@@ -4,6 +4,7 @@ package lindm.inventory.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/approved_configuration.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/os_update.proto";
 import "lindm/agent/v1/recovery_readiness.proto";
@@ -479,6 +480,9 @@ message NativeDetails {
   lindm.agent.v1.PatchStatusObservation patch_status = 18;
   // Absent only on historical host evidence.
   NativeToolCustody tool_custody = 19;
+  // Absent on direct unprivileged inspection, historical host evidence and when
+  // the executor could not be read. Published inventory attaches it.
+  lindm.agent.v1.ApprovedConfigurationObservation approved_configuration = 20;
 }
 
 // NativeToolCustody is the ancestry the agent requires before it runs any

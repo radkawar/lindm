@@ -291,6 +291,9 @@ const (
 	// AdminServiceSuggestValuesProcedure is the fully-qualified name of the AdminService's
 	// SuggestValues RPC.
 	AdminServiceSuggestValuesProcedure = "/lindm.admin.v1.AdminService/SuggestValues"
+	// AdminServiceListApprovedReferencesProcedure is the fully-qualified name of the AdminService's
+	// ListApprovedReferences RPC.
+	AdminServiceListApprovedReferencesProcedure = "/lindm.admin.v1.AdminService/ListApprovedReferences"
 )
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
@@ -385,6 +388,8 @@ type AdminServiceClient interface {
 	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
 	// Recorded values for choosing instead of typing; authorization is per field.
 	SuggestValues(context.Context, *connect.Request[v1.SuggestValuesRequest]) (*connect.Response[v1.SuggestValuesResponse], error)
+	// Approved home roots and package sources devices report, chosen by name.
+	ListApprovedReferences(context.Context, *connect.Request[v1.ListApprovedReferencesRequest]) (*connect.Response[v1.ListApprovedReferencesResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the lindm.admin.v1.AdminService service. By
@@ -920,6 +925,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("SuggestValues")),
 			connect.WithClientOptions(opts...),
 		),
+		listApprovedReferences: connect.NewClient[v1.ListApprovedReferencesRequest, v1.ListApprovedReferencesResponse](
+			httpClient,
+			baseURL+AdminServiceListApprovedReferencesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListApprovedReferences")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -1012,6 +1023,7 @@ type adminServiceClient struct {
 	listAdvisoryFeeds                    *connect.Client[v1.ListAdvisoryFeedsRequest, v1.ListAdvisoryFeedsResponse]
 	acceptAdvisoryFinding                *connect.Client[v1.AcceptAdvisoryFindingRequest, v1.AcceptAdvisoryFindingResponse]
 	suggestValues                        *connect.Client[v1.SuggestValuesRequest, v1.SuggestValuesResponse]
+	listApprovedReferences               *connect.Client[v1.ListApprovedReferencesRequest, v1.ListApprovedReferencesResponse]
 }
 
 // GetAuthorization calls lindm.admin.v1.AdminService.GetAuthorization.
@@ -1452,6 +1464,11 @@ func (c *adminServiceClient) SuggestValues(ctx context.Context, req *connect.Req
 	return c.suggestValues.CallUnary(ctx, req)
 }
 
+// ListApprovedReferences calls lindm.admin.v1.AdminService.ListApprovedReferences.
+func (c *adminServiceClient) ListApprovedReferences(ctx context.Context, req *connect.Request[v1.ListApprovedReferencesRequest]) (*connect.Response[v1.ListApprovedReferencesResponse], error) {
+	return c.listApprovedReferences.CallUnary(ctx, req)
+}
+
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error)
@@ -1544,6 +1561,8 @@ type AdminServiceHandler interface {
 	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
 	// Recorded values for choosing instead of typing; authorization is per field.
 	SuggestValues(context.Context, *connect.Request[v1.SuggestValuesRequest]) (*connect.Response[v1.SuggestValuesResponse], error)
+	// Approved home roots and package sources devices report, chosen by name.
+	ListApprovedReferences(context.Context, *connect.Request[v1.ListApprovedReferencesRequest]) (*connect.Response[v1.ListApprovedReferencesResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -2075,6 +2094,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("SuggestValues")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListApprovedReferencesHandler := connect.NewUnaryHandler(
+		AdminServiceListApprovedReferencesProcedure,
+		svc.ListApprovedReferences,
+		connect.WithSchema(adminServiceMethods.ByName("ListApprovedReferences")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetAuthorizationProcedure:
@@ -2251,6 +2276,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceAcceptAdvisoryFindingHandler.ServeHTTP(w, r)
 		case AdminServiceSuggestValuesProcedure:
 			adminServiceSuggestValuesHandler.ServeHTTP(w, r)
+		case AdminServiceListApprovedReferencesProcedure:
+			adminServiceListApprovedReferencesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -2606,4 +2633,8 @@ func (UnimplementedAdminServiceHandler) AcceptAdvisoryFinding(context.Context, *
 
 func (UnimplementedAdminServiceHandler) SuggestValues(context.Context, *connect.Request[v1.SuggestValuesRequest]) (*connect.Response[v1.SuggestValuesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SuggestValues is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListApprovedReferences(context.Context, *connect.Request[v1.ListApprovedReferencesRequest]) (*connect.Response[v1.ListApprovedReferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListApprovedReferences is not implemented"))
 }

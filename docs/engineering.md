@@ -368,6 +368,19 @@ Permission, timeout and native-command failures remain visible as warnings with
 their reported collection status. Do not invent stderr or a cause when the API
 does not include it.
 
+Profiles name root-local approvals by identity: a local user's approved home
+root and a package's approved source. Published host inventory therefore carries
+the executor's `ApprovedConfigurationObservation` (its configured
+`approved_home_roots` and package sources, at most 32 each; never the local
+signing-key file or fingerprints), read with `GetApprovedConfiguration` and
+attached like patch status. Direct unprivileged collection and an unreadable or
+invalid executor response omit it, and the server then clears that generation's
+references rather than keeping older ones. `ListApprovedReferences` (fleet.read,
+device-scoped, name-prefix search, paged) lists them so the profile editor offers
+"/home" or "APT noble" instead of a root ID or `apt/<repository id>`. A report
+is an observation, not authority: each executor still enforces only its own
+configuration, so a profile may also keep a reference no device reports.
+
 Advisory source freshness does not imply complete coverage. A current source with
 rejected records keeps a warning badge and an expandable record ID, reason and
 package list; unscoped rejections say that affected packages could not be identified.

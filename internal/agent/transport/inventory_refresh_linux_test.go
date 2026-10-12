@@ -57,6 +57,9 @@ type refreshTransportFixture struct {
 	patchStatusResponse                 *agentv1.GetPatchStatusResponse
 	patchStatusErr                      error
 	patchStatusCalls                    int
+	approvedResponse                    *agentv1.GetApprovedConfigurationResponse
+	approvedErr                         error
+	approvedCalls                       int
 	publishedHost                       *inventoryv1.HostObservation
 }
 

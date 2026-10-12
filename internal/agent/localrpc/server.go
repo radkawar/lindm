@@ -56,6 +56,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.GetExecutionTrustRequest{},
 		&agentv1.GetRecoveryReadinessRequest{},
 		&agentv1.GetPatchStatusRequest{},
+		&agentv1.GetApprovedConfigurationRequest{},
 		&agentv1.PrepareResourceExecutionRequest{},
 		&agentv1.CancelResourcePreparationRequest{},
 		&agentv1.StartResourceExecutionRequest{},
@@ -174,6 +175,7 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetPatchStatusProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetApprovedConfigurationProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareResourceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceCancelResourcePreparationProcedure ||
 		procedure == agentv1connect.ExecutorServiceStartResourceExecutionProcedure ||

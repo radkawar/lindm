@@ -234,6 +234,7 @@ var requestRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
 		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
 		&agentv1.GetPatchStatusRequest{}, &agentv1.GetPatchStatusResponse{}, &agentv1.PatchStatusObservation{},
+		&agentv1.GetApprovedConfigurationRequest{}, &agentv1.GetApprovedConfigurationResponse{},
 		&agentv1.PrepareResourceExecutionRequest{}, &agentv1.StartResourceExecutionRequest{},
 		&agentv1.GetResourceExecutionRequest{}, &agentv1.ResourceExecutionRecord{},
 		&agentv1.ResourceExecutionIntent{}, &agentv1.ResourceExecutionChallenge{},

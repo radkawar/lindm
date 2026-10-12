@@ -10,6 +10,7 @@ import { deviceQueryOptions } from "@/features/devices/queries";
 import { packageSearchDefaults, parsePackageSearch } from "@/features/devices/package-search";
 import { DeviceResourceComplianceBadge, DeviceResources } from "@/features/services/view";
 import { ResourceAssignmentDialog } from "@/features/services/assignment-form";
+import { ProfilePicker } from "@/features/profiles/picker";
 import { RevokeApprovalRequest } from "@/features/approvals/revoke";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -65,7 +66,12 @@ function DeviceDetailRoute() {
         />
       )}
       assignDialog={(open, onOpenChange) => (
-        <ResourceAssignmentDialog deviceId={deviceId} open={open} onOpenChange={onOpenChange} />
+        <ResourceAssignmentDialog
+          deviceId={deviceId}
+          open={open}
+          onOpenChange={onOpenChange}
+          profilePicker={ProfilePicker}
+        />
       )}
       findings={<DeviceFindings deviceId={deviceId} />}
       findingsSummary={<DeviceFindingsSummary deviceId={deviceId} />}

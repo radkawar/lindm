@@ -38,12 +38,14 @@ export async function check({ page, demo, visit, settle, require, capture, step 
       await page.getByRole("menuitem", { name: "Assign profile", exact: true }).click();
     }
     const dialog = page.getByRole("dialog");
-    const picker = dialog.getByLabel("Profile version", { exact: true });
+    // The profile picker floats its choices; choosing a profile assigns its latest version.
+    const picker = dialog.getByRole("button", { name: /^Profile / });
     await picker.waitFor({ timeout: 30_000 });
     await picker.click();
+    await page.getByRole("combobox", { name: "Search profile", exact: true }).fill(profileName);
     await page
       .getByRole("option")
-      .filter({ hasText: new RegExp(`^${profileName}, version \\d+$`) })
+      .filter({ has: page.getByText(profileName, { exact: true }) })
       .first()
       .click();
     await dialog

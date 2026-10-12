@@ -4,7 +4,7 @@ import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/valida
 import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { SetResourceAssignmentRequestSchema } from "../../../gen/lindm/admin/v1/assignments_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
+import type { PickerProps } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -35,7 +35,13 @@ import {
   useAssignmentAttempt,
   type AssignmentAttempt,
 } from "./attempt";
-import { resourceProfileHeadsQueryOptions, resourceStateQueryOptions } from "./queries";
+import { resourceStateQueryOptions } from "./queries";
+
+export type ProfileChoice = { profileId: string; revisionId: string; label: string };
+// Composed by the route: chooses a profile by name and reports its latest version.
+export type ProfileChoiceSlot = (
+  props: PickerProps & { onChoose: (choice: ProfileChoice | null) => void },
+) => ReactNode;
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
 const intervalRules = getOption(
@@ -57,18 +63,19 @@ export function ResourceAssignmentForm({
   deviceId,
   expectedAssignmentId,
   stateReady,
+  profilePicker: ProfileChoicePicker,
 }: {
   deviceId: string;
   expectedAssignmentId: string | undefined;
   stateReady: boolean;
+  profilePicker: ProfileChoiceSlot;
 }) {
   const lifetime = useAuthLifetime();
   const queryClient = useQueryClient();
   const attempt = useAssignmentAttempt(deviceId);
   const inFlight = useRef(false);
-  const [pageToken, setPageToken] = useState("");
-  const heads = useQuery(resourceProfileHeadsQueryOptions(lifetime, pageToken));
-  const [revisionId, setRevisionId] = useState("");
+  const [profileId, setProfileId] = useState("");
+  const [choice, setChoice] = useState<ProfileChoice | null>(null);
   const [reason, setReason] = useState("");
   const [intervalSeconds, setIntervalSeconds] = useState(defaultIntervalSeconds);
   const [requestId, setRequestId] = useState(newRequestId);
@@ -77,7 +84,6 @@ export function ResourceAssignmentForm({
   const [refreshing, setRefreshing] = useState(false);
   const approval = attempt?.approval ?? null;
   const locked = attempt !== null || refreshing;
-  const headFailure = heads.error ? toRpcFailure(heads.error) : null;
 
   const mutation = useMutation({
     retry: false,
@@ -160,9 +166,8 @@ export function ResourceAssignmentForm({
 
   function capture(clear: boolean) {
     if (locked || !stateReady) return;
-    const head = heads.data?.profiles.find((profile) => profile.revisionId === revisionId);
-    if (!clear && (!head || headFailure)) {
-      setErrors(["Select a profile."]);
+    if (!clear && !choice) {
+      setErrors(["Choose a profile."]);
       return;
     }
     const payload = create(SetResourceAssignmentRequestSchema, {
@@ -171,7 +176,7 @@ export function ResourceAssignmentForm({
       expectedAssignmentId,
       clear,
       reason: reason.trim(),
-      target: clear ? undefined : { profileId: head!.profileId, revisionId: head!.revisionId },
+      target: clear ? undefined : { profileId: choice!.profileId, revisionId: choice!.revisionId },
       reconcileIntervalSeconds: clear ? undefined : Number(intervalSeconds),
     });
     const validation = validator.validate(SetResourceAssignmentRequestSchema, payload);
@@ -186,9 +191,7 @@ export function ResourceAssignmentForm({
     setErrors([]);
     send({
       payload,
-      targetLabel: clear
-        ? "Remove profile"
-        : `${head!.name}, version ${head!.revisionNumber.toString()}`,
+      targetLabel: clear ? "Remove profile" : choice!.label,
       status: "inflight",
       failure: null,
       approval: null,
@@ -263,7 +266,8 @@ export function ResourceAssignmentForm({
       setAssignmentAttempt(lifetime, deviceId, null);
       setRequestId(newRequestId());
       setReason("");
-      setRevisionId("");
+      setProfileId("");
+      setChoice(null);
       setIntervalSeconds(defaultIntervalSeconds);
     } catch (error) {
       if (getAuthLifetime() === lifetime && !lifetime.signal.aborted)
@@ -287,71 +291,19 @@ export function ResourceAssignmentForm({
         </p>
       ) : (
         <div className="grid min-w-0 gap-2">
-          <Label htmlFor="resource-profile">Profile version</Label>
-          <SelectField
-            id="resource-profile"
-            className="h-9 w-full min-w-0"
-            value={revisionId}
-            disabled={locked || heads.isPending || !!headFailure}
-            onValueChange={(value) => setRevisionId(value)}
-            options={[
-              { value: "", label: "Select a profile" },
-              ...(heads.data?.profiles.map((profile) => ({
-                value: profile.revisionId,
-                label: `${profile.name}, version ${profile.revisionNumber.toString()}`,
-              })) ?? []),
-            ]}
+          <ProfileChoicePicker
+            label="Profile"
+            value={profileId}
+            disabled={locked}
+            onChange={setProfileId}
+            onChoose={setChoice}
           />
-          {heads.isPending ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading profiles…
-            </p>
-          ) : null}
-          {heads.data?.profiles.length === 0 ? (
+          {choice ? (
             <p className="text-sm text-muted-foreground">
-              No profiles found. Create one under Profiles.
+              Assigns the latest version: {choice.label}.
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            {pageToken ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={locked || heads.isFetching}
-                onClick={() => {
-                  setPageToken("");
-                  setRevisionId("");
-                }}
-              >
-                First profile page
-              </Button>
-            ) : null}
-            {heads.data?.nextPageToken ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={locked || heads.isFetching}
-                onClick={() => {
-                  setPageToken(heads.data!.nextPageToken);
-                  setRevisionId("");
-                }}
-              >
-                Next profile page
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={locked || heads.isFetching}
-              onClick={() => void heads.refetch()}
-            >
-              Refresh profiles
-            </Button>
-          </div>
-          {headFailure ? <RpcError failure={headFailure} title="Couldn't load profiles" /> : null}
+          <input type="hidden" name="profile-revision-id" value={choice?.revisionId ?? ""} />
         </div>
       )}
       <div className="grid min-w-0 gap-2">
@@ -455,7 +407,7 @@ export function ResourceAssignmentForm({
       <div className="flex flex-wrap gap-2">
         {!attempt ? (
           <>
-            <Button type="submit" disabled={!stateReady || locked || !revisionId || !!headFailure}>
+            <Button type="submit" disabled={!stateReady || locked || !choice}>
               Save assignment
             </Button>
             <Button
@@ -502,10 +454,12 @@ export function ResourceAssignmentDialog({
   deviceId,
   open,
   onOpenChange,
+  profilePicker,
 }: {
   deviceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  profilePicker: ProfileChoiceSlot;
 }) {
   const lifetime = useAuthLifetime();
   const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
@@ -526,6 +480,7 @@ export function ResourceAssignmentDialog({
           deviceId={deviceId}
           expectedAssignmentId={state.data?.assignment?.assignmentId}
           stateReady={state.isSuccess && !state.error}
+          profilePicker={profilePicker}
         />
       </DialogContent>
     </Dialog>

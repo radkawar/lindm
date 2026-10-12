@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/resource_native.proto";
+import "lindm/resource/v1/software.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// The executor's root-local approvals that profiles reference by identity:
+// approved home folder roots and approved package sources. Published with
+// host inventory so administrators choose them by path and repository instead
+// of copying identifiers. Reporting grants nothing; every executor still
+// enforces only its own local configuration.
+message ApprovedConfigurationObservation {
+  google.protobuf.Timestamp observed_at = 1 [(buf.validate.field).required = true];
+  // Empty when the executor has no account provider configuration.
+  repeated NativeApprovedHomeRoot home_roots = 2 [(buf.validate.field).repeated.max_items = 32];
+  // Empty when package management is not enabled on the device.
+  repeated lindm.resource.v1.RepositoryDesired package_sources = 3 [(buf.validate.field).repeated.max_items = 32];
+}
+
+message GetApprovedConfigurationRequest {}
+message GetApprovedConfigurationResponse {
+  ApprovedConfigurationObservation observation = 1 [(buf.validate.field).required = true];
+}

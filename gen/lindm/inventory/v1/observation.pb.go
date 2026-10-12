@@ -2417,9 +2417,12 @@ type NativeDetails struct {
 	// Published inventory attaches the protected executor patch status.
 	PatchStatus *v1.PatchStatusObservation `protobuf:"bytes,18,opt,name=patch_status,json=patchStatus,proto3" json:"patch_status,omitempty"`
 	// Absent only on historical host evidence.
-	ToolCustody   *NativeToolCustody `protobuf:"bytes,19,opt,name=tool_custody,json=toolCustody,proto3" json:"tool_custody,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ToolCustody *NativeToolCustody `protobuf:"bytes,19,opt,name=tool_custody,json=toolCustody,proto3" json:"tool_custody,omitempty"`
+	// Absent on direct unprivileged inspection, historical host evidence and when
+	// the executor could not be read. Published inventory attaches it.
+	ApprovedConfiguration *v1.ApprovedConfigurationObservation `protobuf:"bytes,20,opt,name=approved_configuration,json=approvedConfiguration,proto3" json:"approved_configuration,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *NativeDetails) Reset() {
@@ -2581,6 +2584,13 @@ func (x *NativeDetails) GetPatchStatus() *v1.PatchStatusObservation {
 func (x *NativeDetails) GetToolCustody() *NativeToolCustody {
 	if x != nil {
 		return x.ToolCustody
+	}
+	return nil
+}
+
+func (x *NativeDetails) GetApprovedConfiguration() *v1.ApprovedConfigurationObservation {
+	if x != nil {
+		return x.ApprovedConfiguration
 	}
 	return nil
 }
@@ -3124,7 +3134,7 @@ var File_lindm_inventory_v1_observation_proto protoreflect.FileDescriptor
 
 const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/inventory/v1/observation.proto\x12\x12lindm.inventory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1elindm/agent/v1/os_update.proto\x1a'lindm/agent/v1/recovery_readiness.proto\"\x81\x04\n" +
+	"$lindm/inventory/v1/observation.proto\x12\x12lindm.inventory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+lindm/agent/v1/approved_configuration.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1elindm/agent/v1/os_update.proto\x1a'lindm/agent/v1/recovery_readiness.proto\"\x81\x04\n" +
 	"\aPackage\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x04name\x12$\n" +
@@ -3351,7 +3361,7 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12N\n" +
 	"\fapplications\x18\x02 \x03(\v2\x1f.lindm.inventory.v1.ApplicationB\t\xbaH\x06\x92\x01\x03\x10\x80\x10R\fapplications:w\xbaHt\x1ar\n" +
-	"\x14applications.failure\x12'failed collections have no partial rows\x1a1this.status == 1 || this.applications.size() == 0\"\x84\v\n" +
+	"\x14applications.failure\x12'failed collections have no partial rows\x1a1this.status == 1 || this.applications.size() == 0\"\xed\v\n" +
 	"\rNativeDetails\x128\n" +
 	"\x03cpu\x18\x01 \x01(\v2\x1e.lindm.inventory.v1.CpuDetailsB\x06\xbaH\x03\xc8\x01\x01R\x03cpu\x12A\n" +
 	"\x06memory\x18\x02 \x01(\v2!.lindm.inventory.v1.MemoryDetailsB\x06\xbaH\x03\xc8\x01\x01R\x06memory\x12D\n" +
@@ -3373,7 +3383,8 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\bplatform\x18\x10 \x01(\v2#.lindm.inventory.v1.PlatformDetailsR\bplatform\x12[\n" +
 	"\x12recovery_readiness\x18\x11 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationR\x11recoveryReadiness\x12I\n" +
 	"\fpatch_status\x18\x12 \x01(\v2&.lindm.agent.v1.PatchStatusObservationR\vpatchStatus\x12H\n" +
-	"\ftool_custody\x18\x13 \x01(\v2%.lindm.inventory.v1.NativeToolCustodyR\vtoolCustody\"\xd4\x03\n" +
+	"\ftool_custody\x18\x13 \x01(\v2%.lindm.inventory.v1.NativeToolCustodyR\vtoolCustody\x12g\n" +
+	"\x16approved_configuration\x18\x14 \x01(\v20.lindm.agent.v1.ApprovedConfigurationObservationR\x15approvedConfiguration\"\xd4\x03\n" +
 	"\x11NativeToolCustody\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12E\n" +
@@ -3467,52 +3478,53 @@ func file_lindm_inventory_v1_observation_proto_rawDescGZIP() []byte {
 var file_lindm_inventory_v1_observation_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_lindm_inventory_v1_observation_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_lindm_inventory_v1_observation_proto_goTypes = []any{
-	(CollectionStatus)(0),                   // 0: lindm.inventory.v1.CollectionStatus
-	(SnapshotState)(0),                      // 1: lindm.inventory.v1.SnapshotState
-	(AptReleaseSignature)(0),                // 2: lindm.inventory.v1.AptReleaseSignature
-	(*Package)(nil),                         // 3: lindm.inventory.v1.Package
-	(*ObservedString)(nil),                  // 4: lindm.inventory.v1.ObservedString
-	(*HostObservation)(nil),                 // 5: lindm.inventory.v1.HostObservation
-	(*RootObservation)(nil),                 // 6: lindm.inventory.v1.RootObservation
-	(*PackageObservation)(nil),              // 7: lindm.inventory.v1.PackageObservation
-	(*PackageBatch)(nil),                    // 8: lindm.inventory.v1.PackageBatch
-	(*NativeObservation)(nil),               // 9: lindm.inventory.v1.NativeObservation
-	(*ObservedUint64)(nil),                  // 10: lindm.inventory.v1.ObservedUint64
-	(*ObservedBool)(nil),                    // 11: lindm.inventory.v1.ObservedBool
-	(*ObservedStrings)(nil),                 // 12: lindm.inventory.v1.ObservedStrings
-	(*CpuDetails)(nil),                      // 13: lindm.inventory.v1.CpuDetails
-	(*MemoryDetails)(nil),                   // 14: lindm.inventory.v1.MemoryDetails
-	(*BlockDevice)(nil),                     // 15: lindm.inventory.v1.BlockDevice
-	(*StorageIdentity)(nil),                 // 16: lindm.inventory.v1.StorageIdentity
-	(*ObservedNVMeScope)(nil),               // 17: lindm.inventory.v1.ObservedNVMeScope
-	(*StorageDetails)(nil),                  // 18: lindm.inventory.v1.StorageDetails
-	(*NetworkInterface)(nil),                // 19: lindm.inventory.v1.NetworkInterface
-	(*NetworkDetails)(nil),                  // 20: lindm.inventory.v1.NetworkDetails
-	(*FirmwareDetails)(nil),                 // 21: lindm.inventory.v1.FirmwareDetails
-	(*TpmDetails)(nil),                      // 22: lindm.inventory.v1.TpmDetails
-	(*Battery)(nil),                         // 23: lindm.inventory.v1.Battery
-	(*BatteryDetails)(nil),                  // 24: lindm.inventory.v1.BatteryDetails
-	(*PowerDetails)(nil),                    // 25: lindm.inventory.v1.PowerDetails
-	(*SessionCounts)(nil),                   // 26: lindm.inventory.v1.SessionCounts
-	(*ActiveSession)(nil),                   // 27: lindm.inventory.v1.ActiveSession
-	(*ActiveSessions)(nil),                  // 28: lindm.inventory.v1.ActiveSessions
-	(*LocalUser)(nil),                       // 29: lindm.inventory.v1.LocalUser
-	(*LocalUsers)(nil),                      // 30: lindm.inventory.v1.LocalUsers
-	(*BackendDetails)(nil),                  // 31: lindm.inventory.v1.BackendDetails
-	(*Application)(nil),                     // 32: lindm.inventory.v1.Application
-	(*ApplicationDetails)(nil),              // 33: lindm.inventory.v1.ApplicationDetails
-	(*NativeDetails)(nil),                   // 34: lindm.inventory.v1.NativeDetails
-	(*NativeToolCustody)(nil),               // 35: lindm.inventory.v1.NativeToolCustody
-	(*ModuleObservation)(nil),               // 36: lindm.inventory.v1.ModuleObservation
-	(*PackageOrigin)(nil),                   // 37: lindm.inventory.v1.PackageOrigin
-	(*AptListing)(nil),                      // 38: lindm.inventory.v1.AptListing
-	(*RepositoryConfiguration)(nil),         // 39: lindm.inventory.v1.RepositoryConfiguration
-	(*RepositoryObservation)(nil),           // 40: lindm.inventory.v1.RepositoryObservation
-	(*PlatformDetails)(nil),                 // 41: lindm.inventory.v1.PlatformDetails
-	(*timestamppb.Timestamp)(nil),           // 42: google.protobuf.Timestamp
-	(*v1.NVMeSanitizeScope)(nil),            // 43: lindm.agent.v1.NVMeSanitizeScope
-	(*v1.RecoveryReadinessObservation)(nil), // 44: lindm.agent.v1.RecoveryReadinessObservation
-	(*v1.PatchStatusObservation)(nil),       // 45: lindm.agent.v1.PatchStatusObservation
+	(CollectionStatus)(0),                       // 0: lindm.inventory.v1.CollectionStatus
+	(SnapshotState)(0),                          // 1: lindm.inventory.v1.SnapshotState
+	(AptReleaseSignature)(0),                    // 2: lindm.inventory.v1.AptReleaseSignature
+	(*Package)(nil),                             // 3: lindm.inventory.v1.Package
+	(*ObservedString)(nil),                      // 4: lindm.inventory.v1.ObservedString
+	(*HostObservation)(nil),                     // 5: lindm.inventory.v1.HostObservation
+	(*RootObservation)(nil),                     // 6: lindm.inventory.v1.RootObservation
+	(*PackageObservation)(nil),                  // 7: lindm.inventory.v1.PackageObservation
+	(*PackageBatch)(nil),                        // 8: lindm.inventory.v1.PackageBatch
+	(*NativeObservation)(nil),                   // 9: lindm.inventory.v1.NativeObservation
+	(*ObservedUint64)(nil),                      // 10: lindm.inventory.v1.ObservedUint64
+	(*ObservedBool)(nil),                        // 11: lindm.inventory.v1.ObservedBool
+	(*ObservedStrings)(nil),                     // 12: lindm.inventory.v1.ObservedStrings
+	(*CpuDetails)(nil),                          // 13: lindm.inventory.v1.CpuDetails
+	(*MemoryDetails)(nil),                       // 14: lindm.inventory.v1.MemoryDetails
+	(*BlockDevice)(nil),                         // 15: lindm.inventory.v1.BlockDevice
+	(*StorageIdentity)(nil),                     // 16: lindm.inventory.v1.StorageIdentity
+	(*ObservedNVMeScope)(nil),                   // 17: lindm.inventory.v1.ObservedNVMeScope
+	(*StorageDetails)(nil),                      // 18: lindm.inventory.v1.StorageDetails
+	(*NetworkInterface)(nil),                    // 19: lindm.inventory.v1.NetworkInterface
+	(*NetworkDetails)(nil),                      // 20: lindm.inventory.v1.NetworkDetails
+	(*FirmwareDetails)(nil),                     // 21: lindm.inventory.v1.FirmwareDetails
+	(*TpmDetails)(nil),                          // 22: lindm.inventory.v1.TpmDetails
+	(*Battery)(nil),                             // 23: lindm.inventory.v1.Battery
+	(*BatteryDetails)(nil),                      // 24: lindm.inventory.v1.BatteryDetails
+	(*PowerDetails)(nil),                        // 25: lindm.inventory.v1.PowerDetails
+	(*SessionCounts)(nil),                       // 26: lindm.inventory.v1.SessionCounts
+	(*ActiveSession)(nil),                       // 27: lindm.inventory.v1.ActiveSession
+	(*ActiveSessions)(nil),                      // 28: lindm.inventory.v1.ActiveSessions
+	(*LocalUser)(nil),                           // 29: lindm.inventory.v1.LocalUser
+	(*LocalUsers)(nil),                          // 30: lindm.inventory.v1.LocalUsers
+	(*BackendDetails)(nil),                      // 31: lindm.inventory.v1.BackendDetails
+	(*Application)(nil),                         // 32: lindm.inventory.v1.Application
+	(*ApplicationDetails)(nil),                  // 33: lindm.inventory.v1.ApplicationDetails
+	(*NativeDetails)(nil),                       // 34: lindm.inventory.v1.NativeDetails
+	(*NativeToolCustody)(nil),                   // 35: lindm.inventory.v1.NativeToolCustody
+	(*ModuleObservation)(nil),                   // 36: lindm.inventory.v1.ModuleObservation
+	(*PackageOrigin)(nil),                       // 37: lindm.inventory.v1.PackageOrigin
+	(*AptListing)(nil),                          // 38: lindm.inventory.v1.AptListing
+	(*RepositoryConfiguration)(nil),             // 39: lindm.inventory.v1.RepositoryConfiguration
+	(*RepositoryObservation)(nil),               // 40: lindm.inventory.v1.RepositoryObservation
+	(*PlatformDetails)(nil),                     // 41: lindm.inventory.v1.PlatformDetails
+	(*timestamppb.Timestamp)(nil),               // 42: google.protobuf.Timestamp
+	(*v1.NVMeSanitizeScope)(nil),                // 43: lindm.agent.v1.NVMeSanitizeScope
+	(*v1.RecoveryReadinessObservation)(nil),     // 44: lindm.agent.v1.RecoveryReadinessObservation
+	(*v1.PatchStatusObservation)(nil),           // 45: lindm.agent.v1.PatchStatusObservation
+	(*v1.ApprovedConfigurationObservation)(nil), // 46: lindm.agent.v1.ApprovedConfigurationObservation
 }
 var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
 	36,  // 0: lindm.inventory.v1.Package.module:type_name -> lindm.inventory.v1.ModuleObservation
@@ -3644,22 +3656,23 @@ var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
 	44,  // 126: lindm.inventory.v1.NativeDetails.recovery_readiness:type_name -> lindm.agent.v1.RecoveryReadinessObservation
 	45,  // 127: lindm.inventory.v1.NativeDetails.patch_status:type_name -> lindm.agent.v1.PatchStatusObservation
 	35,  // 128: lindm.inventory.v1.NativeDetails.tool_custody:type_name -> lindm.inventory.v1.NativeToolCustody
-	0,   // 129: lindm.inventory.v1.NativeToolCustody.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 130: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 131: lindm.inventory.v1.PackageOrigin.status:type_name -> lindm.inventory.v1.CollectionStatus
-	38,  // 132: lindm.inventory.v1.PackageOrigin.listings:type_name -> lindm.inventory.v1.AptListing
-	2,   // 133: lindm.inventory.v1.AptListing.signature:type_name -> lindm.inventory.v1.AptReleaseSignature
-	0,   // 134: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	39,  // 135: lindm.inventory.v1.RepositoryObservation.configurations:type_name -> lindm.inventory.v1.RepositoryConfiguration
-	4,   // 136: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
-	4,   // 137: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
-	40,  // 138: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
-	4,   // 139: lindm.inventory.v1.PlatformDetails.releasever:type_name -> lindm.inventory.v1.ObservedString
-	140, // [140:140] is the sub-list for method output_type
-	140, // [140:140] is the sub-list for method input_type
-	140, // [140:140] is the sub-list for extension type_name
-	140, // [140:140] is the sub-list for extension extendee
-	0,   // [0:140] is the sub-list for field type_name
+	46,  // 129: lindm.inventory.v1.NativeDetails.approved_configuration:type_name -> lindm.agent.v1.ApprovedConfigurationObservation
+	0,   // 130: lindm.inventory.v1.NativeToolCustody.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 131: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 132: lindm.inventory.v1.PackageOrigin.status:type_name -> lindm.inventory.v1.CollectionStatus
+	38,  // 133: lindm.inventory.v1.PackageOrigin.listings:type_name -> lindm.inventory.v1.AptListing
+	2,   // 134: lindm.inventory.v1.AptListing.signature:type_name -> lindm.inventory.v1.AptReleaseSignature
+	0,   // 135: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	39,  // 136: lindm.inventory.v1.RepositoryObservation.configurations:type_name -> lindm.inventory.v1.RepositoryConfiguration
+	4,   // 137: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
+	4,   // 138: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
+	40,  // 139: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
+	4,   // 140: lindm.inventory.v1.PlatformDetails.releasever:type_name -> lindm.inventory.v1.ObservedString
+	141, // [141:141] is the sub-list for method output_type
+	141, // [141:141] is the sub-list for method input_type
+	141, // [141:141] is the sub-list for extension type_name
+	141, // [141:141] is the sub-list for extension extendee
+	0,   // [0:141] is the sub-list for field type_name
 }
 
 func init() { file_lindm_inventory_v1_observation_proto_init() }

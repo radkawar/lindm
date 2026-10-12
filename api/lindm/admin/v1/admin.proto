@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/admin/v1/advisories.proto";
 import "lindm/admin/v1/approvals.proto";
+import "lindm/admin/v1/approved_references.proto";
 import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/assistance.proto";
 import "lindm/admin/v1/authorization.proto";
@@ -122,6 +123,8 @@ service AdminService {
   rpc AcceptAdvisoryFinding(AcceptAdvisoryFindingRequest) returns (AcceptAdvisoryFindingResponse);
   // Recorded values for choosing instead of typing; authorization is per field.
   rpc SuggestValues(SuggestValuesRequest) returns (SuggestValuesResponse);
+  // Approved home roots and package sources devices report, chosen by name.
+  rpc ListApprovedReferences(ListApprovedReferencesRequest) returns (ListApprovedReferencesResponse);
 }
 
 enum DeviceState {
