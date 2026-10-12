@@ -32,6 +32,7 @@ linters:
             - "!**/internal/vmlab/**"
             - "!**/internal/loadlab/**"
             - "!**/internal/labhost/**"
+            - "!**/internal/demolab/**"
           deny:
             - pkg: "lindm/internal/devlab"
               desc: "Development authentication and authority fixtures must not enter production binaries."
@@ -41,6 +42,8 @@ linters:
               desc: "Load qualification belongs only to laboratory entrypoints."
             - pkg: "lindm/internal/labhost"
               desc: "Lab host scheduling and remote execution belong only to laboratory entrypoints."
+            - pkg: "lindm/internal/demolab"
+              desc: "Organization demo qualification belongs only to laboratory entrypoints."
     errcheck:
       check-type-assertions: true
     funlen:

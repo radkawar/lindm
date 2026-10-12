@@ -142,28 +142,6 @@
         "description": "Shared security baseline; executor file allowed_roots must include /etc/motd.d.",
         "resources": [
           {
-            "resourceId": "9559767f-82ee-44e2-90fb-118a73f67ce9",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_MANAGED_FILE",
-                "canonicalKey": "/etc/modprobe.d/99-lindm-blocklist.conf"
-              },
-              "managedFile": {
-                "path": "/etc/modprobe.d/99-lindm-blocklist.conf",
-                "presence": "PRESENCE_PRESENT",
-                "kernelModuleBlocklist": { "modules": ["usb_storage", "uas"] }
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
             "resourceId": "be829bf4-93b4-514f-b6ef-6edf2f1dbeba",
             "desired": {
               "ref": {
@@ -282,7 +260,7 @@
             },
             "ownership": {
               "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+              "release": "RELEASE_BEHAVIOR_RETAIN"
             },
             "verification": {
               "maxAgeSeconds": 3600,
@@ -749,8 +727,30 @@
       "id": "32e2cd56-942d-598e-ab1e-a08ab71a1769",
       "spec": {
         "name": "Finance hardened",
-        "description": "Higher-priority password and firewall policy; sshd.service is stopped and disabled on the Finance host.",
+        "description": "Higher-priority password and firewall policy; USB storage (usb_storage, uas) is blocked through the typed kernel-module template, which the executor must enable with fileProvider.kernelModuleBlocklist; sshd.service is stopped and disabled on the Finance host.",
         "resources": [
+          {
+            "resourceId": "7a58ef8d-c669-512a-8ddd-f50363181dc1",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_MANAGED_FILE",
+                "canonicalKey": "/etc/modprobe.d/99-lindm-blocklist.conf"
+              },
+              "managedFile": {
+                "path": "/etc/modprobe.d/99-lindm-blocklist.conf",
+                "presence": "PRESENCE_PRESENT",
+                "kernelModuleBlocklist": { "modules": ["usb_storage", "uas"] }
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
           {
             "resourceId": "2d9b052d-75b6-5839-9985-e0925ac4b053",
             "desired": {
@@ -818,7 +818,7 @@
             },
             "ownership": {
               "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+              "release": "RELEASE_BEHAVIOR_RETAIN"
             },
             "verification": {
               "maxAgeSeconds": 3600,

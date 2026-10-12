@@ -3,6 +3,7 @@ package orgapply
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -340,6 +341,27 @@ func TestExceptionsRemainPendingUntilExactFindingExists(t *testing.T) {
 	}
 	if plan.Outcomes[0].Status != "pending" || !strings.Contains(plan.Outcomes[0].Detail, "ambiguous") {
 		t.Fatal("ambiguous hostname selected an arbitrary device")
+	}
+}
+
+// A real Ubuntu desktop reports more than 33,000 findings; resolving one declared
+// exception must not depend on retaining the whole list under the catalog cap.
+func TestExceptionResolvesFindingBeyondCatalogCap(t *testing.T) {
+	client := newFakeAdmin()
+	desired := &orgv1.AdvisoryException{Hostname: "laptop", AdvisoryId: "vendor-advisory", PackageName: "package", Request: &adminv1.AcceptAdvisoryFindingRequest{Reason: "temporary compatibility exception", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}}
+	spec := &orgv1.Organization{Name: "exceptions", AdvisoryExceptions: []*orgv1.AdvisoryException{desired}}
+	client.fleet = []*adminv1.Device{{Id: uuid.NewString(), Hostname: "laptop"}}
+	for i := range 33509 {
+		client.findings = append(client.findings, &adminv1.AdvisoryFinding{Id: uuid.NewString(), AdvisoryId: fmt.Sprintf("other-%d", i), PackageName: desired.PackageName, State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED})
+	}
+	target := &adminv1.AdvisoryFinding{Id: uuid.NewString(), AdvisoryId: desired.AdvisoryId, PackageName: desired.PackageName, State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED}
+	client.findings = append(client.findings, target)
+	plan, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Outcomes[0].Status != "created" || plan.Outcomes[0].ID != target.GetId() {
+		t.Fatalf("declared finding on the last page was not resolved: %+v", plan.Outcomes[0])
 	}
 }
 

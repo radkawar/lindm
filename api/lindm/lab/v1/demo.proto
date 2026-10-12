@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/resource_native.proto";
+import "lindm/lab/v1/hosts.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// DemoSpec describes real devices, not qualification evidence. Relative file
+// references resolve from the directory containing this document.
+message DemoSpec {
+  option (buf.validate.message).cel = {
+    id: "demo.unique_devices"
+    message: "device keys and hostnames must be unique"
+    expression: "this.devices.all(d, this.devices.filter(o, o.key == d.key).size() == 1 && this.devices.filter(o, o.hostname == d.hostname).size() == 1)"
+  };
+  string organization = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  repeated DemoDevice devices = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 100
+  }];
+}
+
+// DemoDevice binds placement and enrollment to one named real machine.
+message DemoDevice {
+  option (buf.validate.message).cel = {
+    id: "demo.desktop_assistance"
+    message: "assistance is only available for DESKTOP devices"
+    expression: "!this.assistance || this.role == 1"
+  };
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  string hostname = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+  }];
+  string manifest = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  DemoRole role = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Must name a static group in the referenced organization.
+  string group = 5 [(buf.validate.field).string.uuid = true];
+  // Must name an organization token assigning this device's static group.
+  string provisioning_token = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  bool assistance = 7;
+  bool tpm_bind = 8;
+  optional string host = 9 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  DemoFirmware firmware = 10 [(buf.validate.field).required = true];
+  // The device owner's explicit root executor opt-in for managed files, as a
+  // customer writes it in /etc/lindm/executor.json. The kernel-module template
+  // is admitted only where the registry names qualified initramfs tooling.
+  lindm.agent.v1.NativeFileProviderConfig file_provider = 11;
+}
+
+// DemoRole selects the installed system's role, independently of its group.
+enum DemoRole {
+  DEMO_ROLE_UNSPECIFIED = 0;
+  DEMO_ROLE_DESKTOP = 1;
+  DEMO_ROLE_SERVER = 2;
+}
+
+// DemoFirmware pins files on the execution host, not on the controller.
+// Secure Boot must be explicit; a TPM does not imply Secure Boot enforcement.
+message DemoFirmware {
+  string code = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string vars = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string package = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string version = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  optional bool secure_boot = 5 [(buf.validate.field).required = true];
+}
+
+// DemoState persists the original execution-host and device binding. It contains
+// no enrollment secrets and does not establish native success.
+message DemoState {
+  option (buf.validate.message).cel = {
+    id: "demo.unique_bindings"
+    message: "binding keys must be unique"
+    expression: "this.bindings.all(b, this.bindings.filter(o, o.key == b.key).size() == 1)"
+  };
+  repeated DemoBinding bindings = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 100
+  }];
+}
+
+// DemoBinding prevents a changed host inventory from orphaning a held device.
+message DemoBinding {
+  option (buf.validate.message).cel = {
+    id: "demo.binding_identity"
+    message: "binding key must match its device"
+    expression: "this.key == this.device.key"
+  };
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  string demo_name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  LabHost host = 3 [(buf.validate.field).required = true];
+  DemoDevice device = 4 [(buf.validate.field).required = true];
+  string manifest_sha256 = 5 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+}

@@ -178,3 +178,51 @@ func TestSystemCleanupInvalidInventoryNeverMutates(t *testing.T) {
 		t.Fatal("repeating page mutated resources")
 	}
 }
+
+// A persistent demo removes only its own recorded consumer: other laboratory
+// systems and activation keys stay, and absence is observed afterwards.
+func TestRemoveSystemDeletesOnlyRecordedConsumer(t *testing.T) {
+	owned, other := registrationPrefix+strings.Repeat("a", 32), registrationPrefix+strings.Repeat("b", 32)
+	f := &registrationFixture{systems: map[string]System{
+		consumerOne: {UUID: consumerOne, Name: owned},
+		consumerTwo: {UUID: consumerTwo, Name: other},
+	}, keys: map[string]bool{other: true}}
+	client := registrationClient(t, f)
+	result, err := client.RemoveSystem(context.Background(), consumerOne, owned)
+	if err != nil || !result.Deleted || !result.Absent || result.UUID != consumerOne {
+		t.Fatalf("removal = %+v, %v", result, err)
+	}
+	if len(f.systemDeletes) != 1 || f.systemDeletes[0] != consumerOne || len(f.systems) != 1 || !f.keys[other] {
+		t.Fatal("removal touched another system or key")
+	}
+	result, err = client.RemoveSystem(context.Background(), consumerOne, owned)
+	if err != nil || result.Deleted || !result.Absent || len(f.systemDeletes) != 1 {
+		t.Fatalf("already absent removal = %+v, %v", result, err)
+	}
+}
+
+func TestRemoveSystemRefusesRenamedOrMalformedIdentity(t *testing.T) {
+	owned := registrationPrefix + strings.Repeat("c", 32)
+	f := &registrationFixture{systems: map[string]System{consumerOne: {UUID: consumerOne, Name: "customer-system"}}}
+	client := registrationClient(t, f)
+	if _, err := client.RemoveSystem(context.Background(), consumerOne, owned); err == nil || len(f.systemDeletes) != 0 {
+		t.Fatal("renamed consumer deleted")
+	}
+	for _, test := range [][2]string{{"bad-id", owned}, {consumerOne, "customer-system"}} {
+		if _, err := client.RemoveSystem(context.Background(), test[0], test[1]); err == nil {
+			t.Fatalf("malformed identity %v accepted", test)
+		}
+	}
+	if len(f.systemDeletes) != 0 {
+		t.Fatal("malformed identity reached DELETE")
+	}
+}
+
+func TestRemoveSystemRequiresObservedAbsence(t *testing.T) {
+	owned := registrationPrefix + strings.Repeat("d", 32)
+	f := &registrationFixture{systems: map[string]System{consumerOne: {UUID: consumerOne, Name: owned}}, keepSystem: true}
+	result, err := registrationClient(t, f).RemoveSystem(context.Background(), consumerOne, owned)
+	if err == nil || !result.Deleted || result.Absent {
+		t.Fatalf("acknowledged DELETE substituted for absence: %+v, %v", result, err)
+	}
+}

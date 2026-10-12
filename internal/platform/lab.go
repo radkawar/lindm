@@ -40,6 +40,9 @@ type Lab struct {
 	// its key file that the installed root adds packages from; %s is the
 	// architecture.
 	Kickstart, Repository, RepositoryKey string
+	// RPMMedia describes offline repositories on the authenticated installer
+	// DVD. It does not grant CDN entitlement or provide security updates.
+	RPMMedia *LabRPMMedia
 	// TPM is the encrypted installer's TPM2-unlocking initramfs recipe.
 	TPM LabTPM
 	// Session is the encrypted golden's graphical lab session.
@@ -82,6 +85,12 @@ type RollingTarget struct {
 // it start a full package update through the native frontend.
 type LabUpdater struct {
 	Unit, Trigger string
+}
+
+// LabRPMMedia keeps vendor DVD layout and installed signing-key facts here.
+type LabRPMMedia struct {
+	Repositories []string
+	Key          string
 }
 
 // LaneGate is why a lab lane cannot qualify a release. Architectures lists the

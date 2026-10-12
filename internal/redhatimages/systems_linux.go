@@ -274,3 +274,56 @@ func (c *Client) CleanupRegistrations(ctx context.Context, confirmed bool, legac
 	}
 	return result, errors.Join(failures...)
 }
+
+// SystemRemoval reports one exact consumer's removal. Absent requires a
+// subsequent GET 404; Deleted means this call's DELETE was acknowledged.
+type SystemRemoval struct {
+	UUID    string `json:"uuid"`
+	Deleted bool   `json:"deleted"`
+	Absent  bool   `json:"absent"`
+}
+
+// RemoveSystem deletes exactly one laboratory consumer recorded by its owner's
+// registration receipt, without touching any other system or key. The re-read
+// name must still be that registration's own name; it is never located by
+// hostname. An already absent system is reported as absent, not deleted.
+func (c *Client) RemoveSystem(ctx context.Context, id, name string) (SystemRemoval, error) {
+	result := SystemRemoval{UUID: id}
+	if !canonicalConsumerUUID(id) || !ownedRegistration(name) {
+		return result, errors.New("redhatimages: removal requires an exact consumer UUID and its own registration name")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	system, absent, err := c.readSystem(ctx, id)
+	if err != nil {
+		return result, err
+	}
+	if !absent {
+		if system.Name != name {
+			return result, errors.New("redhatimages: system ownership changed before removal")
+		}
+		response, err := c.systemRequest(ctx, http.MethodDelete, id, 0)
+		if err != nil {
+			return result, err
+		}
+		closeErr := response.Body.Close()
+		switch response.StatusCode {
+		case http.StatusNoContent:
+			result.Deleted = true
+		case http.StatusNotFound:
+		default:
+			return result, fmt.Errorf("redhatimages: system removal HTTP status %d", response.StatusCode)
+		}
+		if closeErr != nil {
+			return result, errors.New("redhatimages: system removal response close failed")
+		}
+	}
+	if _, absent, err = c.readSystem(ctx, id); err != nil {
+		return result, err
+	}
+	if !absent {
+		return result, errors.New("redhatimages: system remains after removal")
+	}
+	result.Absent = true
+	return result, nil
+}

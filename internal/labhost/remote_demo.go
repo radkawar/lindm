@@ -3,6 +3,7 @@ package labhost
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,6 +89,17 @@ func (r RemoteRun) destroyAssistance(ctx context.Context) (err error) {
 		return err
 	}
 	argv := []string{remote + "/lab", "host-exec", remote + "/host.json", "vm", "assistance", "-hold", "-name", name, "-destroy", "-demo-root", demo, "-work-dir", work}
+	if parent := FlagValue(r.Args, "demo-parent"); parent != "" {
+		argv = append(argv, "-demo-parent", parent)
+	}
+	// An organization device's recorded RHSM consumer is removed before its VM.
+	if token := FlagValue(r.Args, "redhat-token-file"); token != "" {
+		staged, err := stage.input(token)
+		if err != nil {
+			return fmt.Errorf("stage -redhat-token-file: %w", err)
+		}
+		argv = append(argv, "-redhat-token-file", staged)
+	}
 	for i := range argv {
 		argv[i] = QuoteShell(argv[i])
 	}

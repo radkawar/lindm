@@ -3,6 +3,7 @@ package orgapply
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
@@ -159,8 +160,22 @@ func (f *fakeAdmin) CreateApproval(_ context.Context, r *connect.Request[adminv1
 
 var _ adminv1connect.AdminServiceClient = (*fakeAdmin)(nil)
 
-func (f *fakeAdmin) ListDeviceFindings(context.Context, *connect.Request[adminv1.ListDeviceFindingsRequest]) (*connect.Response[adminv1.ListDeviceFindingsResponse], error) {
-	return connect.NewResponse(&adminv1.ListDeviceFindingsResponse{Findings: f.findings}), nil
+// ListDeviceFindings pages like the product: at most page_size findings and an
+// opaque cursor (here the decimal offset) until the device's list is exhausted.
+func (f *fakeAdmin) ListDeviceFindings(_ context.Context, request *connect.Request[adminv1.ListDeviceFindingsRequest]) (*connect.Response[adminv1.ListDeviceFindingsResponse], error) {
+	start := 0
+	if token := request.Msg.GetPageToken(); token != "" {
+		var err error
+		if start, err = strconv.Atoi(token); err != nil || start < 0 || start > len(f.findings) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid page token"))
+		}
+	}
+	end := min(start+int(request.Msg.GetPageSize()), len(f.findings))
+	response := &adminv1.ListDeviceFindingsResponse{Findings: f.findings[start:end]}
+	if end < len(f.findings) {
+		response.NextPageToken = strconv.Itoa(end)
+	}
+	return connect.NewResponse(response), nil
 }
 func (f *fakeAdmin) AcceptAdvisoryFinding(_ context.Context, request *connect.Request[adminv1.AcceptAdvisoryFindingRequest]) (*connect.Response[adminv1.AcceptAdvisoryFindingResponse], error) {
 	f.requests = append(f.requests, proto.CloneOf(request.Msg))

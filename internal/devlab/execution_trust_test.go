@@ -1,12 +1,64 @@
 package devlab
 
 import (
+	"os"
 	"slices"
 	"testing"
 
+	"google.golang.org/protobuf/encoding/protojson"
+
 	agentv1 "lindm/gen/lindm/agent/v1"
+	orgv1 "lindm/gen/lindm/org/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
+
+// A persistent organization demo's delegation must let its signers execute every
+// resource kind the maintained organization assigns; otherwise every profile row
+// is refused by the agent as execution_signing_rejected. A disposable action
+// lane keeps its narrow read-only grant.
+func TestPersistentDemoDelegationCoversOrganizationResourceKinds(t *testing.T) {
+	data, err := os.ReadFile("../../lab/demo/org.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	organization := new(orgv1.Organization)
+	if err := protojson.Unmarshal(data, organization); err != nil {
+		t.Fatal(err)
+	}
+	persistent, err := deviceActionDelegationCapabilities(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disposable, err := deviceActionDelegationCapabilities(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := 0
+	for _, profile := range organization.GetProfiles() {
+		for _, row := range profile.GetSpec().GetResources() {
+			capability, err := resource.Capability(row.GetDesired().GetRef().GetKind())
+			if err != nil {
+				t.Fatalf("%s: %v", profile.GetSpec().GetName(), err)
+			}
+			if !slices.Contains(persistent, capability) {
+				t.Errorf("persistent demo delegation cannot execute %s (%s) from %s", row.GetDesired().GetRef().GetKind(), capability, profile.GetSpec().GetName())
+			}
+			kinds++
+		}
+	}
+	if kinds == 0 {
+		t.Fatal("maintained organization assigns no resources")
+	}
+	service, err := resource.Capability(resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(disposable, service) {
+		t.Fatal("disposable action lane gained service execution")
+	}
+}
 
 // A console built with new action forms must not receive service-only signing
 // authority. Reflecting the closed schema makes future action omissions visible.

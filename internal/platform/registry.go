@@ -471,6 +471,7 @@ var registry = []*Release{
 		Quirks:   withPins(elQuirks9, el9Pins),
 		Lab: Lab{Lanes: slices.Concat(rhelLanes, []LabLane{LaneProvisionKickstart}), LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
+			RPMMedia: &LabRPMMedia{Repositories: []string{"BaseOS", "AppStream"}, Key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"},
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor in

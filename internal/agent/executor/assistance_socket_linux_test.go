@@ -56,7 +56,13 @@ func serveSessionSocket(t *testing.T, networkUID uint32, broker *assistanceBroke
 	path := filepath.Join(dir, localrpc.SessionSocketName)
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		if _, err := os.Lstat(path); err == nil {
+		// bind(2) publishes the socket inode before listen(2) accepts clients.
+		// Observe a real connection, not just the pathname, before the first RPC.
+		conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", path)
+		if err == nil {
+			if err := conn.Close(); err != nil {
+				t.Fatal(err)
+			}
 			break
 		}
 		select {
@@ -66,7 +72,7 @@ func serveSessionSocket(t *testing.T, networkUID uint32, broker *assistanceBroke
 		default:
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("session socket was not created")
+			t.Fatal("session socket did not accept connections")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

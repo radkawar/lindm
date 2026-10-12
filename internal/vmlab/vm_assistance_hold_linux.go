@@ -41,6 +41,11 @@ type AssistanceHold struct {
 	Persistent        bool
 	ExistingAccount   bool
 	OwnerAccessFile   string
+	TPMActionID       string
+	Resumed           bool
+	// TPMPassphraseFallback reports that this run's boot of a TPM-bound device
+	// prompted and was unlocked with the stored owner passphrase.
+	TPMPassphraseFallback bool
 }
 
 // holdAssistance hands the owner a fresh console enrollment and the guest's

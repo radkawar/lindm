@@ -298,6 +298,12 @@ tuple does not prove an authenticated boot chain or physical TPM security.
 The assistance and TPM results are separate runs, not a single post-bind
 assistance session.
 
+The [persistent organization demo](../engineering.md#persistent-organization-demo)
+uses this explicitly non-Secure-Boot aarch64 GNOME tuple for Finance, installs the
+agent from the console's signed RPM repository, and performs the product TPM
+action on its own retained encrypted overlay. It does not change firmware
+security to obtain a pass or treat the demo as new platform qualification.
+
 Fedora dracut 108 separates the `systemd-cryptsetup` module from `crypt`
 ([`encrypted_installer_linux.go:205-213`](../../internal/vmlab/encrypted_installer_linux.go#L205-L213)).
 Incorrect-passphrase diagnostics can stay in the initramfs journal without a

@@ -2,6 +2,7 @@ package orgapply
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,12 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 	for _, d := range fleet {
 		byHostname[d.GetHostname()] = append(byHostname[d.GetHostname()], d)
 	}
+	// A real device lists tens of thousands of findings. Scan every page but
+	// retain only declared identities, so the catalog cap bounds matches.
+	declared := make(map[string]bool, len(p.spec.GetAdvisoryExceptions()))
+	for _, e := range p.spec.GetAdvisoryExceptions() {
+		declared[findingKey(e.GetHostname(), e.GetAdvisoryId(), e.GetPackageName())] = true
+	}
 	findings := make(map[string][]*adminv1.AdvisoryFinding)
 	for _, e := range p.spec.GetAdvisoryExceptions() {
 		name := e.GetHostname() + "/" + e.GetAdvisoryId() + "/" + e.GetPackageName()
@@ -49,12 +56,22 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 		deviceID := candidates[0].GetId()
 		items, ok := findings[deviceID]
 		if !ok {
+			hostname, scanned := e.GetHostname(), 0
 			items, err = pages(func(token string) ([]*adminv1.AdvisoryFinding, string, error) {
+				if scanned++; scanned > maxFindingPages {
+					return nil, "", errors.New("orgapply: device findings exceed the scan bound")
+				}
 				r, e := client.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 200, PageToken: token}))
 				if e != nil {
 					return nil, "", e
 				}
-				return r.Msg.GetFindings(), r.Msg.GetNextPageToken(), nil
+				var matches []*adminv1.AdvisoryFinding
+				for _, f := range r.Msg.GetFindings() {
+					if declared[findingKey(hostname, f.GetAdvisoryId(), f.GetPackageName())] {
+						matches = append(matches, f)
+					}
+				}
+				return matches, r.Msg.GetNextPageToken(), nil
 			})
 			if err != nil {
 				return fmt.Errorf("list exception findings: %w", err)
@@ -105,4 +122,12 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 		p.add("advisory_exception", name, match.GetId(), status, "", request)
 	}
 	return nil
+}
+
+// maxFindingPages bounds one device's scan at 1,000,000 findings of 200 per
+// page: ten findings for each of the 100,000 packages an inventory may report.
+const maxFindingPages = 5000
+
+func findingKey(hostname, advisoryID, packageName string) string {
+	return hostname + "\x00" + advisoryID + "\x00" + packageName
 }

@@ -168,6 +168,20 @@ type DeviceFindingCounts struct {
 	Freshness *adminv1.AdvisoryFreshness
 }
 
+// UnknownEvaluationError reports a device whose current evaluation stayed
+// UNKNOWN for the whole wait. Counts carries that evaluation and its reason;
+// callers decide whether the product's reason is an honest terminal state.
+type UnknownEvaluationError struct {
+	Counts *DeviceFindingCounts
+	err    error
+}
+
+func (e *UnknownEvaluationError) Error() string {
+	return fmt.Sprintf("wait for device advisory evaluation (%s): %v", e.Counts.Freshness.GetReason(), e.err)
+}
+
+func (e *UnknownEvaluationError) Unwrap() error { return e.err }
+
 // WaitDeviceFindings waits for a current evaluation through the admin API, never
 // treating missing coverage or a pending evaluation as a zero finding count.
 func WaitDeviceFindings(ctx context.Context, session *OwnerSession, deviceID string, timeout time.Duration) (*DeviceFindingCounts, error) {
@@ -179,6 +193,7 @@ func WaitDeviceFindings(ctx context.Context, session *OwnerSession, deviceID str
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	reason := "evaluation_pending"
+	var last *DeviceFindingCounts
 	for {
 		counts, err := deviceFindingCounts(ctx, session, deviceID)
 		if err != nil {
@@ -191,10 +206,13 @@ func WaitDeviceFindings(ctx context.Context, session *OwnerSession, deviceID str
 				adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR:
 				return counts, nil
 			}
-			reason = counts.Freshness.GetReason()
+			reason, last = counts.Freshness.GetReason(), counts
 		}
 		select {
 		case <-ctx.Done():
+			if last != nil && last.Freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN && reason != "" && reason != "evaluation_pending" {
+				return nil, &UnknownEvaluationError{Counts: last, err: ctx.Err()}
+			}
 			return nil, fmt.Errorf("wait for device advisory evaluation (%s): %w", reason, ctx.Err())
 		case <-ticker.C:
 		}

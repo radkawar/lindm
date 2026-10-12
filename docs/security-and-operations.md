@@ -575,23 +575,26 @@ firewall-zone or update-policy resource where applicable.
 Company baseline sets password controls, deny-by-default ingress with TCP/22 allowed
 for both IP families, persistent sysctl hardening, `/etc/motd.d/50-company`,
 disabled/stopped `cups.service`, and daily security-update starts between 02:00 and
-04:00 Europe/London. Reboots use `SCHEDULED` with a 120-minute maximum delay after
-updates, not a separate reboot window. An already-running update is not killed at
+04:00 Europe/London. Reboots use `SCHEDULED` within an independent daily
+05:00–07:00 Europe/London reboot window, at most 360 minutes after the update, with
+up to two 30-minute employee deferrals. An already-running update is not killed at
 window end. The executor's managed-file `allowed_roots` must explicitly include
 `/etc/motd.d`; approving `/etc` is not a substitute. The host must use pam_motd to
 display that directory.
 
 Engineering adds git, htop and podman, the typed SSH login banner, plus the local
 `developers` group and a `developer` user with a locked password, not an embedded
-login secret. Finance strengthens password controls, removes the SSH firewall
-exception and stops/disables `sshd.service` for its native host; other service names need an explicit profile
+login secret. Finance strengthens password controls, blocks USB storage
+(`usb_storage`, `uas`) through the typed kernel-module template, removes the SSH
+firewall exception and stops/disables `sshd.service` for its native host; other
+service names need an explicit profile
 change. Contractors deny ingress and default egress, permitting only outbound
 TCP 80/443/53 and UDP 53 for both IP families, with a nightly 02:00–02:30 update
 start window. This restriction requires a compatible firewall backend and may block
 nonstandard control-plane ports. Preserve the executor's connectivity guard; do not
 bypass a refused network change. Profiles use create-only ownership, so existing
 unowned native state may require the normal explicit adoption workflow rather than
-being silently taken over.
+being silently taken over; service rows retain native state on release.
 
 **Executor native repository approvals:** Engineering's package resources apply
 only to Ubuntu 24.04 (`Ubuntu`, `x86_64` or `aarch64` platform observations), with DEB
@@ -621,7 +624,10 @@ Advisory exception examples select `demo-engineering-01` and `demo-finance-01`.
 Their expiries are 45 and 60 days after 2026-10-11; review the dates and reasons
 before use. These are illustrative selectors, not a claim that either host is
 vulnerable. Missing or ambiguous hosts/findings remain pending; no finding is
-fabricated and no unrelated finding is accepted.
+fabricated and no unrelated finding is accepted. Planning scans every page of
+the selected device's findings (a real desktop has tens of thousands) but keeps
+only declared matches; a scan beyond 1,000,000 findings fails rather than
+resolving from a partial list.
 
 Set `authorization.approvalRequiredPermissions` to include
 `advisory_exceptions.manage` to require two-human risk acceptance. The policy is
@@ -764,8 +770,10 @@ blindly replayed. See [native records](verification.md#ssh-login-banner).
 
 - USB-storage blocking uses the typed `managedFile.kernelModuleBlocklist` template,
   never arbitrary content at a forbidden path. The executor must explicitly enable
-  `fileProvider.kernelModuleBlocklist`; the demo baseline blocks `usb_storage` and
-  `uas`. The only path is `/etc/modprobe.d/99-lindm-blocklist.conf`, root:root 0644.
+  `fileProvider.kernelModuleBlocklist`; the demo's Finance profile blocks
+  `usb_storage` and `uas`, and the persistent organization demo opts in only the
+  Finance device, whose release names qualified initramfs tooling. The only path
+  is `/etc/modprobe.d/99-lindm-blocklist.conf`, root:root 0644.
   Applying rebuilds installed initramfs images, independently reads their embedded
   stanza and observes native modprobe settings and loaded/built-in modules.
   Loaded modules require a restart; built-in modules are not applicable. No driver

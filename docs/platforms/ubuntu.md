@@ -817,6 +817,13 @@ never establish current vendor freshness. The running banner waits for a current
 non-unknown device evaluation and reports real paginated finding counts.
 Rows without maintained feed facts and unsupported architectures fail explicitly.
 
+The [persistent organization demo](../engineering.md#persistent-organization-demo)
+uses an encrypted Ubuntu 24.04 GNOME Engineering device and the console's signed
+APT installation command. Its requested TPM bind is separately admitted against
+the exact architecture's maintained encryption ledger record; aarch64 assistance
+qualification alone never admits TPM binding. Missing qualification is a startup
+gate, not a silently passphrase-only device.
+
 Qualified: virtual x86_64 and native-KVM aarch64 GNOME/Wayland consent, view,
 control, operator and local stop, decline, portal cancel and lock termination,
 with audit, in

@@ -5699,6 +5699,70 @@ This proves held-demo persistence on native aarch64 KVM, not a new
 remote-control scenario qualification or physical-device validation. Stable,
 nonsecret sibling lock files intentionally remain after destruction.
 
+#### Persistent organization demo, Sparks-only (2026-10-12)
+
+`lab demo -name org-smoke -spec lab/demo/org-demo.json` passed create → Ctrl-C →
+resume → Ctrl-C → `-destroy` with every VM on native aarch64 KVM and only
+`lindmd`, PostgreSQL and TURN on the controller workstation:
+
+- Engineering laptop, Ubuntu 24.04 GNOME, `dgx20`, Secure Boot on: device
+  `66746ac8-1b42-476b-811a-c96c31ba07e0`, product TPM bind
+  `b4197cec-35e5-48ae-a26a-6b6e7bae4ce1`, 33,523 affected findings.
+- Finance desktop, Fedora 44 GNOME, `dgx21`, Secure Boot off: device
+  `3d874d27-a55a-45a2-8d7b-a22c64b52c52`, TPM bind
+  `b744e1ed-6292-47b7-a593-8a81619ce152`, 145 affected findings.
+- IT server, headless RHEL 9.8 aarch64, `dgx21`, Secure Boot on: device
+  `fee49d61-32e6-480d-bfb4-7dd5a338254f`, TPM bind
+  `719e02ad-5f80-441d-b861-16bd9c91e3e8`; dependencies from the authenticated
+  Binary DVD, agent from the console `/repo`, then RHSM registration (consumer
+  `c7459e62-bf98-43a0-a300-4715d22fc1bb`) and a product inventory refresh.
+  Findings stayed `unknown (rhel_platform_stream_unavailable)`: the agent's DNF
+  platform probe reported repositories, releasever and releasever lock as
+  `COLLECTION_STATUS_PERMISSION_DENIED`, an open product inventory defect routed
+  to the RHEL matrix owner. The demo reports that state, never zero findings.
+
+Each device was in its declared static group with assistance-ready desktops. The
+first organization apply set runtime authorization through the owner session;
+the ready apply created 10 and updated 3 objects; the second apply returned 32
+unchanged and 2 pending outcomes. The pending outcomes were the two illustrative
+advisory exceptions, whose selectors match no real finding. The resume kept all
+three device IDs and TPM actions. It reused the original owner enrollment
+(expiry 2026-10-12T08:26:00Z, not reissued) and the persisted owner session. Its
+three applies were unchanged except for the same two pending exceptions. Both
+Ctrl-C stops exited 0. `-destroy` removed RHSM consumer
+`c7459e62-bf98-43a0-a300-4715d22fc1bb` by exact UUID (`deleted=true
+absent=true`) before deleting the IT VM, then removed all three device leaves,
+the controller and its database. Afterwards no named database, demo directory,
+owned process or console/TURN/device listener remained on the workstation,
+`dgx20` or `dgx21`; only empty sibling lock files remain.
+
+Real runs found and fixed these defects before the passing run:
+
+- Exception planning exceeded orgapply's 10,000-object catalog cap on the
+  33,523-finding desktop.
+- The DVD mount and Ctrl-C while queued exited unsuccessfully.
+- 1dcbed0c masked vendor update units on a persistent device; demo devices now
+  wait, bounded and holder-named, instead.
+- Desktop provisioning was skipped after an interrupted first run.
+- Unregistered RHEL could not establish its CSAF stream.
+- The remote destroy omitted the Red Hat token.
+
+Twice, a TPM-bound Ubuntu 24.04 aarch64 root prompted for its passphrase on an
+unattended boot. Every unattended boot also logs a first
+`Esys_Unseal` failure with `TPM_RC_PCR_CHANGED` (0x128) before systemd 255's
+second attempt unlocks. This is reported as a product encryption defect. The
+demo now types the stored owner passphrase only at an actual prompt and says so;
+it never rebinds.
+
+Evidence: `~/.cache/lindm-assistqual-20261011/org-demo-05/smoke-manifest.sha256`,
+SHA-256 `4985e32ee8d4f5e97d855159f82166ece2bae95bcd51c928cd0a21463fad0952`
+(apply outcomes, `ready.json` for create and resume, destroy output and checks,
+binary digests). Good-boot TPM evidence:
+`org-demo-06/tpm-boot-*.txt` and `tpm-evidence.sha256`. Source checkpoints were
+the pre-landing private commits `1c12d163` (create), `53db7569` (resume) and
+`5217b45b` (destroy). This is virtual-machine evidence, not physical-device or
+assistance-scenario qualification.
+
 #### Named split held lifecycle regression
 
 On 2026-10-11, a native aarch64 KVM run on `dgx20` exercised

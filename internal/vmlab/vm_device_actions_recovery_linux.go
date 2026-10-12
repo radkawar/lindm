@@ -47,7 +47,7 @@ func nativeRecoveryDestruction(ctx context.Context, target *EncryptedVM, manifes
 		return result, err
 	}
 	result.Runtime.DiskCount++
-	if err := installActionPrerequisites(ctx, recovery.guest, manifest); err != nil {
+	if err := installActionPrerequisites(ctx, recovery.guest, manifest, true); err != nil {
 		return result, err
 	}
 	if err := packages.Install(ctx, recovery.guest, labBinary); err != nil {

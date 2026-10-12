@@ -690,6 +690,185 @@ ordinary production `lindmd` restarts already retain PostgreSQL accounts,
 sessions, devices and findings. Only disposable laboratory fixture cleanup
 intentionally drops a database. A named fixture retains it until explicit destroy.
 
+#### Persistent organization demo
+
+`lab demo -name NAME -spec lab/demo/org-demo.json` composes one persistent
+controller with multiple real, encrypted machines. The strict protobuf JSON
+schema is `lindm.lab.v1.DemoSpec`; its organization and manifest paths resolve
+relative to the specification file. The product organization remains
+[`lab/demo/org.json`](../lab/demo/org.json), not a parallel lab policy model.
+Each device names a static group and that organization's provisioning token.
+Host firmware paths belong to the execution host. Host selection requires
+native KVM. Before starting any device worker, the runner reserves each host's
+entire guest footprint atomically through ordinary FIFO admission, acquiring
+hosts in global host-name order so concurrent demos cannot retain partial
+per-host reservations and deadlock. Resume uses the originally bound host even
+if inventory configuration subsequently changes. The SSH lifetime broker
+transfers each actual flock lease once through a private authenticated Unix
+socket; workers retain it through teardown even if the broker or controller
+disconnects. This does not introduce a public admission-bypass option.
+
+```sh
+# From the main checkout: build the stamped console/server and lab binaries
+# before requesting lab admission (an unstamped `make build` server is not a
+# valid native-enrollment build).
+cd ~/dev/minor/lindm && make acceptance-build
+artifacts/bin/lab demo -name org \
+  -spec lab/demo/org-demo.json -repo . -build-repo . \
+  -redhat-token-file ~/.config/lindm/redhat-offline-token \
+  -evidence /new/private/org-create
+# Ctrl-C stops every VM, SSH worker and lindmd; state is retained.
+# Resume: the same command with a new -evidence directory. A resume may use a
+# newer build; persisted device identities and owner custody are unchanged.
+artifacts/bin/lab demo -name org -destroy -repo . -build-repo . \
+  -redhat-token-file ~/.config/lindm/redhat-offline-token
+```
+
+`-repo` is the initialized development checkout (PostgreSQL, trust, image and
+golden caches); `-build-repo` is the source the remote workers are built from.
+
+The example runs every VM on the aarch64 Sparks and takes no local lab slot:
+Ubuntu 24.04 GNOME Engineering on `dgx20`, and Fedora 44 GNOME Finance plus the
+encrypted RHEL 9 aarch64 IT/Helpdesk server (no desktop) on `dgx21`. Only
+`lindmd`, PostgreSQL and TURN run on the controller workstation. Fedora aarch64
+explicitly does **not** enforce Secure Boot; TPM PCR7 binding in SetupMode is
+not an authenticated boot chain.
+No synthetic fleet is included. Registry capability gates and the maintained
+qualification ledger admit the exact release/architecture before allocating
+any fixture. Every real device requires encrypted-install qualification;
+requested assistance and TPM binding require their own applicable verified
+PASS. TPM qualification is never inferred from a release-only capability.
+An unqualified Ubuntu aarch64 TPM entry therefore prevents startup until its
+maintained record is present; it does not silently disable the requested bind.
+Unknown qualification scopes, partial records and mismatched Secure Boot
+conditions are not accepted as complete qualification.
+The explicit full-encryption scope
+`full encryption; product TPM bind; unattended cold boot; Secure Boot enforced`
+admits installation and TPM binding only when the device enforces Secure Boot;
+a TPM-only or Secure-Boot-off record cannot satisfy that request.
+The maintained full-five-scenario GNOME Wayland assistance records (colocated
+and split controller/dgx20) likewise require the recorded Secure-Boot-on mode.
+
+The controller owns PostgreSQL, admin HTTPS, the routed LAN device listener,
+and TURN. It publishes native enrollment packages for the union of device
+architectures and enables registry-derived real advisory feeds for the union
+of releases, using the persistent revalidating cache. The initial organization
+apply sets the declared roles and approval requirements as runtime authorization
+through the same owner AdminService session (`UpdateAuthorization`; server
+configuration is never rewritten) and creates enrollment prerequisites, but
+defers role accounts until the machines and findings are ready. The final apply
+uses a real owner browser-kind session and the ordinary account API/CSRF
+boundary; each operation opens a fresh bounded automated owner session,
+avoiding expiry during a long golden build. Each fresh guest runs the console's **same**
+`enrollmentInstallScript`, installing from the controller's `/repo/apt` or
+`/repo/rpm`, then uses the installed product `bootstrap -provisioning-token-file`
+path. It does not enroll through a lab grant or assign group membership later.
+The guest also uses the console-enrollment lane's pinned loopback SSH forward
+for native clients that resolve `localhost` internally instead of consulting
+`/etc/hosts`; the forward is reopened after the TPM cold boot. No installer URL,
+TLS trust check or customer package recipe is substituted.
+Desktop preparation and the remote worker are shared with held assistance.
+TPM binding uses the signed product device action and proves an independent
+unattended cold boot; neither native `cryptenroll` setup nor a prebound golden
+substitutes for the product action. Ubuntu 24.04 aarch64 TPM-bound roots
+intermittently prompt for the passphrase on an unattended boot, after both the
+bind proof boot and later resumes (an open product encryption defect). The
+runner then types the device's stored owner passphrase at the prompt, exactly
+as a user would, keeps the binding (it never rebinds) and prints
+`KEY: TPM unattended unlock fell back to passphrase on this boot (known
+intermittent race, reported)`; `ready.json` records `TPMPassphraseFallback`.
+Each unattended boot stores its TPM evidence in the device's evidence
+directory (`tpm-boot-*`: TPM/cryptsetup journal and kernel lines, TPM devices
+and modules, crypttab, initramfs TPM content, PCRs 0-7 and the LUKS token
+metadata), plus the prompted boot's serial console when it fell back.
+
+A golden booted long after it was built immediately runs its missed persistent
+`apt-daily-upgrade` timer (a first-boot unattended security upgrade). The
+organization's OS-update policy owns those units, so the runner never stops or
+masks them on demo devices. Before installing TPM-action or capture
+prerequisites it waits, with its own 30-minute budget, for a running vendor
+`apt-daily`/`apt-daily-upgrade` unit or dpkg lock holder, printing the holder's
+unit, PID and command; on expiry it fails naming that holder. The install then
+still waits on dpkg's own lock (`DPkg::Lock::Timeout`). Disposable action
+lanes still quiesce their clone's vendor updaters first. One-time desktop
+provisioning follows a saved per-device marker, so a run that stopped before
+reaching it prepares the desktop on the next resume.
+
+A real organization's RHEL server is registered: RHEL CSAF matching needs the
+servicing stream that only its entitled BaseOS repository corroborates, so an
+unregistered server stays `rhel_platform_stream_unavailable`. The IT server
+first installs from the authenticated, manifest-pinned Binary DVD's
+BaseOS/AppStream (re-verified ISO lent to QEMU read-only, vendor RPM signatures
+required, DVD metadata authenticated by the ISO digest). The lindm package comes
+only from the console `/repo`, with its unchanged signature checks. After
+enrollment and TPM binding, the device host registers it with RHSM through the
+maintained hosted path (`-redhat-token-file`, never in argv content, logs or
+evidence), deletes the single-use activation key, retires the DVD repository and
+mount, and uses the entitled repositories. The consumer UUID is persisted in a
+private receipt in the device root before any further guest operation; resume
+never registers again. `-destroy` removes that exact consumer through the Red
+Hat systems API, verifies its absence and reports it, before deleting the VM;
+a receipt without a recorded consumer is refused, never resolved by hostname.
+Each start requests the product's inventory refresh on the registered server so
+evaluation sees its entitled repositories. A device whose evaluation stays
+UNKNOWN for a product reason that only its own evidence can change (currently
+`rhel_platform_stream_unavailable`) is reported as `findings unknown (<reason>)`
+in the ready lines and `ready.json`, never as zero findings; pending or stale
+evaluations still fail the wait.
+
+The persistent controller's execution delegation names every executable
+resource kind as well as the device actions, so profile resources are signed by
+a delegate the agents accept. Persistent fixtures created before that delegated
+device actions only; their agents reject profile executions with
+`execution_signing_rejected`, so destroy and recreate them.
+
+Rollouts and target assignments are also deferred until the real enrolled cohort
+and inventory exist: rollout creation freezes its first ring, so an empty cohort
+must not be admitted by lowering the declared canary gates. Both passes use the
+same organization engine; the final pass consumes the full original declaration.
+
+The controller retains `demos/NAME/demo-state.json` with each original host
+snapshot, image digest and device binding, and `control-plane/` with the same
+trust, accounts, database and listener ports. Each device's host retains
+`demos/NAME-KEY/desktop/` and independent lane credentials in `authority/`.
+Device-set, image, enrollment and host-binding changes require explicit
+destroy; changing the referenced product organization reapplies through the
+product API without replacing VMs or re-enrolling devices. Authorization
+changes apply at runtime without restart; advisory configuration changes
+restart only `lindmd`. A device's `fileProvider` is the owner's root executor
+opt-in (`agentv1.NativeFileProviderConfig`, written to `/etc/lindm/executor.json`
+with only the executor restarted); it is local configuration, not identity, so a
+changed value is recorded in `demo-state.json` and applied at the next start. Its
+`kernelModuleBlocklist` is admitted only on releases whose registry names
+qualified initramfs tooling. Other native providers are not opted in, so their
+profile resources report the product's refusal rather than converging.
+
+Only `demos/NAME/owner-access` stores the human owner's original enrollment,
+role-account enrollment secrets, provisioning tokens and desktop passwords.
+It is atomically checkpointed with mode **0400**, including secrets from
+partially successful applies; never put it in evidence or version control.
+Transient SSH handoffs are private and consumed before readiness. Resume
+never issues another owner enrollment and never repeats device enrollment.
+Human owner and role-account secrets are issued at first readiness, not before
+potentially long VM preparation. Their product lifetime is **1 hour from the
+ready banner** (exact issuance expiry is recorded in `owner-access`); resume
+preserves the original credentials and does not renew the expiry. Enroll once
+promptly. An expired, never-completed role enrollment can be explicitly reset
+by an authorized owner in the console's **Accounts** page; that product reset
+returns a **fresh** enrollment and must not be mistaken for the preserved one.
+Normal session expiry, revocation and step-up rules still apply.
+
+Readiness requires current real findings for every device, its declared static
+membership, a post-enrollment organization apply and an additional unchanged
+apply. Public evidence contains device IDs, findings and apply outcomes, never
+credentials. Pending illustrative advisory exceptions and unsupported product
+features remain visible in those outcomes; control-plane acceptance is not
+native profile compliance. Printed instructions include the localhost console,
+an `ssh -L` command with a controller-host placeholder, the private enrollment
+location, and per-desktop `assistance-respond` commands. Local-user consent
+remains mandatory. Destruction uses the saved host bindings and exact owned
+paths, preserves shared caches and refuses active lifecycle locks.
+
 #### Console UI review
 
 `make ui-review` automates structural checks and emits an owner

@@ -22,10 +22,12 @@ import (
 
 // ConfigureDeviceActions installs private online signing and independent escrow
 // transport/wrapping keys in the owned server, with two-person reveal required.
-// The exact action delegation still needs normal Admin API admission. Only
-// read-only encryption compliance is added; no service execution or wildcard
-// capability is granted. Persistent fixtures restore the same delegation and
-// custody on subsequent calls; disposable fixtures require a single call.
+// The exact action delegation still needs normal Admin API admission. A
+// disposable fixture adds only read-only encryption compliance; a persistent
+// fixture (a held or organization demo whose profiles must dispatch) delegates
+// every executable resource kind. Persistent fixtures restore the same
+// delegation and custody on subsequent calls; disposable fixtures require a
+// single call.
 // Restarting preserves all accounts, sessions and the isolated database.
 func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1.UpdateExecutionTrustRequest, error) {
 	if f.connected != nil {
@@ -52,16 +54,11 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 		}
 		return nil, errors.New("device action custody is already configured")
 	}
-	capabilities, err := deviceActionCapabilities()
+	capabilities, err := deviceActionDelegationCapabilities(f.persistent)
 	if err != nil {
 		return nil, err
 	}
-	// Read-only encryption compliance is qualified on the same encrypted guest.
-	compliance, err := resource.Capability(resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE)
-	if err != nil {
-		return nil, err
-	}
-	keys, err := createExecutionTrustExerciseForLifetime(ctx, f.repository, append(capabilities, compliance), f.persistent)
+	keys, err := createExecutionTrustExerciseForLifetime(ctx, f.repository, capabilities, f.persistent)
 	if err != nil {
 		return nil, err
 	}
@@ -142,4 +139,23 @@ func deviceActionCapabilities() ([]string, error) {
 		capabilities = append(capabilities, capability)
 	}
 	return capabilities, nil
+}
+
+// deviceActionDelegationCapabilities is the delegation a device-action fixture
+// signs. A persistent fixture is a held or organization demo whose profiles must
+// dispatch, so it delegates every executable resource kind; a disposable action
+// lane adds only read-only encryption compliance.
+func deviceActionDelegationCapabilities(persistent bool) ([]string, error) {
+	if persistent {
+		return defaultExecutionCapabilities()
+	}
+	capabilities, err := deviceActionCapabilities()
+	if err != nil {
+		return nil, err
+	}
+	compliance, err := resource.Capability(resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE)
+	if err != nil {
+		return nil, err
+	}
+	return append(capabilities, compliance), nil
 }

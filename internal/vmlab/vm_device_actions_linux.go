@@ -167,7 +167,7 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return nil, fmt.Errorf("observe encrypted guest: %w", err)
 	}
 	vm.guest.captureDiagnostics = options.Encrypted.DiagnosticsDir != ""
-	if err := installActionPrerequisites(ctx, vm.guest, manifest); err != nil {
+	if err := installActionPrerequisites(ctx, vm.guest, manifest, true); err != nil {
 		return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("install native action prerequisites: %w", err))
 	}
 	targets, err := observeActionTargets(ctx, vm)

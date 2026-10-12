@@ -216,7 +216,11 @@ func supplyActionCredential(ctx context.Context, vm *guestVM, actionID string, s
 	return err
 }
 
-func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest) error {
+// installActionPrerequisites installs the release's action prerequisites. Only
+// a disposable clone is quiesced; a persistent organization device keeps its
+// vendor updaters for its own OS-update policy, and its caller waits for any
+// running vendor package run instead.
+func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest, disposable bool) error {
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
 	command, err := labInstallCommand(release, release.Lab.Guest.Actions)
 	if err != nil {
@@ -236,7 +240,10 @@ func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv
 	// finish its current package; the golden itself is unchanged.
 	// Vendor-configured signature verification remains enabled. Network access
 	// is explicit disposable-QEMU user egress, never host routing or namespaces.
-	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(labQuiescePackageUnits+"; "+command), nil, 1<<20, 20*time.Minute)
+	if disposable {
+		command = labQuiescePackageUnits + "; " + command
+	}
+	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, 1<<20, 20*time.Minute)
 	if err != nil {
 		return err
 	}

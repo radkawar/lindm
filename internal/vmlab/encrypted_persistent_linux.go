@@ -24,6 +24,9 @@ const persistentVMMarker = "lindm persistent encrypted VM v1\n"
 type PersistentDevice struct {
 	DeviceID        string `json:"device_id"`
 	DesktopPassword string `json:"desktop_password,omitempty"`
+	TPMActionID     string `json:"tpm_action_id,omitempty"`
+	// DesktopPrepared records completed one-time lab desktop provisioning.
+	DesktopPrepared bool `json:"desktop_prepared,omitempty"`
 }
 
 type persistentVMState struct {

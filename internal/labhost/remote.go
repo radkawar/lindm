@@ -34,6 +34,9 @@ type RemoteRun struct {
 	Repository   string
 	Args         []string
 	Hold         bool
+	// BatchCredential is an opaque private handoff from a live whole-host
+	// reservation. The worker must receive and validate its held flock.
+	BatchCredential string
 	// ReverseForwards are "PORT:HOST:PORT" ssh -R entries on the execution
 	// connection only: the lab host's 127.0.0.1:PORT (bound explicitly, never
 	// ::1) reaches HOST:PORT on the controller for the run's lifetime, and a
@@ -359,7 +362,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			args = SetFlag(args, "retained-metadata", remote+"/snapshot-metadata")
 		}
 	}
-	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections", "first-bundle", "second-bundle", "expired-bundle", "replay-bundle", "bundle-public-key", "release-public-key", "release-root", "release-online-keys", "package-public-key", "advisories"} {
+	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "demo-device", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections", "first-bundle", "second-bundle", "expired-bundle", "replay-bundle", "bundle-public-key", "release-public-key", "release-root", "release-online-keys", "package-public-key", "advisories"} {
 		value := FlagValue(args, name)
 		if value == "" {
 			continue
@@ -417,13 +420,23 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		return err
 	}
 	argv := []string{remote + "/bin/lab", "host-exec", remote + "/host.json"}
+	if r.BatchCredential != "" {
+		credentialPath := filepath.Join(local, "batch-credential")
+		if err := os.WriteFile(credentialPath, []byte(r.BatchCredential), 0600); err != nil {
+			return err
+		}
+		if err := stage.sync(credentialPath, remote+"/batch-credential"); err != nil {
+			return err
+		}
+		argv = []string{remote + "/bin/lab", "host-exec-batch", remote + "/batch-credential", remote + "/host.json"}
+	}
 	argv = append(argv, args...)
 	command := make([]string, len(argv))
 	for i, s := range argv {
 		command[i] = QuoteShell(s)
 	}
 	script := "cd " + QuoteShell(remote+"/source") + " && exec env " + QuoteShell("TMPDIR="+remote+"/work") + " " + strings.Join(command, " ")
-	if args[1] == "assistance" || (consoleBrowserLane(args[1]) && FlagValue(args, "browser-config") != "") {
+	if (args[1] == "assistance" && FlagValue(args, "demo-device") == "") || (consoleBrowserLane(args[1]) && FlagValue(args, "browser-config") != "") {
 		browserEnv, err := stage.assistanceBrowser(work, nativeArch)
 		if err != nil {
 			return err

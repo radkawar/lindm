@@ -7,13 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -347,23 +345,21 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	if len(cfg.Hosts) != 1 {
 		return errors.New("host-exec requires exactly one host")
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	// Reopen as a pollable descriptor: closing a plain blocking inherited stdin
-	// does not necessarily interrupt a concurrent read in the operating system.
-	lifetime, err := os.OpenFile("/proc/self/fd/0", os.O_RDONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return err
-	}
-	done := make(chan struct{})
-	go func() { defer close(done); _, _ = io.Copy(io.Discard, lifetime); cancel() }()
-	defer func() { err = errors.Join(err, lifetime.Close()); <-done }()
-	slots, err := labhost.OpenSlots(cfg.Hosts[0])
-	if err != nil {
-		return err
-	}
-	return slots.RunAdmitted(ctx, vmGuestCount(args[2], args), laneTiming(vmHolds(args[1:])), laneWaitReporter(stderr, cfg.Hosts[0].Name), func(ctx context.Context) error {
-		return runAdmittedHostExec(ctx, args, stdout, stderr, cfg.Hosts[0])
+	return withHostLifetime(ctx, func(ctx context.Context) error {
+		slots, err := labhost.OpenSlots(cfg.Hosts[0])
+		if err != nil {
+			return err
+		}
+		run := func(ctx context.Context) error {
+			return runAdmittedHostExec(ctx, args, stdout, stderr, cfg.Hosts[0])
+		}
+		if credential, ok := ctx.Value(hostBatchCredentialKey{}).(string); ok {
+			if vmGuestCount(args[2], args) != 1 {
+				return errors.New("a batch worker must use exactly one reserved guest")
+			}
+			return slots.RunBatchWorker(ctx, credential, run)
+		}
+		return slots.RunAdmitted(ctx, vmGuestCount(args[2], args), laneTiming(vmHolds(args[1:])), laneWaitReporter(stderr, cfg.Hosts[0].Name), run)
 	})
 }
 

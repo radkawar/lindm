@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,6 +33,9 @@ type VMAssistanceOptions struct {
 	// relayed media on the lab host.
 	RelayAddress string
 	Encrypted    EncryptedVMOptions
+	// RedHatTokenFile registers an entitled organization device with RHSM;
+	// only the organization demo mode uses it.
+	RedHatTokenFile string
 	// Scenarios selects lane scenarios by name, in lane order; nil runs all.
 	Scenarios []string
 	// Hold, when set, receives the owner's access once the selected scenarios
@@ -174,39 +176,11 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 			return result, fmt.Errorf("admit isolated execution authority: %w", err)
 		}
 	}
-	var vm *EncryptedVM
-	switch {
-	case resuming:
-		vm, err = ResumePersistentVM(ctx, options.PersistentDir)
-	case options.PersistentDir != "":
-		if err = os.MkdirAll(filepath.Dir(options.PersistentDir), 0700); err != nil {
-			return result, err
-		}
-		vm, err = ProvisionPersistentVM(ctx, manifest, options.Encrypted, options.PersistentDir)
-	default:
-		vm, err = NewEncryptedVM(ctx, manifest, options.Encrypted)
-	}
+	vm, saved, err := openHeldVM(ctx, manifest, options, resuming)
 	if err != nil {
 		return result, err
 	}
 	defer func() { err = errors.Join(err, vm.Close()) }()
-	var saved *PersistentDevice
-	if resuming {
-		state, stateErr := readPersistentVMState(options.PersistentDir)
-		if stateErr != nil {
-			return result, stateErr
-		}
-		if state.ImageID != manifest.GetId() || state.ImageSHA256 != manifest.GetSha256() {
-			return result, errors.New("persistent VM manifest differs from its recorded image")
-		}
-		saved, err = vm.PersistentDevice()
-		if err != nil {
-			return result, err
-		}
-		if saved == nil {
-			return result, errors.New("persistent VM has incomplete enrollment; destroy it explicitly before provisioning again")
-		}
-	}
 	boot, err := vm.ColdBoot(ctx, vm.InitialUnlockSecret())
 	if err != nil {
 		return result, err

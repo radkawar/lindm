@@ -399,6 +399,20 @@ The vendor shim, GRUB and kernel boot unchanged; no aarch64-specific product fix
 was needed. A headless golden has no session to lock, so lock phases refuse it;
 see [verification](../verification.md#rhel-98-aarch64-encryption-and-tpm).
 
+The [persistent organization demo](../engineering.md#persistent-organization-demo)
+runs the encrypted RHEL 9.8 aarch64 server (no desktop, Secure Boot enforced) for
+IT/Helpdesk on a Spark. Demo admission requires that exact release/architecture's
+own verified encryption record; an x86_64 record does not admit it. Before
+registration the guest takes OS dependencies only from the authenticated aarch64
+Binary DVD's BaseOS/AppStream (vendor RPM signatures still checked), installs the
+agent through the console's signed RPM repository and provisions with the
+group's token. TPM binding is the product device action, not a prebound golden.
+The server is then registered with RHSM like a real organization's server: CSAF
+findings need the servicing stream its entitled BaseOS repository corroborates
+(unregistered, evaluation stays `rhel_platform_stream_unavailable`). The DVD
+repository is retired once the entitled repositories are available; `-destroy`
+removes the exact recorded RHSM consumer before deleting the VM.
+
 The executor's action sandbox drop-in names a LUKS target by its approved
 `/dev/disk/by-uuid/<luks_uuid>` alias, verified at provisioning to be the
 identity-checked block node. On RHEL 10.2 with a second virtio-SCSI disk the root

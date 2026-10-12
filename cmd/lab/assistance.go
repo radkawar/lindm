@@ -51,11 +51,17 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	demoRoot := flags.String("demo-root", "", "host-owned persistent demo root (internal scheduler input)")
 	flags.BoolVar(&options.ConsoleTURNTCP, "console-turn-tcp", false, "restrict the operator Chromium to TURN over TCP (a remote console behind an SSH forward) and require a TCP relay pair")
 	controlPlane := flags.String("control-plane", "", "private single-use controller handle (internal SSH lane input)")
+	demoDevice := flags.String("demo-device", "", "private organization device handoff (internal runner input)")
+	demoParent := flags.String("demo-parent", "", "owning organization demo name (internal runner input)")
 	flags.Bool("colocated", false, "keep lindmd, PostgreSQL and TURN on the SSH lab host instead of the controller")
 	flags.String("controller-address", "", "override the routed controller IPv4 address for an SSH-native split run")
 	flags.StringVar(&options.AdvisoryCache, "advisory-cache", "", "persistent revalidating feed cache for held demos; defaults to the configured lab work directory")
+	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected Red Hat offline-token file for an entitled organization device (internal runner input): registers it, and unregisters its recorded consumer on -destroy")
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	if options.RedHatTokenFile != "" && *demoParent == "" {
+		return errors.New("-redhat-token-file is only valid for an organization demo device")
 	}
 	if err := validateRebootPolicyFlags(*rebootPolicy, *hold, *name, *scenarios); err != nil {
 		return err
@@ -75,6 +81,9 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 			return errors.New("invalid persistent demo root")
 		}
 		if *destroy {
+			if *demoParent != "" {
+				return destroyOrganizationDevice(ctx, options.Repository, *demoRoot, *demoParent, options.RedHatTokenFile, stdout)
+			}
 			return destroyAssistanceDemo(ctx, options.Repository, *demoRoot, stdout)
 		}
 		if ctx.Value(assistanceDemoLockKey{}) != *demoRoot {
@@ -87,6 +96,11 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		}
 		if err := openAssistanceDemoRoot(*demoRoot); err != nil {
 			return err
+		}
+		if *demoParent != "" {
+			if err := bindOrganizationDeviceRoot(*demoRoot, *demoParent, true); err != nil {
+				return err
+			}
 		}
 		options.PersistentDir = filepath.Join(*demoRoot, "desktop")
 		options.FixtureDir = filepath.Join(*demoRoot, "control-plane")
@@ -139,6 +153,23 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		}
 	}
 	options.Encrypted.Hardware = hardware
+	if *demoDevice != "" {
+		input, err := vmlab.ReadDemoDeviceInput(*demoDevice)
+		if err != nil {
+			return err
+		}
+		hardware.Desktop = input.Desktop
+		if !input.Desktop {
+			options.Encrypted.Desktop = ""
+		}
+		options.Hold = func(access *vmlab.AssistanceHold) error {
+			return publishAssistanceHeld(*evidence, access)
+		}
+		if ready, ok := ctx.Value(demoDeviceHeldKey{}).(func(*vmlab.AssistanceHold) error); ok {
+			options.Hold = ready
+		}
+		return vmlab.DemoDeviceVM(ctx, manifest, options, input, stderr)
+	}
 	if *hold {
 		options.Hold = func(access *vmlab.AssistanceHold) error {
 			if *demoRoot != "" {

@@ -69,7 +69,10 @@ type EncryptedVM struct {
 	// bootConsole is set only while an explicitly logged golden is built.
 	bootConsole    io.Writer
 	persistentLock *os.File
-	closed         bool
+	// repositoryMedia is a borrowed, verified read-only DVD descriptor. Its
+	// owner keeps it open across cold boots and closes it after the VM.
+	repositoryMedia *os.File
+	closed          bool
 }
 
 type encryptedProcess struct {
@@ -365,12 +368,17 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		}
 		args = append(args, "-no-reboot")
 	}
+	var mediaFiles []*os.File
+	if v.repositoryMedia != nil {
+		mediaFiles = []*os.File{v.repositoryMedia}
+		args = append(args, encryptedRepositoryMediaArguments(hardware.Architecture)...)
+	}
 	processContext := ctx
 	if v.persistentLock != nil {
 		// Cancellation starts graceful Stop; it must not SIGKILL QEMU first.
 		processContext = context.WithoutCancel(ctx)
 	}
-	p, err := startEncryptedProcess(processContext, v.dir, emulator, args...)
+	p, err := startEncryptedProcessFiles(processContext, v.dir, mediaFiles, emulator, args...)
 	if err != nil {
 		return err
 	}
@@ -382,6 +390,13 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 // passphrase only after an actual initramfs prompt, and proves SSH plus a boot ID.
 // Recovery keys use exactly the same path as installer passphrases.
 func (v *EncryptedVM) ColdBoot(ctx context.Context, secret string) (out UnlockOutcome, err error) {
+	return v.coldBoot(ctx, secret, true)
+}
+
+// coldBoot with requireSecret false types the secret only if the boot actually
+// prompts, as a user at the console would, and also accepts an unattended
+// unlock. UnlockOutcome.PromptSeen records which happened.
+func (v *EncryptedVM) coldBoot(ctx context.Context, secret string, requireSecret bool) (out UnlockOutcome, err error) {
 	if strings.ContainsAny(secret, "\r\n\x00") {
 		return out, errors.New("unlock secret must be a single line")
 	}
@@ -425,7 +440,7 @@ func (v *EncryptedVM) ColdBoot(ctx context.Context, secret string) (out UnlockOu
 	if r.err != nil {
 		return out, r.err
 	}
-	if err == nil && secret != "" && !r.seen {
+	if err == nil && secret != "" && !r.seen && requireSecret {
 		return out, errors.New("guest booted without consuming the chosen unlock secret")
 	}
 	if err != nil {
