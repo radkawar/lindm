@@ -567,5 +567,8 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 // reloads first, and systemd 259 then re-coldplugs the still-active masked
 // timer without its Triggers= dependency and fails it ("Unit to trigger
 // vanished", result resources), degrading Ubuntu 26.04. A unit absent from the
-// image is skipped.
-const labQuiescePackageUnits = `for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service com.system76.SystemUpdater.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit" && systemctl mask "$unit" || exit; fi; done`
+// image is skipped. pop-system-updater's unit uses KillMode=process, so its
+// stop leaves an already running apt-get holding the APT/dpkg locks (observed
+// natively on Pop!_OS 24.04 with guest egress); the script then waits, at most
+// 15 minutes, until no apt-get or dpkg process remains.
+const labQuiescePackageUnits = `for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service com.system76.SystemUpdater.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit" && systemctl mask "$unit" || exit; fi; done; i=0; while pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do i=$((i+1)); if test "$i" -gt 900; then echo "package manager still running after quiesce" >&2; exit 1; fi; sleep 1; done`

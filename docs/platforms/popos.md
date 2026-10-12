@@ -161,7 +161,10 @@ installation time.
   ([daemon/src/service/system.rs](https://github.com/pop-os/system-updater/blob/c208318/daemon/src/service/system.rs));
   automatic upgrades default to off. Its boot-time refresh held the dpkg
   frontend lock and failed a lab agent install with exit 100, so lab guests stop
-  and mask it together with `apt-daily*` (regression
+  and mask it together with `apt-daily*`. Its unit uses `KillMode=process`, so
+  stopping it leaves a running `apt-get` (with guest egress it then held the APT
+  lists lock against the lab's fixture repository); the lab waits until no
+  `apt-get` or `dpkg` remains (regression
   `TestLabQuiescePackageUnitsStopsPopUpdater`). On a real Pop!\_OS desktop the
   updater keeps running and owns package refreshes (and upgrades, when the user
   enables them); lindm does not stop it. While it holds dpkg's frontend lock a

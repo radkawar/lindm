@@ -13,12 +13,23 @@ import (
 // Regression: on Pop!_OS 24.04 the boot-time com.system76.SystemUpdater ran
 // apt-get and held the dpkg frontend lock, so the resource lane's signed agent
 // install failed with exit 100. Present units are stopped before they are
-// masked; absent units are skipped.
+// masked; absent units are skipped. Its KillMode=process stop leaves the
+// running apt-get (which then held the APT lists lock against the lab's
+// fixture repository), so the script waits until no apt-get remains.
 func TestLabQuiescePackageUnitsStopsPopUpdater(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
 	stub := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + nativeQuote(log) + "\ncase \"$1 $2\" in\n\"cat com.system76.SystemUpdater.service\"|\"cat apt-daily.timer\") exit 0 ;;\ncat\\ *) exit 1 ;;\nesac\n"
 	if err := os.WriteFile(filepath.Join(dir, "systemctl"), []byte(stub), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The leftover apt-get is seen twice, then exits; dpkg never runs.
+	count := filepath.Join(dir, "pgrep-count")
+	pgrep := "#!/bin/sh\nn=$(cat " + nativeQuote(count) + " 2>/dev/null || echo 0)\nprintf 'pgrep %s\\n' \"$*\" >> " + nativeQuote(log) + "\ntest \"$2\" = apt-get || exit 1\nn=$((n+1)); echo \"$n\" > " + nativeQuote(count) + "\ntest \"$n\" -le 2\n"
+	if err := os.WriteFile(filepath.Join(dir, "pgrep"), []byte(pgrep), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sleep"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("sh", "-c", labQuiescePackageUnits)
@@ -36,7 +47,8 @@ func TestLabQuiescePackageUnitsStopsPopUpdater(t *testing.T) {
 			effects = append(effects, call)
 		}
 	}
-	want := []string{"stop apt-daily.timer", "mask apt-daily.timer", "stop com.system76.SystemUpdater.service", "mask com.system76.SystemUpdater.service"}
+	want := []string{"stop apt-daily.timer", "mask apt-daily.timer", "stop com.system76.SystemUpdater.service", "mask com.system76.SystemUpdater.service",
+		"pgrep -x apt-get", "pgrep -x apt-get", "pgrep -x apt-get", "pgrep -x dpkg"}
 	if strings.Join(effects, "|") != strings.Join(want, "|") {
 		t.Fatalf("quiesce effects %q, want %q", effects, want)
 	}
