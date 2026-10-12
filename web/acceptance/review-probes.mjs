@@ -634,10 +634,12 @@ export function installProbes(rules) {
       return {
         description: describe(node),
         // Base UI modal dialogs omit aria-modal but mark the rest of the page inert.
+        // Popovers (pickers) are non-modal: Tab leaves and closes them.
         modal:
           node.getAttribute("aria-modal") === "true" ||
           node.getAttribute("role") === "alertdialog" ||
-          document.querySelector("[data-base-ui-inert]") !== null,
+          (node.dataset.slot !== "popover-content" &&
+            document.querySelector("[data-base-ui-inert]") !== null),
         named: !!(
           node.getAttribute("aria-label") ||
           (node.getAttribute("aria-labelledby") &&

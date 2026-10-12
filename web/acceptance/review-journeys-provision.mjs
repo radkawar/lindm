@@ -74,10 +74,11 @@ async function start(ctx, id, job) {
 async function chooseNamed(ctx, container, label, name, prefix) {
   const trigger = container.getByRole("button", { name: new RegExp(`^${label} `) });
   await trigger.click();
-  await container
+  // The picker's choices float in a popover outside the container.
+  await ctx.page
     .getByRole("combobox", { name: `Search ${label.toLowerCase()}`, exact: true })
     .fill(name);
-  const option = container.getByRole("option").filter({
+  const option = ctx.page.getByRole("option").filter({
     has: ctx.page.getByText(name, { exact: true }),
   });
   try {

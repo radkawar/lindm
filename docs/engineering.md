@@ -963,7 +963,14 @@ each starting from scroll position zero:
 - forms: every rendered form has an explicit submit button (console buttons default
   to `type="button"`);
 - ID inputs: reject rendered inputs, textareas, selects and comboboxes whose labels
-  or placeholders ask for IDs or UUIDs, except read-only fields in `TechnicalDetails`.
+  or placeholders ask for IDs or UUIDs, except read-only fields in `TechnicalDetails`;
+- popup stability: every visible dropdown, picker, menu and popover trigger outside
+  dialogs (`aria-haspopup`, or an `aria-expanded` button that reveals a listbox, menu
+  or command list) is opened with real input, and the page-relative boxes of main
+  content must not move while it is open; Escape must close it. Pickers float in a
+  popover (`components/ui/popover.tsx`) rather than expanding inline. The review runs
+  Chromium with classic (non-overlay) scrollbars, so a scroll lock that drops the
+  scrollbar would shift the page and fail.
 
 Once per theme and viewport it also checks the Control-K and Command-K palette
 (open, search, Escape, focus restore) and saves device details to raise a real

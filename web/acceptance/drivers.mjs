@@ -11,12 +11,13 @@ const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 
 // Only observes DOM state. Actions always use browser input/element endpoints.
 function locate(query) {
-  // A closing Base UI select still has layout while its pointer events are off.
-  // Do not mistake its retained options for the next popup's live choices.
+  // A closing Base UI select or popover still has layout while its pointer events
+  // are off. Do not mistake its retained options for the next popup's live choices.
   const visible = (node) =>
     node.getClientRects().length > 0 &&
     getComputedStyle(node).visibility !== "hidden" &&
-    !node.closest('[data-slot="select-content"][data-closed]');
+    !node.closest('[data-slot="select-content"][data-closed]') &&
+    !node.closest('[data-slot="popover-content"][data-closed]');
   const normalize = (value) => value.replace(/\s+/g, " ").trim();
   let root = document;
   if (query.dialog) {
@@ -117,6 +118,9 @@ export class ChromiumDriver {
       headless: true,
       timeout: 30_000,
       args,
+      // Headless Chromium hides scrollbars by default; the console review keeps
+      // classic scrollbars so scroll locks and overflow are measured as users see them.
+      ...(config.classicScrollbars ? { ignoreDefaultArgs: ["--hide-scrollbars"] } : {}),
     });
     this.context = await this.browser.newContext({
       ignoreHTTPSErrors: config.ignoreHTTPSErrors === true,

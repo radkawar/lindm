@@ -27,6 +27,7 @@ import { reviewSSHBanner } from "./review-ssh-banner.mjs";
 import { reviewOSUpdate } from "./review-os-update.mjs";
 import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
 import { reviewOwnerEdits } from "./review-owner-edits.mjs";
+import { popupStability } from "./review-popups.mjs";
 
 process.umask(0o077);
 
@@ -600,6 +601,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   const dialog = await dialogs(page, prefix);
   entry.checks.dialogs = { findings: dialog.findings, destructive: dialog.destructive };
   entry.screenshots.dialogs = dialog.screenshots;
+  entry.checks.popups = await popupStability(page, settleAnimations);
   entry.passed = Object.values(entry.checks).every((check) => check.findings.length === 0);
   summarize(entry);
   report.results.push(entry);
@@ -744,7 +746,7 @@ async function main() {
   if (report.results.some((entry) => !entry.passed))
     throw new Error("directory_authorization_review_failed");
   const driver = new ChromiumDriver();
-  await driver.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000 });
+  await driver.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000, classicScrollbars: true });
   try {
     report.browser = driver.metadata;
     const pages = [driver.page];

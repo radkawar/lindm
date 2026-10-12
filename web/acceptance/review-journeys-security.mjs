@@ -651,10 +651,11 @@ async function recoveryAudit(ctx) {
     { label: "Target device", name: hostname, slug: "device" },
   ]) {
     await main.getByRole("button", { name: new RegExp(`^${choice.label} `) }).click();
-    await main
+    // The picker's choices float in a popover outside main.
+    await page
       .getByRole("combobox", { name: `Search ${choice.label.toLowerCase()}`, exact: true })
       .fill(choice.name);
-    const option = main.getByRole("option", { name: choice.name, exact: true });
+    const option = page.getByRole("option", { name: choice.name, exact: true });
     await visible(option);
     await shot(
       ctx,

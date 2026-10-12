@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -7,6 +7,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type PickerProps = {
   label: string;
@@ -25,6 +26,7 @@ export type PickerOption = {
 
 // cmdk owns active-descendant navigation, arrow keys, Home/End and Enter selection.
 // Search text is never submitted as identity: only a selected server result is used.
+// The choices float over the page: opening the picker never moves surrounding content.
 export function SearchPicker({
   label,
   value,
@@ -35,100 +37,102 @@ export function SearchPicker({
   search,
   onSearchChange,
   note,
+  placeholder = "Choose…",
+  footer,
   children,
 }: PickerProps & {
   options: PickerOption[];
   search?: string;
   onSearchChange?: (search: string) => void;
   note?: string;
+  // Trigger text when nothing is selected, e.g. "Anyone" for an optional filter.
+  placeholder?: string;
+  // Rendered inside the open popover below the choices (loading, retry, more choices).
+  footer?: ReactNode;
+  // Rendered under the trigger whether or not the picker is open.
   children?: ReactNode;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
   const [chosen, setChosen] = useState<PickerOption>();
   const selected =
     options.find((option) => option.value === value) ??
     (chosen?.value === value ? chosen : undefined);
-  function close() {
-    setOpen(false);
-    trigger.current?.focus();
-  }
   return (
-    <div
-      className="grid min-w-0 gap-2"
-      onKeyDown={(event) => {
-        if (open && event.key === "Enter") event.preventDefault();
-        if (open && event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          close();
-        }
-      }}
-    >
+    <div className="grid min-w-0 gap-2">
       <span id={`${id}-label`} className="text-sm font-medium">
         {label}
       </span>
       {name ? <input type="hidden" name={name} value={value} /> : null}
-      <Button
-        ref={trigger}
-        type="button"
-        variant="outline"
-        className="h-auto min-h-9 justify-start whitespace-normal text-left"
-        aria-labelledby={`${id}-label ${id}-value`}
-        aria-expanded={open}
-        aria-controls={open ? `${id}-choices` : undefined}
-        disabled={disabled}
-        onClick={() => setOpen(!open)}
-      >
-        <span id={`${id}-value`}>
-          {selected?.label ?? (value ? "Selected item unavailable" : "Choose…")}
-        </span>
-      </Button>
-      {open && !disabled ? (
-        <Command id={`${id}-choices`} className="border" shouldFilter={!onSearchChange}>
-          <CommandInput
-            autoFocus
-            aria-label={`Search ${label.toLowerCase()}`}
-            placeholder="Search by name…"
-            value={search}
-            onValueChange={onSearchChange}
-          />
-          <CommandList aria-label={label}>
-            <CommandEmpty>No matching options.</CommandEmpty>
-            <CommandItem
-              value="clear-selection"
-              onSelect={() => {
-                onChange("");
-                close();
-              }}
-            >
-              No selection
-            </CommandItem>
-            {options.map((option) => (
+      <Popover open={open && !disabled} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-9 justify-start whitespace-normal text-left"
+            />
+          }
+          aria-labelledby={`${id}-label ${id}-value`}
+          aria-controls={open ? `${id}-choices` : undefined}
+          disabled={disabled}
+        >
+          <span id={`${id}-value`} className="min-w-0 break-words">
+            {selected?.label ?? (value ? "Selected item unavailable" : placeholder)}
+          </span>
+        </PopoverTrigger>
+        <PopoverContent
+          aria-labelledby={`${id}-label`}
+          onKeyDown={(event) => {
+            // Enter selects the active choice; it never submits the surrounding form.
+            if (event.key === "Enter") event.preventDefault();
+          }}
+        >
+          <Command id={`${id}-choices`} shouldFilter={!onSearchChange}>
+            <CommandInput
+              autoFocus
+              aria-label={`Search ${label.toLowerCase()}`}
+              placeholder="Search by name…"
+              value={search}
+              onValueChange={onSearchChange}
+            />
+            <CommandList aria-label={label}>
+              <CommandEmpty>No matching options.</CommandEmpty>
               <CommandItem
-                key={option.value}
-                value={option.value}
-                keywords={[option.label, option.description ?? "", ...(option.keywords ?? [])]}
-                data-checked={value === option.value}
+                value="clear-selection"
                 onSelect={() => {
-                  setChosen(option);
-                  onChange(option.value);
-                  close();
+                  onChange("");
+                  setOpen(false);
                 }}
               >
-                <span className="grid min-w-0 gap-0.5">
-                  <span className="break-words">{option.label}</span>
-                  {option.description ? (
-                    <span className="text-xs text-muted-foreground">{option.description}</span>
-                  ) : null}
-                </span>
+                No selection
               </CommandItem>
-            ))}
-          </CommandList>
-          {note ? <p className="p-2 text-xs text-muted-foreground">{note}</p> : null}
-        </Command>
-      ) : null}
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.value}
+                  keywords={[option.label, option.description ?? "", ...(option.keywords ?? [])]}
+                  data-checked={value === option.value}
+                  onSelect={() => {
+                    setChosen(option);
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="break-words">{option.label}</span>
+                    {option.description ? (
+                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                    ) : null}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandList>
+            {note ? <p className="p-2 text-xs text-muted-foreground">{note}</p> : null}
+            {footer ? <div className="grid gap-2 p-2">{footer}</div> : null}
+          </Command>
+        </PopoverContent>
+      </Popover>
       {children}
     </div>
   );
