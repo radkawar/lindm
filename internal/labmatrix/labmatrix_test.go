@@ -189,6 +189,30 @@ func TestPlanGatesSecureBootCellsWhereSecureBootIsUnavailable(t *testing.T) {
 	}
 }
 
+// Fedora signs its x86_64 kernel for shim but not its aarch64 one, so only the
+// aarch64 Secure Boot cell is gated.
+func TestPlanGatesSecureBootCellsPerArchitecture(t *testing.T) {
+	fedora := release(t, "fedora-44")
+	encrypted := labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	secure := &labv1.MatrixCell{Name: "tpm-unattended-boots", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions", Tpm: true, SecureBoot: true}
+	in := &Inputs{Ledger: &labv1.MatrixLedger{}}
+	for _, arch := range []string{"x86_64", "aarch64"} {
+		in.Manifests = append(in.Manifests,
+			&Manifest{Path: "lab/images/" + arch + "-i.json", Image: &labv1.ImageManifest{Id: arch + "-i", Edition: "Server-dvd-encrypted-lab"}, Release: fedora, Architecture: arch},
+			&Manifest{Path: "lab/images/" + arch + "-c.json", Image: &labv1.ImageManifest{Id: arch + "-c", Edition: "Cloud-Base-Generic"}, Release: fedora, Architecture: arch})
+	}
+	got := map[string]*Cell{}
+	for _, c := range in.Plan([]*platform.Release{fedora}, []*labv1.MatrixCell{secure}) {
+		got[c.Architecture] = c
+	}
+	if c := got["aarch64"]; c.State != Gated || !strings.Contains(c.Reason, fedora.Lab.SecureBootUnavailableFor("arm64")) {
+		t.Fatalf("fedora-44 aarch64 Secure Boot cell: %v %q", c.State, c.Reason)
+	}
+	if c := got["x86_64"]; c.State != NotRun {
+		t.Fatalf("fedora-44 x86_64 Secure Boot cell: %v %q", c.State, c.Reason)
+	}
+}
+
 // A Debian netinst ISO boots both the plain installed golden and the
 // guided-LUKS encrypted golden, so encrypted cells are not "no image".
 func TestDebianNetinstServesEncryptedCells(t *testing.T) {

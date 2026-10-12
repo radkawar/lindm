@@ -9557,6 +9557,56 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "1e408855142a84fddf7d97526759e2e7cc2f723ae8f79a37603ab2d57d681134"
+    },
+    {
+      "platform": "fedora-43",
+      "cell": "recovery-sanitize",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-43-1.6-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/fedora-act43-x86-20261012T140712Z/fedora-43/recovery-sanitize-x86_64.json",
+      "sha256": "a544f489e505e2d53905754a97cbae09c918491dd640f3660d6dd22a836d55df",
+      "recorded": "2026-10-12T19:33:11.851398800Z",
+      "revision": "939f2fe8df519e25dadd47332dc548f5340712f7-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "9d3e253e911a7b4f830855ed49c93ff8dbec2da727e6afe99f36c9cd6c0ac7f2",
+      "recoveryManifest": "fedora-cloud-43-1.6-x86-64",
+      "recoveryManifestSha256": "957515a9eeaf3bb94529f786bfb2bc0e09b3a1568ac4420bc0d7ed61dfd4ec39"
+    },
+    {
+      "platform": "fedora-43",
+      "cell": "tpm-unattended-boots",
+      "architecture": "aarch64",
+      "manifest": "fedora-server-encrypted-43-1.6-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/fedora-tpm-arm-20261012T184633Z/fedora-43/tpm-unattended-boots-aarch64.json",
+      "sha256": "64238590dfa6dcac7b0daaa8053437a27012e30db9de4b7bccf5a3e2c650b904",
+      "recorded": "2026-10-12T20:18:59.200692047Z",
+      "revision": "74c925914b8aaa9bc9889100e985bef7aefbea3a-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "84c88695346d38f9f7ae470c200524c65b662d0b6be8eb5af36c77f5aaa91407",
+      "recoveryManifest": "fedora-cloud-43-1.6-aarch64",
+      "recoveryManifestSha256": "29afcd1ebcb7e45cb591476f33279ee3e4b70039c5322f11a03143d9c94bae3a",
+      "mainlineRevision": "74c925914b8aaa9bc9889100e985bef7aefbea3a"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "tpm-unattended-boots",
+      "architecture": "aarch64",
+      "manifest": "fedora-server-encrypted-44-1.7-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/fedora-tpm-arm-20261012T184633Z/fedora-44/tpm-unattended-boots-aarch64.json",
+      "sha256": "07fcc84bdf13e4d87a9208ac825ca6ae2c5d84a47b40b8ab5eb390937c8a669b",
+      "recorded": "2026-10-12T20:18:54.986860492Z",
+      "revision": "74c925914b8aaa9bc9889100e985bef7aefbea3a-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "2b5104abf91adfe0c97afebdfbcb25c0520df15f4989928f33911030edf60251",
+      "recoveryManifest": "fedora-cloud-44-1.7-aarch64",
+      "recoveryManifestSha256": "47b8c9a986ed066ed2b1d91af7fd76144cff3eab8db99e3efddb380a31a0b9ae",
+      "mainlineRevision": "74c925914b8aaa9bc9889100e985bef7aefbea3a"
     }
   ]
 }

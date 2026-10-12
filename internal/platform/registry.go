@@ -227,6 +227,8 @@ var (
 		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
+	// Fedora signs only its x86_64 kernels for shim (see reasonFedoraARMUnsignedKernel).
+	fedoraARMNoSecureBoot = map[string]string{"aarch64": "the vendor aarch64 kernel has no Authenticode signature, so shim refuses it"}
 	// RHEL installs only from the vendor-authenticated Binary DVD (no Lab.Repository):
 	// the Workstation environment, TPM user space and action prerequisites
 	// become kickstart %packages. An unregistered installed system has no other
@@ -540,7 +542,8 @@ var registry = []*Release{
 			// Encrypted goldens and provision-kickstart install from the signed Server DVD.
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F43", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-43-%s",
-			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
+			TPM:                     LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}},
+			SecureBootUnavailableOn: fedoraARMNoSecureBoot},
 		// Fedora 43 (release and updates) carries dnf5 5.2.18.0, below the
 		// package provider's unprivileged-transaction floor (resources record
 		// "native dnf5 5.4.6.0 or newer required"); os.update.v1 runs dnf5 itself.
@@ -571,7 +574,8 @@ var registry = []*Release{
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
-			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
+			TPM:                     LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}},
+			SecureBootUnavailableOn: fedoraARMNoSecureBoot},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
 		Gates:    without(gates(), OSUpdate),
 		// Recovery needs Secure Boot (measured GRUB: PCR 7 SecureBoot=1; owned

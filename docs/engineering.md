@@ -2934,7 +2934,11 @@ architecture (the Sparks' pinned AAVMF firmware for aarch64). A cell marked
 `secureBoot` (recovery sanitize: original-device signed recovery refuses
 firmware without enforced Secure Boot) additionally receives that architecture's
 `secureBootArgs` after them: the Microsoft-enrolled variable template, which
-overrides the default one, and `-secure-boot`. A cell whose
+overrides the default one, and `-secure-boot`. It is `gated` where the row's
+`Lab.SecureBootUnavailable` (whole release) or `Lab.SecureBootUnavailableOn`
+(one architecture) records why the installed system cannot boot under enforced
+Secure Boot (Pop!\_OS's unsigned systemd-boot; Fedora's unsigned aarch64
+kernel). A cell whose
 capability the registry gates is `gated`, and so is a cell whose lane the row's
 `Lab.LaneGates` gates on that architecture: a concrete product or vendor reason
 the lane cannot qualify the release there, never "not yet run" (the lane itself

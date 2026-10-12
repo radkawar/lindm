@@ -344,6 +344,20 @@ same build carries a 1,896-byte Authenticode signature; under enforced Secure
 Boot the encrypted golden never reached SSH
 (`recovery-sanitize-aarch64.json` in that directory, SHA-256
 `14531ff8ad37a620002d4647f6a3435f0ce672b296808828dc115c7d1985ecb0`).
+On x86_64 (local KVM, OVMF Secure Boot enforced, swtpm2, NVMe) Fedora 43
+measured-GRUB recovery sanitize passed after the direct NVMe sanitize ioctl
+(9b4e6f5f):
+`$HOME/.cache/lindm-matrix/fedora-act43-x86-20261012T140712Z/fedora-43/recovery-sanitize-x86_64.json`,
+SHA-256 `a544f489e505e2d53905754a97cbae09c918491dd640f3660d6dd22a836d55df`.
+The Secure Boot `tpm-unattended-boots` cell is gated on aarch64 for both Fedora
+releases (registry `Lab.SecureBootUnavailableOn`): with the Microsoft template
+enforced, neither Server DVD installer booted before the installer deadline
+(`$HOME/.cache/lindm-matrix/fedora-tpm-arm-20261012T184633Z/fedora-43/tpm-unattended-boots-aarch64.json`,
+SHA-256 `64238590dfa6dcac7b0daaa8053437a27012e30db9de4b7bccf5a3e2c650b904`;
+`fedora-44/tpm-unattended-boots-aarch64.json`, SHA-256
+`07fcc84bdf13e4d87a9208ac825ca6ae2c5d84a47b40b8ab5eb390937c8a669b`). TPM bind
+and unattended cold boot without Secure Boot remain covered by the aarch64
+`encrypted` cells.
 
 Fedora dracut 108 separates the `systemd-cryptsetup` module from `crypt`
 ([`encrypted_installer_linux.go:205-213`](../../internal/vmlab/encrypted_installer_linux.go#L205-L213)).

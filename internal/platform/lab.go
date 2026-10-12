@@ -85,6 +85,10 @@ type Lab struct {
 	// boot under UEFI Secure Boot; lab matrix cells that require Secure Boot
 	// are gated with it. Empty when Secure Boot is available.
 	SecureBootUnavailable string
+	// SecureBootUnavailableOn holds such reasons for single guest
+	// architectures (x86_64, aarch64), e.g. a vendor kernel signed for shim
+	// only on the others.
+	SecureBootUnavailableOn map[string]string
 	// OSUpdateTargets pins, per guest architecture (x86_64, aarch64), the
 	// later rolling snapshot the os-update lane's whole-system policy installs.
 	// Lane prerequisites are provisioned at the image's own snapshot, so a
@@ -198,6 +202,15 @@ func (l Lab) OwnedBootUnavailableFor(architecture string) string {
 		return l.OwnedBootUnavailable
 	}
 	return l.OwnedBootUnavailableOn[kernelArchitecture(architecture)]
+}
+
+// SecureBootUnavailableFor is why the installed release cannot boot under
+// enforced Secure Boot on the guest architecture (either spelling), or "".
+func (l Lab) SecureBootUnavailableFor(architecture string) string {
+	if l.SecureBootUnavailable != "" {
+		return l.SecureBootUnavailable
+	}
+	return l.SecureBootUnavailableOn[kernelArchitecture(architecture)]
 }
 
 // MeasuredGRUBUnavailableFor is why the release's stock GRUB cannot carry
