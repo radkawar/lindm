@@ -58,7 +58,8 @@ func (o *consoleDemoOrigin) close() error {
 // /feeds/<release>/<name>, for the platform registry row release. Signed
 // documents also serve their vendor .sha256 and .asc proofs. A repository feed
 // is the complete updateinfo of the fixture-owned controlled repository: the
-// recorded vendor node inside an <updates> root, its only change.
+// recorded vendor node and the labelled synthetic updates of
+// console_demo_scale.go inside an <updates> root.
 type consoleDemoFeed struct {
 	release, name, fixture string
 	format                 advisoryv1.FeedFormat
@@ -103,7 +104,11 @@ func consoleDemoAdvisories(repository string) (map[string][]byte, []*advisoryv1.
 			files[path+suffix] = data
 		}
 		if feed.repository {
-			files[path] = slices.Concat([]byte("<updates>"), files[path], []byte("</updates>"))
+			synthetic, err := consoleDemoUpdateinfo()
+			if err != nil {
+				return nil, nil, fmt.Errorf("render synthetic demo updates: %w", err)
+			}
+			files[path] = slices.Concat([]byte("<updates>"), files[path], synthetic, []byte("</updates>"))
 		}
 		sources = append(sources, &advisoryv1.FeedSource{Id: "demo-" + feed.release, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: path, MaxAgeSeconds: 604800})
 	}

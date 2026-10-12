@@ -265,6 +265,9 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	if err := s.catalog(ctx); err != nil {
 		return err
 	}
+	if err := s.scale(ctx); err != nil {
+		return err
+	}
 	if err := s.acceptFinding(ctx, rich); err != nil {
 		return err
 	}
@@ -274,6 +277,9 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 				return err
 			}
 		}
+	}
+	if err := s.awaitScaleFindings(ctx); err != nil {
+		return err
 	}
 	for _, d := range s.devices {
 		if d.demo.state == "stale" {

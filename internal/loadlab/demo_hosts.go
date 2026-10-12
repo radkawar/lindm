@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -138,10 +139,12 @@ func demoDevices() ([]*demoDevice, error) {
 		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionUnknown, service: serviceConverged, profile: 2, labels: []string{"kiosk", "lobby"}, state: "stale"},
 		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionNone, profile: -1, labels: []string{"workstation", "retired"}, state: "revoked"},
 		{hostname: "debian-ws-08", key: "debian-12", kernel: "6.1.0-37-amd64", sessions: 1, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "support"}, historical: true},
+		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionLUKS, profile: -1, labels: []string{"server", "ci-runner", "gpu"}},
 	}
 	inventories := [][]*inventoryv1.Package{
-		ubuntuPackages("1:9.6p1-3ubuntu13"), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u2"),
+		slices.Concat(ubuntuPackages("1:9.6p1-3ubuntu13"), bulkPackages("dpkg", demoRoutePackages)), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u2"),
 		rhelPackages(), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u3"),
+		slices.Concat(fedoraPackages(), affectedPackages(), bulkPackages("rpm", demoScalePackages)),
 	}
 	for i, device := range devices {
 		if device.release, ok = platform.Lookup(device.key); !ok {

@@ -938,6 +938,22 @@ Affected. That finding carries a risk-acceptance proposal awaiting independent
 approval, beside one whose finding evidence is unavailable; the seed fails when
 no Affected finding appears instead of omitting them.
 
+Scale fixtures (`internal/loadlab/demo_scale.go`) make pagination, pickers and
+long-content layouts reachable by the review: a Fedora 44 server with the
+70-character hostname `fedora-ci-gpu-runner-0042.build-farm.eu-central-1.lab.example.internal`
+and 3,010 packages, 2,000 of them installed below 500 synthetic security updates
+that the controlled repository serves after the recorded node
+(`FEDORA-2026-SYNTHETIC-NNNN`, titled and described as synthetic, citing no CVE;
+`internal/devlab/console_demo_scale.go`), so it reports 2,000 Affected findings
+across all severities; 2,400 extra packages on the route device; package names
+over 100 characters and versions over 80 characters; 120 device groups with
+four audited membership changes each, 110 extra profiles (one with 25 revisions),
+40 local accounts (usernames up to 64 characters) and 150 audited label changes,
+about 1,000 audit events in all. The seed waits for the server's own evaluation
+to list every synthetic finding. It adds about 9 seconds (44 s to 53 s measured on
+the shared development host): the audited writes run eight at a time while the
+kiosk's verification lapses.
+
 The runner reads every route from `web/src/routeTree.gen.ts`. Parameterised routes use
 the seeded IDs; `$kind` expands to every complex device action. A route the run cannot
 render (missing seed value, redirect or route error) fails it, so new pages are
