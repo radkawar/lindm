@@ -3,6 +3,7 @@ package worktree
 import (
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +56,16 @@ func fixtureRepository(t *testing.T) *Repository {
 		t.Fatal(err)
 	}
 	repo.Archive = filepath.Join(t.TempDir(), "archive")
+	// Protect leaves directories read-only; the temporary tree must stay
+	// removable.
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(filepath.Dir(main), func(path string, d fs.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				_ = os.Chmod(path, 0o755)
+			}
+			return nil
+		})
+	})
 	return repo
 }
 

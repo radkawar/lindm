@@ -24,7 +24,7 @@ type Derivation struct {
 	// called with the main checkout's current content and the worktree's
 	// base and own versions (nil when absent) and returns the merged content.
 	Merge map[string]func(current, base, theirs []byte) ([]byte, error)
-	// Blank, when set, empties the generated regions of the file at the
+	// Blank, when set, empties the generated regions of the Markdown file at the
 	// repository-relative name (returning other files unchanged). The patch is
 	// computed between blanked base and worktree files and applied to
 	// blanked main files, so it carries only hand-written changes; the gate
@@ -112,6 +112,9 @@ func (r *Repository) blankFiles(names []string, blank func(name string, content 
 	}
 	var blanked []string
 	for _, name := range names {
+		if !strings.HasSuffix(name, ".md") {
+			continue
+		}
 		path := filepath.Join(r.Main, name)
 		info, err := os.Lstat(path)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -160,7 +163,7 @@ func (r *Repository) uncommitted(ctx context.Context) (tracked, untracked []stri
 // onlyGenerated reports whether the main checkout's copy of name differs from
 // rev only inside generated regions.
 func (r *Repository) onlyGenerated(ctx context.Context, name, rev string, blank func(name string, content []byte) []byte) (bool, error) {
-	if blank == nil {
+	if blank == nil || !strings.HasSuffix(name, ".md") {
 		return false, nil
 	}
 	current, err := os.ReadFile(filepath.Join(r.Main, name))

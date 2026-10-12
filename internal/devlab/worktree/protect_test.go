@@ -34,11 +34,27 @@ func requireProtected(t *testing.T, repo *Repository) {
 		if info.Mode().IsRegular() && info.Mode().Perm()&0o222 != 0 {
 			t.Fatalf("%s is writable (%v) outside a landing", name, info.Mode().Perm())
 		}
+		dir := filepath.Dir(filepath.Join(repo.Main, name))
+		if info, err := os.Stat(dir); err != nil || info.Mode().Perm()&0o222 != 0 {
+			t.Fatalf("directory %s of %s is writable outside a landing: %v", dir, name, err)
+		}
 	}
 	if os.Geteuid() != 0 {
-		err := os.WriteFile(filepath.Join(repo.Main, "README"), []byte("stray\n"), 0o644)
-		if !errors.Is(err, fs.ErrPermission) {
+		readme := filepath.Join(repo.Main, "README")
+		if err := os.WriteFile(readme, []byte("stray\n"), 0o644); !errors.Is(err, fs.ErrPermission) {
 			t.Fatalf("stray write into the protected checkout: %v", err)
+		}
+		// How editors and agents' tools save: a temporary file beside the
+		// target, renamed over it.
+		if err := os.WriteFile(readme+".tmp", []byte("stray\n"), 0o644); !errors.Is(err, fs.ErrPermission) {
+			t.Fatalf("temporary file created beside a protected file: %v", err)
+		}
+		scratch := filepath.Join(t.TempDir(), "edit")
+		if err := os.WriteFile(scratch, []byte("stray\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(scratch, readme); !errors.Is(err, fs.ErrPermission) {
+			t.Fatalf("rename over a protected file: %v", err)
 		}
 	}
 }
@@ -63,7 +79,7 @@ func TestProtectIsIdempotentAndUnprotectRestoresOwnerWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"Makefile", "README", "package-lock.json", "package.json", "run.sh"}; !slices.Equal(changed, want) {
+	if want := []string{"Makefile", "README", "package-lock.json", "package.json", "run.sh", "./"}; !slices.Equal(changed, want) {
 		t.Fatalf("protected %v, want %v (symlinks have no mode of their own)", changed, want)
 	}
 	requireProtected(t, repo)
@@ -84,7 +100,7 @@ func TestProtectIsIdempotentAndUnprotectRestoresOwnerWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(restored) != 5 || modeOf(t, repo, "README") != 0o644 || modeOf(t, repo, "run.sh") != 0o755 {
+	if len(restored) != 6 || modeOf(t, repo, "README") != 0o644 || modeOf(t, repo, "run.sh") != 0o755 {
 		t.Fatalf("unprotect restored %v; README %v, run.sh %v", restored, modeOf(t, repo, "README"), modeOf(t, repo, "run.sh"))
 	}
 }
@@ -135,7 +151,11 @@ func TestWritableReprotectsAfterEveryLandingOutcome(t *testing.T) {
 	}
 	requireProtected(t, repo)
 
-	// A refusal (a stray untracked file) never reaches the gate.
+	// A refusal (a stray untracked file, from before protection) never
+	// reaches the gate.
+	if err := os.Chmod(repo.Main, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	stray := filepath.Join(repo.Main, "stray.txt")
 	if err := os.WriteFile(stray, []byte("other agent\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -144,6 +164,9 @@ func TestWritableReprotectsAfterEveryLandingOutcome(t *testing.T) {
 		t.Fatal("dirty shared checkout accepted")
 	}
 	requireProtected(t, repo)
+	if err := os.Chmod(repo.Main, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Remove(stray); err != nil {
 		t.Fatal(err)
 	}
@@ -225,5 +248,38 @@ func TestTryLockYieldsToHolder(t *testing.T) {
 	}
 	if err := release(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProtectKeepsBuildOutputsWritable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	repo := fixtureRepository(t)
+	ctx := context.Background()
+	writeFixture(t, filepath.Join(repo.Main, ".gitignore"), "# outputs\nartifacts/\n/web/dist/\n!kept/\n*.cache/\n../outside/\nnode_modules\n")
+	writeFixture(t, filepath.Join(repo.Main, "web", "index.html"), "<html>\n")
+	gitT(t, repo.Main, "add", ".gitignore", "web/index.html")
+	gitT(t, repo.Main, "commit", "--quiet", "-m", "web")
+	writeFixture(t, filepath.Join(repo.Main, "scratch", "notes"), "untracked directory\n")
+	if _, err := repo.Protect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	requireProtected(t, repo)
+	// make check, acceptance-build and ui-review write only below these.
+	for _, output := range []string{"artifacts/bin/lindmd", "web/dist/assets/app.js", "scratch/more", "node_modules/pkg/new.js"} {
+		writeFixture(t, filepath.Join(repo.Main, output), "built\n")
+	}
+	for _, absent := range []string{"kept", "outside"} {
+		if _, err := os.Lstat(filepath.Join(repo.Main, absent)); err == nil {
+			t.Fatalf("created %s from a non-directory or negated pattern", absent)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(repo.Main), "outside")); err == nil {
+		t.Fatal("created a directory outside the checkout")
+	}
+	// Protect is idempotent with outputs present.
+	if again, err := repo.Protect(ctx); err != nil || len(again) != 0 {
+		t.Fatalf("second protect changed %v: %v", again, err)
 	}
 }

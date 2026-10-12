@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -156,7 +157,12 @@ func collect(ctx context.Context, repo *worktree.Repository, options gcOptions) 
 	for _, host := range remote {
 		free, result, err := labhost.CollectRemoteRuns(ctx, host, options.sparkMinFree, options.quiet, options.dryRun)
 		result.Class = "remote-runs " + host.GetName()
-		if err == nil && free >= options.sparkMinFree {
+		// ssh exits 255 when it cannot reach the host: an offline lab host
+		// has nothing gc could collect now and is no gc failure.
+		if exit := (*exec.ExitError)(nil); errors.As(err, &exit) && exit.ExitCode() == 255 {
+			result.Notes = append(result.Notes, "host unreachable over SSH; skipped")
+			err = nil
+		} else if err == nil && free >= options.sparkMinFree {
 			result.Notes = append(result.Notes, fmt.Sprintf("%s free, above the %s threshold", diskgc.Size(free), diskgc.Size(options.sparkMinFree)))
 		}
 		report(result, err)

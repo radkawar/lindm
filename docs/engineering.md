@@ -2594,22 +2594,32 @@ prints the landing marker first. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits any remaining change only
 when green.
 
-Outside landings the shared checkout's tracked regular files are read-only
-(`a-w`), so an edit that a relative path or a tool's default cwd aims at the
-shared tree instead of a private worktree fails at once with EACCES rather than
-dirtying it and blocking every landing. `land` and `gate-commit` restore `u+w`
-under the landing lock and protect again however they end (commit, refusal,
-rollback, failure, interrupt), including files the landing added.
-`go run ./cmd/dev protect` is idempotent and does nothing while another process
-holds the landing lock, whose run re-protects. The `post-merge` and
-`post-checkout` hooks run `.githooks/protect` in the main checkout only, because
-git recreates the files a pull or checkout changes with default (writable)
-permissions; it is plain shell (`flock` on the landing lock, `chmod a-w` on
-tracked regular files) and builds nothing. `dev status` protects too and names
-the tracked files it found writable. Directories
-and untracked files are not protected: `make check`, `acceptance-build` and
-`check-web` write only untracked outputs (`artifacts/`, `web/dist/`), and
-`signoff` and `pre-push` gate clean worktrees. `make generate` refuses in the
+Outside landings the shared checkout's tracked regular files, and every
+directory that directly holds one (the root included), are read-only (`a-w`),
+so an edit that a relative path or a tool's default cwd aims at the shared
+tree instead of a private worktree fails at once with EACCES rather than
+dirtying it and blocking every landing: writing in place needs the file
+writable, and writing a temporary file renamed over the target (how editors
+and agents' tools save) needs its directory writable. `land`, `gate-commit`
+and `sync` restore `u+w` under the landing lock and protect again however they
+end (commit, refusal, rollback, failure, interrupt), including files and
+directories the landing added. `go run ./cmd/dev protect` is idempotent and
+does nothing while another process holds the landing lock, whose run
+re-protects; before protecting it creates the build output directories the
+root `.gitignore` names as plain directory paths (`artifacts/`, `web/dist/`,
+`.cache/`, `.tanstack/`, `.tools/`), so builds still write there. Directories
+holding no tracked file (`.git`, `node_modules/`, those outputs) stay
+writable: `make check`, `acceptance-build` and `ui-review` write only there
+(`web/dist/`, `artifacts/`, temporary directories; verified with every tracked
+directory read-only), and `signoff` and `pre-push` gate clean worktrees.
+Because git cannot replace files in protected directories, the parent updates
+the shared checkout with `go run ./cmd/dev sync` (fetch and fast-forward
+`main` under the landing lock, then protect), never `git pull`; `sync`
+refuses a dirty checkout and never merges. The `post-merge` and
+`post-checkout` hooks run `.githooks/protect` in the main checkout only; it is
+plain shell (`flock` on the landing lock, `chmod a-w` on tracked regular files
+and their directories) and builds nothing. `dev status` protects too and names
+what it found writable. `make generate` refuses in the
 protected checkout by design; generate in a private worktree and land the
 output. When `land` refuses a dirty shared checkout, it lists every uncommitted
 file with its mtime and the private worktrees whose working copy holds the

@@ -172,7 +172,9 @@ func (r *Repository) Change(ctx context.Context, path string, paths []string, de
 				applied = append(applied, ":(exclude,literal)"+name)
 			default:
 				change.Files = append(change.Files, name)
-				if derivation.Blank == nil {
+				// Generated regions live only in Markdown; other files (some
+				// large or binary) are patched whole.
+				if derivation.Blank == nil || !strings.HasSuffix(name, ".md") {
 					continue
 				}
 				if status != "D" {
@@ -328,7 +330,7 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 	// with this landing; a checkout behind or diverged from upstream would
 	// push over or beside work it has not gated.
 	if _, err := git(ctx, r.Main, "merge-base", "--is-ancestor", strings.TrimSpace(upstream), "HEAD"); err != nil {
-		return fmt.Errorf("refused: %s %s at %.12s does not contain %s; bring the shared checkout up to %s first", Trunk, r.Main, prior, strings.TrimSpace(upstream), strings.TrimSpace(upstream))
+		return fmt.Errorf("refused: %s %s at %.12s does not contain %s; run go run ./cmd/dev sync to bring the shared checkout up to %s first", Trunk, r.Main, prior, strings.TrimSpace(upstream), strings.TrimSpace(upstream))
 	}
 	// The marker tells anyone looking at the shared checkout mid-landing whose
 	// applied files they see; it disappears on commit, rollback or refusal.

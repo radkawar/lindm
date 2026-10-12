@@ -21,6 +21,7 @@ func TestProtectSharedYieldsToALanding(t *testing.T) {
 		}
 	}
 	git("init", "--quiet")
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
 	file := filepath.Join(root, "tracked.go")
 	if err := os.WriteFile(file, []byte("package tracked\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -53,10 +54,10 @@ func TestProtectSharedYieldsToALanding(t *testing.T) {
 	}
 
 	report, err = protectShared(t.Context(), repo)
-	if err != nil || report != "1 tracked files were writable, now read-only: tracked.go" || mode() != 0o444 {
+	if err != nil || report != "2 tracked files or directories (trailing /) were writable, now read-only: tracked.go ./" || mode() != 0o444 {
 		t.Fatalf("first protect: %q, %v, mode %v", report, err, mode())
 	}
-	if report, err = protectShared(t.Context(), repo); err != nil || report != "all tracked files read-only" {
+	if report, err = protectShared(t.Context(), repo); err != nil || report != "all tracked files and their directories read-only" {
 		t.Fatalf("repeat protect: %q, %v", report, err)
 	}
 	release, ok, err := repo.TryLock()
@@ -142,7 +143,8 @@ func TestProtectHookBuildsNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	run(root, hook)
-	for name, want := range map[string]os.FileMode{"broken.go": 0o444, "go.mod": 0o444, "run.sh": 0o555, "with space.txt": 0o444, "untracked.txt": 0o644} {
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+	for name, want := range map[string]os.FileMode{"broken.go": 0o444, "go.mod": 0o444, "run.sh": 0o555, "with space.txt": 0o444, "untracked.txt": 0o644, ".": 0o555} {
 		if got := perm(filepath.Join(root, name)); got != want {
 			t.Errorf("%s: mode %v, want %v", name, got, want)
 		}

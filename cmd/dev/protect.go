@@ -16,8 +16,9 @@ import (
 
 const protectUsage = `Usage: go run ./cmd/dev protect
 
-Make the shared main checkout's tracked files read-only (a-w), so a tool that
-writes into it instead of a private worktree fails at once with EACCES rather
+Make the shared main checkout's tracked files and the directories holding
+them read-only (a-w), so a tool that writes into it (in place, or a temporary
+file renamed over the target) instead of a private worktree fails at once with EACCES rather
 than dirtying it and blocking every landing. Idempotent. While a landing or
 gate-commit holds the landing lock it does nothing and succeeds: that run
 re-protects when it ends. dev status runs it when it finds writable tracked
@@ -78,10 +79,10 @@ func protectShared(ctx context.Context, repo *worktree.Repository) (string, erro
 		return "", fmt.Errorf("protect %s: %w", repo.Main, err)
 	}
 	if len(changed) == 0 {
-		return "all tracked files read-only", nil
+		return "all tracked files and their directories read-only", nil
 	}
 	named := changed[:min(len(changed), maxReportedFiles)]
-	report := fmt.Sprintf("%d tracked files were writable, now read-only: %s", len(changed), strings.Join(named, " "))
+	report := fmt.Sprintf("%d tracked files or directories (trailing /) were writable, now read-only: %s", len(changed), strings.Join(named, " "))
 	if extra := len(changed) - len(named); extra > 0 {
 		report += fmt.Sprintf(" … and %d more", extra)
 	}
