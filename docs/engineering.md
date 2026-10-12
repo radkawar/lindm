@@ -1160,10 +1160,11 @@ an element to get a pass. The only acceptable exception is a documented upstream
 library defect, recorded here with its cited reason.
 
 POV coverage is explicit in `web/acceptance/review-contracts.mjs`; a new route needs
-a contract as well as seed data. Dashboard, device detail (including every tab) and
-assistance viewer require a visible `data-review-page="dashboard|device|assistance"`
-region with an enabled, named `data-review-next-action` control (or a wrapper around
-one), or nonempty visible `data-review-state="clear|blocked"` copy. Other routes
+a contract as well as seed data. Dashboard, device detail (including every tab),
+assistance viewer and the signed-in unknown-address page require a visible
+`data-review-page="dashboard|device|assistance|not-found"` region with an enabled,
+named `data-review-next-action` control (or a wrapper around one), or nonempty
+visible `data-review-state="clear|blocked"` copy. Other routes
 currently require only an enabled named main-content control or explicit state:
 **structural action coverage, not evidence of a well-chosen primary action**.
 Every visible `data-review-metric` needs an enabled action or explicit state inside

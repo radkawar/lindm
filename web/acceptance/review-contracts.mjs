@@ -31,6 +31,8 @@ export const routeContracts = {
   "/devices/$deviceId/actions/new/$kind": structural,
   "/devices/$deviceId/recovery/$actionId": structural,
   "/devices/$deviceId/recovery-enrollment": structural,
+  // An unknown address names what was not found and offers a way on.
+  "/$": { mode: "semantic", page: "not-found", minimumMetrics: 0 },
 };
 
 // Pages whose job is a list: at 390px their first row must be on the first screen.

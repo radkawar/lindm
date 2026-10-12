@@ -177,7 +177,11 @@ async function reviewEnrollment({
     entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
     const details = page.locator("summary").filter({ hasText: contract.disclosure });
     await details.click();
-    await page.getByText("Execution root SHA-256", { exact: true }).waitFor();
+    // Technical details label each value as a term ("Label: value").
+    await page
+      .getByRole("term")
+      .filter({ hasText: /^Execution root SHA-256:?\s*$/ })
+      .waitFor();
     require((await section.innerText()).includes(
       ready ? `${origin}/repo/apt` : "Not published",
     ), "Repository details do not match this fixture's publication state");

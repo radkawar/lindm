@@ -157,7 +157,7 @@ async function lostLaptop(ctx) {
   await start(ctx, "lost-laptop", "Devices");
   await findDevice(ctx, device, "lost-laptop");
   const main = page.getByRole("main");
-  await visible(main.getByText(/^Contact /));
+  await visible(main.getByRole("term").filter({ hasText: /^Last contact$/ }));
   await visible(main.getByText(/^(Root encrypted|Root not encrypted|Encryption unknown)$/));
   await main.getByRole("tab", { name: "Encryption", exact: true }).click();
   await visible(main.getByText(/^(Recoverable|Not recoverable|Unknown): /));
@@ -221,7 +221,32 @@ async function lostLaptop(ctx) {
     "Show one named device, affected sessions/accounts, protected exclusions, check-in dependency, account-unlock remedy and whether independent approval is required.",
     "Exact reviewed payload locks sessions without sign-out and disables eligible local human accounts. It does not erase data or revoke enrollment.",
   );
-  await dialog.getByRole("button", { name: "Request approval", exact: true }).click();
+  const requestApproval = dialog.getByRole("button", { name: "Request approval", exact: true });
+  if (await dialog.getByText("Not ready to send", { exact: true }).isVisible()) {
+    // The server admits a device action only while the device is in contact
+    // (an online preflight, not an offline queue), and the review checks it
+    // before an approval is requested. Demo workstations stop reporting.
+    requireState(await requestApproval.isDisabled(), "lost_laptop_unready_approval_offered");
+    await visible(dialog.getByText(/off until this is resolved: /));
+    await shot(
+      ctx,
+      "lost-laptop-refused",
+      "Lock refused by the server's checks",
+      "partly",
+      "The refusal names its cause and remedy, but a lost laptop is usually offline: the lock cannot be queued for its next check-in.",
+      "Say what the administrator can do while the laptop stays offline, and offer to act when it next checks in.",
+      "The server's checks refused the lock before any approval was requested. Nothing was sent; the device is unchanged.",
+    );
+    await dialog.getByRole("button", { name: "Edit action", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden", timeout: 15_000 });
+    return {
+      outcome: "blocked",
+      reason:
+        "The lock review ran the server's checks, which refused the request with its named cause (the synthetic workstation is not in contact), so no approval was requested and nothing was sent. lindm acts only on devices in recent contact; containing an offline lost laptop waits for it to reconnect.",
+    };
+  }
+  await requestApproval.click();
   await visible(dialog.getByText("Waiting for approval", { exact: true }));
   await shot(
     ctx,
@@ -274,20 +299,24 @@ async function criticalCVE(ctx) {
       ? "Critical severity rows exist on this page; their counts do not identify or prove a particular exposed device."
       : "No Critical severity row is visible on this page. This is not proof of no critical exposure across the fleet.",
   );
-  await main.getByRole("button", { name: "Refresh sources", exact: true }).click();
+  // One page Refresh rereads the advisory summary and the sources.
+  await main.getByRole("button", { name: "Refresh", exact: true }).click();
   await settled(page);
+  await main
+    .getByRole("heading", { name: "Advisory sources", exact: true })
+    .scrollIntoViewIfNeeded();
   await shot(
     ctx,
     "critical-cve-sources",
     "Advisory source freshness",
     "partly",
-    "Refresh sources reloads status; remediation may require server configuration or native inventory work outside this screen.",
+    "Refresh reloads source status; remediation may require server configuration or native inventory work outside this screen.",
     "Connect missing, rejected or stale source coverage to named affected scopes and an actionable refresh/setup remedy.",
     "Reloaded source status through the UI; source freshness alone cannot establish complete exposure coverage.",
   );
-  const skipped = main.locator("summary").filter({ hasText: /^Skipped entries/ });
+  const skipped = main.getByRole("region", { name: "Skipped entries", exact: true });
   for (let index = 0; index < (await skipped.count()); index += 1) {
-    await skipped.nth(index).click();
+    await skipped.nth(index).scrollIntoViewIfNeeded();
     await shot(
       ctx,
       `critical-cve-source-rejections-${index + 1}`,
@@ -314,27 +343,21 @@ async function criticalCVE(ctx) {
     await main.getByRole("tab", { name: "Findings", exact: true }).click();
     await visible(main.getByRole("heading", { name: "Security findings", exact: true }));
     await settled(page);
-    const articles = main
+    // Findings are table rows, most severe first.
+    const criticalAffected = main
       .getByRole("tabpanel", { name: "Findings", exact: true })
-      .getByRole("article");
-    let currentCritical = false;
-    for (const article of await articles.all()) {
-      const severity = article
-        .locator("div")
-        .filter({ has: page.locator("dt").filter({ hasText: /^Severity:/ }) });
-      if (
-        (await severity.getByText(/^critical$/i).count()) &&
-        (await article.getByText(/^Affected(?: \(acceptance expired\))?$/).isVisible())
-      )
-        currentCritical = true;
-    }
+      .getByRole("table", { name: "Security findings on this device", exact: true })
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: "Critical", exact: true }) })
+      .filter({ has: page.getByText(/^Affected(?: \(acceptance expired\))?$/) });
+    const currentCritical = (await criticalAffected.count()) > 0;
     if (currentCritical && !exposed) exposed = device;
     await shot(
       ctx,
       `critical-cve-${index + 1}-findings`,
       "Named device findings",
       "partly",
-      "Finding cards offer risk acceptance but no contextual patch action or fleet exposure drilldown.",
+      "Finding rows offer risk acceptance but no contextual patch action or fleet exposure drilldown.",
       "Offer patch review from a current affected finding, retaining CVE, package, fixed version and evidence freshness.",
       currentCritical
         ? "This named device has a visible current Affected finding explicitly marked Critical. It remains synthetic fixture evidence."
@@ -503,9 +526,9 @@ async function remoteHelp(ctx) {
     );
     await main.getByRole("button", { name: "Stop session", exact: true }).click();
     await visible(main.getByRole("heading", { name: "Why this session ended", exact: true }));
-    await visible(
-      main.getByText("Session record. Sharing and control have ended.", { exact: true }),
-    );
+    // No one accepted, so the record says nothing was shared (a started session
+    // reads "Session record. Sharing and control have ended.").
+    await visible(main.getByText("Request record. Nothing was shared.", { exact: true }));
     requireState(!(await takeControl.isVisible()), "remote_help_ended_control_visible");
     requested = false;
     await shot(
@@ -517,8 +540,11 @@ async function remoteHelp(ctx) {
       "Keep end cause/time, historical permissions and return-to-device action; never imply historical consent grants access.",
       "Stopped this journey's request through the UI and observed its ended record. A real local user and native desktop are required to continue actual support.",
     );
-    await main.getByText("Session record", { exact: true }).click();
     await visible(main.getByText(reason, { exact: true }));
+    await main
+      .locator("summary")
+      .filter({ hasText: /^Details$/ })
+      .click();
     await shot(
       ctx,
       "remote-help-ended-details",

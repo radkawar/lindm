@@ -258,7 +258,11 @@ export function DeviceResources({
                               .join(", ")}
                           </p>
                         ) : null}
-                        {resource.desired || resource.reason ? (
+                        {resource.desired ||
+                        resource.reason ||
+                        (resource.latestAction && !SINGLE_STATE_LABELS[resource.disposition]) ? (
+                          // One Details per row: the item's identifiers and desired
+                          // state, then the latest change's exact evidence.
                           <TechnicalDetails
                             items={[
                               ...settingTechnicalIds(resource.desired?.ref),
@@ -271,6 +275,9 @@ export function DeviceResources({
                                   prettySpaces: 2,
                                 })}
                               </pre>
+                            ) : null}
+                            {resource.latestAction && !SINGLE_STATE_LABELS[resource.disposition] ? (
+                              <LatestChangeEvidence action={resource.latestAction} />
                             ) : null}
                           </TechnicalDetails>
                         ) : null}
@@ -551,6 +558,8 @@ function checkInterval(seconds: number) {
   return `every ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
 }
 
+// The Latest change column: what happened, in words. Its exact evidence is in
+// the row's one Details disclosure (LatestChangeEvidence).
 function ActionHistory({
   action,
   resultShown = false,
@@ -565,10 +574,6 @@ function ActionHistory({
     resultShown &&
     status?.state === ResourceExecutionState.SUCCEEDED &&
     status.verification?.disposition !== VerificationDisposition.NOT_APPLICABLE;
-  const checks =
-    status?.verification?.checks.case === "systemdService"
-      ? status.verification.checks.value
-      : undefined;
   return (
     <div className="grid gap-1 whitespace-normal text-xs">
       {repeated ? null : (
@@ -586,67 +591,81 @@ function ActionHistory({
           {blockedReasonLabel(action.closedReason)}
         </p>
       ) : null}
-      <TechnicalDetails
-        items={[
-          { label: "Action ID", value: action.actionId },
-          { label: "Closed reason code", value: action.closedReason },
-          { label: "Sequence", value: action.resourceSequence.toString() },
-          { label: "Issued (server)", value: formatTimestamp(action.issuedAt).local },
-          { label: "Expires (server)", value: formatTimestamp(action.expiresAt).local },
-          {
-            label: "Start authorized (server)",
-            value: formatTimestamp(action.startAuthorizedAt).local,
-          },
-          { label: "Started (device clock)", value: formatTimestamp(status?.startedAt).local },
-          { label: "Completed (device clock)", value: formatTimestamp(status?.completedAt).local },
-          { label: "Attested (device clock)", value: formatTimestamp(action.attestedAt).local },
-          { label: "Received (server)", value: formatTimestamp(action.receivedAt).local },
-          { label: "Evidence revision", value: action.actionRevision.toString() },
-          {
-            label: "Read-only check",
-            value: status?.readOnly
-              ? enumLabel(
-                  VerificationDisposition[
-                    status.verification?.disposition ?? VerificationDisposition.UNSPECIFIED
-                  ],
-                )
-              : undefined,
-          },
-          {
-            label: "Preparation",
-            value:
-              status?.state === ResourceExecutionState.PREPARING
-                ? "Preparing, nothing changed yet"
-                : status?.preparationOutcome
-                  ? "Ended before any change"
-                  : undefined,
-          },
-        ]}
-      >
-        {status ? (
-          <div className="mt-2 grid gap-3">
-            <Observation label="Before" observation={status.before} />
-            <Observation label="After" observation={status.verification?.after} />
-            {status.verification ? (
-              <div>
-                <p>
-                  Verification:{" "}
-                  {enumLabel(VerificationDisposition[status.verification.disposition])}
-                </p>
-                {checks ? (
-                  <p>
-                    Runtime matches: {String(checks.runtimeMatches)}; enablement matches:{" "}
-                    {String(checks.enablementMatches)}; definition matches:{" "}
-                    {String(checks.definitionMatches)}.
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p>No verification reported.</p>
-            )}
+    </div>
+  );
+}
+
+function LatestChangeEvidence({ action }: { action: ResourceActionSummary }) {
+  const status = action.status;
+  const checks =
+    status?.verification?.checks.case === "systemdService"
+      ? status.verification.checks.value
+      : undefined;
+  const items = [
+    { label: "Action ID", value: action.actionId },
+    { label: "Closed reason code", value: action.closedReason },
+    { label: "Sequence", value: action.resourceSequence.toString() },
+    { label: "Issued (server)", value: formatTimestamp(action.issuedAt).local },
+    { label: "Expires (server)", value: formatTimestamp(action.expiresAt).local },
+    { label: "Start authorized (server)", value: formatTimestamp(action.startAuthorizedAt).local },
+    { label: "Started (device clock)", value: formatTimestamp(status?.startedAt).local },
+    { label: "Completed (device clock)", value: formatTimestamp(status?.completedAt).local },
+    { label: "Attested (device clock)", value: formatTimestamp(action.attestedAt).local },
+    { label: "Received (server)", value: formatTimestamp(action.receivedAt).local },
+    { label: "Evidence revision", value: action.actionRevision.toString() },
+    {
+      label: "Read-only check",
+      value: status?.readOnly
+        ? enumLabel(
+            VerificationDisposition[
+              status.verification?.disposition ?? VerificationDisposition.UNSPECIFIED
+            ],
+          )
+        : undefined,
+    },
+    {
+      label: "Preparation",
+      value:
+        status?.state === ResourceExecutionState.PREPARING
+          ? "Preparing, nothing changed yet"
+          : status?.preparationOutcome
+            ? "Ended before any change"
+            : undefined,
+    },
+  ].filter((item) => item.value);
+  return (
+    <div className="mt-3 grid max-w-lg gap-2 whitespace-normal">
+      <p className="font-medium">Latest change</p>
+      <dl className="grid gap-1 break-all">
+        {items.map((item) => (
+          <div key={item.label}>
+            <dt className="inline font-medium">{item.label}: </dt>
+            <dd className="inline font-mono">{item.value}</dd>
           </div>
-        ) : null}
-      </TechnicalDetails>
+        ))}
+      </dl>
+      {status ? (
+        <div className="grid gap-3">
+          <Observation label="Before" observation={status.before} />
+          <Observation label="After" observation={status.verification?.after} />
+          {status.verification ? (
+            <div>
+              <p>
+                Verification: {enumLabel(VerificationDisposition[status.verification.disposition])}
+              </p>
+              {checks ? (
+                <p>
+                  Runtime matches: {String(checks.runtimeMatches)}; enablement matches:{" "}
+                  {String(checks.enablementMatches)}; definition matches:{" "}
+                  {String(checks.definitionMatches)}.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p>No verification reported.</p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

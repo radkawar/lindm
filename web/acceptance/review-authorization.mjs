@@ -240,7 +240,7 @@ export async function reviewAuthorization({
       await capture("partial-outcomes");
       await shown.getByRole("button", { name: "Dismiss secrets", exact: true }).click();
       await page.goto(`${config.origin}/audit`);
-      await page.getByText("Organization access policy changed", { exact: true }).first().waitFor();
+      await page.getByText("Changed organization access policy", { exact: true }).first().waitFor();
       await capture("authorization-audit");
     } catch {
       // Playwright call logs may include the uploaded document or displayed secret.

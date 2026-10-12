@@ -12,10 +12,6 @@ async function visible(locator) {
   await locator.waitFor({ state: "visible", timeout });
 }
 
-function formWithHeading(page, name) {
-  return page.locator("form").filter({ has: page.getByRole("heading", { name, exact: true }) });
-}
-
 async function shot(ctx, name, screen, taskShaped, generic, remedy, outcome) {
   // The account screen predates data-sensitive. Mark only its secret node for
   // the existing screenshot masker; never extract, replace or log its contents.
@@ -71,28 +67,65 @@ async function start(ctx, id, job) {
   );
 }
 
+// Pickers list one server page of choices; a later page is offered by a "More …"
+// button inside the choices or beside the field. Page only when the current page
+// has finished loading and has no match.
+async function matchOnPage(page, popover, option) {
+  const deadline = Date.now() + timeout;
+  let empty = 0;
+  while (Date.now() < deadline) {
+    if (await option.isVisible()) return true;
+    const none = await popover.getByText("No matching options.", { exact: true }).isVisible();
+    const loading = await page
+      .getByRole("status")
+      .filter({ hasText: /^Loading\b/ })
+      .count();
+    empty = none && !loading ? empty + 1 : 0;
+    if (empty >= 4) return false;
+    await page.waitForTimeout(250);
+  }
+  return false;
+}
+
 async function chooseNamed(ctx, container, label, name, prefix) {
+  const { page } = ctx;
   const trigger = container.getByRole("button", { name: new RegExp(`^${label} `) });
-  await trigger.click();
   // The picker's choices float in a popover outside the container.
-  await ctx.page
-    .getByRole("combobox", { name: `Search ${label.toLowerCase()}`, exact: true })
-    .fill(name);
-  const option = ctx.page.getByRole("option").filter({
-    has: ctx.page.getByText(name, { exact: true }),
-  });
-  try {
-    await visible(option);
-  } catch {
-    throw new Error("named_picker_matching_option_not_visible");
+  const popover = page.locator('[data-slot="popover-content"]');
+  const option = page.getByRole("option").filter({ has: page.getByText(name, { exact: true }) });
+  const more = /^More (devices|groups|profiles|versions)$/;
+  let turned = 0;
+  await trigger.click();
+  for (;;) {
+    await page
+      .getByRole("combobox", { name: `Search ${label.toLowerCase()}`, exact: true })
+      .fill(name);
+    if (await matchOnPage(page, popover, option)) break;
+    const inside = popover.getByRole("button", { name: more });
+    const beside = container.getByRole("button", { name: more });
+    const next = (await inside.count()) ? inside.first() : beside.first();
+    if (turned >= 10 || !(await next.count()) || (await next.isDisabled()))
+      throw new Error("named_picker_matching_option_not_visible");
+    const outside = (await inside.count()) === 0;
+    if (outside) {
+      await page.keyboard.press("Escape");
+      await popover.waitFor({ state: "hidden", timeout });
+    }
+    await next.click();
+    turned += 1;
+    if (outside) await trigger.click();
   }
   await shot(
     ctx,
     `${prefix}-choices`,
     "Named selection / matching context",
-    "yes",
-    "The console carries identity internally; the operator reads a name and context.",
-    "Keep names and distinguishing context visible, including unavailable saved selections.",
+    turned ? "partly" : "yes",
+    turned
+      ? `The console carries identity internally, but the picker searches one page at a time; ${name} appeared after ${turned} "More" page turn${turned === 1 ? "" : "s"}.`
+      : "The console carries identity internally; the operator reads a name and context.",
+    turned
+      ? "Search every choice by name on the server, not only the loaded page."
+      : "Keep names and distinguishing context visible, including unavailable saved selections.",
     `The actual picker offers ${name}; no identity was typed or extracted from Details.`,
   );
   await option.click();
@@ -123,11 +156,14 @@ async function createGroup(ctx, id, department, device) {
   );
   const name = `${department} ui-review ${id} ${randomUUID().slice(0, 8)}`;
   await page.getByRole("button", { name: "New group", exact: true }).first().click();
-  const form = formWithHeading(page, "Create group");
+  const dialog = page.getByRole("dialog", { name: "New device group", exact: true });
+  const form = dialog.getByRole("form", { name: "New device group", exact: true });
+  await visible(form);
   await form.getByRole("textbox", { name: "Group name", exact: true }).fill(name);
-  const members = form.getByRole("group", { name: "Member devices", exact: true });
-  await members.getByRole("button", { name: "Add selection", exact: true }).click();
-  await chooseNamed(ctx, members, "Member devices 1", device.Hostname, `${id}-member`);
+  const members = form.getByRole("group", { name: "Devices", exact: true });
+  await chooseNamed(ctx, members, "Add a device", device.Hostname, `${id}-member`);
+  const chosen = members.getByRole("list", { name: "Selected devices", exact: true });
+  await visible(chosen.getByText(device.Hostname, { exact: true }));
   await form
     .getByRole("textbox", { name: "Group change reason", exact: true })
     .fill(
@@ -142,17 +178,49 @@ async function createGroup(ctx, id, department, device) {
     "Explain any existing account-access changes when editing a shared group.",
     `Only ${device.Hostname} is selected for this new isolated group; no existing group is changed.`,
   );
-  await form.getByRole("button", { name: "Save group", exact: true }).click();
+  await form.getByRole("button", { name: "Create group", exact: true }).click();
+  await dialog.waitFor({ state: "hidden", timeout });
   const row = page
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { name, exact: true }) });
+  // The list pages by server order, 50 groups at a time, and sorts by name only
+  // within a page, so the new group may be on any page. Page as an operator would.
+  const list = page.locator('section[aria-labelledby="device-groups-title"]');
+  await list.and(page.locator('[aria-busy="false"]')).waitFor({ timeout });
+  let turned = 0;
+  while (!(await row.isVisible())) {
+    const next = page
+      .getByRole("navigation", { name: "Device group pages", exact: true })
+      .getByRole("button", { name: "Next page", exact: true });
+    if (turned >= 20 || !(await next.isVisible()) || (await next.isDisabled()))
+      throw new Error("created_group_not_listed");
+    await Promise.all([
+      page.waitForResponse((response) =>
+        response.url().endsWith("/lindm.admin.v1.AdminService/ListDeviceGroups"),
+      ),
+      next.click(),
+    ]);
+    await list.and(page.locator('[aria-busy="false"]')).waitFor({ timeout });
+    turned += 1;
+  }
   await visible(row.getByText("1 device", { exact: true }));
+  await row.scrollIntoViewIfNeeded();
+  await shot(
+    ctx,
+    `${id}-group-listed`,
+    "Groups / find the saved group",
+    turned ? "no" : "partly",
+    turned
+      ? `The saved group was not on the first page: groups page in internal order and sort by name only within a page, so it took ${turned} page turn${turned === 1 ? "" : "s"} to find.`
+      : "The saved group happened to be on the first page; groups page in internal order and sort by name only within a page.",
+    "Keep a just-created group in view after the dialog closes, and order or search groups by name across pages.",
+    `The saved ${name} row shows 1 device${turned ? ` on page ${turned + 1} of the list` : " on the first page of the list"}.`,
+  );
   await row.getByRole("button", { name: `Edit ${name}`, exact: true }).click();
   const saved = page.getByRole("form", { name: `Edit ${name}`, exact: true });
-  await visible(
-    saved.getByRole("button", { name: `Member devices 1 ${device.Hostname}`, exact: true }),
-  );
-  if ((await saved.getByRole("button", { name: /^Member devices \d+ / }).count()) !== 1)
+  const savedMembers = saved.getByRole("list", { name: "Selected devices", exact: true });
+  await visible(savedMembers.getByText(device.Hostname, { exact: true }));
+  if ((await savedMembers.getByRole("listitem").count()) !== 1)
     throw new Error("group_membership_not_saved");
   await shot(
     ctx,
@@ -163,6 +231,8 @@ async function createGroup(ctx, id, department, device) {
     "Keep linked department tasks contextual; preserve named identity across destinations.",
     `The actual saved ${department} group shows exactly one named simulator member.`,
   );
+  await page.keyboard.press("Escape");
+  await saved.waitFor({ state: "hidden", timeout });
   return { name };
 }
 
