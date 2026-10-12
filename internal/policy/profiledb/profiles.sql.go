@@ -196,6 +196,38 @@ func (q *Queries) InsertProfileRevision(ctx context.Context, arg InsertProfileRe
 	return err
 }
 
+const listProfileActorNames = `-- name: ListProfileActorNames :many
+SELECT p.id, coalesce(nullif(p.display_name, ''), account.username, '')::text AS display_name
+FROM principals p
+LEFT JOIN local_accounts account ON account.id = p.id
+WHERE p.id = ANY($1::uuid[])
+`
+
+type ListProfileActorNamesRow struct {
+	ID          uuid.UUID
+	DisplayName string
+}
+
+func (q *Queries) ListProfileActorNames(ctx context.Context, ids []uuid.UUID) ([]ListProfileActorNamesRow, error) {
+	rows, err := q.db.Query(ctx, listProfileActorNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProfileActorNamesRow{}
+	for rows.Next() {
+		var i ListProfileActorNamesRow
+		if err := rows.Scan(&i.ID, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProfileDependencies = `-- name: ListProfileDependencies :many
 SELECT resource_id, dependency_kind, dependency_key, condition FROM profile_dependencies
 WHERE revision_id = $1 ORDER BY resource_id, dependency_kind, dependency_key LIMIT 4033

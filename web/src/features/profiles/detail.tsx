@@ -13,19 +13,20 @@ import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
-import { formatTimestamp } from "@/lib/time";
+import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
 import { usePublishAttempt } from "./attempt";
 import { ProfileEditor } from "./editor";
 import {
-  CATALOG_SEMANTICS,
   draftFromPayload,
   draftFromSpec,
   formatRevisionNumber,
   formatSha256,
+  publisherLabel,
   usableUuid,
   type DraftSpec,
 } from "./model";
@@ -88,7 +89,6 @@ export function ProfileDetailView({
     : isHead
       ? "This is the latest version."
       : "This is an older version. A newer one is available.";
-  const published = formatTimestamp(record?.publishedAt);
 
   function displayedSource(): EditorSource | null {
     if (!record?.spec || !head?.spec || headFailure) return null;
@@ -113,8 +113,21 @@ export function ProfileDetailView({
     }
   }
 
+  const canManage = canPermission(principal, "profiles.manage");
+  const settings = record?.spec ? (
+    <div className="grid gap-3">
+      {record.spec.resources.map((resource) => (
+        <ResourceFacts
+          key={resource.resourceId}
+          resource={resource}
+          resources={record.spec?.resources ?? []}
+        />
+      ))}
+    </div>
+  ) : null;
+
   return (
-    <section className="flex min-w-0 flex-col gap-6" aria-busy={displayed.isFetching}>
+    <section className="flex min-w-0 flex-col gap-4" aria-busy={displayed.isFetching}>
       <Link
         to="/profiles"
         search={{ pageSize: 50, pageToken: "" }}
@@ -125,37 +138,53 @@ export function ProfileDetailView({
       <PageHeader
         title={record?.spec?.name.trim() || "Profile"}
         description={record?.spec?.description.trim() || undefined}
+        onRefresh={() => {
+          void displayed.refetch();
+          if (revision !== "") void headQuery.refetch();
+        }}
+        refreshing={displayed.isFetching}
         actions={
-          <>
-            {canPermission(principal, "resources.assign") ? (
-              <Link to="/rollouts" className="text-sm font-medium underline underline-offset-4">
-                Assign in Rollouts
-              </Link>
-            ) : null}
-            <Button
-              variant="outline"
-              disabled={displayed.isFetching}
-              onClick={() => {
-                void displayed.refetch();
-                if (revision !== "") void headQuery.refetch();
-              }}
-            >
-              Refresh version
-            </Button>
-          </>
+          canPermission(principal, "resources.assign") ? (
+            <Link to="/rollouts" className="text-sm font-medium underline underline-offset-4">
+              Assign in Rollouts
+            </Link>
+          ) : null
         }
       />
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        {revisionLabel}. {CATALOG_SEMANTICS}
-      </p>
-      <Card>
-        <CardHeader>
-          <CardTitle>Find a version</CardTitle>
-          <CardDescription>Choose a saved version to inspect.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div
+        data-profile-version
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y py-3 text-sm"
+      >
+        {record ? (
+          <>
+            <StatusBadge status={headKnown && isHead ? "info" : "neutral"}>
+              {revisionLabel}
+            </StatusBadge>
+            <span>Version {formatRevisionNumber(record.revisionNumber)}</span>
+            <span data-profile-publisher>
+              Published <Timestamp value={record.publishedAt} /> by{" "}
+              {publisherLabel(record.actorId, record.actorDisplayName, principal.id)}
+            </span>
+            {headKnown && !isHead ? (
+              <Link
+                to="/profiles/$profileId"
+                params={{ profileId }}
+                search={{ revision: "" }}
+                className="underline underline-offset-4"
+              >
+                Open latest version
+              </Link>
+            ) : !headKnown ? (
+              <span className="text-muted-foreground">{headLabel}</span>
+            ) : null}
+          </>
+        ) : null}
+        <details className="ml-auto min-w-0" data-profile-version-picker>
+          <summary className="cursor-pointer text-sm underline-offset-4 hover:underline">
+            Open another version
+          </summary>
           <form
-            className="flex flex-wrap items-end gap-2"
+            className="mt-2 flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
               event.preventDefault();
               const canonical = usableUuid(lookup);
@@ -175,94 +204,34 @@ export function ProfileDetailView({
                 onChange={setLookup}
               />
             </div>
-            <Button type="submit">Open version</Button>
-            {revision !== "" ? (
-              <Button type="button" variant="outline" onClick={() => onSearch({ revision: "" })}>
-                Latest version
-              </Button>
-            ) : null}
+            <Button type="submit" variant="outline">
+              Open version
+            </Button>
           </form>
           {lookupError !== "" ? (
             <p role="alert" className="mt-2 text-sm text-destructive">
               {lookupError}
             </p>
           ) : null}
-        </CardContent>
-      </Card>
+        </details>
+        {record ? (
+          <TechnicalDetails
+            className="basis-full"
+            items={[
+              { label: "Profile ID", value: profileId },
+              { label: "Version ID", value: record.revisionId },
+              { label: "Publisher ID", value: record.actorId },
+              { label: "Spec SHA-256", value: formatSha256(record.specSha256) },
+            ]}
+          />
+        ) : null}
+      </div>
       {failure ? <RpcError failure={failure} /> : null}
       {displayed.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading profile…</span>
           <Skeleton className="h-40 w-full" />
         </div>
-      ) : null}
-      {record?.spec ? (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Version</CardTitle>
-              <CardDescription>{headLabel}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex flex-wrap gap-2">
-                <StatusBadge status={headKnown && isHead ? "info" : "neutral"}>
-                  {revisionLabel}
-                </StatusBadge>
-                {headKnown && !isHead && head ? (
-                  <Link
-                    to="/profiles/$profileId"
-                    params={{ profileId }}
-                    search={{ revision: "" }}
-                    className="text-sm underline underline-offset-4"
-                  >
-                    Open latest version
-                  </Link>
-                ) : null}
-              </div>
-              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Fact label="Version">{formatRevisionNumber(record.revisionNumber)}</Fact>
-                <Fact label="Published">
-                  {published.date ? (
-                    <time dateTime={published.utc}>{published.local}</time>
-                  ) : (
-                    published.local
-                  )}
-                </Fact>
-                <Fact label="Published by">
-                  {!record.actorId.trim()
-                    ? "The system"
-                    : record.actorId === principal.id
-                      ? "You"
-                      : "Another administrator"}
-                </Fact>
-                <Fact label="Settings">{record.spec.resources.length}</Fact>
-                <Fact label="Description">
-                  {record.spec.description.trim() || "No description"}
-                </Fact>
-              </dl>
-              <TechnicalDetails
-                className="mt-4"
-                items={[
-                  { label: "Profile ID", value: profileId },
-                  { label: "Version ID", value: record.revisionId },
-                  { label: "Publisher ID", value: record.actorId },
-                  { label: "Spec SHA-256", value: formatSha256(record.specSha256) },
-                ]}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>What this profile sets on assigned devices.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {record.spec.resources.map((resource) => (
-                <ResourceFacts key={resource.resourceId} resource={resource} />
-              ))}
-            </CardContent>
-          </Card>
-        </>
       ) : null}
       {headFailure ? (
         <RpcError failure={headFailure}>
@@ -277,12 +246,19 @@ export function ProfileDetailView({
           Loading latest version…
         </p>
       ) : null}
-      {editorSource && canPermission(principal, "profiles.manage") ? (
-        <div className="grid gap-3">
-          <div className="flex flex-wrap gap-2">
+      {editorSource && canManage ? (
+        <ProfileEditor
+          key={`${profileId}:${copyGeneration}`}
+          mode="edit"
+          profileId={profileId}
+          initialDraft={editorSource.draft}
+          initialExpectedRevisionId={editorSource.expectedRevisionId}
+          sourceNote={`${editorSource.sourceNote} It is kept until you publish it or reload the page.`}
+          headerAction={
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={attempt !== null || !record?.spec || !head?.spec || headFailure !== null}
               onClick={() => {
                 const source = displayedSource();
@@ -293,19 +269,28 @@ export function ProfileDetailView({
             >
               Start over from this version
             </Button>
-          </div>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Your draft is kept until you publish it or reload the page.
-          </p>
-          <ProfileEditor
-            key={`${profileId}:${copyGeneration}`}
-            mode="edit"
-            profileId={profileId}
-            initialDraft={editorSource.draft}
-            initialExpectedRevisionId={editorSource.expectedRevisionId}
-            sourceNote={editorSource.sourceNote}
-          />
-        </div>
+          }
+        />
+      ) : null}
+      {settings && record ? (
+        canManage && editorSource ? (
+          // The draft above is the working copy; the published settings of the
+          // version shown stay one click away for comparison.
+          <details className="min-w-0 border p-4" data-profile-published-settings>
+            <summary className="cursor-pointer text-sm font-medium">
+              Settings in version {formatRevisionNumber(record.revisionNumber)} as published
+            </summary>
+            <div className="mt-3">{settings}</div>
+          </details>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Settings</CardTitle>
+              <CardDescription>What this profile sets on assigned devices.</CardDescription>
+            </CardHeader>
+            <CardContent>{settings}</CardContent>
+          </Card>
+        )
       ) : null}
     </section>
   );
@@ -320,17 +305,21 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function ResourceFacts({ resource }: { resource: ProfileResource }) {
+function ResourceFacts({
+  resource,
+  resources,
+}: {
+  resource: ProfileResource;
+  resources: ProfileResource[];
+}) {
   const kind = resource.desired?.state.case;
-  const key = resource.desired?.ref?.canonicalKey;
+  const title = kind === "sshServer" ? undefined : settingTitle(undefined, resource.desired);
   return (
-    <article className="grid min-w-0 gap-3 border bg-muted/20 p-4">
+    <article className="grid min-w-0 gap-3 border bg-muted/20 p-4" data-profile-setting>
       <h2 className="grid gap-0.5 text-sm font-medium">
         <span>{kindLabel(kind)}</span>
-        {key && kind !== "sshServer" ? (
-          <span className="break-all font-mono text-xs font-normal text-muted-foreground">
-            {key}
-          </span>
+        {title ? (
+          <span className="break-all text-xs font-normal text-muted-foreground">{title}</span>
         ) : null}
       </h2>
       <dl className="grid gap-3 sm:grid-cols-2">
@@ -341,10 +330,17 @@ function ResourceFacts({ resource }: { resource: ProfileResource }) {
             <ul className="grid gap-0.5">
               {resource.dependsOn.map((dependency, index) => (
                 <li key={index} className="break-all">
-                  {refKindLabel(dependency.ref?.kind)}
-                  {dependency.ref?.canonicalKey ? (
-                    <span className="font-mono text-xs"> {dependency.ref.canonicalKey}</span>
-                  ) : null}
+                  {refKindLabel(dependency.ref?.kind)}{" "}
+                  <span className="text-xs">
+                    {settingTitle(
+                      dependency.ref,
+                      resources.find(
+                        (other) =>
+                          other.desired?.ref?.kind === dependency.ref?.kind &&
+                          other.desired?.ref?.canonicalKey === dependency.ref?.canonicalKey,
+                      )?.desired,
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -356,6 +352,7 @@ function ResourceFacts({ resource }: { resource: ProfileResource }) {
         items={[
           { label: "Setting ID", value: resource.resourceId },
           { label: "Setting type", value: kind },
+          ...settingTechnicalIds(resource.desired?.ref),
         ]}
       >
         <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">

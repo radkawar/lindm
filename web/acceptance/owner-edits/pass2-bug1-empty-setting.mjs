@@ -16,11 +16,9 @@ const timeout = 30_000;
 const EMPTY_ZONE = /Add an interface, source network or rule\./;
 
 async function publishedVersion(main) {
-  const version = main
-    .locator("dt", { hasText: /^Version$/ })
-    .locator("xpath=following-sibling::dd[1]");
+  const version = main.locator("[data-profile-version]");
   await version.waitFor({ timeout });
-  return (await version.innerText()).trim();
+  return (await version.innerText()).match(/Version (\d+)/)?.[1] ?? "";
 }
 
 export async function check({ page, demo, visit, require, capture, step }) {
@@ -31,15 +29,13 @@ export async function check({ page, demo, visit, require, capture, step }) {
   step("open profile");
   await visit(`/profiles/${encodeURIComponent(profileId)}`);
   const before = await publishedVersion(main);
-  const counter = main.getByText(/^\d+ of \d+ settings\.$/);
-  await counter.waitFor({ timeout });
-  const count = Number.parseInt(await counter.innerText(), 10);
+  const settings = main.locator("[data-profile-editor] fieldset[data-setting-index]");
+  await settings.first().waitFor({ timeout });
+  const count = await settings.count();
 
   step("add empty firewall zone");
   await main.getByRole("button", { name: "Add setting", exact: true }).click();
-  const setting = main.locator("fieldset").filter({
-    has: page.locator(":scope > legend", { hasText: new RegExp(`^Setting ${count + 1}$`) }),
-  });
+  const setting = main.locator(`fieldset[data-setting-index="${count}"]`);
   await setting.waitFor({ timeout });
   await setting.getByRole("combobox", { name: "Setting type", exact: true }).click();
   await page.getByRole("option", { name: "Firewall zone", exact: true }).click();

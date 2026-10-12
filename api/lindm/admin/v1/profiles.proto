@@ -5,6 +5,8 @@ package lindm.admin.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/policy/v1/profile.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
@@ -19,6 +21,9 @@ message ProfileRevision {
   string actor_id = 5 [(buf.validate.field).string.uuid = true];
   google.protobuf.Timestamp published_at = 6 [(buf.validate.field).required = true];
   bytes spec_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  // Current label of the publishing account, projected for readers; actor_id
+  // stays authoritative. Empty when the account has no name or username.
+  string actor_display_name = 8 [(buf.validate.field).string.max_len = 256];
 }
 
 message PublishProfileRevisionRequest {
@@ -76,6 +81,8 @@ message ProfileSummary {
   string actor_id = 7;
   google.protobuf.Timestamp published_at = 8;
   bytes spec_sha256 = 9;
+  // Current label of the publishing account; actor_id stays authoritative.
+  string actor_display_name = 10;
 }
 
 message ListProfilesResponse {
@@ -96,4 +103,22 @@ message ListProfileRevisionsRequest {
 message ListProfileRevisionsResponse {
   repeated ProfileSummary revisions = 1;
   string next_page_token = 2;
+}
+
+message ListQualifiedResourceKindsRequest {}
+
+// A setting kind this server dispatches to devices, with the ownership
+// operations native evidence covers. A resource dispatches only with one of
+// these modes and one of these release behaviors. Kinds absent from the list can
+// be published but are held as unsupported on every device; this is not
+// per-device applicability.
+message QualifiedResourceKind {
+  lindm.resource.v1.ResourceKind kind = 1;
+  repeated lindm.resource.v1.OwnershipMode ownership_modes = 2;
+  repeated lindm.resource.v1.ReleaseBehavior release_behaviors = 3;
+}
+
+message ListQualifiedResourceKindsResponse {
+  // Ordered by kind number.
+  repeated QualifiedResourceKind kinds = 1;
 }

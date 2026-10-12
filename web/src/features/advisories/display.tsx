@@ -5,6 +5,7 @@ import {
   type AdvisoryFeedStatus,
 } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export function useFreshnessClock() {
   const [now, setNow] = useState(Date.now);
@@ -28,11 +29,31 @@ export function findingStateLabel(state: AdvisoryFindingState) {
 // absent rating, not an error or a severity level of its own.
 const unpublishedSeverities: Record<string, true> = { "": true, unknown: true, unspecified: true };
 
-export function publishedSeverity(severity: string) {
+function publishedSeverity(severity: string) {
   const value = severity.trim();
   return Object.hasOwn(unpublishedSeverities, value.toLowerCase())
     ? ""
     : value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+// A rated severity is a neutral badge; an unrated one is plain muted text that
+// says the source gave no rating, so it never reads as a failure.
+export function Severity({ value, badge = true }: { value: string; badge?: boolean }) {
+  const severity = publishedSeverity(value);
+  if (!severity) {
+    return (
+      <span data-advisory-severity="unrated" className="text-muted-foreground">
+        Not rated by the source
+      </span>
+    );
+  }
+  return badge ? (
+    <StatusBadge status="neutral" data-advisory-severity="rated">
+      {severity}
+    </StatusBadge>
+  ) : (
+    <span data-advisory-severity="rated">{severity}</span>
+  );
 }
 
 // Registry display name, else the reported os-release identity.

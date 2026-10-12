@@ -24,7 +24,37 @@ func (s *Store) Get(ctx context.Context, profileID uuid.UUID, revisionID *uuid.U
 	if profileID == uuid.Nil || (revisionID != nil && *revisionID == uuid.Nil) {
 		return nil, ErrProfileRejected
 	}
-	return s.readRevision(ctx, profiledb.New(s.pool), profileID, revisionID)
+	q := profiledb.New(s.pool)
+	revision, err := s.readRevision(ctx, q, profileID, revisionID)
+	if err != nil {
+		return nil, err
+	}
+	names, err := actorNames(ctx, q, revision.GetActorId())
+	if err != nil {
+		return nil, err
+	}
+	revision.ActorDisplayName = names[revision.GetActorId()]
+	return revision, nil
+}
+
+// actorNames projects the current account labels of publishers for readers.
+// Labels are mutable display context; actor IDs remain the audited identity.
+func actorNames(ctx context.Context, q *profiledb.Queries, ids ...string) (map[string]string, error) {
+	parsed := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if actor, err := uuid.Parse(id); err == nil && !slices.Contains(parsed, actor) {
+			parsed = append(parsed, actor)
+		}
+	}
+	labels, err := q.ListProfileActorNames(ctx, parsed)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]string, len(labels))
+	for _, label := range labels {
+		names[label.ID.String()] = label.DisplayName
+	}
+	return names, nil
 }
 
 // GetInTransaction reads an immutable revision using the caller's transaction.
@@ -149,7 +179,25 @@ func (s *Store) List(ctx context.Context, after uuid.UUID, pageSize int32) ([]*a
 		}
 		result = append(result, &adminv1.ProfileSummary{ProfileId: row.ProfileID.String(), RevisionId: row.ID.String(), RevisionNumber: uint64(row.RevisionNumber), Name: row.Name, Description: row.Description, ResourceCount: uint32(row.ResourceCount), ActorId: row.ActorID.String(), PublishedAt: timestamppb.New(row.PublishedAt.Time), SpecSha256: row.SpecDigest})
 	}
+	if err := nameSummaryActors(ctx, profiledb.New(s.pool), result); err != nil {
+		return nil, uuid.Nil, err
+	}
 	return result, next, nil
+}
+
+func nameSummaryActors(ctx context.Context, q *profiledb.Queries, summaries []*adminv1.ProfileSummary) error {
+	ids := make([]string, 0, len(summaries))
+	for _, summary := range summaries {
+		ids = append(ids, summary.GetActorId())
+	}
+	names, err := actorNames(ctx, q, ids...)
+	if err != nil {
+		return err
+	}
+	for _, summary := range summaries {
+		summary.ActorDisplayName = names[summary.GetActorId()]
+	}
+	return nil
 }
 
 // ListRevisions returns retained metadata newest first, without loading resources.
@@ -179,6 +227,9 @@ func (s *Store) ListRevisions(ctx context.Context, profileID uuid.UUID, before i
 			return nil, 0, ErrProfileCorrupt
 		}
 		result = append(result, &adminv1.ProfileSummary{ProfileId: row.ProfileID.String(), RevisionId: row.ID.String(), RevisionNumber: uint64(row.RevisionNumber), Name: row.Name, Description: row.Description, ResourceCount: uint32(row.ResourceCount), ActorId: row.ActorID.String(), PublishedAt: timestamppb.New(row.PublishedAt.Time), SpecSha256: row.SpecDigest})
+	}
+	if err := nameSummaryActors(ctx, q, result); err != nil {
+		return nil, 0, err
 	}
 	return result, next, nil
 }

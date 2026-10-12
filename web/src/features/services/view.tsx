@@ -18,6 +18,7 @@ import {
   ResourceExecutionState,
 } from "../../../gen/lindm/agent/v1/resource_execution_pb";
 import type { SystemdServiceObservation } from "../../../gen/lindm/resource/v1/observations_pb";
+import type { ResourceRef } from "../../../gen/lindm/resource/v1/identity_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -37,6 +38,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { blockedReasonLabel, toRpcFailure } from "@/lib/errors";
+import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
 import { formatTimestamp } from "@/lib/time";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { resourceStateQueryOptions } from "./queries";
@@ -115,6 +117,17 @@ export function DeviceResources({
       (resource) => !resource.latestAction && resource.disposition === ResourceDisposition.PENDING,
     ).length ?? 0) +
     (state.data?.releases.filter((release) => release.state === "pending").length ?? 0);
+  // A managed item's name, using its desired state when this device still has it
+  // (a firewall zone is described by what it binds, never by its UUID).
+  const itemTitle = (ref: ResourceRef | undefined) =>
+    settingTitle(
+      ref,
+      state.data?.resources.find(
+        (resource) =>
+          resource.desired?.ref?.kind === ref?.kind &&
+          resource.desired?.ref?.canonicalKey === ref?.canonicalKey,
+      )?.desired,
+    ) ?? "Unnamed item";
   return (
     <Card className="min-w-0" aria-busy={state.isFetching}>
       <CardHeader>
@@ -203,9 +216,7 @@ export function DeviceResources({
                   {state.data.resources.map((resource) => (
                     <TableRow key={resource.resourceId}>
                       <TableCell className="align-top">
-                        <p className="font-medium break-all">
-                          {resource.desired?.ref?.canonicalKey ?? "Unnamed item"}
-                        </p>
+                        <p className="font-medium break-all">{itemTitle(resource.desired?.ref)}</p>
                         <p className="text-xs text-muted-foreground">
                           {resource.desired?.state.case ?? "Unknown type"}
                         </p>
@@ -213,12 +224,15 @@ export function DeviceResources({
                           <p className="mt-1 whitespace-normal text-xs text-muted-foreground">
                             Depends on{" "}
                             {resource.dependsOn
-                              .map((dependency) => dependency.ref?.canonicalKey ?? "Unknown")
+                              .map((dependency) => itemTitle(dependency.ref))
                               .join(", ")}
                           </p>
                         ) : null}
                         {resource.desired ? (
-                          <TechnicalDetails summary="Settings" items={[]}>
+                          <TechnicalDetails
+                            summary="Settings"
+                            items={settingTechnicalIds(resource.desired?.ref)}
+                          >
                             <pre className="mt-2 max-w-lg overflow-auto whitespace-pre-wrap break-all">
                               {toJsonString(ResourceDesiredStateSchema, resource.desired, {
                                 prettySpaces: 2,
@@ -309,12 +323,11 @@ export function DeviceResources({
                     {state.data.releases.map((release) => (
                       <TableRow key={release.releaseId}>
                         <TableCell className="align-top">
-                          <p className="font-medium break-all">
-                            {release.ref?.canonicalKey ?? "Unnamed item"}
-                          </p>
+                          <p className="font-medium break-all">{itemTitle(release.ref)}</p>
                           <TechnicalDetails
                             items={[
                               { label: "Release ID", value: release.releaseId },
+                              ...settingTechnicalIds(release.ref),
                               { label: "From assignment", value: release.sourceAssignmentId },
                               { label: "To assignment", value: release.supersedingAssignmentId },
                             ]}
@@ -375,12 +388,11 @@ export function DeviceResources({
                         }
                       >
                         <TableCell className="align-top">
-                          <p className="font-medium break-all">
-                            {recent.ref?.canonicalKey ?? "Unnamed item"}
-                          </p>
+                          <p className="font-medium break-all">{itemTitle(recent.ref)}</p>
                           <TechnicalDetails
                             items={[
                               { label: "Action ID", value: recent.action?.actionId },
+                              ...settingTechnicalIds(recent.ref),
                               { label: "Assignment ID", value: recent.assignmentId },
                               {
                                 label: "Sequence",
@@ -574,7 +586,7 @@ function Observation({
       {observation ? (
         <>
           <p>Observed: {formatTimestamp(observation.metadata?.observedAt).local}</p>
-          <p className="break-all">Resource: {observation.ref?.canonicalKey || "Not reported"}</p>
+          <p className="break-all">Resource: {settingTitle(observation.ref) ?? "Not reported"}</p>
           <details>
             <summary className="cursor-pointer">Advanced: view observation JSON</summary>
             <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">

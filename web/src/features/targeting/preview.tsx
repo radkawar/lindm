@@ -28,6 +28,7 @@ import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
+import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
 import { formatTimestamp } from "@/lib/time";
 import { describeViolations } from "@/lib/validation";
 import { useTargetPickers } from "./pickers";
@@ -300,7 +301,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                   >
                     <h4 className="break-all font-medium">
                       {resolved.ref?.kind ?? "Unknown type"} /{" "}
-                      {resolved.ref?.canonicalKey ?? "Unknown"}
+                      {settingTitle(resolved.ref, resolved.resource?.desired) ?? "Unknown"}
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       <StatusBadge
@@ -330,6 +331,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                     <TechnicalDetails
                       items={[
                         { label: "Required capability", value: resolved.capabilityId },
+                        ...settingTechnicalIds(resolved.ref),
                         {
                           label: "From profile versions",
                           value: resolved.contributingRevisionIds.join(", "),

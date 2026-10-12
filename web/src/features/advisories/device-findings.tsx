@@ -18,7 +18,7 @@ import {
   AdvisoryPaging,
   advisoryReasonText,
   findingStateLabel,
-  publishedSeverity,
+  Severity,
   unexpired,
   useFreshnessClock,
 } from "./display";
@@ -173,7 +173,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                 <div>
                   <dt className="inline font-medium">Severity: </dt>
                   <dd className="inline">
-                    {publishedSeverity(finding.severity) || "Not published"}
+                    <Severity value={finding.severity} badge={false} />
                   </dd>
                 </div>
                 {finding.cves.length ? (

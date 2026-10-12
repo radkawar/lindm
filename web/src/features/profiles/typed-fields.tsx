@@ -564,15 +564,13 @@ function TypedField({
       )}
       {recordReference && !generatedReference && !Picker ? (
         <p id={`${id}-description`} className="text-xs text-muted-foreground">
-          Copy this reference from the system that issued it; the server does not provide a
-          selection catalog.
+          Copy this reference from the system that issued it.
         </p>
       ) : null}
       {["uid", "gid"].includes(field.jsonName) ? (
         <p id={`${id}-description`} className="text-xs text-muted-foreground">
-          {field.jsonName === "uid"
-            ? "Numeric user ID on the device"
-            : "Numeric group ID on the device"}
+          Leave unset to let the device assign the next free{" "}
+          {field.jsonName === "uid" ? "user" : "group"} ID.
         </p>
       ) : null}
     </div>
@@ -670,8 +668,7 @@ function MessageInput({
               }
             />
             <p id={`${id}-approved-description`} className="text-xs text-muted-foreground">
-              Copy the full apt/ or rpm/ reference from the device's approved source configuration;
-              the server does not provide a selection catalog.
+              The package source the device already uses, as it names it (begins with apt/ or rpm/).
             </p>
           </div>
         ) : allowed.length === 0 ? (

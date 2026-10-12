@@ -29,7 +29,7 @@ export function SSHBannerFields({
       <p id={`${id}-help`} className="text-sm text-muted-foreground">
         {unsupported
           ? "This setting also contains SSH controls that are not supported here. They are kept unchanged."
-          : "Public text only. Existing notices need approved adoption; removing this setting restores only unchanged, owned files."}
+          : "Anyone who connects sees this text, so keep it public. Replacing a notice a device already has needs an approved assignment. Removing this setting puts the earlier notice back unless someone changed it on the device since."}
       </p>
     </div>
   );

@@ -1,10 +1,12 @@
 package dispatch
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"math"
+	"slices"
 
 	"lindm/internal/device/core"
 
@@ -152,6 +154,29 @@ func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1
 		}
 	}
 	return core.NoStore(&adminv1.ListProfilesResponse{Profiles: rows, NextPageToken: core.EncodeProfileCursor(next)}), nil
+}
+
+// ListQualifiedResourceKinds reports the dispatch qualification the editor
+// offers, read from the same table ResourceDispatchUnsupported enforces.
+func (s *Service) ListQualifiedResourceKinds(ctx context.Context, req *connect.Request[adminv1.ListQualifiedResourceKindsRequest]) (*connect.Response[adminv1.ListQualifiedResourceKindsResponse], error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	if _, err := s.RequireUnrestricted(ctx, identity.PermissionReadFleet); err != nil {
+		return nil, err
+	}
+	if req == nil || req.Msg == nil {
+		return nil, core.Invalid("invalid_profile_request")
+	}
+	return core.NoStore(&adminv1.ListQualifiedResourceKindsResponse{Kinds: qualifiedResourceKinds()}), nil
+}
+
+func qualifiedResourceKinds() []*adminv1.QualifiedResourceKind {
+	kinds := make([]*adminv1.QualifiedResourceKind, 0, len(QualifiedResourceKinds))
+	for kind, qualification := range QualifiedResourceKinds {
+		kinds = append(kinds, &adminv1.QualifiedResourceKind{Kind: kind, OwnershipModes: slices.Clone(qualification.Modes), ReleaseBehaviors: slices.Clone(qualification.Releases)})
+	}
+	slices.SortFunc(kinds, func(a, b *adminv1.QualifiedResourceKind) int { return cmp.Compare(a.GetKind(), b.GetKind()) })
+	return kinds
 }
 
 func (s *Service) ListProfileRevisions(ctx context.Context, req *connect.Request[adminv1.ListProfileRevisionsRequest]) (*connect.Response[adminv1.ListProfileRevisionsResponse], error) {

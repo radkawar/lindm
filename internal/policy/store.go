@@ -55,6 +55,19 @@ func NewStore(pool *pgxpool.Pool) (*Store, error) {
 // request reservation, profile. Exact retries precede head/clock/capacity checks;
 // they return their original immutable revision and never advance a newer head.
 func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.PublishProfileRevisionRequest, actorID uuid.UUID) (*adminv1.ProfileRevision, error) {
+	revision, err := s.publish(ctx, tx, request, actorID)
+	if err != nil {
+		return nil, err
+	}
+	names, err := actorNames(ctx, profiledb.New(tx), revision.GetActorId())
+	if err != nil {
+		return nil, err
+	}
+	revision.ActorDisplayName = names[revision.GetActorId()]
+	return revision, nil
+}
+
+func (s *Store) publish(ctx context.Context, tx pgx.Tx, request *adminv1.PublishProfileRevisionRequest, actorID uuid.UUID) (*adminv1.ProfileRevision, error) {
 	if tx == nil || actorID == uuid.Nil || request == nil {
 		return nil, ErrProfileRejected
 	}

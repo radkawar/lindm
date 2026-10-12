@@ -28,7 +28,7 @@ import { CoverageBanner } from "./coverage-banner";
 import {
   advisorySourcesDocsUrl,
   feedOSLabel,
-  publishedSeverity,
+  Severity,
   sourceAnchor,
   sourceGap,
   unexpired,
@@ -143,7 +143,6 @@ export function AdvisoryFleet() {
                 </TableHeader>
                 <TableBody>
                   {summary.data.advisories.map((advisory) => {
-                    const severity = publishedSeverity(advisory.severity);
                     return (
                       <TableRow key={advisory.advisoryId}>
                         <TableCell>
@@ -155,11 +154,7 @@ export function AdvisoryFleet() {
                           ) : null}
                         </TableCell>
                         <TableCell>
-                          {severity ? (
-                            <StatusBadge status="neutral">{severity}</StatusBadge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Not published</span>
-                          )}
+                          <Severity value={advisory.severity} />
                         </TableCell>
                         <TableCell>
                           <AffectedDevices

@@ -5,7 +5,6 @@ import {
   replaceReservedCreateProfileId,
   reservedCreateProfileId,
 } from "@/features/profiles/attempt";
-import { CATALOG_SEMANTICS } from "@/features/profiles/model";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { canPermission } from "@/lib/permissions";
 import { ProfilePickerProvider } from "@/features/profiles/field-pickers";
@@ -33,10 +32,7 @@ function ProfileCreateRoute() {
       >
         Back to profiles
       </Link>
-      <div>
-        <h1 className="text-2xl font-semibold">Create profile</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">{CATALOG_SEMANTICS}</p>
-      </div>
+      <h1 className="text-2xl font-semibold">Create profile</h1>
       <ProfilePickerProvider
         pickers={{
           device: DevicePicker,

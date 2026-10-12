@@ -423,6 +423,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.GetProfileRevisionRequest{},
 		&adminv1.ListProfilesRequest{},
 		&adminv1.ListProfileRevisionsRequest{},
+		&adminv1.ListQualifiedResourceKindsRequest{},
 		&adminv1.SetResourceAssignmentRequest{},
 		&adminv1.GetDeviceResourceStateRequest{},
 		&adminv1.PutDynamicGroupRequest{},

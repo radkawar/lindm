@@ -55,6 +55,7 @@ type DemoDevice struct{ ID, Hostname, OS, State string }
 type DemoRoutes struct {
 	DeviceID            string // richest enrolled device: encryption, findings, actions, assistance, assignments
 	ProfileID           string // for /profiles/$profileId
+	FirewallProfileID   string // unassigned profile with a firewall zone, for zone naming
 	SecretID            string // for /secrets/$secretId
 	ActionID            string // device action on DeviceID, for /devices/$deviceId/actions/$actionId
 	AssistanceSessionID string // on DeviceID, for /devices/$deviceId/assistance/$sessionId
@@ -271,6 +272,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return err
 	}
 	s.demo.Routes.ProfileID = profiles[0].GetProfileId()
+	s.demo.Routes.FirewallProfileID = profiles[3].GetProfileId()
 	// The kiosk's short verification age starts lapsing while the rest seeds.
 	assigned := slices.Clone(s.devices)
 	slices.SortStableFunc(assigned, func(a, b *simulatedDevice) int { return b.demo.profile - a.demo.profile })
@@ -343,7 +345,9 @@ func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical 
 
 // demoProfiles are the published catalog: profile 0 is the workstation
 // baseline, 1 server hardening and 2 a kiosk whose 30 s verification age
-// makes a silent device's compliance stale.
+// makes a silent device's compliance stale. Profile 3, a guest Wi-Fi firewall
+// zone, is published but never assigned: firewall zones have no name, and the
+// console must identify one by what it binds rather than its UUID.
 func demoProfiles() []*policyv1.ResourceProfile {
 	ownership := func(release resourcev1.ReleaseBehavior) *resourcev1.OwnershipPolicy {
 		return &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: release}
@@ -355,6 +359,7 @@ func demoProfiles() []*policyv1.ResourceProfile {
 		return &policyv1.ProfileResource{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: unit}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: unit, Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN), Verification: verification(age)}
 	}
 	week := uint32(7 * 24 * 3600)
+	guestZone := uuid.NewString()
 	profiles := []*policyv1.ResourceProfile{
 		{Name: "Workstation baseline", Description: "Printing service and LUKS root encryption compliance for staff laptops.", Resources: []*policyv1.ProfileResource{
 			service("cups.service", week),
@@ -365,6 +370,9 @@ func demoProfiles() []*policyv1.ResourceProfile {
 			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, CanonicalKey: "/etc/issue.net"}, State: &resourcev1.ResourceDesiredState_ManagedFile{ManagedFile: &resourcev1.ManagedFileDesired{Path: "/etc/issue.net", Presence: resourcev1.Presence_PRESENCE_PRESENT, Content: []byte("Authorized use only. Activity may be monitored.\n"), Mode: proto.Uint32(0o644)}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
 		}},
 		{Name: "Lobby kiosk", Description: "Single-application browser session, verified every 30 seconds.", Resources: []*policyv1.ProfileResource{service("kiosk-browser.service", 30)}},
+		{Name: "Guest Wi-Fi firewall", Description: "Drop unsolicited inbound traffic from the guest network.", Resources: []*policyv1.ProfileResource{
+			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, CanonicalKey: guestZone}, State: &resourcev1.ResourceDesiredState_FirewallZone{FirewallZone: &resourcev1.FirewallZoneDesired{ZoneId: guestZone, Presence: resourcev1.Presence_PRESENCE_PRESENT, Interfaces: []*resourcev1.InterfaceSelector{{Identity: &resourcev1.InterfaceSelector_PermanentMac{PermanentMac: "02:00:00:00:50:01"}, Ifname: proto.String("wlan0")}}, SourceNetworks: []*resourcev1.CIDR{{NetworkAddress: "192.168.50.0", PrefixLength: 24}}, DefaultIngress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_DROP, DefaultEgress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
+		}},
 	}
 	for _, profile := range profiles {
 		ids := make([]string, len(profile.GetResources()))

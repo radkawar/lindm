@@ -61,3 +61,21 @@ export function profileRevisionsQueryOptions(
     },
   });
 }
+
+// Setting kinds the server dispatches to devices, with their qualified
+// ownership operations. Server configuration, so it is cached for the session.
+export function qualifiedKindsQueryOptions(lifetime: AuthLifetime) {
+  return queryOptions({
+    queryKey: ["qualified-resource-kinds", lifetime.generation] as const,
+    meta: { authGeneration: lifetime.generation },
+    staleTime: Infinity,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listQualifiedResourceKinds(
+        {},
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response.kinds;
+    },
+  });
+}

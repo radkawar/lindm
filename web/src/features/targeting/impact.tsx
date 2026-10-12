@@ -11,6 +11,7 @@ import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
 import { formatTimestamp } from "@/lib/time";
 
 const kindLabels: Record<number, string> = {
@@ -81,7 +82,8 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
                 {kindLabels[resource.ref?.kind ?? 0] ?? "Unknown setting"}
               </span>
               <span className="break-all">
-                {resource.ref?.canonicalKey ?? "Setting identity unavailable"}
+                {settingTitle(resource.ref, resource.resource?.desired) ??
+                  "Setting identity unavailable"}
               </span>
               <div className="flex flex-wrap gap-2">
                 <StatusBadge
@@ -115,6 +117,7 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
               <TechnicalDetails
                 items={[
                   { label: "Required capability", value: resource.capabilityId },
+                  ...settingTechnicalIds(resource.ref),
                   {
                     label: "Contributing profile versions",
                     value: resource.contributingRevisionIds.join(", "),

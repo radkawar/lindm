@@ -77,14 +77,18 @@ export async function reviewSSHBanner({
       await settle(page);
       await field.waitFor();
       if ((await field.inputValue()) !== notice) throw new Error("Saved banner bytes changed");
-      await page.getByText("This is the latest version.", { exact: true }).waitFor();
-      if (await page.getByText(/^Older version\./).count())
+      const version = page.locator("[data-profile-version]");
+      await version.getByText("Latest version", { exact: true }).waitFor();
+      if (await version.getByText("Older version", { exact: true }).count())
         throw new Error("Pinned latest version is labelled older");
       // Check the fetched revision as well as the editable draft, which can
-      // survive reload in the existing publication-outbox recovery state.
+      // survive reload in the existing publication-outbox recovery state. For a
+      // manager the published settings sit in a collapsed section below the draft.
+      const published = page.locator("[data-profile-published-settings]");
+      if (await published.count()) await published.locator(":scope > summary").click();
       const saved = page
-        .locator("article")
-        .filter({ has: page.getByRole("heading", { name: "SSH settings", exact: true }) });
+        .locator("[data-profile-setting]")
+        .filter({ has: page.getByRole("heading", { name: /^SSH login banner/ }) });
       await saved.getByText("Full setting", { exact: true }).click();
       const record = JSON.parse((await saved.locator("pre").textContent()) ?? "");
       if (record.desired?.sshServer?.bannerText !== notice)

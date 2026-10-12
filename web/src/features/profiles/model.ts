@@ -27,7 +27,7 @@ import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { describeViolation } from "@/lib/validation";
-import { initialState, object, replaceReference, withDerivedRef } from "./resource-draft";
+import { object, replaceReference, withDerivedRef } from "./resource-draft";
 import { fieldLabel } from "./typed-fields";
 
 export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -50,9 +50,6 @@ function editorBound(field: DescField): number {
   return Number(bound);
 }
 
-export const CATALOG_SEMANTICS =
-  "Publishing saves the profile. To apply it to devices, assign it in Rollouts.";
-
 // Preserve the complete protobuf document while typed controls edit individual fields.
 export type DraftResource = { resourceId: string; document: string };
 export type DraftSpec = { name: string; description: string; resources: DraftResource[] };
@@ -63,20 +60,23 @@ export function usableUuid(value: string): string | null {
   return canonical === null || canonical === NIL_UUID ? null : canonical;
 }
 
+// A new setting has no type until the administrator chooses one; publishing
+// refuses it until then. The ownership and verification defaults are adjusted
+// to the chosen type's qualification when the type is picked.
 export function newResource(): DraftResource {
   const resourceId = newRequestId();
   return {
     resourceId,
     document: JSON.stringify(
-      withDerivedRef({
+      {
         resourceId,
-        desired: { systemdService: initialState("systemdService") },
+        desired: {},
         ownership: {
           mode: "OWNERSHIP_MODE_CREATE_ONLY",
           release: "RELEASE_BEHAVIOR_RESTORE_OWNED",
         },
         verification: { maxAgeSeconds: 300, checks: ["HEALTH_CHECK_NATIVE_STATE"] },
-      }),
+      },
       null,
       2,
     ),
@@ -147,8 +147,13 @@ export function publishErrors(payload: PublishPayload): DraftErrors {
   const errors = draftErrors(result.kind === "invalid" ? result.violations : []);
   payload.spec.resources.forEach((resource, index) => {
     const state = resource.desired?.state;
+    // Without a type, every other violation on the setting is noise.
+    if (state?.case === undefined) {
+      errors.settings[index] = ["Choose a setting type."];
+      return;
+    }
     if (
-      state?.case === "firewallZone" &&
+      state.case === "firewallZone" &&
       state.value.presence === Presence.PRESENT &&
       state.value.interfaces.length === 0 &&
       state.value.sourceNetworks.length === 0 &&
@@ -298,4 +303,12 @@ export function formatSha256(bytes: Uint8Array): string {
 
 export function formatRevisionNumber(value: bigint): string {
   return value > 0n ? value.toString() : "Unknown";
+}
+
+// Who published a version, by the account's current name; the actor ID stays
+// in Details. A server-side publication has no actor.
+export function publisherLabel(actorId: string, displayName: string, viewerId: string): string {
+  if (!actorId.trim()) return "The system";
+  const name = displayName.trim() || "An account without a name";
+  return actorId === viewerId ? `${name} (you)` : name;
 }

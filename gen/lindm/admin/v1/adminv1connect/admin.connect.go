@@ -146,6 +146,9 @@ const (
 	// AdminServiceListProfileRevisionsProcedure is the fully-qualified name of the AdminService's
 	// ListProfileRevisions RPC.
 	AdminServiceListProfileRevisionsProcedure = "/lindm.admin.v1.AdminService/ListProfileRevisions"
+	// AdminServiceListQualifiedResourceKindsProcedure is the fully-qualified name of the AdminService's
+	// ListQualifiedResourceKinds RPC.
+	AdminServiceListQualifiedResourceKindsProcedure = "/lindm.admin.v1.AdminService/ListQualifiedResourceKinds"
 	// AdminServiceSetResourceAssignmentProcedure is the fully-qualified name of the AdminService's
 	// SetResourceAssignment RPC.
 	AdminServiceSetResourceAssignmentProcedure = "/lindm.admin.v1.AdminService/SetResourceAssignment"
@@ -330,6 +333,7 @@ type AdminServiceClient interface {
 	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
 	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
 	ListProfileRevisions(context.Context, *connect.Request[v1.ListProfileRevisionsRequest]) (*connect.Response[v1.ListProfileRevisionsResponse], error)
+	ListQualifiedResourceKinds(context.Context, *connect.Request[v1.ListQualifiedResourceKindsRequest]) (*connect.Response[v1.ListQualifiedResourceKindsResponse], error)
 	SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error)
 	GetDeviceResourceState(context.Context, *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error)
 	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
@@ -620,6 +624,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceListProfileRevisionsProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("ListProfileRevisions")),
+			connect.WithClientOptions(opts...),
+		),
+		listQualifiedResourceKinds: connect.NewClient[v1.ListQualifiedResourceKindsRequest, v1.ListQualifiedResourceKindsResponse](
+			httpClient,
+			baseURL+AdminServiceListQualifiedResourceKindsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListQualifiedResourceKinds")),
 			connect.WithClientOptions(opts...),
 		),
 		setResourceAssignment: connect.NewClient[v1.SetResourceAssignmentRequest, v1.SetResourceAssignmentResponse](
@@ -953,6 +963,7 @@ type adminServiceClient struct {
 	getProfileRevision                   *connect.Client[v1.GetProfileRevisionRequest, v1.GetProfileRevisionResponse]
 	listProfiles                         *connect.Client[v1.ListProfilesRequest, v1.ListProfilesResponse]
 	listProfileRevisions                 *connect.Client[v1.ListProfileRevisionsRequest, v1.ListProfileRevisionsResponse]
+	listQualifiedResourceKinds           *connect.Client[v1.ListQualifiedResourceKindsRequest, v1.ListQualifiedResourceKindsResponse]
 	setResourceAssignment                *connect.Client[v1.SetResourceAssignmentRequest, v1.SetResourceAssignmentResponse]
 	getDeviceResourceState               *connect.Client[v1.GetDeviceResourceStateRequest, v1.GetDeviceResourceStateResponse]
 	putDynamicGroup                      *connect.Client[v1.PutDynamicGroupRequest, v1.PutDynamicGroupResponse]
@@ -1193,6 +1204,11 @@ func (c *adminServiceClient) ListProfiles(ctx context.Context, req *connect.Requ
 // ListProfileRevisions calls lindm.admin.v1.AdminService.ListProfileRevisions.
 func (c *adminServiceClient) ListProfileRevisions(ctx context.Context, req *connect.Request[v1.ListProfileRevisionsRequest]) (*connect.Response[v1.ListProfileRevisionsResponse], error) {
 	return c.listProfileRevisions.CallUnary(ctx, req)
+}
+
+// ListQualifiedResourceKinds calls lindm.admin.v1.AdminService.ListQualifiedResourceKinds.
+func (c *adminServiceClient) ListQualifiedResourceKinds(ctx context.Context, req *connect.Request[v1.ListQualifiedResourceKindsRequest]) (*connect.Response[v1.ListQualifiedResourceKindsResponse], error) {
+	return c.listQualifiedResourceKinds.CallUnary(ctx, req)
 }
 
 // SetResourceAssignment calls lindm.admin.v1.AdminService.SetResourceAssignment.
@@ -1476,6 +1492,7 @@ type AdminServiceHandler interface {
 	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
 	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
 	ListProfileRevisions(context.Context, *connect.Request[v1.ListProfileRevisionsRequest]) (*connect.Response[v1.ListProfileRevisionsResponse], error)
+	ListQualifiedResourceKinds(context.Context, *connect.Request[v1.ListQualifiedResourceKindsRequest]) (*connect.Response[v1.ListQualifiedResourceKindsResponse], error)
 	SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error)
 	GetDeviceResourceState(context.Context, *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error)
 	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
@@ -1762,6 +1779,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceListProfileRevisionsProcedure,
 		svc.ListProfileRevisions,
 		connect.WithSchema(adminServiceMethods.ByName("ListProfileRevisions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListQualifiedResourceKindsHandler := connect.NewUnaryHandler(
+		AdminServiceListQualifiedResourceKindsProcedure,
+		svc.ListQualifiedResourceKinds,
+		connect.WithSchema(adminServiceMethods.ByName("ListQualifiedResourceKinds")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceSetResourceAssignmentHandler := connect.NewUnaryHandler(
@@ -2130,6 +2153,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceListProfilesHandler.ServeHTTP(w, r)
 		case AdminServiceListProfileRevisionsProcedure:
 			adminServiceListProfileRevisionsHandler.ServeHTTP(w, r)
+		case AdminServiceListQualifiedResourceKindsProcedure:
+			adminServiceListQualifiedResourceKindsHandler.ServeHTTP(w, r)
 		case AdminServiceSetResourceAssignmentProcedure:
 			adminServiceSetResourceAssignmentHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceResourceStateProcedure:
@@ -2385,6 +2410,10 @@ func (UnimplementedAdminServiceHandler) ListProfiles(context.Context, *connect.R
 
 func (UnimplementedAdminServiceHandler) ListProfileRevisions(context.Context, *connect.Request[v1.ListProfileRevisionsRequest]) (*connect.Response[v1.ListProfileRevisionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListProfileRevisions is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListQualifiedResourceKinds(context.Context, *connect.Request[v1.ListQualifiedResourceKindsRequest]) (*connect.Response[v1.ListQualifiedResourceKindsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListQualifiedResourceKinds is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error) {

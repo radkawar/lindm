@@ -1,13 +1,13 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,8 +44,13 @@ import {
   type DraftSpec,
   type PublishPayload,
 } from "./model";
-import { profileRevisionQueryOptions } from "./queries";
+import { qualifiedKindsQueryOptions, profileRevisionQueryOptions } from "./queries";
+import { type Qualification } from "./qualification";
 import { ResourceFields } from "./resource-form";
+import { RolloutHint } from "./rollout-hint";
+
+// Mention the bound only when an administrator is about to meet it.
+const NEAR_RESOURCE_LIMIT = MAX_RESOURCES - 4;
 
 export function ProfileEditor({
   mode,
@@ -54,6 +59,7 @@ export function ProfileEditor({
   initialExpectedRevisionId,
   sourceNote,
   onPrepareAnother,
+  headerAction,
 }: {
   mode: "create" | "edit";
   profileId: string;
@@ -61,6 +67,8 @@ export function ProfileEditor({
   initialExpectedRevisionId?: string;
   sourceNote: string;
   onPrepareAnother?: () => void;
+  // A control that replaces this draft, shown beside the editor title.
+  headerAction?: ReactNode;
 }) {
   const lifetime = useAuthLifetime();
   const queryClient = useQueryClient();
@@ -73,6 +81,12 @@ export function ProfileEditor({
   const [fieldErrors, setFieldErrors] = useState<DraftErrors>(NO_DRAFT_ERRORS);
   const [note, setNote] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  // One switch for every setting's dependency, ownership and verification fields.
+  const [advanced, setAdvanced] = useState(false);
+  const kinds = useQuery(qualifiedKindsQueryOptions(lifetime));
+  const qualification: Qualification = kinds.data
+    ? { status: "known", kinds: kinds.data }
+    : { status: "unknown" };
 
   const locked = attempt !== null;
   const shown = attempt ? draftFromPayload(attempt.payload) : draft;
@@ -177,10 +191,50 @@ export function ProfileEditor({
     setDraft(next);
   }
 
+  function continueAfterPublish() {
+    if (!attempt || attempt.status !== "published") return;
+    if (mode === "create") {
+      clearAttempt(lifetime, profileId);
+      onPrepareAnother?.();
+      return;
+    }
+    const published = attempt.published;
+    if (published?.spec) {
+      setDraft(draftFromSpec(published.spec));
+      setExpectedRevisionId(published.revisionId);
+      setReason("");
+      setRequestId(newRequestId());
+      setFieldErrors(NO_DRAFT_ERRORS);
+      setNote("Ready for your next change. Not published yet.");
+    }
+    clearAttempt(lifetime, profileId);
+  }
+
+  // A published draft is finished: show the outcome where the editor starts and
+  // leave edit mode until the administrator asks for another change.
+  if (attempt?.status === "published") {
+    return (
+      <Card className="min-w-0" data-profile-editor data-profile-published>
+        <CardHeader>
+          <CardTitle>{mode === "create" ? "Profile details" : "Edit profile"}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <AttemptStatus attempt={attempt} />
+          <div>
+            <Button type="button" variant="outline" onClick={continueAfterPublish}>
+              {mode === "create" ? "Create another profile" : "Make another change"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="min-w-0">
+    <Card className="min-w-0" data-profile-editor>
       <CardHeader>
         <CardTitle>{creating ? "Profile details" : "Edit profile"}</CardTitle>
+        {headerAction ? <CardAction>{headerAction}</CardAction> : null}
       </CardHeader>
       <CardContent>
         <form
@@ -227,13 +281,6 @@ export function ProfileEditor({
           <p id="profile-publish-note" className="text-sm text-muted-foreground">
             {sourceNote}
           </p>
-          <TechnicalDetails
-            items={[
-              { label: "Profile ID", value: profileId },
-              { label: "Based on version", value: shownExpected },
-              { label: "Request ID", value: shownRequestId },
-            ]}
-          />
           {locked ? (
             <p className="text-sm">
               Editing is paused while this save is pending. Retry it, or start over.
@@ -262,6 +309,31 @@ export function ProfileEditor({
               onChange={(event) => changeDraft({ ...draft, description: event.target.value })}
             />
           </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+            <h3 className="text-base font-semibold">Settings</h3>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="accent-primary"
+                checked={advanced}
+                onChange={(event) => setAdvanced(event.target.checked)}
+              />
+              Advanced options
+            </label>
+          </div>
+          {kinds.isError ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              Couldn't check which setting types this server can apply to devices.{" "}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => void kinds.refetch()}
+              >
+                Check again
+              </Button>
+            </p>
+          ) : null}
           <div className="grid gap-3">
             {shown.resources.map((resource, index) => (
               <ResourceFields
@@ -271,6 +343,8 @@ export function ProfileEditor({
                 resources={shown.resources}
                 locked={locked}
                 errors={fieldErrors.settings[index] ?? []}
+                advanced={advanced}
+                qualification={qualification}
                 onChange={(next) => changeDraft(updateResource(draft, next))}
                 onRemove={() => changeDraft(removeResource(draft, resource.resourceId))}
               />
@@ -281,15 +355,22 @@ export function ProfileEditor({
               type="button"
               variant="outline"
               disabled={locked || shown.resources.length >= MAX_RESOURCES}
+              aria-describedby={
+                shown.resources.length >= NEAR_RESOURCE_LIMIT ? "profile-setting-limit" : undefined
+              }
               onClick={() =>
                 changeDraft({ ...draft, resources: [...draft.resources, newResource()] })
               }
             >
               Add setting
             </Button>
-            <p className="text-sm text-muted-foreground">
-              {shown.resources.length} of {MAX_RESOURCES} settings.
-            </p>
+            {shown.resources.length >= NEAR_RESOURCE_LIMIT ? (
+              <p id="profile-setting-limit" className="text-sm text-muted-foreground">
+                {shown.resources.length >= MAX_RESOURCES
+                  ? `A profile holds at most ${MAX_RESOURCES} settings. Remove one, or put the rest in another profile.`
+                  : `${MAX_RESOURCES - shown.resources.length} more settings fit in this profile.`}
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="profile-reason">Reason</Label>
@@ -329,6 +410,7 @@ export function ProfileEditor({
             </Alert>
           ) : null}
           {attempt ? <AttemptStatus attempt={attempt} /> : null}
+          <RolloutHint />
           <div className="flex flex-wrap gap-2">
             {!attempt ? (
               <Button type="submit">{creating ? "Publish profile" : "Publish changes"}</Button>
@@ -401,14 +483,12 @@ export function ProfileEditor({
                 </Button>
               </>
             ) : null}
-            {attempt && attempt.status !== "inflight" && attempt.status !== "published" ? (
+            {attempt && attempt.status !== "inflight" ? (
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (!attempt || attempt.status === "inflight" || attempt.status === "published") {
-                    return;
-                  }
+                  if (!attempt || attempt.status === "inflight") return;
                   unlock(
                     draftFromPayload(attempt.payload),
                     attempt.payload.expectedRevisionId,
@@ -420,63 +500,73 @@ export function ProfileEditor({
                 Edit draft
               </Button>
             ) : null}
-            {attempt?.status === "published" ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  if (!attempt || attempt.status !== "published") return;
-                  if (mode === "create") {
-                    clearAttempt(lifetime, profileId);
-                    onPrepareAnother?.();
-                    return;
-                  }
-                  const published = attempt.published;
-                  if (published?.spec) {
-                    setDraft(draftFromSpec(published.spec));
-                    setExpectedRevisionId(published.revisionId);
-                    setReason("");
-                    setRequestId(newRequestId());
-                    setFieldErrors(NO_DRAFT_ERRORS);
-                    setNote("Ready for your next change. Not published yet.");
-                  }
-                  clearAttempt(lifetime, profileId);
-                }}
-              >
-                {mode === "create" ? "Create another profile" : "Make another change"}
-              </Button>
-            ) : null}
           </div>
+          <TechnicalDetails
+            summary="View JSON"
+            items={[
+              { label: "Profile ID", value: profileId },
+              { label: "Based on version", value: shownExpected },
+              { label: "Request ID", value: shownRequestId },
+            ]}
+          >
+            <pre
+              className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all border bg-muted/30 p-3"
+              aria-label="Profile draft JSON"
+            >
+              {JSON.stringify(
+                {
+                  name: shown.name,
+                  description: shown.description,
+                  resources: shown.resources.map((resource) => JSON.parse(resource.document)),
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </TechnicalDetails>
         </form>
       </CardContent>
     </Card>
   );
 }
 
+// Moves the reader to the outcome: the form above it has just been replaced.
+function PublishedOutcome({ published }: { published: ProfileRevision }) {
+  const outcome = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    outcome.current?.scrollIntoView({ block: "nearest" });
+    outcome.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <Alert ref={outcome} tabIndex={-1} data-profile-publish-outcome>
+      <AlertTitle>Profile published</AlertTitle>
+      <AlertDescription>
+        <p>
+          Version {formatRevisionNumber(published.revisionNumber)} is saved. Devices are unchanged
+          until you roll it out from{" "}
+          <Link to="/rollouts" className="underline underline-offset-4">
+            Rollouts
+          </Link>
+          .
+        </p>
+        <p>
+          <Link
+            to="/profiles/$profileId"
+            params={{ profileId: published.profileId }}
+            search={{ revision: published.revisionId }}
+            className="underline underline-offset-4"
+          >
+            View this version
+          </Link>
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
   if (attempt.status === "published" && attempt.published) {
-    const published = attempt.published;
-    return (
-      <Alert>
-        <AlertTitle>Profile published</AlertTitle>
-        <AlertDescription>
-          <p>
-            Version {formatRevisionNumber(published.revisionNumber)} is saved. To apply it to
-            devices, assign it in Rollouts.
-          </p>
-          <p>
-            <Link
-              to="/profiles/$profileId"
-              params={{ profileId: published.profileId }}
-              search={{ revision: published.revisionId }}
-              className="underline underline-offset-4"
-            >
-              View this version
-            </Link>
-          </p>
-        </AlertDescription>
-      </Alert>
-    );
+    return <PublishedOutcome published={attempt.published} />;
   }
   if (attempt.status === "inflight") {
     return (

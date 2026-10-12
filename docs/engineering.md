@@ -2507,6 +2507,19 @@ new publication does not shift an existing keyset cursor. Unknown profiles retur
 the same NotFound reason as `GetProfileRevision`. Listing history neither activates
 a revision nor claims native compliance.
 
+Revision reads (`GetProfileRevision`, `PublishProfileRevision`, both lists) carry
+`actor_display_name`: the publishing account's current label (principal display
+name, else local username), projected for readers beside the authoritative
+`actor_id`. It is mutable display context, not audit evidence.
+
+`ListQualifiedResourceKinds` (unrestricted `fleet.read`) reports the kinds this
+server dispatches, with the ownership modes and release behaviors native evidence
+covers, read from the same table `ResourceDispatchUnsupported` enforces (a
+dispatch test asserts they agree). The profile editor disables other kinds as
+"not available yet" and offers only those ownership operations, so a draft never
+asks for a combination dispatch would hold. Publication still accepts any valid
+kind; this is server qualification, not per-device applicability.
+
 Resolution retains priority and contributor provenance across heterogeneous
 resources. Equal-priority optional dimensions merge only when compatible;
 explicit false/zero and managed empty sets remain specified values.

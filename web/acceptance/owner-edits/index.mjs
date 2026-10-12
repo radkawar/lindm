@@ -15,9 +15,13 @@ import * as assistanceRecord from "./assistance-record.mjs";
 import * as revealApproval from "./pass2-reveal-approval.mjs";
 import * as advisories from "./advisories.mjs";
 import * as advisoriesSources from "./advisories-sources.mjs";
+import * as advisorySeverity from "./advisory-severity.mjs";
 import * as enrollment from "./enrollment.mjs";
 import * as agentRepository from "./agent-repository.mjs";
 import * as rollouts from "./rollouts.mjs";
+import * as profiles from "./profiles.mjs";
+import * as profileEditor from "./profile-editor.mjs";
+import * as profilePublish from "./profile-publish.mjs";
 import * as pass2Bug7DialogScrolled from "./pass2-bug7-dialog-scrolled.mjs";
 import * as pass2Bug8PickerSidebar from "./pass2-bug8-picker-sidebar.mjs";
 import * as pass2P27StackedDialogs from "./pass2-p2-7-stacked-dialogs.mjs";
@@ -60,6 +64,7 @@ export const ownerEdits = [
   revealApproval,
   advisories,
   advisoriesSources,
+  advisorySeverity,
   enrollment,
   pass2Bug5,
   pass2SafetyApprovals,
@@ -67,6 +72,8 @@ export const ownerEdits = [
   rollouts,
   accounts,
   authorization,
+  profiles,
+  profileEditor,
   // Read-only; the wipe form case needs the seed's stale storage, so before wipeForm.
   pass2Bug7DialogScrolled,
   pass2Bug8PickerSidebar,
@@ -91,6 +98,8 @@ export const ownerEdits = [
   pass2SafetyAssistance,
   pass2SafetyReveal,
   pass2SecretReveal,
+  // Publishes one new, never-assigned profile.
+  profilePublish,
   // Changes and restores the route device profile; keep last.
   pass2AssignmentProgress,
 ];

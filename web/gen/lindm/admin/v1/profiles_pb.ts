@@ -9,6 +9,10 @@ import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { ResourceProfile } from "../../policy/v1/profile_pb.js";
 import { file_lindm_policy_v1_profile } from "../../policy/v1/profile_pb.js";
+import type { OwnershipMode, ReleaseBehavior } from "../../resource/v1/common_pb.js";
+import { file_lindm_resource_v1_common } from "../../resource/v1/common_pb.js";
+import type { ResourceKind } from "../../resource/v1/identity_pb.js";
+import { file_lindm_resource_v1_identity } from "../../resource/v1/identity_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -16,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/profiles.proto.
  */
 export const file_lindm_admin_v1_profiles: GenFile = /*@__PURE__*/
-  fileDesc("Ch1saW5kbS9hZG1pbi92MS9wcm9maWxlcy5wcm90bxIObGluZG0uYWRtaW4udjEinAIKD1Byb2ZpbGVSZXZpc2lvbhIcCgpwcm9maWxlX2lkGAEgASgJQgi6SAVyA7ABARIdCgtyZXZpc2lvbl9pZBgCIAEoCUIIukgFcgOwAQESIAoPcmV2aXNpb25fbnVtYmVyGAMgASgEQge6SAQyAiAAEjYKBHNwZWMYBCABKAsyIC5saW5kbS5wb2xpY3kudjEuUmVzb3VyY2VQcm9maWxlQga6SAPIAQESGgoIYWN0b3JfaWQYBSABKAlCCLpIBXIDsAEBEjgKDHB1Ymxpc2hlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARIcCgtzcGVjX3NoYTI1NhgHIAEoDEIHukgEegJoICLmAgodUHVibGlzaFByb2ZpbGVSZXZpc2lvblJlcXVlc3QSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJCCgpwcm9maWxlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBElEKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBSACIAQESNgoEc3BlYxgEIAEoCzIgLmxpbmRtLnBvbGljeS52MS5SZXNvdXJjZVByb2ZpbGVCBrpIA8gBARIZCgZyZWFzb24YBSABKAlCCbpIBnIEmLUYAUIXChVfZXhwZWN0ZWRfcmV2aXNpb25faWQiWwoeUHVibGlzaFByb2ZpbGVSZXZpc2lvblJlc3BvbnNlEjkKCHJldmlzaW9uGAEgASgLMh8ubGluZG0uYWRtaW4udjEuUHJvZmlsZVJldmlzaW9uQga6SAPIAQEiuQEKGUdldFByb2ZpbGVSZXZpc2lvblJlcXVlc3QSQgoKcHJvZmlsZV9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJICgtyZXZpc2lvbl9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABAUgAiAEBQg4KDF9yZXZpc2lvbl9pZCJXChpHZXRQcm9maWxlUmV2aXNpb25SZXNwb25zZRI5CghyZXZpc2lvbhgBIAEoCzIfLmxpbmRtLmFkbWluLnYxLlByb2ZpbGVSZXZpc2lvbkIGukgDyAEBIk8KE0xpc3RQcm9maWxlc1JlcXVlc3QSGgoJcGFnZV9zaXplGAEgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEIuYBCg5Qcm9maWxlU3VtbWFyeRISCgpwcm9maWxlX2lkGAEgASgJEhMKC3JldmlzaW9uX2lkGAIgASgJEhcKD3JldmlzaW9uX251bWJlchgDIAEoBBIMCgRuYW1lGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhYKDnJlc291cmNlX2NvdW50GAYgASgNEhAKCGFjdG9yX2lkGAcgASgJEjAKDHB1Ymxpc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLc3BlY19zaGEyNTYYCSABKAwiYQoUTGlzdFByb2ZpbGVzUmVzcG9uc2USMAoIcHJvZmlsZXMYASADKAsyHi5saW5kbS5hZG1pbi52MS5Qcm9maWxlU3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkinAEKG0xpc3RQcm9maWxlUmV2aXNpb25zUmVxdWVzdBJCCgpwcm9maWxlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEhsKCXBhZ2Vfc2l6ZRgCIAEoDUIIukgFKgMYyAESHAoKcGFnZV90b2tlbhgDIAEoCUIIukgFcgMYgAQiagocTGlzdFByb2ZpbGVSZXZpc2lvbnNSZXNwb25zZRIxCglyZXZpc2lvbnMYASADKAsyHi5saW5kbS5hZG1pbi52MS5Qcm9maWxlU3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAlCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_policy_v1_profile, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch1saW5kbS9hZG1pbi92MS9wcm9maWxlcy5wcm90bxIObGluZG0uYWRtaW4udjEiwgIKD1Byb2ZpbGVSZXZpc2lvbhIcCgpwcm9maWxlX2lkGAEgASgJQgi6SAVyA7ABARIdCgtyZXZpc2lvbl9pZBgCIAEoCUIIukgFcgOwAQESIAoPcmV2aXNpb25fbnVtYmVyGAMgASgEQge6SAQyAiAAEjYKBHNwZWMYBCABKAsyIC5saW5kbS5wb2xpY3kudjEuUmVzb3VyY2VQcm9maWxlQga6SAPIAQESGgoIYWN0b3JfaWQYBSABKAlCCLpIBXIDsAEBEjgKDHB1Ymxpc2hlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARIcCgtzcGVjX3NoYTI1NhgHIAEoDEIHukgEegJoIBIkChJhY3Rvcl9kaXNwbGF5X25hbWUYCCABKAlCCLpIBXIDGIACIuYCCh1QdWJsaXNoUHJvZmlsZVJldmlzaW9uUmVxdWVzdBJCCgpyZXF1ZXN0X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkIKCnByb2ZpbGVfaWQYAiABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESUQoUZXhwZWN0ZWRfcmV2aXNpb25faWQYAyABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQFIAIgBARI2CgRzcGVjGAQgASgLMiAubGluZG0ucG9saWN5LnYxLlJlc291cmNlUHJvZmlsZUIGukgDyAEBEhkKBnJlYXNvbhgFIAEoCUIJukgGcgSYtRgBQhcKFV9leHBlY3RlZF9yZXZpc2lvbl9pZCJbCh5QdWJsaXNoUHJvZmlsZVJldmlzaW9uUmVzcG9uc2USOQoIcmV2aXNpb24YASABKAsyHy5saW5kbS5hZG1pbi52MS5Qcm9maWxlUmV2aXNpb25CBrpIA8gBASK5AQoZR2V0UHJvZmlsZVJldmlzaW9uUmVxdWVzdBJCCgpwcm9maWxlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkgKC3JldmlzaW9uX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBSACIAQFCDgoMX3JldmlzaW9uX2lkIlcKGkdldFByb2ZpbGVSZXZpc2lvblJlc3BvbnNlEjkKCHJldmlzaW9uGAEgASgLMh8ubGluZG0uYWRtaW4udjEuUHJvZmlsZVJldmlzaW9uQga6SAPIAQEiTwoTTGlzdFByb2ZpbGVzUmVxdWVzdBIaCglwYWdlX3NpemUYASABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgCIAEoCUIIukgFcgMYgAQiggIKDlByb2ZpbGVTdW1tYXJ5EhIKCnByb2ZpbGVfaWQYASABKAkSEwoLcmV2aXNpb25faWQYAiABKAkSFwoPcmV2aXNpb25fbnVtYmVyGAMgASgEEgwKBG5hbWUYBCABKAkSEwoLZGVzY3JpcHRpb24YBSABKAkSFgoOcmVzb3VyY2VfY291bnQYBiABKA0SEAoIYWN0b3JfaWQYByABKAkSMAoMcHVibGlzaGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtzcGVjX3NoYTI1NhgJIAEoDBIaChJhY3Rvcl9kaXNwbGF5X25hbWUYCiABKAkiYQoUTGlzdFByb2ZpbGVzUmVzcG9uc2USMAoIcHJvZmlsZXMYASADKAsyHi5saW5kbS5hZG1pbi52MS5Qcm9maWxlU3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkinAEKG0xpc3RQcm9maWxlUmV2aXNpb25zUmVxdWVzdBJCCgpwcm9maWxlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEhsKCXBhZ2Vfc2l6ZRgCIAEoDUIIukgFKgMYyAESHAoKcGFnZV90b2tlbhgDIAEoCUIIukgFcgMYgAQiagocTGlzdFByb2ZpbGVSZXZpc2lvbnNSZXNwb25zZRIxCglyZXZpc2lvbnMYASADKAsyHi5saW5kbS5hZG1pbi52MS5Qcm9maWxlU3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiIwohTGlzdFF1YWxpZmllZFJlc291cmNlS2luZHNSZXF1ZXN0IsABChVRdWFsaWZpZWRSZXNvdXJjZUtpbmQSLQoEa2luZBgBIAEoDjIfLmxpbmRtLnJlc291cmNlLnYxLlJlc291cmNlS2luZBI5Cg9vd25lcnNoaXBfbW9kZXMYAiADKA4yIC5saW5kbS5yZXNvdXJjZS52MS5Pd25lcnNoaXBNb2RlEj0KEXJlbGVhc2VfYmVoYXZpb3JzGAMgAygOMiIubGluZG0ucmVzb3VyY2UudjEuUmVsZWFzZUJlaGF2aW9yIloKIkxpc3RRdWFsaWZpZWRSZXNvdXJjZUtpbmRzUmVzcG9uc2USNAoFa2luZHMYASADKAsyJS5saW5kbS5hZG1pbi52MS5RdWFsaWZpZWRSZXNvdXJjZUtpbmRCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_policy_v1_profile, file_lindm_resource_v1_common, file_lindm_resource_v1_identity, file_lindm_validation_v1_string_rules]);
 
 /**
  * A published revision is immutable. Publishing changes the catalog head, not
@@ -59,6 +63,14 @@ export type ProfileRevision = Message<"lindm.admin.v1.ProfileRevision"> & {
    * @generated from field: bytes spec_sha256 = 7;
    */
   specSha256: Uint8Array;
+
+  /**
+   * Current label of the publishing account, projected for readers; actor_id
+   * stays authoritative. Empty when the account has no name or username.
+   *
+   * @generated from field: string actor_display_name = 8;
+   */
+  actorDisplayName: string;
 };
 
 /**
@@ -239,6 +251,13 @@ export type ProfileSummary = Message<"lindm.admin.v1.ProfileSummary"> & {
    * @generated from field: bytes spec_sha256 = 9;
    */
   specSha256: Uint8Array;
+
+  /**
+   * Current label of the publishing account; actor_id stays authoritative.
+   *
+   * @generated from field: string actor_display_name = 10;
+   */
+  actorDisplayName: string;
 };
 
 /**
@@ -320,4 +339,69 @@ export type ListProfileRevisionsResponse = Message<"lindm.admin.v1.ListProfileRe
  */
 export const ListProfileRevisionsResponseSchema: GenMessage<ListProfileRevisionsResponse> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 9);
+
+/**
+ * @generated from message lindm.admin.v1.ListQualifiedResourceKindsRequest
+ */
+export type ListQualifiedResourceKindsRequest = Message<"lindm.admin.v1.ListQualifiedResourceKindsRequest"> & {
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListQualifiedResourceKindsRequest.
+ * Use `create(ListQualifiedResourceKindsRequestSchema)` to create a new message.
+ */
+export const ListQualifiedResourceKindsRequestSchema: GenMessage<ListQualifiedResourceKindsRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_profiles, 10);
+
+/**
+ * A setting kind this server dispatches to devices, with the ownership
+ * operations native evidence covers. A resource dispatches only with one of
+ * these modes and one of these release behaviors. Kinds absent from the list can
+ * be published but are held as unsupported on every device; this is not
+ * per-device applicability.
+ *
+ * @generated from message lindm.admin.v1.QualifiedResourceKind
+ */
+export type QualifiedResourceKind = Message<"lindm.admin.v1.QualifiedResourceKind"> & {
+  /**
+   * @generated from field: lindm.resource.v1.ResourceKind kind = 1;
+   */
+  kind: ResourceKind;
+
+  /**
+   * @generated from field: repeated lindm.resource.v1.OwnershipMode ownership_modes = 2;
+   */
+  ownershipModes: OwnershipMode[];
+
+  /**
+   * @generated from field: repeated lindm.resource.v1.ReleaseBehavior release_behaviors = 3;
+   */
+  releaseBehaviors: ReleaseBehavior[];
+};
+
+/**
+ * Describes the message lindm.admin.v1.QualifiedResourceKind.
+ * Use `create(QualifiedResourceKindSchema)` to create a new message.
+ */
+export const QualifiedResourceKindSchema: GenMessage<QualifiedResourceKind> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_profiles, 11);
+
+/**
+ * @generated from message lindm.admin.v1.ListQualifiedResourceKindsResponse
+ */
+export type ListQualifiedResourceKindsResponse = Message<"lindm.admin.v1.ListQualifiedResourceKindsResponse"> & {
+  /**
+   * Ordered by kind number.
+   *
+   * @generated from field: repeated lindm.admin.v1.QualifiedResourceKind kinds = 1;
+   */
+  kinds: QualifiedResourceKind[];
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListQualifiedResourceKindsResponse.
+ * Use `create(ListQualifiedResourceKindsResponseSchema)` to create a new message.
+ */
+export const ListQualifiedResourceKindsResponseSchema: GenMessage<ListQualifiedResourceKindsResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_profiles, 12);
 

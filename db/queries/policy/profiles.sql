@@ -43,6 +43,12 @@ WHERE profile_id = sqlc.arg(profile_id)
   AND (sqlc.arg(before_revision)::bigint = 0 OR revision_number < sqlc.arg(before_revision)::bigint)
 ORDER BY revision_number DESC LIMIT sqlc.arg(page_limit)::integer;
 
+-- name: ListProfileActorNames :many
+SELECT p.id, coalesce(nullif(p.display_name, ''), account.username, '')::text AS display_name
+FROM principals p
+LEFT JOIN local_accounts account ON account.id = p.id
+WHERE p.id = ANY(sqlc.arg('ids')::uuid[]);
+
 -- name: InsertProfileRevision :exec
 INSERT INTO profile_revisions (id, profile_id, revision_number, name, description,
     resource_count, spec_digest, actor_id, published_at)

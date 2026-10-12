@@ -68,7 +68,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes
-	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID} {
+	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.FirewallProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID} {
 		if id == "" {
 			t.Fatalf("missing route ID: %+v", routes)
 		}

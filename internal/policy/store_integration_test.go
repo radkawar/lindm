@@ -144,6 +144,54 @@ func TestProfilePublicationRetainsCanonicalHistoryAndRetry(t *testing.T) {
 	}
 }
 
+// Readers see the publisher's current account label beside the audited actor
+// ID: the principal's display name, else the local account's username.
+func TestProfileReadsNamePublisher(t *testing.T) {
+	f := newProfileFixture(t)
+	if _, err := f.pool.Exec(t.Context(), "UPDATE principals SET display_name='Ada Admin' WHERE id=$1", f.actor); err != nil {
+		t.Fatal(err)
+	}
+	request := profileRequest()
+	published, err := f.publish(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileID := uuid.MustParse(request.GetProfileId())
+	head, err := f.store.Get(t.Context(), profileID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	heads, _, err := f.store.List(t.Context(), uuid.Nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, _, err := f.store.ListRevisions(t.Context(), profileID, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published.GetActorDisplayName() != "Ada Admin" || head.GetActorDisplayName() != "Ada Admin" ||
+		len(heads) != 1 || heads[0].GetActorDisplayName() != "Ada Admin" || len(history) != 1 || history[0].GetActorDisplayName() != "Ada Admin" {
+		t.Fatalf("publisher label not projected: publish=%q get=%q list=%v history=%v", published.GetActorDisplayName(), head.GetActorDisplayName(), heads, history)
+	}
+	if head.GetActorId() != f.actor.String() || heads[0].GetActorId() != f.actor.String() {
+		t.Fatal("publisher label replaced the audited actor ID")
+	}
+	// A renamed account shows its current label; without one, its username.
+	if _, err := f.pool.Exec(t.Context(), "UPDATE principals SET display_name='' WHERE id=$1", f.actor); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(t.Context(), "INSERT INTO local_accounts (id, username, role) VALUES ($1, 'ada', 'owner')", f.actor); err != nil {
+		t.Fatal(err)
+	}
+	head, err = f.store.Get(t.Context(), profileID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if head.GetActorDisplayName() != "ada" {
+		t.Fatalf("unnamed local account label = %q, want its username", head.GetActorDisplayName())
+	}
+}
+
 func TestProfileConcurrentHeadCompareAndSwap(t *testing.T) {
 	f := newProfileFixture(t)
 	initial := profileRequest()

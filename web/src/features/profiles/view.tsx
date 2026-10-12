@@ -2,13 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ui/select-field";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
-import { TechnicalDetails } from "@/components/ui/technical-details";
+import { Timestamp } from "@/components/ui/timestamp";
 import {
   Table,
   TableBody,
@@ -23,10 +22,10 @@ import { canPermission } from "@/lib/permissions";
 import { useListPagination } from "@/hooks/use-list-pagination";
 import { toRpcFailure } from "@/lib/errors";
 import type { PageSize } from "@/lib/list-search";
-import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { usePublishAttempts, type PublishStatus } from "./attempt";
-import { CATALOG_SEMANTICS, formatRevisionNumber } from "./model";
+import { formatRevisionNumber, publisherLabel } from "./model";
 import { profilesQueryOptions } from "./queries";
+import { RolloutHint } from "./rollout-hint";
 import { type ProfileListSearch } from "./search";
 
 const PAGE_SIZES = [50, 100] as const;
@@ -54,28 +53,23 @@ export function ProfilesView({
   const pagination = useListPagination({ pageSize, pageToken }, onSearch);
   const attempts = usePublishAttempts();
   const failure = list.error ? toRpcFailure(list.error) : null;
-  const now = new Date();
 
   return (
-    <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
-      <PageHeader
-        title="Profiles"
-        description={`Sets of device settings. ${CATALOG_SEMANTICS}`}
-        actions={
-          <>
-            <Button
-              variant="outline"
-              disabled={list.isFetching}
-              onClick={() => void list.refetch()}
-            >
-              Refresh
-            </Button>
-            {canPermission(principal, "profiles.manage") ? (
+    <section className="flex min-w-0 flex-col gap-4" aria-busy={list.isFetching}>
+      <div className="grid gap-1">
+        <PageHeader
+          title="Profiles"
+          description="Sets of device settings."
+          onRefresh={() => void list.refetch()}
+          refreshing={list.isFetching}
+          actions={
+            canPermission(principal, "profiles.manage") ? (
               <Button render={<Link to="/profiles/new" />}>Create profile</Button>
-            ) : null}
-          </>
-        }
-      />
+            ) : null
+          }
+        />
+        <RolloutHint />
+      </div>
       {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
           <AlertTitle>A profile hasn't finished saving</AlertTitle>
@@ -109,19 +103,6 @@ export function ProfilesView({
           {list.data ? <p>The profiles below are from the last successful refresh.</p> : null}
         </RpcError>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
-        <Label htmlFor="profile-page-size">Page size</Label>
-        <SelectField
-          id="profile-page-size"
-          className="h-9"
-          value={pageSize}
-          onValueChange={(value) => {
-            const next = Number(value);
-            if (next === 50 || next === 100) onSearch({ pageSize: next, pageToken: "" });
-          }}
-          options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
-        />
-      </div>
       {list.isPending ? (
         <div role="status" className="grid gap-3 border p-4">
           <span className="text-sm text-muted-foreground">Loading profiles…</span>
@@ -135,7 +116,7 @@ export function ProfilesView({
           title={pageToken === "" ? "No profiles yet" : "No more profiles"}
           description={
             pageToken === ""
-              ? "Create a profile, then assign it to devices in Rollouts."
+              ? "Create a profile to group the settings devices get."
               : "Return to the first page."
           }
           action={
@@ -159,7 +140,6 @@ export function ProfilesView({
           </TableHeader>
           <TableBody>
             {list.data.profiles.map((profile) => {
-              const published = formatTimestamp(profile.publishedAt);
               return (
                 <TableRow key={profile.profileId}>
                   <TableCell className="whitespace-normal">
@@ -189,21 +169,10 @@ export function ProfilesView({
                     </Link>
                   </TableCell>
                   <TableCell className="whitespace-normal">
-                    {published.date ? (
-                      <time dateTime={published.utc}>
-                        {published.local} ({freshnessLabel(published.date, now)})
-                      </time>
-                    ) : (
-                      "Unknown"
-                    )}
+                    <Timestamp value={profile.publishedAt} missing="Unknown" />
                   </TableCell>
-                  <TableCell>
-                    {!profile.actorId.trim()
-                      ? "The system"
-                      : profile.actorId === principal.id
-                        ? "You"
-                        : "Another administrator"}
-                    <TechnicalDetails items={[{ label: "Publisher ID", value: profile.actorId }]} />
+                  <TableCell className="whitespace-normal" data-profile-publisher>
+                    {publisherLabel(profile.actorId, profile.actorDisplayName, principal.id)}
                   </TableCell>
                 </TableRow>
               );
@@ -211,18 +180,22 @@ export function ProfilesView({
           </TableBody>
         </Table>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" disabled={pageToken === ""} onClick={pagination.previous}>
-          {pagination.previousLabel}
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextPageToken}
-          onClick={() => pagination.next(list.data?.nextPageToken ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
+      <ListPagination
+        label="Profile pages"
+        previousLabel={pagination.previousLabel}
+        onPrevious={pageToken === "" ? undefined : pagination.previous}
+        onNext={
+          list.data?.nextPageToken
+            ? () => pagination.next(list.data?.nextPageToken ?? "")
+            : undefined
+        }
+        busy={list.isFetching}
+        pageSize={pageSize}
+        pageSizes={PAGE_SIZES}
+        onPageSizeChange={(next) => {
+          if (next === 50 || next === 100) onSearch({ pageSize: next, pageToken: "" });
+        }}
+      />
     </section>
   );
 }
