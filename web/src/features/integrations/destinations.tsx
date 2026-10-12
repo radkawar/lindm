@@ -634,6 +634,7 @@ function DestinationForm({
                 aria-describedby={`${id}-secret-hint`}
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
+                data-freeform="new signing secret shared with the receiver"
               />
               <Button
                 type="button"
@@ -729,6 +730,7 @@ function RotateForm({
               aria-describedby={`${id}-secret-hint`}
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
+              data-freeform="new signing secret shared with the receiver"
             />
             <Button
               type="button"
