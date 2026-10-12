@@ -208,6 +208,17 @@ coverage have a server-configuration remedy. See the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
 This delivery path does not transfer qualification between Ubuntu releases.
 
+For unattended installs, a provisioning token offers **cloud-init** (cloud images)
+and **Ubuntu autoinstall** (subiquity on 22.04, 24.04 and 26.04). Autoinstall puts
+the same cloud-config in `autoinstall.user-data`, so the agent is installed and
+enrolled by the installed system's cloud-init on first boot — that first boot,
+not the installer, needs to reach `lindmd`. Subiquity keeps the user-data, including
+the token, in `/var/log/installer/autoinstall-user-data` and under
+`/etc/cloud/cloud.cfg.d/`; delete those copies after enrollment. On 24.04 arm64
+both formats passed end to end from the console clipboard through independent
+approval to **Enrolled** ([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
+22.04, 26.04 and amd64 are offered but have no provisioning record.
+
 Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
 signature check. Authentication is signed `InRelease` → hashed `Packages` → archive
 SHA-256; the DEB does not carry an embedded package signature. The generated deb822

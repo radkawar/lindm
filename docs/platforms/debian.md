@@ -66,6 +66,10 @@ remedy. Follow the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server);
 Ubuntu installation evidence does not qualify Debian.
 
+A provisioning token offers only **cloud-init** for Debian (genericcloud images).
+Debian's installer uses preseed, which the console does not generate, and Ubuntu
+autoinstall is subiquity-only. No provisioning lane has a Debian record.
+
 Agent packaging uses DEB/APT, not an RPM-derived path. Authentication is repository
 `InRelease` signature → `Packages` hashes → exact archive digest; a built `.deb` is
 not independently signed. Use a dedicated independently trusted `Signed-By` key, not

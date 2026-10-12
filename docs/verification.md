@@ -6486,6 +6486,50 @@ captures in the two `*-qualified-screenshots/` directories and the final contact
 sheet. There are no recorded unresolved owner annotations for this slice;
 automated green does not constitute owner design approval.
 
+### Installer provisioning from the console (2026-10-12)
+
+The `provision-*` matrix cells ([runbook](engineering.md#installer-provisioning-from-the-console))
+fed the console's copied provisioning snippet, unmodified, into a real first boot
+or vendor installation on native aarch64 KVM (`dgx21`, QEMU on AAVMF
+`2024.02-2ubuntu0.10`, Secure Boot off, virtio-blk). Each token required
+independent approval: `console-approver` approved the exact pending installation
+in the approval inbox and the token's creator executed it, before the owner's
+browser saw **Enrolled** on that device's page. No guest had a lindm agent,
+repository, CA or bootstrap before the snippet; lab-owned profile parts were
+scanned to contain none and only added access keys and a hosts line for the
+fixture's public name. Each record binds `snippet_sha256` to the browser
+clipboard digest, the package origin to the fixture's `/repo/apt` or `/repo/rpm`,
+and the package signer to the pinned fingerprint
+`3FDA7F683947D52989D5D05FCF260DD4BA9AD1F9` (APT `Signed-By` primary key; RPM
+signature key ID `CF260DD4BA9AD1F9`). Every guest ran the same agent binary,
+SHA-256 `9d2901994438ca1ffcd5647728bb62306325be86bf60f8fcf894cd855d5e7fba`, and
+ended with `lindm-provision.service` `active/success` and its token removed.
+Records are under `~/lab-evidence/`:
+
+| Cell                  | Release / media                   | Record                                                                     | SHA-256                                                            | Device                                 |
+| --------------------- | --------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| provision-cloud-init  | Ubuntu 24.04 cloud image          | `provision-20261012-ci4/ubuntu-24.04/provision-cloud-init-aarch64.json`    | `3e468cd556412fcb2147d92eca77c34700a9813efdc9802f16abed96ff960af7` | `a538acd8-af07-4e8c-bcda-6d08003de6d8` |
+| provision-cloud-init  | Fedora 44 Cloud Base 1.7          | `provision-20261012-ci2/fedora-44/provision-cloud-init-aarch64.json`       | `664f585302a3141bbb02ce0a027378697876adee6e6383d8752d0a760a143da4` | `d078a341-f12e-419a-8f48-6aba1994b01e` |
+| provision-autoinstall | Ubuntu 24.04.5 live-server ISO    | `provision-20261012-inst1/ubuntu-24.04/provision-autoinstall-aarch64.json` | `bfccb86f82dd9a2cb01caa596f38d7bc9427d7a12af23951ccab0111d1e205c0` | `d72887a0-65cb-4c10-9259-aefd6729217c` |
+| provision-kickstart   | Fedora 44 Server DVD 1.7          | `provision-20261012-inst1/fedora-44/provision-kickstart-aarch64.json`      | `5f84901a8a419e9d07f3868adb1b35d7089d15bec9fbc0bc58792b1b6a6f48ef` | `bb7bb0d6-0c69-43dd-bdbb-af244e7fa976` |
+| provision-kickstart   | RHEL 9.8 Binary DVD, unregistered | `provision-20261012-inst2/rhel-9/provision-kickstart-aarch64.json`         | `82969ff2bdff08fd65f035b1274b2f6280a74c43017f3e5930580205f4368c1b` | `ceda4206-33a1-4f73-8f45-659a04262963` |
+
+The lanes found and fixed real defects before passing: the approval inbox could not
+execute an approved pending enrollment (670a6e89), so no approval-required
+provisioned device could ever enroll from the console; the AutoYaST script's
+zypper hit YaST's held zypp lock (a1287ec1, `ZYPP_LOCKFILE_ROOT`); and the RHEL
+DVD case proved that DNF prerequisites must be skipped when installed, because an
+unregistered target has no enabled repository. Lab-side fixes (encrypted unlock
+tail, browser retries on `net::ERR_NETWORK_CHANGED`, selectors after console
+edits) are in the ledger's FAIL rows.
+
+Not qualified: openSUSE Tumbleweed `provision-autoyast` — the AutoYaST snippet
+installed the agent from the fixture's signed repository and the device reserved
+enrollment, but no run has yet completed approval to **Enrolled**; see the ledger
+for the current row. Other releases offering a format (Ubuntu 22.04/26.04, RHEL 10,
+AlmaLinux/Rocky, Debian, Arch, x86_64) have no provisioning record unless the
+generated matrix above shows one.
+
 ### Customer-journey release acceptance
 
 `make acceptance` runs the maintained `lab acceptance` command, not a composition

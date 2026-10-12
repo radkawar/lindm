@@ -60,6 +60,16 @@ Missing agent artifacts have an explicit server setup remedy. See the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
 Fedora evidence does not qualify this RHEL path.
 
+For unattended installs, a provisioning token offers **cloud-init** (KVM guest
+image) and **Kickstart**. A Binary-DVD install needs no registration for the
+agent itself: the snippet installs its DNF prerequisites only when `rpm -q` lacks
+them (an unregistered DVD target has no enabled repository, and DNF 4 refuses an
+install without one), then installs lindm-agent from `lindmd`'s repository alone
+inside the `%post` chroot. RHEL 9.8 aarch64 from the Binary DVD, unregistered and
+without any lab repository, passed end to end
+([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
+RHEL 10, 8 and x86_64 are offered without a provisioning record.
+
 The agent is a signed native RPM; building, signing and independent verification
 precede publication ([`rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).
 RPM configuration is `%config(noreplace)` and systemd lifecycle scriptlets are

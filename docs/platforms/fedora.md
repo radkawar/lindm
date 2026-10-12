@@ -55,6 +55,17 @@ See the [install runbook](../security-and-operations.md#enrollment-installation-
 Fedora Atomic is separately gated; a mutable DNF install is not an rpm-ostree
 deployment or evidence for another Fedora release.
 
+For unattended installs, a provisioning token offers **cloud-init** (Fedora Cloud)
+and **Kickstart** (Anaconda). The Kickstart `%post --erroronfail` installs the agent
+in the target chroot over the installer's network and only enables units; a
+missing network or failed signature check fails the installation. The snippet
+restores SELinux labels of `/etc/lindm` and its unit and runs no script from `/etc`,
+so the first boot stays Enforcing. Anaconda keeps the profile, with the token, in
+`/root/anaconda-ks.cfg` and `/root/original-ks.cfg`; delete them after enrollment.
+Fedora 44 aarch64 passed both formats end to end
+([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
+Fedora 43 and x86_64 are offered without a provisioning record.
+
 Use native signed RPM delivery. The builder signs and independently verifies the
 RPM before publishing its digest
 ([`internal/packaging/rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).

@@ -146,6 +146,10 @@ package signatures before starting lindmd, and configures that exact signer.
 Its architecture selection comes from lifecycle-enabled pacman registry rows;
 building a generic arm64 package does not admit Arch Linux ARM.
 
+A provisioning token offers only **cloud-init** for Arch (the official cloud
+image); archinstall configurations are not generated. No provisioning lane has an
+Arch record.
+
 Arch agent packaging explicitly selects `FormatArch`; default builds remain
 DEB/RPM. The deterministic `.pkg.tar.zst` contains `.PKGINFO`, `.MTREE`,
 `.BUILDINFO` and fixed `.INSTALL` lifecycle callbacks. The build record describes

@@ -93,6 +93,22 @@ controller link until SSH keepalives failed (`write |1: broken pipe`).
 
 ## Packaging, signing, repositories, paths and LSM
 
+A provisioning token offers **cloud-init** and **AutoYaST** for Tumbleweed (and
+AutoYaST for SLES/SLED 15; Leap 16.0's Agama installer is offered cloud-init only).
+The AutoYaST snippet is a `chrooted` chroot-script: it installs the agent in the
+target over the installer network and only enables units. YaST holds the system
+zypp lock while scripts run, so the script exports
+`ZYPP_LOCKFILE_ROOT=/var/run/autoyast` (the AutoYaST guide's documented lock root
+for scripts); zypper then refreshes and installs from a `--reposd-dir` holding only
+`lindm.repo`, so DVD or mirror repositories in the target cannot fail the install.
+Chroot-script failures are not fatal to YaST; read
+`/var/adm/autoinstall/logs/lindm-enroll.sh.log` when a device does not appear, and
+delete the retained profile under `/var/adm/autoinstall/` after enrollment. The
+`provision-autoyast` lane on Tumbleweed aarch64 has proven installation and
+enrollment reservation; see the
+[installer provisioning evidence](../verification.md#installer-provisioning-from-the-console-2026-10-12)
+for its approval-to-Enrolled status.
+
 The maintained `enroll-from-console` lane serves the manifest's verified vendor
 closure for prerequisite packages and checks the native RPM database both before
 and after the real copied zypper command. It does not treat zypper as DNF or fall

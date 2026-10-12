@@ -55,6 +55,11 @@ architecture coverage have an explicit server setup remedy. See the
 This common delivery method does not transfer RHEL/Fedora or cross-derivative
 qualification.
 
+A provisioning token offers **cloud-init** and **Kickstart** for every AlmaLinux,
+Rocky Linux and CentOS Stream row, using the same DNF snippet as RHEL. No
+provisioning lane has a record for these releases; the RHEL 9 Kickstart result
+does not transfer to them.
+
 Use native RPMs, independently verified against the configured package signer.
 The builder signs then verifies before recording the release artifact
 ([`packaging/rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).
