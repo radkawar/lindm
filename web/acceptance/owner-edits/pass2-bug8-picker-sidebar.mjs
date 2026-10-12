@@ -71,6 +71,18 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await main.getByRole("button", { name: "New rollout", exact: true }).click();
   const form = main.getByRole("region", { name: "New rollout", exact: true });
   await form.waitFor({ timeout });
+  await settle();
+  // The console scrolls the form into view when it opens; lists above it may still
+  // be loading or refreshing then, so the check scrolls to it as a user would.
+  const heading = form.getByRole("heading", { name: "New rollout", exact: true });
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const box = await heading.boundingBox();
+    const height = page.viewportSize()?.height ?? 0;
+    if (box && box.y >= 0 && box.y + box.height <= height) break;
+    await page.mouse.move(800, Math.max(1, height / 2));
+    await page.mouse.wheel(0, box && box.y < 0 ? box.y - 100 : (box?.y ?? height) - height / 3);
+    await page.waitForTimeout(150);
+  }
   await page.evaluate(listen, NAV);
   const scrollY = await page.evaluate(() => window.scrollY);
   require(scrollY >
