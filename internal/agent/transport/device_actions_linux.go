@@ -11,8 +11,11 @@ import (
 	"log/slog"
 	"time"
 
+	"connectrpc.com/connect"
+
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	"lindm/internal/rpcreason"
 )
 
 const (
@@ -20,6 +23,9 @@ const (
 	deviceActionDispatchTimeout = 5 * time.Minute
 	deviceActionPollTimeout     = 10 * time.Second
 	deviceActionPollInterval    = 500 * time.Millisecond
+	// deviceActionCredentialWait is the executor's longest start challenge
+	// window; a start after it is refused as expired whatever the credential.
+	deviceActionCredentialWait = 30 * time.Second
 )
 
 // dispatchDeviceActions has no spool or local queue. The server retains exact
@@ -174,7 +180,7 @@ func (m *managementLoop) prepareAndStartDeviceAction(ctx context.Context, work *
 		}
 		grant = response.GetStartGrantEnvelope()
 	}
-	started, err := rpc(ctx, m.executor.StartDeviceAction, &agentv1.StartDeviceActionRequest{ActionId: work.GetActionId(), StartGrantEnvelope: grant})
+	started, err := m.startDeviceAction(ctx, work.GetActionId(), grant)
 	if err != nil {
 		return nil, fmt.Errorf("start device action: %w", err)
 	}
@@ -182,6 +188,31 @@ func (m *managementLoop) prepareAndStartDeviceAction(ctx context.Context, work *
 		return nil, err
 	}
 	return started.GetStatus(), nil
+}
+
+// startDeviceAction retries a start refused only for a missing local owner
+// credential. That refusal consumes nothing and leaves the action PREPARED, and
+// the operator can supply the credential only after preparation, so the first
+// attempt in the preparing cycle always precedes it. Waiting for the next
+// management cycle (the 20 s interval plus the rest of this cycle) let a loaded
+// host consume the start after the executor's 30 s challenge had passed, which
+// leaves OUTCOME_UNKNOWN. Every attempt sends the same grant; any other result,
+// or the end of the challenge window, ends the wait.
+func (m *managementLoop) startDeviceAction(ctx context.Context, actionID string, grant []byte) (*agentv1.StartDeviceActionResponse, error) {
+	deadline := time.Now().Add(deviceActionCredentialWait)
+	for {
+		started, err := rpc(ctx, m.executor.StartDeviceAction, &agentv1.StartDeviceActionRequest{ActionId: actionID, StartGrantEnvelope: grant})
+		if err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcreason.Get(err) != "device_action_credential_required" || !time.Now().Before(deadline) {
+			return started, err
+		}
+		timer := time.NewTimer(deviceActionPollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, err
+		case <-timer.C:
+		}
+	}
 }
 
 func checkDeviceActionStatus(status *agentv1.DeviceActionStatus, actionID string, digest [sha256.Size]byte) error {

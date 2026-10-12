@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -18,6 +19,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	"lindm/internal/rpcreason"
 )
 
 func TestDeviceActionRelayUnknownNeverRestarts(t *testing.T) {
@@ -116,6 +118,39 @@ func TestDeviceActionRelayPollBoundPreservesPending(t *testing.T) {
 	})
 }
 
+// The operator can supply a local owner credential only after preparation, so
+// the preparing cycle's start always precedes it. The relay retries that exact
+// grant promptly instead of leaving it to the next management cycle, which a
+// loaded host delayed past the executor's 30 s challenge (Omarchy live erase).
+func TestDeviceActionRelayStartWaitsForLocalCredential(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := newDeviceActionRelayFixture(t)
+		f.missingCredential = 3
+		begin := time.Now()
+		if err := f.loop.dispatchDeviceActions(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if elapsed := time.Since(begin); elapsed != 3*deviceActionPollInterval || f.starts != 4 || f.authorizations != 1 || !f.closed || f.attestedState != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+			t.Fatalf("credential retry: elapsed %v, starts %d, authorizations %d, closed %v, attested %v", elapsed, f.starts, f.authorizations, f.closed, f.attestedState)
+		}
+	})
+}
+
+func TestDeviceActionRelayCredentialWaitEndsWithChallenge(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := newDeviceActionRelayFixture(t)
+		f.missingCredential = math.MaxInt
+		begin := time.Now()
+		if err := f.loop.dispatchDeviceActions(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		attempts := int(deviceActionCredentialWait/deviceActionPollInterval) + 1
+		if elapsed := time.Since(begin); elapsed != deviceActionCredentialWait || f.starts != attempts || f.closed || f.attestedState != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
+			t.Fatalf("unbounded or terminal credential wait: elapsed %v, starts %d, closed %v, attested %v", elapsed, f.starts, f.closed, f.attestedState)
+		}
+	})
+}
+
 func TestDeviceActionRelayManagementCancellationJoins(t *testing.T) {
 	for _, phase := range []string{"action-work", "action-prepare", "action-authorize", "action-start", "action-poll", "action-attest", "action-report", "action-confirm"} {
 		t.Run(phase, func(t *testing.T) {
@@ -162,6 +197,7 @@ type deviceActionRelayFixture struct {
 	confirms                                                 int
 	loseStart, loseReport, loseConfirm                       bool
 	liveRoot                                                 bool
+	missingCredential                                        int
 	recoveryProof, recoveryCredential, recoveryBootGrant     []byte
 	recoveryPrepares, recoveryRegistrations, recoveryCommits int
 	loseRecoveryRegistration, loseRecoveryCommit             bool
@@ -232,6 +268,11 @@ func (e *deviceActionRelayExecutor) StartDeviceAction(ctx context.Context, req *
 	}
 	if err := f.phase(ctx, "action-start"); err != nil {
 		return nil, err
+	}
+	if f.missingCredential > 0 {
+		// The executor's refusal before consumption: the action stays PREPARED.
+		f.missingCredential--
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_credential_required")
 	}
 	f.state = agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED
 	if f.liveRoot {

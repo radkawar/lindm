@@ -1042,7 +1042,11 @@ original action ID; accepted console requests are not native execution proof.
 Recovery rotation uses an independently retained owner unlock path. The operator
 supplies an existing unlock credential through the root-only local
 `SupplyDeviceActionCredential` RPC, bound to a prepared action and retained only
-briefly in memory. Native helpers receive sealed anonymous file descriptors, not
+briefly in memory. A start refused only for that missing credential consumes
+nothing; the relay retries the same start grant every 500 ms until the 30 s start
+challenge ends, so a credential supplied after preparation is used at once
+rather than at the next 20 s management cycle, which a loaded host can push past
+the challenge. Native helpers receive sealed anonymous file descriptors, not
 plaintext files, environment variables or command-line arguments. A new recovery
 passphrase contains 256 random bits rendered as 64 literal hexadecimal characters.
 The executor verifies that new key before reporting a new managed slot. Only
