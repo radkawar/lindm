@@ -26,9 +26,12 @@ const (
 // SyncAssistanceRequest reports the device's complete observed state for each
 // assistance session it knows. Reports are idempotent state, not events.
 type SyncAssistanceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionEpoch  uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
-	Reports       []*v1.AssistanceReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	SessionEpoch uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	Reports      []*v1.AssistanceReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
+	// The executor's applied remote-assistance setting; UNSPECIFIED from agents
+	// that predate it leaves the server's view unknown.
+	Policy        v1.AssistancePolicy `protobuf:"varint,3,opt,name=policy,proto3,enum=lindm.agent.v1.AssistancePolicy" json:"policy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -75,6 +78,13 @@ func (x *SyncAssistanceRequest) GetReports() []*v1.AssistanceReport {
 		return x.Reports
 	}
 	return nil
+}
+
+func (x *SyncAssistanceRequest) GetPolicy() v1.AssistancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return v1.AssistancePolicy(0)
 }
 
 // SyncAssistanceResponse carries the complete desired state for every open
@@ -128,10 +138,11 @@ var File_lindm_device_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_assistance_proto_rawDesc = "" +
 	"\n" +
-	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\x95\x01\n" +
+	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\xd9\x01\n" +
 	"\x15SyncAssistanceRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12D\n" +
-	"\areports\x18\x02 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\"g\n" +
+	"\areports\x18\x02 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12B\n" +
+	"\x06policy\x18\x03 \x01(\x0e2 .lindm.agent.v1.AssistancePolicyB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy\"g\n" +
 	"\x16SyncAssistanceResponse\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\bR\n" +
@@ -154,16 +165,18 @@ var file_lindm_device_v1_assistance_proto_goTypes = []any{
 	(*SyncAssistanceRequest)(nil),  // 0: lindm.device.v1.SyncAssistanceRequest
 	(*SyncAssistanceResponse)(nil), // 1: lindm.device.v1.SyncAssistanceResponse
 	(*v1.AssistanceReport)(nil),    // 2: lindm.agent.v1.AssistanceReport
-	(*v1.AssistanceDirective)(nil), // 3: lindm.agent.v1.AssistanceDirective
+	(v1.AssistancePolicy)(0),       // 3: lindm.agent.v1.AssistancePolicy
+	(*v1.AssistanceDirective)(nil), // 4: lindm.agent.v1.AssistanceDirective
 }
 var file_lindm_device_v1_assistance_proto_depIdxs = []int32{
 	2, // 0: lindm.device.v1.SyncAssistanceRequest.reports:type_name -> lindm.agent.v1.AssistanceReport
-	3, // 1: lindm.device.v1.SyncAssistanceResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 1: lindm.device.v1.SyncAssistanceRequest.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	4, // 2: lindm.device.v1.SyncAssistanceResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_lindm_device_v1_assistance_proto_init() }

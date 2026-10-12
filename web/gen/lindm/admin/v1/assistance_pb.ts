@@ -7,7 +7,7 @@ import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { AssistanceEndCause, AssistanceIceServer, AssistanceLocalSession, AssistanceMode } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceEndCause, AssistanceIceServer, AssistanceLocalSession, AssistanceMode, AssistancePolicy } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/assistance.proto.
  */
 export const file_lindm_admin_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSLlBQoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCSLtAgoeQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESQQoJZGV2aWNlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEjgKBG1vZGUYAyABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIrChRtYXhfZHVyYXRpb25fc2Vjb25kcxgFIAEoDUINukgK2AEBKgUYiA4oPBJCCg90YXJnZXRfdXNlcm5hbWUYBiABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kIlUKH0NyZWF0ZUFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uInYKHUxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGgoJcGFnZV9zaXplGAIgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAEIm4KHkxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXNwb25zZRIzCghzZXNzaW9ucxgBIAMoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSI7ChtHZXRBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUgocR2V0QXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iPAocSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASKgAQodSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhEKCW9mZmVyX3NkcBgCIAEoCRI4CgtpY2Vfc2VydmVycxgDIAMoCzIjLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VJY2VTZXJ2ZXIiXwoeQW5zd2VyQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEh8KCmFuc3dlcl9zZHAYAiABKAlCC7pICHIGEAEYgIABIlUKH0Fuc3dlckFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIjwKHFN0b3BBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUwodU3RvcEFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBkIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_assistance, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSLlBQoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCSLtAgoeQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESQQoJZGV2aWNlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEjgKBG1vZGUYAyABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIrChRtYXhfZHVyYXRpb25fc2Vjb25kcxgFIAEoDUINukgK2AEBKgUYiA4oPBJCCg90YXJnZXRfdXNlcm5hbWUYBiABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kIlUKH0NyZWF0ZUFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uInYKHUxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGgoJcGFnZV9zaXplGAIgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAEIm4KHkxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXNwb25zZRIzCghzZXNzaW9ucxgBIAMoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSI7ChtHZXRBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUgocR2V0QXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iPAocSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASKgAQodSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhEKCW9mZmVyX3NkcBgCIAEoCRI4CgtpY2Vfc2VydmVycxgDIAMoCzIjLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VJY2VTZXJ2ZXIiXwoeQW5zd2VyQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEh8KCmFuc3dlcl9zZHAYAiABKAlCC7pICHIGEAEYgIABIlUKH0Fuc3dlckFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIjwKHFN0b3BBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUwodU3RvcEFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIroCChNBc3Npc3RhbmNlUmVhZGluZXNzEjcKBXN0YXRlGAEgASgOMigubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEjAKBnBvbGljeRgCIAEoDjIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSMgoHZGVza3RvcBgDIAEoDjIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VEZXNrdG9wEjkKFWludmVudG9yeV9vYnNlcnZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9vcGVuX3Nlc3Npb25faWQYBiABKAkiYgodR2V0QXNzaXN0YW5jZVJlYWRpbmVzc1JlcXVlc3QSQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBIlgKHkdldEFzc2lzdGFuY2VSZWFkaW5lc3NSZXNwb25zZRI2CglyZWFkaW5lc3MYASABKAsyIy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBirnAgoYQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEioKJkFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfUkVBRFkQARIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9VTkNPTkZJR1VSRUQQAhIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9OT1RfRU5ST0xMRUQQAxInCiNBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9ESVNBQkxFRBAEEikKJUFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX05PX0RFU0tUT1AQBRImCiJBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9PRkZMSU5FEAYSIwofQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfQlVTWRAHKnYKEUFzc2lzdGFuY2VEZXNrdG9wEiIKHkFTU0lTVEFOQ0VfREVTS1RPUF9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfREVTS1RPUF9QUkVTRU5UEAESHQoZQVNTSVNUQU5DRV9ERVNLVE9QX0FCU0VOVBACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_assistance, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AssistanceSession
@@ -401,6 +401,88 @@ export const StopAssistanceSessionResponseSchema: GenMessage<StopAssistanceSessi
   messageDesc(file_lindm_admin_v1_assistance, 12);
 
 /**
+ * @generated from message lindm.admin.v1.AssistanceReadiness
+ */
+export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> & {
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceReadinessState state = 1;
+   */
+  state: AssistanceReadinessState;
+
+  /**
+   * The device's reported setting; UNSPECIFIED when it has not reported one.
+   *
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 2;
+   */
+  policy: AssistancePolicy;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceDesktop desktop = 3;
+   */
+  desktop: AssistanceDesktop;
+
+  /**
+   * When the session inventory behind desktop was collected.
+   *
+   * @generated from field: google.protobuf.Timestamp inventory_observed_at = 4;
+   */
+  inventoryObservedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_seen_at = 5;
+   */
+  lastSeenAt?: Timestamp | undefined;
+
+  /**
+   * The non-ended session when state is BUSY.
+   *
+   * @generated from field: string open_session_id = 6;
+   */
+  openSessionId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.AssistanceReadiness.
+ * Use `create(AssistanceReadinessSchema)` to create a new message.
+ */
+export const AssistanceReadinessSchema: GenMessage<AssistanceReadiness> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 13);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceReadinessRequest
+ */
+export type GetAssistanceReadinessRequest = Message<"lindm.admin.v1.GetAssistanceReadinessRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceReadinessRequest.
+ * Use `create(GetAssistanceReadinessRequestSchema)` to create a new message.
+ */
+export const GetAssistanceReadinessRequestSchema: GenMessage<GetAssistanceReadinessRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 14);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceReadinessResponse
+ */
+export type GetAssistanceReadinessResponse = Message<"lindm.admin.v1.GetAssistanceReadinessResponse"> & {
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceReadiness readiness = 1;
+   */
+  readiness?: AssistanceReadiness | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceReadinessResponse.
+ * Use `create(GetAssistanceReadinessResponseSchema)` to create a new message.
+ */
+export const GetAssistanceReadinessResponseSchema: GenMessage<GetAssistanceReadinessResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 15);
+
+/**
  * AssistanceState is the server lifecycle of one support invitation.
  *
  * @generated from enum lindm.admin.v1.AssistanceState
@@ -455,4 +537,105 @@ export enum AssistanceState {
  */
 export const AssistanceStateSchema: GenEnum<AssistanceState> = /*@__PURE__*/
   enumDesc(file_lindm_admin_v1_assistance, 0);
+
+/**
+ * AssistanceReadinessState is the server's answer to "can a new request reach
+ * a person on this device now?", from evidence the device has reported.
+ *
+ * @generated from enum lindm.admin.v1.AssistanceReadinessState
+ */
+export enum AssistanceReadinessState {
+  /**
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * No known blocker. Unknown policy or desktop evidence is left to the device.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_READY = 1;
+   */
+  READY = 1,
+
+  /**
+   * This server has no assistance relay configured.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_UNCONFIGURED = 2;
+   */
+  UNCONFIGURED = 2,
+
+  /**
+   * The device is pending, revoked or otherwise not actively enrolled.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_NOT_ENROLLED = 3;
+   */
+  NOT_ENROLLED = 3,
+
+  /**
+   * The device reports remote assistance turned off in its agent configuration.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_DISABLED = 4;
+   */
+  DISABLED = 4,
+
+  /**
+   * The latest successful session inventory shows no local graphical session,
+   * not even a login screen: a headless host.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_NO_DESKTOP = 5;
+   */
+  NO_DESKTOP = 5,
+
+  /**
+   * The device has not checked in within the two-minute online window.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_OFFLINE = 6;
+   */
+  OFFLINE = 6,
+
+  /**
+   * Another session on this device has not ended; see open_session_id.
+   *
+   * @generated from enum value: ASSISTANCE_READINESS_STATE_BUSY = 7;
+   */
+  BUSY = 7,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.AssistanceReadinessState.
+ */
+export const AssistanceReadinessStateSchema: GenEnum<AssistanceReadinessState> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_assistance, 1);
+
+/**
+ * AssistanceDesktop is the session-inventory evidence for a local desktop.
+ *
+ * @generated from enum lindm.admin.v1.AssistanceDesktop
+ */
+export enum AssistanceDesktop {
+  /**
+   * No successful active-session inventory.
+   *
+   * @generated from enum value: ASSISTANCE_DESKTOP_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * A local X11 or Wayland session, including a login screen.
+   *
+   * @generated from enum value: ASSISTANCE_DESKTOP_PRESENT = 1;
+   */
+  PRESENT = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_DESKTOP_ABSENT = 2;
+   */
+  ABSENT = 2,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.AssistanceDesktop.
+ */
+export const AssistanceDesktopSchema: GenEnum<AssistanceDesktop> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_assistance, 2);
 

@@ -134,6 +134,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"JoinAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
 		"AnswerAssistanceSession": {identity.PermissionRunRemoteAssistance, admins, false},
 		"StopAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
+		"GetAssistanceReadiness":  {identity.PermissionRunRemoteAssistance, admins, false},
 	}
 }
 

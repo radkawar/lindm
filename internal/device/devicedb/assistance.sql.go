@@ -75,6 +75,16 @@ func (q *Queries) BindAssistanceLocalSession(ctx context.Context, arg BindAssist
 	return err
 }
 
+const clearAssistanceDevicePolicy = `-- name: ClearAssistanceDevicePolicy :exec
+DELETE FROM assistance_device_policies
+WHERE device_id = $1
+`
+
+func (q *Queries) ClearAssistanceDevicePolicy(ctx context.Context, deviceID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearAssistanceDevicePolicy, deviceID)
+	return err
+}
+
 const confirmAssistanceDeviceEnded = `-- name: ConfirmAssistanceDeviceEnded :exec
 UPDATE assistance_sessions
 SET device_ended = true
@@ -138,6 +148,48 @@ func (q *Queries) EndAssistanceSession(ctx context.Context, arg EndAssistanceSes
 		arg.ID,
 	)
 	return err
+}
+
+const getAssistanceReadiness = `-- name: GetAssistanceReadiness :one
+SELECT
+    d.state,
+    d.current_generation_id,
+    d.last_seen_at,
+    p.policy AS reported_policy,
+    h.finished_at AS inventory_finished_at,
+    h.details AS inventory_details,
+    s.id AS open_session_id
+FROM devices d
+LEFT JOIN assistance_device_policies p ON p.device_id = d.id
+LEFT JOIN host_observations h ON h.generation_id = d.current_generation_id
+LEFT JOIN assistance_sessions s ON s.device_id = d.id AND s.state <> 6
+WHERE d.id = $1
+`
+
+type GetAssistanceReadinessRow struct {
+	State               string
+	CurrentGenerationID *uuid.UUID
+	LastSeenAt          pgtype.Timestamptz
+	ReportedPolicy      pgtype.Int2
+	InventoryFinishedAt pgtype.Timestamptz
+	InventoryDetails    []byte
+	OpenSessionID       *uuid.UUID
+}
+
+// At most one non-ended session exists per device (assistance_sessions_one_open).
+func (q *Queries) GetAssistanceReadiness(ctx context.Context, deviceID uuid.UUID) (GetAssistanceReadinessRow, error) {
+	row := q.db.QueryRow(ctx, getAssistanceReadiness, deviceID)
+	var i GetAssistanceReadinessRow
+	err := row.Scan(
+		&i.State,
+		&i.CurrentGenerationID,
+		&i.LastSeenAt,
+		&i.ReportedPolicy,
+		&i.InventoryFinishedAt,
+		&i.InventoryDetails,
+		&i.OpenSessionID,
+	)
+	return i, err
 }
 
 const getAssistanceSession = `-- name: GetAssistanceSession :one
@@ -627,6 +679,26 @@ func (q *Queries) OfferAssistanceSession(ctx context.Context, arg OfferAssistanc
 		arg.OfferFingerprint,
 		arg.ID,
 	)
+	return err
+}
+
+const setAssistanceDevicePolicy = `-- name: SetAssistanceDevicePolicy :exec
+INSERT INTO assistance_device_policies (device_id, policy, changed_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (device_id) DO UPDATE
+SET policy = excluded.policy, changed_at = excluded.changed_at
+WHERE assistance_device_policies.policy <> excluded.policy
+`
+
+type SetAssistanceDevicePolicyParams struct {
+	DeviceID  uuid.UUID
+	Policy    int16
+	ChangedAt pgtype.Timestamptz
+}
+
+// Writes only when the reported value changes, not on every idle sync.
+func (q *Queries) SetAssistanceDevicePolicy(ctx context.Context, arg SetAssistanceDevicePolicyParams) error {
+	_, err := q.db.Exec(ctx, setAssistanceDevicePolicy, arg.DeviceID, arg.Policy, arg.ChangedAt)
 	return err
 }
 

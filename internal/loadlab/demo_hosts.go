@@ -47,12 +47,18 @@ type demoDevice struct {
 	key, versionID string
 	release        *platform.Release
 	state          string // enrolled, awaiting-inventory, stale or revoked once seeded
-	sessions       uint64
-	encryption     encryptionState
-	service        serviceOutcome
-	profile        int // index into demoProfiles; -1 is unassigned
-	historical     bool
-	proposal       bool // carries the advisory risk-acceptance proposal; needs a complete feed
+	// sessions counts local graphical logins, or SSH logins on a headless host.
+	// Session inventory is complete: a desktop with none shows its login screen.
+	sessions uint64
+	headless bool
+	// assistance is the executor setting reported with every assistance sync;
+	// UNSPECIFIED models an agent that predates the report.
+	assistance agentv1.AssistancePolicy
+	encryption encryptionState
+	service    serviceOutcome
+	profile    int // index into demoProfiles; -1 is unassigned
+	historical bool
+	proposal   bool // carries the advisory risk-acceptance proposal; needs a complete feed
 	// factsWithheld never reports host inventory, so platform-limited items
 	// wait for its facts while unrestricted items still apply.
 	factsWithheld bool
@@ -119,6 +125,11 @@ func rhelPackages() []*inventoryv1.Package {
 	}
 }
 
+const (
+	assistanceOn  = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
+	assistanceOff = agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+)
+
 // demoDevices returns the deterministic fleet in enrollment order. Index 0
 // is the richest device; the pending enrollment is provisioned separately.
 // Operating systems are registry rows, never os-release literals.
@@ -134,15 +145,17 @@ func demoDevices() ([]*demoDevice, error) {
 		Repositories:   &inventoryv1.RepositoryObservation{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Backend: string(el9.Packages.Backend), Ids: []string{"rhel-9-for-x86_64-appstream-rpms", "rhel-9-for-x86_64-baseos-rpms"}},
 	}
 	devices := []*demoDevice{
-		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "engineering"}},
+		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "engineering"}},
+		// An older agent: it does not report its assistance setting, which is off.
 		{hostname: "ubuntu-ws-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionNone, service: serviceApplies, profile: 0, labels: []string{"workstation", "engineering"}},
-		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "design"}, proposal: true},
-		{hostname: "debian-srv-04", key: "debian-12", kernel: "6.1.0-37-amd64", encryption: encryptionUnknown, service: serviceFails, profile: 1, labels: []string{"server", "build"}},
-		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.4", kernel: "5.14.0-427.13.1.el9_4.x86_64", encryption: encryptionNone, service: serviceApplies, profile: 1, labels: []string{"server", "database"}, platform: el},
-		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionUnknown, service: serviceConverged, profile: 2, labels: []string{"kiosk", "lobby"}, state: "stale"},
-		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionNone, profile: -1, labels: []string{"workstation", "retired"}, state: "revoked"},
+		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "design"}, proposal: true},
+		{hostname: "debian-srv-04", key: "debian-12", kernel: "6.1.0-37-amd64", headless: true, assistance: assistanceOff, encryption: encryptionUnknown, service: serviceFails, profile: 1, labels: []string{"server", "build"}},
+		// The owner's report: a headless RHEL server, assistance off, an admin on SSH.
+		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.4", kernel: "5.14.0-427.13.1.el9_4.x86_64", sessions: 1, headless: true, assistance: assistanceOff, encryption: encryptionNone, service: serviceApplies, profile: 1, labels: []string{"server", "database"}, platform: el},
+		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionUnknown, service: serviceConverged, profile: 2, labels: []string{"kiosk", "lobby"}, state: "stale"},
+		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", assistance: assistanceOn, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "retired"}, state: "revoked"},
 		{hostname: "debian-ws-08", key: "debian-12", kernel: "6.1.0-37-amd64", sessions: 1, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "support"}, historical: true},
-		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionLUKS, profile: -1, labels: []string{"server", "ci-runner", "gpu"}},
+		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", headless: true, assistance: assistanceOff, encryption: encryptionLUKS, profile: -1, labels: []string{"server", "ci-runner", "gpu"}},
 		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
 	}
 	inventories := [][]*inventoryv1.Package{
@@ -179,7 +192,7 @@ func (s *demoDevice) observation(historical *inventoryv1.HostObservation, boot s
 	}
 	host := &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(boot), Hostname: observed(s.hostname), OsId: observed(s.release.ID), OsVersion: observed(s.versionID), Architecture: observed("x86_64"), KernelRelease: observed(s.kernel), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(s.serial)}
 	host.Details = syntheticNativeDetails()
-	host.Details.Sessions.Users.Value, host.Details.Sessions.Sessions.Value = s.sessions, s.sessions
+	host.Details.Sessions = s.sessionInventory()
 	host.Details.Platform = s.platform
 	if s.encryption == encryptionUnknown {
 		return host
@@ -211,6 +224,34 @@ func (s *demoDevice) observation(historical *inventoryv1.HostObservation, boot s
 	}
 	host.Details.Storage = &inventoryv1.StorageDetails{Status: success, Devices: devices}
 	return host
+}
+
+// sessionInventory is a complete logind session list, so the server can tell a
+// desktop (a user's Wayland login, or its login screen) from a headless host.
+func (s *demoDevice) sessionInventory() *inventoryv1.SessionCounts {
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	session := func(user, class, kind string, remote bool) *inventoryv1.ActiveSession {
+		seat := observed("seat0")
+		if remote {
+			seat = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE}
+		}
+		return &inventoryv1.ActiveSession{UserName: observed(user), SessionClass: observed(class), SessionType: observed(kind), Seat: seat, Remote: &inventoryv1.ObservedBool{Status: success, Value: remote}}
+	}
+	active := &inventoryv1.ActiveSessions{Status: success}
+	for range s.sessions {
+		if s.headless {
+			active.Sessions = append(active.Sessions, session("admin", "user", "tty", true))
+		} else {
+			active.Sessions = append(active.Sessions, session("demo", "user", "wayland", false))
+		}
+	}
+	if !s.headless && s.sessions == 0 {
+		active.Sessions = append(active.Sessions, session("gdm", "greeter", "wayland", false))
+	}
+	count := func() *inventoryv1.ObservedUint64 {
+		return &inventoryv1.ObservedUint64{Status: success, Value: uint64(len(active.Sessions))}
+	}
+	return &inventoryv1.SessionCounts{Users: count(), Sessions: count(), ActiveSessions: active}
 }
 
 // immediateResult is the simulated executor's terminal answer for intents

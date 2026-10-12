@@ -29,6 +29,26 @@ export function assistanceSessionsQueryOptions(
   });
 }
 
+// Whether a new request can reach a person on the device. It follows check-ins and
+// open sessions, so it refreshes with the history.
+export function assistanceReadinessQueryOptions(lifetime: AuthLifetime, deviceId: string) {
+  return queryOptions({
+    queryKey: ["assistance-readiness", lifetime.generation, deviceId] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    refetchInterval: 5_000,
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.getAssistanceReadiness(
+        { deviceId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      if (!result.readiness) throw new Error("The server returned no assistance readiness.");
+      return result.readiness;
+    },
+  });
+}
+
 // The viewer follows one session at 1 s while it is open; polling stops once it ended.
 export function assistanceSessionQueryOptions(
   lifetime: AuthLifetime,

@@ -15,6 +15,9 @@ message SyncAssistanceRequest {
     lte: 9223372036854775807
   }];
   repeated lindm.agent.v1.AssistanceReport reports = 2 [(buf.validate.field).repeated.max_items = 8];
+  // The executor's applied remote-assistance setting; UNSPECIFIED from agents
+  // that predate it leaves the server's view unknown.
+  lindm.agent.v1.AssistancePolicy policy = 3 [(buf.validate.field).enum.defined_only = true];
 }
 
 // SyncAssistanceResponse carries the complete desired state for every open

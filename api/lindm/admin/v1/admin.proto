@@ -97,6 +97,8 @@ service AdminService {
   rpc JoinAssistanceSession(JoinAssistanceSessionRequest) returns (JoinAssistanceSessionResponse);
   rpc AnswerAssistanceSession(AnswerAssistanceSessionRequest) returns (AnswerAssistanceSessionResponse);
   rpc StopAssistanceSession(StopAssistanceSessionRequest) returns (StopAssistanceSessionResponse);
+  // Whether a new request can reach a person on the device, and the evidence.
+  rpc GetAssistanceReadiness(GetAssistanceReadinessRequest) returns (GetAssistanceReadinessResponse);
   rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);
   rpc ListDeviceStorageTargets(ListDeviceStorageTargetsRequest) returns (ListDeviceStorageTargetsResponse);
   rpc RevealRecoveryKey(RevealRecoveryKeyRequest) returns (RevealRecoveryKeyResponse);

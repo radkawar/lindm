@@ -405,6 +405,25 @@ func TestAssistanceBrokerDisabledEndsInvitations(t *testing.T) {
 	}
 }
 
+// The server refuses requests before they become sessions only if every idle
+// sync, not just one carrying an invitation, reports the applied setting.
+func TestAssistanceBrokerReportsPolicy(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		want := agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+		if enabled {
+			want = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
+		}
+		f := newAssistanceFixture(t, enabled)
+		response, err := f.broker.syncNetwork(t.Context(), &agentv1.SyncAssistanceRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.GetPolicy() != want {
+			t.Fatalf("enabled=%v reported %v, want %v", enabled, response.GetPolicy(), want)
+		}
+	}
+}
+
 func TestAssistanceBrokerSessionEligibility(t *testing.T) {
 	f := newAssistanceFixture(t, true)
 	if _, err := f.helper(4242); !errors.Is(err, errNoGraphicalSession) {

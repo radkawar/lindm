@@ -232,6 +232,59 @@ func (AssistanceEndCause) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{2}
 }
 
+// AssistancePolicy is the device's applied remote-assistance setting, so the
+// server can refuse a request before it reaches a device that would decline it.
+type AssistancePolicy int32
+
+const (
+	// Not reported: an agent that predates this field.
+	AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED AssistancePolicy = 0
+	AssistancePolicy_ASSISTANCE_POLICY_ENABLED     AssistancePolicy = 1
+	// Absent or disabled RemoteAssistanceConfig: invitations end DISABLED.
+	AssistancePolicy_ASSISTANCE_POLICY_DISABLED AssistancePolicy = 2
+)
+
+// Enum value maps for AssistancePolicy.
+var (
+	AssistancePolicy_name = map[int32]string{
+		0: "ASSISTANCE_POLICY_UNSPECIFIED",
+		1: "ASSISTANCE_POLICY_ENABLED",
+		2: "ASSISTANCE_POLICY_DISABLED",
+	}
+	AssistancePolicy_value = map[string]int32{
+		"ASSISTANCE_POLICY_UNSPECIFIED": 0,
+		"ASSISTANCE_POLICY_ENABLED":     1,
+		"ASSISTANCE_POLICY_DISABLED":    2,
+	}
+)
+
+func (x AssistancePolicy) Enum() *AssistancePolicy {
+	p := new(AssistancePolicy)
+	*p = x
+	return p
+}
+
+func (x AssistancePolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistancePolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_assistance_proto_enumTypes[3].Descriptor()
+}
+
+func (AssistancePolicy) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_assistance_proto_enumTypes[3]
+}
+
+func (x AssistancePolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistancePolicy.Descriptor instead.
+func (AssistancePolicy) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{3}
+}
+
 type AssistanceIceServer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
@@ -684,8 +737,10 @@ func (x *SyncAssistanceRequest) GetDirectives() []*AssistanceDirective {
 }
 
 type SyncAssistanceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reports       []*AssistanceReport    `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Reports []*AssistanceReport    `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	// The executor's applied RemoteAssistanceConfig, reported on every sync.
+	Policy        AssistancePolicy `protobuf:"varint,2,opt,name=policy,proto3,enum=lindm.agent.v1.AssistancePolicy" json:"policy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -725,6 +780,13 @@ func (x *SyncAssistanceResponse) GetReports() []*AssistanceReport {
 		return x.Reports
 	}
 	return nil
+}
+
+func (x *SyncAssistanceResponse) GetPolicy() AssistancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED
 }
 
 // RemoteAssistanceConfig is device policy. Disabled devices end every
@@ -839,9 +901,10 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x15SyncAssistanceRequest\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\bR\n" +
-	"directives\"^\n" +
+	"directives\"\xa2\x01\n" +
 	"\x16SyncAssistanceResponse\x12D\n" +
-	"\areports\x18\x01 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\"|\n" +
+	"\areports\x18\x01 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12B\n" +
+	"\x06policy\x18\x02 \x01(\x0e2 .lindm.agent.v1.AssistancePolicyB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy\"|\n" +
 	"\x16RemoteAssistanceConfig\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12H\n" +
 	"\x19session_runtime_directory\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\x17sessionRuntimeDirectory*h\n" +
@@ -871,7 +934,11 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x12$\n" +
 	" ASSISTANCE_END_CAUSE_UNAVAILABLE\x10\v\x12*\n" +
 	"&ASSISTANCE_END_CAUSE_CONNECTION_FAILED\x10\f\x12!\n" +
-	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\rB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\r*t\n" +
+	"\x10AssistancePolicy\x12!\n" +
+	"\x1dASSISTANCE_POLICY_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19ASSISTANCE_POLICY_ENABLED\x10\x01\x12\x1e\n" +
+	"\x1aASSISTANCE_POLICY_DISABLED\x10\x02B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_assistance_proto_rawDescOnce sync.Once
@@ -885,39 +952,41 @@ func file_lindm_agent_v1_assistance_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_assistance_proto_rawDescData
 }
 
-var file_lindm_agent_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_agent_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_lindm_agent_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_agent_v1_assistance_proto_goTypes = []any{
 	(AssistanceMode)(0),            // 0: lindm.agent.v1.AssistanceMode
 	(AssistancePhase)(0),           // 1: lindm.agent.v1.AssistancePhase
 	(AssistanceEndCause)(0),        // 2: lindm.agent.v1.AssistanceEndCause
-	(*AssistanceIceServer)(nil),    // 3: lindm.agent.v1.AssistanceIceServer
-	(*AssistanceInvitation)(nil),   // 4: lindm.agent.v1.AssistanceInvitation
-	(*AssistanceDirective)(nil),    // 5: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil), // 6: lindm.agent.v1.AssistanceLocalSession
-	(*AssistanceReport)(nil),       // 7: lindm.agent.v1.AssistanceReport
-	(*SyncAssistanceRequest)(nil),  // 8: lindm.agent.v1.SyncAssistanceRequest
-	(*SyncAssistanceResponse)(nil), // 9: lindm.agent.v1.SyncAssistanceResponse
-	(*RemoteAssistanceConfig)(nil), // 10: lindm.agent.v1.RemoteAssistanceConfig
-	(*timestamppb.Timestamp)(nil),  // 11: google.protobuf.Timestamp
+	(AssistancePolicy)(0),          // 3: lindm.agent.v1.AssistancePolicy
+	(*AssistanceIceServer)(nil),    // 4: lindm.agent.v1.AssistanceIceServer
+	(*AssistanceInvitation)(nil),   // 5: lindm.agent.v1.AssistanceInvitation
+	(*AssistanceDirective)(nil),    // 6: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil), // 7: lindm.agent.v1.AssistanceLocalSession
+	(*AssistanceReport)(nil),       // 8: lindm.agent.v1.AssistanceReport
+	(*SyncAssistanceRequest)(nil),  // 9: lindm.agent.v1.SyncAssistanceRequest
+	(*SyncAssistanceResponse)(nil), // 10: lindm.agent.v1.SyncAssistanceResponse
+	(*RemoteAssistanceConfig)(nil), // 11: lindm.agent.v1.RemoteAssistanceConfig
+	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_assistance_proto_depIdxs = []int32{
 	0,  // 0: lindm.agent.v1.AssistanceInvitation.mode:type_name -> lindm.agent.v1.AssistanceMode
-	11, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
-	11, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
-	3,  // 3: lindm.agent.v1.AssistanceInvitation.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
-	4,  // 4: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
+	12, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
+	12, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
+	4,  // 3: lindm.agent.v1.AssistanceInvitation.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
+	5,  // 4: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
 	2,  // 5: lindm.agent.v1.AssistanceDirective.terminate_cause:type_name -> lindm.agent.v1.AssistanceEndCause
 	1,  // 6: lindm.agent.v1.AssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
 	2,  // 7: lindm.agent.v1.AssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	6,  // 8: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	5,  // 9: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	7,  // 10: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	7,  // 8: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	6,  // 9: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	8,  // 10: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
+	3,  // 11: lindm.agent.v1.SyncAssistanceResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_assistance_proto_init() }
@@ -930,7 +999,7 @@ func file_lindm_agent_v1_assistance_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_assistance_proto_rawDesc), len(file_lindm_agent_v1_assistance_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,

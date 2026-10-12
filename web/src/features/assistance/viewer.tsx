@@ -32,9 +32,11 @@ import {
   TimeCell,
   assistanceFailureMessage,
   controlText,
+  couldNotStart,
   endCauseText,
   localSessionText,
   modeLabels,
+  startFailureRemedy,
 } from "./display";
 import { InputCapture, videoFramePoint } from "./input";
 import { assistanceSessionQueryOptions } from "./queries";
@@ -179,7 +181,9 @@ export function AssistanceViewerPage({
         title="Remote assistance"
         description={
           ended
-            ? "Session record. Sharing and control have ended."
+            ? session.startedAt
+              ? "Session record. Sharing and control have ended."
+              : "Request record. Nothing was shared."
             : creator
               ? "The user chooses what to share. Leaving this page stops your session."
               : "Only the requesting admin can connect. The user can stop sharing at any time."
@@ -267,6 +271,7 @@ function SessionStatus({
   identifiers: readonly { label: string; value: ReactNode }[];
 }) {
   const ended = session.state === AssistanceState.ENDED;
+  const failed = couldNotStart(session);
   const now = useNow(!ended);
   const endsAt = session.endsAt ? timestampDate(session.endsAt).getTime() : NaN;
   const consentBy = session.consentDeadline
@@ -275,13 +280,17 @@ function SessionStatus({
   const live = session.state === AssistanceState.ACTIVE;
   const waiting =
     session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED;
+  // An ended record lists only what happened: the person the device bound, the
+  // control decision they made, and a duration only when sharing started.
+  const person = localSessionText(session);
+  const control = controlText(session);
   return (
     <section
       aria-label="Session situation"
       className="grid gap-4 border-l-2 border-primary bg-muted/30 p-4"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <AssistanceStateBadge state={session.state} />
+        <AssistanceStateBadge session={session} />
         {live && Number.isFinite(endsAt) ? (
           <span role="status" className="text-sm">
             {remainingLabel(endsAt - now)} remaining
@@ -295,10 +304,16 @@ function SessionStatus({
       </div>
       <div>
         <h2 className="text-base font-semibold">
-          {ended ? "Why this session ended" : "Support request"}
+          {failed ? "Why it couldn't start" : ended ? "Why this session ended" : "Support request"}
         </h2>
         <p className="mt-1 text-sm">{ended ? endCauseText(session) : session.reason}</p>
-        {ended ? (
+        {failed ? <p className="mt-1 text-sm">{startFailureRemedy(session)}</p> : null}
+        {failed ? (
+          <p className="mt-1 text-sm text-muted-foreground" data-review-state="clear">
+            Refused <TimeCell value={session.endedAt} />. Once this is fixed, return to the device
+            to request again.
+          </p>
+        ) : ended ? (
           <p className="mt-1 text-sm text-muted-foreground" data-review-state="clear">
             Ended <TimeCell value={session.endedAt} />. To help again, return to the device and
             request a new session with fresh consent.
@@ -312,22 +327,28 @@ function SessionStatus({
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         {ended ? (
           <>
-            <Fact label="Reason shown to the user">{session.reason}</Fact>
-            <Fact label="Duration">{sessionDuration(session)}</Fact>
+            <Fact
+              label={session.localSession?.username ? "Reason shown to the user" : "Support reason"}
+            >
+              {session.reason}
+            </Fact>
+            {session.startedAt ? <Fact label="Duration">{sessionDuration(session)}</Fact> : null}
+            {person ? <Fact label="Device user during the session">{person}</Fact> : null}
           </>
-        ) : null}
-        <Fact label={ended ? "Device user during the session" : "Person on the device"}>
-          {localSessionText(session)}
-        </Fact>
+        ) : (
+          <Fact label="Person on the device">{person}</Fact>
+        )}
         <Fact label="Requesting admin">{session.operatorDisplay || "Unknown"}</Fact>
         <Fact label="Requested access">{modeLabels[session.mode]}</Fact>
-        <Fact label={ended ? "Control permission during the session" : "User's control permission"}>
-          {controlText(session)}
-        </Fact>
+        {!ended ? (
+          <Fact label="User's control permission">{control}</Fact>
+        ) : session.mode === AssistanceMode.CONTROL && control ? (
+          <Fact label="Control permission during the session">{control}</Fact>
+        ) : null}
       </dl>
       {ended ? (
         <TechnicalDetails
-          summary="Session record"
+          summary={session.startedAt ? "Session record" : "Details"}
           className="border-t pt-3 text-sm text-foreground"
           items={identifiers}
         >
@@ -349,30 +370,34 @@ function SessionStatus({
 }
 
 function SessionTimes({ session, ended }: { session: AssistanceSession; ended: boolean }) {
+  const started = Boolean(session.startedAt);
   return (
     <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-2">
       <Fact label="Requested">
         <TimeCell value={session.createdAt} />
       </Fact>
-      <Fact label="Started">
-        <TimeCell value={session.startedAt} />
-      </Fact>
+      {started ? (
+        <Fact label="Started">
+          <TimeCell value={session.startedAt} />
+        </Fact>
+      ) : null}
       {ended ? (
-        <Fact label="Ended">
+        <Fact label={couldNotStart(session) ? "Refused" : "Ended"}>
           <TimeCell value={session.endedAt} />
         </Fact>
       ) : null}
-      <Fact label={ended ? "Original time limit" : "Ends by"}>
-        <TimeCell value={session.endsAt} />
-      </Fact>
+      {started || !ended ? (
+        <Fact label={ended ? "Original time limit" : "Ends by"}>
+          <TimeCell value={session.endsAt} />
+        </Fact>
+      ) : null}
     </dl>
   );
 }
 
-// Time screen sharing was live: start to end. Requests that were declined or
-// expired before the user accepted never started.
+// Time screen sharing was live: start to end. Shown only for sessions that started.
 function sessionDuration(session: AssistanceSession): string {
-  if (!session.startedAt || !session.endedAt) return "Never started";
+  if (!session.startedAt || !session.endedAt) return "Not recorded";
   const seconds = Math.max(
     0,
     Math.round(

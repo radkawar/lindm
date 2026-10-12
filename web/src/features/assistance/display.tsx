@@ -1,5 +1,6 @@
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { Code } from "@connectrpc/connect";
+import type { ReactNode } from "react";
 import { AssistanceState, type AssistanceSession } from "../../../gen/lindm/admin/v1/assistance_pb";
 import { AssistanceEndCause, AssistanceMode } from "../../../gen/lindm/agent/v1/assistance_pb";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
@@ -38,13 +39,48 @@ const endCauseLabels: Record<AssistanceEndCause, string> = {
   [AssistanceEndCause.NO_ELIGIBLE_SESSION]: "No one was signed in and unlocked on the device.",
   [AssistanceEndCause.UNAVAILABLE]: "Screen sharing isn't available on this device.",
   [AssistanceEndCause.CONNECTION_FAILED]: "The connection failed.",
-  [AssistanceEndCause.DISABLED]: "Remote assistance is turned off for this device.",
+  [AssistanceEndCause.DISABLED]: "Remote assistance is turned off on this device.",
 };
 
-export function AssistanceStateBadge({ state }: { state: AssistanceState }) {
-  const presentation = stateLabels[state] ?? stateLabels[AssistanceState.UNSPECIFIED];
+// Assistance is a device-local agent setting (packaged default: off); no console role
+// can turn it on remotely.
+export const disabledRemedy = (
+  <>
+    Someone with root on the device can set <code>remote_assistance.enabled</code> in{" "}
+    <code>/etc/lindm/executor.json</code> and restart <code>lindm-executor</code>.
+  </>
+);
+
+// The device refused or failed the request before anything was shared. Such a record
+// reads "Couldn't start" with the remedy, never "Ended".
+const startFailures: Partial<Record<AssistanceEndCause, ReactNode>> = {
+  [AssistanceEndCause.DISABLED]: disabledRemedy,
+  [AssistanceEndCause.NO_ELIGIBLE_SESSION]:
+    "Ask the person to sign in to their desktop and unlock it, then request again.",
+  [AssistanceEndCause.UNAVAILABLE]:
+    "The desktop's screen-sharing portal or PipeWire is missing or failed on the device. Fix its desktop packages, then request again.",
+  [AssistanceEndCause.CONNECTION_FAILED]:
+    "Check that the device and your browser can reach this server's assistance relay, then request again.",
+};
+
+export function couldNotStart(session: AssistanceSession): boolean {
   return (
-    <StatusBadge status={presentation.tone} dot={state === AssistanceState.ACTIVE}>
+    session.state === AssistanceState.ENDED &&
+    !session.startedAt &&
+    session.endCause in startFailures
+  );
+}
+
+export function startFailureRemedy(session: AssistanceSession): ReactNode {
+  return couldNotStart(session) ? startFailures[session.endCause] : null;
+}
+
+export function AssistanceStateBadge({ session }: { session: AssistanceSession }) {
+  if (couldNotStart(session))
+    return <StatusBadge status="warning">Couldn&apos;t start</StatusBadge>;
+  const presentation = stateLabels[session.state] ?? stateLabels[AssistanceState.UNSPECIFIED];
+  return (
+    <StatusBadge status={presentation.tone} dot={session.state === AssistanceState.ACTIVE}>
       {presentation.label}
     </StatusBadge>
   );
@@ -56,16 +92,19 @@ export function endCauseText(session: AssistanceSession): string {
   return session.endDetail ? `${label} (${session.endDetail})` : label;
 }
 
+// Empty for a refused request: it never reached a person, so there is nothing to report.
 export function localSessionText(session: AssistanceSession): string {
   const local = session.localSession;
   if (!local?.username) {
     if (session.state === AssistanceState.ENDED) {
+      // A refused request never reached anyone: no person to report.
+      if (couldNotStart(session)) return "";
       // A session that never started was never accepted by anyone on the device.
       if (!session.startedAt)
         return session.targetUsername
           ? `No one accepted (requested for ${session.targetUsername})`
           : "No one accepted";
-      return session.targetUsername || "Not reported";
+      return session.targetUsername;
     }
     return session.targetUsername ? `Waiting (${session.targetUsername})` : "Waiting";
   }
@@ -73,12 +112,13 @@ export function localSessionText(session: AssistanceSession): string {
   return `${local.username}${kind ? ` (${kind})` : ""}`;
 }
 
+// Empty for an ended control request the user never answered: no decision happened.
 export function controlText(session: AssistanceSession): string {
-  if (session.state === AssistanceState.ENDED) {
-    if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
-    return session.controlGranted ? "Was granted; no longer active" : "Was not granted";
-  }
   if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
+  if (session.state === AssistanceState.ENDED) {
+    if (!session.consentedAt) return "";
+    return session.controlGranted ? "Was granted; no longer active" : "Not granted by the user";
+  }
   if (session.controlGranted) return "Granted";
   if (session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED)
     return "Waiting for user";
@@ -97,13 +137,18 @@ export function TimeCell({ value }: { value: Timestamp | undefined }) {
 
 // Server reasons keyed by their documented transport code; a familiar reason under any
 // other code stays a plain failure.
-const failureMessages: Record<string, string> = {
+const failureMessages: Record<string, ReactNode> = {
   [`${Code.FailedPrecondition}:assistance_unconfigured`]:
     "Remote assistance isn't set up on this server.",
   [`${Code.FailedPrecondition}:device_offline`]:
     "The device is offline. Try again once it has checked in.",
   [`${Code.FailedPrecondition}:assistance_busy`]:
     "Another remote assistance session is already open on this device.",
+  [`${Code.FailedPrecondition}:assistance_disabled`]: (
+    <>Remote assistance is turned off on this device. {disabledRemedy}</>
+  ),
+  [`${Code.FailedPrecondition}:assistance_no_desktop`]:
+    "This device has no desktop session to share. Its latest inventory shows no one signed in to a desktop and no login screen.",
   [`${Code.FailedPrecondition}:assistance_capacity`]:
     "Too many remote assistance sessions are running. Try again later.",
   [`${Code.FailedPrecondition}:assistance_state`]:
@@ -120,6 +165,6 @@ const failureMessages: Record<string, string> = {
 };
 
 // Expected assistance conditions; other failures use the shared RPC error presentation.
-export function assistanceFailureMessage(failure: RpcFailure): string {
-  return failureMessages[`${failure.code}:${failure.reason}`] ?? "";
+export function assistanceFailureMessage(failure: RpcFailure): ReactNode {
+  return failureMessages[`${failure.code}:${failure.reason}`] ?? null;
 }

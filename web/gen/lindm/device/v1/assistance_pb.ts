@@ -5,7 +5,7 @@
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
-import type { AssistanceDirective, AssistanceReport } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceDirective, AssistancePolicy, AssistanceReport } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/device/v1/assistance.proto.
  */
 export const file_lindm_device_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIn4KFVN5bmNBc3Npc3RhbmNlUmVxdWVzdBIoCg1zZXNzaW9uX2Vwb2NoGAEgASgEQhG6SA4yDBj//////////38gABI7CgdyZXBvcnRzGAIgAygLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVJlcG9ydEIIukgFkgECEAgiWwoWU3luY0Fzc2lzdGFuY2VSZXNwb25zZRJBCgpkaXJlY3RpdmVzGAEgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpcmVjdGl2ZUIIukgFkgECEAhCJFoibGluZG0vZ2VuL2xpbmRtL2RldmljZS92MTtkZXZpY2V2MWIGcHJvdG8z", [file_buf_validate_validate, file_lindm_agent_v1_assistance]);
+  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIroBChVTeW5jQXNzaXN0YW5jZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASOwoHcmVwb3J0cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZXBvcnRCCLpIBZIBAhAIEjoKBnBvbGljeRgDIAEoDjIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3lCCLpIBYIBAhABIlsKFlN5bmNBc3Npc3RhbmNlUmVzcG9uc2USQQoKZGlyZWN0aXZlcxgBIAMoCzIjLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VEaXJlY3RpdmVCCLpIBZIBAhAIQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_assistance]);
 
 /**
  * SyncAssistanceRequest reports the device's complete observed state for each
@@ -31,6 +31,14 @@ export type SyncAssistanceRequest = Message<"lindm.device.v1.SyncAssistanceReque
    * @generated from field: repeated lindm.agent.v1.AssistanceReport reports = 2;
    */
   reports: AssistanceReport[];
+
+  /**
+   * The executor's applied remote-assistance setting; UNSPECIFIED from agents
+   * that predate it leaves the server's view unknown.
+   *
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 3;
+   */
+  policy: AssistancePolicy;
 };
 
 /**

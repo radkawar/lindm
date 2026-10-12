@@ -1,7 +1,8 @@
-// Owner edit pass 2026-10-12 (run 16717866-d6a9-4b6f-b59f-399eedc25b8a): one
-// module per imported task. Each exports `task` (name, screenId, route,
-// priority, acceptance) and `check(context)`, which asserts the task's
-// acceptance criterion through the real console on the seeded demo fleet.
+// Owner edit pass 2026-10-12 (run 16717866-d6a9-4b6f-b59f-399eedc25b8a) and later
+// owner reports: one module per imported task. Each exports `task` (name,
+// screenId when it came from the edit sheet, route, priority, acceptance) and
+// `check(context)`, which asserts the task's acceptance criterion through the
+// real console on the seeded demo fleet.
 // Order matters: read-only checks run first; checks that request work (Refresh
 // inventory) or move state run last.
 import * as dashboard from "./dashboard.mjs";
@@ -13,6 +14,7 @@ import * as recordedChoices from "./recorded-choices.mjs";
 import * as deviceActions from "./device-actions.mjs";
 import * as assistanceRecord from "./assistance-record.mjs";
 import * as revealApproval from "./pass2-reveal-approval.mjs";
+import * as assistanceGate from "./assistance-gate.mjs";
 import * as advisories from "./advisories.mjs";
 import * as advisoriesSources from "./advisories-sources.mjs";
 import * as advisorySeverity from "./advisory-severity.mjs";
@@ -68,6 +70,7 @@ export const ownerEdits = [
   deviceActions,
   assistanceRecord,
   revealApproval,
+  assistanceGate,
   advisories,
   advisoriesSources,
   advisorySeverity,

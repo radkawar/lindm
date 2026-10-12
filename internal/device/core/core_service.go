@@ -460,6 +460,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.CreateAssistanceSessionRequest{}, &adminv1.ListAssistanceSessionsRequest{},
 		&adminv1.GetAssistanceSessionRequest{}, &adminv1.JoinAssistanceSessionRequest{},
 		&adminv1.AnswerAssistanceSessionRequest{}, &adminv1.StopAssistanceSessionRequest{},
+		&adminv1.GetAssistanceReadinessRequest{},
 		&devicev1.SyncAssistanceRequest{}, &devicev1.SyncAssistanceResponse{},
 		&devicev1.GetDeviceActionWorkRequest{},
 		&devicev1.AuthorizeDeviceActionStartRequest{},

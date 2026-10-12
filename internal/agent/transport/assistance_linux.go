@@ -83,7 +83,7 @@ func (l *assistanceLoop) cycle(parent context.Context) error {
 	if err != nil {
 		return fmt.Errorf("establish assistance session: %w", err)
 	}
-	response, err := rpc(ctx, authority.servers.device.SyncAssistance, &devicev1.SyncAssistanceRequest{SessionEpoch: authority.epoch, Reports: local.GetReports()})
+	response, err := rpc(ctx, authority.servers.device.SyncAssistance, &devicev1.SyncAssistanceRequest{SessionEpoch: authority.epoch, Reports: local.GetReports(), Policy: local.GetPolicy()})
 	if err != nil {
 		return fmt.Errorf("sync server assistance: %w", err)
 	}

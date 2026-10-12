@@ -140,3 +140,31 @@ WHERE id = sqlc.arg('id') AND state <> 6;
 UPDATE assistance_sessions
 SET device_ended = true
 WHERE id = sqlc.arg('id') AND state = 6;
+
+-- name: SetAssistanceDevicePolicy :exec
+-- Writes only when the reported value changes, not on every idle sync.
+INSERT INTO assistance_device_policies (device_id, policy, changed_at)
+VALUES (sqlc.arg('device_id'), sqlc.arg('policy'), sqlc.arg('changed_at'))
+ON CONFLICT (device_id) DO UPDATE
+SET policy = excluded.policy, changed_at = excluded.changed_at
+WHERE assistance_device_policies.policy <> excluded.policy;
+
+-- name: ClearAssistanceDevicePolicy :exec
+DELETE FROM assistance_device_policies
+WHERE device_id = sqlc.arg('device_id');
+
+-- name: GetAssistanceReadiness :one
+-- At most one non-ended session exists per device (assistance_sessions_one_open).
+SELECT
+    d.state,
+    d.current_generation_id,
+    d.last_seen_at,
+    p.policy AS reported_policy,
+    h.finished_at AS inventory_finished_at,
+    h.details AS inventory_details,
+    s.id AS open_session_id
+FROM devices d
+LEFT JOIN assistance_device_policies p ON p.device_id = d.id
+LEFT JOIN host_observations h ON h.generation_id = d.current_generation_id
+LEFT JOIN assistance_sessions s ON s.device_id = d.id AND s.state <> 6
+WHERE d.id = sqlc.arg('device_id');

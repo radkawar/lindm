@@ -2290,13 +2290,22 @@ Each side sends its complete current state, never a stream of events:
    (`VIEW` or `CONTROL`), reason and duration of at most 30 minutes. This needs
    `remote_assistance.run`, fresh authorization and device scope. The device must
    be active and seen within two minutes. At most one non-ended session may exist
-   per device, and a deployment-wide admission cap applies. The row in
+   per device, and a deployment-wide admission cap applies. A device that reports
+   assistance disabled (`assistance_disabled`) or whose latest successful session
+   inventory shows no local X11/Wayland session, not even a login screen
+   (`assistance_no_desktop`), is refused before any row exists, so a refusal is
+   never recorded as an ended session. `AdminService.GetAssistanceReadiness`
+   (same permission and scope) returns the same verdict and its evidence so the
+   console offers a request only where it can reach a person. Otherwise the row in
    `assistance_sessions` binds the operator, device, mode, reason, the 120-second
    consent deadline and the hard `ends_at`.
 2. The network process polls `DeviceService.SyncAssistance` (session-epoch fenced,
    mTLS) every 15 seconds with ±10% jitter, and every second while any session is
    open. It relays the server directives to the executor through
-   `ExecutorService.SyncAssistance` and returns the executor's reports.
+   `ExecutorService.SyncAssistance` and returns the executor's reports with the
+   executor's applied `remote_assistance.enabled` setting. The server keeps that
+   setting in `assistance_device_policies`; an agent that does not report it
+   leaves it unknown and the device itself decides.
 3. The root executor keeps an in-memory broker. A restart loses its sessions and
    fails closed: a still-running helper that reports a live session the restarted
    broker never delivered is told to terminate. When

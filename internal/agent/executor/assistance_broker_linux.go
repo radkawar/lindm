@@ -174,7 +174,11 @@ func (b *assistanceBroker) syncNetwork(ctx context.Context, req *agentv1.SyncAss
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.expire(b.clock())
-	return &agentv1.SyncAssistanceResponse{Reports: b.reports()}, nil
+	policy := agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+	if b.enabled {
+		policy = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
+	}
+	return &agentv1.SyncAssistanceResponse{Reports: b.reports(), Policy: policy}, nil
 }
 
 // syncSession binds the SO_PEERCRED uid to its single eligible logind session,

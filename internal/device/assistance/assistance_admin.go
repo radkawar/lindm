@@ -133,6 +133,10 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
+		// Refusals the device reported in advance come before availability; none records a session.
+		if err := refuseUnreachable(ctx, q, deviceID); err != nil {
+			return err
+		}
 		if device.State != core.StateActive || device.CurrentGenerationID == nil || !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > assistanceOnlineWindow {
 			return rpcreason.Error(connect.CodeFailedPrecondition, "device_offline")
 		}

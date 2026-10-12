@@ -81,6 +81,9 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 	if err := q.TouchAssistanceDeviceSync(ctx, devicedb.TouchAssistanceDeviceSyncParams{DeviceID: principal.DeviceID, SyncedAt: core.Timestamptz(now)}); err != nil {
 		return nil, core.MapErr(err)
 	}
+	if err := recordAssistancePolicy(ctx, q, principal.DeviceID, req.Msg.GetPolicy(), now); err != nil {
+		return nil, core.MapErr(err)
+	}
 	rows, err := q.ListAssistanceDirectiveSessions(ctx, devicedb.ListAssistanceDirectiveSessionsParams{DeviceID: principal.DeviceID, EndedAfter: core.Timestamptz(now.Add(-assistanceEndedDelivery))})
 	if err != nil {
 		return nil, core.MapErr(err)

@@ -223,6 +223,9 @@ const (
 	// AdminServiceStopAssistanceSessionProcedure is the fully-qualified name of the AdminService's
 	// StopAssistanceSession RPC.
 	AdminServiceStopAssistanceSessionProcedure = "/lindm.admin.v1.AdminService/StopAssistanceSession"
+	// AdminServiceGetAssistanceReadinessProcedure is the fully-qualified name of the AdminService's
+	// GetAssistanceReadiness RPC.
+	AdminServiceGetAssistanceReadinessProcedure = "/lindm.admin.v1.AdminService/GetAssistanceReadiness"
 	// AdminServiceGetDeviceEncryptionProcedure is the fully-qualified name of the AdminService's
 	// GetDeviceEncryption RPC.
 	AdminServiceGetDeviceEncryptionProcedure = "/lindm.admin.v1.AdminService/GetDeviceEncryption"
@@ -365,6 +368,8 @@ type AdminServiceClient interface {
 	JoinAssistanceSession(context.Context, *connect.Request[v1.JoinAssistanceSessionRequest]) (*connect.Response[v1.JoinAssistanceSessionResponse], error)
 	AnswerAssistanceSession(context.Context, *connect.Request[v1.AnswerAssistanceSessionRequest]) (*connect.Response[v1.AnswerAssistanceSessionResponse], error)
 	StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error)
+	// Whether a new request can reach a person on the device, and the evidence.
+	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
 	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
@@ -791,6 +796,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("StopAssistanceSession")),
 			connect.WithClientOptions(opts...),
 		),
+		getAssistanceReadiness: connect.NewClient[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse](
+			httpClient,
+			baseURL+AdminServiceGetAssistanceReadinessProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetAssistanceReadiness")),
+			connect.WithClientOptions(opts...),
+		),
 		getDeviceEncryption: connect.NewClient[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse](
 			httpClient,
 			baseURL+AdminServiceGetDeviceEncryptionProcedure,
@@ -1010,6 +1021,7 @@ type adminServiceClient struct {
 	joinAssistanceSession                *connect.Client[v1.JoinAssistanceSessionRequest, v1.JoinAssistanceSessionResponse]
 	answerAssistanceSession              *connect.Client[v1.AnswerAssistanceSessionRequest, v1.AnswerAssistanceSessionResponse]
 	stopAssistanceSession                *connect.Client[v1.StopAssistanceSessionRequest, v1.StopAssistanceSessionResponse]
+	getAssistanceReadiness               *connect.Client[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse]
 	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
 	listDeviceStorageTargets             *connect.Client[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse]
 	revealRecoveryKey                    *connect.Client[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse]
@@ -1359,6 +1371,11 @@ func (c *adminServiceClient) StopAssistanceSession(ctx context.Context, req *con
 	return c.stopAssistanceSession.CallUnary(ctx, req)
 }
 
+// GetAssistanceReadiness calls lindm.admin.v1.AdminService.GetAssistanceReadiness.
+func (c *adminServiceClient) GetAssistanceReadiness(ctx context.Context, req *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {
+	return c.getAssistanceReadiness.CallUnary(ctx, req)
+}
+
 // GetDeviceEncryption calls lindm.admin.v1.AdminService.GetDeviceEncryption.
 func (c *adminServiceClient) GetDeviceEncryption(ctx context.Context, req *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error) {
 	return c.getDeviceEncryption.CallUnary(ctx, req)
@@ -1551,6 +1568,8 @@ type AdminServiceHandler interface {
 	JoinAssistanceSession(context.Context, *connect.Request[v1.JoinAssistanceSessionRequest]) (*connect.Response[v1.JoinAssistanceSessionResponse], error)
 	AnswerAssistanceSession(context.Context, *connect.Request[v1.AnswerAssistanceSessionRequest]) (*connect.Response[v1.AnswerAssistanceSessionResponse], error)
 	StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error)
+	// Whether a new request can reach a person on the device, and the evidence.
+	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
 	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
@@ -1973,6 +1992,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("StopAssistanceSession")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceGetAssistanceReadinessHandler := connect.NewUnaryHandler(
+		AdminServiceGetAssistanceReadinessProcedure,
+		svc.GetAssistanceReadiness,
+		connect.WithSchema(adminServiceMethods.ByName("GetAssistanceReadiness")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetDeviceEncryptionHandler := connect.NewUnaryHandler(
 		AdminServiceGetDeviceEncryptionProcedure,
 		svc.GetDeviceEncryption,
@@ -2253,6 +2278,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceAnswerAssistanceSessionHandler.ServeHTTP(w, r)
 		case AdminServiceStopAssistanceSessionProcedure:
 			adminServiceStopAssistanceSessionHandler.ServeHTTP(w, r)
+		case AdminServiceGetAssistanceReadinessProcedure:
+			adminServiceGetAssistanceReadinessHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceEncryptionProcedure:
 			adminServiceGetDeviceEncryptionHandler.ServeHTTP(w, r)
 		case AdminServiceListDeviceStorageTargetsProcedure:
@@ -2566,6 +2593,10 @@ func (UnimplementedAdminServiceHandler) AnswerAssistanceSession(context.Context,
 
 func (UnimplementedAdminServiceHandler) StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.StopAssistanceSession is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAssistanceReadiness is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error) {

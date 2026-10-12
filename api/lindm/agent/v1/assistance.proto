@@ -169,6 +169,18 @@ message SyncAssistanceRequest {
 }
 message SyncAssistanceResponse {
   repeated AssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 8];
+  // The executor's applied RemoteAssistanceConfig, reported on every sync.
+  AssistancePolicy policy = 2 [(buf.validate.field).enum.defined_only = true];
+}
+
+// AssistancePolicy is the device's applied remote-assistance setting, so the
+// server can refuse a request before it reaches a device that would decline it.
+enum AssistancePolicy {
+  // Not reported: an agent that predates this field.
+  ASSISTANCE_POLICY_UNSPECIFIED = 0;
+  ASSISTANCE_POLICY_ENABLED = 1;
+  // Absent or disabled RemoteAssistanceConfig: invitations end DISABLED.
+  ASSISTANCE_POLICY_DISABLED = 2;
 }
 
 // RemoteAssistanceConfig is device policy. Disabled devices end every

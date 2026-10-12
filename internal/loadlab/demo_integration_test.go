@@ -156,6 +156,19 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	if !causes[agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED] || !causes[agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED] {
 		t.Fatalf("assistance end causes: %v", causes)
 	}
+	// The headless server reports assistance off: the console offers no request,
+	// and a request is refused before any session exists.
+	off, err := admin.GetAssistanceReadiness(ctx, connect.NewRequest(&adminv1.GetAssistanceReadinessRequest{DeviceId: routes.AssistanceOffDeviceID}))
+	if err != nil || off.Msg.GetReadiness().GetState() != adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_DISABLED || off.Msg.GetReadiness().GetDesktop() != adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_ABSENT {
+		t.Fatalf("headless assistance-off readiness: %v %v", off, err)
+	}
+	if _, err := admin.CreateAssistanceSession(ctx, connect.NewRequest(&adminv1.CreateAssistanceSessionRequest{RequestId: uuid.NewString(), DeviceId: routes.AssistanceOffDeviceID, Mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, Reason: "Refused before it exists"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("request to an assistance-off device: %v", err)
+	}
+	refused, err := admin.GetAssistanceSession(ctx, connect.NewRequest(&adminv1.GetAssistanceSessionRequest{SessionId: routes.RefusedAssistanceSessionID}))
+	if err != nil || refused.Msg.GetSession().GetDeviceId() != routes.RefusedAssistanceDeviceID || refused.Msg.GetSession().GetEndCause() != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DISABLED || refused.Msg.GetSession().GetStartedAt() != nil {
+		t.Fatalf("refused assistance record: %v %v", refused, err)
+	}
 	findings, err := admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: routes.DeviceID, PageSize: 50}))
 	if err != nil || !slices.ContainsFunc(findings.Msg.GetFindings(), func(finding *adminv1.AdvisoryFinding) bool { return finding.GetException() != nil }) {
 		t.Fatalf("missing accepted advisory finding: %v %v", findings, err)

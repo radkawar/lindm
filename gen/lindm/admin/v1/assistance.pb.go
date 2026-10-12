@@ -91,6 +91,132 @@ func (AssistanceState) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{0}
 }
 
+// AssistanceReadinessState is the server's answer to "can a new request reach
+// a person on this device now?", from evidence the device has reported.
+type AssistanceReadinessState int32
+
+const (
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_UNSPECIFIED AssistanceReadinessState = 0
+	// No known blocker. Unknown policy or desktop evidence is left to the device.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_READY AssistanceReadinessState = 1
+	// This server has no assistance relay configured.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_UNCONFIGURED AssistanceReadinessState = 2
+	// The device is pending, revoked or otherwise not actively enrolled.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_NOT_ENROLLED AssistanceReadinessState = 3
+	// The device reports remote assistance turned off in its agent configuration.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_DISABLED AssistanceReadinessState = 4
+	// The latest successful session inventory shows no local graphical session,
+	// not even a login screen: a headless host.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_NO_DESKTOP AssistanceReadinessState = 5
+	// The device has not checked in within the two-minute online window.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_OFFLINE AssistanceReadinessState = 6
+	// Another session on this device has not ended; see open_session_id.
+	AssistanceReadinessState_ASSISTANCE_READINESS_STATE_BUSY AssistanceReadinessState = 7
+)
+
+// Enum value maps for AssistanceReadinessState.
+var (
+	AssistanceReadinessState_name = map[int32]string{
+		0: "ASSISTANCE_READINESS_STATE_UNSPECIFIED",
+		1: "ASSISTANCE_READINESS_STATE_READY",
+		2: "ASSISTANCE_READINESS_STATE_UNCONFIGURED",
+		3: "ASSISTANCE_READINESS_STATE_NOT_ENROLLED",
+		4: "ASSISTANCE_READINESS_STATE_DISABLED",
+		5: "ASSISTANCE_READINESS_STATE_NO_DESKTOP",
+		6: "ASSISTANCE_READINESS_STATE_OFFLINE",
+		7: "ASSISTANCE_READINESS_STATE_BUSY",
+	}
+	AssistanceReadinessState_value = map[string]int32{
+		"ASSISTANCE_READINESS_STATE_UNSPECIFIED":  0,
+		"ASSISTANCE_READINESS_STATE_READY":        1,
+		"ASSISTANCE_READINESS_STATE_UNCONFIGURED": 2,
+		"ASSISTANCE_READINESS_STATE_NOT_ENROLLED": 3,
+		"ASSISTANCE_READINESS_STATE_DISABLED":     4,
+		"ASSISTANCE_READINESS_STATE_NO_DESKTOP":   5,
+		"ASSISTANCE_READINESS_STATE_OFFLINE":      6,
+		"ASSISTANCE_READINESS_STATE_BUSY":         7,
+	}
+)
+
+func (x AssistanceReadinessState) Enum() *AssistanceReadinessState {
+	p := new(AssistanceReadinessState)
+	*p = x
+	return p
+}
+
+func (x AssistanceReadinessState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceReadinessState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_assistance_proto_enumTypes[1].Descriptor()
+}
+
+func (AssistanceReadinessState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[1]
+}
+
+func (x AssistanceReadinessState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceReadinessState.Descriptor instead.
+func (AssistanceReadinessState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{1}
+}
+
+// AssistanceDesktop is the session-inventory evidence for a local desktop.
+type AssistanceDesktop int32
+
+const (
+	// No successful active-session inventory.
+	AssistanceDesktop_ASSISTANCE_DESKTOP_UNSPECIFIED AssistanceDesktop = 0
+	// A local X11 or Wayland session, including a login screen.
+	AssistanceDesktop_ASSISTANCE_DESKTOP_PRESENT AssistanceDesktop = 1
+	AssistanceDesktop_ASSISTANCE_DESKTOP_ABSENT  AssistanceDesktop = 2
+)
+
+// Enum value maps for AssistanceDesktop.
+var (
+	AssistanceDesktop_name = map[int32]string{
+		0: "ASSISTANCE_DESKTOP_UNSPECIFIED",
+		1: "ASSISTANCE_DESKTOP_PRESENT",
+		2: "ASSISTANCE_DESKTOP_ABSENT",
+	}
+	AssistanceDesktop_value = map[string]int32{
+		"ASSISTANCE_DESKTOP_UNSPECIFIED": 0,
+		"ASSISTANCE_DESKTOP_PRESENT":     1,
+		"ASSISTANCE_DESKTOP_ABSENT":      2,
+	}
+)
+
+func (x AssistanceDesktop) Enum() *AssistanceDesktop {
+	p := new(AssistanceDesktop)
+	*p = x
+	return p
+}
+
+func (x AssistanceDesktop) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceDesktop) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_assistance_proto_enumTypes[2].Descriptor()
+}
+
+func (AssistanceDesktop) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[2]
+}
+
+func (x AssistanceDesktop) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceDesktop.Descriptor instead.
+func (AssistanceDesktop) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{2}
+}
+
 type AssistanceSession struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -909,6 +1035,181 @@ func (x *StopAssistanceSessionResponse) GetSession() *AssistanceSession {
 	return nil
 }
 
+type AssistanceReadiness struct {
+	state protoimpl.MessageState   `protogen:"open.v1"`
+	State AssistanceReadinessState `protobuf:"varint,1,opt,name=state,proto3,enum=lindm.admin.v1.AssistanceReadinessState" json:"state,omitempty"`
+	// The device's reported setting; UNSPECIFIED when it has not reported one.
+	Policy  v1.AssistancePolicy `protobuf:"varint,2,opt,name=policy,proto3,enum=lindm.agent.v1.AssistancePolicy" json:"policy,omitempty"`
+	Desktop AssistanceDesktop   `protobuf:"varint,3,opt,name=desktop,proto3,enum=lindm.admin.v1.AssistanceDesktop" json:"desktop,omitempty"`
+	// When the session inventory behind desktop was collected.
+	InventoryObservedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=inventory_observed_at,json=inventoryObservedAt,proto3" json:"inventory_observed_at,omitempty"`
+	LastSeenAt          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	// The non-ended session when state is BUSY.
+	OpenSessionId string `protobuf:"bytes,6,opt,name=open_session_id,json=openSessionId,proto3" json:"open_session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceReadiness) Reset() {
+	*x = AssistanceReadiness{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceReadiness) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceReadiness) ProtoMessage() {}
+
+func (x *AssistanceReadiness) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceReadiness.ProtoReflect.Descriptor instead.
+func (*AssistanceReadiness) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AssistanceReadiness) GetState() AssistanceReadinessState {
+	if x != nil {
+		return x.State
+	}
+	return AssistanceReadinessState_ASSISTANCE_READINESS_STATE_UNSPECIFIED
+}
+
+func (x *AssistanceReadiness) GetPolicy() v1.AssistancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return v1.AssistancePolicy(0)
+}
+
+func (x *AssistanceReadiness) GetDesktop() AssistanceDesktop {
+	if x != nil {
+		return x.Desktop
+	}
+	return AssistanceDesktop_ASSISTANCE_DESKTOP_UNSPECIFIED
+}
+
+func (x *AssistanceReadiness) GetInventoryObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.InventoryObservedAt
+	}
+	return nil
+}
+
+func (x *AssistanceReadiness) GetLastSeenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeenAt
+	}
+	return nil
+}
+
+func (x *AssistanceReadiness) GetOpenSessionId() string {
+	if x != nil {
+		return x.OpenSessionId
+	}
+	return ""
+}
+
+type GetAssistanceReadinessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssistanceReadinessRequest) Reset() {
+	*x = GetAssistanceReadinessRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssistanceReadinessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssistanceReadinessRequest) ProtoMessage() {}
+
+func (x *GetAssistanceReadinessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssistanceReadinessRequest.ProtoReflect.Descriptor instead.
+func (*GetAssistanceReadinessRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetAssistanceReadinessRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+type GetAssistanceReadinessResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Readiness     *AssistanceReadiness   `protobuf:"bytes,1,opt,name=readiness,proto3" json:"readiness,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssistanceReadinessResponse) Reset() {
+	*x = GetAssistanceReadinessResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssistanceReadinessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssistanceReadinessResponse) ProtoMessage() {}
+
+func (x *GetAssistanceReadinessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssistanceReadinessResponse.ProtoReflect.Descriptor instead.
+func (*GetAssistanceReadinessResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetAssistanceReadinessResponse) GetReadiness() *AssistanceReadiness {
+	if x != nil {
+		return x.Readiness
+	}
+	return nil
+}
+
 var File_lindm_admin_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
@@ -984,7 +1285,19 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\"\\\n" +
 	"\x1dStopAssistanceSessionResponse\x12;\n" +
-	"\asession\x18\x01 \x01(\v2!.lindm.admin.v1.AssistanceSessionR\asession*\xe8\x01\n" +
+	"\asession\x18\x01 \x01(\v2!.lindm.admin.v1.AssistanceSessionR\asession\"\x82\x03\n" +
+	"\x13AssistanceReadiness\x12>\n" +
+	"\x05state\x18\x01 \x01(\x0e2(.lindm.admin.v1.AssistanceReadinessStateR\x05state\x128\n" +
+	"\x06policy\x18\x02 \x01(\x0e2 .lindm.agent.v1.AssistancePolicyR\x06policy\x12;\n" +
+	"\adesktop\x18\x03 \x01(\x0e2!.lindm.admin.v1.AssistanceDesktopR\adesktop\x12N\n" +
+	"\x15inventory_observed_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x13inventoryObservedAt\x12<\n" +
+	"\flast_seen_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSeenAt\x12&\n" +
+	"\x0fopen_session_id\x18\x06 \x01(\tR\ropenSessionId\"l\n" +
+	"\x1dGetAssistanceReadinessRequest\x12K\n" +
+	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\"c\n" +
+	"\x1eGetAssistanceReadinessResponse\x12A\n" +
+	"\treadiness\x18\x01 \x01(\v2#.lindm.admin.v1.AssistanceReadinessR\treadiness*\xe8\x01\n" +
 	"\x0fAssistanceState\x12 \n" +
 	"\x1cASSISTANCE_STATE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aASSISTANCE_STATE_REQUESTED\x10\x01\x12\x1d\n" +
@@ -992,7 +1305,20 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\x18ASSISTANCE_STATE_OFFERED\x10\x03\x12\x1d\n" +
 	"\x19ASSISTANCE_STATE_ANSWERED\x10\x04\x12\x1b\n" +
 	"\x17ASSISTANCE_STATE_ACTIVE\x10\x05\x12\x1a\n" +
-	"\x16ASSISTANCE_STATE_ENDED\x10\x06B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x16ASSISTANCE_STATE_ENDED\x10\x06*\xe7\x02\n" +
+	"\x18AssistanceReadinessState\x12*\n" +
+	"&ASSISTANCE_READINESS_STATE_UNSPECIFIED\x10\x00\x12$\n" +
+	" ASSISTANCE_READINESS_STATE_READY\x10\x01\x12+\n" +
+	"'ASSISTANCE_READINESS_STATE_UNCONFIGURED\x10\x02\x12+\n" +
+	"'ASSISTANCE_READINESS_STATE_NOT_ENROLLED\x10\x03\x12'\n" +
+	"#ASSISTANCE_READINESS_STATE_DISABLED\x10\x04\x12)\n" +
+	"%ASSISTANCE_READINESS_STATE_NO_DESKTOP\x10\x05\x12&\n" +
+	"\"ASSISTANCE_READINESS_STATE_OFFLINE\x10\x06\x12#\n" +
+	"\x1fASSISTANCE_READINESS_STATE_BUSY\x10\a*v\n" +
+	"\x11AssistanceDesktop\x12\"\n" +
+	"\x1eASSISTANCE_DESKTOP_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aASSISTANCE_DESKTOP_PRESENT\x10\x01\x12\x1d\n" +
+	"\x19ASSISTANCE_DESKTOP_ABSENT\x10\x02B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_assistance_proto_rawDescOnce sync.Once
@@ -1006,53 +1332,65 @@ func file_lindm_admin_v1_assistance_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_assistance_proto_rawDescData
 }
 
-var file_lindm_admin_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_lindm_admin_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_admin_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_lindm_admin_v1_assistance_proto_goTypes = []any{
 	(AssistanceState)(0),                    // 0: lindm.admin.v1.AssistanceState
-	(*AssistanceSession)(nil),               // 1: lindm.admin.v1.AssistanceSession
-	(*CreateAssistanceSessionRequest)(nil),  // 2: lindm.admin.v1.CreateAssistanceSessionRequest
-	(*CreateAssistanceSessionResponse)(nil), // 3: lindm.admin.v1.CreateAssistanceSessionResponse
-	(*ListAssistanceSessionsRequest)(nil),   // 4: lindm.admin.v1.ListAssistanceSessionsRequest
-	(*ListAssistanceSessionsResponse)(nil),  // 5: lindm.admin.v1.ListAssistanceSessionsResponse
-	(*GetAssistanceSessionRequest)(nil),     // 6: lindm.admin.v1.GetAssistanceSessionRequest
-	(*GetAssistanceSessionResponse)(nil),    // 7: lindm.admin.v1.GetAssistanceSessionResponse
-	(*JoinAssistanceSessionRequest)(nil),    // 8: lindm.admin.v1.JoinAssistanceSessionRequest
-	(*JoinAssistanceSessionResponse)(nil),   // 9: lindm.admin.v1.JoinAssistanceSessionResponse
-	(*AnswerAssistanceSessionRequest)(nil),  // 10: lindm.admin.v1.AnswerAssistanceSessionRequest
-	(*AnswerAssistanceSessionResponse)(nil), // 11: lindm.admin.v1.AnswerAssistanceSessionResponse
-	(*StopAssistanceSessionRequest)(nil),    // 12: lindm.admin.v1.StopAssistanceSessionRequest
-	(*StopAssistanceSessionResponse)(nil),   // 13: lindm.admin.v1.StopAssistanceSessionResponse
-	(v1.AssistanceMode)(0),                  // 14: lindm.agent.v1.AssistanceMode
-	(*timestamppb.Timestamp)(nil),           // 15: google.protobuf.Timestamp
-	(v1.AssistanceEndCause)(0),              // 16: lindm.agent.v1.AssistanceEndCause
-	(*v1.AssistanceLocalSession)(nil),       // 17: lindm.agent.v1.AssistanceLocalSession
-	(*v1.AssistanceIceServer)(nil),          // 18: lindm.agent.v1.AssistanceIceServer
+	(AssistanceReadinessState)(0),           // 1: lindm.admin.v1.AssistanceReadinessState
+	(AssistanceDesktop)(0),                  // 2: lindm.admin.v1.AssistanceDesktop
+	(*AssistanceSession)(nil),               // 3: lindm.admin.v1.AssistanceSession
+	(*CreateAssistanceSessionRequest)(nil),  // 4: lindm.admin.v1.CreateAssistanceSessionRequest
+	(*CreateAssistanceSessionResponse)(nil), // 5: lindm.admin.v1.CreateAssistanceSessionResponse
+	(*ListAssistanceSessionsRequest)(nil),   // 6: lindm.admin.v1.ListAssistanceSessionsRequest
+	(*ListAssistanceSessionsResponse)(nil),  // 7: lindm.admin.v1.ListAssistanceSessionsResponse
+	(*GetAssistanceSessionRequest)(nil),     // 8: lindm.admin.v1.GetAssistanceSessionRequest
+	(*GetAssistanceSessionResponse)(nil),    // 9: lindm.admin.v1.GetAssistanceSessionResponse
+	(*JoinAssistanceSessionRequest)(nil),    // 10: lindm.admin.v1.JoinAssistanceSessionRequest
+	(*JoinAssistanceSessionResponse)(nil),   // 11: lindm.admin.v1.JoinAssistanceSessionResponse
+	(*AnswerAssistanceSessionRequest)(nil),  // 12: lindm.admin.v1.AnswerAssistanceSessionRequest
+	(*AnswerAssistanceSessionResponse)(nil), // 13: lindm.admin.v1.AnswerAssistanceSessionResponse
+	(*StopAssistanceSessionRequest)(nil),    // 14: lindm.admin.v1.StopAssistanceSessionRequest
+	(*StopAssistanceSessionResponse)(nil),   // 15: lindm.admin.v1.StopAssistanceSessionResponse
+	(*AssistanceReadiness)(nil),             // 16: lindm.admin.v1.AssistanceReadiness
+	(*GetAssistanceReadinessRequest)(nil),   // 17: lindm.admin.v1.GetAssistanceReadinessRequest
+	(*GetAssistanceReadinessResponse)(nil),  // 18: lindm.admin.v1.GetAssistanceReadinessResponse
+	(v1.AssistanceMode)(0),                  // 19: lindm.agent.v1.AssistanceMode
+	(*timestamppb.Timestamp)(nil),           // 20: google.protobuf.Timestamp
+	(v1.AssistanceEndCause)(0),              // 21: lindm.agent.v1.AssistanceEndCause
+	(*v1.AssistanceLocalSession)(nil),       // 22: lindm.agent.v1.AssistanceLocalSession
+	(*v1.AssistanceIceServer)(nil),          // 23: lindm.agent.v1.AssistanceIceServer
+	(v1.AssistancePolicy)(0),                // 24: lindm.agent.v1.AssistancePolicy
 }
 var file_lindm_admin_v1_assistance_proto_depIdxs = []int32{
-	14, // 0: lindm.admin.v1.AssistanceSession.mode:type_name -> lindm.agent.v1.AssistanceMode
+	19, // 0: lindm.admin.v1.AssistanceSession.mode:type_name -> lindm.agent.v1.AssistanceMode
 	0,  // 1: lindm.admin.v1.AssistanceSession.state:type_name -> lindm.admin.v1.AssistanceState
-	15, // 2: lindm.admin.v1.AssistanceSession.created_at:type_name -> google.protobuf.Timestamp
-	15, // 3: lindm.admin.v1.AssistanceSession.consent_deadline:type_name -> google.protobuf.Timestamp
-	15, // 4: lindm.admin.v1.AssistanceSession.ends_at:type_name -> google.protobuf.Timestamp
-	15, // 5: lindm.admin.v1.AssistanceSession.consented_at:type_name -> google.protobuf.Timestamp
-	15, // 6: lindm.admin.v1.AssistanceSession.started_at:type_name -> google.protobuf.Timestamp
-	15, // 7: lindm.admin.v1.AssistanceSession.ended_at:type_name -> google.protobuf.Timestamp
-	16, // 8: lindm.admin.v1.AssistanceSession.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	17, // 9: lindm.admin.v1.AssistanceSession.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	14, // 10: lindm.admin.v1.CreateAssistanceSessionRequest.mode:type_name -> lindm.agent.v1.AssistanceMode
-	1,  // 11: lindm.admin.v1.CreateAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	1,  // 12: lindm.admin.v1.ListAssistanceSessionsResponse.sessions:type_name -> lindm.admin.v1.AssistanceSession
-	1,  // 13: lindm.admin.v1.GetAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	1,  // 14: lindm.admin.v1.JoinAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	18, // 15: lindm.admin.v1.JoinAssistanceSessionResponse.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
-	1,  // 16: lindm.admin.v1.AnswerAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	1,  // 17: lindm.admin.v1.StopAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	20, // 2: lindm.admin.v1.AssistanceSession.created_at:type_name -> google.protobuf.Timestamp
+	20, // 3: lindm.admin.v1.AssistanceSession.consent_deadline:type_name -> google.protobuf.Timestamp
+	20, // 4: lindm.admin.v1.AssistanceSession.ends_at:type_name -> google.protobuf.Timestamp
+	20, // 5: lindm.admin.v1.AssistanceSession.consented_at:type_name -> google.protobuf.Timestamp
+	20, // 6: lindm.admin.v1.AssistanceSession.started_at:type_name -> google.protobuf.Timestamp
+	20, // 7: lindm.admin.v1.AssistanceSession.ended_at:type_name -> google.protobuf.Timestamp
+	21, // 8: lindm.admin.v1.AssistanceSession.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	22, // 9: lindm.admin.v1.AssistanceSession.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	19, // 10: lindm.admin.v1.CreateAssistanceSessionRequest.mode:type_name -> lindm.agent.v1.AssistanceMode
+	3,  // 11: lindm.admin.v1.CreateAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	3,  // 12: lindm.admin.v1.ListAssistanceSessionsResponse.sessions:type_name -> lindm.admin.v1.AssistanceSession
+	3,  // 13: lindm.admin.v1.GetAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	3,  // 14: lindm.admin.v1.JoinAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	23, // 15: lindm.admin.v1.JoinAssistanceSessionResponse.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
+	3,  // 16: lindm.admin.v1.AnswerAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	3,  // 17: lindm.admin.v1.StopAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	1,  // 18: lindm.admin.v1.AssistanceReadiness.state:type_name -> lindm.admin.v1.AssistanceReadinessState
+	24, // 19: lindm.admin.v1.AssistanceReadiness.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	2,  // 20: lindm.admin.v1.AssistanceReadiness.desktop:type_name -> lindm.admin.v1.AssistanceDesktop
+	20, // 21: lindm.admin.v1.AssistanceReadiness.inventory_observed_at:type_name -> google.protobuf.Timestamp
+	20, // 22: lindm.admin.v1.AssistanceReadiness.last_seen_at:type_name -> google.protobuf.Timestamp
+	16, // 23: lindm.admin.v1.GetAssistanceReadinessResponse.readiness:type_name -> lindm.admin.v1.AssistanceReadiness
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_assistance_proto_init() }
@@ -1065,8 +1403,8 @@ func file_lindm_admin_v1_assistance_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_assistance_proto_rawDesc), len(file_lindm_admin_v1_assistance_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   13,
+			NumEnums:      3,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

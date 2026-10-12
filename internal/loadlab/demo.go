@@ -64,6 +64,12 @@ type DemoRoutes struct {
 	// FactsPendingDeviceID has not reported its platform, so its profile's
 	// platform-limited item waits for device facts (/devices/$deviceId).
 	FactsPendingDeviceID string
+	// Headless server whose agent reports remote assistance turned off; the
+	// console must offer it no assistance request.
+	AssistanceOffDeviceID string
+	// A request an older agent refused before anything was shared, on
+	// RefusedAssistanceDeviceID: "Couldn't start", never "Ended".
+	RefusedAssistanceDeviceID, RefusedAssistanceSessionID string
 }
 
 // demoSeed drives the real Admin, Enrollment and Device APIs for one fixture.
@@ -191,7 +197,7 @@ func (s *demoSeed) checkIns(ctx context.Context, d *simulatedDevice) error {
 	defer ticker.Stop()
 	for {
 		call, cancel := context.WithTimeout(ctx, 15*time.Second)
-		_, err := d.client.SyncAssistance(call, connect.NewRequest(&devicev1.SyncAssistanceRequest{SessionEpoch: d.epoch}))
+		_, err := d.syncAssistance(call)
 		cancel()
 		if err == nil {
 			call, cancel = context.WithTimeout(ctx, time.Minute)
@@ -275,6 +281,15 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		if err := s.describe(ctx, d, historical); err != nil {
 			return err
 		}
+		// The idle check-in every agent makes, reporting its assistance setting.
+		if d.demo.assistance != agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED {
+			if _, err := d.syncAssistance(ctx); err != nil {
+				return fmt.Errorf("report %s assistance policy: %w", d.demo.hostname, err)
+			}
+		}
+		if d.demo.headless && d.demo.assistance == assistanceOff && s.demo.Routes.AssistanceOffDeviceID == "" {
+			s.demo.Routes.AssistanceOffDeviceID = d.id
+		}
 	}
 	profiles, err := s.publishProfiles(ctx)
 	if err != nil {
@@ -294,6 +309,14 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	}
 	if err := s.richDevice(ctx, rich); err != nil {
 		return err
+	}
+	for _, d := range s.devices {
+		if d.demo.assistance == agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED && !d.demo.historical && s.demo.Routes.RefusedAssistanceSessionID == "" {
+			if s.demo.Routes.RefusedAssistanceSessionID, err = s.refusedAssistance(ctx, d); err != nil {
+				return fmt.Errorf("refused demo assistance: %w", err)
+			}
+			s.demo.Routes.RefusedAssistanceDeviceID = d.id
+		}
 	}
 	for _, d := range s.devices {
 		if d.demo.state == "revoked" {
@@ -635,6 +658,22 @@ func demoEscrow(binding *agentv1.RecoveryKeyBinding, rotate *agentv1.EscrowRotat
 	return &agentv1.DeviceActionEscrow{EscrowKeyId: rotate.GetEscrowKeyId(), Ciphertext: ciphertext, RecoveryKeySha256: digest[:], NewKeyslot: binding.GetNewKeyslot(), LuksUuid: binding.GetLuksUuid(), MetadataSha256: metadata[:]}, nil
 }
 
+// refusedAssistance is a request to an older agent that does not report its
+// assistance setting, so the server cannot refuse it in advance; the device
+// ends it DISABLED before any prompt. Its check-in first proves it online.
+func (s *demoSeed) refusedAssistance(ctx context.Context, d *simulatedDevice) (string, error) {
+	if _, err := d.syncAssistance(ctx); err != nil {
+		return "", err
+	}
+	created, err := s.owner.Admin.CreateAssistanceSession(ctx, connect.NewRequest(&adminv1.CreateAssistanceSessionRequest{RequestId: uuid.NewString(), DeviceId: d.id, Mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, MaxDurationSeconds: 900, Reason: "Check why the shared printer is offline"}))
+	if err != nil {
+		return "", err
+	}
+	id := created.Msg.GetSession().GetId()
+	_, err = d.syncAssistance(ctx, &agentv1.AssistanceReport{SessionId: id, Phase: agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED, EndCause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DISABLED})
+	return id, err
+}
+
 // assistance requests a view session and answers as the device's local user:
 // declined at the prompt, or consented, connected and stopped by the user.
 // Offers and answers are synthetic relay-only SDP; no media flows.
@@ -655,7 +694,7 @@ func (s *demoSeed) assistance(ctx context.Context, d *simulatedDevice, accept bo
 	report := &agentv1.AssistanceReport{SessionId: id, LocalSession: &agentv1.AssistanceLocalSession{Username: "demo", Uid: 1000, LogindSessionId: "2", SessionType: "wayland", Desktop: d.demo.release.Desktop.Name}}
 	sync := func(phase agentv1.AssistancePhase, cause agentv1.AssistanceEndCause) error {
 		report.Phase, report.EndCause = phase, cause
-		_, err := d.client.SyncAssistance(ctx, connect.NewRequest(&devicev1.SyncAssistanceRequest{SessionEpoch: d.epoch, Reports: []*agentv1.AssistanceReport{report}}))
+		_, err := d.syncAssistance(ctx, report)
 		return err
 	}
 	if err := sync(agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED); err != nil {
@@ -685,6 +724,16 @@ func (s *demoSeed) assistance(ctx context.Context, d *simulatedDevice, accept bo
 		return "", err
 	}
 	return id, sync(agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED)
+}
+
+// syncAssistance is one agent assistance exchange: its session reports and,
+// as every current agent sends, its applied assistance setting.
+func (d *simulatedDevice) syncAssistance(ctx context.Context, reports ...*agentv1.AssistanceReport) (*devicev1.SyncAssistanceResponse, error) {
+	response, err := d.client.SyncAssistance(ctx, connect.NewRequest(&devicev1.SyncAssistanceRequest{SessionEpoch: d.epoch, Reports: reports, Policy: d.demo.assistance}))
+	if err != nil {
+		return nil, err
+	}
+	return response.Msg, nil
 }
 
 // demoSDP is a minimal non-trickle relay-only description with a fresh

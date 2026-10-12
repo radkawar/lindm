@@ -123,3 +123,55 @@ message StopAssistanceSessionRequest {
 message StopAssistanceSessionResponse {
   AssistanceSession session = 1;
 }
+
+// AssistanceReadinessState is the server's answer to "can a new request reach
+// a person on this device now?", from evidence the device has reported.
+enum AssistanceReadinessState {
+  ASSISTANCE_READINESS_STATE_UNSPECIFIED = 0;
+  // No known blocker. Unknown policy or desktop evidence is left to the device.
+  ASSISTANCE_READINESS_STATE_READY = 1;
+  // This server has no assistance relay configured.
+  ASSISTANCE_READINESS_STATE_UNCONFIGURED = 2;
+  // The device is pending, revoked or otherwise not actively enrolled.
+  ASSISTANCE_READINESS_STATE_NOT_ENROLLED = 3;
+  // The device reports remote assistance turned off in its agent configuration.
+  ASSISTANCE_READINESS_STATE_DISABLED = 4;
+  // The latest successful session inventory shows no local graphical session,
+  // not even a login screen: a headless host.
+  ASSISTANCE_READINESS_STATE_NO_DESKTOP = 5;
+  // The device has not checked in within the two-minute online window.
+  ASSISTANCE_READINESS_STATE_OFFLINE = 6;
+  // Another session on this device has not ended; see open_session_id.
+  ASSISTANCE_READINESS_STATE_BUSY = 7;
+}
+
+// AssistanceDesktop is the session-inventory evidence for a local desktop.
+enum AssistanceDesktop {
+  // No successful active-session inventory.
+  ASSISTANCE_DESKTOP_UNSPECIFIED = 0;
+  // A local X11 or Wayland session, including a login screen.
+  ASSISTANCE_DESKTOP_PRESENT = 1;
+  ASSISTANCE_DESKTOP_ABSENT = 2;
+}
+
+message AssistanceReadiness {
+  AssistanceReadinessState state = 1;
+  // The device's reported setting; UNSPECIFIED when it has not reported one.
+  lindm.agent.v1.AssistancePolicy policy = 2;
+  AssistanceDesktop desktop = 3;
+  // When the session inventory behind desktop was collected.
+  google.protobuf.Timestamp inventory_observed_at = 4;
+  google.protobuf.Timestamp last_seen_at = 5;
+  // The non-ended session when state is BUSY.
+  string open_session_id = 6;
+}
+
+message GetAssistanceReadinessRequest {
+  string device_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+message GetAssistanceReadinessResponse {
+  AssistanceReadiness readiness = 1;
+}
