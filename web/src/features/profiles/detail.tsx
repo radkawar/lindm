@@ -32,6 +32,18 @@ import {
 import { profileRevisionQueryOptions } from "./queries";
 import type { ProfileDetailSearch } from "./search";
 import { ProfileRevisionPicker } from "./picker";
+import { desiredField, resourceKinds } from "./resource-draft";
+
+// Setting types in administrator words; the generated arm name stays in Details.
+function kindLabel(arm: string | undefined) {
+  return resourceKinds.find((entry) => entry.arm === arm)?.label ?? "Other setting type";
+}
+// ResourceRef.kind numbers follow the desired-state field numbers (see withDerivedRef).
+function refKindLabel(kind: number | undefined) {
+  return kindLabel(
+    resourceKinds.find((entry) => (desiredField(entry.arm)?.number ?? 0) - 9 === kind)?.arm,
+  );
+}
 
 type EditorSource = {
   draft: DraftSpec;
@@ -114,16 +126,23 @@ export function ProfileDetailView({
         title={record?.spec?.name.trim() || "Profile"}
         description={record?.spec?.description.trim() || undefined}
         actions={
-          <Button
-            variant="outline"
-            disabled={displayed.isFetching}
-            onClick={() => {
-              void displayed.refetch();
-              if (revision !== "") void headQuery.refetch();
-            }}
-          >
-            Refresh version
-          </Button>
+          <>
+            {canPermission(principal, "resources.assign") ? (
+              <Link to="/rollouts" className="text-sm font-medium underline underline-offset-4">
+                Assign in Rollouts
+              </Link>
+            ) : null}
+            <Button
+              variant="outline"
+              disabled={displayed.isFetching}
+              onClick={() => {
+                void displayed.refetch();
+                if (revision !== "") void headQuery.refetch();
+              }}
+            >
+              Refresh version
+            </Button>
+          </>
         }
       />
       <p className="max-w-3xl text-sm text-muted-foreground">
@@ -157,14 +176,11 @@ export function ProfileDetailView({
               />
             </div>
             <Button type="submit">Open version</Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={revision === ""}
-              onClick={() => onSearch({ revision: "" })}
-            >
-              Latest version
-            </Button>
+            {revision !== "" ? (
+              <Button type="button" variant="outline" onClick={() => onSearch({ revision: "" })}>
+                Latest version
+              </Button>
+            ) : null}
           </form>
           {lookupError !== "" ? (
             <p role="alert" className="mt-2 text-sm text-destructive">
@@ -306,29 +322,41 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 function ResourceFacts({ resource }: { resource: ProfileResource }) {
   const kind = resource.desired?.state.case;
+  const key = resource.desired?.ref?.canonicalKey;
   return (
     <article className="grid min-w-0 gap-3 border bg-muted/20 p-4">
-      <h2 className="break-all text-sm font-medium">
-        {kind === "sshServer"
-          ? "SSH settings"
-          : resource.desired?.ref?.canonicalKey || "Unnamed setting"}
+      <h2 className="grid gap-0.5 text-sm font-medium">
+        <span>{kindLabel(kind)}</span>
+        {key && kind !== "sshServer" ? (
+          <span className="break-all font-mono text-xs font-normal text-muted-foreground">
+            {key}
+          </span>
+        ) : null}
       </h2>
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Fact label="Type">{kind === "sshServer" ? "SSH server" : (kind ?? "Unknown")}</Fact>
         <Fact label="Depends on">
-          {resource.dependsOn.length === 0
-            ? "None"
-            : resource.dependsOn
-                .map(
-                  (dependency) =>
-                    `${dependency.ref?.kind ?? "Unknown"} / ${dependency.ref?.canonicalKey ?? "Unknown"}`,
-                )
-                .join(", ")}
+          {resource.dependsOn.length === 0 ? (
+            "Nothing else in this profile"
+          ) : (
+            <ul className="grid gap-0.5">
+              {resource.dependsOn.map((dependency, index) => (
+                <li key={index} className="break-all">
+                  {refKindLabel(dependency.ref?.kind)}
+                  {dependency.ref?.canonicalKey ? (
+                    <span className="font-mono text-xs"> {dependency.ref.canonicalKey}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Fact>
       </dl>
       <TechnicalDetails
         summary="Full setting"
-        items={[{ label: "Setting ID", value: resource.resourceId }]}
+        items={[
+          { label: "Setting ID", value: resource.resourceId },
+          { label: "Setting type", value: kind },
+        ]}
       >
         <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
           {toJsonString(ProfileResourceSchema, resource, { prettySpaces: 2 })}

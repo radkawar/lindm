@@ -166,7 +166,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         <form
-          className="flex flex-wrap items-end gap-2"
+          className="grid min-w-0 gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             if (
@@ -187,15 +187,13 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
             read.mutate(id);
           }}
         >
-          <div className="grid min-w-0 grow gap-1.5">
-            <DevicePicker
-              label="Device"
-              value={deviceId}
-              disabled={!!current.loading || unresolved}
-              onChange={setDeviceId}
-            />
-          </div>
-          <Button type="submit" disabled={!!current.loading || unresolved}>
+          <DevicePicker
+            label="Device"
+            value={deviceId}
+            disabled={!!current.loading || unresolved}
+            onChange={setDeviceId}
+          />
+          <Button type="submit" className="w-fit" disabled={!!current.loading || unresolved}>
             {current.loading ? "Loading preview…" : "Preview"}
           </Button>
         </form>
@@ -381,6 +379,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
               <Label htmlFor="target-activation-reason">Reason</Label>
               <Textarea
                 id="target-activation-reason"
+                data-freeform="audit reason"
                 value={current.request?.reason ?? reason}
                 readOnly={!!current.request}
                 onChange={(event) => setReason(event.target.value)}

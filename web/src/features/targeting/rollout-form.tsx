@@ -61,14 +61,27 @@ export function RolloutForm() {
               return (
                 <fieldset key={index} className="grid min-w-0 gap-4 border p-3">
                   <legend className="text-sm font-semibold">Stage {index + 1}</legend>
-                  <label className="grid gap-1.5 text-sm">
-                    Stage name
-                    <Input
-                      required
-                      value={stage.name}
-                      onChange={(event) => set({ name: event.target.value })}
-                    />
-                  </label>
+                  <div className="grid gap-1.5">
+                    <label className="grid gap-1.5 text-sm">
+                      Stage name
+                      <Input
+                        required
+                        data-freeform="new rollout stage name"
+                        maxLength={64}
+                        pattern="[a-zA-Z0-9_.\-]+"
+                        spellCheck={false}
+                        aria-describedby={`rollout-stage-${index}-name-help`}
+                        value={stage.name}
+                        onChange={(event) => set({ name: event.target.value })}
+                      />
+                    </label>
+                    <span
+                      id={`rollout-stage-${index}-name-help`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Letters, numbers, dots, dashes and underscores; for example pilot or wave-2.
+                    </span>
+                  </div>
                   <TargetControl
                     label={`Stage ${index + 1} target`}
                     value={stage.cohort}

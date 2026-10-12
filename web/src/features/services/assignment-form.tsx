@@ -342,6 +342,7 @@ export function ResourceAssignmentForm({
         <Input
           id="service-reconcile-interval"
           type="number"
+          data-freeform="numeric check interval"
           className="h-9"
           min={intervalMin}
           max={intervalMax}
@@ -362,6 +363,7 @@ export function ResourceAssignmentForm({
         <Label htmlFor="service-assignment-reason">Reason (required)</Label>
         <Textarea
           id="service-assignment-reason"
+          data-freeform="audit reason"
           required
           readOnly={locked}
           value={attempt?.payload.reason ?? reason}

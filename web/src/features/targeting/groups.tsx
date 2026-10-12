@@ -53,6 +53,7 @@ export function DynamicGroupsView() {
         pending={list.isPending}
         error={list.error}
         empty={list.data?.length === 0}
+        firstPage={!afterId}
         noun="dynamic groups"
       />
       {!list.error

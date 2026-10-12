@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +25,6 @@ import {
   type PublishAttempt,
 } from "./attempt";
 import {
-  CATALOG_SEMANTICS,
   DESCRIPTION_MAX,
   MAX_RESOURCES,
   NAME_MAX,
@@ -168,8 +167,7 @@ export function ProfileEditor({
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle>{creating ? "Create profile" : "Edit profile"}</CardTitle>
-        <CardDescription>{CATALOG_SEMANTICS}</CardDescription>
+        <CardTitle>{creating ? "Profile details" : "Edit profile"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -226,6 +224,7 @@ export function ProfileEditor({
             <Label htmlFor="profile-name">Name</Label>
             <Input
               id="profile-name"
+              data-freeform="new or renamed profile name"
               required
               maxLength={NAME_MAX * 2}
               value={shown.name}
@@ -237,6 +236,7 @@ export function ProfileEditor({
             <Label htmlFor="profile-description">Description</Label>
             <Textarea
               id="profile-description"
+              data-freeform="profile description"
               maxLength={DESCRIPTION_MAX * 2}
               value={shown.description}
               readOnly={locked}
@@ -275,6 +275,7 @@ export function ProfileEditor({
             <Label htmlFor="profile-reason">Reason</Label>
             <Textarea
               id="profile-reason"
+              data-freeform="audit reason"
               required
               value={shownReason}
               readOnly={locked}

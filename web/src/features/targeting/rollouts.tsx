@@ -38,6 +38,11 @@ import { ListStatus, TargetPagination } from "./list";
 import { TargetPreviewView } from "./preview";
 import { RolloutForm } from "./rollout-form";
 import { rolloutName, type TargetNames } from "./pickers";
+import { formatSeconds } from "./duration";
+
+function deviceCount(count: number) {
+  return count === 1 ? "1 device" : `${count} devices`;
+}
 
 const ROLLOUT_REASON_MESSAGES: Record<string, string> = {
   failure_threshold:
@@ -216,7 +221,8 @@ function StagedRollouts({ names }: { names: TargetNames }) {
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Updates every 10 seconds.</span>
           <Button
             type="button"
             variant="outline"
@@ -224,14 +230,6 @@ function StagedRollouts({ names }: { names: TargetNames }) {
             onClick={() => setPlanning(!planning)}
           >
             Plan staged rollout
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={list.isFetching}
-            onClick={() => void list.refetch()}
-          >
-            Refresh rollouts
           </Button>
         </div>
       </div>
@@ -256,7 +254,9 @@ function StagedRollouts({ names }: { names: TargetNames }) {
         pending={list.isPending}
         error={list.error}
         empty={list.data?.length === 0}
+        firstPage={!afterId}
         noun="staged rollouts"
+        emptyDescription="Plan a staged rollout to deliver a profile version to a small group first, then widen it when devices report healthy."
       />
       {!list.error
         ? states.map((state) => (
@@ -308,7 +308,9 @@ function SavedAssignments({ names }: { names: TargetNames }) {
         pending={list.isPending}
         error={list.error}
         empty={list.data?.length === 0}
+        firstPage={!afterId}
         noun="saved assignments"
+        emptyDescription="Choose New rollout to assign a profile version to a device or group."
       />
       {!list.error && list.data?.length ? (
         <ul className="grid min-w-0 gap-3">
@@ -400,18 +402,22 @@ function RolloutCard({
   if (!rollout) return null;
   const stage = rollout.rings[state.ringIndex];
   const next = rollout.rings[state.ringIndex + 1];
+  // Selection counts move only when a saved assignment uses this rollout.
+  const unused = !!deliveries && deliveriesComplete && deliveries.length === 0;
   return (
     <article className="grid min-w-0 gap-3 border p-4">
       <h3 className="break-words text-sm font-semibold">{rolloutName(state)}</h3>
       <p className="flex flex-wrap items-center gap-2 text-sm">
-        <StatusBadge status={state.paused ? "warning" : "info"}>
+        <StatusBadge status={state.paused ? "warning" : unused ? "neutral" : "info"}>
           {state.paused
             ? "Paused"
-            : !next
-              ? "Final stage"
-              : stage?.manualPromotion
-                ? "Manual promotion required"
-                : "Waiting to advance"}
+            : unused
+              ? "Not delivering yet"
+              : !next
+                ? "Final stage"
+                : stage?.manualPromotion
+                  ? "Manual promotion required"
+                  : "Waiting to advance"}
         </StatusBadge>
         <span>
           Stage {state.ringIndex + 1} of {rollout.rings.length}: {stage?.name ?? "Unknown"}
@@ -434,14 +440,17 @@ function RolloutCard({
       ) : null}
       {state.pauseReason ? (
         <p className="break-words text-sm">
-          Paused: {ROLLOUT_REASON_MESSAGES[state.pauseReason] ?? state.pauseReason}
+          Paused:{" "}
+          {ROLLOUT_REASON_MESSAGES[state.pauseReason] ??
+            "The server recorded a reason this console doesn't recognize. See Details."}
         </p>
       ) : null}
       <p className="text-sm">
-        Included: {state.selectedCount}; waiting: {state.pendingCount}; excluded:{" "}
-        {state.excludedCount}. These are saved rollout counts, not proof of device execution.
+        {deviceCount(state.selectedCount)} included, {state.pendingCount} waiting,{" "}
+        {state.excludedCount} excluded. These are saved rollout counts, not proof of device
+        execution.
       </p>
-      {!state.paused && next && !stage?.manualPromotion ? (
+      {!state.paused && !unused && next && !stage?.manualPromotion ? (
         <p className="text-sm text-muted-foreground">
           {state.gateReason
             ? (ROLLOUT_REASON_MESSAGES[state.gateReason] ??
@@ -475,15 +484,15 @@ function RolloutCard({
           {rollout.rings.map((ring) => (
             <li className="grid gap-2 border p-3 text-sm" key={ring.name}>
               <h4 className="font-medium">
-                {ring.name}: {ring.cumulativeBasisPoints / 100}% cumulative share
+                {ring.name}: {ring.cumulativeBasisPoints / 100}% of devices in total
               </h4>
               <p>
                 Target: <TargetName target={ring.cohort} names={names} />
               </p>
               <p>
-                At least {ring.minimumCanaries} initial devices and {ring.minimumObserved}{" "}
-                observations; observe for {ring.soakSeconds} seconds. Observations must be no older
-                than {ring.healthMaxAgeSeconds} seconds.
+                At least {deviceCount(ring.minimumCanaries)} to start and {ring.minimumObserved}{" "}
+                reporting; observe for {formatSeconds(ring.soakSeconds)}. Observations must be no
+                older than {formatSeconds(ring.healthMaxAgeSeconds)}.
               </p>
               <p>
                 Allow at most {ring.failureBasisPoints / 100}% failed,{" "}

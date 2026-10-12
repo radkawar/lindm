@@ -109,6 +109,7 @@ export function ResourceFields({
             <Label htmlFor={`${id}-modules`}>Modules to block</Label>
             <Textarea
               id={`${id}-modules`}
+              data-freeform="kernel module names to block; may not be loaded on any device yet"
               value={(
                 (object(object(desired.managedFile).kernelModuleBlocklist).modules as string[]) ??
                 []

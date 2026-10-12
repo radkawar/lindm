@@ -60,7 +60,7 @@ export function ProfilesView({
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Profiles"
-        description="Sets of device settings you can assign to devices."
+        description={`Sets of device settings. ${CATALOG_SEMANTICS}`}
         actions={
           <>
             <Button
@@ -76,7 +76,6 @@ export function ProfilesView({
           </>
         }
       />
-      <p className="text-sm text-muted-foreground">{CATALOG_SEMANTICS}</p>
       {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
           <AlertTitle>A profile hasn't finished saving</AlertTitle>
@@ -133,8 +132,17 @@ export function ProfilesView({
       ) : null}
       {list.isSuccess && list.data.profiles.length === 0 ? (
         <EmptyState
-          title={pageToken === "" ? "No profiles yet" : "No profiles on this page"}
-          description="Create a profile, then assign it to devices in Rollouts."
+          title={pageToken === "" ? "No profiles yet" : "No more profiles"}
+          description={
+            pageToken === ""
+              ? "Create a profile, then assign it to devices in Rollouts."
+              : "Return to the first page."
+          }
+          action={
+            pageToken === "" && canPermission(principal, "profiles.manage") ? (
+              <Button render={<Link to="/profiles/new" />}>Create profile</Button>
+            ) : null
+          }
         />
       ) : null}
       {list.data && list.data.profiles.length > 0 ? (

@@ -75,6 +75,7 @@ export function NumberControl({
       {label}
       <Input
         type="number"
+        data-freeform="numeric rollout threshold"
         required
         step={percent ? "0.01" : "1"}
         value={percent ? value / 100 : value}
@@ -128,7 +129,12 @@ export function ReasonControl({
   return (
     <label className="grid gap-1.5 text-sm">
       {label}
-      <Textarea required value={value} onChange={(event) => onChange(event.target.value)} />
+      <Textarea
+        required
+        data-freeform="audit reason"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }

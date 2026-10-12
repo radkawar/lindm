@@ -12,7 +12,7 @@ export const task = {
 };
 
 const timeout = 30_000;
-const ACTIVE = /^(Waiting to advance|Manual promotion required|Final stage)$/;
+const ACTIVE = /^(Not delivering yet|Waiting to advance|Manual promotion required|Final stage)$/;
 const SUMMARY = /^(\d+) in progress, (\d+) paused/;
 
 // Visible on screen and not inside a closed disclosure or hidden subtree.
@@ -81,12 +81,12 @@ export async function check({ page, visit, settle, require, capture, step }) {
   // A loaded list shows its in-progress summary; an empty one its empty state.
   await staged
     .getByText(SUMMARY)
-    .or(staged.getByText("No staged rollouts on this page", { exact: true }))
+    .or(staged.getByText("No staged rollouts yet", { exact: true }))
     .first()
     .waitFor({ timeout });
   await saved
     .getByRole("listitem")
-    .or(saved.getByText("No saved assignments on this page", { exact: true }))
+    .or(saved.getByText("No saved assignments yet", { exact: true }))
     .first()
     .waitFor({ timeout });
   await settle();

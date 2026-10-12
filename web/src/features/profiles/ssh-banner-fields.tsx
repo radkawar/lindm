@@ -19,6 +19,7 @@ export function SSHBannerFields({
       <Label htmlFor={id}>Notice before SSH sign-in</Label>
       <Textarea
         id={id}
+        data-freeform="SSH banner text"
         value={String(value.bannerText ?? "")}
         disabled={disabled || unsupported}
         rows={6}

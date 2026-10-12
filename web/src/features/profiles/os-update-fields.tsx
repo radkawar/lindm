@@ -1,8 +1,16 @@
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchPicker } from "@/components/ui/search-picker";
 import { SelectField } from "@/components/ui/select-field";
 import { object } from "./resource-draft";
+
+// IANA zone names known to this browser; devices resolve the same tz database names.
+const timeZones = [...new Set(["UTC", ...Intl.supportedValuesOf("timeZone")])].map((zone) => ({
+  value: zone,
+  label: zone.replaceAll("_", " "),
+  keywords: [zone],
+}));
 
 type Props = {
   value: JsonObject;
@@ -24,15 +32,17 @@ function WindowFields({ value, onChange, id, disabled }: Props) {
   const selected = Array.isArray(value.weekdays) ? value.weekdays : [];
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-zone`}>Time zone</Label>
-        <Input
-          id={`${id}-zone`}
-          disabled={disabled}
-          value={String(value.timeZone ?? "")}
-          onChange={(event) => onChange({ ...value, timeZone: event.target.value })}
-        />
-      </div>
+      <SearchPicker
+        label="Time zone"
+        disabled={disabled}
+        value={String(value.timeZone ?? "")}
+        options={
+          value.timeZone && !timeZones.some((zone) => zone.value === value.timeZone)
+            ? [{ value: String(value.timeZone), label: String(value.timeZone) }, ...timeZones]
+            : timeZones
+        }
+        onChange={(timeZone) => onChange({ ...value, timeZone })}
+      />
       <div className="grid gap-1.5">
         <Label htmlFor={`${id}-start`}>Start time</Label>
         <Input
@@ -79,6 +89,7 @@ function WindowFields({ value, onChange, id, disabled }: Props) {
         <Input
           id={`${id}-duration`}
           type="number"
+          data-freeform="maintenance window length in minutes"
           disabled={disabled}
           value={Number(value.durationMinutes ?? 120)}
           onChange={(event) => onChange({ ...value, durationMinutes: Number(event.target.value) })}
@@ -134,6 +145,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
         <Input
           id={`${id}-update-delay`}
           type="number"
+          data-freeform="update delay threshold in days"
           disabled={disabled}
           value={Number(value.deferralDays ?? 0)}
           onChange={(event) => onChange({ ...value, deferralDays: Number(event.target.value) })}
@@ -164,6 +176,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
             <Input
               id={`${id}-deadline`}
               type="number"
+              data-freeform="restart deadline in minutes"
               disabled={disabled}
               value={Number(reboot.maxDelayMinutes ?? 60)}
               onChange={(event) =>
@@ -221,6 +234,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
                   <Input
                     id={`${id}-count`}
                     type="number"
+                    data-freeform="deferral count threshold"
                     disabled={disabled}
                     value={Number(object(reboot.employeeDeferral).maxDeferrals ?? 2)}
                     onChange={(event) =>
@@ -239,6 +253,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
                   <Input
                     id={`${id}-delay`}
                     type="number"
+                    data-freeform="deferral delay in minutes"
                     disabled={disabled}
                     value={Number(object(reboot.employeeDeferral).delayMinutes ?? 15)}
                     onChange={(event) =>
@@ -260,6 +275,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
             <Label htmlFor={`${id}-notice`}>Message for employees</Label>
             <Input
               id={`${id}-notice`}
+              data-freeform="message shown to employees"
               disabled={disabled}
               value={String(reboot.notice ?? "")}
               onChange={(event) => changeReboot({ ...reboot, notice: event.target.value })}
