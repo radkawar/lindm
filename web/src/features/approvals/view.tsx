@@ -247,6 +247,12 @@ function ApprovalCard({
               options,
             );
             break;
+          case "approvePendingEnrollment":
+            await adminClient.approvePendingEnrollment(
+              { ...approval.payload.value, approvalId: approval.id },
+              options,
+            );
+            break;
           case "revokeDevice":
             await adminClient.revokeDevice(
               { ...approval.payload.value, approvalId: approval.id },

@@ -534,6 +534,21 @@ try {
   result.failure = failure(error);
   if (config?.evidenceDirectory && driver) {
     try {
+      // The console's own support details (code and reason identifiers only,
+      // never server messages) make an ambiguous "Result unknown" diagnosable.
+      result.failure.consoleErrors = await driver.observe(() =>
+        [...document.querySelectorAll('[data-slot="support-details"]')].map((node) => {
+          const field = (label) =>
+            [...node.querySelectorAll("dt")]
+              .find((term) => term.textContent.trim() === `${label}:`)
+              ?.nextElementSibling?.textContent.trim() ?? "";
+          return { code: field("Code"), reason: field("Reason") };
+        }),
+      );
+    } catch {
+      result.failure.consoleErrorsUnavailable = true;
+    }
+    try {
       await screenshot("failure");
     } catch {
       result.failure.screenshotUnavailable = true;
