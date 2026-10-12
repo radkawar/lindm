@@ -23,7 +23,12 @@ import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors"
 import { reasonError } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { IssueProvisioningToken, ProvisioningTokens } from "./provisioning";
+import {
+  IssueProvisioningToken,
+  ProvisioningTokens,
+  type AttributeFieldsSlot,
+  type AttributeReader,
+} from "./provisioning";
 import { EnrollmentSecretDialog, type EnrollmentCredential } from "./token-result";
 import { EnrollmentGrants } from "./grants";
 import { PendingEnrollments } from "./pending";
@@ -40,12 +45,16 @@ export function EnrollmentView({
   profileRevisionPicker,
   method,
   onMethodChange: setMethod,
+  attributeFields,
+  readAttributes,
 }: {
   accountPicker: PickerSlot;
   groupPicker: PickerSlot;
   profileRevisionPicker: PickerSlot;
   method: EnrollmentMethod | null;
   onMethodChange: (method: EnrollmentMethod | null) => void;
+  attributeFields: AttributeFieldsSlot;
+  readAttributes: AttributeReader;
 }) {
   const lifetime = useAuthLifetime();
   const [credential, setCredential] = useState<EnrollmentCredential | null>(null);
@@ -81,9 +90,9 @@ export function EnrollmentView({
             <CardDescription>For setting up one machine from its terminal.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <p className="text-sm">A single-use code that expires in 5 minutes.</p>
+            <p className="text-sm">A single-use code that expires after 5 minutes by default.</p>
             <p className="text-sm text-muted-foreground">
-              You'll get the install and enroll commands for apt or dnf.
+              You'll get the install and enroll commands for the device's distribution.
             </p>
             <Button className="w-fit" aria-haspopup="dialog" onClick={() => setMethod("grant")}>
               Create one-time code
@@ -142,6 +151,8 @@ export function EnrollmentView({
             accountPicker={accountPicker}
             groupPicker={groupPicker}
             profileRevisionPicker={profileRevisionPicker}
+            attributeFields={attributeFields}
+            readAttributes={readAttributes}
             onCancel={() => setMethod(null)}
             onIssued={(result) =>
               issued({
@@ -344,6 +355,7 @@ function IssueGrant({
         <Label htmlFor="grant-reason">Reason</Label>
         <Textarea
           id="grant-reason"
+          data-freeform="audit reason"
           required
           maxLength={512}
           value={reason}

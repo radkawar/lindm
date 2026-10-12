@@ -637,9 +637,11 @@ func (x *RotateSecretResponse) GetSecret() *SecretSummary {
 }
 
 type ListSecretsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PageSize  uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Case-insensitive display-name prefix; empty lists every secret. Restart paging when it changes.
+	NamePrefix    string `protobuf:"bytes,3,opt,name=name_prefix,json=namePrefix,proto3" json:"name_prefix,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -684,6 +686,13 @@ func (x *ListSecretsRequest) GetPageSize() uint32 {
 func (x *ListSecretsRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListSecretsRequest) GetNamePrefix() string {
+	if x != nil {
+		return x.NamePrefix
 	}
 	return ""
 }
@@ -2245,11 +2254,13 @@ const file_lindm_admin_v1_secrets_proto_rawDesc = "" +
 	"\bmaterial\x18\x04 \x01(\v2\x1e.lindm.agent.v1.SecretMaterialB\x06\xbaH\x03\xc8\x01\x01R\bmaterial\x12!\n" +
 	"\x06reason\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"M\n" +
 	"\x14RotateSecretResponse\x125\n" +
-	"\x06secret\x18\x01 \x01(\v2\x1d.lindm.admin.v1.SecretSummaryR\x06secret\"d\n" +
+	"\x06secret\x18\x01 \x01(\v2\x1d.lindm.admin.v1.SecretSummaryR\x06secret\"\x8f\x01\n" +
 	"\x12ListSecretsRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"v\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12)\n" +
+	"\vname_prefix\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\n" +
+	"namePrefix\"v\n" +
 	"\x13ListSecretsResponse\x127\n" +
 	"\asecrets\x18\x01 \x03(\v2\x1d.lindm.admin.v1.SecretSummaryR\asecrets\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"9\n" +

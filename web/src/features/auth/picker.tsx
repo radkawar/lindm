@@ -7,47 +7,58 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { accountsQueryOptions } from "./accounts";
 
+const SHOWN = 100;
+
+// The account list is loaded whole; search runs over every account and shows the first
+// matches in username order so no account is hidden behind a page.
 export function AccountPicker(props: PickerProps) {
   const query = useQuery(accountsQueryOptions(useAuthLifetime()));
-  const [page, setPage] = useState(0);
-  const accounts = query.data?.accounts ?? [];
-  const shown = accounts.slice(page * 100, (page + 1) * 100);
-  const selected = accounts.find((account) => account.id === props.value);
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLowerCase();
+  const matches = (query.data?.accounts ?? [])
+    .filter((account) => account.username.toLowerCase().includes(needle))
+    .sort((a, b) => a.username.localeCompare(b.username));
+  const shown = matches.slice(0, SHOWN);
+  const selected = query.data?.accounts.find((account) => account.id === props.value);
   if (selected && !shown.includes(selected)) shown.unshift(selected);
   return (
     <SearchPicker
       {...props}
+      search={search}
+      onSearchChange={setSearch}
       options={shown.map((account) => ({
         value: account.id,
         label: account.username,
-        description: account.role,
+        description: account.enabled ? account.role : `${account.role} · disabled`,
       }))}
-      note="Search within this page of up to 100 accounts."
-    >
-      {query.isPending ? <p role="status">Loading accounts…</p> : null}
-      {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
-      <div className="flex gap-2">
-        {page > 0 ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous accounts
-          </Button>
-        ) : null}
-        {(page + 1) * 100 < accounts.length ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled}
-            onClick={() => setPage(page + 1)}
-          >
-            More accounts
-          </Button>
-        ) : null}
-      </div>
-    </SearchPicker>
+      note={
+        matches.length > SHOWN
+          ? `Showing ${SHOWN} of ${matches.length} matching accounts. Keep typing to narrow.`
+          : undefined
+      }
+      footer={
+        query.isPending || query.error ? (
+          <div className="grid gap-2 p-2">
+            {query.isPending ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading accounts…
+              </p>
+            ) : null}
+            {query.error ? (
+              <RpcError failure={toRpcFailure(query.error)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={query.isFetching}
+                  onClick={() => void query.refetch()}
+                >
+                  Retry
+                </Button>
+              </RpcError>
+            ) : null}
+          </div>
+        ) : undefined
+      }
+    />
   );
 }

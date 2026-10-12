@@ -4,15 +4,20 @@ import type { AuthLifetime } from "@/lib/auth-lifetime";
 import type { PageSize } from "@/lib/list-search";
 
 // Metadata only. Revealed material never enters a query.
-export function secretsQueryOptions(lifetime: AuthLifetime, pageSize: PageSize, pageToken: string) {
+export function secretsQueryOptions(
+  lifetime: AuthLifetime,
+  pageSize: PageSize,
+  pageToken: string,
+  namePrefix = "",
+) {
   return queryOptions({
-    queryKey: ["secrets", lifetime.generation, pageSize, pageToken] as const,
+    queryKey: ["secrets", lifetime.generation, pageSize, pageToken, namePrefix] as const,
     meta: { authGeneration: lifetime.generation },
     retry: false,
     staleTime: 0,
     queryFn: async ({ signal }) => {
       const response = await adminClient.listSecrets(
-        { pageSize, pageToken },
+        { pageSize, pageToken, namePrefix },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

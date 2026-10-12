@@ -150,19 +150,24 @@ export function PendingEnrollments() {
   );
 }
 
+// Pending installations have not reported inventory, so the token's preassigned
+// owner name is the only human identity available.
+function ownerName(enrollment: PendingEnrollment): string | null {
+  const owner = enrollment.metadata?.owner;
+  return owner?.case === "ownerText" && owner.value.trim()
+    ? `New device for ${owner.value.trim()}`
+    : null;
+}
+
 function PendingRow({ enrollment }: { enrollment: PendingEnrollment }) {
   const waiting = enrollment.state === "pending_approval";
   const approved = enrollment.state === "approved";
   return (
     <article className="grid gap-3 border p-4">
       <div className="flex flex-wrap justify-between gap-2">
-        <Link
-          to="/devices/$deviceId"
-          params={{ deviceId: enrollment.deviceId }}
-          className="break-all text-sm underline underline-offset-4"
-        >
-          Open device
-        </Link>
+        <h3 className="min-w-0 break-words text-sm font-medium">
+          {ownerName(enrollment) ?? "New device, hostname not reported yet"}
+        </h3>
         <StatusBadge status={waiting ? "warning" : approved ? "info" : "neutral"}>
           {waiting
             ? "Awaiting approval"
@@ -177,6 +182,13 @@ function PendingRow({ enrollment }: { enrollment: PendingEnrollment }) {
         <dt className="text-muted-foreground">Expires</dt>
         <dd>{formatTimestamp(enrollment.expiresAt).local}</dd>
       </dl>
+      <Link
+        to="/devices/$deviceId"
+        params={{ deviceId: enrollment.deviceId }}
+        className="w-fit text-sm underline underline-offset-4"
+      >
+        Open device
+      </Link>
       <TechnicalDetails
         items={[
           { label: "Device ID", value: enrollment.deviceId },

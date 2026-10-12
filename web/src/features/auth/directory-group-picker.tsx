@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
+import type { PickerProps } from "@/components/ui/search-picker";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { authorizationQueryOptions } from "./authorization-queries";
 import { identitySettingsQueryOptions } from "./identity-settings";
 
 const referenceLabels: Record<string, string> = {
@@ -16,32 +17,19 @@ const referenceLabels: Record<string, string> = {
 };
 
 // Identity-provider references are not device-group identities. There is no provider
-// catalog API: known policy references are selectable, new references are explicit setup.
+// catalog API: the choices are groups seen in members' sign-ins (SuggestValues
+// DIRECTORY_GROUP); a group nobody has signed in with yet is explicit setup below.
 export function DirectoryGroupPicker(props: PickerProps) {
   const lifetime = useAuthLifetime();
-  const policy = useQuery(authorizationQueryOptions(lifetime));
   const identity = useQuery(identitySettingsQueryOptions(lifetime));
   const [reference, setReference] = useState("");
-  const keycloak = identity.data?.primarySource === "keycloak";
   const referenceLabel = referenceLabels[identity.data?.primarySource ?? ""];
-  const known = [
-    ...new Set([
-      ...(policy.data?.authorization?.policy?.groupBindings.map((binding) => binding.group) ?? []),
-      ...(props.value ? [props.value] : []),
-    ]),
-  ];
   return (
     <div className="grid gap-2">
-      <SearchPicker
+      <SuggestionPicker
         {...props}
-        options={known.map((value, index) => ({
-          value,
-          label: keycloak ? value : `Configured directory group ${index + 1}`,
-          description: keycloak
-            ? "Keycloak group path"
-            : "Display name unavailable from the identity provider",
-        }))}
-        note="Search configured directory groups only; a directory-wide catalog is not available."
+        field={SuggestionField.DIRECTORY_GROUP}
+        note="Type the beginning of a group. Only groups seen when members signed in appear."
       />
       {props.value ? (
         <TechnicalDetails items={[{ label: "Directory group reference", value: props.value }]} />
@@ -56,6 +44,7 @@ export function DirectoryGroupPicker(props: PickerProps) {
           <label className="grid gap-2 font-medium">
             {referenceLabel ?? "Directory group reference unavailable"}
             <Input
+              data-freeform="identity-provider group reference not yet seen at sign-in"
               autoComplete="off"
               disabled={props.disabled || !referenceLabel}
               value={reference}

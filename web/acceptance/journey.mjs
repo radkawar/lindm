@@ -170,7 +170,7 @@ async function captureCredential(ui, kind, config, captureScreens) {
       await ui.select("Installer format", label, true);
       await ui.select("Operating system", choices[family], true);
       commands[format] = await ui.nonemptyValue({
-        label: `${format} provisioning snippet`,
+        label: `${label} provisioning snippet`,
         dialog: true,
       });
     }
@@ -239,10 +239,11 @@ export async function createProvisioningSnippet(ui, config, captureScreens) {
   // Format first: the operating systems offered are those supporting it.
   await ui.select("Installer format", provisioningFormatLabels[format], true);
   await ui.select("Operating system", config.provisionPlatform, true);
-  const snippet = await ui.nonemptyValue({ label: `${format} provisioning snippet`, dialog: true });
+  const label = provisioningFormatLabels[format];
+  const snippet = await ui.nonemptyValue({ label: `${label} provisioning snippet`, dialog: true });
   await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
-  await ui.click({ role: "button", text: `Copy ${format} snippet`, dialog: true });
-  await ui.wait({ role: "status", contains: `${format} snippet copied.`, dialog: true });
+  await ui.click({ role: "button", text: `Copy ${label} snippet`, dialog: true });
+  await ui.wait({ role: "status", contains: `${label} snippet copied.`, dialog: true });
   const copied = await ui.driver.browserTask(() => navigator.clipboard.readText());
   await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
   if (!copied || copied !== snippet) throw new Error("clipboard_snippet_mismatch");

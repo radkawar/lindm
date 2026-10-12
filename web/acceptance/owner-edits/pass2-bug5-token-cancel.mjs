@@ -48,7 +48,7 @@ export async function check({ page, visit, settle, require, capture, step }) {
 
       step(`expand optional settings (${label})`);
       await dialog.locator("summary").filter({ hasText: "Settings for enrolled devices" }).click();
-      await dialog.getByText("Custom attributes (JSON)").waitFor({ timeout });
+      await dialog.getByText("Custom attributes", { exact: true }).waitFor({ timeout });
       await settle();
       const cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
       const create = dialog.getByRole("button", { name: "Create provisioning token", exact: true });

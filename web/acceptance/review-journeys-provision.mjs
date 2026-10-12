@@ -575,9 +575,8 @@ async function helpdesk(ctx) {
     role !== "Helpdesk" ||
     (await saved.getByRole("button", { name: /^Device groups \d+ / }).count()) !== 1 ||
     (await saved.getByRole("button", { name: /^Devices \d+ / }).count()) !== 0 ||
-    (await saved
-      .getByRole("textbox", { name: "Labels (device must have all, one per line)", exact: true })
-      .inputValue()) !== ""
+    (await saved.getByRole("button", { name: /^Labels \(device must have all\) \d+ / }).count()) !==
+      0
   )
     throw new Error("helpdesk_access_not_persisted");
   if (

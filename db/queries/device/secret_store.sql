@@ -31,6 +31,7 @@ LEFT JOIN principals creator ON creator.id = s.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
 WHERE s.deleted_at IS NULL
   AND (NOT sqlc.arg(has_cursor)::boolean OR (s.created_at, s.id) > (sqlc.arg(cursor_created_at)::timestamptz, sqlc.arg(cursor_id)::uuid))
+  AND starts_with(lower(s.display_name), lower(sqlc.arg(name_prefix)::text))
 ORDER BY s.created_at, s.id
 LIMIT sqlc.arg(row_limit);
 

@@ -331,14 +331,16 @@ LEFT JOIN principals creator ON creator.id = s.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
 WHERE s.deleted_at IS NULL
   AND (NOT $1::boolean OR (s.created_at, s.id) > ($2::timestamptz, $3::uuid))
+  AND starts_with(lower(s.display_name), lower($4::text))
 ORDER BY s.created_at, s.id
-LIMIT $4
+LIMIT $5
 `
 
 type ListManagedSecretsParams struct {
 	HasCursor       bool
 	CursorCreatedAt pgtype.Timestamptz
 	CursorID        uuid.UUID
+	NamePrefix      string
 	RowLimit        int32
 }
 
@@ -359,6 +361,7 @@ func (q *Queries) ListManagedSecrets(ctx context.Context, arg ListManagedSecrets
 		arg.HasCursor,
 		arg.CursorCreatedAt,
 		arg.CursorID,
+		arg.NamePrefix,
 		arg.RowLimit,
 	)
 	if err != nil {

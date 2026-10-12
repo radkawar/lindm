@@ -268,7 +268,7 @@ func (s *Service) ListSecrets(ctx context.Context, req *connect.Request[adminv1.
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
 		return nil, core.Invalid("invalid_argument")
 	}
-	params := devicedb.ListManagedSecretsParams{RowLimit: core.PageLimit(req.Msg.GetPageSize()) + 1}
+	params := devicedb.ListManagedSecretsParams{RowLimit: core.PageLimit(req.Msg.GetPageSize()) + 1, NamePrefix: req.Msg.GetNamePrefix()}
 	if token := req.Msg.GetPageToken(); token != "" {
 		when, id, err := core.DecodeCursor(token)
 		if err != nil {

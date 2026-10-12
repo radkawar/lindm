@@ -240,6 +240,17 @@ func TestSecretStoreLifecycleAndIdempotency(t *testing.T) {
 	if _, err := f.svc.ListSecrets(f.ownerCtx, connect.NewRequest(&adminv1.ListSecretsRequest{PageToken: "garbage"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("bad page token: %v", err)
 	}
+	prefixed, err := f.svc.ListSecrets(f.ownerCtx, connect.NewRequest(&adminv1.ListSecretsRequest{NamePrefix: "OFFICE"}))
+	if err != nil || len(prefixed.Msg.GetSecrets()) != 1 || prefixed.Msg.GetSecrets()[0].GetSecretId() != other.GetSecretId() || prefixed.Msg.GetNextPageToken() != "" {
+		t.Fatalf("name prefix: %v %v", prefixed, err)
+	}
+	// The prefix matches names from their start only; "wifi" is inside "office wifi".
+	if inner, err := f.svc.ListSecrets(f.ownerCtx, connect.NewRequest(&adminv1.ListSecretsRequest{NamePrefix: "wifi"})); err != nil || len(inner.Msg.GetSecrets()) != 0 {
+		t.Fatalf("inner match: %v %v", inner, err)
+	}
+	if _, err := f.svc.ListSecrets(f.ownerCtx, connect.NewRequest(&adminv1.ListSecretsRequest{NamePrefix: strings.Repeat("a", 129)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("long prefix: %v", err)
+	}
 	detail, err := f.svc.GetSecret(f.ownerCtx, connect.NewRequest(&adminv1.GetSecretRequest{SecretId: summary.GetSecretId()}))
 	if err != nil || len(detail.Msg.GetVersions()) != 2 || detail.Msg.GetVersions()[0].GetVersion() != 2 || detail.Msg.GetVersions()[1].GetReason() != create.GetReason() || detail.Msg.GetVersions()[0].GetCreatedByDisplayName() == "" {
 		t.Fatalf("get secret: %v %v", detail, err)

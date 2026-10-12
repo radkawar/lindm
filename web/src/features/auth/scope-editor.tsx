@@ -1,8 +1,22 @@
 import { create } from "@bufbuild/protobuf";
 import { DeviceScopeSchema, type DeviceScope } from "../../../gen/lindm/auth/v1/authorization_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { MultiPicker, type PickerSlot } from "@/components/ui/search-picker";
+import { MultiPicker, type PickerProps, type PickerSlot } from "@/components/ui/search-picker";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
+
+// Labels devices report today; a label no device has yet can still be typed so a rule
+// can cover devices enrolled later.
+export function DeviceLabelPicker(props: PickerProps) {
+  return (
+    <SuggestionPicker
+      {...props}
+      field={SuggestionField.DEVICE_LABEL}
+      allowTyped
+      typedDescription="No device has this label yet"
+    />
+  );
+}
 
 export function ScopeEditor({
   scopes,
@@ -27,25 +41,19 @@ export function ScopeEditor({
       {scopes.map((scope, index) => (
         <div className="grid min-w-0 gap-3 border bg-muted/20 p-4" key={index}>
           <h3 className="text-sm font-semibold">Rule {index + 1}</h3>
-          <label className="grid gap-2 text-sm font-medium">
-            Labels (device must have all, one per line)
-            <Textarea
-              className="font-mono text-xs"
-              value={scope.labels.join("\n")}
-              onChange={(event) =>
-                onChange(
-                  scopes.map((current, position) =>
-                    position === index
-                      ? create(DeviceScopeSchema, {
-                          ...current,
-                          labels: event.target.value.split("\n"),
-                        })
-                      : current,
-                  ),
-                )
-              }
-            />
-          </label>
+          <MultiPicker
+            label="Labels (device must have all)"
+            values={scope.labels}
+            picker={DeviceLabelPicker}
+            disabled={disabled}
+            onChange={(labels) =>
+              onChange(
+                scopes.map((current, position) =>
+                  position === index ? create(DeviceScopeSchema, { ...current, labels }) : current,
+                ),
+              )
+            }
+          />
           {(["deviceIds", "groupIds"] as const).map((field) => (
             <MultiPicker
               key={field}

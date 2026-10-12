@@ -180,6 +180,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
   if (!active) return null;
   const provisioning = credential.kind === "provisioning";
   const title = provisioning ? "Provisioning token" : "One-time enrollment code";
+  const formatLabel =
+    provisioningFormats.find((item) => item.value === format)?.label ?? "installer";
   const unavailable = credential.deliveryUnknown || !secret;
   const allPlatforms = instructions.data?.platforms ?? [];
   // The registry decides which releases support an installer format.
@@ -304,7 +306,9 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 <Textarea
                   data-sensitive="true"
                   aria-label={
-                    provisioning ? `${format} provisioning snippet` : "Install and enroll command"
+                    provisioning
+                      ? `${formatLabel} provisioning snippet`
+                      : "Install and enroll command"
                   }
                   readOnly
                   spellCheck={false}
@@ -316,10 +320,13 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                   <Button
                     variant="default"
                     onClick={() =>
-                      void copy(snippet, provisioning ? `${format} snippet` : "Install command")
+                      void copy(
+                        snippet,
+                        provisioning ? `${formatLabel} snippet` : "Install command",
+                      )
                     }
                   >
-                    Copy {provisioning ? `${format} snippet` : "install command"}
+                    Copy {provisioning ? `${formatLabel} snippet` : "install command"}
                   </Button>
                 </div>
               </>
@@ -328,6 +335,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             ) : platform ? (
               <UnavailableInstall platform={platform} />
             ) : null}
+
             {copyStatus ? (
               <p role={copyFailed ? "alert" : "status"} className="text-sm text-muted-foreground">
                 {copyStatus}

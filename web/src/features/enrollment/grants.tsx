@@ -210,7 +210,9 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
   return (
     <article className="grid gap-3 border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-medium">One-time enrollment code</h3>
+        <h3 className="min-w-0 break-words font-medium">
+          {grant.name.trim() || "One-time enrollment code"}
+        </h3>
         <StatusBadge status={grant.status === EnrollmentGrantStatus.ACTIVE ? "success" : "neutral"}>
           {grantStatusLabels[grant.status] ?? "Unknown"}
         </StatusBadge>
@@ -292,6 +294,7 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
             <label className="grid gap-2 text-sm font-medium">
               Reason
               <Textarea
+                data-freeform="audit reason"
                 required
                 value={reason}
                 disabled={busy || captured !== null}

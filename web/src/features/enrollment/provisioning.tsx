@@ -1,7 +1,7 @@
-import { create, fromJsonString, toJsonString } from "@bufbuild/protobuf";
+import { create, toJsonString } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   CreateProvisioningTokenRequestSchema,
   RevokeProvisioningTokenRequestSchema,
@@ -10,7 +10,11 @@ import {
   type ProvisioningToken,
   type RevokeProvisioningTokenRequest,
 } from "../../../gen/lindm/admin/v1/provisioning_pb";
-import { DeviceMetadataSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
+import {
+  DeviceMetadataSchema,
+  type AttributeValue,
+} from "../../../gen/lindm/admin/v1/inventory_management_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -28,7 +32,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
-import { MultiPicker, type PickerSlot } from "@/components/ui/search-picker";
+import { MultiPicker, type PickerProps, type PickerSlot } from "@/components/ui/search-picker";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -39,6 +44,30 @@ import { formatTimestamp } from "@/lib/time";
 import { provisioningTokensQueryOptions } from "./queries";
 import { enrollmentFailure } from "./validation";
 import { validateRequest } from "@/lib/validation";
+
+// Device-attribute editing is owned by the devices feature; routes compose it in.
+export type AttributeFieldsSlot = (props: {
+  attributes: Record<string, AttributeValue>;
+  onChange: (attributes: Record<string, AttributeValue>) => void;
+  disabled?: boolean;
+  legend?: string;
+}) => ReactNode;
+export type AttributeReader = (
+  data: FormData,
+  attributes: Record<string, AttributeValue>,
+) => Record<string, AttributeValue>;
+
+// Labels devices report today, or a new label for the devices this token enrolls.
+function DeviceLabelPicker(props: PickerProps) {
+  return (
+    <SuggestionPicker
+      {...props}
+      field={SuggestionField.DEVICE_LABEL}
+      allowTyped
+      typedDescription="New label; no device has it yet"
+    />
+  );
+}
 
 export function ProvisioningTokens() {
   const lifetime = useAuthLifetime();
@@ -103,12 +132,16 @@ export function IssueProvisioningToken({
   accountPicker: AccountPicker,
   groupPicker,
   profileRevisionPicker,
+  attributeFields: AttributeFields,
+  readAttributes,
 }: {
   onIssued: (result: CreateProvisioningTokenResponse) => void;
   onCancel?: () => void;
   accountPicker: PickerSlot;
   groupPicker: PickerSlot;
   profileRevisionPicker: PickerSlot;
+  attributeFields: AttributeFieldsSlot;
+  readAttributes: AttributeReader;
 }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
@@ -118,8 +151,10 @@ export function IssueProvisioningToken({
   const [completed, setCompleted] = useState(false);
   const [ownerKind, setOwnerKind] = useState("");
   const [ownerAccount, setOwnerAccount] = useState("");
+  const [labels, setLabels] = useState<string[]>([]);
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [profileRevisionIds, setProfileRevisionIds] = useState<string[]>([]);
+  const [attributes, setAttributes] = useState<Record<string, AttributeValue>>({});
   const [failure, setFailure] = useState<RpcFailure | null>(null);
 
   async function issue(data: FormData) {
@@ -131,10 +166,10 @@ export function IssueProvisioningToken({
     try {
       let request = captured;
       if (!request) {
-        const metadata = fromJsonString(DeviceMetadataSchema, String(data.get("metadata") || "{}"));
-        metadata.labels = String(data.get("labels") ?? "")
-          .split(/\s+/)
-          .filter(Boolean);
+        const metadata = create(DeviceMetadataSchema, {
+          labels: labels.filter(Boolean),
+          attributes: readAttributes(data, attributes),
+        });
         const owner = String(data.get("owner") ?? "").trim();
         metadata.owner =
           ownerKind === "ownerPrincipalId"
@@ -198,7 +233,12 @@ export function IssueProvisioningToken({
         <fieldset className="grid gap-4" disabled={busy || captured !== null || completed}>
           <label className="grid gap-1.5 text-sm font-medium">
             Purpose / audit reason
-            <Textarea name="reason" placeholder="For example, October laptop deployment" required />
+            <Textarea
+              name="reason"
+              data-freeform="audit reason describing the deployment"
+              placeholder="For example, October laptop deployment"
+              required
+            />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
@@ -219,7 +259,15 @@ export function IssueProvisioningToken({
             </div>
             <label className="grid gap-1.5 text-sm font-medium">
               Maximum uses
-              <Input name="maxUses" type="number" defaultValue="100" required />
+              <Input
+                name="maxUses"
+                type="number"
+                data-freeform="numeric use limit (1 to 10,000)"
+                min={1}
+                max={10000}
+                defaultValue="100"
+                required
+              />
             </label>
           </div>
           <label className="flex items-start gap-2 text-sm">
@@ -234,10 +282,13 @@ export function IssueProvisioningToken({
               <p className="text-sm text-muted-foreground">
                 Applied to every device enrolled with this token. These can't be changed later.
               </p>
-              <label className="grid gap-1.5 text-sm font-medium">
-                Labels (space separated)
-                <Input name="labels" />
-              </label>
+              <MultiPicker
+                label="Labels"
+                values={labels}
+                onChange={setLabels}
+                picker={DeviceLabelPicker}
+                disabled={busy || captured !== null || completed}
+              />
               <Label htmlFor="token-owner-kind">Assign owner</Label>
               <SelectField
                 id="token-owner-kind"
@@ -260,7 +311,11 @@ export function IssueProvisioningToken({
               ) : ownerKind === "ownerText" ? (
                 <label className="grid gap-1.5 text-sm font-medium">
                   Owner name
-                  <Input name="owner" required />
+                  <Input
+                    name="owner"
+                    data-freeform="owner name not tied to a console account"
+                    required
+                  />
                 </label>
               ) : null}
               <MultiPicker
@@ -277,18 +332,12 @@ export function IssueProvisioningToken({
                 picker={profileRevisionPicker}
                 disabled={busy || captured !== null || completed}
               />
-              <label className="grid gap-1.5 text-sm font-medium">
-                Custom attributes (JSON)
-                <Textarea
-                  name="metadata"
-                  defaultValue={'{"attributes":{}}'}
-                  spellCheck={false}
-                  className="font-mono text-xs"
-                />
-              </label>
-              <p className="text-sm text-muted-foreground">
-                Example: {`{"attributes":{"site":{"stringValue":"east"}}}`}
-              </p>
+              <AttributeFields
+                legend="Custom attributes"
+                attributes={attributes}
+                onChange={setAttributes}
+                disabled={busy || captured !== null || completed}
+              />
             </div>
           </details>
         </fieldset>
@@ -460,7 +509,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
             <fieldset className="grid gap-3" disabled={busy || captured !== null || revoked}>
               <label className="grid gap-1.5 text-sm">
                 Reason
-                <Textarea name="reason" required />
+                <Textarea name="reason" data-freeform="audit reason" required />
               </label>
             </fieldset>
             {captured ? (

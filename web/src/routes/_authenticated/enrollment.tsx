@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { EnrollmentView } from "@/features/enrollment/view";
 import { AccountPicker } from "@/features/auth/picker";
+import { AttributeFields, readAttributeInputs } from "@/features/devices/attributes";
 import { GroupPicker } from "@/features/groups/picker";
 import { ProfileRevisionPicker } from "@/features/profiles/picker";
 import { RestrictedPage } from "@/components/layout/restricted-page";
@@ -39,6 +40,8 @@ function EnrollmentPage() {
           replace: true,
         })
       }
+      attributeFields={AttributeFields}
+      readAttributes={readAttributeInputs}
     />
   );
 }

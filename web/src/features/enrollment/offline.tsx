@@ -1,7 +1,7 @@
 import { create, fromJsonString, toBinary, toJsonString } from "@bufbuild/protobuf";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   CreateOfflineEnrollmentAuthorizationRequestSchema,
   ImportOfflineEnrollmentRequestRequestSchema,
@@ -18,6 +18,8 @@ import { ExecutionRootSchema } from "../../../gen/lindm/agent/v1/trust_pb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { RpcFailure } from "@/lib/errors";
@@ -38,8 +40,16 @@ export function OfflineEnrollment() {
   );
 }
 
+// Imported offline requests either wait for an independent approval or are ready to export.
+const importedStateLabels: Record<string, string> = {
+  pending_approval:
+    "Request imported. It waits for another admin's approval in the approval inbox; export the response after that.",
+  ready: "Request imported and ready. Export the response now.",
+};
+
 function OfflineAuthorization() {
   const lifetime = useAuthLifetime();
+  const formId = useId();
   const inFlight = useRef(false);
   const [captured, setCaptured] = useState<CreateOfflineEnrollmentAuthorizationRequest | null>(
     null,
@@ -141,10 +151,23 @@ function OfflineAuthorization() {
               Provisioning token
               <Input name="token" type="password" autoComplete="off" required spellCheck={false} />
             </label>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Valid for (seconds)
-              <Input name="lifetime" type="number" defaultValue="3600" required />
-            </label>
+            <div className="grid gap-1.5">
+              <Label htmlFor={`${formId}-lifetime`}>Authorization expires after</Label>
+              <SelectField
+                id={`${formId}-lifetime`}
+                name="lifetime"
+                defaultValue="3600"
+                disabled={busy || captured !== null || !!document}
+                required
+                options={[
+                  { value: "3600", label: "1 hour (default)" },
+                  { value: "14400", label: "4 hours" },
+                  { value: "86400", label: "24 hours" },
+                  { value: "259200", label: "3 days" },
+                  { value: "604800", label: "7 days" },
+                ]}
+              />
+            </div>
             <label className="grid gap-1.5 text-sm font-medium">
               Execution root file (execution-root.json)
               <Input
@@ -153,32 +176,38 @@ function OfflineAuthorization() {
                 onChange={(event) => void readAuthenticatedRoot(event.target.files?.[0])}
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Root version
-              <Input
-                name="rootVersion"
-                inputMode="numeric"
-                required
-                value={rootVersion}
-                onChange={(event) => setRootVersion(event.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Root SHA-256
-              <Input
-                name="rootDigest"
-                required
-                spellCheck={false}
-                value={rootDigest}
-                onChange={(event) => setRootDigest(event.target.value)}
-              />
-            </label>
             <p className="text-sm text-muted-foreground">
-              Choose the execution-root.json used on the device to fill these in.
+              Choose the execution-root.json used on the device. Its version and digest fill in
+              below.
             </p>
+            <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+              <label className="grid gap-1.5 text-sm font-medium">
+                Root version
+                <Input
+                  name="rootVersion"
+                  data-freeform="root version read from the operator's execution-root.json"
+                  inputMode="numeric"
+                  required
+                  value={rootVersion}
+                  onChange={(event) => setRootVersion(event.target.value)}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Root SHA-256
+                <Input
+                  name="rootDigest"
+                  data-freeform="root digest computed from the operator's execution-root.json"
+                  className="font-mono"
+                  required
+                  spellCheck={false}
+                  value={rootDigest}
+                  onChange={(event) => setRootDigest(event.target.value)}
+                />
+              </label>
+            </div>
             <label className="grid gap-1.5 text-sm font-medium">
               Reason
-              <Textarea name="reason" required />
+              <Textarea name="reason" data-freeform="audit reason" required />
             </label>
           </fieldset>
           {captured ? (
@@ -204,7 +233,7 @@ function OfflineAuthorization() {
         </pre>
         <p className="text-sm text-muted-foreground">
           If it was interrupted, run{" "}
-          <code>
+          <code className="break-all font-mono text-xs">
             /usr/libexec/lindm/lindm-agent offline-export -resume -out
             /run/lindm/lindm-offline-request.json
           </code>{" "}
@@ -268,7 +297,7 @@ function OfflineExchange() {
         lifetime.signal.throwIfAborted();
         if (!result.enrollment) throw new Error("No enrollment status came back. Try again.");
         setStatus({
-          state: result.enrollment.state.replaceAll("_", " "),
+          state: result.enrollment.state,
           deviceId: result.enrollment.deviceId,
           generation: String(result.enrollment.enrollmentGeneration),
         });
@@ -326,6 +355,7 @@ function OfflineExchange() {
         <label className="grid gap-1.5 text-sm font-medium">
           Reason for export
           <Textarea
+            data-freeform="audit reason"
             value={reason}
             disabled={busy || attempt !== null}
             onChange={(event) => setReason(event.target.value)}
@@ -354,12 +384,14 @@ function OfflineExchange() {
         {status ? (
           <div className="grid gap-1">
             <p role="status" className="text-sm">
-              Request imported. Status: {status.state}.
+              {importedStateLabels[status.state] ??
+                "Request imported. Its enrollment state isn't recognized; check the device page."}
             </p>
             <TechnicalDetails
               items={[
                 { label: "Device ID", value: status.deviceId },
                 { label: "Enrollment generation", value: status.generation },
+                { label: "Enrollment state", value: status.state },
               ]}
             />
           </div>
