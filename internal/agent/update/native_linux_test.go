@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -207,11 +209,12 @@ func TestNativePackagePathMatchesPrivateAPTArchiveIdentity(t *testing.T) {
 
 // zypper's --disable-repositories also disables the command-line RPM repository
 // (exit 104 on Tumbleweed); updates must hide configured repositories with an
-// empty private directory instead and refuse one that is not empty.
+// empty private directory instead and refuse one that is not empty. zypper's
+// temporary tree stays in the transaction directory.
 func TestZypperUpdateHidesRepositoriesWithoutDisablingCommandLineRPM(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "agent.rpm")
-	args, err := zypperUpdateArgs(directory, path, true)
+	args, env, err := zypperUpdateCommand(directory, path, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,10 +223,85 @@ func TestZypperUpdateHidesRepositoriesWithoutDisablingCommandLineRPM(t *testing.
 	if !slices.Equal(args, want) {
 		t.Fatalf("args = %q, want %q", args, want)
 	}
+	tmp := filepath.Join(directory, "zypp-tmp")
+	if info, err := os.Stat(tmp); err != nil || !info.IsDir() || info.Mode().Perm() != 0700 || !slices.Equal(env, []string{"ZYPPTMPDIR=" + tmp}) {
+		t.Fatalf("zypper temporary directory %v (%v), env %q", info, err, env)
+	}
 	if err := os.WriteFile(filepath.Join(repos, "vendor.repo"), []byte("[vendor]\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := zypperUpdateArgs(directory, path, false); err == nil {
+	if _, _, err := zypperUpdateCommand(directory, path, false); err == nil {
 		t.Fatal("non-empty repository directory admitted")
+	}
+}
+
+// The helper runs zypper through nativeexec's environment allowlist; a key it
+// refuses fails every zypper self-update before exec (apply, exit -1).
+func TestZypperUpdateEnvironmentPassesNativeexec(t *testing.T) {
+	directory := t.TempDir()
+	_, env, err := zypperUpdateCommand(directory, filepath.Join(directory, "agent.rpm"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := runNative(t.Context(), "apply", false, env, "/usr/bin/env")
+	if err != nil || !strings.Contains(string(out), "\nZYPPTMPDIR="+filepath.Join(directory, "zypp-tmp")+"\n") {
+		t.Fatalf("zypper environment %q: %v", out, err)
+	}
+}
+
+// zypper hard-links the command-line RPM into its temporary tree and its RPMS
+// cache; a power loss mid-transaction leaves both names, and the staged
+// package then fails protected custody (one link) on every recovery. Release
+// removes them, but never a cache file that is a different inode.
+func TestReleaseZypperNamesRestoresSingleLinkCustody(t *testing.T) {
+	directory, cache := t.TempDir(), t.TempDir()
+	path := filepath.Join(directory, "agent.rpm")
+	if err := os.WriteFile(path, []byte("rpm"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := zypperUpdateCommand(directory, path, false); err != nil {
+		t.Fatal(err)
+	}
+	cli := filepath.Join(directory, "zypp-tmp", "zypp.tmp", "zypp.Ab12Cd", "zypper", "_tmpRPMcache_", "%CLI%")
+	if err := os.MkdirAll(cli, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{filepath.Join(cli, "agent.rpm"), filepath.Join(cache, "agent.rpm")} {
+		if err := os.Link(path, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	links := func() uint64 {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			t.Fatal("no native stat")
+		}
+		return uint64(stat.Nlink)
+	}
+	if links() != 3 {
+		t.Fatalf("setup links = %d", links())
+	}
+	if err := releaseZypperNames(directory, path, cache); err != nil {
+		t.Fatal(err)
+	}
+	if links() != 1 {
+		t.Fatalf("links after release = %d", links())
+	}
+	if _, err := os.Lstat(filepath.Join(directory, "zypp-tmp")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("zypper temporary tree kept: %v", err)
+	}
+	other := filepath.Join(cache, "agent.rpm")
+	if err := os.WriteFile(other, []byte("other"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := releaseZypperNames(directory, path, cache); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(other); err != nil {
+		t.Fatalf("unrelated cache file removed: %v", err)
 	}
 }

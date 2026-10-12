@@ -356,6 +356,11 @@ type LabSession struct {
 	// lab user's AccountsService session. The GDM service is the release's
 	// Desktop.DisplayManager.
 	GDMConfig, Name string
+	// GDMSysconfig, when set, is the sysconfig file whose
+	// DISPLAYMANAGER_AUTOLOGIN openSUSE's GDM (gdm-sysconfig-settings.patch)
+	// answers AutomaticLoginEnable and AutomaticLogin from ahead of GDMConfig;
+	// the lab names the autologin user there too.
+	GDMSysconfig string
 	// Terminal is the argv prefix that opens a terminal running a command.
 	Terminal []string
 	// UpgradePrompt is the update-manager file whose release-upgrade Prompt the

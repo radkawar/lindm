@@ -230,13 +230,16 @@ func runCommands(ctx context.Context, commands []command, revision []byte, befor
 	return nil
 }
 func checkHooks() error {
-	data, err := rootRead("/etc/login.defs")
+	sources, err := loginDefsSources("/")
 	if err != nil {
 		return err
 	}
-	for line := range strings.SplitSeq(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) > 1 && (fields[0] == "USERDEL_CMD" || fields[0] == "USERADD_CMD") {
+	for _, source := range sources {
+		data, err := rootRead(source)
+		if err != nil {
+			return err
+		}
+		if loginDefsHook(data) {
 			return fmt.Errorf("%w: native account hook configured", ErrUnsupported)
 		}
 	}
@@ -250,6 +253,51 @@ func checkHooks() error {
 		}
 	}
 	return nil
+}
+
+// loginDefsSources lists the files shadow's useradd/userdel read below root:
+// etc/login.defs, and on vendor-directory builds (openSUSE's libeconf shadow
+// ships usr/etc/login.defs and no etc/login.defs) also usr/etc/login.defs and
+// the *.defs drop-ins of both login.defs.d directories. All existing sources
+// are returned, so a hook in any of them is seen.
+func loginDefsSources(root string) ([]string, error) {
+	var sources []string
+	for _, path := range []string{"etc/login.defs", "usr/etc/login.defs"} {
+		path = filepath.Join(root, path)
+		if _, err := os.Lstat(path); err == nil {
+			sources = append(sources, path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("login.defs: %w", os.ErrNotExist)
+	}
+	for _, directory := range []string{"usr/etc/login.defs.d", "etc/login.defs.d"} {
+		directory = filepath.Join(root, directory)
+		entries, err := os.ReadDir(directory)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), ".defs") {
+				sources = append(sources, filepath.Join(directory, entry.Name()))
+			}
+		}
+	}
+	return sources, nil
+}
+
+func loginDefsHook(data []byte) bool {
+	for line := range strings.SplitSeq(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 1 && (fields[0] == "USERDEL_CMD" || fields[0] == "USERADD_CMD") {
+			return true
+		}
+	}
+	return false
 }
 func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([]command, error) {
 	before, target := r.Before.GetObservation(), r.Target.GetObservation()

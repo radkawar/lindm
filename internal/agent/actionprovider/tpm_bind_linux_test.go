@@ -37,6 +37,7 @@ type tpmFixture struct {
 	enrolls  int
 	imports  int
 	gates    int
+	pcrlock  bool
 }
 
 const fixtureSealed = `{"type":"systemd-tpm2","keyslots":["1"],"tpm2-blob":"c2VhbGVkLW9iamVjdA==","tpm2-pcrs":[7],"tpm2-pcr-bank":"sha256","tpm2-primary-alg":"ecc","tpm2-policy-hash":"2035"}`
@@ -71,6 +72,7 @@ func newTPMFixture(t *testing.T, release string) *tpmFixture {
 	}
 	f.p.run = f.native
 	f.p.hostRelease = func() (*platform.Release, error) { return row, nil }
+	f.p.pcrlockPolicy = func() (bool, error) { return f.pcrlock, nil }
 	return f
 }
 
@@ -93,7 +95,7 @@ func (f *tpmFixture) native(_ context.Context, request nativeRequest) ([]byte, e
 			return nil, err
 		}
 		defer clear(owner)
-		if !bytes.Equal(owner, f.owner) || !slices.Contains(request.args, "--tpm2-pcrs=7") {
+		if !bytes.Equal(owner, f.owner) || !slices.Contains(request.args, "--tpm2-pcrs=7") || slices.Contains(request.args, "--tpm2-pcrlock=") != f.pcrlock {
 			return nil, errors.New("unexpected enrollment")
 		}
 		f.slots["1"] = true
@@ -239,6 +241,20 @@ func TestTPMBindWritesTheReleaseTokenReferences(t *testing.T) {
 				t.Fatalf("evidence omits the reference count: %q", verified.GetEvidence())
 			}
 		})
+	}
+}
+
+// The Tumbleweed encrypted guest carried /var/lib/systemd/pcrlock.json, which
+// cryptenroll adds to every enrollment unasked: a bind after a deliberate PCR 7
+// change then failed its own token-only unseal. With a pcrlock policy present
+// the bind turns it off and seals exactly the approved PCRs.
+func TestTPMBindKeepsExactPCRsDespitePCRLockPolicy(t *testing.T) {
+	for _, pcrlock := range []bool{false, true} {
+		f := newTPMFixture(t, "opensuse-tumbleweed")
+		f.pcrlock = pcrlock
+		if err := f.bind(t, f.plan(t)); err != nil || f.enrolls != 1 {
+			t.Fatalf("pcrlock=%t: enrolls %d: %v", pcrlock, f.enrolls, err)
+		}
 	}
 }
 

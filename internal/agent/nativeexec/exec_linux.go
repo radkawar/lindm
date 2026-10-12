@@ -59,6 +59,7 @@ var allowedEnv = map[string]bool{
 	"ZYPP_LOGFILE":       true, // private caller-owned diagnostic destination
 	"ZYPP_LOCK_TIMEOUT":  true, // fail immediately when the native lock is busy
 	"ZYPP_LOCKFILE_ROOT": true, // isolate preparation's frontend lock only
+	"ZYPPTMPDIR":         true, // private temporary tree holding zypper's hard link to a command-line RPM
 	"SYSTEMD_COLORS":     true,
 	"SYSTEMD_PAGER":      true,
 	"SYSTEMD_UNIT_PATH":  true, // private staged unit verification

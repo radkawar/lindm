@@ -229,6 +229,47 @@ func TestAccountSelectionAndAlreadyExpiredOwnership(t *testing.T) {
 	}
 }
 
+// Tumbleweed's libeconf shadow ships no /etc/login.defs: the human UID range
+// comes from /usr/etc/login.defs and the login.defs.d *.defs drop-ins, an /etc
+// drop-in replacing the same-named vendor one and a later name winning.
+func TestHumanPolicyReadsVendorLoginDefsAndDropins(t *testing.T) {
+	p, _, _ := accountFixture(t, "$6$private-test-hash", "")
+	root := p.accounts.root
+	for _, dir := range []string{"usr/etc/login.defs.d", "etc/login.defs.d"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(filepath.Join(root, "etc/login.defs"), filepath.Join(root, "usr/etc/login.defs")); err != nil {
+		t.Fatal(err)
+	}
+	write := func(path, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, path), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("usr/etc/login.defs.d/50-uid.defs", "UID_MIN 900\n")
+	write("etc/login.defs.d/50-uid.defs", "UID_MIN 999\n")
+	write("etc/login.defs.d/60-max.defs", "UID_MAX 1000\n")
+	write("etc/login.defs.d/login_defs-4.20.3-1.1.noarch", "UID_MIN 1\n")
+	minimum, maximum, _, err := p.accounts.humanPolicy(t.Context())
+	if err != nil || minimum != 999 || maximum != 1000 {
+		t.Fatalf("human UID range %d-%d: %v", minimum, maximum, err)
+	}
+	all := aliceLockSpec()
+	all.GetLockSessions().Usernames = nil
+	all.GetLockSessions().AllHumanAccounts = true
+	selected, err := p.selectedAccounts(t.Context(), all)
+	if err != nil || len(selected) != 1 || selected[0].GetUsername() != "alice" {
+		t.Fatalf("human selection from vendor login.defs: %v", err)
+	}
+	write("etc/login.defs.d/60-max.defs", "UID_MAX 1000\nUID_MAX 2000\n")
+	if _, _, _, err := p.accounts.humanPolicy(t.Context()); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("ambiguous drop-in admitted: %v", err)
+	}
+}
+
 func TestAccountNativeFailureAndFreshReleaseRecovery(t *testing.T) {
 	p, directory, _ := accountFixture(t, "$6$private-test-hash", "")
 	plan := accountPlan(t, p, aliceLockSpec())

@@ -18,33 +18,42 @@ import (
 // Every screenshot and journal excerpt it references lives in the same new
 // evidence directory and is bound by SHA-256; consumers re-verify the files.
 type VMAssistanceResult struct {
-	ImageID           string                        `json:"image_id"`
-	ImageSHA256       string                        `json:"image_sha256"`
-	Distribution      string                        `json:"distribution"`
-	DesktopProfile    string                        `json:"desktop_profile"`
-	Architecture      string                        `json:"architecture"`
-	PackageSHA256     string                        `json:"package_sha256"`
-	SignerFingerprint string                        `json:"package_signer"`
-	LabSHA256         string                        `json:"lab_sha256"`
-	LindmdSHA256      string                        `json:"lindmd_sha256"`
-	Firmware          *EncryptedFirmwareEvidence    `json:"firmware"`
-	Runtime           *vmRuntimeEvidence            `json:"runtime"`
-	RecipeVersion     string                        `json:"installer_recipe_version"`
-	Database          string                        `json:"isolated_database"`
-	Topology          string                        `json:"topology"`
-	DeviceID          string                        `json:"device_id"`
-	Relay             assistanceRelayEvidence       `json:"relay"`
-	Guest             *assistanceGuestEvidence      `json:"guest"`
-	Browser           *assistanceBrowserEvidence    `json:"browser"`
-	Scenarios         []*assistanceScenarioEvidence `json:"scenarios"`
-	Audit             []assistanceAuditEvidence     `json:"audit"`
-	Journals          []assistanceEvidenceFile      `json:"journals"`
-	Screenshots       []assistanceEvidenceFile      `json:"screenshots"`
-	StartedAt         time.Time                     `json:"started_at"`
-	FinishedAt        time.Time                     `json:"finished_at"`
-	Passed            bool                          `json:"passed"`
-	Failure           string                        `json:"failure,omitempty"`
-	Boundaries        []string                      `json:"boundaries"`
+	ImageID           string                     `json:"image_id"`
+	ImageSHA256       string                     `json:"image_sha256"`
+	Distribution      string                     `json:"distribution"`
+	DesktopProfile    string                     `json:"desktop_profile"`
+	Architecture      string                     `json:"architecture"`
+	PackageSHA256     string                     `json:"package_sha256"`
+	SignerFingerprint string                     `json:"package_signer"`
+	LabSHA256         string                     `json:"lab_sha256"`
+	LindmdSHA256      string                     `json:"lindmd_sha256"`
+	Firmware          *EncryptedFirmwareEvidence `json:"firmware"`
+	Runtime           *vmRuntimeEvidence         `json:"runtime"`
+	RecipeVersion     string                     `json:"installer_recipe_version"`
+	Database          string                     `json:"isolated_database"`
+	Topology          string                     `json:"topology"`
+	DeviceID          string                     `json:"device_id"`
+	Relay             assistanceRelayEvidence    `json:"relay"`
+	Guest             *assistanceGuestEvidence   `json:"guest"`
+	Browser           *assistanceBrowserEvidence `json:"browser"`
+	// Readiness is the server's assistance readiness the lane waited for
+	// after publishing its desktop session inventory.
+	Readiness   *assistanceReadinessEvidence  `json:"readiness,omitempty"`
+	Scenarios   []*assistanceScenarioEvidence `json:"scenarios"`
+	Audit       []assistanceAuditEvidence     `json:"audit"`
+	Journals    []assistanceEvidenceFile      `json:"journals"`
+	Screenshots []assistanceEvidenceFile      `json:"screenshots"`
+	StartedAt   time.Time                     `json:"started_at"`
+	FinishedAt  time.Time                     `json:"finished_at"`
+	Passed      bool                          `json:"passed"`
+	Failure     string                        `json:"failure,omitempty"`
+	Boundaries  []string                      `json:"boundaries"`
+}
+
+// assistanceReadinessEvidence is GetAssistanceReadiness when the lane began.
+type assistanceReadinessEvidence struct {
+	State               string    `json:"state"`
+	InventoryObservedAt time.Time `json:"inventory_observed_at"`
 }
 
 // assistanceEvidenceFile binds one evidence artifact by its path relative to

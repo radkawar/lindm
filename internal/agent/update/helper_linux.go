@@ -163,6 +163,11 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 	if err := mutablePlatform(tx.GetManager()); err != nil {
 		return err
 	}
+	if tx.GetManager() == agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_ZYPPER {
+		if err := releaseZypperNames(directory, packagePath(directory, tx), zypperRPMCache); err != nil {
+			return err
+		}
+	}
 	if err := validatePackage(ctx, directory, tx); err != nil {
 		return err
 	}

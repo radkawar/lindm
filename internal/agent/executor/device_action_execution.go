@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
@@ -323,6 +324,11 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 	}
 	if state != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED && state != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING && state != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RETIRING_ESCROW {
 		return
+	}
+	if operationErr != nil {
+		// Like resource executions: provider and nativeexec errors carry no
+		// native output or key material, only the failing step and its status.
+		slog.Warn("device action failed", "action_id", actionID, "state", state.String(), "error", operationErr)
 	}
 	if result != nil && s.admit(result) != nil {
 		result, operationErr = nil, errInternal

@@ -117,7 +117,8 @@ func TestPackageUnitsDoNotWidenExecutorOrDownloadDuringApply(t *testing.T) {
 }
 
 // zypper exits 5 ("The target filesystem is mounted as read-only") unless /
-// itself is writable; only its apply unit gains /, never staging or DNF.
+// itself is writable, and ReadWritePaths=/ never overrides ProtectSystem=strict
+// at /. Only the zypper apply unit drops ProtectSystem, never staging or DNF.
 func TestZypperApplyUnitKeepsRootWritable(t *testing.T) {
 	const directory = "/var/lib/lindm/executor/packageprovider/a2bca405-36e9-4a43-b5b5-d0b82a05e551"
 	for _, tc := range []struct {
@@ -134,9 +135,13 @@ func TestZypperApplyUnitKeepsRootWritable(t *testing.T) {
 		for _, property := range packageProperties(directory, request, tc.phase) {
 			values[property.Name] = property.Value.Value()
 		}
+		want := "strict"
+		if tc.writable {
+			want = "no"
+		}
 		paths := unitValue[[]string](t, values, "ReadWritePaths")
-		if slices.Contains(paths, "/") != tc.writable || values["ProtectSystem"] != "strict" || values["ProtectHome"] != "yes" {
-			t.Fatalf("%s %s: ReadWritePaths %q", tc.product.GetOsId(), tc.phase, paths)
+		if values["ProtectSystem"] != want || slices.Contains(paths, "/") || values["ProtectHome"] != "yes" || values["PrivateNetwork"] != (tc.phase == "apply") {
+			t.Fatalf("%s %s: ProtectSystem %v, ReadWritePaths %q", tc.product.GetOsId(), tc.phase, values["ProtectSystem"], paths)
 		}
 	}
 }

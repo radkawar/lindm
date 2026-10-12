@@ -454,14 +454,14 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		}
 		_, err = mutatingCommand(ctx, phase, "/usr/bin/dnf", "--assumeyes", "--disablerepo=*", "--setopt=install_weak_deps=False", "--setopt=obsoletes=False", "--setopt=plugins=0", action, path)
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_ZYPPER:
-		args, err := zypperUpdateArgs(directory, path, interrupted && prior.version == tx.GetNativeVersion())
+		args, env, err := zypperUpdateCommand(directory, path, interrupted && prior.version == tx.GetNativeVersion())
 		if err != nil {
 			return err
 		}
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = mutatingCommand(ctx, phase, "/usr/bin/zypper", args...)
+		_, err = runNative(ctx, phase, true, env, "/usr/bin/zypper", args...)
 		return err
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN:
 		preview, err := nativeCommand(ctx, "simulate", "/usr/bin/pacman", "-U", "--print", "--print-format", "%n", path)
@@ -482,29 +482,67 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 	return err
 }
 
-// zypperUpdateArgs installs only the verified input RPM. --disable-repositories
+// zypperUpdateCommand installs only the verified input RPM. --disable-repositories
 // also disables zypper's command-line RPM repository (exit 104:
 // "_tmpRPMcache_:lindm-agent=<evr>" not found), so an empty private repository
 // directory in the transaction directory hides every configured repository
-// instead; missing dependencies fail rather than download.
-func zypperUpdateArgs(directory, path string, reinstall bool) ([]string, error) {
+// instead; missing dependencies fail rather than download. ZYPPTMPDIR keeps
+// zypper's temporary tree, holding one of its hard links to the input RPM, in
+// the transaction directory (see releaseZypperNames).
+func zypperUpdateCommand(directory, path string, reinstall bool) (args, env []string, err error) {
 	repos := filepath.Join(directory, "zypper-repos")
 	if err := os.Mkdir(repos, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
-		return nil, err
+		return nil, nil, err
 	}
 	info, err := os.Lstat(repos)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	entries, err := os.ReadDir(repos)
 	if err != nil || !info.IsDir() || len(entries) != 0 {
-		return nil, errors.Join(errors.New("zypper repository directory is not an empty private directory"), err)
+		return nil, nil, errors.Join(errors.New("zypper repository directory is not an empty private directory"), err)
 	}
-	args := []string{"--non-interactive", "--no-refresh", "--reposd-dir", repos, "install", "--no-recommends", "--no-allow-vendor-change"}
+	tmp := zypperTmpDirectory(directory)
+	if err := os.Mkdir(tmp, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return nil, nil, err
+	}
+	args = []string{"--non-interactive", "--no-refresh", "--reposd-dir", repos, "install", "--no-recommends", "--no-allow-vendor-change"}
 	if reinstall {
 		args = append(args, "--force")
 	}
-	return append(args, "--", path), nil
+	return append(args, "--", path), []string{"ZYPPTMPDIR=" + tmp}, nil
+}
+
+// zypperRPMCache is where zypper hard-links every command-line RPM for the
+// transaction, besides its temporary tree under ZYPPTMPDIR; it removes both
+// names only when it exits.
+const zypperRPMCache = "/var/cache/zypper/RPMS"
+
+func zypperTmpDirectory(directory string) string { return filepath.Join(directory, "zypp-tmp") }
+
+// releaseZypperNames removes the hard links to the staged RPM that a zypper
+// interrupted by power loss leaves behind, which protected custody (exactly one
+// link) would otherwise refuse on every recovery: the transaction's private
+// zypper temporary tree whole, and zypper's cache name only while it still
+// names the staged inode.
+func releaseZypperNames(directory, path, cache string) error {
+	if err := os.RemoveAll(zypperTmpDirectory(directory)); err != nil {
+		return err
+	}
+	var staged, cached unix.Stat_t
+	if err := unix.Lstat(path, &staged); err != nil {
+		return err
+	}
+	name := filepath.Join(cache, filepath.Base(path))
+	if err := unix.Lstat(name, &cached); errors.Is(err, unix.ENOENT) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if cached.Dev != staged.Dev || cached.Ino != staged.Ino {
+		return nil
+	}
+	return unix.Unlink(name)
 }
 
 func ownedAPTPreview(data []byte) error {
@@ -542,19 +580,19 @@ type tailWriter struct{ tail *nativeOutputTail }
 func (w tailWriter) Write(p []byte) (int, error) { w.tail.write(p); return len(p), nil }
 
 func nativeCommand(ctx context.Context, phase, executable string, args ...string) ([]byte, error) {
-	return runNative(ctx, phase, false, executable, args...)
+	return runNative(ctx, phase, false, nil, executable, args...)
 }
 
 // mutatingCommand runs a step that changes the package database: on deadline
 // or cancellation it is terminated, never SIGKILLed mid-transaction.
 func mutatingCommand(ctx context.Context, phase, executable string, args ...string) ([]byte, error) {
-	return runNative(ctx, phase, true, executable, args...)
+	return runNative(ctx, phase, true, nil, executable, args...)
 }
 
-func runNative(ctx context.Context, phase string, terminateOnly bool, executable string, args ...string) ([]byte, error) {
+func runNative(ctx context.Context, phase string, terminateOnly bool, env []string, executable string, args ...string) ([]byte, error) {
 	var stdoutTail, stderrTail nativeOutputTail
 	result, err := nativeexec.Run(ctx, nativeexec.Command{
-		Path: executable, Args: args, Env: []string{"DEBIAN_FRONTEND=noninteractive"}, Dir: "/",
+		Path: executable, Args: args, Env: append([]string{"DEBIAN_FRONTEND=noninteractive"}, env...), Dir: "/",
 		Timeout: 20 * time.Minute, StdoutLimit: nativeOutputLimit, StderrLimit: nativeOutputLimit,
 		StdoutTee: tailWriter{&stdoutTail}, StderrTee: tailWriter{&stderrTail}, TerminateOnly: terminateOnly,
 	})

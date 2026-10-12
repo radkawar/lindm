@@ -739,7 +739,7 @@ var registry = []*Release{
 			OSUpdateTargets: map[string]RollingTarget{"x86_64": {Date: "2026-10-10", ClosureSHA256: "1165cc188e357a44320f9dee48974af28f76f0c6dd454d22e6d875526ac6ad3a", RepomdSHA256: "f48382bb7f18b6762f1fcf342954413c5ed88edd33a6c9215c4d80dc86e1f0d2"}},
 			Session: LabSession{
 				Desktops:  map[string][]string{"gnome": {"patterns-gnome-gnome", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good"}},
-				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
+				GDMConfig: "/etc/gdm/custom.conf", GDMSysconfig: "/etc/sysconfig/displaymanager", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
 				Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good", "gnome-shell", "mutter"},
 			},
 			Guest: LabGuest{Initrd: "/boot/initrd-%s", KernelConfig: "/usr/lib/modules/%s/config",

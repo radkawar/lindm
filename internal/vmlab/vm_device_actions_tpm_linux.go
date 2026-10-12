@@ -6,11 +6,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -184,7 +186,7 @@ func nativeTPMMismatch(ctx context.Context, manifest *labv1.ImageManifest, optio
 	defer clear(credential)
 	result.TPMPolicyBind, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, credential, false)
 	if err != nil {
-		return err
+		return errors.Join(err, diagnoseTPMPolicyBind(ctx, machine.vm.guest, machine.target.Identity.GetLuksUuid()))
 	}
 	if err := machine.PowerOff(ctx); err != nil {
 		return err
@@ -210,4 +212,38 @@ func nativeTPMMismatch(ctx context.Context, manifest *labv1.ImageManifest, optio
 	}
 	result.TPMPolicyRecoveryBoot = &recovered
 	return nil
+}
+
+// diagnoseTPMPolicyBind keeps the guest's own reason a bind against the
+// extended PCR 7 did not verify: cryptsetup's token unlock messages (lines
+// naming TPM, token, unseal, PCR or policy, never JSON or header bytes), the
+// current PCR 7 banks, an automatic pcrlock policy and the systemd version.
+func diagnoseTPMPolicyBind(ctx context.Context, vm *guestVM, luksUUID string) error {
+	if !vmValidID(luksUUID) {
+		return nil
+	}
+	script := `dev=/dev/disk/by-uuid/` + luksUUID + `
+cryptsetup --debug open --type luks2 --test-passphrase --token-only --token-type systemd-tpm2 "$dev" 2>&1 | grep -iE 'tpm|token|unseal|pcr|policy|session|srk|error|fail' | grep -v '[{}]' | tail -60
+echo "exit=$?"
+tpm2_pcrread sha1:7+sha256:7 2>&1
+ls -l /var/lib/systemd/pcrlock.json /run/systemd/pcrlock.json /etc/systemd/tpm2-pcr-public-key.pem 2>&1
+systemd-cryptenroll --version 2>&1 | head -1
+journalctl -b --no-pager -n 40 -t systemd-cryptenroll -t cryptsetup 2>&1`
+	result, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote(script), nil, 256<<10, time.Minute)
+	if err != nil {
+		return fmt.Errorf("collect TPM policy-bind diagnostics: %w", err)
+	}
+	data, err := json.Marshal(struct {
+		Source         string
+		ExitCode       int
+		Stdout, Stderr string
+	}{"tpm-policy-bind-token-unlock", result.ExitCode, string(result.Stdout), string(result.Stderr)})
+	if err != nil {
+		return err
+	}
+	path, err := saveGuestDiagnostics(actionDiagnosticsDirectory(vm), data)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("private TPM policy-bind diagnostics saved to %q", path)
 }

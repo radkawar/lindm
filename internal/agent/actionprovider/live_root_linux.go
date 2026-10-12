@@ -189,7 +189,14 @@ func (p *Provider) executeLiveRoot(ctx context.Context, plan *agentv1.DeviceActi
 	// effect. The independent helper still powers off if this worker is killed.
 	work, cancel := context.WithTimeout(context.Background(), liveRootEffectTimeout)
 	defer cancel()
-	var failures error
+	// Closing an erased LUKS device makes udev re-probe it: its LUKS-UUID
+	// device unit vanishes, systemd stops the bound systemd-cryptsetup unit and
+	// cascades through the local file systems (Tumbleweed unmounted its /home,
+	// /opt, /root, /srv and /usr/local subvolumes and stopped the agent and this
+	// executor before any result was attested). With the forced poweroff
+	// armed, udev processes no further events until it powers off. A failure
+	// still erases every approved target; the result just stays UNKNOWN.
+	_, failures := p.run(work, nativeRequest{command: udevadm, args: []string{"control", "--stop-exec-queue"}})
 	for index, target := range targets {
 		proof := result.CryptoEraseResults[index]
 		_, nativeErr := p.crypt(work, target.file, []string{"luksErase", "--batch-mode", descriptor(0)})

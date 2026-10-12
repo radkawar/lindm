@@ -272,6 +272,11 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Username: assistanceOperator}
 	var scenarioErr error
 	if len(scenarios) != 0 {
+		readiness, err := awaitAssistanceReadiness(ctx, vm.guest, control.session, result.DeviceID)
+		if err != nil {
+			return result, err
+		}
+		result.Readiness = &assistanceReadinessEvidence{State: readiness.GetState().String(), InventoryObservedAt: readiness.GetInventoryObservedAt().AsTime()}
 		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, desktop: desktop, deviceID: result.DeviceID, turnTCP: options.ConsoleTURNTCP}, fixture, options, scenarios)
 	}
 	// Device journals are recorded for failures too: they are the product

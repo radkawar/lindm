@@ -133,9 +133,12 @@ is not used: it also disables zypper's command-line RPM repository, so every
 commit failed with exit 104 (`_tmpRPMcache_:<name>=<evr>` not found). zypper
 also refuses any transaction while `/` itself is a read-only mount ("The target
 filesystem is mounted as read-only", exit 5), even when `/etc`, `/usr` and
-`/var` are writable. The bounded package apply unit therefore keeps `/`
-writable on Tumbleweed only; its other confinement (private network, protected
-home, kernel and control-group protections, capability bound) is unchanged.
+`/var` are writable. `ReadWritePaths=/` cannot lift `ProtectSystem=strict`'s
+read-only `/` (of two mounts at one path systemd keeps the more restrictive), so
+the bounded zypper package apply unit runs without `ProtectSystem`; its other
+confinement (private network, protected home, kernel and control-group
+protections, capability bound) is unchanged, and staging and every other
+backend stay `strict`.
 Tumbleweed reports OS-update backend `zypper` in host patch status; migration
 00033 widened the patch-status projection's backend bound, which had refused
 every Tumbleweed and Arch host observation carrying patch status.
@@ -243,7 +246,8 @@ crossovers are refused.
 
 The shared native runner allows only the needed
 [documented libzypp environment keys](https://github.com/openSUSE/libzypp/blob/master/zypp/doc/autoinclude/EnvironmentVariables.doc):
-`ZYPP_CONF`, `ZYPP_LOGFILE`, `ZYPP_LOCK_TIMEOUT` and `ZYPP_LOCKFILE_ROOT`.
+`ZYPP_CONF`, `ZYPP_LOGFILE`, `ZYPP_LOCK_TIMEOUT`, `ZYPP_LOCKFILE_ROOT` and
+`ZYPPTMPDIR` (the agent self-update's private temporary tree).
 Preparation selects a private lock root; live apply deliberately omits that
 override and cannot inherit one from the agent's environment. Real subprocess
 policy regressions cover both paths and retain rejection of unrelated overrides.
@@ -270,6 +274,25 @@ any architecture of the name as overlapping. Not yet natively queried with
 The provider recognizes native ndb `Packages.db` as well as SQLite RPM databases.
 The shadow provider queries the package owning `useradd`, not Fedora's
 `shadow-utils` package name.
+
+Tumbleweed's shadow is built against libeconf's vendor directory: it ships
+`/usr/etc/login.defs` plus `login.defs.d` drop-ins and no `/etc/login.defs`.
+The accounts provider's native-hook check (`USERADD_CMD`/`USERDEL_CMD`) reads
+every existing source — `/etc/login.defs`, `/usr/etc/login.defs` and the
+`*.defs` drop-ins of both `login.defs.d` directories — instead of failing every
+account resource on the absent `/etc/login.defs` (`loginDefsSources`). The
+lock action's "all human accounts" selection resolves `UID_MIN`/`UID_MAX` the
+way libeconf does: `/etc/login.defs`, else `/usr/etc/login.defs`, then the
+drop-ins by name with an `/etc` drop-in replacing the same-named vendor one
+(`loginDefinitions`). Password aging (`PASS_*`) still edits `/etc/login.defs`;
+creating that file on Tumbleweed would make shadow ignore the vendor file, so
+aging fields there remain unqualified (the password lane sets only pwquality).
+
+Tumbleweed also keeps no `/etc/gshadow`; shadow's tools maintain it only when it
+exists, and `groupadd` never creates it. The accounts provider admits an absent
+group shadow (bound into the local database revision, so creating it later
+changes every plan's precondition) and still requires a present one to agree
+with `/etc/group` without group administrators.
 
 The signed snapshot closure must include the registry's RPM build/signing tools,
 GnuPG, Python, nftables and firewalld before starting resource qualification.
@@ -556,7 +579,15 @@ The implemented agent self-update helper installs only the admitted local packag
 using zypper `--no-refresh --reposd-dir <empty private directory>`, without
 recommendations or vendor changes (see the command-line repository note above).
 Interrupted same-version work can force reinstallation
-([`native_linux.go`](../../internal/agent/update/native_linux.go), `zypperUpdateArgs`).
+([`native_linux.go`](../../internal/agent/update/native_linux.go), `zypperUpdateCommand`).
+zypper hard-links the command-line RPM into its temporary tree and into
+`/var/cache/zypper/RPMS` and removes both names only when it exits, so a power
+loss mid-transaction left the staged package with three links and every
+recovery refused it as unprotected (`native zypper validation failed (exit
+-1)`). The helper sets `ZYPPTMPDIR` to the transaction's private `zypp-tmp`
+directory; before revalidating, recovery removes that tree and the
+`/var/cache/zypper/RPMS` name only while it is still the staged inode
+(`releaseZypperNames`).
 This is an agent-package path, not a Tumbleweed distribution upgrade or an atomic
 OS updater. Signed metadata, immutable staging, authorization and observed native
 recovery remain required (`docs/architecture.md:949-978`).
@@ -678,6 +709,13 @@ rotation, owner-slot preservation and cold-boot proof. Ordinary TPM event logs
 are retained with SHA-256 in encrypted smoke evidence. Their presence alone
 does not prove that GRUB measured the required final command and kernel into
 PCRs 8/9.
+
+The Tumbleweed encrypted guest carried a `/var/lib/systemd/pcrlock.json`
+(observed by the encrypted lane), and `systemd-cryptenroll` silently adds that policy to every `--tpm2-pcrs=`
+enrollment. A bind after a deliberate PCR 7 change then failed its own token-only
+unlock ("None of the alternative values for PCR 7 encoded in policy match the
+current TPM state"). When such a file exists, the bind passes an empty
+`--tpm2-pcrlock=`, so the token seals exactly the approved PCRs.
 
 Measured original-device recovery has a separate registry
 `bls-loader-entry-oneshot` adapter on x86_64 and aarch64. It stages an
@@ -803,6 +841,31 @@ The matrix runs lock/quarantine, live-root erase and report-loss together throug
 `-scenario=wipe -wipe-phase=live-actions`. Recovery sanitize remains a distinct
 capability and evidence cell; a measured-GRUB gate cannot suppress supported
 live effects or be bypassed by their passing records.
+
+openSUSE's GDM (`gdm-sysconfig-settings.patch`) answers `AutomaticLoginEnable`
+and `AutomaticLogin` from `DISPLAYMANAGER_AUTOLOGIN` in
+`/etc/sysconfig/displaymanager` ahead of `/etc/gdm/custom.conf`, so a
+custom.conf autologin alone left Tumbleweed at the GDM greeter and the lock,
+wipe and assistance lanes never observed a GNOME user session. The lab's GNOME
+autologin also names its desktop user there (`Lab.Session.GDMSysconfig`),
+rewriting the file in place so its SELinux label and other settings stay.
+
+Tumbleweed's root is btrfs on LUKS2. `stat("/")` reports btrfs's anonymous
+per-subvolume device (for example `0:35`), absent from `/sys/dev/block`, so the
+live-root crypto erase found no root crypt mapping and refused every plan
+(`device_action_unsupported`). Since fa75d78f the provider reads the
+filesystem's fsid from `/` with `BTRFS_IOC_FS_INFO` and walks every member listed
+in `/sys/fs/btrfs/<fsid>/devices` down to the single root LUKS2 mapping
+(`rootBlockDevices`); a root spanning several crypt mappings stays unsupported.
+
+Once the live erase closed an erased partition, udev re-probed it, the LUKS-UUID
+device unit vanished and systemd stopped the bound `systemd-cryptsetup@cr_root`
+unit. That cascaded through "Local File Systems": `/home`, `/opt`, `/root`,
+`/srv` and `/usr/local` were unmounted and the agent and executor were stopped
+before the result was attested (the lab captured this on the serial console).
+After the forced poweroff is armed and before the first header effect, the
+provider now runs `udevadm control --stop-exec-queue`, so no device event is
+processed until the forced poweroff.
 
 Lock, quarantine, power, escrow, binding and erasure must be evaluated per action,
 actual session/topology and provisioned privilege, not advertised from inventory
@@ -1151,11 +1214,41 @@ The v2 dispatch (`tw-arm64-dgx21-dispatch-v2.json`,
 `9cc8db6ed3ed41254d9dea088b0d4a539ba70917d71af81b9c39a9d89f07f16e`) also passed,
 but it carries the old `not applicable` SELinux label.
 
+### 2026-10-12 snapshot-pinned matrix (Tumbleweed 20261007 aarch64, 20261009 x86_64)
+
+`lab matrix run -platform opensuse-tumbleweed` from the Tier 2 worktrees: aarch64
+on the DGX Spark hosts, x86_64 on local KVM, each record in the
+[ledger](../verification.md#1-launch-platform-qualification) under
+`~/.cache/lindm-tier2-matrix/`:
+
+| Cell                | aarch64 record / SHA-256                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Inventory           | `tw2-arm-r3-939f2fe8/…/inventory-aarch64.json` / `53abab0a32e563a3dbb0e41ad52fed8028a43ef106d51cadd1956e3d2b64964c`           |
+| Lifecycle           | `tw2-arm-r3-939f2fe8/…/lifecycle-aarch64.json` / `f7fa56dfd6911c9b884cef6b5f34df9d83a66a17ec85d2d66bca000ff8384b05`           |
+| Dispatch            | `tw2-arm-r3-939f2fe8/…/dispatch-aarch64.json` / `60a29b4ea2e5f9bee1c4fa4489c9070b710e0b591383cc94eca20e06f988ff5d`            |
+| Services            | `tw2-arm-r3-939f2fe8/…/services-aarch64.json` / `720005992062be156d7e23d7856a2eec194e684f091fa845f17889f5c9251435`            |
+| Advisories          | `tw2-arm-r3-939f2fe8/…/advisories-aarch64.json` / `617a0a34dd91e174d6e0892d982a503517fb15ff222e6f04ab7f0541e6d0d067`          |
+| Air gap             | `tw2-arm-r3-939f2fe8/…/airgap-aarch64.json` / `0ef2900ba8965d70512925420db4fe26ea0052932284c1d26a1261965f77984b`              |
+| Enroll from console | `tw2-arm-r4-a0ec26df/…/enroll-from-console-aarch64.json` / `80b7b52e98acfa8c381391b57acec2e5ac239f4d73f7bf714a832dc070250ae0` |
+| Self-update         | `tw2-arm-r6-8823efd3/…/self-update-aarch64.json` / `032745dad5c723b6004a9b421a7960d0a5fe71fc564ec30acfbf45675fa0c46e`         |
+
+(`…` is `opensuse-tumbleweed`.) Recovery sanitize is recorded in the
+[Tier 2 recovery section](../verification.md#tier-2-recovery-sanitize-records-2026-10-12).
+The remaining cells failed for Tumbleweed-specific reasons fixed in this landing,
+and are being rerun: package commits (zypper exit 5, `ProtectSystem`), agent
+self-update recovery (zypper's hard links), local accounts (`/usr/etc/login.defs`,
+no `/etc/gshadow`), GNOME autologin (GDM sysconfig), live-root erase (btrfs root
+mapping, udev cascade), TPM policy binding (automatic pcrlock) and the assistance
+readiness gate. aarch64 `os-update` has no later target: the ports repository has
+published nothing after its 2026-10-07 snapshot (repomd revision
+2026-10-08T02:08Z, unchanged on 2026-10-12), so no `Lab.OSUpdateTargets` entry
+exists for aarch64. x86_64 cells are queued behind the shared local KVM slots.
+
 ## Known gaps
 
 Leap and Tumbleweed policy-level SELinux behavior (denials, custom modules) is not
-established by these records; they only record the kernel enforcing state. Tumbleweed x86_64
-still needs inspection, lifecycle and dispatch from its cloud image. Tumbleweed also
+established by these records; they only record the kernel enforcing state. Tumbleweed
+matrix cells not yet passing are listed in the 2026-10-12 matrix section. Tumbleweed also
 needs distribution-upgrade snapshot and rollback evidence: these lanes upgrade only
 the agent package. The aarch64 golden is bound to the 20261007 snapshot. Once the
 ports tree advances, building a new golden fails closed until the manifest is bumped

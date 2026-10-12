@@ -77,8 +77,11 @@ type Provider struct {
 	flushHeader func(*os.File) error
 	// hostRelease identifies this host's registry row (TPM2 token references).
 	hostRelease func() (*platform.Release, error)
-	gate        chan struct{}
-	clock       func() time.Time
+	// pcrlockPolicy reports whether systemd-cryptenroll would add a
+	// systemd-pcrlock policy on its own (pcrlockPolicyPresent).
+	pcrlockPolicy func() (bool, error)
+	gate          chan struct{}
+	clock         func() time.Time
 }
 
 func New(options Options) (*Provider, error) {
@@ -145,6 +148,7 @@ func New(options Options) (*Provider, error) {
 	}
 	p.flushHeader = flushBlockHeader
 	p.hostRelease = readHostRelease
+	p.pcrlockPolicy = pcrlockPolicyPresent
 	return p, nil
 }
 

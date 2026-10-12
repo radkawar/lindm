@@ -29,9 +29,10 @@ const (
 	usermod
 	chage
 	chpasswd
+	udevadm
 )
 
-var executable = [...]string{"/usr/sbin/cryptsetup", "/usr/bin/systemd-cryptenroll", "/usr/sbin/nft", "/usr/bin/lsblk", "/usr/bin/systemctl", "/usr/sbin/dmsetup", "/usr/sbin/usermod", "/usr/bin/chage", "/usr/sbin/chpasswd"}
+var executable = [...]string{"/usr/sbin/cryptsetup", "/usr/bin/systemd-cryptenroll", "/usr/sbin/nft", "/usr/bin/lsblk", "/usr/bin/systemctl", "/usr/sbin/dmsetup", "/usr/sbin/usermod", "/usr/bin/chage", "/usr/sbin/chpasswd", "/usr/bin/udevadm"}
 
 const outputLimit = 1 << 20
 

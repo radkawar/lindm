@@ -16,6 +16,28 @@ import (
 	"lindm/internal/platform"
 )
 
+// gdmSysconfigAutologin names user (a shell word) as DISPLAYMANAGER_AUTOLOGIN
+// in the session's GDM sysconfig file, rewriting the file in place (inode and
+// SELinux label kept) and leaving its other settings. Without a declared file
+// it is empty.
+func gdmSysconfigAutologin(session platform.LabSession, user string) string {
+	if session.GDMSysconfig == "" {
+		return ""
+	}
+	file := nativeQuote(session.GDMSysconfig)
+	return `settings=$(grep -v '^DISPLAYMANAGER_AUTOLOGIN=' ` + file + ` 2>/dev/null || true)
+{ if test -n "$settings"; then printf '%s\n' "$settings"; fi; printf 'DISPLAYMANAGER_AUTOLOGIN="%s"\n' ` + user + `; } > ` + file + `
+`
+}
+
+// gdmSysconfigLabel is the GDM sysconfig file as an extra restorecon operand.
+func gdmSysconfigLabel(session platform.LabSession) string {
+	if session.GDMSysconfig == "" {
+		return ""
+	}
+	return " " + nativeQuote(session.GDMSysconfig)
+}
+
 const actionDesktopUser = "lindm-desktop-test"
 
 // labDesktop is one installer desktop's lab session profile, keyed by the
@@ -61,9 +83,9 @@ var labDesktops = []*labDesktop{
 		name: "gnome",
 		autologin: func(session platform.LabSession) string {
 			return `printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=%s\nInitialSetupEnable=False\n' "$u" > ` + nativeQuote(session.GDMConfig) + `
-install -d -m 0755 /var/lib/AccountsService/users
+` + gdmSysconfigAutologin(session, `"$u"`) + `install -d -m 0755 /var/lib/AccountsService/users
 printf '[User]\nSystemAccount=false\nSession=%s\nXSession=%s\n' ` + nativeQuote(session.Name) + ` ` + nativeQuote(session.Name) + ` > /var/lib/AccountsService/users/"$u"
-if command -v restorecon >/dev/null; then restorecon -RF ` + nativeQuote(session.GDMConfig) + ` /var/lib/AccountsService /home/"$u"; fi
+if command -v restorecon >/dev/null; then restorecon -RF ` + nativeQuote(session.GDMConfig) + gdmSysconfigLabel(session) + ` /var/lib/AccountsService /home/"$u"; fi
 systemctl restart display-manager.service`
 		},
 		services:     []string{"gdm-autologin"},

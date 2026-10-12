@@ -252,6 +252,12 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 			return evidence, err
 		}
 	}
+	// The pinned SSH transport died as soon as Tumbleweed's live erase began.
+	// From here the serial window observed above also carries the guest
+	// journal, so the erase's own effects stay visible without SSH.
+	if err := lifecycleCommand(ctx, machine.vm.guest, "forward live-erase journal to the serial console", `systemd-run --quiet --collect --unit=lindm-lab-console-journal --property=StandardOutput=tty --property=TTYPath=/dev/console sh -c "journalctl -f -n 0 -o short-monotonic --no-pager | grep --line-buffered -v 'lindm-agent\['"`); err != nil {
+		return evidence, err
+	}
 	created, err := control.session.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
 	if err != nil {
 		return evidence, err

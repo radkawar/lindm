@@ -5,10 +5,12 @@ package actionprovider
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -463,21 +465,47 @@ func accountLines(data []byte, use func(string) error) error {
 	return nil
 }
 
-func (a *accountLocker) readLocal(ctx context.Context, name string) (_ []byte, err error) {
+func (a *accountLocker) readLocal(ctx context.Context, name string) ([]byte, error) {
+	data, err := a.readRooted(ctx, "etc", name)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, ErrUnsupported
+	}
+	return data, err
+}
+
+// openRootedDirectory opens dir below the locker root when root owns it and
+// neither group nor others may write it. A missing directory is
+// os.ErrNotExist; any other custody failure is ErrUnsupported.
+func (a *accountLocker) openRootedDirectory(dir string) (int, error) {
+	directoryFD, err := unix.Open(filepath.Join(a.root, dir), unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
+	if errors.Is(err, unix.ENOENT) {
+		return -1, os.ErrNotExist
+	} else if err != nil {
+		return -1, ErrUnsupported
+	}
+	var directoryStat unix.Stat_t
+	if unix.Fstat(directoryFD, &directoryStat) != nil || directoryStat.Uid != 0 || directoryStat.Mode&0022 != 0 {
+		_ = unix.Close(directoryFD)
+		return -1, ErrUnsupported
+	}
+	return directoryFD, nil
+}
+
+// readRooted reads the root-owned regular file dir/name below the locker root.
+// A missing directory or file is os.ErrNotExist.
+func (a *accountLocker) readRooted(ctx context.Context, dir, name string) (_ []byte, err error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	directoryFD, err := unix.Open(filepath.Join(a.root, "etc"), unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
+	directoryFD, err := a.openRootedDirectory(dir)
 	if err != nil {
-		return nil, ErrUnsupported
+		return nil, err
 	}
 	defer func() { err = errors.Join(err, unix.Close(directoryFD)) }()
-	var directoryStat unix.Stat_t
-	if unix.Fstat(directoryFD, &directoryStat) != nil || directoryStat.Uid != 0 || directoryStat.Mode&0022 != 0 {
-		return nil, ErrUnsupported
-	}
 	fd, err := unix.Openat(directoryFD, name, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
-	if err != nil {
+	if errors.Is(err, unix.ENOENT) {
+		return nil, os.ErrNotExist
+	} else if err != nil {
 		return nil, ErrUnsupported
 	}
 	file := os.NewFile(uintptr(fd), "local-account-state")
@@ -494,38 +522,89 @@ func (a *accountLocker) readLocal(ctx context.Context, name string) (_ []byte, e
 	return data, nil
 }
 
+// loginDefinitions returns shadow's login.defs sources in precedence order:
+// /etc/login.defs, or on libeconf vendor-directory builds (Tumbleweed ships no
+// /etc/login.defs) /usr/etc/login.defs; then the *.defs drop-ins of
+// /usr/etc/login.defs.d and /etc/login.defs.d by name, an /etc drop-in
+// replacing the same-named vendor one. A later source's value wins.
+func (a *accountLocker) loginDefinitions(ctx context.Context) ([][]byte, error) {
+	base, err := a.readRooted(ctx, "etc", "login.defs")
+	if errors.Is(err, os.ErrNotExist) {
+		base, err = a.readRooted(ctx, "usr/etc", "login.defs")
+	}
+	if err != nil {
+		return nil, ErrUnsupported
+	}
+	dropins := make(map[string]string)
+	for _, dir := range []string{"usr/etc/login.defs.d", "etc/login.defs.d"} {
+		directoryFD, err := a.openRootedDirectory(dir)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		directory := os.NewFile(uintptr(directoryFD), "login-defs-dropins")
+		entries, err := directory.ReadDir(-1)
+		err = errors.Join(err, directory.Close())
+		if err != nil {
+			return nil, ErrUnsupported
+		}
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), ".defs") {
+				dropins[entry.Name()] = dir
+			}
+		}
+	}
+	sources := [][]byte{base}
+	for _, name := range slices.Sorted(maps.Keys(dropins)) {
+		data, err := a.readRooted(ctx, dropins[name], name)
+		if err != nil {
+			return nil, ErrUnsupported
+		}
+		sources = append(sources, data)
+	}
+	return sources, nil
+}
+
 func (a *accountLocker) humanPolicy(ctx context.Context) (uint32, uint32, map[string]bool, error) {
-	definitions, err := a.readLocal(ctx, "login.defs")
+	sources, err := a.loginDefinitions(ctx)
 	if err != nil {
 		return 0, 0, nil, err
 	}
 	var minimum, maximum uint32
-	err = accountLines(definitions, func(line string) error {
-		fields := strings.Fields(strings.SplitN(line, "#", 2)[0])
-		if len(fields) == 0 || (fields[0] != "UID_MIN" && fields[0] != "UID_MAX") {
+	for _, definitions := range sources {
+		var sourceMinimum, sourceMaximum uint32
+		err = accountLines(definitions, func(line string) error {
+			fields := strings.Fields(strings.SplitN(line, "#", 2)[0])
+			if len(fields) == 0 || (fields[0] != "UID_MIN" && fields[0] != "UID_MAX") {
+				return nil
+			}
+			if len(fields) != 2 {
+				return ErrUnsupported
+			}
+			value, err := strconv.ParseUint(fields[1], 10, 32)
+			if err != nil || value == 0 {
+				return ErrUnsupported
+			}
+			if fields[0] == "UID_MIN" {
+				if sourceMinimum != 0 {
+					return ErrUnsupported
+				}
+				sourceMinimum = uint32(value)
+			} else {
+				if sourceMaximum != 0 {
+					return ErrUnsupported
+				}
+				sourceMaximum = uint32(value)
+			}
 			return nil
+		})
+		if err != nil {
+			return 0, 0, nil, ErrUnsupported
 		}
-		if len(fields) != 2 {
-			return ErrUnsupported
-		}
-		value, err := strconv.ParseUint(fields[1], 10, 32)
-		if err != nil || value == 0 {
-			return ErrUnsupported
-		}
-		if fields[0] == "UID_MIN" {
-			if minimum != 0 {
-				return ErrUnsupported
-			}
-			minimum = uint32(value)
-		} else {
-			if maximum != 0 {
-				return ErrUnsupported
-			}
-			maximum = uint32(value)
-		}
-		return nil
-	})
-	if err != nil || minimum == 0 || maximum < minimum {
+		minimum, maximum = cmp.Or(sourceMinimum, minimum), cmp.Or(sourceMaximum, maximum)
+	}
+	if minimum == 0 || maximum < minimum {
 		return 0, 0, nil, ErrUnsupported
 	}
 	shellData, err := a.readLocal(ctx, "shells")

@@ -376,11 +376,21 @@ func adoptedUserDesired(maxDays uint32) *resourcev1.ResourceDesiredState {
 	return &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: resourceLabAdoptUser}, State: &resourcev1.ResourceDesiredState_LocalUser{LocalUser: user}}
 }
 
+// groupShadowFiles expands to /etc/gshadow only where it exists: Tumbleweed's
+// shadow keeps no group shadow file, and its tools never create one.
+const groupShadowFiles = "$(test -e /etc/gshadow && echo /etc/gshadow)"
+
+// whereGroupShadow runs command only where /etc/gshadow exists, and otherwise
+// prints gshadow-absent.
+func whereGroupShadow(command string) string {
+	return "if test -e /etc/gshadow; then " + command + "; else printf 'gshadow-absent\\n'; fi"
+}
+
 func groupOracle(present bool) func(context.Context, *guestVM) (VMResourceNativeRecord, error) {
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
-		command := "if getent group " + resourceLabGroup + "; then exit 1; fi; if grep '^" + resourceLabGroup + ":' /etc/group /etc/gshadow; then exit 1; fi; printf 'group-absent\\n'"
+		command := "if getent group " + resourceLabGroup + "; then exit 1; fi; if grep '^" + resourceLabGroup + ":' /etc/group " + groupShadowFiles + "; then exit 1; fi; printf 'group-absent\\n'"
 		if present {
-			command = fmt.Sprintf("test \"$(getent group %s)\" = '%s:x:%d:'; grep '^%s:' /etc/group; grep -c '^%s:' /etc/gshadow", resourceLabGroup, resourceLabGroup, resourceLabGroupID, resourceLabGroup, resourceLabGroup)
+			command = fmt.Sprintf("test \"$(getent group %s)\" = '%s:x:%d:'; grep '^%s:' /etc/group; %s", resourceLabGroup, resourceLabGroup, resourceLabGroupID, resourceLabGroup, whereGroupShadow("grep -c '^"+resourceLabGroup+":' /etc/gshadow"))
 		}
 		return resourceOracle(ctx, vm, "native-group-database", command)
 	}
@@ -404,7 +414,7 @@ func userOracle(name string, uid uint32, shell string, present bool) func(contex
 // plus a scenario-specific native check; shadow content is never printed.
 func accountDatabaseOracle(check string) func(context.Context, *guestVM) (VMResourceNativeRecord, error) {
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
-		return resourceOracle(ctx, vm, "native-account-databases-unchanged", "sha256sum /etc/passwd /etc/shadow /etc/group /etc/gshadow; ls -1A "+resourceLabHomeRoot+"; "+check)
+		return resourceOracle(ctx, vm, "native-account-databases-unchanged", "sha256sum /etc/passwd /etc/shadow /etc/group "+groupShadowFiles+"; ls -1A "+resourceLabHomeRoot+"; "+check)
 	}
 }
 
@@ -415,7 +425,7 @@ func adoptedGroupOracle(gid uint32, members string) func(context.Context, *guest
 		g := resourceLabAdoptGroup
 		command := "line=$(getent group " + g + "); printf '%s\\n' \"$line\"; test \"$(printf '%s' \"$line\" | cut -d: -f3)\" = " + strconv.FormatUint(uint64(gid), 10) +
 			"; test \"$(printf '%s' \"$line\" | cut -d: -f4 | tr , '\\n' | sort | paste -sd, -)\" = " + nativeQuote(members) +
-			"; grep '^" + g + ":' /etc/group; printf 'gshadow-sha256 %s\\n' \"$(grep '^" + g + ":' /etc/gshadow | sha256sum | cut -d' ' -f1)\"; grep '^" + g + ":' /etc/gshadow | cut -d: -f1,4; id -nG " + resourceLabForeign + "; id -nG " + resourceLabAdoptUser
+			"; grep '^" + g + ":' /etc/group; " + whereGroupShadow("printf 'gshadow-sha256 %s\\n' \"$(grep '^"+g+":' /etc/gshadow | sha256sum | cut -d' ' -f1)\"; grep '^"+g+":' /etc/gshadow | cut -d: -f1,4") + "; id -nG " + resourceLabForeign + "; id -nG " + resourceLabAdoptUser
 		return resourceOracle(ctx, vm, "native-adopted-group", command)
 	}
 }

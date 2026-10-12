@@ -28,7 +28,10 @@ import (
 
 type localDB struct {
 	users, groups, shadow, gshadow map[string][]string
-	revision                       []byte
+	// shadowGroups is whether /etc/gshadow exists. shadow's tools maintain it
+	// only when present; openSUSE (Tumbleweed) ships none.
+	shadowGroups bool
+	revision     []byte
 }
 
 // nativeRun executes one fixed tool. stdin carries the only secret input any
@@ -79,7 +82,12 @@ func parseRecords(data []byte, fields int) (map[string][]string, error) {
 	}
 	return records, nil
 }
-func readDatabase(nativeDigest func(string, []byte) ([]byte, error)) (db *localDB, err error) {
+func readDatabase(nativeDigest func(string, []byte) ([]byte, error)) (*localDB, error) {
+	return readDatabaseAt("", nativeDigest)
+}
+
+// readDatabaseAt reads the local account files below root ("" is the host).
+func readDatabaseAt(root string, nativeDigest func(string, []byte) ([]byte, error)) (db *localDB, err error) {
 	if nativeDigest == nil {
 		return nil, ErrUnsupported
 	}
@@ -90,10 +98,17 @@ func readDatabase(nativeDigest func(string, []byte) ([]byte, error)) (db *localD
 		count  int
 		target *map[string][]string
 	}{{"/etc/passwd", 7, &db.users}, {"/etc/group", 4, &db.groups}, {"/etc/shadow", 9, &db.shadow}, {"/etc/gshadow", 4, &db.gshadow}} {
-		data, e := rootRead(item.path)
+		data, e := rootRead(root + item.path)
+		if item.path == "/etc/gshadow" && errors.Is(e, os.ErrNotExist) {
+			// An absent group shadow is part of the revision: creating it
+			// later changes every account plan's precondition.
+			h.Write([]byte(item.path + "\x00absent"))
+			continue
+		}
 		if e != nil {
 			return nil, e
 		}
+		db.shadowGroups = db.shadowGroups || item.path == "/etc/gshadow"
 		*item.target, e = parseRecords(data, item.count)
 		if e != nil {
 			return nil, e
@@ -122,6 +137,9 @@ func readDatabase(nativeDigest func(string, []byte) ([]byte, error)) (db *localD
 		}
 	}
 	for name, row := range db.groups {
+		if !db.shadowGroups {
+			continue
+		}
 		shadow := db.gshadow[name]
 		if shadow == nil || shadow[2] != "" || !slices.Equal(members(row[3]), members(shadow[3])) {
 			return nil, ErrUnsafe
@@ -182,6 +200,8 @@ func (p *Provider) observeLocal(ctx context.Context, d *resourcev1.ResourceDesir
 		private := db.gshadow[name]
 		if d.GetLocalUser() != nil {
 			private = db.shadow[name]
+		} else if !db.shadowGroups {
+			private = []string{}
 		}
 		if private == nil || p.config.NativeDigest == nil {
 			return nil, nil, nil, ErrUnsafe

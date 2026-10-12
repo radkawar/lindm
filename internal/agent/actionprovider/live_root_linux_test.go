@@ -115,7 +115,7 @@ func TestBtrfsRootResolvesEveryMemberDevice(t *testing.T) {
 }
 
 func TestLiveRootEffectOrdersGatePoweroffAllHeadersAndSurvivesNetworkLoss(t *testing.T) {
-	for _, variant := range []string{"success", "gate-denied", "poweroff-arm-failed", "first-native-failed", "network-lost", "raw-readback-failed"} {
+	for _, variant := range []string{"success", "gate-denied", "poweroff-arm-failed", "udev-freeze-failed", "first-native-failed", "network-lost", "raw-readback-failed"} {
 		t.Run(variant, func(t *testing.T) {
 			p, spec := liveScopeFixture()
 			p.clock = func() time.Time { return time.Unix(1800000000, 0) }
@@ -135,7 +135,7 @@ func TestLiveRootEffectOrdersGatePoweroffAllHeadersAndSurvivesNetworkLoss(t *tes
 			}
 			// The native runner reports exits as *nativeexec.ExitError.
 			exit := &nativeexec.ExitError{Program: "cryptsetup", Code: 1}
-			consumed, armed, erases := false, false, 0
+			consumed, armed, frozen, erases := false, false, false, 0
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			p.flushHeader = func(file *os.File) error {
@@ -162,8 +162,20 @@ func TestLiveRootEffectOrdersGatePoweroffAllHeadersAndSurvivesNetworkLoss(t *tes
 					}
 					return nil, nil
 				}
-				if !armed || request.command != cryptsetup {
-					t.Fatal("header effect preceded independent forced-poweroff timer")
+				if request.command == udevadm {
+					// Freezing udev follows the armed forced poweroff and
+					// precedes every header effect.
+					if !armed || erases != 0 || len(request.args) != 2 || request.args[0] != "control" || request.args[1] != "--stop-exec-queue" {
+						t.Fatal("udev freeze outside the armed window before the effects")
+					}
+					frozen = true
+					if variant == "udev-freeze-failed" {
+						return nil, errors.New("udev control socket refused")
+					}
+					return nil, nil
+				}
+				if !armed || !frozen || request.command != cryptsetup {
+					t.Fatal("header effect preceded independent forced-poweroff timer or udev freeze")
 				}
 				if work.Err() != nil {
 					t.Fatal("report/network cancellation reached consumed effect")

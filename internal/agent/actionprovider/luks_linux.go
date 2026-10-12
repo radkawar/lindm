@@ -391,6 +391,19 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 	for i, pcr := range plan.GetSpec().GetTpm2Bind().GetPcrs() {
 		pcrs[i] = strconv.FormatUint(uint64(pcr), 10)
 	}
+	args := []string{"--unlock-key-file=" + descriptor(1), "--tpm2-device=auto", "--tpm2-pcrs=" + strings.Join(pcrs, "+")}
+	if p.pcrlockPolicy == nil {
+		return ErrUnsupported
+	}
+	pcrlock, err := p.pcrlockPolicy()
+	if err != nil {
+		return err
+	}
+	if pcrlock {
+		// Keep the sealed policy exactly the approved PCRs: an empty value
+		// turns off cryptenroll's automatic pcrlock policy.
+		args = append(args, "--tpm2-pcrlock=")
+	}
 	secret, err := secretFile(credential)
 	if err != nil {
 		return err
@@ -399,7 +412,7 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 	if err := gate(ctx); err != nil {
 		return err
 	}
-	_, err = p.run(ctx, nativeRequest{command: cryptenroll, args: []string{"--unlock-key-file=" + descriptor(1), "--tpm2-device=auto", "--tpm2-pcrs=" + strings.Join(pcrs, "+"), descriptor(0)}, files: []*os.File{target.file, secret.file}})
+	_, err = p.run(ctx, nativeRequest{command: cryptenroll, args: append(args, descriptor(0)), files: []*os.File{target.file, secret.file}})
 	if err != nil {
 		return errors.Join(ErrOutcomeUnknown, err)
 	}
@@ -409,6 +422,25 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 		}
 	}
 	return nil
+}
+
+// pcrlockPolicyPresent reports a systemd-pcrlock policy file in the paths
+// systemd-cryptenroll searches. Whenever one exists (the Tumbleweed encrypted
+// guest carried /var/lib/systemd/pcrlock.json) cryptenroll silently
+// adds that policy to a --tpm2-pcrs= enrollment, so the token no longer
+// unseals under the approved PCRs alone: a bind after a deliberate PCR 7
+// change failed its own token-only verification ("None of the alternative
+// values for PCR 7 encoded in policy match"). The file exists only with
+// systemd 255 or later, which accepts --tpm2-pcrlock=.
+func pcrlockPolicyPresent() (bool, error) {
+	for _, path := range []string{"/run/systemd/pcrlock.json", "/var/lib/systemd/pcrlock.json"} {
+		if _, err := os.Lstat(path); err == nil {
+			return true, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 // referenceTPMToken adds references-1 byte-identical copies of the token
