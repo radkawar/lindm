@@ -1,7 +1,7 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
@@ -87,7 +87,6 @@ function intervalLabel(seconds: number): string {
 
 export function Reports() {
   const lifetime = useAuthLifetime();
-  const principal = usePrincipal();
   const [page, setPage] = useState("");
   const [adding, setAdding] = useState(false);
   const addAction = useIntegrationAction();
@@ -178,23 +177,6 @@ export function Reports() {
         onNext={list.data?.nextAfterId ? () => setPage(list.data?.nextAfterId ?? "") : undefined}
         busy={list.isFetching}
       />
-      <div className="grid gap-1 border-y py-3">
-        <h3 className="text-sm font-semibold">Export audit evidence</h3>
-        {canPermission(principal, "audit.read", true) ? (
-          <p className="text-sm text-muted-foreground">
-            Filter the{" "}
-            <Link to="/audit" className="text-foreground underline underline-offset-4">
-              audit log
-            </Link>{" "}
-            by kind of action, actor, device and time range, then export the matching events.
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Choosing audit evidence also requires unrestricted audit access. Ask an owner to review
-            your access; existing reports remain available below.
-          </p>
-        )}
-      </div>
       <Artifacts />
     </section>
   );
@@ -353,6 +335,14 @@ function ScheduleForm({
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Run on schedule
         </label>
+        {existing ? (
+          <TechnicalDetails
+            items={[
+              { label: "Schedule ID", value: existing.id },
+              { label: "Revision", value: existing.revision.toString() },
+            ]}
+          />
+        ) : null}
         <div className="grid gap-2">
           <Label htmlFor={`${id}-reason`}>Reason (audited)</Label>
           <Input
@@ -366,14 +356,6 @@ function ScheduleForm({
         <Button type="submit" className="w-fit">
           {existing ? "Save schedule" : "Create schedule"}
         </Button>
-        {existing ? (
-          <TechnicalDetails
-            items={[
-              { label: "Schedule ID", value: existing.id },
-              { label: "Revision", value: existing.revision.toString() },
-            ]}
-          />
-        ) : null}
       </fieldset>
     </form>
   );
@@ -390,12 +372,26 @@ function saveBlob(blob: Blob, filename: string) {
 
 function Artifacts() {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const client = useQueryClient();
   const navigate = useNavigate();
   const [page, setPage] = useState("");
   const list = useQuery(reportArtifactsQueryOptions(lifetime, page));
   const [downloading, setDownloading] = useState("");
   const [error, setError] = useState<RpcFailure | null>(null);
+  // The audit export links to /integrations#report-<id>. The row renders only
+  // after the list loads, so scroll to and focus it then; an export beyond this
+  // page falls back to the Reports heading.
+  const hash = useLocation({ select: (location) => location.hash.replace(/^#/, "") });
+  const focusedHash = useRef("");
+  useEffect(() => {
+    if (!hash.startsWith("report-") || !list.data || focusedHash.current === hash) return;
+    const target = document.getElementById(hash) ?? document.getElementById("reports-heading");
+    if (!target) return;
+    focusedHash.current = hash;
+    target.scrollIntoView({ block: "center" });
+    target.focus({ preventScroll: true });
+  }, [hash, list.data]);
   async function download(artifact: ReportArtifact) {
     if (downloading || lifetime.signal.aborted) return;
     setDownloading(artifact.id);
@@ -451,7 +447,22 @@ function Artifacts() {
       aria-label="Report artifacts"
       aria-busy={list.isFetching}
     >
-      <h3 className="text-base font-semibold">Reports</h3>
+      <h3 id="reports-heading" tabIndex={-1} className="text-base font-semibold outline-none">
+        Reports
+      </h3>
+      <p className="-mt-2 text-sm text-muted-foreground">
+        {canPermission(principal, "audit.read", true) ? (
+          <>
+            Scheduled runs and audit evidence exports. To export evidence, filter the{" "}
+            <Link to="/audit" className="text-foreground underline underline-offset-4">
+              audit log
+            </Link>{" "}
+            and choose Export filtered evidence.
+          </>
+        ) : (
+          "Scheduled runs and audit evidence exports. Exporting evidence also requires unrestricted audit access."
+        )}
+      </p>
       {error ? <RpcError failure={error} title="Report not downloaded" /> : null}
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
@@ -495,7 +506,8 @@ function Artifacts() {
               <TableRow
                 id={`report-${artifact.id}`}
                 key={artifact.id}
-                className="align-top target:bg-muted/50"
+                tabIndex={-1}
+                className="align-top target:bg-muted/50 focus:bg-muted/50 focus:outline-2 focus:-outline-offset-2 focus:outline-ring"
               >
                 <TableCell className="min-w-40 whitespace-normal">
                   {KINDS[artifact.kind]} · {FORMAT_LABELS[artifact.format]}

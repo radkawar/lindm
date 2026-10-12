@@ -237,13 +237,15 @@ const listDeliveries = `-- name: ListDeliveries :many
 SELECT id, destination_id, event_id, sequence, resource_id, status, attempts, replay_count, next_attempt_at, lease_token, lease_generation, lease_expires_at, delivered_at, last_error FROM integration_deliveries
 WHERE ($1::uuid IS NULL OR destination_id=$1)
   AND ($2::integer=0 OR status=$2)
-  AND (sequence,id) < ($3::bigint,$4::uuid)
-ORDER BY sequence DESC,id DESC LIMIT $5
+  AND (NOT $3::boolean OR status=4 OR (status IN (1,2) AND last_error<>''))
+  AND (sequence,id) < ($4::bigint,$5::uuid)
+ORDER BY sequence DESC,id DESC LIMIT $6
 `
 
 type ListDeliveriesParams struct {
 	DestinationID  *uuid.UUID
 	StatusFilter   int32
+	FailuresOnly   bool
 	BeforeSequence int64
 	BeforeID       uuid.UUID
 	PageLimit      int32
@@ -253,6 +255,7 @@ func (q *Queries) ListDeliveries(ctx context.Context, arg ListDeliveriesParams) 
 	rows, err := q.db.Query(ctx, listDeliveries,
 		arg.DestinationID,
 		arg.StatusFilter,
+		arg.FailuresOnly,
 		arg.BeforeSequence,
 		arg.BeforeID,
 		arg.PageLimit,
@@ -518,6 +521,62 @@ func (q *Queries) RotateDestinationSecret(ctx context.Context, arg RotateDestina
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const summarizeDeliveries = `-- name: SummarizeDeliveries :many
+SELECT d.id AS destination_id,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status=3 AND x.delivered_at>=$1::timestamptz)::bigint AS delivered,
+  (SELECT max(x.delivered_at) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status=3)::timestamptz AS last_delivered_at,
+  (SELECT count(*) FROM integration_deliveries x WHERE x.destination_id=d.id AND x.status=4)::bigint AS failed,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2) AND x.last_error<>'')::bigint AS retrying,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2) AND x.last_error='')::bigint AS queued,
+  COALESCE((SELECT x.last_error FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2,4) AND x.last_error<>''
+    ORDER BY x.sequence DESC LIMIT 1), '')::text AS last_error
+FROM integration_destinations d WHERE d.deleted_at IS NULL
+ORDER BY d.created_at DESC,d.id DESC LIMIT 100
+`
+
+type SummarizeDeliveriesRow struct {
+	DestinationID   uuid.UUID
+	Delivered       int64
+	LastDeliveredAt pgtype.Timestamptz
+	Failed          int64
+	Retrying        int64
+	Queued          int64
+	LastError       string
+}
+
+func (q *Queries) SummarizeDeliveries(ctx context.Context, deliveredSince pgtype.Timestamptz) ([]SummarizeDeliveriesRow, error) {
+	rows, err := q.db.Query(ctx, summarizeDeliveries, deliveredSince)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SummarizeDeliveriesRow{}
+	for rows.Next() {
+		var i SummarizeDeliveriesRow
+		if err := rows.Scan(
+			&i.DestinationID,
+			&i.Delivered,
+			&i.LastDeliveredAt,
+			&i.Failed,
+			&i.Retrying,
+			&i.Queued,
+			&i.LastError,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateDestination = `-- name: UpdateDestination :one

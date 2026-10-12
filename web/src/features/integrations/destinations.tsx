@@ -1,7 +1,8 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { Trash2 } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -32,13 +33,17 @@ import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { adminClient } from "@/lib/rpc";
 import { toRpcFailure } from "@/lib/errors";
+import { reasonError } from "@/lib/reason";
 import {
   DestinationConfigSchema,
   DestinationKind,
+  type CertificateSummary,
+  type DeliverySummary,
   type Destination,
 } from "../../../gen/lindm/integrations/v1/delivery_pb";
 import { useIntegrationAction, type IntegrationAction } from "./action";
-import { destinationsQueryOptions } from "./queries";
+import { destinationHealth, plural } from "./health";
+import { deliverySummaryQueryOptions, destinationsQueryOptions } from "./queries";
 
 const KIND_LABELS: Record<DestinationKind, string> = {
   [DestinationKind.UNSPECIFIED]: "Unknown",
@@ -54,44 +59,81 @@ const OVERLAP_OPTIONS = [
   { value: 86400, label: "24 hours" },
 ];
 
+// The same rules the server enforces (DestinationConfig and request CEL), checked
+// before submit so each field explains itself.
+const WEBHOOK_ENDPOINT = /^https:\/\/[^/@?#]+(\/[^?#]*)?$/;
+const SYSLOG_ENDPOINT = /^tls:\/\/[^/@?#]+:[0-9]+$/;
+
+function secretError(secret: string): string {
+  const size = new TextEncoder().encode(secret).length;
+  if (size === 0) return "Enter a signing secret, or generate one.";
+  if (size < 32 || size > 64) {
+    return `Use 32 to 64 characters; this has ${size}. Generate one to be safe.`;
+  }
+  return "";
+}
+
+// Shown only when a certificate must be supplied: syslog trust or an explicit
+// pin/replace; an empty value there would silently drop pinning.
+function caError(ca: string): string {
+  const text = ca.trim();
+  if (text === "") return "Paste the CA certificate that signed the receiver's certificate.";
+  if (!text.startsWith("-----BEGIN CERTIFICATE-----") || /PRIVATE KEY/.test(text)) {
+    return "Paste only PEM certificates starting with -----BEGIN CERTIFICATE-----, never a key.";
+  }
+  return "";
+}
+
+/** 48 random URL-safe characters (288 bits) for a new signing secret. */
+function generateSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(36));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_");
+}
+
 export function Destinations() {
   const lifetime = useAuthLifetime();
   const [page, setPage] = useState("");
   const [adding, setAdding] = useState(false);
   const addAction = useIntegrationAction();
   const list = useQuery(destinationsQueryOptions(lifetime, page));
+  const summary = useQuery(deliverySummaryQueryOptions(lifetime));
+  const summaries = new Map(summary.data?.summaries.map((row) => [row.destinationId, row]) ?? []);
   return (
     <section
-      className="grid min-w-0 gap-4 border-t pt-6"
-      aria-label="Delivery destinations"
+      className="grid min-w-0 gap-3"
+      aria-labelledby="destinations-heading"
       aria-busy={list.isFetching}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1">
-          <h2 className="text-base font-semibold">Destinations</h2>
+          <h2 id="destinations-heading" className="text-base font-semibold">
+            Destinations
+          </h2>
           <p className="text-sm text-muted-foreground">
-            New audit events go to every destination that is sending. A destination that is off does
-            not receive events recorded while it is off.
+            New audit events go to every destination that is sending.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setAdding(true)}>
-            {addAction.blocked ? "Review pending destination" : "Add destination"}
-          </Button>
-        </div>
+        <Button onClick={() => setAdding(true)}>
+          {addAction.blocked ? "Review pending destination" : "Add destination"}
+        </Button>
       </div>
       <Dialog open={adding} onOpenChange={setAdding}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add destination</DialogTitle>
             <DialogDescription>
-              Only audit events recorded after it is created are sent; earlier events are not.
+              Only audit events recorded after it is created are sent.
             </DialogDescription>
           </DialogHeader>
           <DestinationForm action={addAction} onDone={() => setAdding(false)} />
         </DialogContent>
       </Dialog>
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
+      {summary.error ? (
+        <RpcError failure={toRpcFailure(summary.error)} title="Delivery health unavailable" />
+      ) : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading destinations…</span>
@@ -124,10 +166,8 @@ export function Destinations() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
+              <TableHead>Health</TableHead>
               <TableHead>Address</TableHead>
-              <TableHead>Delivery</TableHead>
-              <TableHead>Changed</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -138,6 +178,7 @@ export function Destinations() {
               <DestinationRow
                 key={`${destination.id}:${destination.version}`}
                 destination={destination}
+                summary={summaries.get(destination.id)}
               />
             ))}
           </TableBody>
@@ -156,65 +197,209 @@ export function Destinations() {
   );
 }
 
-function DestinationRow({ destination }: { destination: Destination }) {
-  const action = useIntegrationAction();
-  const [open, setOpen] = useState(false);
-  const config = destination.config;
-  const name = config?.displayName.trim() || "Unnamed destination";
-  const overlapEnds = destination.previousSecretExpiresAt
-    ? timestampDate(destination.previousSecretExpiresAt)
-    : null;
+function destinationName(destination: Destination) {
+  return destination.config?.displayName.trim() || "Unnamed destination";
+}
+
+function overlapEnd(destination: Destination): Date | null {
+  if (!destination.previousSecretExpiresAt) return null;
+  const end = timestampDate(destination.previousSecretExpiresAt);
+  return end.getTime() > Date.now() ? end : null;
+}
+
+function DestinationRow({
+  destination,
+  summary,
+}: {
+  destination: Destination;
+  summary: DeliverySummary | undefined;
+}) {
+  const editAction = useIntegrationAction();
+  const rotateAction = useIntegrationAction();
+  const deleteAction = useIntegrationAction();
+  const [open, setOpen] = useState<"" | "edit" | "rotate" | "delete">("");
+  const name = destinationName(destination);
+  const health = destinationHealth(destination, summary);
+  const webhook = destination.config?.kind === DestinationKind.WEBHOOK;
+  const overlap = overlapEnd(destination);
   return (
     <TableRow className="align-top">
       <TableCell className="min-w-40 whitespace-normal break-words">
         <span className="font-medium">{name}</span>
+        <p className="text-xs text-muted-foreground">
+          {KIND_LABELS[destination.config?.kind ?? DestinationKind.UNSPECIFIED]}
+        </p>
         <TechnicalDetails
           items={[
             { label: "Destination ID", value: destination.id },
             { label: "Revision", value: destination.version.toString() },
+            { label: "Delivery reason", value: summary?.lastError },
           ]}
         />
       </TableCell>
-      <TableCell>{KIND_LABELS[config?.kind ?? DestinationKind.UNSPECIFIED]}</TableCell>
-      <TableCell className="min-w-48 max-w-md whitespace-normal break-all font-mono text-xs">
-        {config?.endpoint}
-      </TableCell>
-      <TableCell className="whitespace-normal">
-        <StatusBadge status={config?.enabled ? "success" : "neutral"}>
-          {config?.enabled ? "Sending" : "Paused"}
-        </StatusBadge>
-        {overlapEnds && overlapEnds.getTime() > Date.now() ? (
+      <TableCell className="min-w-48 max-w-sm whitespace-normal">
+        <StatusBadge status={health.tone}>{health.label}</StatusBadge>
+        {health.detail ? <p className="mt-1 text-xs">{health.detail}</p> : null}
+        {summary?.lastDeliveredAt && destination.config?.enabled ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last delivered <Timestamp value={summary.lastDeliveredAt} />
+          </p>
+        ) : null}
+        {overlap ? (
           <p className="mt-1 text-xs text-muted-foreground">
             Old signing secret works until <Timestamp value={destination.previousSecretExpiresAt} />
           </p>
         ) : null}
       </TableCell>
-      <TableCell>
-        <Timestamp value={destination.updatedAt} />
+      <TableCell className="min-w-48 max-w-md whitespace-normal break-all font-mono text-xs">
+        {destination.config?.endpoint}
       </TableCell>
-      <TableCell className="text-right">
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          {action.blocked ? "Review pending change" : "Edit"}
-        </Button>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto text-left sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="break-words">Edit {name}</DialogTitle>
-              <DialogDescription>
-                Changes apply to events sent after you save. The type can't be changed.
-              </DialogDescription>
-            </DialogHeader>
-            <DestinationForm
-              destination={destination}
-              action={action}
-              onDone={() => setOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+      <TableCell>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setOpen("edit")}>
+            {editAction.blocked ? "Review pending change" : "Edit"}
+          </Button>
+          {webhook ? (
+            <Button variant="outline" size="sm" onClick={() => setOpen("rotate")}>
+              {rotateAction.blocked ? "Review pending rotation" : "Rotate secret"}
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Delete ${name}`}
+            title={`Delete ${name}`}
+            onClick={() => setOpen("delete")}
+          >
+            <Trash2 aria-hidden="true" />
+          </Button>
+        </div>
+        <RowDialog
+          open={open === "edit"}
+          onClose={() => setOpen("")}
+          title={`Edit ${name}`}
+          description="Changes apply to events sent after you save. The type can't be changed."
+        >
+          <DestinationForm
+            destination={destination}
+            action={editAction}
+            onDone={() => setOpen("")}
+          />
+        </RowDialog>
+        <RowDialog
+          open={open === "rotate"}
+          onClose={() => setOpen("")}
+          title={`Rotate signing secret for ${name}`}
+          description="The receiver checks each event's signature with this secret."
+        >
+          <RotateForm destination={destination} action={rotateAction} onDone={() => setOpen("")} />
+        </RowDialog>
+        <RowDialog
+          open={open === "delete"}
+          onClose={() => setOpen("")}
+          title={`Delete ${name}`}
+          description="This can't be undone."
+        >
+          <DeleteForm
+            destination={destination}
+            summary={summary}
+            action={deleteAction}
+            onDone={() => setOpen("")}
+          />
+        </RowDialog>
       </TableCell>
     </TableRow>
   );
 }
+
+function RowDialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto text-left sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="break-words">{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FieldError({ id, message }: { id: string; message: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
+
+function ReasonField({
+  id,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  error: string;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={`${id}-reason`}>Reason (audited)</Label>
+      <Input
+        id={`${id}-reason`}
+        data-freeform="audit reason"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-reason-error` : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <FieldError id={`${id}-reason-error`} message={error} />
+    </div>
+  );
+}
+
+function CertificateLine({ certificate }: { certificate: CertificateSummary }) {
+  const expired = certificate.notAfter && timestampDate(certificate.notAfter) < new Date();
+  return (
+    <li className="grid gap-1">
+      <span className="break-words font-medium">{certificate.subject}</span>
+      <span className="text-xs">
+        {expired ? "Expired " : "Expires "}
+        <Timestamp value={certificate.notAfter} relative={false} />
+      </span>
+      <span className="break-all font-mono text-xs text-muted-foreground">
+        SHA-256 {certificate.sha256Fingerprint}
+      </span>
+    </li>
+  );
+}
+
+type FieldKey = "name" | "endpoint" | "ca" | "secret" | "reason";
+
+// Proto field names of a server violation → the form input it belongs under.
+const SERVER_FIELDS: Record<string, FieldKey> = {
+  display_name: "name",
+  endpoint: "endpoint",
+  pinned_ca_pem: "ca",
+  signing_secret: "secret",
+  reason: "reason",
+};
 
 function DestinationForm({
   destination,
@@ -229,25 +414,65 @@ function DestinationForm({
   const [name, setName] = useState(destination?.config?.displayName ?? "");
   const [kind, setKind] = useState(destination?.config?.kind ?? DestinationKind.WEBHOOK);
   const [endpoint, setEndpoint] = useState(destination?.config?.endpoint ?? "");
-  const [ca, setCa] = useState(destination?.config?.pinnedCaPem ?? "");
+  // The stored PEM is never shown; it is sent back unchanged unless replaced.
+  const [replacingCa, setReplacingCa] = useState(false);
+  const [ca, setCa] = useState("");
   const [enabled, setEnabled] = useState(destination?.config?.enabled ?? true);
   const [secret, setSecret] = useState("");
-  const [overlap, setOverlap] = useState(3600);
+  const [shownSecret, setShownSecret] = useState(false);
   const [reason, setReason] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  // Server refusals with buf.validate violations, placed under their inputs.
+  const [serverErrors, setServerErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const id = destination?.id ?? "new";
-  const callOptions = { signal: lifetime.signal };
+  const syslog = kind === DestinationKind.SYSLOG_TLS;
+  const storedCertificates = destination?.pinnedCaCertificates ?? [];
+  const storedPem = destination?.config?.pinnedCaPem ?? "";
+  // Syslog without stored trust must take a PEM; otherwise PEM input is opt-in.
+  const editingCa = replacingCa || (syslog && !storedPem);
+  const errors = {
+    name: name.trim() === "" ? "Enter a name, for example SOC webhook." : "",
+    endpoint: syslog
+      ? SYSLOG_ENDPOINT.test(endpoint.trim())
+        ? ""
+        : "Use tls://host:port, for example tls://siem.example:6514."
+      : WEBHOOK_ENDPOINT.test(endpoint.trim())
+        ? ""
+        : "Use an https:// address, for example https://receiver.example/events. Plain http:// isn't allowed.",
+    ca: editingCa ? caError(ca) : "",
+    secret: !destination && !syslog ? secretError(secret) : "",
+    reason: reasonError(reason),
+  };
+  const shown = (key: FieldKey) => serverErrors[key] || (attempted ? errors[key] : "");
+
+  async function placeServerErrors<T>(send: () => Promise<T>): Promise<T> {
+    try {
+      return await send();
+    } catch (error) {
+      const placed: Partial<Record<FieldKey, string>> = {};
+      for (const field of toRpcFailure(error).fields ?? []) {
+        const key = SERVER_FIELDS[field.field];
+        if (key && !placed[key]) placed[key] = field.message;
+      }
+      setServerErrors(placed);
+      throw error;
+    }
+  }
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setAttempted(true);
+    setServerErrors({});
+    if (Object.values(errors).some(Boolean)) return;
     const config = create(DestinationConfigSchema, {
-      displayName: name,
+      displayName: name.trim(),
       kind,
-      endpoint,
-      pinnedCaPem: ca,
+      endpoint: endpoint.trim(),
+      pinnedCaPem: editingCa ? ca.trim() : storedPem,
       enabled,
     });
     const requestId = crypto.randomUUID();
+    const callOptions = { signal: lifetime.signal };
     if (destination) {
       const request = {
         requestId,
@@ -257,41 +482,25 @@ function DestinationForm({
         reason,
       };
       action.perform(async () => {
-        const response = await adminClient.updateDestination(request, callOptions);
+        const response = await placeServerErrors(() =>
+          adminClient.updateDestination(request, callOptions),
+        );
         lifetime.signal.throwIfAborted();
         onDone();
         return response;
       });
-    } else {
-      const request = {
-        requestId,
-        config,
-        reason,
-        signingSecret:
-          kind === DestinationKind.WEBHOOK ? new TextEncoder().encode(secret) : new Uint8Array(),
-      };
-      action.perform(async () => {
-        const response = await adminClient.createDestination(request, callOptions);
-        lifetime.signal.throwIfAborted();
-        setSecret("");
-        onDone();
-        return response;
-      });
+      return;
     }
-  }
-
-  function rotate() {
-    if (!destination) return;
     const request = {
-      requestId: crypto.randomUUID(),
-      destinationId: destination.id,
-      expectedVersion: destination.version,
-      signingSecret: new TextEncoder().encode(secret),
-      overlapSeconds: overlap,
+      requestId,
+      config,
       reason,
+      signingSecret: syslog ? new Uint8Array() : new TextEncoder().encode(secret),
     };
     action.perform(async () => {
-      const response = await adminClient.rotateDestinationSecret(request, callOptions);
+      const response = await placeServerErrors(() =>
+        adminClient.createDestination(request, callOptions),
+      );
       lifetime.signal.throwIfAborted();
       setSecret("");
       onDone();
@@ -299,24 +508,8 @@ function DestinationForm({
     });
   }
 
-  function remove() {
-    if (!destination) return;
-    const request = {
-      requestId: crypto.randomUUID(),
-      destinationId: destination.id,
-      expectedVersion: destination.version,
-      reason,
-    };
-    action.perform(async () => {
-      const response = await adminClient.deleteDestination(request, callOptions);
-      lifetime.signal.throwIfAborted();
-      onDone();
-      return response;
-    });
-  }
-
   return (
-    <form onSubmit={save} className="grid min-w-0 gap-4">
+    <form onSubmit={save} noValidate className="grid min-w-0 gap-4">
       {action.feedback}
       <fieldset className="grid min-w-0 gap-3" disabled={action.blocked}>
         <div className="grid gap-2">
@@ -324,11 +517,13 @@ function DestinationForm({
           <Input
             id={`${id}-name`}
             data-freeform="new destination name"
-            required
             maxLength={128}
+            aria-invalid={shown("name") ? true : undefined}
+            aria-describedby={shown("name") ? `${id}-name-error` : undefined}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+          <FieldError id={`${id}-name-error`} message={shown("name")} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor={`${id}-kind`}>Type</Label>
@@ -349,138 +544,302 @@ function DestinationForm({
           <Input
             id={`${id}-endpoint`}
             data-freeform="external receiver URL"
-            type="url"
-            required
             maxLength={2048}
             className="font-mono"
-            placeholder={
-              kind === DestinationKind.WEBHOOK
-                ? "https://receiver.example/events"
-                : "tls://siem.example:6514"
-            }
+            placeholder={syslog ? "tls://siem.example:6514" : "https://receiver.example/events"}
+            aria-invalid={shown("endpoint") ? true : undefined}
+            aria-describedby={shown("endpoint") ? `${id}-endpoint-error` : undefined}
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
           />
+          <FieldError id={`${id}-endpoint-error`} message={shown("endpoint")} />
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`${id}-ca`}>
-            CA certificate {kind === DestinationKind.SYSLOG_TLS ? "(required)" : "(optional)"}
-          </Label>
-          <Textarea
-            id={`${id}-ca`}
-            data-freeform="pasted PEM certificate"
-            rows={3}
-            className="max-h-40 font-mono text-xs"
-            placeholder="-----BEGIN CERTIFICATE-----"
-            value={ca}
-            required={kind === DestinationKind.SYSLOG_TLS}
-            onChange={(e) => setCa(e.target.value)}
-          />
+        <div className="grid gap-2" role="group" aria-labelledby={`${id}-ca-heading`}>
+          <span id={`${id}-ca-heading`} className="text-sm font-medium">
+            CA certificate {syslog ? "(required)" : "(optional)"}
+          </span>
+          {storedCertificates.length > 0 && !replacingCa ? (
+            <ul className="grid gap-2 border p-3" aria-label="Pinned CA certificate">
+              {storedCertificates.map((certificate) => (
+                <CertificateLine key={certificate.sha256Fingerprint} certificate={certificate} />
+              ))}
+            </ul>
+          ) : null}
+          {!editingCa && !storedPem ? (
+            <p className="text-xs text-muted-foreground">
+              Trusts the receiver's public certificate authorities.
+            </p>
+          ) : null}
+          {editingCa ? (
+            <>
+              <Label htmlFor={`${id}-ca`} className="sr-only">
+                {storedPem ? "Replacement CA certificate (PEM)" : "CA certificate (PEM)"}
+              </Label>
+              <Textarea
+                id={`${id}-ca`}
+                data-freeform="pasted PEM certificate"
+                rows={3}
+                className="max-h-40 font-mono text-xs"
+                placeholder="-----BEGIN CERTIFICATE-----"
+                aria-invalid={shown("ca") ? true : undefined}
+                aria-describedby={shown("ca") ? `${id}-ca-error` : undefined}
+                value={ca}
+                onChange={(e) => setCa(e.target.value)}
+              />
+              <FieldError id={`${id}-ca-error`} message={shown("ca")} />
+            </>
+          ) : null}
+          {storedPem ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              onClick={() => {
+                setReplacingCa(!replacingCa);
+                setCa("");
+              }}
+            >
+              {replacingCa ? "Keep current certificate" : "Replace certificate"}
+            </Button>
+          ) : !syslog ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              onClick={() => {
+                setReplacingCa(!replacingCa);
+                setCa("");
+              }}
+            >
+              {replacingCa ? "Use public certificate authorities" : "Pin a CA certificate"}
+            </Button>
+          ) : null}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Send events
         </label>
-        {!destination && kind === DestinationKind.WEBHOOK ? (
+        {!destination && !syslog ? (
           <div className="grid gap-2">
             <Label htmlFor={`${id}-secret`}>Signing secret</Label>
-            <Input
-              id={`${id}-secret`}
-              type="password"
-              autoComplete="new-password"
-              required
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              A random 32 to 64 character secret shared with your receiver. It's never shown again.
-            </p>
-          </div>
-        ) : null}
-        <div className="grid gap-2">
-          <Label htmlFor={`${id}-reason`}>Reason (audited)</Label>
-          <Input
-            id={`${id}-reason`}
-            data-freeform="audit reason"
-            required
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </div>
-        <Button type="submit" className="w-fit">
-          {destination ? "Save changes" : "Create destination"}
-        </Button>
-        {destination && kind === DestinationKind.WEBHOOK ? (
-          <div className="grid gap-3 border-t pt-4">
-            <h3 className="font-semibold">Rotate signing secret</h3>
-            <div className="grid gap-2">
-              <Label htmlFor={`${id}-secret`}>New signing secret</Label>
+            <div className="flex gap-2">
               <Input
                 id={`${id}-secret`}
-                type="password"
+                type={shownSecret ? "text" : "password"}
                 autoComplete="new-password"
+                className={shownSecret ? "font-mono" : undefined}
+                aria-invalid={shown("secret") ? true : undefined}
+                aria-describedby={`${id}-secret-hint`}
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
               />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor={`${id}-overlap`}>Keep the old secret working for</Label>
-              <SelectField
-                id={`${id}-overlap`}
-                className="h-9 w-48"
-                value={overlap}
-                onValueChange={(value) => setOverlap(Number(value))}
-                options={OVERLAP_OPTIONS}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={!secret || !reason.trim()}
-              onClick={rotate}
-            >
-              Rotate signing secret
-            </Button>
-            {!secret || !reason.trim() ? (
-              <p className="text-xs text-muted-foreground">
-                Enter a new secret and a reason to rotate.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {destination ? (
-          <div className="grid gap-3 border-t pt-4">
-            <h3 className="font-semibold">Delete destination</h3>
-            <p className="text-sm text-muted-foreground">
-              Events not yet delivered to {name || "this destination"} are dropped, and new events
-              are no longer sent. This can't be undone.
-            </p>
-            {confirmDelete ? (
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="destructive" onClick={remove}>
-                  Delete {name || "destination"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setConfirmDelete(false)}>
-                  Keep destination
-                </Button>
-              </div>
-            ) : (
               <Button
                 type="button"
                 variant="outline"
-                className="w-fit"
-                disabled={!reason.trim()}
-                onClick={() => setConfirmDelete(true)}
+                onClick={() => {
+                  setSecret(generateSecret());
+                  setShownSecret(true);
+                }}
               >
-                Delete destination…
+                Generate
               </Button>
-            )}
-            {!reason.trim() ? (
-              <p className="text-xs text-muted-foreground">Enter a reason to delete.</p>
-            ) : null}
+            </div>
+            <p id={`${id}-secret-hint`} className="text-xs text-muted-foreground">
+              32 to 64 characters, shared with your receiver. It's never shown again after creation.
+            </p>
+            <FieldError id={`${id}-secret-error`} message={shown("secret")} />
           </div>
         ) : null}
+        <ReasonField id={id} value={reason} onChange={setReason} error={shown("reason")} />
+        <Button type="submit" className="w-fit">
+          {destination ? "Save changes" : "Create destination"}
+        </Button>
+      </fieldset>
+    </form>
+  );
+}
+
+function RotateForm({
+  destination,
+  action,
+  onDone,
+}: {
+  destination: Destination;
+  action: IntegrationAction;
+  onDone: () => void;
+}) {
+  const lifetime = useAuthLifetime();
+  const [secret, setSecret] = useState("");
+  const [shownSecret, setShownSecret] = useState(false);
+  const [overlap, setOverlap] = useState(3600);
+  const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const id = `${destination.id}-rotate`;
+  const active = overlapEnd(destination);
+  if (active && !action.blocked) {
+    return (
+      <p className="text-sm">
+        The secret replaced by the last rotation still works until{" "}
+        <Timestamp value={destination.previousSecretExpiresAt} />. You can rotate again after that.
+      </p>
+    );
+  }
+  const errors = { secret: secretError(secret), reason: reasonError(reason) };
+  const label = OVERLAP_OPTIONS.find((option) => option.value === overlap)?.label ?? "";
+  const deadline = timestampFromDate(new Date(Date.now() + overlap * 1000));
+
+  function rotate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAttempted(true);
+    if (errors.secret || errors.reason) return;
+    const request = {
+      requestId: crypto.randomUUID(),
+      destinationId: destination.id,
+      expectedVersion: destination.version,
+      signingSecret: new TextEncoder().encode(secret),
+      overlapSeconds: overlap,
+      reason,
+    };
+    action.perform(async () => {
+      const response = await adminClient.rotateDestinationSecret(request, {
+        signal: lifetime.signal,
+      });
+      lifetime.signal.throwIfAborted();
+      setSecret("");
+      onDone();
+      return response;
+    });
+  }
+
+  return (
+    <form onSubmit={rotate} noValidate className="grid min-w-0 gap-4">
+      {action.feedback}
+      <fieldset className="grid min-w-0 gap-3" disabled={action.blocked}>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-secret`}>New signing secret</Label>
+          <div className="flex gap-2">
+            <Input
+              id={`${id}-secret`}
+              type={shownSecret ? "text" : "password"}
+              autoComplete="new-password"
+              className={shownSecret ? "font-mono" : undefined}
+              aria-invalid={attempted && errors.secret ? true : undefined}
+              aria-describedby={`${id}-secret-hint`}
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setSecret(generateSecret());
+                setShownSecret(true);
+              }}
+            >
+              Generate
+            </Button>
+          </div>
+          <p id={`${id}-secret-hint`} className="text-xs text-muted-foreground">
+            32 to 64 characters. Copy it to the receiver; it's never shown again.
+          </p>
+          <FieldError id={`${id}-secret-error`} message={attempted ? errors.secret : ""} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-overlap`}>Keep the old secret working for</Label>
+          <SelectField
+            id={`${id}-overlap`}
+            className="h-9 w-48"
+            value={overlap}
+            onValueChange={(value) => setOverlap(Number(value))}
+            options={OVERLAP_OPTIONS}
+          />
+        </div>
+        <p className="border-l-2 border-warning pl-3 text-sm" aria-live="polite">
+          {overlap > 0 ? (
+            <>
+              The old secret keeps working for {label}; update the receiver before{" "}
+              <Timestamp value={deadline} relative={false} />.
+            </>
+          ) : (
+            <>
+              The old secret stops working immediately; the receiver rejects events until it has the
+              new secret.
+            </>
+          )}
+        </p>
+        <ReasonField
+          id={id}
+          value={reason}
+          onChange={setReason}
+          error={attempted ? errors.reason : ""}
+        />
+        <Button type="submit" className="w-fit">
+          Rotate secret
+        </Button>
+      </fieldset>
+    </form>
+  );
+}
+
+function DeleteForm({
+  destination,
+  summary,
+  action,
+  onDone,
+}: {
+  destination: Destination;
+  summary: DeliverySummary | undefined;
+  action: IntegrationAction;
+  onDone: () => void;
+}) {
+  const lifetime = useAuthLifetime();
+  const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const name = destinationName(destination);
+  const pending = summary ? summary.failed + summary.retrying + summary.queued : undefined;
+  const error = reasonError(reason);
+
+  function remove(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAttempted(true);
+    if (error) return;
+    const request = {
+      requestId: crypto.randomUUID(),
+      destinationId: destination.id,
+      expectedVersion: destination.version,
+      reason,
+    };
+    action.perform(async () => {
+      const response = await adminClient.deleteDestination(request, { signal: lifetime.signal });
+      lifetime.signal.throwIfAborted();
+      onDone();
+      return response;
+    });
+  }
+
+  return (
+    <form onSubmit={remove} noValidate className="grid min-w-0 gap-4">
+      {action.feedback}
+      <p className="border-l-2 border-destructive pl-3 text-sm">
+        {name} stops receiving events.{" "}
+        {pending === undefined
+          ? "Events not yet delivered to it are dropped."
+          : pending > 0n
+            ? `${plural(pending, "event")} not yet delivered to it are dropped.`
+            : "No events are waiting to be delivered to it."}
+      </p>
+      <fieldset className="grid min-w-0 gap-3" disabled={action.blocked}>
+        <ReasonField
+          id={`${destination.id}-delete`}
+          value={reason}
+          onChange={setReason}
+          error={attempted ? error : ""}
+        />
+        <Button type="submit" variant="destructive" className="w-fit">
+          Delete destination
+        </Button>
       </fieldset>
     </form>
   );

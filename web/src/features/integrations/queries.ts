@@ -15,23 +15,41 @@ export function destinationsQueryOptions(lifetime: AuthLifetime, pageToken: stri
   });
 }
 
-export function deliveriesQueryOptions(
-  lifetime: AuthLifetime,
-  pageToken: string,
-  deadLetters: boolean,
-) {
+/** Dead letters and deliveries retrying after a failed attempt, newest first. */
+export function failedDeliveriesQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   return queryOptions({
-    queryKey: ["integrations", lifetime.generation, "deliveries", pageToken, deadLetters],
+    queryKey: ["integrations", lifetime.generation, "deliveries", "failures", pageToken],
     meta: { authGeneration: lifetime.generation },
     queryFn: ({ signal }) =>
       adminClient.listDeliveries(
-        {
-          pageSize: 20,
-          pageToken,
-          status: deadLetters ? DeliveryStatus.DEAD_LETTER : DeliveryStatus.UNSPECIFIED,
-        },
+        { pageSize: 20, pageToken, failuresOnly: true },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       ),
+  });
+}
+
+export function deliveredQueryOptions(
+  lifetime: AuthLifetime,
+  destinationId: string,
+  pageToken: string,
+) {
+  return queryOptions({
+    queryKey: ["integrations", lifetime.generation, "deliveries", destinationId, pageToken],
+    meta: { authGeneration: lifetime.generation },
+    queryFn: ({ signal }) =>
+      adminClient.listDeliveries(
+        { pageSize: 20, pageToken, destinationId, status: DeliveryStatus.DELIVERED },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      ),
+  });
+}
+
+export function deliverySummaryQueryOptions(lifetime: AuthLifetime) {
+  return queryOptions({
+    queryKey: ["integrations", lifetime.generation, "delivery-summary"],
+    meta: { authGeneration: lifetime.generation },
+    queryFn: ({ signal }) =>
+      adminClient.summarizeDeliveries({}, { signal: AbortSignal.any([signal, lifetime.signal]) }),
   });
 }
 
@@ -53,7 +71,7 @@ export function reportArtifactsQueryOptions(lifetime: AuthLifetime, afterId: str
     meta: { authGeneration: lifetime.generation },
     queryFn: ({ signal }) =>
       adminClient.listReportArtifacts(
-        { pageSize: 50, afterId },
+        { pageSize: 10, afterId },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       ),
   });

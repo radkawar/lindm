@@ -61,7 +61,8 @@ func New(pool *pgxpool.Pool, auth *identity.Service, encryptionKey []byte, clock
 	rules, err := protovalidate.New(protovalidate.WithMessages(
 		&integrationsv1.CreateDestinationRequest{}, &integrationsv1.UpdateDestinationRequest{},
 		&integrationsv1.DeleteDestinationRequest{}, &integrationsv1.RotateDestinationSecretRequest{},
-		&integrationsv1.ListDestinationsRequest{}, &integrationsv1.ListDeliveriesRequest{}, &integrationsv1.ReplayDeliveryRequest{},
+		&integrationsv1.ListDestinationsRequest{}, &integrationsv1.ListDeliveriesRequest{}, &integrationsv1.SummarizeDeliveriesRequest{},
+		&integrationsv1.ReplayDeliveryRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err

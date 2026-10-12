@@ -45,8 +45,26 @@ INSERT INTO audit_events(id,actor_id,action,resource_id,reason) VALUES ($1,$2,$3
 SELECT * FROM integration_deliveries
 WHERE (sqlc.narg(destination_id)::uuid IS NULL OR destination_id=sqlc.narg(destination_id))
   AND (sqlc.arg(status_filter)::integer=0 OR status=sqlc.arg(status_filter))
+  AND (NOT sqlc.arg(failures_only)::boolean OR status=4 OR (status IN (1,2) AND last_error<>''))
   AND (sequence,id) < (sqlc.arg(before_sequence)::bigint,sqlc.arg(before_id)::uuid)
 ORDER BY sequence DESC,id DESC LIMIT sqlc.arg(page_limit);
+
+-- name: SummarizeDeliveries :many
+SELECT d.id AS destination_id,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status=3 AND x.delivered_at>=sqlc.arg(delivered_since)::timestamptz)::bigint AS delivered,
+  (SELECT max(x.delivered_at) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status=3)::timestamptz AS last_delivered_at,
+  (SELECT count(*) FROM integration_deliveries x WHERE x.destination_id=d.id AND x.status=4)::bigint AS failed,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2) AND x.last_error<>'')::bigint AS retrying,
+  (SELECT count(*) FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2) AND x.last_error='')::bigint AS queued,
+  COALESCE((SELECT x.last_error FROM integration_deliveries x
+    WHERE x.destination_id=d.id AND x.status IN (1,2,4) AND x.last_error<>''
+    ORDER BY x.sequence DESC LIMIT 1), '')::text AS last_error
+FROM integration_destinations d WHERE d.deleted_at IS NULL
+ORDER BY d.created_at DESC,d.id DESC LIMIT 100;
 
 -- name: LockDelivery :one
 SELECT * FROM integration_deliveries WHERE id=$1 FOR UPDATE;

@@ -51,6 +51,9 @@ const (
 	// IntegrationServiceListDeliveriesProcedure is the fully-qualified name of the IntegrationService's
 	// ListDeliveries RPC.
 	IntegrationServiceListDeliveriesProcedure = "/lindm.integrations.v1.IntegrationService/ListDeliveries"
+	// IntegrationServiceSummarizeDeliveriesProcedure is the fully-qualified name of the
+	// IntegrationService's SummarizeDeliveries RPC.
+	IntegrationServiceSummarizeDeliveriesProcedure = "/lindm.integrations.v1.IntegrationService/SummarizeDeliveries"
 	// IntegrationServiceReplayDeliveryProcedure is the fully-qualified name of the IntegrationService's
 	// ReplayDelivery RPC.
 	IntegrationServiceReplayDeliveryProcedure = "/lindm.integrations.v1.IntegrationService/ReplayDelivery"
@@ -64,6 +67,7 @@ type IntegrationServiceClient interface {
 	RotateDestinationSecret(context.Context, *connect.Request[v1.RotateDestinationSecretRequest]) (*connect.Response[v1.RotateDestinationSecretResponse], error)
 	ListDestinations(context.Context, *connect.Request[v1.ListDestinationsRequest]) (*connect.Response[v1.ListDestinationsResponse], error)
 	ListDeliveries(context.Context, *connect.Request[v1.ListDeliveriesRequest]) (*connect.Response[v1.ListDeliveriesResponse], error)
+	SummarizeDeliveries(context.Context, *connect.Request[v1.SummarizeDeliveriesRequest]) (*connect.Response[v1.SummarizeDeliveriesResponse], error)
 	ReplayDelivery(context.Context, *connect.Request[v1.ReplayDeliveryRequest]) (*connect.Response[v1.ReplayDeliveryResponse], error)
 }
 
@@ -114,6 +118,12 @@ func NewIntegrationServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(integrationServiceMethods.ByName("ListDeliveries")),
 			connect.WithClientOptions(opts...),
 		),
+		summarizeDeliveries: connect.NewClient[v1.SummarizeDeliveriesRequest, v1.SummarizeDeliveriesResponse](
+			httpClient,
+			baseURL+IntegrationServiceSummarizeDeliveriesProcedure,
+			connect.WithSchema(integrationServiceMethods.ByName("SummarizeDeliveries")),
+			connect.WithClientOptions(opts...),
+		),
 		replayDelivery: connect.NewClient[v1.ReplayDeliveryRequest, v1.ReplayDeliveryResponse](
 			httpClient,
 			baseURL+IntegrationServiceReplayDeliveryProcedure,
@@ -131,6 +141,7 @@ type integrationServiceClient struct {
 	rotateDestinationSecret *connect.Client[v1.RotateDestinationSecretRequest, v1.RotateDestinationSecretResponse]
 	listDestinations        *connect.Client[v1.ListDestinationsRequest, v1.ListDestinationsResponse]
 	listDeliveries          *connect.Client[v1.ListDeliveriesRequest, v1.ListDeliveriesResponse]
+	summarizeDeliveries     *connect.Client[v1.SummarizeDeliveriesRequest, v1.SummarizeDeliveriesResponse]
 	replayDelivery          *connect.Client[v1.ReplayDeliveryRequest, v1.ReplayDeliveryResponse]
 }
 
@@ -164,6 +175,11 @@ func (c *integrationServiceClient) ListDeliveries(ctx context.Context, req *conn
 	return c.listDeliveries.CallUnary(ctx, req)
 }
 
+// SummarizeDeliveries calls lindm.integrations.v1.IntegrationService.SummarizeDeliveries.
+func (c *integrationServiceClient) SummarizeDeliveries(ctx context.Context, req *connect.Request[v1.SummarizeDeliveriesRequest]) (*connect.Response[v1.SummarizeDeliveriesResponse], error) {
+	return c.summarizeDeliveries.CallUnary(ctx, req)
+}
+
 // ReplayDelivery calls lindm.integrations.v1.IntegrationService.ReplayDelivery.
 func (c *integrationServiceClient) ReplayDelivery(ctx context.Context, req *connect.Request[v1.ReplayDeliveryRequest]) (*connect.Response[v1.ReplayDeliveryResponse], error) {
 	return c.replayDelivery.CallUnary(ctx, req)
@@ -178,6 +194,7 @@ type IntegrationServiceHandler interface {
 	RotateDestinationSecret(context.Context, *connect.Request[v1.RotateDestinationSecretRequest]) (*connect.Response[v1.RotateDestinationSecretResponse], error)
 	ListDestinations(context.Context, *connect.Request[v1.ListDestinationsRequest]) (*connect.Response[v1.ListDestinationsResponse], error)
 	ListDeliveries(context.Context, *connect.Request[v1.ListDeliveriesRequest]) (*connect.Response[v1.ListDeliveriesResponse], error)
+	SummarizeDeliveries(context.Context, *connect.Request[v1.SummarizeDeliveriesRequest]) (*connect.Response[v1.SummarizeDeliveriesResponse], error)
 	ReplayDelivery(context.Context, *connect.Request[v1.ReplayDeliveryRequest]) (*connect.Response[v1.ReplayDeliveryResponse], error)
 }
 
@@ -224,6 +241,12 @@ func NewIntegrationServiceHandler(svc IntegrationServiceHandler, opts ...connect
 		connect.WithSchema(integrationServiceMethods.ByName("ListDeliveries")),
 		connect.WithHandlerOptions(opts...),
 	)
+	integrationServiceSummarizeDeliveriesHandler := connect.NewUnaryHandler(
+		IntegrationServiceSummarizeDeliveriesProcedure,
+		svc.SummarizeDeliveries,
+		connect.WithSchema(integrationServiceMethods.ByName("SummarizeDeliveries")),
+		connect.WithHandlerOptions(opts...),
+	)
 	integrationServiceReplayDeliveryHandler := connect.NewUnaryHandler(
 		IntegrationServiceReplayDeliveryProcedure,
 		svc.ReplayDelivery,
@@ -244,6 +267,8 @@ func NewIntegrationServiceHandler(svc IntegrationServiceHandler, opts ...connect
 			integrationServiceListDestinationsHandler.ServeHTTP(w, r)
 		case IntegrationServiceListDeliveriesProcedure:
 			integrationServiceListDeliveriesHandler.ServeHTTP(w, r)
+		case IntegrationServiceSummarizeDeliveriesProcedure:
+			integrationServiceSummarizeDeliveriesHandler.ServeHTTP(w, r)
 		case IntegrationServiceReplayDeliveryProcedure:
 			integrationServiceReplayDeliveryHandler.ServeHTTP(w, r)
 		default:
@@ -277,6 +302,10 @@ func (UnimplementedIntegrationServiceHandler) ListDestinations(context.Context, 
 
 func (UnimplementedIntegrationServiceHandler) ListDeliveries(context.Context, *connect.Request[v1.ListDeliveriesRequest]) (*connect.Response[v1.ListDeliveriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.integrations.v1.IntegrationService.ListDeliveries is not implemented"))
+}
+
+func (UnimplementedIntegrationServiceHandler) SummarizeDeliveries(context.Context, *connect.Request[v1.SummarizeDeliveriesRequest]) (*connect.Response[v1.SummarizeDeliveriesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.integrations.v1.IntegrationService.SummarizeDeliveries is not implemented"))
 }
 
 func (UnimplementedIntegrationServiceHandler) ReplayDelivery(context.Context, *connect.Request[v1.ReplayDeliveryRequest]) (*connect.Response[v1.ReplayDeliveryResponse], error) {

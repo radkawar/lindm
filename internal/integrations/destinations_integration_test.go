@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -145,5 +146,70 @@ func TestIntegrationAuthorizationValidationAndStableCursor(t *testing.T) {
 	_, err = f.service.ListDeliveries(f.ctx, connect.NewRequest(&integrationsv1.ListDeliveriesRequest{Status: integrationsv1.DeliveryStatus_DELIVERY_STATUS_DEAD_LETTER, PageToken: page.Msg.NextPageToken}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatal("cursor crossed filters")
+	}
+}
+
+func TestDeliverySummaryCountsRecentDeliveriesAndFailureBacklog(t *testing.T) {
+	f := newIntegrationFixture(t)
+	target := f.target(t, 1, "https://receiver.example/events", "", bytes.Repeat([]byte{1}, 32))
+	other := f.target(t, 1, "https://other.example/events", "", bytes.Repeat([]byte{2}, 32))
+	set := func(event uuid.UUID, assignment string, args ...any) {
+		t.Helper()
+		_, err := f.conn.Exec(f.ctx, "UPDATE integration_deliveries SET "+assignment+" WHERE destination_id=$1 AND event_id=$2", append([]any{target.ID, event}, args...)...)
+		requireNoError(t, err)
+	}
+	recent := f.event(t, "recent")
+	set(recent, "status=3, delivered_at=clock_timestamp()-interval '1 hour'")
+	old := f.event(t, "old")
+	set(old, "status=3, delivered_at=clock_timestamp()-interval '2 days'")
+	dead := f.event(t, "dead")
+	set(dead, "status=4, attempts=10, last_error='http_status'")
+	retrying := f.event(t, "retrying")
+	set(retrying, "attempts=2, last_error='connect_failed'")
+	queued := f.event(t, "queued")
+
+	denied := identity.WithPrincipal(f.ctx, identity.Principal{ID: f.actor.ID, Role: "auditor"})
+	if _, err := f.service.SummarizeDeliveries(denied, connect.NewRequest(&integrationsv1.SummarizeDeliveriesRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatal("unprivileged summary accepted")
+	}
+	summary, err := f.service.SummarizeDeliveries(f.ctx, connect.NewRequest(&integrationsv1.SummarizeDeliveriesRequest{}))
+	requireNoError(t, err)
+	if summary.Msg.DeliveredSince == nil || time.Since(summary.Msg.DeliveredSince.AsTime()) < 23*time.Hour {
+		t.Fatal("summary window is not the last 24 hours")
+	}
+	counts := map[string]*integrationsv1.DeliverySummary{}
+	for _, row := range summary.Msg.Summaries {
+		counts[row.DestinationId] = row
+	}
+	got := counts[target.ID.String()]
+	// The retrying delivery is newer than the dead letter, so its reason is the latest.
+	if got == nil || got.Delivered != 1 || got.Failed != 1 || got.Retrying != 1 || got.Queued != 1 || got.LastDeliveredAt == nil || got.LastError != "connect_failed" {
+		t.Fatalf("summary for receiver %v", got)
+	}
+	// Every event also fanned out to the other destination, still waiting.
+	if peer := counts[other.ID.String()]; peer == nil || peer.Delivered != 0 || peer.Queued != 5 || peer.LastDeliveredAt != nil || peer.LastError != "" {
+		t.Fatalf("summary for the other destination %v", peer)
+	}
+
+	destination := target.ID.String()
+	failures, err := f.service.ListDeliveries(f.ctx, connect.NewRequest(&integrationsv1.ListDeliveriesRequest{DestinationId: &destination, FailuresOnly: true, PageSize: 1}))
+	requireNoError(t, err)
+	if len(failures.Msg.Deliveries) != 1 || failures.Msg.NextPageToken == "" {
+		t.Fatal("missing first failures page")
+	}
+	rest, err := f.service.ListDeliveries(f.ctx, connect.NewRequest(&integrationsv1.ListDeliveriesRequest{DestinationId: &destination, FailuresOnly: true, PageToken: failures.Msg.NextPageToken}))
+	requireNoError(t, err)
+	listed := map[uuid.UUID]bool{}
+	for _, delivery := range append(failures.Msg.Deliveries, rest.Msg.Deliveries...) {
+		listed[uuid.MustParse(delivery.EventId)] = true
+	}
+	if len(listed) != 2 || !listed[dead] || !listed[retrying] || listed[queued] || listed[recent] || listed[old] {
+		t.Fatalf("failures listed %v", listed)
+	}
+	if _, err = f.service.ListDeliveries(f.ctx, connect.NewRequest(&integrationsv1.ListDeliveriesRequest{DestinationId: &destination, PageToken: failures.Msg.NextPageToken})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatal("failures cursor reused for every delivery")
+	}
+	if _, err = f.service.ListDeliveries(f.ctx, connect.NewRequest(&integrationsv1.ListDeliveriesRequest{FailuresOnly: true, Status: integrationsv1.DeliveryStatus_DELIVERY_STATUS_DELIVERED})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatal("failures filter combined with a status filter")
 	}
 }

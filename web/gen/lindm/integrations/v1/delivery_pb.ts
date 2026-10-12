@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/integrations/v1/delivery.proto.
  */
 export const file_lindm_integrations_v1_delivery: GenFile = /*@__PURE__*/
-  fileDesc("CiRsaW5kbS9pbnRlZ3JhdGlvbnMvdjEvZGVsaXZlcnkucHJvdG8SFWxpbmRtLmludGVncmF0aW9ucy52MSLTAwoRRGVzdGluYXRpb25Db25maWcSIAoMZGlzcGxheV9uYW1lGAEgASgJQgq6SAdyBRABGIABEkAKBGtpbmQYAiABKA4yJi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25LaW5kQgq6SAeCAQQQASAAEh0KCGVuZHBvaW50GAMgASgJQgu6SAhyBhiAEIgBARIgCg1waW5uZWRfY2FfcGVtGAQgASgJQgm6SAZyBCiAgAQSDwoHZW5hYmxlZBgFIAEoCDqHArpIgwIagAIKFGRlc3RpbmF0aW9uLmVuZHBvaW50Ekl3ZWJob29rcyByZXF1aXJlIEhUVFBTOyBzeXNsb2cgcmVxdWlyZXMgdGxzOi8vaG9zdDpwb3J0IGFuZCBwaW5uZWQgQ0EgUEVNGpwBdGhpcy5raW5kID09IDEgPyB0aGlzLmVuZHBvaW50Lm1hdGNoZXMoJ15odHRwczovL1teL0A/I10rKC9bXj8jXSopPyQnKSA6ICh0aGlzLmVuZHBvaW50Lm1hdGNoZXMoJ150bHM6Ly9bXi9APyNdKzpbMC05XSskJykgJiYgdGhpcy5waW5uZWRfY2FfcGVtLnNpemUoKSA+IDApIoQCCgtEZXN0aW5hdGlvbhIKCgJpZBgBIAEoCRI4CgZjb25maWcYAiABKAsyKC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25Db25maWcSLgoKY3JlYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdmVyc2lvbhgFIAEoBBI+ChpwcmV2aW91c19zZWNyZXRfZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi/AIKGENyZWF0ZURlc3RpbmF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARJACgZjb25maWcYAiABKAsyKC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25Db25maWdCBrpIA8gBARIfCg5zaWduaW5nX3NlY3JldBgDIAEoDEIHukgEegIYQBIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYATrDAbpIvwEavAEKEmRlc3RpbmF0aW9uLnNlY3JldBJKd2ViaG9va3MgcmVxdWlyZSBhIDMyLTY0IGJ5dGUgc2lnbmluZyBzZWNyZXQ7IHN5c2xvZyBoYXMgbm8gc2lnbmluZyBzZWNyZXQaWnRoaXMuY29uZmlnLmtpbmQgPT0gMSA/IHRoaXMuc2lnbmluZ19zZWNyZXQuc2l6ZSgpID49IDMyIDogdGhpcy5zaWduaW5nX3NlY3JldC5zaXplKCkgPT0gMCJUChlDcmVhdGVEZXN0aW5hdGlvblJlc3BvbnNlEjcKC2Rlc3RpbmF0aW9uGAEgASgLMiIubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlc3RpbmF0aW9uIuQBChhVcGRhdGVEZXN0aW5hdGlvblJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESIAoOZGVzdGluYXRpb25faWQYAiABKAlCCLpIBXIDsAEBEkAKBmNvbmZpZxgDIAEoCzIoLmxpbmRtLmludGVncmF0aW9ucy52MS5EZXN0aW5hdGlvbkNvbmZpZ0IGukgDyAEBEisKEGV4cGVjdGVkX3ZlcnNpb24YBCABKARCEbpIDjIMGP//////////fyAAEhkKBnJlYXNvbhgFIAEoCUIJukgGcgSYtRgBIlQKGVVwZGF0ZURlc3RpbmF0aW9uUmVzcG9uc2USNwoLZGVzdGluYXRpb24YASABKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24iogEKGERlbGV0ZURlc3RpbmF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIgCg5kZXN0aW5hdGlvbl9pZBgCIAEoCUIIukgFcgOwAQESKwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoBEIRukgOMgwY//////////9/IAASGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiGwoZRGVsZXRlRGVzdGluYXRpb25SZXNwb25zZSLvAQoeUm90YXRlRGVzdGluYXRpb25TZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEiAKDmRlc3RpbmF0aW9uX2lkGAIgASgJQgi6SAVyA7ABARIhCg5zaWduaW5nX3NlY3JldBgDIAEoDEIJukgGegQQIBhAEiIKD292ZXJsYXBfc2Vjb25kcxgEIAEoDUIJukgGKgQYgKMFEisKEGV4cGVjdGVkX3ZlcnNpb24YBSABKARCEbpIDjIMGP//////////fyAAEhkKBnJlYXNvbhgGIAEoCUIJukgGcgSYtRgBIloKH1JvdGF0ZURlc3RpbmF0aW9uU2VjcmV0UmVzcG9uc2USNwoLZGVzdGluYXRpb24YASABKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24iUwoXTGlzdERlc3RpbmF0aW9uc1JlcXVlc3QSGgoJcGFnZV9zaXplGAEgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAIIm0KGExpc3REZXN0aW5hdGlvbnNSZXNwb25zZRI4CgxkZXN0aW5hdGlvbnMYASADKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIsECCghEZWxpdmVyeRIKCgJpZBgBIAEoCRIQCghldmVudF9pZBgCIAEoCRIWCg5kZXN0aW5hdGlvbl9pZBgDIAEoCRITCgtyZXNvdXJjZV9pZBgEIAEoCRIQCghzZXF1ZW5jZRgFIAEoBBI1CgZzdGF0dXMYBiABKA4yJS5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVsaXZlcnlTdGF0dXMSEAoIYXR0ZW1wdHMYByABKA0SFAoMcmVwbGF5X2NvdW50GAggASgNEjMKD25leHRfYXR0ZW1wdF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMZGVsaXZlcmVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAsgASgJIswBChVMaXN0RGVsaXZlcmllc1JlcXVlc3QSJQoOZGVzdGluYXRpb25faWQYASABKAlCCLpIBXIDsAEBSACIAQESPwoGc3RhdHVzGAIgASgOMiUubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGl2ZXJ5U3RhdHVzQgi6SAWCAQIQARIaCglwYWdlX3NpemUYAyABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgEIAEoCUIIukgFcgMYgAhCEQoPX2Rlc3RpbmF0aW9uX2lkImYKFkxpc3REZWxpdmVyaWVzUmVzcG9uc2USMwoKZGVsaXZlcmllcxgBIAMoCzIfLmxpbmRtLmludGVncmF0aW9ucy52MS5EZWxpdmVyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkibwoVUmVwbGF5RGVsaXZlcnlSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEh0KC2RlbGl2ZXJ5X2lkGAIgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASJLChZSZXBsYXlEZWxpdmVyeVJlc3BvbnNlEjEKCGRlbGl2ZXJ5GAEgASgLMh8ubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGl2ZXJ5IokBChVJbnRlZ3JhdGlvblBhZ2VDdXJzb3ISLwoLYmVmb3JlX3RpbWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhcKD2JlZm9yZV9zZXF1ZW5jZRgCIAEoAxIRCgliZWZvcmVfaWQYAyABKAkSEwoLZmlsdGVyX2hhc2gYBCABKAwiugEKEEludGVncmF0aW9uRXZlbnQSGgoIZXZlbnRfaWQYASABKAlSCGV2ZW50X2lkEjwKC29jY3VycmVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFILb2NjdXJyZWRfYXQSGgoIYWN0b3JfaWQYAyABKAlSCGFjdG9yX2lkEg4KBmFjdGlvbhgEIAEoCRIgCgtyZXNvdXJjZV9pZBgFIAEoCVILcmVzb3VyY2VfaWQqcgoPRGVzdGluYXRpb25LaW5kEiAKHERFU1RJTkFUSU9OX0tJTkRfVU5TUEVDSUZJRUQQABIcChhERVNUSU5BVElPTl9LSU5EX1dFQkhPT0sQARIfChtERVNUSU5BVElPTl9LSU5EX1NZU0xPR19UTFMQAirJAQoORGVsaXZlcnlTdGF0dXMSHwobREVMSVZFUllfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGwoXREVMSVZFUllfU1RBVFVTX1BFTkRJTkcQARIaChZERUxJVkVSWV9TVEFUVVNfTEVBU0VEEAISHQoZREVMSVZFUllfU1RBVFVTX0RFTElWRVJFRBADEh8KG0RFTElWRVJZX1NUQVRVU19ERUFEX0xFVFRFUhAEEh0KGURFTElWRVJZX1NUQVRVU19DQU5DRUxMRUQQBTLaBgoSSW50ZWdyYXRpb25TZXJ2aWNlEnYKEUNyZWF0ZURlc3RpbmF0aW9uEi8ubGluZG0uaW50ZWdyYXRpb25zLnYxLkNyZWF0ZURlc3RpbmF0aW9uUmVxdWVzdBowLmxpbmRtLmludGVncmF0aW9ucy52MS5DcmVhdGVEZXN0aW5hdGlvblJlc3BvbnNlEnYKEVVwZGF0ZURlc3RpbmF0aW9uEi8ubGluZG0uaW50ZWdyYXRpb25zLnYxLlVwZGF0ZURlc3RpbmF0aW9uUmVxdWVzdBowLmxpbmRtLmludGVncmF0aW9ucy52MS5VcGRhdGVEZXN0aW5hdGlvblJlc3BvbnNlEnYKEURlbGV0ZURlc3RpbmF0aW9uEi8ubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGV0ZURlc3RpbmF0aW9uUmVxdWVzdBowLmxpbmRtLmludGVncmF0aW9ucy52MS5EZWxldGVEZXN0aW5hdGlvblJlc3BvbnNlEogBChdSb3RhdGVEZXN0aW5hdGlvblNlY3JldBI1LmxpbmRtLmludGVncmF0aW9ucy52MS5Sb3RhdGVEZXN0aW5hdGlvblNlY3JldFJlcXVlc3QaNi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuUm90YXRlRGVzdGluYXRpb25TZWNyZXRSZXNwb25zZRJzChBMaXN0RGVzdGluYXRpb25zEi4ubGluZG0uaW50ZWdyYXRpb25zLnYxLkxpc3REZXN0aW5hdGlvbnNSZXF1ZXN0Gi8ubGluZG0uaW50ZWdyYXRpb25zLnYxLkxpc3REZXN0aW5hdGlvbnNSZXNwb25zZRJtCg5MaXN0RGVsaXZlcmllcxIsLmxpbmRtLmludGVncmF0aW9ucy52MS5MaXN0RGVsaXZlcmllc1JlcXVlc3QaLS5saW5kbS5pbnRlZ3JhdGlvbnMudjEuTGlzdERlbGl2ZXJpZXNSZXNwb25zZRJtCg5SZXBsYXlEZWxpdmVyeRIsLmxpbmRtLmludGVncmF0aW9ucy52MS5SZXBsYXlEZWxpdmVyeVJlcXVlc3QaLS5saW5kbS5pbnRlZ3JhdGlvbnMudjEuUmVwbGF5RGVsaXZlcnlSZXNwb25zZUIwWi5saW5kbS9nZW4vbGluZG0vaW50ZWdyYXRpb25zL3YxO2ludGVncmF0aW9uc3YxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
+  fileDesc("CiRsaW5kbS9pbnRlZ3JhdGlvbnMvdjEvZGVsaXZlcnkucHJvdG8SFWxpbmRtLmludGVncmF0aW9ucy52MSLTAwoRRGVzdGluYXRpb25Db25maWcSIAoMZGlzcGxheV9uYW1lGAEgASgJQgq6SAdyBRABGIABEkAKBGtpbmQYAiABKA4yJi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25LaW5kQgq6SAeCAQQQASAAEh0KCGVuZHBvaW50GAMgASgJQgu6SAhyBhiAEIgBARIgCg1waW5uZWRfY2FfcGVtGAQgASgJQgm6SAZyBCiAgAQSDwoHZW5hYmxlZBgFIAEoCDqHArpIgwIagAIKFGRlc3RpbmF0aW9uLmVuZHBvaW50Ekl3ZWJob29rcyByZXF1aXJlIEhUVFBTOyBzeXNsb2cgcmVxdWlyZXMgdGxzOi8vaG9zdDpwb3J0IGFuZCBwaW5uZWQgQ0EgUEVNGpwBdGhpcy5raW5kID09IDEgPyB0aGlzLmVuZHBvaW50Lm1hdGNoZXMoJ15odHRwczovL1teL0A/I10rKC9bXj8jXSopPyQnKSA6ICh0aGlzLmVuZHBvaW50Lm1hdGNoZXMoJ150bHM6Ly9bXi9APyNdKzpbMC05XSskJykgJiYgdGhpcy5waW5uZWRfY2FfcGVtLnNpemUoKSA+IDApIs8CCgtEZXN0aW5hdGlvbhIKCgJpZBgBIAEoCRI4CgZjb25maWcYAiABKAsyKC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25Db25maWcSLgoKY3JlYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdmVyc2lvbhgFIAEoBBI+ChpwcmV2aW91c19zZWNyZXRfZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASSQoWcGlubmVkX2NhX2NlcnRpZmljYXRlcxgHIAMoCzIpLmxpbmRtLmludGVncmF0aW9ucy52MS5DZXJ0aWZpY2F0ZVN1bW1hcnkicAoSQ2VydGlmaWNhdGVTdW1tYXJ5Eg8KB3N1YmplY3QYASABKAkSLQoJbm90X2FmdGVyGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIaChJzaGEyNTZfZmluZ2VycHJpbnQYAyABKAki/AIKGENyZWF0ZURlc3RpbmF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARJACgZjb25maWcYAiABKAsyKC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb25Db25maWdCBrpIA8gBARIfCg5zaWduaW5nX3NlY3JldBgDIAEoDEIHukgEegIYQBIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYATrDAbpIvwEavAEKEmRlc3RpbmF0aW9uLnNlY3JldBJKd2ViaG9va3MgcmVxdWlyZSBhIDMyLTY0IGJ5dGUgc2lnbmluZyBzZWNyZXQ7IHN5c2xvZyBoYXMgbm8gc2lnbmluZyBzZWNyZXQaWnRoaXMuY29uZmlnLmtpbmQgPT0gMSA/IHRoaXMuc2lnbmluZ19zZWNyZXQuc2l6ZSgpID49IDMyIDogdGhpcy5zaWduaW5nX3NlY3JldC5zaXplKCkgPT0gMCJUChlDcmVhdGVEZXN0aW5hdGlvblJlc3BvbnNlEjcKC2Rlc3RpbmF0aW9uGAEgASgLMiIubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlc3RpbmF0aW9uIuQBChhVcGRhdGVEZXN0aW5hdGlvblJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESIAoOZGVzdGluYXRpb25faWQYAiABKAlCCLpIBXIDsAEBEkAKBmNvbmZpZxgDIAEoCzIoLmxpbmRtLmludGVncmF0aW9ucy52MS5EZXN0aW5hdGlvbkNvbmZpZ0IGukgDyAEBEisKEGV4cGVjdGVkX3ZlcnNpb24YBCABKARCEbpIDjIMGP//////////fyAAEhkKBnJlYXNvbhgFIAEoCUIJukgGcgSYtRgBIlQKGVVwZGF0ZURlc3RpbmF0aW9uUmVzcG9uc2USNwoLZGVzdGluYXRpb24YASABKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24iogEKGERlbGV0ZURlc3RpbmF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIgCg5kZXN0aW5hdGlvbl9pZBgCIAEoCUIIukgFcgOwAQESKwoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoBEIRukgOMgwY//////////9/IAASGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiGwoZRGVsZXRlRGVzdGluYXRpb25SZXNwb25zZSLvAQoeUm90YXRlRGVzdGluYXRpb25TZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEiAKDmRlc3RpbmF0aW9uX2lkGAIgASgJQgi6SAVyA7ABARIhCg5zaWduaW5nX3NlY3JldBgDIAEoDEIJukgGegQQIBhAEiIKD292ZXJsYXBfc2Vjb25kcxgEIAEoDUIJukgGKgQYgKMFEisKEGV4cGVjdGVkX3ZlcnNpb24YBSABKARCEbpIDjIMGP//////////fyAAEhkKBnJlYXNvbhgGIAEoCUIJukgGcgSYtRgBIloKH1JvdGF0ZURlc3RpbmF0aW9uU2VjcmV0UmVzcG9uc2USNwoLZGVzdGluYXRpb24YASABKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24iUwoXTGlzdERlc3RpbmF0aW9uc1JlcXVlc3QSGgoJcGFnZV9zaXplGAEgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAIIm0KGExpc3REZXN0aW5hdGlvbnNSZXNwb25zZRI4CgxkZXN0aW5hdGlvbnMYASADKAsyIi5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVzdGluYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIsECCghEZWxpdmVyeRIKCgJpZBgBIAEoCRIQCghldmVudF9pZBgCIAEoCRIWCg5kZXN0aW5hdGlvbl9pZBgDIAEoCRITCgtyZXNvdXJjZV9pZBgEIAEoCRIQCghzZXF1ZW5jZRgFIAEoBBI1CgZzdGF0dXMYBiABKA4yJS5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVsaXZlcnlTdGF0dXMSEAoIYXR0ZW1wdHMYByABKA0SFAoMcmVwbGF5X2NvdW50GAggASgNEjMKD25leHRfYXR0ZW1wdF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMZGVsaXZlcmVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAsgASgJIuQCChVMaXN0RGVsaXZlcmllc1JlcXVlc3QSJQoOZGVzdGluYXRpb25faWQYASABKAlCCLpIBXIDsAEBSACIAQESPwoGc3RhdHVzGAIgASgOMiUubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGl2ZXJ5U3RhdHVzQgi6SAWCAQIQARIaCglwYWdlX3NpemUYAyABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgEIAEoCUIIukgFcgMYgAgSFQoNZmFpbHVyZXNfb25seRgFIAEoCDp/ukh8GnoKGGRlbGl2ZXJpZXMuZmFpbHVyZXNfb25seRI1ZmFpbHVyZXNfb25seSBjYW5ub3QgYmUgY29tYmluZWQgd2l0aCBhIHN0YXR1cyBmaWx0ZXIaJyF0aGlzLmZhaWx1cmVzX29ubHkgfHwgdGhpcy5zdGF0dXMgPT0gMEIRCg9fZGVzdGluYXRpb25faWQiZgoWTGlzdERlbGl2ZXJpZXNSZXNwb25zZRIzCgpkZWxpdmVyaWVzGAEgAygLMh8ubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGl2ZXJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIcChpTdW1tYXJpemVEZWxpdmVyaWVzUmVxdWVzdCK5AQoPRGVsaXZlcnlTdW1tYXJ5EhYKDmRlc3RpbmF0aW9uX2lkGAEgASgJEhEKCWRlbGl2ZXJlZBgCIAEoBBIOCgZmYWlsZWQYAyABKAQSEAoIcmV0cnlpbmcYBCABKAQSDgoGcXVldWVkGAUgASgEEjUKEWxhc3RfZGVsaXZlcmVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAcgASgJIo0BChtTdW1tYXJpemVEZWxpdmVyaWVzUmVzcG9uc2USOQoJc3VtbWFyaWVzGAEgAygLMiYubGluZG0uaW50ZWdyYXRpb25zLnYxLkRlbGl2ZXJ5U3VtbWFyeRIzCg9kZWxpdmVyZWRfc2luY2UYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIm8KFVJlcGxheURlbGl2ZXJ5UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIdCgtkZWxpdmVyeV9pZBgCIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEiSwoWUmVwbGF5RGVsaXZlcnlSZXNwb25zZRIxCghkZWxpdmVyeRgBIAEoCzIfLmxpbmRtLmludGVncmF0aW9ucy52MS5EZWxpdmVyeSKJAQoVSW50ZWdyYXRpb25QYWdlQ3Vyc29yEi8KC2JlZm9yZV90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9iZWZvcmVfc2VxdWVuY2UYAiABKAMSEQoJYmVmb3JlX2lkGAMgASgJEhMKC2ZpbHRlcl9oYXNoGAQgASgMIroBChBJbnRlZ3JhdGlvbkV2ZW50EhoKCGV2ZW50X2lkGAEgASgJUghldmVudF9pZBI8CgtvY2N1cnJlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSC29jY3VycmVkX2F0EhoKCGFjdG9yX2lkGAMgASgJUghhY3Rvcl9pZBIOCgZhY3Rpb24YBCABKAkSIAoLcmVzb3VyY2VfaWQYBSABKAlSC3Jlc291cmNlX2lkKnIKD0Rlc3RpbmF0aW9uS2luZBIgChxERVNUSU5BVElPTl9LSU5EX1VOU1BFQ0lGSUVEEAASHAoYREVTVElOQVRJT05fS0lORF9XRUJIT09LEAESHwobREVTVElOQVRJT05fS0lORF9TWVNMT0dfVExTEAIqyQEKDkRlbGl2ZXJ5U3RhdHVzEh8KG0RFTElWRVJZX1NUQVRVU19VTlNQRUNJRklFRBAAEhsKF0RFTElWRVJZX1NUQVRVU19QRU5ESU5HEAESGgoWREVMSVZFUllfU1RBVFVTX0xFQVNFRBACEh0KGURFTElWRVJZX1NUQVRVU19ERUxJVkVSRUQQAxIfChtERUxJVkVSWV9TVEFUVVNfREVBRF9MRVRURVIQBBIdChlERUxJVkVSWV9TVEFUVVNfQ0FOQ0VMTEVEEAUy2AcKEkludGVncmF0aW9uU2VydmljZRJ2ChFDcmVhdGVEZXN0aW5hdGlvbhIvLmxpbmRtLmludGVncmF0aW9ucy52MS5DcmVhdGVEZXN0aW5hdGlvblJlcXVlc3QaMC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuQ3JlYXRlRGVzdGluYXRpb25SZXNwb25zZRJ2ChFVcGRhdGVEZXN0aW5hdGlvbhIvLmxpbmRtLmludGVncmF0aW9ucy52MS5VcGRhdGVEZXN0aW5hdGlvblJlcXVlc3QaMC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuVXBkYXRlRGVzdGluYXRpb25SZXNwb25zZRJ2ChFEZWxldGVEZXN0aW5hdGlvbhIvLmxpbmRtLmludGVncmF0aW9ucy52MS5EZWxldGVEZXN0aW5hdGlvblJlcXVlc3QaMC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuRGVsZXRlRGVzdGluYXRpb25SZXNwb25zZRKIAQoXUm90YXRlRGVzdGluYXRpb25TZWNyZXQSNS5saW5kbS5pbnRlZ3JhdGlvbnMudjEuUm90YXRlRGVzdGluYXRpb25TZWNyZXRSZXF1ZXN0GjYubGluZG0uaW50ZWdyYXRpb25zLnYxLlJvdGF0ZURlc3RpbmF0aW9uU2VjcmV0UmVzcG9uc2UScwoQTGlzdERlc3RpbmF0aW9ucxIuLmxpbmRtLmludGVncmF0aW9ucy52MS5MaXN0RGVzdGluYXRpb25zUmVxdWVzdBovLmxpbmRtLmludGVncmF0aW9ucy52MS5MaXN0RGVzdGluYXRpb25zUmVzcG9uc2USbQoOTGlzdERlbGl2ZXJpZXMSLC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuTGlzdERlbGl2ZXJpZXNSZXF1ZXN0Gi0ubGluZG0uaW50ZWdyYXRpb25zLnYxLkxpc3REZWxpdmVyaWVzUmVzcG9uc2USfAoTU3VtbWFyaXplRGVsaXZlcmllcxIxLmxpbmRtLmludGVncmF0aW9ucy52MS5TdW1tYXJpemVEZWxpdmVyaWVzUmVxdWVzdBoyLmxpbmRtLmludGVncmF0aW9ucy52MS5TdW1tYXJpemVEZWxpdmVyaWVzUmVzcG9uc2USbQoOUmVwbGF5RGVsaXZlcnkSLC5saW5kbS5pbnRlZ3JhdGlvbnMudjEuUmVwbGF5RGVsaXZlcnlSZXF1ZXN0Gi0ubGluZG0uaW50ZWdyYXRpb25zLnYxLlJlcGxheURlbGl2ZXJ5UmVzcG9uc2VCMFoubGluZG0vZ2VuL2xpbmRtL2ludGVncmF0aW9ucy92MTtpbnRlZ3JhdGlvbnN2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.integrations.v1.DestinationConfig
@@ -88,6 +88,13 @@ export type Destination = Message<"lindm.integrations.v1.Destination"> & {
    * @generated from field: google.protobuf.Timestamp previous_secret_expires_at = 6;
    */
   previousSecretExpiresAt?: Timestamp | undefined;
+
+  /**
+   * One entry per certificate in config.pinned_ca_pem, in PEM order.
+   *
+   * @generated from field: repeated lindm.integrations.v1.CertificateSummary pinned_ca_certificates = 7;
+   */
+  pinnedCaCertificates: CertificateSummary[];
 };
 
 /**
@@ -96,6 +103,40 @@ export type Destination = Message<"lindm.integrations.v1.Destination"> & {
  */
 export const DestinationSchema: GenMessage<Destination> = /*@__PURE__*/
   messageDesc(file_lindm_integrations_v1_delivery, 1);
+
+/**
+ * Display summary of a stored trust certificate, so the console can identify
+ * the pinned CA without showing the PEM.
+ *
+ * @generated from message lindm.integrations.v1.CertificateSummary
+ */
+export type CertificateSummary = Message<"lindm.integrations.v1.CertificateSummary"> & {
+  /**
+   * Subject common name, or the full distinguished name when it has none.
+   *
+   * @generated from field: string subject = 1;
+   */
+  subject: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp not_after = 2;
+   */
+  notAfter?: Timestamp | undefined;
+
+  /**
+   * SHA-256 of the DER certificate, uppercase hex pairs separated by colons.
+   *
+   * @generated from field: string sha256_fingerprint = 3;
+   */
+  sha256Fingerprint: string;
+};
+
+/**
+ * Describes the message lindm.integrations.v1.CertificateSummary.
+ * Use `create(CertificateSummarySchema)` to create a new message.
+ */
+export const CertificateSummarySchema: GenMessage<CertificateSummary> = /*@__PURE__*/
+  messageDesc(file_lindm_integrations_v1_delivery, 2);
 
 /**
  * @generated from message lindm.integrations.v1.CreateDestinationRequest
@@ -127,7 +168,7 @@ export type CreateDestinationRequest = Message<"lindm.integrations.v1.CreateDest
  * Use `create(CreateDestinationRequestSchema)` to create a new message.
  */
 export const CreateDestinationRequestSchema: GenMessage<CreateDestinationRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 2);
+  messageDesc(file_lindm_integrations_v1_delivery, 3);
 
 /**
  * @generated from message lindm.integrations.v1.CreateDestinationResponse
@@ -144,7 +185,7 @@ export type CreateDestinationResponse = Message<"lindm.integrations.v1.CreateDes
  * Use `create(CreateDestinationResponseSchema)` to create a new message.
  */
 export const CreateDestinationResponseSchema: GenMessage<CreateDestinationResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 3);
+  messageDesc(file_lindm_integrations_v1_delivery, 4);
 
 /**
  * @generated from message lindm.integrations.v1.UpdateDestinationRequest
@@ -181,7 +222,7 @@ export type UpdateDestinationRequest = Message<"lindm.integrations.v1.UpdateDest
  * Use `create(UpdateDestinationRequestSchema)` to create a new message.
  */
 export const UpdateDestinationRequestSchema: GenMessage<UpdateDestinationRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 4);
+  messageDesc(file_lindm_integrations_v1_delivery, 5);
 
 /**
  * @generated from message lindm.integrations.v1.UpdateDestinationResponse
@@ -198,7 +239,7 @@ export type UpdateDestinationResponse = Message<"lindm.integrations.v1.UpdateDes
  * Use `create(UpdateDestinationResponseSchema)` to create a new message.
  */
 export const UpdateDestinationResponseSchema: GenMessage<UpdateDestinationResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 5);
+  messageDesc(file_lindm_integrations_v1_delivery, 6);
 
 /**
  * @generated from message lindm.integrations.v1.DeleteDestinationRequest
@@ -230,7 +271,7 @@ export type DeleteDestinationRequest = Message<"lindm.integrations.v1.DeleteDest
  * Use `create(DeleteDestinationRequestSchema)` to create a new message.
  */
 export const DeleteDestinationRequestSchema: GenMessage<DeleteDestinationRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 6);
+  messageDesc(file_lindm_integrations_v1_delivery, 7);
 
 /**
  * @generated from message lindm.integrations.v1.DeleteDestinationResponse
@@ -243,7 +284,7 @@ export type DeleteDestinationResponse = Message<"lindm.integrations.v1.DeleteDes
  * Use `create(DeleteDestinationResponseSchema)` to create a new message.
  */
 export const DeleteDestinationResponseSchema: GenMessage<DeleteDestinationResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 7);
+  messageDesc(file_lindm_integrations_v1_delivery, 8);
 
 /**
  * @generated from message lindm.integrations.v1.RotateDestinationSecretRequest
@@ -285,7 +326,7 @@ export type RotateDestinationSecretRequest = Message<"lindm.integrations.v1.Rota
  * Use `create(RotateDestinationSecretRequestSchema)` to create a new message.
  */
 export const RotateDestinationSecretRequestSchema: GenMessage<RotateDestinationSecretRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 8);
+  messageDesc(file_lindm_integrations_v1_delivery, 9);
 
 /**
  * @generated from message lindm.integrations.v1.RotateDestinationSecretResponse
@@ -302,7 +343,7 @@ export type RotateDestinationSecretResponse = Message<"lindm.integrations.v1.Rot
  * Use `create(RotateDestinationSecretResponseSchema)` to create a new message.
  */
 export const RotateDestinationSecretResponseSchema: GenMessage<RotateDestinationSecretResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 9);
+  messageDesc(file_lindm_integrations_v1_delivery, 10);
 
 /**
  * @generated from message lindm.integrations.v1.ListDestinationsRequest
@@ -324,7 +365,7 @@ export type ListDestinationsRequest = Message<"lindm.integrations.v1.ListDestina
  * Use `create(ListDestinationsRequestSchema)` to create a new message.
  */
 export const ListDestinationsRequestSchema: GenMessage<ListDestinationsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 10);
+  messageDesc(file_lindm_integrations_v1_delivery, 11);
 
 /**
  * @generated from message lindm.integrations.v1.ListDestinationsResponse
@@ -346,7 +387,7 @@ export type ListDestinationsResponse = Message<"lindm.integrations.v1.ListDestin
  * Use `create(ListDestinationsResponseSchema)` to create a new message.
  */
 export const ListDestinationsResponseSchema: GenMessage<ListDestinationsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 11);
+  messageDesc(file_lindm_integrations_v1_delivery, 12);
 
 /**
  * @generated from message lindm.integrations.v1.Delivery
@@ -415,7 +456,7 @@ export type Delivery = Message<"lindm.integrations.v1.Delivery"> & {
  * Use `create(DeliverySchema)` to create a new message.
  */
 export const DeliverySchema: GenMessage<Delivery> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 12);
+  messageDesc(file_lindm_integrations_v1_delivery, 13);
 
 /**
  * @generated from message lindm.integrations.v1.ListDeliveriesRequest
@@ -440,6 +481,13 @@ export type ListDeliveriesRequest = Message<"lindm.integrations.v1.ListDeliverie
    * @generated from field: string page_token = 4;
    */
   pageToken: string;
+
+  /**
+   * Only dead letters and deliveries waiting to retry after a failed attempt.
+   *
+   * @generated from field: bool failures_only = 5;
+   */
+  failuresOnly: boolean;
 };
 
 /**
@@ -447,7 +495,7 @@ export type ListDeliveriesRequest = Message<"lindm.integrations.v1.ListDeliverie
  * Use `create(ListDeliveriesRequestSchema)` to create a new message.
  */
 export const ListDeliveriesRequestSchema: GenMessage<ListDeliveriesRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 13);
+  messageDesc(file_lindm_integrations_v1_delivery, 14);
 
 /**
  * @generated from message lindm.integrations.v1.ListDeliveriesResponse
@@ -469,7 +517,102 @@ export type ListDeliveriesResponse = Message<"lindm.integrations.v1.ListDeliveri
  * Use `create(ListDeliveriesResponseSchema)` to create a new message.
  */
 export const ListDeliveriesResponseSchema: GenMessage<ListDeliveriesResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 14);
+  messageDesc(file_lindm_integrations_v1_delivery, 15);
+
+/**
+ * @generated from message lindm.integrations.v1.SummarizeDeliveriesRequest
+ */
+export type SummarizeDeliveriesRequest = Message<"lindm.integrations.v1.SummarizeDeliveriesRequest"> & {
+};
+
+/**
+ * Describes the message lindm.integrations.v1.SummarizeDeliveriesRequest.
+ * Use `create(SummarizeDeliveriesRequestSchema)` to create a new message.
+ */
+export const SummarizeDeliveriesRequestSchema: GenMessage<SummarizeDeliveriesRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_integrations_v1_delivery, 16);
+
+/**
+ * Per-destination counts for the delivery log. Delivered counts only deliveries
+ * completed at or after delivered_since; the other counts are the current backlog.
+ *
+ * @generated from message lindm.integrations.v1.DeliverySummary
+ */
+export type DeliverySummary = Message<"lindm.integrations.v1.DeliverySummary"> & {
+  /**
+   * @generated from field: string destination_id = 1;
+   */
+  destinationId: string;
+
+  /**
+   * @generated from field: uint64 delivered = 2;
+   */
+  delivered: bigint;
+
+  /**
+   * Dead letters awaiting an operator retry.
+   *
+   * @generated from field: uint64 failed = 3;
+   */
+  failed: bigint;
+
+  /**
+   * Waiting to retry after at least one failed attempt.
+   *
+   * @generated from field: uint64 retrying = 4;
+   */
+  retrying: bigint;
+
+  /**
+   * Waiting for a first attempt or currently being sent.
+   *
+   * @generated from field: uint64 queued = 5;
+   */
+  queued: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_delivered_at = 6;
+   */
+  lastDeliveredAt?: Timestamp | undefined;
+
+  /**
+   * Bounded machine reason of the newest failed or retrying delivery, if any.
+   *
+   * @generated from field: string last_error = 7;
+   */
+  lastError: string;
+};
+
+/**
+ * Describes the message lindm.integrations.v1.DeliverySummary.
+ * Use `create(DeliverySummarySchema)` to create a new message.
+ */
+export const DeliverySummarySchema: GenMessage<DeliverySummary> = /*@__PURE__*/
+  messageDesc(file_lindm_integrations_v1_delivery, 17);
+
+/**
+ * @generated from message lindm.integrations.v1.SummarizeDeliveriesResponse
+ */
+export type SummarizeDeliveriesResponse = Message<"lindm.integrations.v1.SummarizeDeliveriesResponse"> & {
+  /**
+   * One entry per current destination, newest destination first, at most 100.
+   *
+   * @generated from field: repeated lindm.integrations.v1.DeliverySummary summaries = 1;
+   */
+  summaries: DeliverySummary[];
+
+  /**
+   * @generated from field: google.protobuf.Timestamp delivered_since = 2;
+   */
+  deliveredSince?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.integrations.v1.SummarizeDeliveriesResponse.
+ * Use `create(SummarizeDeliveriesResponseSchema)` to create a new message.
+ */
+export const SummarizeDeliveriesResponseSchema: GenMessage<SummarizeDeliveriesResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_integrations_v1_delivery, 18);
 
 /**
  * @generated from message lindm.integrations.v1.ReplayDeliveryRequest
@@ -496,7 +639,7 @@ export type ReplayDeliveryRequest = Message<"lindm.integrations.v1.ReplayDeliver
  * Use `create(ReplayDeliveryRequestSchema)` to create a new message.
  */
 export const ReplayDeliveryRequestSchema: GenMessage<ReplayDeliveryRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 15);
+  messageDesc(file_lindm_integrations_v1_delivery, 19);
 
 /**
  * @generated from message lindm.integrations.v1.ReplayDeliveryResponse
@@ -513,7 +656,7 @@ export type ReplayDeliveryResponse = Message<"lindm.integrations.v1.ReplayDelive
  * Use `create(ReplayDeliveryResponseSchema)` to create a new message.
  */
 export const ReplayDeliveryResponseSchema: GenMessage<ReplayDeliveryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 16);
+  messageDesc(file_lindm_integrations_v1_delivery, 20);
 
 /**
  * Opaque server-authenticated pagination state; not a separate public RPC.
@@ -547,7 +690,7 @@ export type IntegrationPageCursor = Message<"lindm.integrations.v1.IntegrationPa
  * Use `create(IntegrationPageCursorSchema)` to create a new message.
  */
 export const IntegrationPageCursorSchema: GenMessage<IntegrationPageCursor> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 17);
+  messageDesc(file_lindm_integrations_v1_delivery, 21);
 
 /**
  * Exact JSON body schema for webhooks and syslog MSG. PostgreSQL emits snake-case
@@ -589,7 +732,7 @@ export type IntegrationEvent = Message<"lindm.integrations.v1.IntegrationEvent">
  * Use `create(IntegrationEventSchema)` to create a new message.
  */
 export const IntegrationEventSchema: GenMessage<IntegrationEvent> = /*@__PURE__*/
-  messageDesc(file_lindm_integrations_v1_delivery, 18);
+  messageDesc(file_lindm_integrations_v1_delivery, 22);
 
 /**
  * @generated from enum lindm.integrations.v1.DestinationKind
@@ -709,6 +852,14 @@ export const IntegrationService: GenService<{
     methodKind: "unary";
     input: typeof ListDeliveriesRequestSchema;
     output: typeof ListDeliveriesResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.integrations.v1.IntegrationService.SummarizeDeliveries
+   */
+  summarizeDeliveries: {
+    methodKind: "unary";
+    input: typeof SummarizeDeliveriesRequestSchema;
+    output: typeof SummarizeDeliveriesResponseSchema;
   },
   /**
    * @generated from rpc lindm.integrations.v1.IntegrationService.ReplayDelivery

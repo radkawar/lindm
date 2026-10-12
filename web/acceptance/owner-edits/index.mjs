@@ -64,6 +64,13 @@ import * as pass2P2SignInError from "./pass2-p2-11-sign-in-error.mjs";
 import * as pass2P2NotFound from "./pass2-p2-12-not-found.mjs";
 import * as pass2P2DeepLink from "./pass2-p2-13-deep-link.mjs";
 import * as pass2P2StepUp from "./pass2-p2-14-step-up.mjs";
+import * as integrationsLayout from "./integrations-layout.mjs";
+import * as integrationsCaCertificate from "./integrations-ca-certificate.mjs";
+import * as integrationsFieldOrder from "./integrations-field-order.mjs";
+import * as integrationsRotateSecret from "./integrations-rotate-secret.mjs";
+import * as integrationsDeliveryLog from "./integrations-delivery-log.mjs";
+import * as integrationsDestinationValidation from "./integrations-destination-validation.mjs";
+import * as integrationsReportLink from "./integrations-report-link.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -110,6 +117,12 @@ export const ownerEdits = [
   audit,
   auditLogPass2,
   groups,
+  integrationsLayout,
+  integrationsCaCertificate,
+  integrationsFieldOrder,
+  integrationsRotateSecret,
+  integrationsDeliveryLog,
+  integrationsDestinationValidation,
   pass2RestartDelay,
   // Need the route device's inventory stale, so they precede the wipe check's refresh.
   pass2ReviewPreflight,
@@ -128,6 +141,8 @@ export const ownerEdits = [
   // Adds an admin who approves one recovery-key reveal, run with step-up.
   pass2P2StepUp,
   pass2SafetyReveal,
+  // Queues one audit evidence export.
+  integrationsReportLink,
   pass2SecretReveal,
   // Publishes one new, never-assigned profile.
   profilePublish,

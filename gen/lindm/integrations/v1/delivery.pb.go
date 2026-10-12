@@ -216,8 +216,10 @@ type Destination struct {
 	UpdatedAt               *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Version                 uint64                 `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	PreviousSecretExpiresAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=previous_secret_expires_at,json=previousSecretExpiresAt,proto3" json:"previous_secret_expires_at,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// One entry per certificate in config.pinned_ca_pem, in PEM order.
+	PinnedCaCertificates []*CertificateSummary `protobuf:"bytes,7,rep,name=pinned_ca_certificates,json=pinnedCaCertificates,proto3" json:"pinned_ca_certificates,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Destination) Reset() {
@@ -292,6 +294,77 @@ func (x *Destination) GetPreviousSecretExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Destination) GetPinnedCaCertificates() []*CertificateSummary {
+	if x != nil {
+		return x.PinnedCaCertificates
+	}
+	return nil
+}
+
+// Display summary of a stored trust certificate, so the console can identify
+// the pinned CA without showing the PEM.
+type CertificateSummary struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Subject common name, or the full distinguished name when it has none.
+	Subject  string                 `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
+	NotAfter *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=not_after,json=notAfter,proto3" json:"not_after,omitempty"`
+	// SHA-256 of the DER certificate, uppercase hex pairs separated by colons.
+	Sha256Fingerprint string `protobuf:"bytes,3,opt,name=sha256_fingerprint,json=sha256Fingerprint,proto3" json:"sha256_fingerprint,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CertificateSummary) Reset() {
+	*x = CertificateSummary{}
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CertificateSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CertificateSummary) ProtoMessage() {}
+
+func (x *CertificateSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CertificateSummary.ProtoReflect.Descriptor instead.
+func (*CertificateSummary) Descriptor() ([]byte, []int) {
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CertificateSummary) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *CertificateSummary) GetNotAfter() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NotAfter
+	}
+	return nil
+}
+
+func (x *CertificateSummary) GetSha256Fingerprint() string {
+	if x != nil {
+		return x.Sha256Fingerprint
+	}
+	return ""
+}
+
 type CreateDestinationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -304,7 +377,7 @@ type CreateDestinationRequest struct {
 
 func (x *CreateDestinationRequest) Reset() {
 	*x = CreateDestinationRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[2]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -316,7 +389,7 @@ func (x *CreateDestinationRequest) String() string {
 func (*CreateDestinationRequest) ProtoMessage() {}
 
 func (x *CreateDestinationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[2]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -329,7 +402,7 @@ func (x *CreateDestinationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDestinationRequest.ProtoReflect.Descriptor instead.
 func (*CreateDestinationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{2}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateDestinationRequest) GetRequestId() string {
@@ -369,7 +442,7 @@ type CreateDestinationResponse struct {
 
 func (x *CreateDestinationResponse) Reset() {
 	*x = CreateDestinationResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[3]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +454,7 @@ func (x *CreateDestinationResponse) String() string {
 func (*CreateDestinationResponse) ProtoMessage() {}
 
 func (x *CreateDestinationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[3]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +467,7 @@ func (x *CreateDestinationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDestinationResponse.ProtoReflect.Descriptor instead.
 func (*CreateDestinationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{3}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateDestinationResponse) GetDestination() *Destination {
@@ -417,7 +490,7 @@ type UpdateDestinationRequest struct {
 
 func (x *UpdateDestinationRequest) Reset() {
 	*x = UpdateDestinationRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[4]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -429,7 +502,7 @@ func (x *UpdateDestinationRequest) String() string {
 func (*UpdateDestinationRequest) ProtoMessage() {}
 
 func (x *UpdateDestinationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[4]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -442,7 +515,7 @@ func (x *UpdateDestinationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDestinationRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDestinationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{4}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateDestinationRequest) GetRequestId() string {
@@ -489,7 +562,7 @@ type UpdateDestinationResponse struct {
 
 func (x *UpdateDestinationResponse) Reset() {
 	*x = UpdateDestinationResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[5]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +574,7 @@ func (x *UpdateDestinationResponse) String() string {
 func (*UpdateDestinationResponse) ProtoMessage() {}
 
 func (x *UpdateDestinationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[5]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +587,7 @@ func (x *UpdateDestinationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDestinationResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDestinationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{5}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateDestinationResponse) GetDestination() *Destination {
@@ -536,7 +609,7 @@ type DeleteDestinationRequest struct {
 
 func (x *DeleteDestinationRequest) Reset() {
 	*x = DeleteDestinationRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[6]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +621,7 @@ func (x *DeleteDestinationRequest) String() string {
 func (*DeleteDestinationRequest) ProtoMessage() {}
 
 func (x *DeleteDestinationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[6]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +634,7 @@ func (x *DeleteDestinationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDestinationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDestinationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{6}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteDestinationRequest) GetRequestId() string {
@@ -600,7 +673,7 @@ type DeleteDestinationResponse struct {
 
 func (x *DeleteDestinationResponse) Reset() {
 	*x = DeleteDestinationResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[7]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -612,7 +685,7 @@ func (x *DeleteDestinationResponse) String() string {
 func (*DeleteDestinationResponse) ProtoMessage() {}
 
 func (x *DeleteDestinationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[7]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -625,7 +698,7 @@ func (x *DeleteDestinationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDestinationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteDestinationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{7}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{8}
 }
 
 type RotateDestinationSecretRequest struct {
@@ -642,7 +715,7 @@ type RotateDestinationSecretRequest struct {
 
 func (x *RotateDestinationSecretRequest) Reset() {
 	*x = RotateDestinationSecretRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[8]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +727,7 @@ func (x *RotateDestinationSecretRequest) String() string {
 func (*RotateDestinationSecretRequest) ProtoMessage() {}
 
 func (x *RotateDestinationSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[8]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +740,7 @@ func (x *RotateDestinationSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateDestinationSecretRequest.ProtoReflect.Descriptor instead.
 func (*RotateDestinationSecretRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{8}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RotateDestinationSecretRequest) GetRequestId() string {
@@ -721,7 +794,7 @@ type RotateDestinationSecretResponse struct {
 
 func (x *RotateDestinationSecretResponse) Reset() {
 	*x = RotateDestinationSecretResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[9]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -733,7 +806,7 @@ func (x *RotateDestinationSecretResponse) String() string {
 func (*RotateDestinationSecretResponse) ProtoMessage() {}
 
 func (x *RotateDestinationSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[9]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -746,7 +819,7 @@ func (x *RotateDestinationSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateDestinationSecretResponse.ProtoReflect.Descriptor instead.
 func (*RotateDestinationSecretResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{9}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RotateDestinationSecretResponse) GetDestination() *Destination {
@@ -766,7 +839,7 @@ type ListDestinationsRequest struct {
 
 func (x *ListDestinationsRequest) Reset() {
 	*x = ListDestinationsRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[10]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +851,7 @@ func (x *ListDestinationsRequest) String() string {
 func (*ListDestinationsRequest) ProtoMessage() {}
 
 func (x *ListDestinationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[10]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +864,7 @@ func (x *ListDestinationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDestinationsRequest.ProtoReflect.Descriptor instead.
 func (*ListDestinationsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{10}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListDestinationsRequest) GetPageSize() uint32 {
@@ -818,7 +891,7 @@ type ListDestinationsResponse struct {
 
 func (x *ListDestinationsResponse) Reset() {
 	*x = ListDestinationsResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[11]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +903,7 @@ func (x *ListDestinationsResponse) String() string {
 func (*ListDestinationsResponse) ProtoMessage() {}
 
 func (x *ListDestinationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[11]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +916,7 @@ func (x *ListDestinationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDestinationsResponse.ProtoReflect.Descriptor instead.
 func (*ListDestinationsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{11}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListDestinationsResponse) GetDestinations() []*Destination {
@@ -880,7 +953,7 @@ type Delivery struct {
 
 func (x *Delivery) Reset() {
 	*x = Delivery{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[12]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +965,7 @@ func (x *Delivery) String() string {
 func (*Delivery) ProtoMessage() {}
 
 func (x *Delivery) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[12]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +978,7 @@ func (x *Delivery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delivery.ProtoReflect.Descriptor instead.
 func (*Delivery) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{12}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Delivery) GetId() string {
@@ -991,13 +1064,15 @@ type ListDeliveriesRequest struct {
 	Status        DeliveryStatus         `protobuf:"varint,2,opt,name=status,proto3,enum=lindm.integrations.v1.DeliveryStatus" json:"status,omitempty"`
 	PageSize      uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string                 `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Only dead letters and deliveries waiting to retry after a failed attempt.
+	FailuresOnly  bool `protobuf:"varint,5,opt,name=failures_only,json=failuresOnly,proto3" json:"failures_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListDeliveriesRequest) Reset() {
 	*x = ListDeliveriesRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[13]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1009,7 +1084,7 @@ func (x *ListDeliveriesRequest) String() string {
 func (*ListDeliveriesRequest) ProtoMessage() {}
 
 func (x *ListDeliveriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[13]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1022,7 +1097,7 @@ func (x *ListDeliveriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDeliveriesRequest.ProtoReflect.Descriptor instead.
 func (*ListDeliveriesRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{13}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListDeliveriesRequest) GetDestinationId() string {
@@ -1053,6 +1128,13 @@ func (x *ListDeliveriesRequest) GetPageToken() string {
 	return ""
 }
 
+func (x *ListDeliveriesRequest) GetFailuresOnly() bool {
+	if x != nil {
+		return x.FailuresOnly
+	}
+	return false
+}
+
 type ListDeliveriesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Deliveries    []*Delivery            `protobuf:"bytes,1,rep,name=deliveries,proto3" json:"deliveries,omitempty"`
@@ -1063,7 +1145,7 @@ type ListDeliveriesResponse struct {
 
 func (x *ListDeliveriesResponse) Reset() {
 	*x = ListDeliveriesResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[14]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1075,7 +1157,7 @@ func (x *ListDeliveriesResponse) String() string {
 func (*ListDeliveriesResponse) ProtoMessage() {}
 
 func (x *ListDeliveriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[14]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1088,7 +1170,7 @@ func (x *ListDeliveriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDeliveriesResponse.ProtoReflect.Descriptor instead.
 func (*ListDeliveriesResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{14}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListDeliveriesResponse) GetDeliveries() []*Delivery {
@@ -1105,6 +1187,193 @@ func (x *ListDeliveriesResponse) GetNextPageToken() string {
 	return ""
 }
 
+type SummarizeDeliveriesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SummarizeDeliveriesRequest) Reset() {
+	*x = SummarizeDeliveriesRequest{}
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SummarizeDeliveriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SummarizeDeliveriesRequest) ProtoMessage() {}
+
+func (x *SummarizeDeliveriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SummarizeDeliveriesRequest.ProtoReflect.Descriptor instead.
+func (*SummarizeDeliveriesRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{16}
+}
+
+// Per-destination counts for the delivery log. Delivered counts only deliveries
+// completed at or after delivered_since; the other counts are the current backlog.
+type DeliverySummary struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DestinationId string                 `protobuf:"bytes,1,opt,name=destination_id,json=destinationId,proto3" json:"destination_id,omitempty"`
+	Delivered     uint64                 `protobuf:"varint,2,opt,name=delivered,proto3" json:"delivered,omitempty"`
+	// Dead letters awaiting an operator retry.
+	Failed uint64 `protobuf:"varint,3,opt,name=failed,proto3" json:"failed,omitempty"`
+	// Waiting to retry after at least one failed attempt.
+	Retrying uint64 `protobuf:"varint,4,opt,name=retrying,proto3" json:"retrying,omitempty"`
+	// Waiting for a first attempt or currently being sent.
+	Queued          uint64                 `protobuf:"varint,5,opt,name=queued,proto3" json:"queued,omitempty"`
+	LastDeliveredAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_delivered_at,json=lastDeliveredAt,proto3" json:"last_delivered_at,omitempty"`
+	// Bounded machine reason of the newest failed or retrying delivery, if any.
+	LastError     string `protobuf:"bytes,7,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeliverySummary) Reset() {
+	*x = DeliverySummary{}
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeliverySummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeliverySummary) ProtoMessage() {}
+
+func (x *DeliverySummary) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeliverySummary.ProtoReflect.Descriptor instead.
+func (*DeliverySummary) Descriptor() ([]byte, []int) {
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DeliverySummary) GetDestinationId() string {
+	if x != nil {
+		return x.DestinationId
+	}
+	return ""
+}
+
+func (x *DeliverySummary) GetDelivered() uint64 {
+	if x != nil {
+		return x.Delivered
+	}
+	return 0
+}
+
+func (x *DeliverySummary) GetFailed() uint64 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *DeliverySummary) GetRetrying() uint64 {
+	if x != nil {
+		return x.Retrying
+	}
+	return 0
+}
+
+func (x *DeliverySummary) GetQueued() uint64 {
+	if x != nil {
+		return x.Queued
+	}
+	return 0
+}
+
+func (x *DeliverySummary) GetLastDeliveredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastDeliveredAt
+	}
+	return nil
+}
+
+func (x *DeliverySummary) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+type SummarizeDeliveriesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One entry per current destination, newest destination first, at most 100.
+	Summaries      []*DeliverySummary     `protobuf:"bytes,1,rep,name=summaries,proto3" json:"summaries,omitempty"`
+	DeliveredSince *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=delivered_since,json=deliveredSince,proto3" json:"delivered_since,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SummarizeDeliveriesResponse) Reset() {
+	*x = SummarizeDeliveriesResponse{}
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SummarizeDeliveriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SummarizeDeliveriesResponse) ProtoMessage() {}
+
+func (x *SummarizeDeliveriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SummarizeDeliveriesResponse.ProtoReflect.Descriptor instead.
+func (*SummarizeDeliveriesResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SummarizeDeliveriesResponse) GetSummaries() []*DeliverySummary {
+	if x != nil {
+		return x.Summaries
+	}
+	return nil
+}
+
+func (x *SummarizeDeliveriesResponse) GetDeliveredSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeliveredSince
+	}
+	return nil
+}
+
 type ReplayDeliveryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -1116,7 +1385,7 @@ type ReplayDeliveryRequest struct {
 
 func (x *ReplayDeliveryRequest) Reset() {
 	*x = ReplayDeliveryRequest{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[15]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1128,7 +1397,7 @@ func (x *ReplayDeliveryRequest) String() string {
 func (*ReplayDeliveryRequest) ProtoMessage() {}
 
 func (x *ReplayDeliveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[15]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1141,7 +1410,7 @@ func (x *ReplayDeliveryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplayDeliveryRequest.ProtoReflect.Descriptor instead.
 func (*ReplayDeliveryRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{15}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ReplayDeliveryRequest) GetRequestId() string {
@@ -1174,7 +1443,7 @@ type ReplayDeliveryResponse struct {
 
 func (x *ReplayDeliveryResponse) Reset() {
 	*x = ReplayDeliveryResponse{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[16]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1186,7 +1455,7 @@ func (x *ReplayDeliveryResponse) String() string {
 func (*ReplayDeliveryResponse) ProtoMessage() {}
 
 func (x *ReplayDeliveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[16]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1199,7 +1468,7 @@ func (x *ReplayDeliveryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplayDeliveryResponse.ProtoReflect.Descriptor instead.
 func (*ReplayDeliveryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{16}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ReplayDeliveryResponse) GetDelivery() *Delivery {
@@ -1222,7 +1491,7 @@ type IntegrationPageCursor struct {
 
 func (x *IntegrationPageCursor) Reset() {
 	*x = IntegrationPageCursor{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[17]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1234,7 +1503,7 @@ func (x *IntegrationPageCursor) String() string {
 func (*IntegrationPageCursor) ProtoMessage() {}
 
 func (x *IntegrationPageCursor) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[17]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1247,7 +1516,7 @@ func (x *IntegrationPageCursor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationPageCursor.ProtoReflect.Descriptor instead.
 func (*IntegrationPageCursor) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{17}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *IntegrationPageCursor) GetBeforeTime() *timestamppb.Timestamp {
@@ -1295,7 +1564,7 @@ type IntegrationEvent struct {
 
 func (x *IntegrationEvent) Reset() {
 	*x = IntegrationEvent{}
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[18]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1307,7 +1576,7 @@ func (x *IntegrationEvent) String() string {
 func (*IntegrationEvent) ProtoMessage() {}
 
 func (x *IntegrationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[18]
+	mi := &file_lindm_integrations_v1_delivery_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1320,7 +1589,7 @@ func (x *IntegrationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationEvent.ProtoReflect.Descriptor instead.
 func (*IntegrationEvent) Descriptor() ([]byte, []int) {
-	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{18}
+	return file_lindm_integrations_v1_delivery_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *IntegrationEvent) GetEventId() string {
@@ -1371,7 +1640,7 @@ const file_lindm_integrations_v1_delivery_proto_rawDesc = "" +
 	"\bendpoint\x18\x03 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\bendpoint\x12-\n" +
 	"\rpinned_ca_pem\x18\x04 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x04R\vpinnedCaPem\x12\x18\n" +
 	"\aenabled\x18\x05 \x01(\bR\aenabled:\x87\x02\xbaH\x83\x02\x1a\x80\x02\n" +
-	"\x14destination.endpoint\x12Iwebhooks require HTTPS; syslog requires tls://host:port and pinned CA PEM\x1a\x9c\x01this.kind == 1 ? this.endpoint.matches('^https://[^/@?#]+(/[^?#]*)?$') : (this.endpoint.matches('^tls://[^/@?#]+:[0-9]+$') && this.pinned_ca_pem.size() > 0)\"\xc8\x02\n" +
+	"\x14destination.endpoint\x12Iwebhooks require HTTPS; syslog requires tls://host:port and pinned CA PEM\x1a\x9c\x01this.kind == 1 ? this.endpoint.matches('^https://[^/@?#]+(/[^?#]*)?$') : (this.endpoint.matches('^tls://[^/@?#]+:[0-9]+$') && this.pinned_ca_pem.size() > 0)\"\xa9\x03\n" +
 	"\vDestination\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12@\n" +
 	"\x06config\x18\x02 \x01(\v2(.lindm.integrations.v1.DestinationConfigR\x06config\x129\n" +
@@ -1380,7 +1649,12 @@ const file_lindm_integrations_v1_delivery_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\x04R\aversion\x12W\n" +
-	"\x1aprevious_secret_expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x17previousSecretExpiresAt\"\xa6\x03\n" +
+	"\x1aprevious_secret_expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x17previousSecretExpiresAt\x12_\n" +
+	"\x16pinned_ca_certificates\x18\a \x03(\v2).lindm.integrations.v1.CertificateSummaryR\x14pinnedCaCertificates\"\x96\x01\n" +
+	"\x12CertificateSummary\x12\x18\n" +
+	"\asubject\x18\x01 \x01(\tR\asubject\x127\n" +
+	"\tnot_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bnotAfter\x12-\n" +
+	"\x12sha256_fingerprint\x18\x03 \x01(\tR\x11sha256Fingerprint\"\xa6\x03\n" +
 	"\x18CreateDestinationRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12H\n" +
@@ -1437,19 +1711,34 @@ const file_lindm_integrations_v1_delivery_proto_rawDesc = "" +
 	"\fdelivered_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\vdeliveredAt\x12\x1d\n" +
 	"\n" +
-	"last_error\x18\v \x01(\tR\tlastError\"\xf8\x01\n" +
+	"last_error\x18\v \x01(\tR\tlastError\"\x9e\x03\n" +
 	"\x15ListDeliveriesRequest\x124\n" +
 	"\x0edestination_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\rdestinationId\x88\x01\x01\x12G\n" +
 	"\x06status\x18\x02 \x01(\x0e2%.lindm.integrations.v1.DeliveryStatusB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06status\x12$\n" +
 	"\tpage_size\x18\x03 \x01(\rB\a\xbaH\x04*\x02\x18dR\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\tpageTokenB\x11\n" +
+	"page_token\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\tpageToken\x12#\n" +
+	"\rfailures_only\x18\x05 \x01(\bR\ffailuresOnly:\x7f\xbaH|\x1az\n" +
+	"\x18deliveries.failures_only\x125failures_only cannot be combined with a status filter\x1a'!this.failures_only || this.status == 0B\x11\n" +
 	"\x0f_destination_id\"\x81\x01\n" +
 	"\x16ListDeliveriesResponse\x12?\n" +
 	"\n" +
 	"deliveries\x18\x01 \x03(\v2\x1f.lindm.integrations.v1.DeliveryR\n" +
 	"deliveries\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x8e\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x1c\n" +
+	"\x1aSummarizeDeliveriesRequest\"\x89\x02\n" +
+	"\x0fDeliverySummary\x12%\n" +
+	"\x0edestination_id\x18\x01 \x01(\tR\rdestinationId\x12\x1c\n" +
+	"\tdelivered\x18\x02 \x01(\x04R\tdelivered\x12\x16\n" +
+	"\x06failed\x18\x03 \x01(\x04R\x06failed\x12\x1a\n" +
+	"\bretrying\x18\x04 \x01(\x04R\bretrying\x12\x16\n" +
+	"\x06queued\x18\x05 \x01(\x04R\x06queued\x12F\n" +
+	"\x11last_delivered_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0flastDeliveredAt\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\a \x01(\tR\tlastError\"\xa8\x01\n" +
+	"\x1bSummarizeDeliveriesResponse\x12D\n" +
+	"\tsummaries\x18\x01 \x03(\v2&.lindm.integrations.v1.DeliverySummaryR\tsummaries\x12C\n" +
+	"\x0fdelivered_since\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x0edeliveredSince\"\x8e\x01\n" +
 	"\x15ReplayDeliveryRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12)\n" +
@@ -1481,14 +1770,15 @@ const file_lindm_integrations_v1_delivery_proto_rawDesc = "" +
 	"\x16DELIVERY_STATUS_LEASED\x10\x02\x12\x1d\n" +
 	"\x19DELIVERY_STATUS_DELIVERED\x10\x03\x12\x1f\n" +
 	"\x1bDELIVERY_STATUS_DEAD_LETTER\x10\x04\x12\x1d\n" +
-	"\x19DELIVERY_STATUS_CANCELLED\x10\x052\xda\x06\n" +
+	"\x19DELIVERY_STATUS_CANCELLED\x10\x052\xd8\a\n" +
 	"\x12IntegrationService\x12v\n" +
 	"\x11CreateDestination\x12/.lindm.integrations.v1.CreateDestinationRequest\x1a0.lindm.integrations.v1.CreateDestinationResponse\x12v\n" +
 	"\x11UpdateDestination\x12/.lindm.integrations.v1.UpdateDestinationRequest\x1a0.lindm.integrations.v1.UpdateDestinationResponse\x12v\n" +
 	"\x11DeleteDestination\x12/.lindm.integrations.v1.DeleteDestinationRequest\x1a0.lindm.integrations.v1.DeleteDestinationResponse\x12\x88\x01\n" +
 	"\x17RotateDestinationSecret\x125.lindm.integrations.v1.RotateDestinationSecretRequest\x1a6.lindm.integrations.v1.RotateDestinationSecretResponse\x12s\n" +
 	"\x10ListDestinations\x12..lindm.integrations.v1.ListDestinationsRequest\x1a/.lindm.integrations.v1.ListDestinationsResponse\x12m\n" +
-	"\x0eListDeliveries\x12,.lindm.integrations.v1.ListDeliveriesRequest\x1a-.lindm.integrations.v1.ListDeliveriesResponse\x12m\n" +
+	"\x0eListDeliveries\x12,.lindm.integrations.v1.ListDeliveriesRequest\x1a-.lindm.integrations.v1.ListDeliveriesResponse\x12|\n" +
+	"\x13SummarizeDeliveries\x121.lindm.integrations.v1.SummarizeDeliveriesRequest\x1a2.lindm.integrations.v1.SummarizeDeliveriesResponse\x12m\n" +
 	"\x0eReplayDelivery\x12,.lindm.integrations.v1.ReplayDeliveryRequest\x1a-.lindm.integrations.v1.ReplayDeliveryResponseB0Z.lindm/gen/lindm/integrations/v1;integrationsv1b\x06proto3"
 
 var (
@@ -1504,70 +1794,81 @@ func file_lindm_integrations_v1_delivery_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_integrations_v1_delivery_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_integrations_v1_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_lindm_integrations_v1_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_lindm_integrations_v1_delivery_proto_goTypes = []any{
 	(DestinationKind)(0),                    // 0: lindm.integrations.v1.DestinationKind
 	(DeliveryStatus)(0),                     // 1: lindm.integrations.v1.DeliveryStatus
 	(*DestinationConfig)(nil),               // 2: lindm.integrations.v1.DestinationConfig
 	(*Destination)(nil),                     // 3: lindm.integrations.v1.Destination
-	(*CreateDestinationRequest)(nil),        // 4: lindm.integrations.v1.CreateDestinationRequest
-	(*CreateDestinationResponse)(nil),       // 5: lindm.integrations.v1.CreateDestinationResponse
-	(*UpdateDestinationRequest)(nil),        // 6: lindm.integrations.v1.UpdateDestinationRequest
-	(*UpdateDestinationResponse)(nil),       // 7: lindm.integrations.v1.UpdateDestinationResponse
-	(*DeleteDestinationRequest)(nil),        // 8: lindm.integrations.v1.DeleteDestinationRequest
-	(*DeleteDestinationResponse)(nil),       // 9: lindm.integrations.v1.DeleteDestinationResponse
-	(*RotateDestinationSecretRequest)(nil),  // 10: lindm.integrations.v1.RotateDestinationSecretRequest
-	(*RotateDestinationSecretResponse)(nil), // 11: lindm.integrations.v1.RotateDestinationSecretResponse
-	(*ListDestinationsRequest)(nil),         // 12: lindm.integrations.v1.ListDestinationsRequest
-	(*ListDestinationsResponse)(nil),        // 13: lindm.integrations.v1.ListDestinationsResponse
-	(*Delivery)(nil),                        // 14: lindm.integrations.v1.Delivery
-	(*ListDeliveriesRequest)(nil),           // 15: lindm.integrations.v1.ListDeliveriesRequest
-	(*ListDeliveriesResponse)(nil),          // 16: lindm.integrations.v1.ListDeliveriesResponse
-	(*ReplayDeliveryRequest)(nil),           // 17: lindm.integrations.v1.ReplayDeliveryRequest
-	(*ReplayDeliveryResponse)(nil),          // 18: lindm.integrations.v1.ReplayDeliveryResponse
-	(*IntegrationPageCursor)(nil),           // 19: lindm.integrations.v1.IntegrationPageCursor
-	(*IntegrationEvent)(nil),                // 20: lindm.integrations.v1.IntegrationEvent
-	(*timestamppb.Timestamp)(nil),           // 21: google.protobuf.Timestamp
+	(*CertificateSummary)(nil),              // 4: lindm.integrations.v1.CertificateSummary
+	(*CreateDestinationRequest)(nil),        // 5: lindm.integrations.v1.CreateDestinationRequest
+	(*CreateDestinationResponse)(nil),       // 6: lindm.integrations.v1.CreateDestinationResponse
+	(*UpdateDestinationRequest)(nil),        // 7: lindm.integrations.v1.UpdateDestinationRequest
+	(*UpdateDestinationResponse)(nil),       // 8: lindm.integrations.v1.UpdateDestinationResponse
+	(*DeleteDestinationRequest)(nil),        // 9: lindm.integrations.v1.DeleteDestinationRequest
+	(*DeleteDestinationResponse)(nil),       // 10: lindm.integrations.v1.DeleteDestinationResponse
+	(*RotateDestinationSecretRequest)(nil),  // 11: lindm.integrations.v1.RotateDestinationSecretRequest
+	(*RotateDestinationSecretResponse)(nil), // 12: lindm.integrations.v1.RotateDestinationSecretResponse
+	(*ListDestinationsRequest)(nil),         // 13: lindm.integrations.v1.ListDestinationsRequest
+	(*ListDestinationsResponse)(nil),        // 14: lindm.integrations.v1.ListDestinationsResponse
+	(*Delivery)(nil),                        // 15: lindm.integrations.v1.Delivery
+	(*ListDeliveriesRequest)(nil),           // 16: lindm.integrations.v1.ListDeliveriesRequest
+	(*ListDeliveriesResponse)(nil),          // 17: lindm.integrations.v1.ListDeliveriesResponse
+	(*SummarizeDeliveriesRequest)(nil),      // 18: lindm.integrations.v1.SummarizeDeliveriesRequest
+	(*DeliverySummary)(nil),                 // 19: lindm.integrations.v1.DeliverySummary
+	(*SummarizeDeliveriesResponse)(nil),     // 20: lindm.integrations.v1.SummarizeDeliveriesResponse
+	(*ReplayDeliveryRequest)(nil),           // 21: lindm.integrations.v1.ReplayDeliveryRequest
+	(*ReplayDeliveryResponse)(nil),          // 22: lindm.integrations.v1.ReplayDeliveryResponse
+	(*IntegrationPageCursor)(nil),           // 23: lindm.integrations.v1.IntegrationPageCursor
+	(*IntegrationEvent)(nil),                // 24: lindm.integrations.v1.IntegrationEvent
+	(*timestamppb.Timestamp)(nil),           // 25: google.protobuf.Timestamp
 }
 var file_lindm_integrations_v1_delivery_proto_depIdxs = []int32{
 	0,  // 0: lindm.integrations.v1.DestinationConfig.kind:type_name -> lindm.integrations.v1.DestinationKind
 	2,  // 1: lindm.integrations.v1.Destination.config:type_name -> lindm.integrations.v1.DestinationConfig
-	21, // 2: lindm.integrations.v1.Destination.created_at:type_name -> google.protobuf.Timestamp
-	21, // 3: lindm.integrations.v1.Destination.updated_at:type_name -> google.protobuf.Timestamp
-	21, // 4: lindm.integrations.v1.Destination.previous_secret_expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 5: lindm.integrations.v1.CreateDestinationRequest.config:type_name -> lindm.integrations.v1.DestinationConfig
-	3,  // 6: lindm.integrations.v1.CreateDestinationResponse.destination:type_name -> lindm.integrations.v1.Destination
-	2,  // 7: lindm.integrations.v1.UpdateDestinationRequest.config:type_name -> lindm.integrations.v1.DestinationConfig
-	3,  // 8: lindm.integrations.v1.UpdateDestinationResponse.destination:type_name -> lindm.integrations.v1.Destination
-	3,  // 9: lindm.integrations.v1.RotateDestinationSecretResponse.destination:type_name -> lindm.integrations.v1.Destination
-	3,  // 10: lindm.integrations.v1.ListDestinationsResponse.destinations:type_name -> lindm.integrations.v1.Destination
-	1,  // 11: lindm.integrations.v1.Delivery.status:type_name -> lindm.integrations.v1.DeliveryStatus
-	21, // 12: lindm.integrations.v1.Delivery.next_attempt_at:type_name -> google.protobuf.Timestamp
-	21, // 13: lindm.integrations.v1.Delivery.delivered_at:type_name -> google.protobuf.Timestamp
-	1,  // 14: lindm.integrations.v1.ListDeliveriesRequest.status:type_name -> lindm.integrations.v1.DeliveryStatus
-	14, // 15: lindm.integrations.v1.ListDeliveriesResponse.deliveries:type_name -> lindm.integrations.v1.Delivery
-	14, // 16: lindm.integrations.v1.ReplayDeliveryResponse.delivery:type_name -> lindm.integrations.v1.Delivery
-	21, // 17: lindm.integrations.v1.IntegrationPageCursor.before_time:type_name -> google.protobuf.Timestamp
-	21, // 18: lindm.integrations.v1.IntegrationEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	4,  // 19: lindm.integrations.v1.IntegrationService.CreateDestination:input_type -> lindm.integrations.v1.CreateDestinationRequest
-	6,  // 20: lindm.integrations.v1.IntegrationService.UpdateDestination:input_type -> lindm.integrations.v1.UpdateDestinationRequest
-	8,  // 21: lindm.integrations.v1.IntegrationService.DeleteDestination:input_type -> lindm.integrations.v1.DeleteDestinationRequest
-	10, // 22: lindm.integrations.v1.IntegrationService.RotateDestinationSecret:input_type -> lindm.integrations.v1.RotateDestinationSecretRequest
-	12, // 23: lindm.integrations.v1.IntegrationService.ListDestinations:input_type -> lindm.integrations.v1.ListDestinationsRequest
-	15, // 24: lindm.integrations.v1.IntegrationService.ListDeliveries:input_type -> lindm.integrations.v1.ListDeliveriesRequest
-	17, // 25: lindm.integrations.v1.IntegrationService.ReplayDelivery:input_type -> lindm.integrations.v1.ReplayDeliveryRequest
-	5,  // 26: lindm.integrations.v1.IntegrationService.CreateDestination:output_type -> lindm.integrations.v1.CreateDestinationResponse
-	7,  // 27: lindm.integrations.v1.IntegrationService.UpdateDestination:output_type -> lindm.integrations.v1.UpdateDestinationResponse
-	9,  // 28: lindm.integrations.v1.IntegrationService.DeleteDestination:output_type -> lindm.integrations.v1.DeleteDestinationResponse
-	11, // 29: lindm.integrations.v1.IntegrationService.RotateDestinationSecret:output_type -> lindm.integrations.v1.RotateDestinationSecretResponse
-	13, // 30: lindm.integrations.v1.IntegrationService.ListDestinations:output_type -> lindm.integrations.v1.ListDestinationsResponse
-	16, // 31: lindm.integrations.v1.IntegrationService.ListDeliveries:output_type -> lindm.integrations.v1.ListDeliveriesResponse
-	18, // 32: lindm.integrations.v1.IntegrationService.ReplayDelivery:output_type -> lindm.integrations.v1.ReplayDeliveryResponse
-	26, // [26:33] is the sub-list for method output_type
-	19, // [19:26] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	25, // 2: lindm.integrations.v1.Destination.created_at:type_name -> google.protobuf.Timestamp
+	25, // 3: lindm.integrations.v1.Destination.updated_at:type_name -> google.protobuf.Timestamp
+	25, // 4: lindm.integrations.v1.Destination.previous_secret_expires_at:type_name -> google.protobuf.Timestamp
+	4,  // 5: lindm.integrations.v1.Destination.pinned_ca_certificates:type_name -> lindm.integrations.v1.CertificateSummary
+	25, // 6: lindm.integrations.v1.CertificateSummary.not_after:type_name -> google.protobuf.Timestamp
+	2,  // 7: lindm.integrations.v1.CreateDestinationRequest.config:type_name -> lindm.integrations.v1.DestinationConfig
+	3,  // 8: lindm.integrations.v1.CreateDestinationResponse.destination:type_name -> lindm.integrations.v1.Destination
+	2,  // 9: lindm.integrations.v1.UpdateDestinationRequest.config:type_name -> lindm.integrations.v1.DestinationConfig
+	3,  // 10: lindm.integrations.v1.UpdateDestinationResponse.destination:type_name -> lindm.integrations.v1.Destination
+	3,  // 11: lindm.integrations.v1.RotateDestinationSecretResponse.destination:type_name -> lindm.integrations.v1.Destination
+	3,  // 12: lindm.integrations.v1.ListDestinationsResponse.destinations:type_name -> lindm.integrations.v1.Destination
+	1,  // 13: lindm.integrations.v1.Delivery.status:type_name -> lindm.integrations.v1.DeliveryStatus
+	25, // 14: lindm.integrations.v1.Delivery.next_attempt_at:type_name -> google.protobuf.Timestamp
+	25, // 15: lindm.integrations.v1.Delivery.delivered_at:type_name -> google.protobuf.Timestamp
+	1,  // 16: lindm.integrations.v1.ListDeliveriesRequest.status:type_name -> lindm.integrations.v1.DeliveryStatus
+	15, // 17: lindm.integrations.v1.ListDeliveriesResponse.deliveries:type_name -> lindm.integrations.v1.Delivery
+	25, // 18: lindm.integrations.v1.DeliverySummary.last_delivered_at:type_name -> google.protobuf.Timestamp
+	19, // 19: lindm.integrations.v1.SummarizeDeliveriesResponse.summaries:type_name -> lindm.integrations.v1.DeliverySummary
+	25, // 20: lindm.integrations.v1.SummarizeDeliveriesResponse.delivered_since:type_name -> google.protobuf.Timestamp
+	15, // 21: lindm.integrations.v1.ReplayDeliveryResponse.delivery:type_name -> lindm.integrations.v1.Delivery
+	25, // 22: lindm.integrations.v1.IntegrationPageCursor.before_time:type_name -> google.protobuf.Timestamp
+	25, // 23: lindm.integrations.v1.IntegrationEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	5,  // 24: lindm.integrations.v1.IntegrationService.CreateDestination:input_type -> lindm.integrations.v1.CreateDestinationRequest
+	7,  // 25: lindm.integrations.v1.IntegrationService.UpdateDestination:input_type -> lindm.integrations.v1.UpdateDestinationRequest
+	9,  // 26: lindm.integrations.v1.IntegrationService.DeleteDestination:input_type -> lindm.integrations.v1.DeleteDestinationRequest
+	11, // 27: lindm.integrations.v1.IntegrationService.RotateDestinationSecret:input_type -> lindm.integrations.v1.RotateDestinationSecretRequest
+	13, // 28: lindm.integrations.v1.IntegrationService.ListDestinations:input_type -> lindm.integrations.v1.ListDestinationsRequest
+	16, // 29: lindm.integrations.v1.IntegrationService.ListDeliveries:input_type -> lindm.integrations.v1.ListDeliveriesRequest
+	18, // 30: lindm.integrations.v1.IntegrationService.SummarizeDeliveries:input_type -> lindm.integrations.v1.SummarizeDeliveriesRequest
+	21, // 31: lindm.integrations.v1.IntegrationService.ReplayDelivery:input_type -> lindm.integrations.v1.ReplayDeliveryRequest
+	6,  // 32: lindm.integrations.v1.IntegrationService.CreateDestination:output_type -> lindm.integrations.v1.CreateDestinationResponse
+	8,  // 33: lindm.integrations.v1.IntegrationService.UpdateDestination:output_type -> lindm.integrations.v1.UpdateDestinationResponse
+	10, // 34: lindm.integrations.v1.IntegrationService.DeleteDestination:output_type -> lindm.integrations.v1.DeleteDestinationResponse
+	12, // 35: lindm.integrations.v1.IntegrationService.RotateDestinationSecret:output_type -> lindm.integrations.v1.RotateDestinationSecretResponse
+	14, // 36: lindm.integrations.v1.IntegrationService.ListDestinations:output_type -> lindm.integrations.v1.ListDestinationsResponse
+	17, // 37: lindm.integrations.v1.IntegrationService.ListDeliveries:output_type -> lindm.integrations.v1.ListDeliveriesResponse
+	20, // 38: lindm.integrations.v1.IntegrationService.SummarizeDeliveries:output_type -> lindm.integrations.v1.SummarizeDeliveriesResponse
+	22, // 39: lindm.integrations.v1.IntegrationService.ReplayDelivery:output_type -> lindm.integrations.v1.ReplayDeliveryResponse
+	32, // [32:40] is the sub-list for method output_type
+	24, // [24:32] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_lindm_integrations_v1_delivery_proto_init() }
@@ -1575,14 +1876,14 @@ func file_lindm_integrations_v1_delivery_proto_init() {
 	if File_lindm_integrations_v1_delivery_proto != nil {
 		return
 	}
-	file_lindm_integrations_v1_delivery_proto_msgTypes[13].OneofWrappers = []any{}
+	file_lindm_integrations_v1_delivery_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_integrations_v1_delivery_proto_rawDesc), len(file_lindm_integrations_v1_delivery_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   19,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

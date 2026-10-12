@@ -100,7 +100,11 @@ func (s *Service) ListDeliveries(ctx context.Context, req *connect.Request[integ
 	if _, err := s.principal(ctx, req.Msg); err != nil {
 		return nil, err
 	}
-	cursor, err := s.cursor(req.Msg.PageToken, "deliveries\x00"+req.Msg.GetDestinationId()+"\x00"+req.Msg.Status.String())
+	filter := "deliveries\x00" + req.Msg.GetDestinationId() + "\x00" + req.Msg.Status.String()
+	if req.Msg.FailuresOnly {
+		filter += "\x00failures"
+	}
+	cursor, err := s.cursor(req.Msg.PageToken, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +121,7 @@ func (s *Service) ListDeliveries(ctx context.Context, req *connect.Request[integ
 		destinationID = &id
 	}
 	size := pageSize(req.Msg.PageSize)
-	rows, err := integrationdb.New(s.pool).ListDeliveries(ctx, integrationdb.ListDeliveriesParams{DestinationID: destinationID, StatusFilter: int32(req.Msg.Status), BeforeSequence: cursor.BeforeSequence, BeforeID: before, PageLimit: size + 1})
+	rows, err := integrationdb.New(s.pool).ListDeliveries(ctx, integrationdb.ListDeliveriesParams{DestinationID: destinationID, StatusFilter: int32(req.Msg.Status), FailuresOnly: req.Msg.FailuresOnly, BeforeSequence: cursor.BeforeSequence, BeforeID: before, PageLimit: size + 1})
 	if err != nil {
 		return nil, storeError(err)
 	}
@@ -134,6 +138,25 @@ func (s *Service) ListDeliveries(ctx context.Context, req *connect.Request[integ
 	}
 	for _, row := range rows {
 		response.Deliveries = append(response.Deliveries, deliveryMessage(row))
+	}
+	return connect.NewResponse(response), nil
+}
+
+// deliverySummaryWindow bounds the delivered count the console reports per destination.
+const deliverySummaryWindow = 24 * time.Hour
+
+func (s *Service) SummarizeDeliveries(ctx context.Context, req *connect.Request[integrationsv1.SummarizeDeliveriesRequest]) (*connect.Response[integrationsv1.SummarizeDeliveriesResponse], error) {
+	if _, err := s.principal(ctx, req.Msg); err != nil {
+		return nil, err
+	}
+	since := s.clock().Add(-deliverySummaryWindow)
+	rows, err := integrationdb.New(s.pool).SummarizeDeliveries(ctx, pgtype.Timestamptz{Time: since, Valid: true})
+	if err != nil {
+		return nil, storeError(err)
+	}
+	response := &integrationsv1.SummarizeDeliveriesResponse{DeliveredSince: timestamppb.New(since), Summaries: make([]*integrationsv1.DeliverySummary, 0, len(rows))}
+	for _, row := range rows {
+		response.Summaries = append(response.Summaries, &integrationsv1.DeliverySummary{DestinationId: row.DestinationID.String(), Delivered: uint64(row.Delivered), Failed: uint64(row.Failed), Retrying: uint64(row.Retrying), Queued: uint64(row.Queued), LastDeliveredAt: timestamp(row.LastDeliveredAt), LastError: row.LastError})
 	}
 	return connect.NewResponse(response), nil
 }

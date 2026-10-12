@@ -3,6 +3,7 @@ package integrations
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"net"
@@ -60,7 +61,39 @@ func timestamp(value pgtype.Timestamptz) *timestamppb.Timestamp {
 	return timestamppb.New(value.Time)
 }
 func destinationMessage(row integrationdb.IntegrationDestination) *integrationsv1.Destination {
-	return &integrationsv1.Destination{Id: row.ID.String(), Config: &integrationsv1.DestinationConfig{DisplayName: row.DisplayName, Kind: integrationsv1.DestinationKind(row.Kind), Endpoint: row.Endpoint, PinnedCaPem: row.PinnedCaPem, Enabled: row.Enabled}, CreatedAt: timestamp(row.CreatedAt), UpdatedAt: timestamp(row.UpdatedAt), Version: uint64(row.Version), PreviousSecretExpiresAt: timestamp(row.PreviousSecretExpiresAt)}
+	return &integrationsv1.Destination{Id: row.ID.String(), Config: &integrationsv1.DestinationConfig{DisplayName: row.DisplayName, Kind: integrationsv1.DestinationKind(row.Kind), Endpoint: row.Endpoint, PinnedCaPem: row.PinnedCaPem, Enabled: row.Enabled}, CreatedAt: timestamp(row.CreatedAt), UpdatedAt: timestamp(row.UpdatedAt), Version: uint64(row.Version), PreviousSecretExpiresAt: timestamp(row.PreviousSecretExpiresAt), PinnedCaCertificates: certificateSummaries(row.PinnedCaPem)}
+}
+
+// certificateSummaries describes stored trust material that validateTrust
+// accepted. Undecodable trailing data, which validation rejects, ends the list.
+func certificateSummaries(pemText string) []*integrationsv1.CertificateSummary {
+	var summaries []*integrationsv1.CertificateSummary
+	remaining := []byte(pemText)
+	for {
+		block, rest := pem.Decode(remaining)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return summaries
+		}
+		remaining = rest
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return summaries
+		}
+		subject := cert.Subject.CommonName
+		if subject == "" {
+			subject = cert.Subject.String()
+		}
+		digest := sha256.Sum256(cert.Raw)
+		const digits = "0123456789ABCDEF"
+		fingerprint := make([]byte, 0, len(digest)*3-1)
+		for i, value := range digest {
+			if i > 0 {
+				fingerprint = append(fingerprint, ':')
+			}
+			fingerprint = append(fingerprint, digits[value>>4], digits[value&0x0f])
+		}
+		summaries = append(summaries, &integrationsv1.CertificateSummary{Subject: subject, NotAfter: timestamppb.New(cert.NotAfter), Sha256Fingerprint: string(fingerprint)})
+	}
 }
 func audit(ctx context.Context, q *integrationdb.Queries, actor uuid.UUID, action auditkind.Kind, resource, reason string) error {
 	return q.InsertIntegrationAudit(ctx, integrationdb.InsertIntegrationAuditParams{ID: uuid.New(), ActorID: &actor, Action: action.String(), ResourceID: resource, Reason: reason})

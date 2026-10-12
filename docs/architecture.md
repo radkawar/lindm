@@ -2160,7 +2160,12 @@ lease. Delivery ordering and retries are durable across replicas; external sends
 remain at least once. Dead letters block only their ordering key. Webhooks use
 timestamp-bound HMAC-SHA256 with explicit bounded previous-key overlap; syslog
 uses verified TLS 1.3 and RFC 5424/RFC 6587 framing. Remote bodies and credentials
-never become error messages.
+never become error messages. Destinations return a subject, expiry and SHA-256
+fingerprint for each pinned CA certificate, so the console identifies trust without
+showing PEM. `SummarizeDeliveries` counts, per current destination, deliveries
+completed in the last 24 hours (a partial index on delivered rows keeps this bounded)
+plus the dead-letter, retrying and queued backlog and the newest failure reason; `ListDeliveries` with
+`failures_only` lists only dead letters and deliveries retrying after a failed attempt.
 
 The audit-chain head is a transactional row lock, not a sequence whose gaps or
 commit ordering could hide dropped records. SHA-256 links bind chain UUID,

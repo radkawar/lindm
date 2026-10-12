@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
@@ -27,139 +28,222 @@ import {
 import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
+import { reasonError } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
-import { DeliveryStatus, type Delivery } from "../../../gen/lindm/integrations/v1/delivery_pb";
+import {
+  DeliveryStatus,
+  type Delivery,
+  type DeliverySummary,
+} from "../../../gen/lindm/integrations/v1/delivery_pb";
 import { useIntegrationAction } from "./action";
-import { deliveriesQueryOptions, destinationsQueryOptions } from "./queries";
+import { deliveryFailureText, plural } from "./health";
+import {
+  deliveredQueryOptions,
+  deliverySummaryQueryOptions,
+  destinationsQueryOptions,
+  failedDeliveriesQueryOptions,
+} from "./queries";
 
-const STATUS: Record<DeliveryStatus, string> = {
-  [DeliveryStatus.UNSPECIFIED]: "Unknown",
-  [DeliveryStatus.PENDING]: "Pending",
-  [DeliveryStatus.LEASED]: "Delivering",
-  [DeliveryStatus.DELIVERED]: "Delivered",
-  [DeliveryStatus.DEAD_LETTER]: "Failed",
-  [DeliveryStatus.CANCELLED]: "Cancelled",
-};
-
+/**
+ * Failures first; delivered events are only counted per destination (server
+ * summary over the last 24 hours) and listed on request.
+ */
 export function Deliveries() {
   const lifetime = useAuthLifetime();
   const [page, setPage] = useState("");
-  const [deadLetters, setDeadLetters] = useState(false);
-  const list = useQuery(deliveriesQueryOptions(lifetime, page, deadLetters));
+  const failures = useQuery(failedDeliveriesQueryOptions(lifetime, page));
+  const summary = useQuery(deliverySummaryQueryOptions(lifetime));
   const destinations = useQuery(destinationsQueryOptions(lifetime, ""));
-  const destinationNames = useMemo(
-    () =>
-      new Map(
-        destinations.data?.destinations.map((d) => [d.id, d.config?.displayName.trim() ?? ""]) ??
-          [],
-      ),
-    [destinations.data],
-  );
-  function show(failedOnly: boolean) {
-    setDeadLetters(failedOnly);
-    setPage("");
+  const names: Record<string, string> = {};
+  for (const destination of destinations.data?.destinations ?? []) {
+    names[destination.id] = destination.config?.displayName.trim() || "Unnamed destination";
   }
+  const nameOf = (id: string) => names[id] ?? "Destination name unavailable";
   return (
     <section
-      className="grid min-w-0 gap-4 border-t pt-6"
-      aria-label="Delivery history"
-      aria-busy={list.isFetching}
+      className="grid min-w-0 gap-3 border-t pt-6"
+      aria-labelledby="deliveries-heading"
+      aria-busy={failures.isFetching || summary.isFetching}
     >
       <div className="grid gap-1">
-        <h2 className="text-base font-semibold">Deliveries</h2>
+        <h2 id="deliveries-heading" className="text-base font-semibold">
+          Delivery log
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Receivers may get the same event more than once and should ignore repeats.
+          Failed deliveries are listed; successful ones are counted per destination.
         </p>
       </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Show deliveries">
-        <Button
-          size="sm"
-          variant={deadLetters ? "outline" : "default"}
-          aria-pressed={!deadLetters}
-          onClick={() => show(false)}
-        >
-          All deliveries
-        </Button>
-        <Button
-          size="sm"
-          variant={deadLetters ? "default" : "outline"}
-          aria-pressed={deadLetters}
-          onClick={() => show(true)}
-        >
-          Failed only
-        </Button>
-      </div>
-      {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
-      {list.isPending ? (
+      {failures.error ? <RpcError failure={toRpcFailure(failures.error)} /> : null}
+      {failures.isPending ? (
         <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading deliveries…</span>
-          <Skeleton className="h-32 w-full" />
+          <span className="text-sm text-muted-foreground">Loading failed deliveries…</span>
+          <Skeleton className="h-16 w-full" />
         </div>
       ) : null}
-      {list.data?.deliveries.length === 0 ? (
+      {failures.data?.deliveries.length === 0 ? (
         <EmptyState
-          title={deadLetters ? "No failed deliveries" : "No deliveries yet"}
+          title={page ? "No more failed deliveries" : "No failed deliveries"}
           description={
             page
-              ? "No more deliveries on this page. Return to the first page."
-              : deadLetters
-                ? "Every delivery either succeeded or is still being retried."
-                : "Events are listed here once a destination is sending."
+              ? "Return to the first page."
+              : "No delivery is failing or waiting to retry after an error."
           }
           action={
             page ? (
               <Button variant="outline" onClick={() => setPage("")}>
                 First page
               </Button>
-            ) : deadLetters ? (
-              <Button variant="outline" onClick={() => show(false)}>
-                Show all deliveries
-              </Button>
             ) : undefined
           }
         />
       ) : null}
-      {list.data && list.data.deliveries.length > 0 ? (
-        <Table aria-label="Deliveries">
+      {failures.data && failures.data.deliveries.length > 0 ? (
+        <Table aria-label="Failed deliveries">
           <TableHeader>
             <TableRow>
               <TableHead>Destination</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>When</TableHead>
               <TableHead>Attempts</TableHead>
-              <TableHead>Last error</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {list.data.deliveries.map((delivery) => (
-              <DeliveryRow
+            {failures.data.deliveries.map((delivery) => (
+              <FailureRow
                 key={delivery.id}
                 delivery={delivery}
-                destinationName={
-                  destinationNames.get(delivery.destinationId) || "Destination name unavailable"
-                }
+                destinationName={nameOf(delivery.destinationId)}
               />
             ))}
           </TableBody>
         </Table>
       ) : null}
       <ListPagination
-        label="Delivery pages"
+        label="Failed delivery pages"
         previousLabel="First page"
         onPrevious={page ? () => setPage("") : undefined}
         onNext={
-          list.data?.nextPageToken ? () => setPage(list.data?.nextPageToken ?? "") : undefined
+          failures.data?.nextPageToken
+            ? () => setPage(failures.data?.nextPageToken ?? "")
+            : undefined
         }
-        busy={list.isFetching}
+        busy={failures.isFetching}
       />
+      {summary.error ? (
+        <RpcError failure={toRpcFailure(summary.error)} title="Delivery counts unavailable" />
+      ) : null}
+      {summary.data && summary.data.summaries.length > 0 ? (
+        <ul className="grid border-y" aria-label="Delivered events per destination">
+          {summary.data.summaries.map((row) => (
+            <DeliveredGroup
+              key={row.destinationId}
+              summary={row}
+              destinationName={nameOf(row.destinationId)}
+            />
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }
 
-function DeliveryRow({
+function DeliveredGroup({
+  summary,
+  destinationName,
+}: {
+  summary: DeliverySummary;
+  destinationName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const panel = `delivered-${summary.destinationId}`;
+  const Icon = open ? ChevronDown : ChevronRight;
+  return (
+    <li className="grid min-w-0 gap-2 border-b py-2 last:border-b-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 break-words text-sm">
+          <span className="font-medium">{destinationName}</span>
+          {" · "}
+          {plural(summary.delivered, "event")} delivered in the last 24 h
+          {summary.queued > 0n ? ` · ${plural(summary.queued, "event")} waiting to send` : null}
+          {summary.lastDeliveredAt ? (
+            <span className="text-muted-foreground">
+              {" · last "}
+              <Timestamp value={summary.lastDeliveredAt} />
+            </span>
+          ) : null}
+        </p>
+        {summary.lastDeliveredAt ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={open}
+            aria-controls={panel}
+            onClick={() => setOpen(!open)}
+          >
+            <Icon aria-hidden="true" />
+            {open ? "Hide delivered" : "Show delivered"}
+          </Button>
+        ) : null}
+      </div>
+      {open ? (
+        <div id={panel}>
+          <DeliveredList destinationId={summary.destinationId} />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function DeliveredList({ destinationId }: { destinationId: string }) {
+  const lifetime = useAuthLifetime();
+  const [page, setPage] = useState("");
+  const list = useQuery(deliveredQueryOptions(lifetime, destinationId, page));
+  if (list.error) return <RpcError failure={toRpcFailure(list.error)} />;
+  if (list.isPending) return <Skeleton className="h-16 w-full" />;
+  return (
+    <div className="grid gap-2">
+      <Table aria-label="Delivered events">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Delivered</TableHead>
+            <TableHead>Attempts</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {list.data.deliveries.map((delivery) => (
+            <TableRow key={delivery.id} className="align-top">
+              <TableCell>
+                <Timestamp value={delivery.deliveredAt} />
+                <TechnicalDetails
+                  items={[
+                    { label: "Delivery ID", value: delivery.id },
+                    { label: "Event ID", value: delivery.eventId },
+                    { label: "Resource", value: delivery.resourceId },
+                  ]}
+                />
+              </TableCell>
+              <TableCell className="tabular-nums">
+                {delivery.attempts}
+                {delivery.replayCount > 0 ? ` · retried ${delivery.replayCount}×` : null}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <ListPagination
+        label="Delivered event pages"
+        previousLabel="Newest"
+        onPrevious={page ? () => setPage("") : undefined}
+        onNext={list.data.nextPageToken ? () => setPage(list.data.nextPageToken) : undefined}
+        busy={list.isFetching}
+      />
+    </div>
+  );
+}
+
+function FailureRow({
   delivery,
   destinationName,
 }: {
@@ -170,13 +254,16 @@ function DeliveryRow({
   const action = useIntegrationAction();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const failed = delivery.status === DeliveryStatus.DEAD_LETTER;
+  const error = reasonError(reason);
   return (
     <TableRow className="align-top">
       <TableCell className="min-w-40 whitespace-normal break-words">
         {destinationName}
         <TechnicalDetails
           items={[
+            { label: "Reason code", value: delivery.lastError },
             { label: "Delivery ID", value: delivery.id },
             { label: "Event ID", value: delivery.eventId },
             { label: "Destination ID", value: delivery.destinationId },
@@ -184,45 +271,22 @@ function DeliveryRow({
           ]}
         />
       </TableCell>
-      <TableCell>
-        <StatusBadge
-          status={
-            failed
-              ? "destructive"
-              : delivery.status === DeliveryStatus.DELIVERED
-                ? "success"
-                : delivery.status === DeliveryStatus.LEASED
-                  ? "info"
-                  : delivery.lastError
-                    ? "warning"
-                    : "neutral"
-          }
-        >
-          {STATUS[delivery.status]}
+      <TableCell className="min-w-56 max-w-md whitespace-normal break-words">
+        <StatusBadge status={failed ? "destructive" : "warning"}>
+          {failed ? "Failed" : "Retrying"}
         </StatusBadge>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {delivery.status === DeliveryStatus.DELIVERED ? (
-          <Timestamp value={delivery.deliveredAt} />
-        ) : delivery.status === DeliveryStatus.PENDING ||
-          delivery.status === DeliveryStatus.LEASED ? (
-          <>
+        <p className="mt-1 text-sm">{deliveryFailureText(delivery.lastError)}</p>
+        {failed ? null : (
+          <p className="mt-1 text-xs text-muted-foreground">
             Next try <Timestamp value={delivery.nextAttemptAt} />
-          </>
-        ) : null}
+          </p>
+        )}
       </TableCell>
       <TableCell className="tabular-nums">
         {delivery.attempts}
         {delivery.replayCount > 0 ? (
           <span className="text-muted-foreground"> · retried {delivery.replayCount}×</span>
         ) : null}
-      </TableCell>
-      <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-        {delivery.lastError ? (
-          <span className="font-mono text-xs">{delivery.lastError}</span>
-        ) : (
-          <span className="text-muted-foreground">None</span>
-        )}
       </TableCell>
       <TableCell className="text-right">
         {failed || action.blocked ? (
@@ -242,8 +306,11 @@ function DeliveryRow({
                 {action.feedback}
                 <form
                   className="grid gap-3"
+                  noValidate
                   onSubmit={(event) => {
                     event.preventDefault();
+                    setAttempted(true);
+                    if (error) return;
                     const request = {
                       requestId: crypto.randomUUID(),
                       deliveryId: delivery.id,
@@ -264,11 +331,14 @@ function DeliveryRow({
                     <Input
                       id={`${delivery.id}-reason`}
                       data-freeform="audit reason"
-                      required
+                      aria-invalid={attempted && error ? true : undefined}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                     />
-                    <Button type="submit" className="w-fit" disabled={!reason.trim()}>
+                    {attempted && error ? (
+                      <p className="text-xs text-destructive">{error}</p>
+                    ) : null}
+                    <Button type="submit" className="w-fit">
                       Retry delivery
                     </Button>
                   </fieldset>

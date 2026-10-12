@@ -434,6 +434,20 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "This capability is not enabled on the server.",
           action: "Ask an administrator to review the server configuration.",
         };
+      case "rotation_overlap_active":
+        return {
+          tone: "warning",
+          title: "Previous secret still active",
+          message: "The secret replaced by the last rotation still works for its overlap period.",
+          action: "Rotate again after that period ends.",
+        };
+      case "webhook_required":
+        return {
+          tone: "neutral",
+          title: "No signing secret",
+          message: "Only webhook destinations have a signing secret.",
+          action: "Choose a webhook destination.",
+        };
     }
   }
   if (failure.code === Code.ResourceExhausted && failure.reason === "device_action_capacity") {
@@ -507,6 +521,39 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       message: "This value doesn't match the kind of secret you chose.",
       action: "Enter a value of the right kind.",
     };
+  }
+  if (failure.code === Code.InvalidArgument) {
+    switch (failure.reason) {
+      case "invalid_endpoint":
+        return {
+          tone: "warning",
+          title: "Address not accepted",
+          message:
+            "Webhooks need an https:// address and syslog needs tls://host:port, without a user name.",
+          action: "Correct the address and try again.",
+        };
+      case "invalid_ca":
+        return {
+          tone: "warning",
+          title: "Certificate not accepted",
+          message: "The CA certificate must be one or more PEM certificates and nothing else.",
+          action: "Paste only blocks starting with -----BEGIN CERTIFICATE-----, never a key.",
+        };
+      case "destination_kind_immutable":
+        return {
+          tone: "warning",
+          title: "Type can't change",
+          message: "A destination keeps the type it was created with.",
+          action: "Add a new destination of the other type instead.",
+        };
+      case "invalid_request":
+        return {
+          tone: "warning",
+          title: "Some values weren't accepted",
+          message: "The server rejected one or more of the values entered.",
+          action: "Check each field against its hint and try again.",
+        };
+    }
   }
   if (failure.code === Code.AlreadyExists && failure.reason === "request_id_reused") {
     return {
