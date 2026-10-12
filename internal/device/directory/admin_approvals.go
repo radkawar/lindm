@@ -38,6 +38,9 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 	}
 	defer s.Release()
 	scope := s.inventory.RecoveryReadinessApprovalScope(req.Msg.GetCreateDeviceAction())
+	if req.Msg.GetCreateDeviceAction() != nil || req.Msg.GetSetResourceAssignment() != nil || req.Msg.GetAcceptAdvisoryFinding() != nil {
+		scope = core.MutableDeviceApprovalScope(scope)
+	}
 	var targetPreview *policyv1.TargetPreview
 	if request := req.Msg.GetActivateTargetPreview(); request != nil {
 		base := scope

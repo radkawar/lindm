@@ -53,7 +53,7 @@ func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, 
 		return err
 	}
 	if deviceID != nil {
-		if _, err := core.LockDeviceScope(ctx, q, authorized, identity.PermissionManageInventory, *deviceID); err != nil {
+		if _, err := core.LockMutableDevice(ctx, q, authorized, identity.PermissionManageInventory, *deviceID); err != nil {
 			return err
 		}
 	} else if err := core.RequireUnrestrictedPrincipal(authorized, identity.PermissionManageInventory); err != nil {

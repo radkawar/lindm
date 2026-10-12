@@ -64,7 +64,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	}
 	q := devicedb.New(tx)
 	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
-	device, err := core.LockDeviceScope(ctx, q, approval.Principal(), identity.PermissionAssignResources, deviceID)
+	device, err := core.LockMutableDevice(ctx, q, approval.Principal(), identity.PermissionAssignResources, deviceID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.ErrNotFound
 	}

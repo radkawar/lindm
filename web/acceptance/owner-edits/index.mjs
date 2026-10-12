@@ -44,6 +44,7 @@ import * as authorization from "./authorization.mjs";
 import * as pass2AssignmentProgress from "./pass2-assignment-progress.mjs";
 import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
+import * as pass2RevokedDevice from "./pass2-bug9-revoked-device.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -53,6 +54,7 @@ export const ownerEdits = [
   pass2SafetyUndo,
   deviceEncryption,
   recordedChoices,
+  pass2RevokedDevice,
   deviceActions,
   assistanceRecord,
   revealApproval,

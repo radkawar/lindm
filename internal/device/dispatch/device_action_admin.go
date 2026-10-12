@@ -85,7 +85,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
 	generationID, _ := uuid.Parse(req.Msg.GetEnrollmentGeneration())
 	requestID, _ := uuid.Parse(req.Msg.GetRequestId())
-	device, err := core.LockDeviceScope(ctx, q, authorization.Principal(), permission, deviceID)
+	device, err := core.LockMutableDevice(ctx, q, authorization.Principal(), permission, deviceID)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}

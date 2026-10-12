@@ -186,6 +186,10 @@ message Device {
   // Open advisory findings of the current, fresh evaluation minus active
   // exceptions. Absent when the device has no current advisory evaluation.
   DeviceFindingCounts findings = 26;
+  // Populated by GetDevice for revoked devices: when, and by whom, the device
+  // was revoked. An empty display name means the revoker was not recorded.
+  google.protobuf.Timestamp revoked_at = 27;
+  string revoked_by_display_name = 28 [(buf.validate.field).string.max_len = 512];
 }
 
 // Encryption of the filesystem mounted at "/", as the agent classified it:

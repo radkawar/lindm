@@ -123,10 +123,14 @@ SELECT
     g.current_snapshot_id,
     coalesce(r.agent_release, '')::text AS agent_release,
     coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
-    r.reported_at AS agent_version_accepted_at
+    r.reported_at AS agent_version_accepted_at,
+    d.revoked_at,
+    coalesce(nullif(revoker.display_name, ''), account.username, '')::text AS revoker_display_name
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
 LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
+LEFT JOIN principals revoker ON revoker.id = d.revoked_by
+LEFT JOIN local_accounts account ON account.id = revoker.id
 WHERE d.id = $1
 `
 
@@ -151,6 +155,8 @@ type GetDeviceDetailRow struct {
 	AgentRelease             string
 	AgentProtocolVersion     int32
 	AgentVersionAcceptedAt   pgtype.Timestamptz
+	RevokedAt                pgtype.Timestamptz
+	RevokerDisplayName       string
 }
 
 func (q *Queries) GetDeviceDetail(ctx context.Context, id uuid.UUID) (GetDeviceDetailRow, error) {
@@ -177,6 +183,8 @@ func (q *Queries) GetDeviceDetail(ctx context.Context, id uuid.UUID) (GetDeviceD
 		&i.AgentRelease,
 		&i.AgentProtocolVersion,
 		&i.AgentVersionAcceptedAt,
+		&i.RevokedAt,
+		&i.RevokerDisplayName,
 	)
 	return i, err
 }

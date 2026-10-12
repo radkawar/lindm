@@ -36,6 +36,7 @@ import { DeviceActionMenu } from "./action-menu";
 import { DeviceAgentUpdate } from "./agent-update";
 import { DevicePosture } from "./posture";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Timestamp } from "@/components/ui/timestamp";
 import { PageHeader } from "@/components/ui/page-header";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 
@@ -129,6 +130,9 @@ export function DeviceDetailView({
   const encryption =
     root?.encryption?.status === CollectionStatus.SUCCESS ? root.encryption.value : "";
   const encrypted = ["luks", "dm-crypt", "inherited-dm-crypt"].includes(encryption);
+  // A revoked device is read-only: the server refuses every mutation of it.
+  // Encryption stays live for recovery-key reveal and recovery re-enrollment.
+  const revoked = device?.lifecycleState === DeviceState.REVOKED;
   return (
     <section
       data-review-page="device"
@@ -178,8 +182,8 @@ export function DeviceDetailView({
           ) : null}
         </div>
         {/* At most two page actions: Actions and Assign profile. */}
-        <div data-review-next-action className="flex flex-wrap items-center gap-2">
-          {data && device ? (
+        {data && device && !revoked ? (
+          <div data-review-next-action className="flex flex-wrap items-center gap-2">
             <DeviceActionMenu
               device={device}
               permissions={data.callerPermissions}
@@ -189,15 +193,15 @@ export function DeviceDetailView({
                 onSearch({ ...search, action: action ?? undefined }, true)
               }
             />
-          ) : null}
-          {device && device.lifecycleState !== DeviceState.REVOKED && canAssign ? (
-            <Button variant="outline" aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
-              <Plus aria-hidden="true" /> Assign profile
-            </Button>
-          ) : null}
-        </div>
+            {canAssign ? (
+              <Button variant="outline" aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
+                <Plus aria-hidden="true" /> Assign profile
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      {device && canAssign ? assignDialog(assignOpen, setAssignOpen) : null}
+      {device && !revoked && canAssign ? assignDialog(assignOpen, setAssignOpen) : null}
       {device?.lifecycleState === DeviceState.PENDING ? (
         <Alert>
           <AlertTitle>Waiting for enrollment approval</AlertTitle>
@@ -216,14 +220,8 @@ export function DeviceDetailView({
             )}
           </AlertDescription>
         </Alert>
-      ) : device?.lifecycleState === DeviceState.REVOKED ? (
-        <Alert>
-          <AlertTitle>Revoked</AlertTitle>
-          <AlertDescription>
-            This device can no longer check in or receive actions. Its last reported evidence and
-            history stay here for review.
-          </AlertDescription>
-        </Alert>
+      ) : device && revoked ? (
+        <RevokedBanner device={device} />
       ) : null}
       {unavailable ? (
         <Alert data-review-state="blocked">
@@ -358,11 +356,13 @@ export function DeviceDetailView({
                 </Fact>
               </dl>
             </details>
-            <DeviceMetadataCard
-              deviceId={deviceId}
-              metadata={device.metadata}
-              accountPicker={accountPicker}
-            />
+            <ReadOnly when={revoked}>
+              <DeviceMetadataCard
+                deviceId={deviceId}
+                metadata={device.metadata}
+                accountPicker={accountPicker}
+              />
+            </ReadOnly>
             <details data-slot="support-details" className="border p-4">
               <summary className="w-fit cursor-pointer font-medium">Details for support</summary>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -564,8 +564,10 @@ export function DeviceDetailView({
             hidden={activeTab !== "resources"}
             className="space-y-4"
           >
-            {resources(canAssign ? () => setAssignOpen(true) : undefined)}
-            {canAssign ? (
+            <ReadOnly when={revoked}>
+              {resources(canAssign && !revoked ? () => setAssignOpen(true) : undefined)}
+            </ReadOnly>
+            {canAssign && !revoked ? (
               <Link
                 to="/rollouts"
                 search={{ device: deviceId }}
@@ -584,7 +586,11 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {activeTab === "encryption" ? (
-              <DeviceEncryptionPanel key={`encryption:${deviceId}`} deviceId={deviceId} />
+              <DeviceEncryptionPanel
+                key={`encryption:${deviceId}`}
+                deviceId={deviceId}
+                revoked={revoked}
+              />
             ) : null}
           </section>
           <section
@@ -596,7 +602,9 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {activeTab === "local-admin" ? (
-              <DeviceLocalAdminPanel key={`local-admin:${deviceId}`} deviceId={deviceId} />
+              <ReadOnly when={revoked}>
+                <DeviceLocalAdminPanel key={`local-admin:${deviceId}`} deviceId={deviceId} />
+              </ReadOnly>
             ) : null}
           </section>
           <section
@@ -608,11 +616,13 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {activeTab === "actions" ? (
-              <DeviceActionsPanel
-                key={`actions:${deviceId}`}
-                deviceId={deviceId}
-                deviceName={device.hostname.trim() || "Unnamed device"}
-              />
+              <ReadOnly when={revoked}>
+                <DeviceActionsPanel
+                  key={`actions:${deviceId}`}
+                  deviceId={deviceId}
+                  deviceName={device.hostname.trim() || "Unnamed device"}
+                />
+              </ReadOnly>
             ) : null}
           </section>
           <section
@@ -623,7 +633,7 @@ export function DeviceDetailView({
             hidden={activeTab !== "assistance"}
             className="space-y-4"
           >
-            {activeTab === "assistance" ? assistance : null}
+            {activeTab === "assistance" ? <ReadOnly when={revoked}>{assistance}</ReadOnly> : null}
           </section>
           <section
             role="tabpanel"
@@ -633,11 +643,42 @@ export function DeviceDetailView({
             hidden={activeTab !== "findings"}
             className="space-y-4"
           >
-            {findings}
+            <ReadOnly when={revoked}>{findings}</ReadOnly>
           </section>
         </ToolCustodyContext.Provider>
       ) : null}
     </section>
+  );
+}
+
+// Disables every native control inside while keeping the content readable.
+function ReadOnly({ when, children }: { when: boolean; children: ReactNode }) {
+  if (!when) return children;
+  return (
+    <fieldset disabled data-read-only="revoked" className="min-w-0 space-y-4">
+      {children}
+    </fieldset>
+  );
+}
+
+function RevokedBanner({ device }: { device: Device }) {
+  return (
+    <Alert data-review-revoked>
+      <AlertTitle>
+        Revoked
+        {device.revokedAt ? (
+          <>
+            {" "}
+            on <Timestamp value={device.revokedAt} relative={false} />
+          </>
+        ) : null}{" "}
+        by {device.revokedByDisplayName || "an unrecorded administrator"}
+      </AlertTitle>
+      <AlertDescription>
+        This device can no longer reach lindm, so it is read-only. Its inventory and history stay
+        here. To bring it back, use recovery re-enrollment on the Encryption tab.
+      </AlertDescription>
+    </Alert>
   );
 }
 

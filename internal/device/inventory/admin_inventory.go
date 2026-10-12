@@ -359,6 +359,7 @@ func deviceFromDetail(row devicedb.GetDeviceDetailRow) (*adminv1.Device, error) 
 		SnapshotReceivedAt: core.ProtoTime(row.SnapshotReceivedAt), PublishedSnapshotSequence: uint64(row.PublishedSequence),
 		AgentRelease: row.AgentRelease, AgentProtocolVersion: uint32(row.AgentProtocolVersion),
 		AgentVersionAcceptedAt: core.ProtoTime(row.AgentVersionAcceptedAt),
+		RevokedAt:              core.ProtoTime(row.RevokedAt), RevokedByDisplayName: row.RevokerDisplayName,
 	}, nil
 }
 

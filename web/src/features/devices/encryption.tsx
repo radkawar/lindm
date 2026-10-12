@@ -70,7 +70,14 @@ function recoverability(
   );
 }
 
-export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
+// A revoked device keeps reveal and recovery re-enrollment; it gets no new actions.
+export function DeviceEncryptionPanel({
+  deviceId,
+  revoked,
+}: {
+  deviceId: string;
+  revoked: boolean;
+}) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const navigate = useNavigate();
@@ -130,7 +137,7 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
   const canReveal = !!escrow && canPermission(principal, "recovery_keys.read");
   const secondary = [
     ...(["escrowRotate", "tpm2Bind"] as const)
-      .filter((kind) => canPermission(principal, actionPermissions[kind]))
+      .filter((kind) => !revoked && canPermission(principal, actionPermissions[kind]))
       .map((kind) => ({
         label: actionLabels[kind],
         open: () =>

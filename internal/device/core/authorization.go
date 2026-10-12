@@ -113,6 +113,36 @@ func LockDeviceScope(ctx context.Context, q *devicedb.Queries, principal identit
 	return row, nil
 }
 
+// ErrDeviceReadOnly refuses operator mutations of a revoked device. Its record,
+// history and inventory stay readable; only recovery re-enrollment and secret
+// reveals (which rely on retained escrow) still target it.
+var ErrDeviceReadOnly = rpcreason.Error(connect.CodeFailedPrecondition, "device_revoked")
+
+// LockMutableDevice is LockDeviceScope for operator mutations of the device:
+// actions, assistance, assignments, local-admin policy, metadata and exceptions.
+func LockMutableDevice(ctx context.Context, q *devicedb.Queries, principal identity.Principal, perm identity.Permission, deviceID uuid.UUID) (devicedb.GetDeviceForUpdateRow, error) {
+	row, err := LockDeviceScope(ctx, q, principal, perm, deviceID)
+	if err != nil {
+		return row, err
+	}
+	if row.State == StateRevoked {
+		return devicedb.GetDeviceForUpdateRow{}, ErrDeviceReadOnly
+	}
+	return row, nil
+}
+
+// MutableDeviceApprovalScope extends scope so approvals for a device mutation
+// cannot be requested, decided or consumed while the device is revoked.
+func MutableDeviceApprovalScope(scope identity.ApprovalScope) identity.ApprovalScope {
+	return func(ctx context.Context, tx pgx.Tx, principal identity.Principal, perm identity.Permission, target uuid.UUID) error {
+		if err := scope(ctx, tx, principal, perm, target); err != nil || target == uuid.Nil {
+			return err
+		}
+		_, err := LockMutableDevice(ctx, devicedb.New(tx), principal, perm, target)
+		return err
+	}
+}
+
 // withinUnrestrictedAuthorization refreshes before opening a transaction, then
 // fences both entry and commit. No cached request principal authorizes a write.
 func (s *Service) WithinUnrestrictedAuthorization(ctx context.Context, actor identity.Principal, perm identity.Permission, fn func(context.Context, *devicedb.Queries) error) error {

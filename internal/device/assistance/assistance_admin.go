@@ -113,7 +113,7 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 	}
 	var session *adminv1.AssistanceSession
 	err = s.assistanceTx(ctx, authorization, identity.PermissionRunRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		device, err := core.LockDeviceScope(ctx, q, authorization.Principal(), identity.PermissionRunRemoteAssistance, deviceID)
+		device, err := core.LockMutableDevice(ctx, q, authorization.Principal(), identity.PermissionRunRemoteAssistance, deviceID)
 		if err != nil {
 			return core.MapErr(err)
 		}

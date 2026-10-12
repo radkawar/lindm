@@ -158,7 +158,7 @@ func (s *Service) AcceptAdvisoryFinding(ctx context.Context, req *connect.Reques
 	if err := s.LockActionApproval(ctx, tx, consumption, approval, identity.PermissionManageAdvisoryExceptions); err != nil {
 		return nil, core.ApprovalError(err)
 	}
-	if _, err := core.LockDeviceScope(ctx, devicedb.New(tx), approval.Principal(), identity.PermissionManageAdvisoryExceptions, id); err != nil {
+	if _, err := core.LockMutableDevice(ctx, devicedb.New(tx), approval.Principal(), identity.PermissionManageAdvisoryExceptions, id); err != nil {
 		return nil, core.MapErr(err)
 	}
 	out, err := s.Advisories.Accept(ctx, tx, actor.ID, req.Msg)

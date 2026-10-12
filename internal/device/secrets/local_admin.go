@@ -124,7 +124,7 @@ func (s *Service) localAdminMutation(ctx context.Context, message proto.Message,
 		return nil, core.ExecutionError(err)
 	}
 	q := devicedb.New(tx)
-	device, err := core.LockDeviceScope(ctx, q, authorization.Principal(), permission, deviceID)
+	device, err := core.LockMutableDevice(ctx, q, authorization.Principal(), permission, deviceID)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
