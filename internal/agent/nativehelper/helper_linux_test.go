@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/privatecustody"
 )
 
@@ -110,6 +112,31 @@ func TestPackageUnitsDoNotWidenExecutorOrDownloadDuringApply(t *testing.T) {
 		}
 		if phase == "prepare" && len(unitValue[[]string](t, values, "ReadWritePaths")) != 1 {
 			t.Fatal("preflight can modify native package database/payload")
+		}
+	}
+}
+
+// zypper exits 5 ("The target filesystem is mounted as read-only") unless /
+// itself is writable; only its apply unit gains /, never staging or DNF.
+func TestZypperApplyUnitKeepsRootWritable(t *testing.T) {
+	const directory = "/var/lib/lindm/executor/packageprovider/a2bca405-36e9-4a43-b5b5-d0b82a05e551"
+	for _, tc := range []struct {
+		product  *resourcev1.PlatformProduct
+		phase    string
+		writable bool
+	}{
+		{&resourcev1.PlatformProduct{OsId: "opensuse-tumbleweed", Version: "20261007"}, "apply", true},
+		{&resourcev1.PlatformProduct{OsId: "opensuse-tumbleweed", Version: "20261007"}, "prepare", false},
+		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "43"}, "apply", false},
+	} {
+		request := &agentv1.NativePackageTransactionRequest{TransactionId: "a2bca405-36e9-4a43-b5b5-d0b82a05e551", Platform: tc.product}
+		values := make(map[string]any)
+		for _, property := range packageProperties(directory, request, tc.phase) {
+			values[property.Name] = property.Value.Value()
+		}
+		paths := unitValue[[]string](t, values, "ReadWritePaths")
+		if slices.Contains(paths, "/") != tc.writable || values["ProtectSystem"] != "strict" || values["ProtectHome"] != "yes" {
+			t.Fatalf("%s %s: ReadWritePaths %q", tc.product.GetOsId(), tc.phase, paths)
 		}
 	}
 }

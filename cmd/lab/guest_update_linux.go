@@ -267,12 +267,13 @@ func freezeNativeUnpack(ctx context.Context, group, binary string, original *uni
 // nativeUnpackManager reports whether comm names the native manager that
 // unpacks the agent: pacman replaces the binary in place, the others stage a
 // partial file. EL's /usr/bin/dnf is a symlink to dnf-3, so DNF 4 started
-// through its resolved entrypoint reports comm dnf-3.
+// through its resolved entrypoint reports comm dnf-3. libzypp names zypper's
+// main thread "Zypp-main", which is the process comm on openSUSE Tumbleweed.
 func nativeUnpackManager(comm string, inPlace bool) bool {
 	if inPlace {
 		return comm == "pacman"
 	}
-	return slices.Contains([]string{"dnf", "dnf-3", "dnf5", "zypper", "dpkg", "apt-get"}, comm)
+	return slices.Contains([]string{"dnf", "dnf-3", "dnf5", "zypper", "Zypp-main", "dpkg", "apt-get"}, comm)
 }
 
 func guestUpdateUnpackTerminal(status *agentv1.AgentUpdateStatus) error {

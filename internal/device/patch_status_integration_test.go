@@ -111,3 +111,25 @@ func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
 	}
 	expect(&adminv1.FleetPatchSummary{UnknownDevices: 1})
 }
+
+// Arch (pacman) and Tumbleweed (zypper) agents report the rolling backends;
+// the projection's backend bound once refused their whole host observation.
+func TestPatchStatusProjectsRollingBackends(t *testing.T) {
+	for _, backend := range []resourcev1.OSUpdateBackend{resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN, resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER} {
+		t.Run(backend.String(), func(t *testing.T) {
+			f := newEnrolled(t, 0)
+			observed := f.now.Add(-time.Minute)
+			patchStatusReport(t, f, 1, &agentv1.PatchStatusObservation{
+				ObservedAt: timestamppb.New(observed), BootId: uuid.NewString(), Available: true,
+				Backend: backend, PendingUpdates: 4, PolicyInstalled: true, MetadataRefreshedAt: timestamppb.New(observed.Add(-time.Hour)),
+			})
+			row, err := devicedb.New(f.conn).GetHostPatchStatus(f.ctx, uuid.MustParse(f.generation))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if row.Backend != int16(backend) || row.PendingUpdates != 4 || !row.Available {
+				t.Fatalf("projection lost rolling backend status: %+v", row)
+			}
+		})
+	}
+}

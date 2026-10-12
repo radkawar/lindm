@@ -120,9 +120,10 @@ func TestGuestUpdateUnpackResolvesActualUnitCgroup(t *testing.T) {
 }
 
 // Rocky Linux 9.8 x86_64 froze its staged unpack under comm "dnf-3" (the
-// resolved /usr/bin/dnf); pacman alone replaces the binary in place.
+// resolved /usr/bin/dnf); openSUSE Tumbleweed aarch64 froze zypper as
+// "Zypp-main" beside its rpm child; pacman alone replaces the binary in place.
 func TestNativeUnpackManagerNames(t *testing.T) {
-	for _, comm := range []string{"dnf", "dnf-3", "dnf5", "zypper", "dpkg", "apt-get"} {
+	for _, comm := range []string{"dnf", "dnf-3", "dnf5", "zypper", "Zypp-main", "dpkg", "apt-get"} {
 		if !nativeUnpackManager(comm, false) || nativeUnpackManager(comm, true) {
 			t.Fatalf("%s misclassified", comm)
 		}

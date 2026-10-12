@@ -111,6 +111,19 @@ uses a private repository directory containing only that site repository, with
 repository and package signatures required. The disabled vendor repositories
 are unreachable in the isolated site namespace and are never refreshed.
 
+Package resources and agent self-updates commit verified local RPM files with
+zypper against an empty private repository directory. `--disable-repositories`
+is not used: it also disables zypper's command-line RPM repository, so every
+commit failed with exit 104 (`_tmpRPMcache_:<name>=<evr>` not found). zypper
+also refuses any transaction while `/` itself is a read-only mount ("The target
+filesystem is mounted as read-only", exit 5), even when `/etc`, `/usr` and
+`/var` are writable. The bounded package apply unit therefore keeps `/`
+writable on Tumbleweed only; its other confinement (private network, protected
+home, kernel and control-group protections, capability bound) is unchanged.
+Tumbleweed reports OS-update backend `zypper` in host patch status; migration
+00033 widened the patch-status projection's backend bound, which had refused
+every Tumbleweed and Arch host observation carrying patch status.
+
 Select the exact openSUSE release in the console for the zypper install-and-enroll
 command. It uses signed RPM packages and metadata from the customer's own `lindmd`
 HTTPS `/repo/rpm` endpoint, never an external agent repository or a DNF command

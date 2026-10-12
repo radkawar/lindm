@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 const managerName = "org.freedesktop.systemd1"
@@ -146,6 +148,24 @@ func transientProperties(directory, transactionID, phase string) []unitProperty 
 		}{true, families}),
 		property("LimitCORE", uint64(0)), property("MemorySwapMax", uint64(0)),
 	}
+}
+
+// packageProperties confines one package transaction phase. zypper refuses
+// every transaction while / itself is a read-only mount ("The target
+// filesystem is mounted as read-only", exit 5), even with /etc, /usr and /var
+// writable as ProtectSystem=strict's ReadWritePaths leave them, so a zypper
+// apply unit also keeps / writable; every other confinement is unchanged.
+func packageProperties(directory string, request *agentv1.NativePackageTransactionRequest, phase string) []unitProperty {
+	properties := transientProperties(directory, request.GetTransactionId(), phase)
+	if phase != "apply" || platform.Of(request.GetPlatform()).Native().Packages.Backend != platform.BackendZypper {
+		return properties
+	}
+	for i := range properties {
+		if paths, ok := properties[i].Value.Value().([]string); ok && properties[i].Name == "ReadWritePaths" {
+			properties[i].Value = dbus.MakeVariant(append(slices.Clone(paths), "/"))
+		}
+	}
+	return properties
 }
 
 func (bus *nativeBus) start(ctx context.Context, directory string, request *agentv1.NativePackageTransactionRequest, phase string) error {

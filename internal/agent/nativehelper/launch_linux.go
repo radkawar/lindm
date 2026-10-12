@@ -52,7 +52,7 @@ func Launch(ctx context.Context, stateDirectory, actionID string, input *agentv1
 	}
 	defer clear(encoded)
 	return launchEffect(ctx, directory, unitName(request.GetTransactionId(), phase), encoded, request.GetNonce(),
-		transientProperties(directory, request.GetTransactionId(), phase), authorize, nil)
+		packageProperties(directory, request, phase), authorize, nil)
 }
 
 func launchEffect(ctx context.Context, directory, unit string, encoded, nonce []byte, properties []unitProperty, authorize func(context.Context) (*agentv1.NativeEffectPermit, error), output *agentv1.NativeHelperResult) (resultErr error) {
