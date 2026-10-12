@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { Cloud, Laptop } from "lucide-react";
 import { toast } from "sonner";
@@ -57,6 +57,12 @@ export function EnrollmentView({
   readAttributes: AttributeReader;
 }) {
   const lifetime = useAuthLifetime();
+  const client = useQueryClient();
+  // The page's one Refresh rereads every list it shows.
+  const listKeys = ["pending-enrollments", "enrollment-grants", "provisioning-tokens"];
+  const isListQuery = (query: { queryKey: readonly unknown[] }) =>
+    listKeys.includes(String(query.queryKey[0])) && query.queryKey[1] === lifetime.generation;
+  const refreshing = useIsFetching({ predicate: isListQuery }) > 0;
   const [credential, setCredential] = useState<EnrollmentCredential | null>(null);
   const [activeTab, setActiveTab] = useState<"grants" | "tokens">("grants");
   const [offline, setOffline] = useState(false);
@@ -80,6 +86,8 @@ export function EnrollmentView({
       <PageHeader
         title="Enroll a device"
         description="Choose how you want to add devices to your fleet."
+        onRefresh={() => void client.invalidateQueries({ predicate: isListQuery })}
+        refreshing={refreshing}
       />
       <PendingEnrollments />
       <div className="grid gap-4 lg:grid-cols-2">

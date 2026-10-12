@@ -150,6 +150,9 @@ var (
 	IdentitySCIMDeleted           = kind("identity.scim_deleted")
 	IdentitySCIMLifecycle         = kind("identity.scim_lifecycle")
 	IdentitySCIMUpdated           = kind("identity.scim_updated")
+	// In-page re-verification (password, then passkey) on a signed-in session.
+	IdentityStepUp       = kind("identity.step_up")
+	IdentityStepUpDenied = kind("identity.step_up_denied")
 )
 
 // Event destinations (webhooks, syslog).

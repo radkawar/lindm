@@ -274,7 +274,13 @@ export function RecoveryKeyReveal({
           </Link>
         </p>
       ) : null}
-      {failure ? <RpcError failure={failure} title="Couldn't reveal recovery key" /> : null}
+      {failure ? (
+        <RpcError
+          failure={failure}
+          title="Couldn't reveal recovery key"
+          onRetry={() => void reveal()}
+        />
+      ) : null}
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}

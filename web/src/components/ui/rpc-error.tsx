@@ -1,18 +1,26 @@
 import type { ReactNode } from "react";
+import { Code } from "@connectrpc/connect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { StepUpVerify } from "@/components/ui/step-up-verify";
 import { classifyRpcFailure, type RpcFailure } from "@/lib/errors";
 import { RAW_VALIDATION_TEXT } from "@/lib/validation";
 
+// onRetry resubmits the caller's same request; a step-up refusal offers the
+// in-page identity check and then calls it.
 export function RpcError({
   failure,
   title,
+  onRetry,
   children,
 }: {
   failure: RpcFailure;
   title?: string;
+  onRetry?: () => void;
   children?: ReactNode;
 }) {
   const presentation = classifyRpcFailure(failure);
+  const stepUp =
+    failure.code === Code.PermissionDenied && failure.reason === "recent_step_up_required";
   return (
     <Alert
       variant={presentation.tone === "destructive" ? "destructive" : "default"}
@@ -28,6 +36,7 @@ export function RpcError({
             : presentation.message}
         </p>
         <p>{presentation.action}</p>
+        {stepUp ? <StepUpVerify onVerified={onRetry} /> : null}
         <details data-slot="support-details" className="mt-2">
           <summary className="cursor-pointer">Details for support</summary>
           <dl className="mt-2 grid gap-1 break-words text-xs">

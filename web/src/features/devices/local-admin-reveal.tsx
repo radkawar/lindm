@@ -274,7 +274,13 @@ export function LocalAdminPasswordReveal({
           </Link>
         </p>
       ) : null}
-      {failure ? <RpcError failure={failure} title="Couldn't reveal password" /> : null}
+      {failure ? (
+        <RpcError
+          failure={failure}
+          title="Couldn't reveal password"
+          onRetry={() => void reveal()}
+        />
+      ) : null}
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}

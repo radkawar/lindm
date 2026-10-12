@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -13,6 +14,7 @@ import (
 	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) registerLocalHTTP(mux *http.ServeMux) {
@@ -21,6 +23,8 @@ func (s *Service) registerLocalHTTP(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /auth/local/login/begin", s.handleLocalLoginBegin)
 	mux.HandleFunc("POST /auth/local/login/finish", s.handleLocalLoginFinish)
+	mux.Handle("POST /auth/local/step-up/begin", s.RequireSession(http.HandlerFunc(s.handleLocalStepUpBegin)))
+	mux.Handle("POST /auth/local/step-up/finish", s.RequireSession(http.HandlerFunc(s.handleLocalStepUpFinish)))
 	mux.HandleFunc("POST /auth/local/enroll/begin", s.handleLocalEnrollBegin)
 	mux.HandleFunc("POST /auth/local/enroll/finish", s.handleLocalEnrollFinish)
 	mux.Handle("GET /auth/accounts", s.RequireSession(http.HandlerFunc(s.handleAccounts)))
@@ -60,11 +64,59 @@ func (s *Service) handleLocalLoginBegin(w http.ResponseWriter, r *http.Request) 
 	}
 	result, err := s.beginLocalLogin(r.Context(), request, r.RemoteAddr)
 	if err != nil {
+		if errors.Is(err, errUnauthenticated) {
+			// One reason for unknown, wrong, disabled and locked: never an
+			// account-existence oracle, but the console can say what to fix.
+			w.Header().Set(rpcreason.Header, "invalid_credentials")
+		}
 		writeStatus(w, statusFor(err))
 		return
 	}
 	writeProto(w, result)
 }
+
+// Step-up refusals carry a reason the console can act on: a wrong password
+// (same reason as sign-in), a failed passkey check, or a session that can
+// never step up (organization sign-in, service account).
+func writeStepUpRefusal(w http.ResponseWriter, err error, credentialReason string) {
+	switch {
+	case errors.Is(err, errUnauthenticated):
+		w.Header().Set(rpcreason.Header, credentialReason)
+		writeStatus(w, http.StatusUnauthorized)
+	case errors.Is(err, ErrAuthorizationDenied):
+		w.Header().Set(rpcreason.Header, "step_up_unavailable")
+		writeStatus(w, http.StatusForbidden)
+	default:
+		writeStatus(w, statusFor(err))
+	}
+}
+
+func (s *Service) handleLocalStepUpBegin(w http.ResponseWriter, r *http.Request) {
+	request := &authv1.LocalStepUpRequest{}
+	if !s.readAuthRequest(w, r, request) {
+		return
+	}
+	result, err := s.beginLocalStepUp(r.Context(), request, r.RemoteAddr)
+	if err != nil {
+		writeStepUpRefusal(w, err, "invalid_credentials")
+		return
+	}
+	writeProto(w, result)
+}
+
+func (s *Service) handleLocalStepUpFinish(w http.ResponseWriter, r *http.Request) {
+	request := &authv1.WebAuthnFinishRequest{}
+	if !s.readAuthRequest(w, r, request) {
+		return
+	}
+	if err := s.finishLocalStepUp(r.Context(), request, r.RemoteAddr); err != nil {
+		writeStepUpRefusal(w, err, "step_up_failed")
+		return
+	}
+	prepare(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Service) handleLocalEnrollBegin(w http.ResponseWriter, r *http.Request) {
 	request := &authv1.LocalEnrollmentRequest{}
 	if !s.readAuthRequest(w, r, request) {

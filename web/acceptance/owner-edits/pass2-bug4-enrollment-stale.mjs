@@ -90,10 +90,11 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await capture("approved-waiting-to-finish");
 
   step("refresh keeps the server's answer");
-  const refresh = main
-    .getByRole("region", { name: APPROVED })
-    .getByRole("button", { name: "Refresh", exact: true });
-  await refresh.click();
+  // The page's one Refresh, in its header, rereads every enrollment list.
+  const refresh = main.getByRole("button", { name: "Refresh", exact: true });
+  require((await refresh.count()) ===
+    1, `Enrollment shows ${await refresh.count()} Refresh buttons`);
+  await refresh.first().click();
   await settle();
   await approved.waitFor({ timeout });
   await assertApproved("after Refresh");

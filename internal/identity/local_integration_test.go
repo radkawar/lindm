@@ -3,6 +3,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,11 +14,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/identity/identitydb"
+	"lindm/internal/rpcreason"
 	"lindm/internal/testdb"
 )
 
@@ -164,6 +167,42 @@ func TestLocalAuthenticationLifecycle(t *testing.T) {
 	defer func() { _ = tx.Rollback(ctx) }()
 	if err = s.LockAuthorization(ctx, tx, authorization, PermissionManageAccounts); !errors.Is(err, ErrAuthorizationChanged) {
 		t.Fatalf("disabled old approval: %v", err)
+	}
+}
+
+// A wrong password and an unknown username are refused identically, with one
+// stable reason the console turns into "Username or password is incorrect."
+func TestLocalLoginRefusalReasonIsUniform(t *testing.T) {
+	s, ctx, _ := localIntegrationService(t)
+	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enrollLocal(t, s, ctx, enrollment, localAuthenticator(t))
+	type refusal struct {
+		status int
+		reason string
+		body   string
+	}
+	begin := func(username, password string) refusal {
+		t.Helper()
+		body, err := protojson.Marshal(&authv1.LocalLoginRequest{Username: username, Password: password})
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := httptest.NewRequestWithContext(ctx, http.MethodPost, localTestOrigin+"/auth/local/login/begin", bytes.NewReader(body))
+		request.Header.Set("Origin", localTestOrigin)
+		recorder := httptest.NewRecorder()
+		s.handleLocalLoginBegin(recorder, request)
+		return refusal{recorder.Code, recorder.Header().Get(rpcreason.Header), recorder.Body.String()}
+	}
+	wrong := begin("owner", "incorrect password 123")
+	unknown := begin("nobody", localTestPassword)
+	if wrong.status != http.StatusUnauthorized || wrong.reason != "invalid_credentials" {
+		t.Fatalf("wrong password: %+v", wrong)
+	}
+	if unknown != wrong {
+		t.Fatalf("unknown user %+v differs from wrong password %+v", unknown, wrong)
 	}
 }
 func TestLocalEnrollmentExpiryAndLockout(t *testing.T) {

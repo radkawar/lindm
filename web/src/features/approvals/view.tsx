@@ -531,7 +531,10 @@ function ApprovalCard({
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
           {
-            description: "Refresh before trying again.",
+            description:
+              next.reason === "recent_step_up_required"
+                ? "Verify in the request card; it is sent again afterwards."
+                : "Refresh before trying again.",
           },
         );
         if (!next.ambiguous) setAttempt(null);
@@ -790,7 +793,7 @@ function ApprovalCard({
         </p>
       ) : null}
       {failure ? (
-        <RpcError failure={failure}>
+        <RpcError failure={failure} onRetry={() => void act("execute")}>
           {failure.ambiguous ? (
             <p>Refresh to check whether it went through before trying again.</p>
           ) : null}

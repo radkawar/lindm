@@ -55,7 +55,7 @@ func (q *Queries) ClearLocalFailures(ctx context.Context, id uuid.UUID) error {
 
 const consumeLocalCeremony = `-- name: ConsumeLocalCeremony :one
 DELETE FROM local_ceremonies WHERE token_hash = $1
-  AND kind = $2 AND expires_at > now() RETURNING token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version, expires_at
+  AND kind = $2 AND expires_at > now() RETURNING token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version, expires_at, session_hash
 `
 
 type ConsumeLocalCeremonyParams struct {
@@ -76,6 +76,7 @@ func (q *Queries) ConsumeLocalCeremony(ctx context.Context, arg ConsumeLocalCere
 		&i.IncidentReason,
 		&i.AuthorizationVersion,
 		&i.ExpiresAt,
+		&i.SessionHash,
 	)
 	return i, err
 }
@@ -243,8 +244,8 @@ func (q *Queries) InsertLocalAccount(ctx context.Context, arg InsertLocalAccount
 }
 
 const insertLocalCeremony = `-- name: InsertLocalCeremony :exec
-INSERT INTO local_ceremonies (token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO local_ceremonies (token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version, session_hash)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type InsertLocalCeremonyParams struct {
@@ -256,6 +257,7 @@ type InsertLocalCeremonyParams struct {
 	PasswordHash         string
 	IncidentReason       string
 	AuthorizationVersion int64
+	SessionHash          []byte
 }
 
 func (q *Queries) InsertLocalCeremony(ctx context.Context, arg InsertLocalCeremonyParams) error {
@@ -268,6 +270,7 @@ func (q *Queries) InsertLocalCeremony(ctx context.Context, arg InsertLocalCeremo
 		arg.PasswordHash,
 		arg.IncidentReason,
 		arg.AuthorizationVersion,
+		arg.SessionHash,
 	)
 	return err
 }
@@ -428,6 +431,26 @@ func (q *Queries) ListLocalCredentials(ctx context.Context, accountID uuid.UUID)
 		return nil, err
 	}
 	return items, nil
+}
+
+const markSessionSteppedUp = `-- name: MarkSessionSteppedUp :execrows
+UPDATE sessions SET stepped_up_at = now()
+WHERE token_hash = $1 AND principal_id = $2
+  AND kind = 'browser' AND revoked_at IS NULL
+  AND idle_expires_at > now() AND absolute_expires_at > now()
+`
+
+type MarkSessionSteppedUpParams struct {
+	TokenHash   []byte
+	PrincipalID uuid.UUID
+}
+
+func (q *Queries) MarkSessionSteppedUp(ctx context.Context, arg MarkSessionSteppedUpParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markSessionSteppedUp, arg.TokenHash, arg.PrincipalID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const purgeLocalCeremonies = `-- name: PurgeLocalCeremonies :exec

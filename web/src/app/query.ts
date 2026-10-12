@@ -17,7 +17,8 @@ function expire(error: unknown, generation: unknown): void {
   synchronizeAuthLifetime(null);
   clearCsrfToken();
   queryClient.clear();
-  void router?.navigate({ to: "/" });
+  // Sign in again, then return to where the session ended.
+  void router?.navigate({ to: "/", search: { next: router.state.location.href } });
 }
 
 export const queryClient = new QueryClient({

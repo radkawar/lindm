@@ -74,6 +74,7 @@ type LocalCeremony struct {
 	IncidentReason       string
 	AuthorizationVersion int64
 	ExpiresAt            pgtype.Timestamptz
+	SessionHash          []byte
 }
 
 type Principal struct {
@@ -144,4 +145,5 @@ type Session struct {
 	BreakGlass        bool
 	IncidentReason    string
 	Kind              string
+	SteppedUpAt       pgtype.Timestamptz
 }

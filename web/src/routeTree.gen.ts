@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as EnrollRouteImport } from './routes/enroll'
+import { Route as AuthenticatedSplatRouteImport } from './routes/_authenticated/$'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedAdvisoriesRouteImport } from './routes/_authenticated/advisories'
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
@@ -49,6 +50,11 @@ const EnrollRoute = EnrollRouteImport.update({
   id: '/enroll',
   path: '/enroll',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSplatRoute = AuthenticatedSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
@@ -180,6 +186,7 @@ const AuthenticatedDevicesDeviceIdActionsNewKindRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
+  '/$': typeof AuthenticatedSplatRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/advisories': typeof AuthenticatedAdvisoriesRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
+  '/$': typeof AuthenticatedSplatRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/advisories': typeof AuthenticatedAdvisoriesRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/enroll': typeof EnrollRoute
+  '/_authenticated/$': typeof AuthenticatedSplatRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/advisories': typeof AuthenticatedAdvisoriesRoute
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/enroll'
+    | '/$'
     | '/accounts'
     | '/advisories'
     | '/approvals'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/enroll'
+    | '/$'
     | '/accounts'
     | '/advisories'
     | '/approvals'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/enroll'
+    | '/_authenticated/$'
     | '/_authenticated/accounts'
     | '/_authenticated/advisories'
     | '/_authenticated/approvals'
@@ -373,6 +385,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/enroll'
       preLoaderRoute: typeof EnrollRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/$': {
+      id: '/_authenticated/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AuthenticatedSplatRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/accounts': {
       id: '/_authenticated/accounts'
@@ -539,6 +558,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedSplatRoute: typeof AuthenticatedSplatRoute
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedAdvisoriesRoute: typeof AuthenticatedAdvisoriesRoute
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
@@ -565,6 +585,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedSplatRoute: AuthenticatedSplatRoute,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedAdvisoriesRoute: AuthenticatedAdvisoriesRoute,
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,

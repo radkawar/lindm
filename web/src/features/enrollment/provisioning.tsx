@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { MultiPicker, type PickerProps, type PickerSlot } from "@/components/ui/search-picker";
 import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
@@ -83,14 +84,6 @@ export function ProvisioningTokens() {
           <p className="text-sm text-muted-foreground">
             Reusable tokens for enrolling many devices. Revoking a token stops new enrollments only.
           </p>
-          <Button
-            className="w-fit"
-            variant="outline"
-            disabled={list.isFetching}
-            onClick={() => void list.refetch()}
-          >
-            Refresh
-          </Button>
           {list.isPending ? <p role="status">Loading tokens…</p> : null}
           {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
           {!list.error && list.data?.tokens.length === 0 ? (
@@ -104,22 +97,16 @@ export function ProvisioningTokens() {
           {list.data?.tokens.map((token) => (
             <TokenRow key={token.tokenId} token={token} />
           ))}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={!pageToken || list.isFetching}
-              onClick={() => setPageToken("")}
-            >
-              First page
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!list.data?.nextPageToken || list.isFetching}
-              onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
-            >
-              Next page
-            </Button>
-          </div>
+          <ListPagination
+            label="Provisioning token pages"
+            busy={list.isFetching}
+            onPrevious={pageToken ? () => setPageToken("") : undefined}
+            onNext={
+              list.data?.nextPageToken
+                ? () => setPageToken(list.data?.nextPageToken ?? "")
+                : undefined
+            }
+          />
         </CardContent>
       </Card>
     </section>

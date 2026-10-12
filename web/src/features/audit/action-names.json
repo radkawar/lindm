@@ -72,6 +72,8 @@
   "identity.scim_deleted": "Removed directory account",
   "identity.scim_lifecycle": "Changed directory account status",
   "identity.scim_updated": "Updated directory account",
+  "identity.step_up": "Verified identity for a sensitive action",
+  "identity.step_up_denied": "Refused identity check for a sensitive action",
   "integration.delivery.replayed": "Retried event delivery",
   "integration.destination.created": "Created event destination",
   "integration.destination.deleted": "Deleted event destination",

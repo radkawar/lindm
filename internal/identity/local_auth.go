@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -107,7 +108,7 @@ func (s *Service) beginLocalLogin(ctx context.Context, request *authv1.LocalLogi
 		if err != nil {
 			return errUnauthenticated
 		}
-		challenge, err = s.persistCeremony(ctx, q, principal, "login", session, options.Response, "", request.GetIncidentReason(), nil)
+		challenge, err = s.persistCeremony(ctx, q, principal, "login", session, options.Response, "", request.GetIncidentReason(), nil, nil)
 		return err
 	})
 	if err != nil {
@@ -154,7 +155,7 @@ func (s *Service) beginLocalEnrollment(ctx context.Context, request *authv1.Loca
 		if err != nil {
 			return errUnauthenticated
 		}
-		challenge, err = s.persistCeremony(ctx, q, principal, "enroll", session, options.Response, password, "", digest)
+		challenge, err = s.persistCeremony(ctx, q, principal, "enroll", session, options.Response, password, "", digest, nil)
 		return err
 	})
 	return challenge, err
@@ -167,7 +168,7 @@ type localCeremonySession struct {
 	EnrollmentSecretHash []byte `json:"enrollment_secret_hash,omitempty"`
 }
 
-func (s *Service) persistCeremony(ctx context.Context, q *identitydb.Queries, principal identitydb.Principal, kind string, session *webauthn.SessionData, options any, password, reason string, enrollmentHash []byte) (*authv1.WebAuthnChallenge, error) {
+func (s *Service) persistCeremony(ctx context.Context, q *identitydb.Queries, principal identitydb.Principal, kind string, session *webauthn.SessionData, options any, password, reason string, enrollmentHash, boundSession []byte) (*authv1.WebAuthnChallenge, error) {
 	token, err := randomToken()
 	if err != nil {
 		return nil, err
@@ -187,30 +188,42 @@ func (s *Service) persistCeremony(ctx context.Context, q *identitydb.Queries, pr
 	if err = q.DeleteLocalCeremonies(ctx, principal.ID); err != nil {
 		return nil, s.dbErr(err)
 	}
-	err = q.InsertLocalCeremony(ctx, identitydb.InsertLocalCeremonyParams{TokenHash: domainHash("lindm.local.ceremony.v1", token), AccountID: principal.ID, Kind: kind, ChallengeHash: digest, SessionData: data, PasswordHash: password, IncidentReason: reason, AuthorizationVersion: principal.AuthorizationVersion})
+	err = q.InsertLocalCeremony(ctx, identitydb.InsertLocalCeremonyParams{TokenHash: domainHash("lindm.local.ceremony.v1", token), AccountID: principal.ID, Kind: kind, ChallengeHash: digest, SessionData: data, PasswordHash: password, IncidentReason: reason, AuthorizationVersion: principal.AuthorizationVersion, SessionHash: boundSession})
 	if err != nil {
 		return nil, s.dbErr(err)
 	}
 	return &authv1.WebAuthnChallenge{Token: token, OptionsJson: string(encoded)}, nil
 }
 
-func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAuthnFinishRequest, kind, remote string) (result string, resultErr error) {
+func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAuthnFinishRequest, kind, remote string) (string, error) {
+	return s.finishCeremony(ctx, request, kind, remote, authenticatedSession{})
+}
+
+// finishCeremony verifies a login, enrollment or step-up response. A step-up
+// ceremony must be finished by the same principal and session that began it.
+func (s *Service) finishCeremony(ctx context.Context, request *authv1.WebAuthnFinishRequest, kind, remote string, proof authenticatedSession) (result string, resultErr error) {
 	// Consumption commits before parsing or verification: even a failed response cannot replay a challenge.
 	ceremony, err := identitydb.New(s.pool).ConsumeLocalCeremony(ctx, identitydb.ConsumeLocalCeremonyParams{TokenHash: domainHash("lindm.local.ceremony.v1", request.GetToken()), Kind: kind})
 	if err != nil {
 		return "", errUnauthenticated
 	}
+	verifying := kind == "login" || kind == "step_up"
 	defer func() {
-		if resultErr != nil && kind == "login" {
+		if resultErr != nil && verifying {
 			failureCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()
 			action := auditkind.IdentityLocalMFADenied
-			if !s.localPrimary {
+			if kind == "step_up" {
+				action = auditkind.IdentityStepUpDenied
+			} else if !s.localPrimary {
 				action = auditkind.IdentityBreakGlassDenied
 			}
 			resultErr = errors.Join(resultErr, s.emergencyAudit(failureCtx, ceremony.AccountID, action, "", "WebAuthn ceremony denied"))
 		}
 	}()
+	if kind == "step_up" && (proof.actor != ceremony.AccountID || !bytes.Equal(proof.hash, ceremony.SessionHash)) {
+		return "", errUnauthenticated
+	}
 	stored, session, err := restoreCeremony(ceremony, request)
 	if err != nil {
 		return "", err
@@ -257,7 +270,7 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 		}
 		if err != nil || credential == nil || credential.Authenticator.CloneWarning {
 			denied = true
-			if kind == "login" {
+			if verifying {
 				if err := q.RecordLocalFailure(ctx, account.ID); err != nil {
 					return s.dbErr(err)
 				}
@@ -270,6 +283,9 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 		}
 		if kind == "enroll" {
 			return s.completeLocalEnrollment(ctx, q, ceremony, stored, account.ID, credential.ID, data)
+		}
+		if kind == "step_up" {
+			return s.completeStepUp(ctx, q, proof, account.ID, credential.ID, data)
 		}
 		cookie, err = s.startLocalSession(ctx, q, ceremony, account.ID, credential.ID, data, now)
 		return err

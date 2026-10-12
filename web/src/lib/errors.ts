@@ -448,9 +448,9 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     if (failure.reason === "recent_step_up_required") {
       return {
         tone: "warning",
-        title: "Verify your identity",
-        message: "This action requires recent identity verification.",
-        action: "Complete step-up verification before submitting again.",
+        title: "Verify it's you",
+        message: "This needs a recent identity check.",
+        action: "Enter your password, then confirm with your passkey.",
       };
     }
     if (failure.reason === "approval_required" || failure.reason === "human_approval_required") {
@@ -469,6 +469,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     };
   }
   if (failure.code === Code.Unauthenticated) {
+    if (failure.reason === "invalid_credentials") {
+      return {
+        tone: "warning",
+        title: "Username or password is incorrect.",
+        message: "Check both and try again.",
+        action: "Repeated failures lock the account for a while.",
+      };
+    }
     return {
       tone: "warning",
       title: "Sign-in required",

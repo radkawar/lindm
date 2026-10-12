@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -40,7 +41,6 @@ const grantStatusLabels: Record<EnrollmentGrantStatus, string> = {
 
 export function EnrollmentGrants() {
   const lifetime = useAuthLifetime();
-  const client = useQueryClient();
   const historyId = useId();
   const [activePage, setActivePage] = useState("");
   const [historyPage, setHistoryPage] = useState("");
@@ -55,18 +55,7 @@ export function EnrollmentGrants() {
   const historyCount = active.data?.inactiveCount;
   return (
     <section className="grid gap-4" aria-label="One-time enrollment grants">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Codes that can still enroll a device.</p>
-        <Button
-          variant="outline"
-          disabled={active.isFetching || history.isFetching}
-          onClick={() =>
-            void client.invalidateQueries({ queryKey: ["enrollment-grants", lifetime.generation] })
-          }
-        >
-          Refresh
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">Codes that can still enroll a device.</p>
       <GrantList
         list={active}
         pageToken={activePage}
@@ -132,24 +121,12 @@ function GrantList({
       {!list.error
         ? list.data?.grants.map((grant) => <GrantRow key={grant.grantId} grant={grant} />)
         : null}
-      {pageToken || list.data?.nextPageToken ? (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={!pageToken || list.isFetching}
-            onClick={() => onPage("")}
-          >
-            First page
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!list.data?.nextPageToken || list.isFetching}
-            onClick={() => onPage(list.data?.nextPageToken ?? "")}
-          >
-            Next page
-          </Button>
-        </div>
-      ) : null}
+      <ListPagination
+        label="Code pages"
+        busy={list.isFetching}
+        onPrevious={pageToken ? () => onPage("") : undefined}
+        onNext={list.data?.nextPageToken ? () => onPage(list.data?.nextPageToken ?? "") : undefined}
+      />
     </>
   );
 }

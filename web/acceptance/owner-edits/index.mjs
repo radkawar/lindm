@@ -60,6 +60,10 @@ import * as groups from "./groups.mjs";
 import * as groupsDynamicCreate from "./groups-dynamic-create.mjs";
 import * as pass2ActionsHistory from "./pass2-p2-actions-history.mjs";
 import * as pass2ActionPending from "./pass2-p2-6-action-pending.mjs";
+import * as pass2P2SignInError from "./pass2-p2-11-sign-in-error.mjs";
+import * as pass2P2NotFound from "./pass2-p2-12-not-found.mjs";
+import * as pass2P2DeepLink from "./pass2-p2-13-deep-link.mjs";
+import * as pass2P2StepUp from "./pass2-p2-14-step-up.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -83,6 +87,10 @@ export const ownerEdits = [
   pass2Bug5,
   pass2SafetyApprovals,
   agentRepository,
+  pass2P2NotFound,
+  pass2P2DeepLink,
+  // One refused sign-in in a separate signed-out context.
+  pass2P2SignInError,
   rollouts,
   accounts,
   authorization,
@@ -117,6 +125,8 @@ export const ownerEdits = [
   pass2Bug6,
   pass2Bug4,
   pass2SafetyAssistance,
+  // Adds an admin who approves one recovery-key reveal, run with step-up.
+  pass2P2StepUp,
   pass2SafetyReveal,
   pass2SecretReveal,
   // Publishes one new, never-assigned profile.

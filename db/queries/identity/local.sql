@@ -82,8 +82,8 @@ DELETE FROM local_ceremonies WHERE account_id = sqlc.arg(account_id);
 DELETE FROM local_ceremonies WHERE expires_at <= now();
 
 -- name: InsertLocalCeremony :exec
-INSERT INTO local_ceremonies (token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version)
-VALUES (sqlc.arg(token_hash), sqlc.arg(account_id), sqlc.arg(kind), sqlc.arg(challenge_hash), sqlc.arg(session_data), sqlc.arg(password_hash), sqlc.arg(incident_reason), sqlc.arg(authorization_version));
+INSERT INTO local_ceremonies (token_hash, account_id, kind, challenge_hash, session_data, password_hash, incident_reason, authorization_version, session_hash)
+VALUES (sqlc.arg(token_hash), sqlc.arg(account_id), sqlc.arg(kind), sqlc.arg(challenge_hash), sqlc.arg(session_data), sqlc.arg(password_hash), sqlc.arg(incident_reason), sqlc.arg(authorization_version), sqlc.narg(session_hash));
 
 -- name: ConsumeLocalCeremony :one
 DELETE FROM local_ceremonies WHERE token_hash = sqlc.arg(token_hash)
@@ -119,3 +119,9 @@ SELECT EXISTS (
     AND p.issuer = sqlc.arg(local_issuer) AND p.subject = a.id::text
     AND EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id)
 );
+
+-- name: MarkSessionSteppedUp :execrows
+UPDATE sessions SET stepped_up_at = now()
+WHERE token_hash = sqlc.arg(token_hash) AND principal_id = sqlc.arg(principal_id)
+  AND kind = 'browser' AND revoked_at IS NULL
+  AND idle_expires_at > now() AND absolute_expires_at > now();

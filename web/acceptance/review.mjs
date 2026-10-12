@@ -105,6 +105,15 @@ async function complexActionKinds(path) {
 function concrete(path, params) {
   const names = [...path.matchAll(/\$(\w+)/g)].map((item) => item[1]);
   let urls = [{ url: path, label: "" }];
+  // A trailing bare "$" is a splat (catch-all) route: visit a seeded address.
+  if (path.endsWith("/$")) {
+    const values = params[`${path}:_splat`] ?? params._splat;
+    if (!values?.length) return { missing: "_splat", urls: [] };
+    urls = values.map((value) => ({
+      url: `${path.slice(0, -1)}${value}`,
+      label: "unknown address",
+    }));
+  }
   for (const name of names) {
     const values = params[`${path}:${name}`] ?? params[name];
     if (!values?.length) return { missing: name, urls: [] };
@@ -731,6 +740,8 @@ async function main() {
     "/devices/$deviceId/actions/$actionId:actionId": [ids.ActionID],
     "/devices/$deviceId/recovery/$actionId:actionId": [ids.RecoveryActionID],
     kind: kinds,
+    // The signed-in catch-all renders "Page not found" inside the shell.
+    _splat: ["no-such-page"],
   };
   for (const [name, values] of Object.entries(params)) params[name] = values.filter(Boolean);
   for (const route of routes) {

@@ -289,7 +289,7 @@ func (q *Queries) GetPrincipalForUpdate(ctx context.Context, id uuid.UUID) (Prin
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
 SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason, kind
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind, stepped_up_at
 FROM sessions
 WHERE token_hash = $1
 `
@@ -308,6 +308,7 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.BreakGlass,
 		&i.IncidentReason,
 		&i.Kind,
+		&i.SteppedUpAt,
 	)
 	return i, err
 }
@@ -723,7 +724,7 @@ WHERE token_hash = $1
   AND idle_expires_at > now()
   AND absolute_expires_at > now()
 RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason, kind
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind, stepped_up_at
 `
 
 func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, error) {
@@ -740,6 +741,7 @@ func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, 
 		&i.BreakGlass,
 		&i.IncidentReason,
 		&i.Kind,
+		&i.SteppedUpAt,
 	)
 	return i, err
 }

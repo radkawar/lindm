@@ -21,10 +21,11 @@ export async function reviewOwnerEdits({ page, config, visit, settle, screenshot
     const require = (value, message) => {
       if (!value) findings.push(message);
     };
-    const capture = async (name) => {
-      await settle(page);
+    // A check may capture its own page, e.g. a separate signed-out context.
+    const capture = async (name, target = page) => {
+      await settle(target);
       screenshots.push(
-        await screenshot(page, `owner-edit-${slug(task.name)}-${slug(name)}.png`, true),
+        await screenshot(target, `owner-edit-${slug(task.name)}-${slug(name)}.png`, true),
       );
     };
     let step = "start";

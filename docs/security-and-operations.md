@@ -450,8 +450,13 @@ escrowed password, exactly as for recovery keys; back it up with the same custod
 sets per-device local-admin policies; `secrets.reveal` (owner, admin) reveals
 them. Secret create, rotate and reveal need an unrestricted principal because a
 secret is not device-scoped. Reveal additionally needs a reason and a local
-browser session younger than five minutes (password plus passkey); OIDC and CLI
-sessions never satisfy step-up. Every attempt is audited before any plaintext
+browser session signed in or re-verified within five minutes (password plus
+passkey); OIDC and CLI sessions never satisfy step-up. When the window has
+passed, the console's refusal offers an in-page check (`POST
+/auth/local/step-up/begin` with the password, then `/finish` with a passkey
+assertion bound to the same session) that records `stepped_up_at` on that
+session and resends the same request; a wrong password counts toward lockout and
+no new session is issued. Every attempt is audited before any plaintext
 leaves the server, and responses are `no-store`.
 
 Enter a password-hash secret as a crypt(3) string, never the password: for

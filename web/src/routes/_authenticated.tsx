@@ -14,9 +14,10 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ context }) => {
+  beforeLoad: async ({ context, location }) => {
     const principal = await context.queryClient.fetchQuery(sessionQueryOptions());
-    if (!principal) throw redirect({ to: "/" });
+    // Signed out: sign in, then return to the page that was asked for.
+    if (!principal) throw redirect({ to: "/", search: { next: location.href } });
     return { principal };
   },
   component: AuthenticatedLayout,

@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useRouter } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { RpcError } from "@/components/ui/rpc-error";
 import { toRpcFailure } from "@/lib/errors";
+import { rememberNextPath } from "@/lib/next-path";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,9 +11,9 @@ import { fetchAuthenticationOptions } from "./local-api";
 import { LocalForm } from "./local-form";
 import { sessionQueryKey, sessionQueryOptions } from "./queries";
 
-export function SignIn({ notice }: { notice: string }) {
+// next: an already validated same-origin console path to open after sign-in.
+export function SignIn({ notice, next }: { notice: string; next?: string }) {
   const client = useQueryClient();
-  const router = useRouter();
   const options = useQuery({
     queryKey: ["authentication-options"],
     queryFn: ({ signal }) => fetchAuthenticationOptions(signal),
@@ -48,15 +49,17 @@ export function SignIn({ notice }: { notice: string }) {
             </RpcError>
           ) : null}
           {options.data?.externalLogin ? (
-            <Button render={<a href={loginHref} />}>Sign in with organization</Button>
+            <Button render={<a href={loginHref} onClick={() => rememberNextPath(next)} />}>
+              Sign in with organization
+            </Button>
           ) : null}
           {options.data?.localLogin ? (
             <LocalForm
               emergency={options.data.breakGlass}
               onSuccess={async () => {
+                // The home route then opens `next` or the dashboard.
                 await client.invalidateQueries({ queryKey: sessionQueryKey });
                 await client.fetchQuery(sessionQueryOptions());
-                await router.navigate({ to: "/dashboard" });
               }}
             />
           ) : null}

@@ -298,7 +298,9 @@ export function SecretReveal({
           </Link>
         </p>
       ) : null}
-      {failure ? <RpcError failure={failure} title="Secret not revealed" /> : null}
+      {failure ? (
+        <RpcError failure={failure} title="Secret not revealed" onRetry={() => void reveal()} />
+      ) : null}
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}

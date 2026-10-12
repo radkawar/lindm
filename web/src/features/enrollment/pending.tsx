@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import type { PendingEnrollment } from "../../../gen/lindm/admin/v1/provisioning_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
@@ -83,24 +84,15 @@ export function PendingEnrollments() {
         : null}
     </div>
   );
-  const pages = paged ? (
-    <div className="flex gap-2">
-      <Button
-        variant="outline"
-        disabled={!pageToken || list.isFetching}
-        onClick={() => setPageToken("")}
-      >
-        First page
-      </Button>
-      <Button
-        variant="outline"
-        disabled={!list.data.nextPageToken || list.isFetching}
-        onClick={() => setPageToken(list.data.nextPageToken)}
-      >
-        Next page
-      </Button>
-    </div>
-  ) : null;
+  const nextPage = list.data.nextPageToken;
+  const pages = (
+    <ListPagination
+      label="Pending enrollment pages"
+      busy={list.isFetching}
+      onPrevious={pageToken ? () => setPageToken("") : undefined}
+      onNext={nextPage ? () => setPageToken(nextPage) : undefined}
+    />
+  );
   if (open.length === 0) {
     return (
       <section className="grid gap-3" aria-label="Devices waiting for approval">
@@ -121,12 +113,7 @@ export function PendingEnrollments() {
         <h2 id={headingId} className="text-base font-semibold">
           {heading}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-            Refresh
-          </Button>
-          <Button render={<Link to="/approvals" />}>Open approval inbox</Button>
-        </div>
+        <Button render={<Link to="/approvals" />}>Open approval inbox</Button>
       </div>
       {waiting.length > 0 ? (
         <p className="text-sm text-muted-foreground">
