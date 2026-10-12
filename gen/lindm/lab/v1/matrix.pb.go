@@ -187,8 +187,12 @@ type LabMatrix struct {
 	// Full capability lanes rerun periodically for registry rolling platforms.
 	// Cadence belongs to the platform registry, not the scheduler.
 	RollingRequalificationCells []string `protobuf:"bytes,3,rep,name=rolling_requalification_cells,json=rollingRequalificationCells,proto3" json:"rolling_requalification_cells,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Arguments appended after architecture_args for cells that require
+	// enforced Secure Boot: the Microsoft-enrolled variable template and
+	// -secure-boot. Later flags override the default template.
+	SecureBootArgs map[string]*MatrixArgs `protobuf:"bytes,4,rep,name=secure_boot_args,json=secureBootArgs,proto3" json:"secure_boot_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *LabMatrix) Reset() {
@@ -238,6 +242,13 @@ func (x *LabMatrix) GetArchitectureArgs() map[string]*MatrixArgs {
 func (x *LabMatrix) GetRollingRequalificationCells() []string {
 	if x != nil {
 		return x.RollingRequalificationCells
+	}
+	return nil
+}
+
+func (x *LabMatrix) GetSecureBootArgs() map[string]*MatrixArgs {
+	if x != nil {
+		return x.SecureBootArgs
 	}
 	return nil
 }
@@ -304,8 +315,11 @@ type MatrixCell struct {
 	Lane string `protobuf:"bytes,6,opt,name=lane,proto3" json:"lane,omitempty"`
 	// Fixed lane arguments. Inputs (manifest, binaries, packages, records) are
 	// supplied by the matrix runner.
-	Args          []string `protobuf:"bytes,7,rep,name=args,proto3" json:"args,omitempty"`
-	NoLane        string   `protobuf:"bytes,8,opt,name=no_lane,json=noLane,proto3" json:"no_lane,omitempty"`
+	Args   []string `protobuf:"bytes,7,rep,name=args,proto3" json:"args,omitempty"`
+	NoLane string   `protobuf:"bytes,8,opt,name=no_lane,json=noLane,proto3" json:"no_lane,omitempty"`
+	// The lane refuses without enforced Secure Boot (e.g. original-device signed
+	// recovery); it receives LabMatrix.secure_boot_args for its architecture.
+	SecureBoot    bool `protobuf:"varint,9,opt,name=secure_boot,json=secureBoot,proto3" json:"secure_boot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -394,6 +408,13 @@ func (x *MatrixCell) GetNoLane() string {
 		return x.NoLane
 	}
 	return ""
+}
+
+func (x *MatrixCell) GetSecureBoot() bool {
+	if x != nil {
+		return x.SecureBoot
+	}
+	return false
 }
 
 // MatrixLedger is the append-only record of matrix cell outcomes.
@@ -631,19 +652,24 @@ var File_lindm_lab_v1_matrix_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/matrix.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x89\x04\n" +
+	"\x19lindm/lab/v1/matrix.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9f\a\n" +
 	"\tLabMatrix\x12:\n" +
 	"\x05cells\x18\x01 \x03(\v2\x18.lindm.lab.v1.MatrixCellB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10@R\x05cells\x12w\n" +
 	"\x11architecture_args\x18\x02 \x03(\v2-.lindm.lab.v1.LabMatrix.ArchitectureArgsEntryB\x1b\xbaH\x18\x9a\x01\x15\"\x13r\x11R\x06x86_64R\aaarch64R\x10architectureArgs\x12V\n" +
-	"\x1drolling_requalification_cells\x18\x03 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18?R\x1brollingRequalificationCells\x1a]\n" +
+	"\x1drolling_requalification_cells\x18\x03 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18?R\x1brollingRequalificationCells\x12r\n" +
+	"\x10secure_boot_args\x18\x04 \x03(\v2+.lindm.lab.v1.LabMatrix.SecureBootArgsEntryB\x1b\xbaH\x18\x9a\x01\x15\"\x13r\x11R\x06x86_64R\aaarch64R\x0esecureBootArgs\x1a]\n" +
 	"\x15ArchitectureArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
-	"\x05value\x18\x02 \x01(\v2\x18.lindm.lab.v1.MatrixArgsR\x05value:\x028\x01:\x8f\x01\xbaH\x8b\x01\x1a\x88\x01\n" +
-	"\x1clab.matrix_cell_names_unique\x12\x19cell names must be unique\x1aMthis.cells.all(c, this.cells.filter(other, other.name == c.name).size() == 1)\"7\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.lindm.lab.v1.MatrixArgsR\x05value:\x028\x01\x1a[\n" +
+	"\x13SecureBootArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.lindm.lab.v1.MatrixArgsR\x05value:\x028\x01:\xd4\x02\xbaH\xd0\x02\x1a\x88\x01\n" +
+	"\x1clab.matrix_cell_names_unique\x12\x19cell names must be unique\x1aMthis.cells.all(c, this.cells.filter(other, other.name == c.name).size() == 1)\x1a\xc2\x01\n" +
+	"\x1blab.matrix_secure_boot_args\x12@a Secure Boot cell needs secure_boot_args for every architecture\x1aa!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)\"7\n" +
 	"\n" +
 	"MatrixArgs\x12)\n" +
-	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xd3\x04\n" +
+	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\x99\x05\n" +
 	"\n" +
 	"MatrixCell\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x04name\x12\x1f\n" +
@@ -654,8 +680,10 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05image\x121\n" +
 	"\x04lane\x18\x06 \x01(\tB\x1d\xbaH\x1ar\x18\x18?2\x14^([a-z][a-z0-9-]*)?$R\x04lane\x12)\n" +
 	"\x04args\x18\a \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\x12!\n" +
-	"\ano_lane\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x06noLane:\xce\x01\xbaH\xca\x01\x1a\xc7\x01\n" +
-	"\x14lab.matrix_cell_lane\x12Ya cell names either a lane or the reason no maintained lane exists; arguments need a lane\x1aTthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0)\"U\n" +
+	"\ano_lane\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x06noLane\x12\x1f\n" +
+	"\vsecure_boot\x18\t \x01(\bR\n" +
+	"secureBoot:\xf3\x01\xbaH\xef\x01\x1a\xec\x01\n" +
+	"\x14lab.matrix_cell_lane\x12ia cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane\x1aithis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
 	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xc3\a\n" +
@@ -707,7 +735,7 @@ func file_lindm_lab_v1_matrix_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_lab_v1_matrix_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lindm_lab_v1_matrix_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_lindm_lab_v1_matrix_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_lindm_lab_v1_matrix_proto_goTypes = []any{
 	(MatrixImage)(0),              // 0: lindm.lab.v1.MatrixImage
 	(MatrixVerdict)(0),            // 1: lindm.lab.v1.MatrixVerdict
@@ -718,22 +746,25 @@ var file_lindm_lab_v1_matrix_proto_goTypes = []any{
 	(*MatrixLedger)(nil),          // 6: lindm.lab.v1.MatrixLedger
 	(*MatrixLedgerEntry)(nil),     // 7: lindm.lab.v1.MatrixLedgerEntry
 	nil,                           // 8: lindm.lab.v1.LabMatrix.ArchitectureArgsEntry
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	nil,                           // 9: lindm.lab.v1.LabMatrix.SecureBootArgsEntry
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_lindm_lab_v1_matrix_proto_depIdxs = []int32{
-	5, // 0: lindm.lab.v1.LabMatrix.cells:type_name -> lindm.lab.v1.MatrixCell
-	8, // 1: lindm.lab.v1.LabMatrix.architecture_args:type_name -> lindm.lab.v1.LabMatrix.ArchitectureArgsEntry
-	0, // 2: lindm.lab.v1.MatrixCell.image:type_name -> lindm.lab.v1.MatrixImage
-	7, // 3: lindm.lab.v1.MatrixLedger.entries:type_name -> lindm.lab.v1.MatrixLedgerEntry
-	1, // 4: lindm.lab.v1.MatrixLedgerEntry.verdict:type_name -> lindm.lab.v1.MatrixVerdict
-	9, // 5: lindm.lab.v1.MatrixLedgerEntry.recorded:type_name -> google.protobuf.Timestamp
-	2, // 6: lindm.lab.v1.MatrixLedgerEntry.source:type_name -> lindm.lab.v1.MatrixSource
-	4, // 7: lindm.lab.v1.LabMatrix.ArchitectureArgsEntry.value:type_name -> lindm.lab.v1.MatrixArgs
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	5,  // 0: lindm.lab.v1.LabMatrix.cells:type_name -> lindm.lab.v1.MatrixCell
+	8,  // 1: lindm.lab.v1.LabMatrix.architecture_args:type_name -> lindm.lab.v1.LabMatrix.ArchitectureArgsEntry
+	9,  // 2: lindm.lab.v1.LabMatrix.secure_boot_args:type_name -> lindm.lab.v1.LabMatrix.SecureBootArgsEntry
+	0,  // 3: lindm.lab.v1.MatrixCell.image:type_name -> lindm.lab.v1.MatrixImage
+	7,  // 4: lindm.lab.v1.MatrixLedger.entries:type_name -> lindm.lab.v1.MatrixLedgerEntry
+	1,  // 5: lindm.lab.v1.MatrixLedgerEntry.verdict:type_name -> lindm.lab.v1.MatrixVerdict
+	10, // 6: lindm.lab.v1.MatrixLedgerEntry.recorded:type_name -> google.protobuf.Timestamp
+	2,  // 7: lindm.lab.v1.MatrixLedgerEntry.source:type_name -> lindm.lab.v1.MatrixSource
+	4,  // 8: lindm.lab.v1.LabMatrix.ArchitectureArgsEntry.value:type_name -> lindm.lab.v1.MatrixArgs
+	4,  // 9: lindm.lab.v1.LabMatrix.SecureBootArgsEntry.value:type_name -> lindm.lab.v1.MatrixArgs
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_lindm_lab_v1_matrix_proto_init() }
@@ -747,7 +778,7 @@ func file_lindm_lab_v1_matrix_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_lab_v1_matrix_proto_rawDesc), len(file_lindm_lab_v1_matrix_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -348,7 +348,7 @@ type matrixRun struct {
 	root, repo, cache, evidence, self, lindmd, agent, redhatToken, revision string
 	consoleBrowsers, consoleAdmin, consoleDevice                            string
 	signer                                                                  *packaging.SigningKey
-	archArgs                                                                map[string]*labv1.MatrixArgs
+	archArgs, secureBootArgs                                                map[string]*labv1.MatrixArgs
 	airgap                                                                  map[string][]string
 	// lifecycle inputs per packaging architecture and format.
 	builds     map[string][2]string
@@ -422,7 +422,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 			return err
 		}
 	}
-	run.root, run.evidence, run.archArgs = selection.root, *evidence, in.Matrix.GetArchitectureArgs()
+	run.root, run.evidence, run.archArgs, run.secureBootArgs = selection.root, *evidence, in.Matrix.GetArchitectureArgs(), in.Matrix.GetSecureBootArgs()
 	if run.self, err = os.Executable(); err != nil {
 		return err
 	}
@@ -760,6 +760,13 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	args = append(args, "-manifest", filepath.Join(r.root, c.Manifest.Path), "-cache", r.cache)
 	if vmHasHardwareFlags(lane) {
 		args = append(args, r.archArgs[c.Architecture].GetArgs()...)
+	}
+	if c.Spec.GetSecureBoot() {
+		secureBoot, ok := r.secureBootArgs[c.Architecture]
+		if !vmHasHardwareFlags(lane) || !ok {
+			return nil, fmt.Errorf("%s requires Secure Boot firmware arguments for %s", c.Spec.GetName(), c.Architecture)
+		}
+		args = append(args, secureBoot.GetArgs()...)
 	}
 	if c.Spec.GetCapabilityKinds() {
 		kinds := splitList(labhost.FlagValue(args, "kinds"))

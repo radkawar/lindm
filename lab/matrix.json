@@ -75,7 +75,8 @@
       "capabilities": ["recovery-sanitize"],
       "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
       "lane": "device-actions",
-      "args": ["-scenario=wipe", "-wipe-phase=recovery-nvme"]
+      "args": ["-scenario=wipe", "-wipe-phase=recovery-nvme"],
+      "secureBoot": true
     },
     {
       "name": "self-update",
@@ -147,6 +148,14 @@
         "-firmware-package=qemu-efi-aarch64",
         "-firmware-version=2024.02-2ubuntu0.10"
       ]
+    }
+  },
+  "secureBootArgs": {
+    "x86_64": {
+      "args": ["-firmware-vars=/usr/share/OVMF/OVMF_VARS_4M.ms.fd", "-secure-boot"]
+    },
+    "aarch64": {
+      "args": ["-firmware-vars=/usr/share/AAVMF/AAVMF_VARS.ms.fd", "-secure-boot"]
     }
   }
 }

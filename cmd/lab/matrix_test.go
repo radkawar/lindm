@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -84,6 +85,42 @@ func TestMatrixActionCellsRequireTheirCompleteNativeProof(t *testing.T) {
 		}
 		if len(cells) != 1 || cells[0].Spec.GetLane() != "device-actions" || !slices.Contains(cells[0].Spec.GetArgs(), tc.required) {
 			t.Fatalf("%s omitted native proof %s", tc.cell, tc.required)
+		}
+	}
+}
+
+// Original-device signed recovery refuses non-Secure-Boot firmware, so the
+// cell's Microsoft-enrolled template must override the default and come last.
+func TestMatrixSecureBootCellOverridesFirmwareTemplate(t *testing.T) {
+	for _, tc := range []struct{ architecture, vars string }{
+		{"x86_64", "/usr/share/OVMF/OVMF_VARS_4M.ms.fd"},
+		{"aarch64", "/usr/share/AAVMF/AAVMF_VARS.ms.fd"},
+	} {
+		selection := matrixSelection{root: "../..", platforms: "ubuntu-24.04", cells: "recovery-sanitize", architecture: tc.architecture}
+		in, cells, err := selection.plan()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(cells) != 1 || !cells[0].Spec.GetSecureBoot() {
+			t.Fatal("recovery-sanitize does not require Secure Boot")
+		}
+		run := &matrixRun{root: "../..", archArgs: in.Matrix.GetArchitectureArgs(), secureBootArgs: in.Matrix.GetSecureBootArgs()}
+		args, err := run.laneArgs(cells[0], t.TempDir()+"/cell")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var vars string
+		for _, arg := range args {
+			if value, ok := strings.CutPrefix(arg, "-firmware-vars="); ok {
+				vars = value
+			}
+		}
+		if vars != tc.vars || !slices.Contains(args, "-secure-boot") {
+			t.Fatalf("%s: effective vars %q, args %v", tc.architecture, vars, args)
+		}
+		delete(run.secureBootArgs, tc.architecture)
+		if _, err := run.laneArgs(cells[0], t.TempDir()+"/cell"); err == nil {
+			t.Fatal("Secure Boot cell ran without Secure Boot firmware")
 		}
 	}
 }

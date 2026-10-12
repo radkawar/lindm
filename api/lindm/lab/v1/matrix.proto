@@ -16,6 +16,11 @@ message LabMatrix {
     message: "cell names must be unique"
     expression: "this.cells.all(c, this.cells.filter(other, other.name == c.name).size() == 1)"
   };
+  option (buf.validate.message).cel = {
+    id: "lab.matrix_secure_boot_args"
+    message: "a Secure Boot cell needs secure_boot_args for every architecture"
+    expression: "!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)"
+  };
 
   repeated MatrixCell cells = 1 [(buf.validate.field).repeated = {
     min_items: 1
@@ -41,6 +46,15 @@ message LabMatrix {
       }
     }
   }];
+  // Arguments appended after architecture_args for cells that require
+  // enforced Secure Boot: the Microsoft-enrolled variable template and
+  // -secure-boot. Later flags override the default template.
+  map<string, MatrixArgs> secure_boot_args = 4 [(buf.validate.field).map.keys.string = {
+    in: [
+      "x86_64",
+      "aarch64"
+    ]
+  }];
 }
 
 // MatrixArgs is a list of fixed lane arguments.
@@ -61,8 +75,8 @@ message MatrixArgs {
 message MatrixCell {
   option (buf.validate.message).cel = {
     id: "lab.matrix_cell_lane"
-    message: "a cell names either a lane or the reason no maintained lane exists; arguments need a lane"
-    expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0)"
+    message: "a cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane"
+    expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)"
   };
 
   string name = 1 [(buf.validate.field).string = {
@@ -113,6 +127,9 @@ message MatrixCell {
     }
   }];
   string no_lane = 8 [(buf.validate.field).string.max_len = 256];
+  // The lane refuses without enforced Secure Boot (e.g. original-device signed
+  // recovery); it receives LabMatrix.secure_boot_args for its architecture.
+  bool secure_boot = 9;
 }
 
 // MatrixImage is the kind of pinned manifest a cell boots.
