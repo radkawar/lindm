@@ -389,6 +389,7 @@ func (p *Provider) observe(ctx context.Context, desired *resourcev1.ResourceDesi
 					record.ProvenanceKnown = true
 				}
 			}
+			applyInstalledProvenance(record, receipt.GetInstalledProvenance(), d.GetRepository())
 		}
 	}
 	pin, contents, err := readPin(p.pinPath(desired.GetRef()))
@@ -441,8 +442,13 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 	if err != nil {
 		return nil, err
 	}
-	if err := p.acquisitionAllowed(before, ledger, operation); err != nil {
-		return nil, err
+	// An installed package lindm did not install is acquired only once
+	// preparation has proven its provenance against the approved source.
+	prove := p.needsInstalledProvenance(desired, before, ledger, operation)
+	if !prove {
+		if err := p.acquisitionAllowed(before, ledger, operation); err != nil {
+			return nil, err
+		}
 	}
 	effective := proto.CloneOf(desired.GetNativePackage())
 	if effective.GetAny() != nil && before.GetNativePackage().GetInstalled() && effective.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
@@ -493,6 +499,7 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 		TransactionId: transactionID, ExpectedDatabaseRevision: bytes.Clone(db.revision),
 		Platform: proto.CloneOf(p.config.Platform), ActionId: p.config.ActionID,
 		StagingExpiresAt: proto.CloneOf(expires), StagingMaxBytes: maximum, IntentSha256: bytes.Clone(p.config.IntentDigest),
+		ProveInstalledProvenance: prove,
 	}
 	if !p.rolling() && p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && before.GetNativePackage().GetPinFile() != nil {
 		request.CandidatePinContents = pinProjection(p.backend.GetBackend(), pin)
@@ -510,6 +517,14 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 	manifest, err := readPreparedManifest(directory)
 	if err != nil {
 		return nil, err
+	}
+	if proof := manifest.GetInstalledProvenance(); proof != nil && (!prove || !applyInstalledProvenance(before.GetNativePackage().GetRecord(), proof, desired.GetNativePackage().GetRepository())) {
+		return nil, ErrConflict
+	}
+	if prove {
+		if err := p.acquisitionAllowed(before, ledger, operation); err != nil {
+			return nil, err
+		}
 	}
 	changePackages, err := manifestChangesPackages(manifest)
 	if err != nil {
@@ -594,10 +609,10 @@ func (p *Provider) acquisitionAllowed(before *resourcev1.ResourceObservation, le
 		return errors.New("packageprovider: release has no ownership baseline")
 	}
 	o := before.GetNativePackage()
-	// lindm knows a package's origin only when it installed it; dpkg/rpm keep
-	// no artifact digest that could prove a preinstalled package came from the
-	// approved repository, so neither CREATE_ONLY nor approved adoption may
-	// take it over.
+	// lindm knows a package's origin when it installed it, or when preparation
+	// proved the installation is the approved source's artifact
+	// (provenance_linux.go). Without either, neither CREATE_ONLY nor approved
+	// adoption may take it over.
 	if o.GetInstalled() && !o.GetRecord().GetProvenanceKnown() {
 		return admissiondetail.Wrap(fmt.Errorf("%w: installed provenance unknown; unsafe acquisition refused", ErrConflict), "existing_package_unverified")
 	}

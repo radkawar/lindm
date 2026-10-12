@@ -96,8 +96,11 @@ type NativePackageTransactionRequest struct {
 	CandidatePinContents []byte           `protobuf:"bytes,15,opt,name=candidate_pin_contents,json=candidatePinContents,proto3,oneof" json:"candidate_pin_contents,omitempty"`
 	CandidatePinSha256   []byte           `protobuf:"bytes,16,opt,name=candidate_pin_sha256,json=candidatePinSha256,proto3,oneof" json:"candidate_pin_sha256,omitempty"`
 	OriginalPin          *v1.FileIdentity `protobuf:"bytes,17,opt,name=original_pin,json=originalPin,proto3" json:"original_pin,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// PREPARE-only: prove that the installed target, which lindm did not
+	// install, is the approved source's artifact (approved adoption evidence).
+	ProveInstalledProvenance bool `protobuf:"varint,18,opt,name=prove_installed_provenance,json=proveInstalledProvenance,proto3" json:"prove_installed_provenance,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *NativePackageTransactionRequest) Reset() {
@@ -249,6 +252,13 @@ func (x *NativePackageTransactionRequest) GetOriginalPin() *v1.FileIdentity {
 	return nil
 }
 
+func (x *NativePackageTransactionRequest) GetProveInstalledProvenance() bool {
+	if x != nil {
+		return x.ProveInstalledProvenance
+	}
+	return false
+}
+
 type NativePackageStagingCancellation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
@@ -297,7 +307,7 @@ var File_lindm_agent_v1_native_package_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_native_package_proto_rawDesc = "" +
 	"\n" +
-	"#lindm/agent/v1/native_package.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1blindm/agent/v1/config.proto\x1a\x1elindm/resource/v1/common.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\x1a lindm/resource/v1/software.proto\"\xa5\x11\n" +
+	"#lindm/agent/v1/native_package.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1blindm/agent/v1/config.proto\x1a\x1elindm/resource/v1/common.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\x1a lindm/resource/v1/software.proto\"\xb8\x13\n" +
 	"\x1fNativePackageTransactionRequest\x12V\n" +
 	"\toperation\x18\x01 \x01(\x0e2,.lindm.agent.v1.NativePackageHelperOperationB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\toperation\x12I\n" +
@@ -318,10 +328,12 @@ const file_lindm_agent_v1_native_package_proto_rawDesc = "" +
 	"\rintent_sha256\x18\x0e \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12D\n" +
 	"\x16candidate_pin_contents\x18\x0f \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x14candidatePinContents\x88\x01\x01\x12>\n" +
 	"\x14candidate_pin_sha256\x18\x10 \x01(\fB\a\xbaH\x04z\x02h H\x01R\x12candidatePinSha256\x88\x01\x01\x12B\n" +
-	"\foriginal_pin\x18\x11 \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\voriginalPin:\xfc\a\xbaH\xf8\a\x1a\xb7\x03\n" +
+	"\foriginal_pin\x18\x11 \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\voriginalPin\x12<\n" +
+	"\x1aprove_installed_provenance\x18\x12 \x01(\bR\x18proveInstalledProvenance:\xd1\t\xbaH\xcd\t\x1a\xb7\x03\n" +
 	"$native_package_helper.pin_projection\x12Wpin projection binds existing native RPM versionlock evidence and exact candidate bytes\x1a\xb5\x02has(this.candidate_pin_contents) == has(this.candidate_pin_sha256) && has(this.candidate_pin_contents) == has(this.original_pin) && (!has(this.original_pin) || (this.desired.native_package.package.ecosystem == 2 && this.original_pin.path in ['/etc/dnf/versionlock.toml', '/etc/dnf/plugins/versionlock.list']))\x1a\x80\x02\n" +
 	"\"native_package_helper.request_kind\x12Onative package helper accepts only package resources and exact package identity\x1a\x88\x01this.desired.ref.kind == 12 && has(this.desired.native_package) && this.desired.native_package.package == this.effective_desired.package\x1a\xb8\x02\n" +
-	"#native_package_helper.apply_binding\x12Happlication requires the complete admitted plan and transaction manifest\x1a\xc6\x01this.operation != 2 || (has(this.manifest) && has(this.plan) && this.plan.ref == this.desired.ref && has(this.plan.native_package) && this.plan.native_package.desired == this.desired.native_package)B\x19\n" +
+	"#native_package_helper.apply_binding\x12Happlication requires the complete admitted plan and transaction manifest\x1a\xc6\x01this.operation != 2 || (has(this.manifest) && has(this.plan) && this.plan.ref == this.desired.ref && has(this.plan.native_package) && this.plan.native_package.desired == this.desired.native_package)\x1a\xd2\x01\n" +
+	"&native_package_helper.provenance_proof\x12Einstalled provenance is proven only while preparing a present package\x1aa!this.prove_installed_provenance || (this.operation == 1 && this.effective_desired.presence == 1)B\x19\n" +
 	"\x17_candidate_pin_contentsB\x17\n" +
 	"\x15_candidate_pin_sha256\"I\n" +
 	" NativePackageStagingCancellation\x12%\n" +

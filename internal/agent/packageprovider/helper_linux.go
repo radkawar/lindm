@@ -156,14 +156,16 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 			return err
 		}
 	}
+	var proof *resourcev1.InstalledProvenanceProof
+	prove := p.provenanceStep(ctx, directory, request, db.records[packageKey(target)], &proof)
 	var entries []*resourcev1.PackageTransactionEntry
 	var snapshot *resourcev1.RepositorySnapshot
 	if p.rolling() {
 		entries, snapshot, err = p.planRolling(ctx, directory, d, db, request.GetSource())
 	} else if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
-		entries, snapshot, err = p.planAPT(ctx, directory, d, db, request.GetSource())
+		entries, snapshot, err = p.planAPT(ctx, directory, d, db, request.GetSource(), prove)
 	} else {
-		entries, snapshot, err = p.planDNF(ctx, directory, d, db, request.GetSource())
+		entries, snapshot, err = p.planDNF(ctx, directory, d, db, request.GetSource(), prove)
 	}
 	if err != nil {
 		return err
@@ -192,6 +194,7 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 	manifest := &resourcev1.PackageTransactionManifest{Entries: entries, NativeDatabaseRevision: bytes.Clone(db.revision), Sources: &resourcev1.SourceSnapshot{Source: &resourcev1.SourceSnapshot_Repositories{Repositories: &resourcev1.RepositorySnapshots{Repositories: []*resourcev1.RepositorySnapshot{snapshot}}}}, NativeLockIdentity: p.nativeLockIdentity(), AffectedResources: []*resourcev1.ResourceRef{proto.CloneOf(request.GetDesired().GetRef())}, AffectedDesiredSha256: [][]byte{digest[:]}}
 	manifest.CandidatePinSha256 = bytes.Clone(request.GetCandidatePinSha256())
 	manifest.OriginalPin = proto.CloneOf(request.GetOriginalPin())
+	manifest.InstalledProvenance = boundProof(proof, snapshot)
 	manifest.NativeTransaction, err = artifactFor(p.nativeTransactionPath(directory))
 	if err != nil {
 		return err

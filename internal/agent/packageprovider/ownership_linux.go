@@ -81,6 +81,17 @@ func (p *Provider) installedIdentity(ctx context.Context, record *resourcev1.Nat
 	return h.Sum(nil), nil
 }
 
+// releaseKeepsInstallation reports whether release leaves the installed package
+// as it is. Only a package lindm installed (absent at acquisition) is owned
+// presence that RESTORE_OWNED may remove; a package that was already installed
+// when its row was acquired, such as an adopted one, is never removed or
+// downgraded: restoring its baseline restores only the recorded pin.
+func releaseKeepsInstallation(desired *resourcev1.NativePackageDesired, ledger *agentv1.ResourceOwnershipLedger) bool {
+	return ledger.GetOwner().GetPolicy().GetRelease() == resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN ||
+		desired.GetRemoval() == resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_RETAIN_INSTALLATION ||
+		ledger.GetBaseline().GetObservation().GetNativePackage().GetInstalled()
+}
+
 func releaseTarget(desired *resourcev1.ResourceDesiredState, before *resourcev1.ResourceObservation, ledger *agentv1.ResourceOwnershipLedger) (*resourcev1.NativePackageDesired, []byte, *resourcev1.OwnershipInverseBinding, error) {
 	if ledger == nil || ledger.GetLastApplied() == nil || ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {
 		return nil, nil, nil, ErrOutcomeUnknown
@@ -96,9 +107,9 @@ func releaseTarget(desired *resourcev1.ResourceDesiredState, before *resourcev1.
 	target := current
 	if ledger.GetOwner().GetPolicy().GetRelease() == resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED {
 		pin = bytes.Clone(baseline.GetPinContents())
-		if effective.GetRemoval() != resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_RETAIN_INSTALLATION {
-			target = baseline
-		}
+	}
+	if !releaseKeepsInstallation(effective, ledger) {
+		target = baseline
 	}
 	if target.GetInstalled() {
 		effective.Presence = resourcev1.Presence_PRESENCE_PRESENT

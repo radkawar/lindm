@@ -2177,6 +2177,40 @@ be in system RPM trust; DNF5 before 5.4.6.0 refuses to store a transaction from
 a read-only `/usr`; `NoNewPrivileges=` breaks RPM's SELinux scriptlet transition
 (exit 127); and DNF's single shared versionlock file is not another package's pin.
 
+##### Native package approved adoption (pending)
+
+The agent implements approved adoption of an installed package that lindm did
+not install, once PREPARE has proven its provenance against the approved
+source ([engineering](engineering.md#native-package-resource-provider)). This is
+**not qualified**: `QualifiedResourceKinds` still lists only `CREATE_ONLY` for
+`NATIVE_PACKAGE`, so the server reports an approved-adoption package row as
+`resource_ownership_operation_unavailable`. The evidence so far is unit-level:
+parser and decision tests (`internal/agent/packageprovider/provenance_linux_test.go`),
+a dpkg comparison against a real dpkg database that dpkg itself installed into a
+private root, and, on an Ubuntu 24.04 amd64 host, the same comparison of the
+installed `git 1:2.43.0-1ubuntu7.3` and `htop 3.3.0-4build1` with their archive
+`.deb`s. The APT and DNF5 proof inside the staging unit, the plan and apply
+bindings, the journal claim and release have not run natively. No RPM proof has
+run at all.
+
+The qualifying run is `lab vm resources -phase connected -kinds packages` on
+Ubuntu 24.04 and Fedora 44, from a source tree whose qualification table also
+lists `OWNERSHIP_MODE_APPROVED_ADOPTION` for `NATIVE_PACKAGE`. Its package kind
+then also requires these scenarios on APT and DNF5. The fixture's v1 is
+installed outside lindm (`dpkg -i` / `rpm -i` of the signed artifact), and the
+fixture `.deb`s now ship `md5sums`:
+
+- `modified-installation-unverified`: with a packaged file modified, approved
+  adoption is refused unstarted with `existing_package_unverified`;
+- `installed-package-adoption-required`: create-only is refused unstarted with
+  `existing_package`;
+- `approved-package-adoption`: converges with `approved_source_matches`; the
+  owned pin is the only effect and the maintainer log is unchanged;
+- `adopted-release-retains-package`: release restores the unmanaged
+  installation byte for byte (version, verify, no pin, maintainer log).
+
+Only records from that run may add the mode to the table.
+
 ##### Secret-delivered password hash and managed local-admin password
 
 `lab vm resources -phase connected -kinds secret-password,local-admin

@@ -374,9 +374,14 @@ func parseAPTSimulation(output []byte) ([]aptChange, error) {
 	return changes, nil
 }
 
-func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource) ([]*resourcev1.PackageTransactionEntry, *resourcev1.RepositorySnapshot, error) {
+// afterRefresh runs once the approved metadata is authenticated and before
+// anything else uses it (the installed-provenance proof).
+func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource, afterRefresh func() error) ([]*resourcev1.PackageTransactionEntry, *resourcev1.RepositorySnapshot, error) {
 	snapshot, err := p.prepareAPT(ctx, directory, source)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := afterRefresh(); err != nil {
 		return nil, nil, err
 	}
 	target, err := p.nativeTarget(db, d.GetPackage())

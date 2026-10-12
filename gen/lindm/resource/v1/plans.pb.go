@@ -676,6 +676,66 @@ func (PackageTransactionOperation) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{10}
 }
 
+// How an installed package that lindm did not install was proven to be the
+// approved source's artifact. Neither dpkg nor rpm records the repository a
+// package came from, so each method compares the installed native records with
+// the exact artifact the approved source's authenticated metadata lists.
+type InstalledProvenanceMethod int32
+
+const (
+	InstalledProvenanceMethod_INSTALLED_PROVENANCE_METHOD_UNSPECIFIED InstalledProvenanceMethod = 0
+	// dpkg keeps no archive digest. The indexed .deb was fetched and checked
+	// against the signed index; its control fields, md5sums and conffile list
+	// equal the installed dpkg records, and dpkg --verify finds every installed
+	// non-conffile matching those MD5 sums. MD5 is not collision resistant.
+	InstalledProvenanceMethod_INSTALLED_PROVENANCE_METHOD_DPKG_CONTROL InstalledProvenanceMethod = 1
+	// rpm keeps the installed header. Its SHA256HEADER equals that of the
+	// repository package signed by the approved key, and rpm --verify finds every
+	// installed non-config file's size, digest and link target unchanged.
+	InstalledProvenanceMethod_INSTALLED_PROVENANCE_METHOD_RPM_HEADER InstalledProvenanceMethod = 2
+)
+
+// Enum value maps for InstalledProvenanceMethod.
+var (
+	InstalledProvenanceMethod_name = map[int32]string{
+		0: "INSTALLED_PROVENANCE_METHOD_UNSPECIFIED",
+		1: "INSTALLED_PROVENANCE_METHOD_DPKG_CONTROL",
+		2: "INSTALLED_PROVENANCE_METHOD_RPM_HEADER",
+	}
+	InstalledProvenanceMethod_value = map[string]int32{
+		"INSTALLED_PROVENANCE_METHOD_UNSPECIFIED":  0,
+		"INSTALLED_PROVENANCE_METHOD_DPKG_CONTROL": 1,
+		"INSTALLED_PROVENANCE_METHOD_RPM_HEADER":   2,
+	}
+)
+
+func (x InstalledProvenanceMethod) Enum() *InstalledProvenanceMethod {
+	p := new(InstalledProvenanceMethod)
+	*p = x
+	return p
+}
+
+func (x InstalledProvenanceMethod) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InstalledProvenanceMethod) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_resource_v1_plans_proto_enumTypes[11].Descriptor()
+}
+
+func (InstalledProvenanceMethod) Type() protoreflect.EnumType {
+	return &file_lindm_resource_v1_plans_proto_enumTypes[11]
+}
+
+func (x InstalledProvenanceMethod) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InstalledProvenanceMethod.Descriptor instead.
+func (InstalledProvenanceMethod) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{11}
+}
+
 type AppTransactionOperation int32
 
 const (
@@ -715,11 +775,11 @@ func (x AppTransactionOperation) String() string {
 }
 
 func (AppTransactionOperation) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[11].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[12].Descriptor()
 }
 
 func (AppTransactionOperation) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[11]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[12]
 }
 
 func (x AppTransactionOperation) Number() protoreflect.EnumNumber {
@@ -728,7 +788,7 @@ func (x AppTransactionOperation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AppTransactionOperation.Descriptor instead.
 func (AppTransactionOperation) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{11}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{12}
 }
 
 type UpdateCheckpoint int32
@@ -776,11 +836,11 @@ func (x UpdateCheckpoint) String() string {
 }
 
 func (UpdateCheckpoint) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[12].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[13].Descriptor()
 }
 
 func (UpdateCheckpoint) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[12]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[13]
 }
 
 func (x UpdateCheckpoint) Number() protoreflect.EnumNumber {
@@ -789,7 +849,7 @@ func (x UpdateCheckpoint) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UpdateCheckpoint.Descriptor instead.
 func (UpdateCheckpoint) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{12}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{13}
 }
 
 type SessionField int32
@@ -831,11 +891,11 @@ func (x SessionField) String() string {
 }
 
 func (SessionField) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[13].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[14].Descriptor()
 }
 
 func (SessionField) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[13]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[14]
 }
 
 func (x SessionField) Number() protoreflect.EnumNumber {
@@ -844,7 +904,7 @@ func (x SessionField) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SessionField.Descriptor instead.
 func (SessionField) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{13}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{14}
 }
 
 type PasswordField int32
@@ -901,11 +961,11 @@ func (x PasswordField) String() string {
 }
 
 func (PasswordField) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[14].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[15].Descriptor()
 }
 
 func (PasswordField) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[14]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[15]
 }
 
 func (x PasswordField) Number() protoreflect.EnumNumber {
@@ -914,7 +974,7 @@ func (x PasswordField) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PasswordField.Descriptor instead.
 func (PasswordField) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{14}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{15}
 }
 
 type CredentialStep int32
@@ -962,11 +1022,11 @@ func (x CredentialStep) String() string {
 }
 
 func (CredentialStep) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[15].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[16].Descriptor()
 }
 
 func (CredentialStep) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[15]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[16]
 }
 
 func (x CredentialStep) Number() protoreflect.EnumNumber {
@@ -975,7 +1035,7 @@ func (x CredentialStep) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CredentialStep.Descriptor instead.
 func (CredentialStep) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{15}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{16}
 }
 
 type DirectoryStep int32
@@ -1017,11 +1077,11 @@ func (x DirectoryStep) String() string {
 }
 
 func (DirectoryStep) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_resource_v1_plans_proto_enumTypes[16].Descriptor()
+	return file_lindm_resource_v1_plans_proto_enumTypes[17].Descriptor()
 }
 
 func (DirectoryStep) Type() protoreflect.EnumType {
-	return &file_lindm_resource_v1_plans_proto_enumTypes[16]
+	return &file_lindm_resource_v1_plans_proto_enumTypes[17]
 }
 
 func (x DirectoryStep) Number() protoreflect.EnumNumber {
@@ -1030,7 +1090,7 @@ func (x DirectoryStep) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DirectoryStep.Descriptor instead.
 func (DirectoryStep) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{16}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{17}
 }
 
 type PlanSafety struct {
@@ -2520,6 +2580,110 @@ func (x *PackageTransactionEntry) GetMetadataRevisionSha256() []byte {
 	return nil
 }
 
+// Effect-free preparation evidence for approved adoption: the installed package
+// (exactly this native record) is the approved source's artifact.
+type InstalledProvenanceProof struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Package                *PackageIdentity       `protobuf:"bytes,1,opt,name=package,proto3" json:"package,omitempty"`
+	Version                *NativeVersion         `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	Source                 *ResourceRef           `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	SignerSha256           []byte                 `protobuf:"bytes,4,opt,name=signer_sha256,json=signerSha256,proto3" json:"signer_sha256,omitempty"`
+	MetadataRevisionSha256 []byte                 `protobuf:"bytes,5,opt,name=metadata_revision_sha256,json=metadataRevisionSha256,proto3" json:"metadata_revision_sha256,omitempty"`
+	// The approved artifact exactly as the authenticated metadata declares it.
+	Artifact *ArtifactRef              `protobuf:"bytes,6,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	Method   InstalledProvenanceMethod `protobuf:"varint,7,opt,name=method,proto3,enum=lindm.resource.v1.InstalledProvenanceMethod" json:"method,omitempty"`
+	// NativePackageRecord.native_identity_sha256 of the proven installation.
+	NativeIdentitySha256 []byte `protobuf:"bytes,8,opt,name=native_identity_sha256,json=nativeIdentitySha256,proto3" json:"native_identity_sha256,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *InstalledProvenanceProof) Reset() {
+	*x = InstalledProvenanceProof{}
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstalledProvenanceProof) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstalledProvenanceProof) ProtoMessage() {}
+
+func (x *InstalledProvenanceProof) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstalledProvenanceProof.ProtoReflect.Descriptor instead.
+func (*InstalledProvenanceProof) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *InstalledProvenanceProof) GetPackage() *PackageIdentity {
+	if x != nil {
+		return x.Package
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetVersion() *NativeVersion {
+	if x != nil {
+		return x.Version
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetSource() *ResourceRef {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetSignerSha256() []byte {
+	if x != nil {
+		return x.SignerSha256
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetMetadataRevisionSha256() []byte {
+	if x != nil {
+		return x.MetadataRevisionSha256
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetArtifact() *ArtifactRef {
+	if x != nil {
+		return x.Artifact
+	}
+	return nil
+}
+
+func (x *InstalledProvenanceProof) GetMethod() InstalledProvenanceMethod {
+	if x != nil {
+		return x.Method
+	}
+	return InstalledProvenanceMethod_INSTALLED_PROVENANCE_METHOD_UNSPECIFIED
+}
+
+func (x *InstalledProvenanceProof) GetNativeIdentitySha256() []byte {
+	if x != nil {
+		return x.NativeIdentitySha256
+	}
+	return nil
+}
+
 type PackageTransactionManifest struct {
 	state                  protoimpl.MessageState     `protogen:"open.v1"`
 	Entries                []*PackageTransactionEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
@@ -2532,13 +2696,16 @@ type PackageTransactionManifest struct {
 	NativeTransaction  *ArtifactRef  `protobuf:"bytes,7,opt,name=native_transaction,json=nativeTransaction,proto3" json:"native_transaction,omitempty"`
 	CandidatePinSha256 []byte        `protobuf:"bytes,8,opt,name=candidate_pin_sha256,json=candidatePinSha256,proto3,oneof" json:"candidate_pin_sha256,omitempty"`
 	OriginalPin        *FileIdentity `protobuf:"bytes,9,opt,name=original_pin,json=originalPin,proto3" json:"original_pin,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Present only when preparation was asked to prove an installed package's
+	// provenance for acquisition and the proof succeeded.
+	InstalledProvenance *InstalledProvenanceProof `protobuf:"bytes,10,opt,name=installed_provenance,json=installedProvenance,proto3" json:"installed_provenance,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *PackageTransactionManifest) Reset() {
 	*x = PackageTransactionManifest{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[17]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2550,7 +2717,7 @@ func (x *PackageTransactionManifest) String() string {
 func (*PackageTransactionManifest) ProtoMessage() {}
 
 func (x *PackageTransactionManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[17]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2563,7 +2730,7 @@ func (x *PackageTransactionManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageTransactionManifest.ProtoReflect.Descriptor instead.
 func (*PackageTransactionManifest) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{17}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PackageTransactionManifest) GetEntries() []*PackageTransactionEntry {
@@ -2629,6 +2796,13 @@ func (x *PackageTransactionManifest) GetOriginalPin() *FileIdentity {
 	return nil
 }
 
+func (x *PackageTransactionManifest) GetInstalledProvenance() *InstalledProvenanceProof {
+	if x != nil {
+		return x.InstalledProvenance
+	}
+	return nil
+}
+
 type NativePackagePlan struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Desired *NativePackageDesired  `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
@@ -2650,7 +2824,7 @@ type NativePackagePlan struct {
 
 func (x *NativePackagePlan) Reset() {
 	*x = NativePackagePlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[18]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2662,7 +2836,7 @@ func (x *NativePackagePlan) String() string {
 func (*NativePackagePlan) ProtoMessage() {}
 
 func (x *NativePackagePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[18]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2675,7 +2849,7 @@ func (x *NativePackagePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NativePackagePlan.ProtoReflect.Descriptor instead.
 func (*NativePackagePlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{18}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *NativePackagePlan) GetDesired() *NativePackageDesired {
@@ -2756,7 +2930,7 @@ type RepositoryPlan struct {
 
 func (x *RepositoryPlan) Reset() {
 	*x = RepositoryPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[19]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2768,7 +2942,7 @@ func (x *RepositoryPlan) String() string {
 func (*RepositoryPlan) ProtoMessage() {}
 
 func (x *RepositoryPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[19]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2781,7 +2955,7 @@ func (x *RepositoryPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryPlan.ProtoReflect.Descriptor instead.
 func (*RepositoryPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{19}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RepositoryPlan) GetDesired() *RepositoryDesired {
@@ -2847,7 +3021,7 @@ type FlatpakAppPlan struct {
 
 func (x *FlatpakAppPlan) Reset() {
 	*x = FlatpakAppPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[20]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2859,7 +3033,7 @@ func (x *FlatpakAppPlan) String() string {
 func (*FlatpakAppPlan) ProtoMessage() {}
 
 func (x *FlatpakAppPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[20]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2872,7 +3046,7 @@ func (x *FlatpakAppPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakAppPlan.ProtoReflect.Descriptor instead.
 func (*FlatpakAppPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{20}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *FlatpakAppPlan) GetDesired() *FlatpakAppDesired {
@@ -2938,7 +3112,7 @@ type OSUpdatePlan struct {
 
 func (x *OSUpdatePlan) Reset() {
 	*x = OSUpdatePlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[21]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2950,7 +3124,7 @@ func (x *OSUpdatePlan) String() string {
 func (*OSUpdatePlan) ProtoMessage() {}
 
 func (x *OSUpdatePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[21]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2963,7 +3137,7 @@ func (x *OSUpdatePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdatePlan.ProtoReflect.Descriptor instead.
 func (*OSUpdatePlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{21}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *OSUpdatePlan) GetInverse() *OwnershipInverseBinding {
@@ -3028,7 +3202,7 @@ type SessionPolicyPlan struct {
 
 func (x *SessionPolicyPlan) Reset() {
 	*x = SessionPolicyPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[22]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3040,7 +3214,7 @@ func (x *SessionPolicyPlan) String() string {
 func (*SessionPolicyPlan) ProtoMessage() {}
 
 func (x *SessionPolicyPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[22]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3053,7 +3227,7 @@ func (x *SessionPolicyPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPolicyPlan.ProtoReflect.Descriptor instead.
 func (*SessionPolicyPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{22}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SessionPolicyPlan) GetDesired() *SessionPolicyDesired {
@@ -3105,7 +3279,7 @@ type PasswordPolicyPlan struct {
 
 func (x *PasswordPolicyPlan) Reset() {
 	*x = PasswordPolicyPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[23]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3117,7 +3291,7 @@ func (x *PasswordPolicyPlan) String() string {
 func (*PasswordPolicyPlan) ProtoMessage() {}
 
 func (x *PasswordPolicyPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[23]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3130,7 +3304,7 @@ func (x *PasswordPolicyPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasswordPolicyPlan.ProtoReflect.Descriptor instead.
 func (*PasswordPolicyPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{23}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PasswordPolicyPlan) GetDesired() *PasswordPolicyDesired {
@@ -3189,7 +3363,7 @@ type SnapAppPlan struct {
 
 func (x *SnapAppPlan) Reset() {
 	*x = SnapAppPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[24]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3201,7 +3375,7 @@ func (x *SnapAppPlan) String() string {
 func (*SnapAppPlan) ProtoMessage() {}
 
 func (x *SnapAppPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[24]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3214,7 +3388,7 @@ func (x *SnapAppPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapAppPlan.ProtoReflect.Descriptor instead.
 func (*SnapAppPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{24}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SnapAppPlan) GetDesired() *SnapAppDesired {
@@ -3272,7 +3446,7 @@ type CertificateEnrollmentPlan struct {
 
 func (x *CertificateEnrollmentPlan) Reset() {
 	*x = CertificateEnrollmentPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[25]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3284,7 +3458,7 @@ func (x *CertificateEnrollmentPlan) String() string {
 func (*CertificateEnrollmentPlan) ProtoMessage() {}
 
 func (x *CertificateEnrollmentPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[25]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3297,7 +3471,7 @@ func (x *CertificateEnrollmentPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CertificateEnrollmentPlan.ProtoReflect.Descriptor instead.
 func (*CertificateEnrollmentPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{25}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *CertificateEnrollmentPlan) GetDesired() *CertificateEnrollmentDesired {
@@ -3349,7 +3523,7 @@ type DirectoryClientPlan struct {
 
 func (x *DirectoryClientPlan) Reset() {
 	*x = DirectoryClientPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[26]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3361,7 +3535,7 @@ func (x *DirectoryClientPlan) String() string {
 func (*DirectoryClientPlan) ProtoMessage() {}
 
 func (x *DirectoryClientPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[26]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3374,7 +3548,7 @@ func (x *DirectoryClientPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectoryClientPlan.ProtoReflect.Descriptor instead.
 func (*DirectoryClientPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{26}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DirectoryClientPlan) GetDesired() *DirectoryClientDesired {
@@ -3440,7 +3614,7 @@ type FlatpakTransactionEntry struct {
 
 func (x *FlatpakTransactionEntry) Reset() {
 	*x = FlatpakTransactionEntry{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[27]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3452,7 +3626,7 @@ func (x *FlatpakTransactionEntry) String() string {
 func (*FlatpakTransactionEntry) ProtoMessage() {}
 
 func (x *FlatpakTransactionEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[27]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3465,7 +3639,7 @@ func (x *FlatpakTransactionEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakTransactionEntry.ProtoReflect.Descriptor instead.
 func (*FlatpakTransactionEntry) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{27}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *FlatpakTransactionEntry) GetInstallation() *InstallationBinding {
@@ -3563,7 +3737,7 @@ type SnapTransactionEntry struct {
 
 func (x *SnapTransactionEntry) Reset() {
 	*x = SnapTransactionEntry{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[28]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3575,7 +3749,7 @@ func (x *SnapTransactionEntry) String() string {
 func (*SnapTransactionEntry) ProtoMessage() {}
 
 func (x *SnapTransactionEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[28]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3588,7 +3762,7 @@ func (x *SnapTransactionEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapTransactionEntry.ProtoReflect.Descriptor instead.
 func (*SnapTransactionEntry) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{28}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SnapTransactionEntry) GetName() string {
@@ -3674,7 +3848,7 @@ type AppTransactionEntry struct {
 
 func (x *AppTransactionEntry) Reset() {
 	*x = AppTransactionEntry{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[29]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3686,7 +3860,7 @@ func (x *AppTransactionEntry) String() string {
 func (*AppTransactionEntry) ProtoMessage() {}
 
 func (x *AppTransactionEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[29]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3699,7 +3873,7 @@ func (x *AppTransactionEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppTransactionEntry.ProtoReflect.Descriptor instead.
 func (*AppTransactionEntry) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{29}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *AppTransactionEntry) GetApp() isAppTransactionEntry_App {
@@ -3753,7 +3927,7 @@ type ResourceDigestBinding struct {
 
 func (x *ResourceDigestBinding) Reset() {
 	*x = ResourceDigestBinding{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[30]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3765,7 +3939,7 @@ func (x *ResourceDigestBinding) String() string {
 func (*ResourceDigestBinding) ProtoMessage() {}
 
 func (x *ResourceDigestBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[30]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3778,7 +3952,7 @@ func (x *ResourceDigestBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceDigestBinding.ProtoReflect.Descriptor instead.
 func (*ResourceDigestBinding) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{30}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ResourceDigestBinding) GetRef() *ResourceRef {
@@ -3808,7 +3982,7 @@ type AppTransactionManifest struct {
 
 func (x *AppTransactionManifest) Reset() {
 	*x = AppTransactionManifest{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[31]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3820,7 +3994,7 @@ func (x *AppTransactionManifest) String() string {
 func (*AppTransactionManifest) ProtoMessage() {}
 
 func (x *AppTransactionManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[31]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3833,7 +4007,7 @@ func (x *AppTransactionManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppTransactionManifest.ProtoReflect.Descriptor instead.
 func (*AppTransactionManifest) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{31}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *AppTransactionManifest) GetEntries() []*AppTransactionEntry {
@@ -3888,7 +4062,7 @@ type DeploymentTransactionManifest struct {
 
 func (x *DeploymentTransactionManifest) Reset() {
 	*x = DeploymentTransactionManifest{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[32]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3900,7 +4074,7 @@ func (x *DeploymentTransactionManifest) String() string {
 func (*DeploymentTransactionManifest) ProtoMessage() {}
 
 func (x *DeploymentTransactionManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[32]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3913,7 +4087,7 @@ func (x *DeploymentTransactionManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeploymentTransactionManifest.ProtoReflect.Descriptor instead.
 func (*DeploymentTransactionManifest) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{32}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeploymentTransactionManifest) GetSource() *SourceSnapshot {
@@ -3991,7 +4165,7 @@ type ManagedFilePlan struct {
 
 func (x *ManagedFilePlan) Reset() {
 	*x = ManagedFilePlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4003,7 +4177,7 @@ func (x *ManagedFilePlan) String() string {
 func (*ManagedFilePlan) ProtoMessage() {}
 
 func (x *ManagedFilePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4016,7 +4190,7 @@ func (x *ManagedFilePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagedFilePlan.ProtoReflect.Descriptor instead.
 func (*ManagedFilePlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{33}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ManagedFilePlan) GetDesired() *ManagedFileDesired {
@@ -4059,7 +4233,7 @@ type SysctlPlan struct {
 
 func (x *SysctlPlan) Reset() {
 	*x = SysctlPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4071,7 +4245,7 @@ func (x *SysctlPlan) String() string {
 func (*SysctlPlan) ProtoMessage() {}
 
 func (x *SysctlPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4084,7 +4258,7 @@ func (x *SysctlPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SysctlPlan.ProtoReflect.Descriptor instead.
 func (*SysctlPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{34}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SysctlPlan) GetDesired() *SysctlDesired {
@@ -4129,7 +4303,7 @@ type SystemdDefinitionPlan struct {
 
 func (x *SystemdDefinitionPlan) Reset() {
 	*x = SystemdDefinitionPlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4141,7 +4315,7 @@ func (x *SystemdDefinitionPlan) String() string {
 func (*SystemdDefinitionPlan) ProtoMessage() {}
 
 func (x *SystemdDefinitionPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4154,7 +4328,7 @@ func (x *SystemdDefinitionPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemdDefinitionPlan.ProtoReflect.Descriptor instead.
 func (*SystemdDefinitionPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{35}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SystemdDefinitionPlan) GetDesired() *SystemdDefinitionDesired {
@@ -4211,7 +4385,7 @@ type EncryptionCompliancePlan struct {
 
 func (x *EncryptionCompliancePlan) Reset() {
 	*x = EncryptionCompliancePlan{}
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4223,7 +4397,7 @@ func (x *EncryptionCompliancePlan) String() string {
 func (*EncryptionCompliancePlan) ProtoMessage() {}
 
 func (x *EncryptionCompliancePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4236,7 +4410,7 @@ func (x *EncryptionCompliancePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncryptionCompliancePlan.ProtoReflect.Descriptor instead.
 func (*EncryptionCompliancePlan) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{36}
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *EncryptionCompliancePlan) GetDesired() *EncryptionComplianceDesired {
@@ -4433,7 +4607,18 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x1fpackage_transaction_entry.shape\x12Vinstall/upgrade entries bind exact bytes and versions; removal binds owned prior state\x1a\xda\x01this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))\x1a\x85\x01\n" +
 	"&package_transaction_entry.architecture\x12:transaction entries name the resolved package architecture\x1a\x1fthis.package.architecture != ''B\x10\n" +
 	"\x0e_signer_sha256B\x1b\n" +
-	"\x19_metadata_revision_sha256\"\xea\x06\n" +
+	"\x19_metadata_revision_sha256\"\xb7\x06\n" +
+	"\x18InstalledProvenanceProof\x12D\n" +
+	"\apackage\x18\x01 \x01(\v2\".lindm.resource.v1.PackageIdentityB\x06\xbaH\x03\xc8\x01\x01R\apackage\x12B\n" +
+	"\aversion\x18\x02 \x01(\v2 .lindm.resource.v1.NativeVersionB\x06\xbaH\x03\xc8\x01\x01R\aversion\x12>\n" +
+	"\x06source\x18\x03 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x06source\x12,\n" +
+	"\rsigner_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\fsignerSha256\x12A\n" +
+	"\x18metadata_revision_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x16metadataRevisionSha256\x12B\n" +
+	"\bartifact\x18\x06 \x01(\v2\x1e.lindm.resource.v1.ArtifactRefB\x06\xbaH\x03\xc8\x01\x01R\bartifact\x12P\n" +
+	"\x06method\x18\a \x01(\x0e2,.lindm.resource.v1.InstalledProvenanceMethodB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06method\x12=\n" +
+	"\x16native_identity_sha256\x18\b \x01(\fB\a\xbaH\x04z\x02h R\x14nativeIdentitySha256:\x8a\x02\xbaH\x86\x02\x1a\x83\x02\n" +
+	" installed_provenance_proof.shape\x12Qan installed-provenance proof names a concrete package of its approved repository\x1a\x8b\x01this.source.kind == 13 && this.package.architecture != '' && (this.method == 1 ? this.package.ecosystem == 1 : this.package.ecosystem == 2)\"\xca\a\n" +
 	"\x1aPackageTransactionManifest\x12O\n" +
 	"\aentries\x18\x01 \x03(\v2*.lindm.resource.v1.PackageTransactionEntryB\t\xbaH\x06\x92\x01\x03\x10\x80 R\aentries\x12A\n" +
 	"\x18native_database_revision\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x16nativeDatabaseRevision\x12C\n" +
@@ -4444,7 +4629,9 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x17affected_desired_sha256\x18\x06 \x03(\fB\x11\xbaH\x0e\x92\x01\v\b\x01\x10\x80\x02\"\x04z\x02h R\x15affectedDesiredSha256\x12U\n" +
 	"\x12native_transaction\x18\a \x01(\v2\x1e.lindm.resource.v1.ArtifactRefB\x06\xbaH\x03\xc8\x01\x01R\x11nativeTransaction\x12>\n" +
 	"\x14candidate_pin_sha256\x18\b \x01(\fB\a\xbaH\x04z\x02h H\x00R\x12candidatePinSha256\x88\x01\x01\x12B\n" +
-	"\foriginal_pin\x18\t \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\voriginalPin:\x99\x01\xbaH\x95\x01\x1a\x92\x01\n" +
+	"\foriginal_pin\x18\t \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\voriginalPin\x12^\n" +
+	"\x14installed_provenance\x18\n" +
+	" \x01(\v2+.lindm.resource.v1.InstalledProvenanceProofR\x13installedProvenance:\x99\x01\xbaH\x95\x01\x1a\x92\x01\n" +
 	"\x19package_manifest.bindings\x12.every affected resource binds a desired digest\x1aEthis.affected_resources.size() == this.affected_desired_sha256.size()B\x17\n" +
 	"\x15_candidate_pin_sha256\"\x9b\x04\n" +
 	"\x11NativePackagePlan\x12I\n" +
@@ -4693,7 +4880,11 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"%PACKAGE_TRANSACTION_OPERATION_INSTALL\x10\x01\x12)\n" +
 	"%PACKAGE_TRANSACTION_OPERATION_UPGRADE\x10\x02\x12.\n" +
 	"*PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED\x10\x03\x124\n" +
-	"0PACKAGE_TRANSACTION_OPERATION_APPROVED_DOWNGRADE\x10\x04*\xf6\x01\n" +
+	"0PACKAGE_TRANSACTION_OPERATION_APPROVED_DOWNGRADE\x10\x04*\xa2\x01\n" +
+	"\x19InstalledProvenanceMethod\x12+\n" +
+	"'INSTALLED_PROVENANCE_METHOD_UNSPECIFIED\x10\x00\x12,\n" +
+	"(INSTALLED_PROVENANCE_METHOD_DPKG_CONTROL\x10\x01\x12*\n" +
+	"&INSTALLED_PROVENANCE_METHOD_RPM_HEADER\x10\x02*\xf6\x01\n" +
 	"\x17AppTransactionOperation\x12)\n" +
 	"%APP_TRANSACTION_OPERATION_UNSPECIFIED\x10\x00\x12%\n" +
 	"!APP_TRANSACTION_OPERATION_INSTALL\x10\x01\x12$\n" +
@@ -4752,8 +4943,8 @@ func file_lindm_resource_v1_plans_proto_rawDescGZIP() []byte {
 	return file_lindm_resource_v1_plans_proto_rawDescData
 }
 
-var file_lindm_resource_v1_plans_proto_enumTypes = make([]protoimpl.EnumInfo, 17)
-var file_lindm_resource_v1_plans_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_lindm_resource_v1_plans_proto_enumTypes = make([]protoimpl.EnumInfo, 18)
+var file_lindm_resource_v1_plans_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_lindm_resource_v1_plans_proto_goTypes = []any{
 	(Reversibility)(0),                      // 0: lindm.resource.v1.Reversibility
 	(RollbackScope)(0),                      // 1: lindm.resource.v1.RollbackScope
@@ -4766,248 +4957,256 @@ var file_lindm_resource_v1_plans_proto_goTypes = []any{
 	(DNSField)(0),                           // 8: lindm.resource.v1.DNSField
 	(ProxyField)(0),                         // 9: lindm.resource.v1.ProxyField
 	(PackageTransactionOperation)(0),        // 10: lindm.resource.v1.PackageTransactionOperation
-	(AppTransactionOperation)(0),            // 11: lindm.resource.v1.AppTransactionOperation
-	(UpdateCheckpoint)(0),                   // 12: lindm.resource.v1.UpdateCheckpoint
-	(SessionField)(0),                       // 13: lindm.resource.v1.SessionField
-	(PasswordField)(0),                      // 14: lindm.resource.v1.PasswordField
-	(CredentialStep)(0),                     // 15: lindm.resource.v1.CredentialStep
-	(DirectoryStep)(0),                      // 16: lindm.resource.v1.DirectoryStep
-	(*PlanSafety)(nil),                      // 17: lindm.resource.v1.PlanSafety
-	(*CheckpointRef)(nil),                   // 18: lindm.resource.v1.CheckpointRef
-	(*OwnershipInverseBinding)(nil),         // 19: lindm.resource.v1.OwnershipInverseBinding
-	(*SystemdServicePlan)(nil),              // 20: lindm.resource.v1.SystemdServicePlan
-	(*MemberEdgeChange)(nil),                // 21: lindm.resource.v1.MemberEdgeChange
-	(*LocalGroupPlan)(nil),                  // 22: lindm.resource.v1.LocalGroupPlan
-	(*LocalUserPlan)(nil),                   // 23: lindm.resource.v1.LocalUserPlan
-	(*SudoRulePlan)(nil),                    // 24: lindm.resource.v1.SudoRulePlan
-	(*SSHServerPlan)(nil),                   // 25: lindm.resource.v1.SSHServerPlan
-	(*TimeSyncPlan)(nil),                    // 26: lindm.resource.v1.TimeSyncPlan
-	(*TrustCAPlan)(nil),                     // 27: lindm.resource.v1.TrustCAPlan
-	(*FirewallObjectDelta)(nil),             // 28: lindm.resource.v1.FirewallObjectDelta
-	(*FirewallZonePlan)(nil),                // 29: lindm.resource.v1.FirewallZonePlan
-	(*NetworkConnectionPlan)(nil),           // 30: lindm.resource.v1.NetworkConnectionPlan
-	(*DNSPlan)(nil),                         // 31: lindm.resource.v1.DNSPlan
-	(*ProxyPlan)(nil),                       // 32: lindm.resource.v1.ProxyPlan
-	(*PackageTransactionEntry)(nil),         // 33: lindm.resource.v1.PackageTransactionEntry
-	(*PackageTransactionManifest)(nil),      // 34: lindm.resource.v1.PackageTransactionManifest
-	(*NativePackagePlan)(nil),               // 35: lindm.resource.v1.NativePackagePlan
-	(*RepositoryPlan)(nil),                  // 36: lindm.resource.v1.RepositoryPlan
-	(*FlatpakAppPlan)(nil),                  // 37: lindm.resource.v1.FlatpakAppPlan
-	(*OSUpdatePlan)(nil),                    // 38: lindm.resource.v1.OSUpdatePlan
-	(*SessionPolicyPlan)(nil),               // 39: lindm.resource.v1.SessionPolicyPlan
-	(*PasswordPolicyPlan)(nil),              // 40: lindm.resource.v1.PasswordPolicyPlan
-	(*SnapAppPlan)(nil),                     // 41: lindm.resource.v1.SnapAppPlan
-	(*CertificateEnrollmentPlan)(nil),       // 42: lindm.resource.v1.CertificateEnrollmentPlan
-	(*DirectoryClientPlan)(nil),             // 43: lindm.resource.v1.DirectoryClientPlan
-	(*FlatpakTransactionEntry)(nil),         // 44: lindm.resource.v1.FlatpakTransactionEntry
-	(*SnapTransactionEntry)(nil),            // 45: lindm.resource.v1.SnapTransactionEntry
-	(*AppTransactionEntry)(nil),             // 46: lindm.resource.v1.AppTransactionEntry
-	(*ResourceDigestBinding)(nil),           // 47: lindm.resource.v1.ResourceDigestBinding
-	(*AppTransactionManifest)(nil),          // 48: lindm.resource.v1.AppTransactionManifest
-	(*DeploymentTransactionManifest)(nil),   // 49: lindm.resource.v1.DeploymentTransactionManifest
-	(*ManagedFilePlan)(nil),                 // 50: lindm.resource.v1.ManagedFilePlan
-	(*SysctlPlan)(nil),                      // 51: lindm.resource.v1.SysctlPlan
-	(*SystemdDefinitionPlan)(nil),           // 52: lindm.resource.v1.SystemdDefinitionPlan
-	(*EncryptionCompliancePlan)(nil),        // 53: lindm.resource.v1.EncryptionCompliancePlan
-	(ClaimDomain)(0),                        // 54: lindm.resource.v1.ClaimDomain
-	(*ArtifactRef)(nil),                     // 55: lindm.resource.v1.ArtifactRef
-	(*timestamppb.Timestamp)(nil),           // 56: google.protobuf.Timestamp
-	(*SystemdServiceDesired)(nil),           // 57: lindm.resource.v1.SystemdServiceDesired
-	(*SystemdServiceObservation)(nil),       // 58: lindm.resource.v1.SystemdServiceObservation
-	(*InstallLink)(nil),                     // 59: lindm.resource.v1.InstallLink
-	(*ResourceRef)(nil),                     // 60: lindm.resource.v1.ResourceRef
-	(*LocalGroupDesired)(nil),               // 61: lindm.resource.v1.LocalGroupDesired
-	(*LocalUserDesired)(nil),                // 62: lindm.resource.v1.LocalUserDesired
-	(*SudoRuleDesired)(nil),                 // 63: lindm.resource.v1.SudoRuleDesired
-	(*ProbeReceipt)(nil),                    // 64: lindm.resource.v1.ProbeReceipt
-	(*SSHServerDesired)(nil),                // 65: lindm.resource.v1.SSHServerDesired
-	(*TimeSyncDesired)(nil),                 // 66: lindm.resource.v1.TimeSyncDesired
-	(*TrustCADesired)(nil),                  // 67: lindm.resource.v1.TrustCADesired
-	(*FirewallRule)(nil),                    // 68: lindm.resource.v1.FirewallRule
-	(*FirewallZoneDesired)(nil),             // 69: lindm.resource.v1.FirewallZoneDesired
-	(*FirewallZoneObservation)(nil),         // 70: lindm.resource.v1.FirewallZoneObservation
-	(*NetworkConnectionDesired)(nil),        // 71: lindm.resource.v1.NetworkConnectionDesired
-	(ConnectionMedium)(0),                   // 72: lindm.resource.v1.ConnectionMedium
-	(*DNSDesired)(nil),                      // 73: lindm.resource.v1.DNSDesired
-	(*ProxyDesired)(nil),                    // 74: lindm.resource.v1.ProxyDesired
-	(*PackageIdentity)(nil),                 // 75: lindm.resource.v1.PackageIdentity
-	(*NativeVersion)(nil),                   // 76: lindm.resource.v1.NativeVersion
-	(*SourceSnapshot)(nil),                  // 77: lindm.resource.v1.SourceSnapshot
-	(*FileIdentity)(nil),                    // 78: lindm.resource.v1.FileIdentity
-	(*NativePackageDesired)(nil),            // 79: lindm.resource.v1.NativePackageDesired
-	(*RepositoryDesired)(nil),               // 80: lindm.resource.v1.RepositoryDesired
-	(*FlatpakAppDesired)(nil),               // 81: lindm.resource.v1.FlatpakAppDesired
-	(*FlatpakPermissionPolicy)(nil),         // 82: lindm.resource.v1.FlatpakPermissionPolicy
-	(*OSUpdateDesired)(nil),                 // 83: lindm.resource.v1.OSUpdateDesired
-	(OSUpdateBackend)(0),                    // 84: lindm.resource.v1.OSUpdateBackend
-	(OSUpdateNativeFile)(0),                 // 85: lindm.resource.v1.OSUpdateNativeFile
-	(*SessionPolicyDesired)(nil),            // 86: lindm.resource.v1.SessionPolicyDesired
-	(*PasswordPolicyDesired)(nil),           // 87: lindm.resource.v1.PasswordPolicyDesired
-	(*SnapAppDesired)(nil),                  // 88: lindm.resource.v1.SnapAppDesired
-	(*SnapInterfaceGrant)(nil),              // 89: lindm.resource.v1.SnapInterfaceGrant
-	(*CertificateEnrollmentDesired)(nil),    // 90: lindm.resource.v1.CertificateEnrollmentDesired
-	(*DirectoryClientDesired)(nil),          // 91: lindm.resource.v1.DirectoryClientDesired
-	(*InstallationBinding)(nil),             // 92: lindm.resource.v1.InstallationBinding
-	(SnapConfinement)(0),                    // 93: lindm.resource.v1.SnapConfinement
-	(*DeploymentIdentity)(nil),              // 94: lindm.resource.v1.DeploymentIdentity
-	(*ManagedFileDesired)(nil),              // 95: lindm.resource.v1.ManagedFileDesired
-	(*ManagedFileObservation)(nil),          // 96: lindm.resource.v1.ManagedFileObservation
-	(*SysctlDesired)(nil),                   // 97: lindm.resource.v1.SysctlDesired
-	(*SysctlObservation)(nil),               // 98: lindm.resource.v1.SysctlObservation
-	(*SystemdDefinitionDesired)(nil),        // 99: lindm.resource.v1.SystemdDefinitionDesired
-	(*SystemdDefinitionObservation)(nil),    // 100: lindm.resource.v1.SystemdDefinitionObservation
-	(*EncryptionComplianceDesired)(nil),     // 101: lindm.resource.v1.EncryptionComplianceDesired
-	(*EncryptionComplianceObservation)(nil), // 102: lindm.resource.v1.EncryptionComplianceObservation
+	(InstalledProvenanceMethod)(0),          // 11: lindm.resource.v1.InstalledProvenanceMethod
+	(AppTransactionOperation)(0),            // 12: lindm.resource.v1.AppTransactionOperation
+	(UpdateCheckpoint)(0),                   // 13: lindm.resource.v1.UpdateCheckpoint
+	(SessionField)(0),                       // 14: lindm.resource.v1.SessionField
+	(PasswordField)(0),                      // 15: lindm.resource.v1.PasswordField
+	(CredentialStep)(0),                     // 16: lindm.resource.v1.CredentialStep
+	(DirectoryStep)(0),                      // 17: lindm.resource.v1.DirectoryStep
+	(*PlanSafety)(nil),                      // 18: lindm.resource.v1.PlanSafety
+	(*CheckpointRef)(nil),                   // 19: lindm.resource.v1.CheckpointRef
+	(*OwnershipInverseBinding)(nil),         // 20: lindm.resource.v1.OwnershipInverseBinding
+	(*SystemdServicePlan)(nil),              // 21: lindm.resource.v1.SystemdServicePlan
+	(*MemberEdgeChange)(nil),                // 22: lindm.resource.v1.MemberEdgeChange
+	(*LocalGroupPlan)(nil),                  // 23: lindm.resource.v1.LocalGroupPlan
+	(*LocalUserPlan)(nil),                   // 24: lindm.resource.v1.LocalUserPlan
+	(*SudoRulePlan)(nil),                    // 25: lindm.resource.v1.SudoRulePlan
+	(*SSHServerPlan)(nil),                   // 26: lindm.resource.v1.SSHServerPlan
+	(*TimeSyncPlan)(nil),                    // 27: lindm.resource.v1.TimeSyncPlan
+	(*TrustCAPlan)(nil),                     // 28: lindm.resource.v1.TrustCAPlan
+	(*FirewallObjectDelta)(nil),             // 29: lindm.resource.v1.FirewallObjectDelta
+	(*FirewallZonePlan)(nil),                // 30: lindm.resource.v1.FirewallZonePlan
+	(*NetworkConnectionPlan)(nil),           // 31: lindm.resource.v1.NetworkConnectionPlan
+	(*DNSPlan)(nil),                         // 32: lindm.resource.v1.DNSPlan
+	(*ProxyPlan)(nil),                       // 33: lindm.resource.v1.ProxyPlan
+	(*PackageTransactionEntry)(nil),         // 34: lindm.resource.v1.PackageTransactionEntry
+	(*InstalledProvenanceProof)(nil),        // 35: lindm.resource.v1.InstalledProvenanceProof
+	(*PackageTransactionManifest)(nil),      // 36: lindm.resource.v1.PackageTransactionManifest
+	(*NativePackagePlan)(nil),               // 37: lindm.resource.v1.NativePackagePlan
+	(*RepositoryPlan)(nil),                  // 38: lindm.resource.v1.RepositoryPlan
+	(*FlatpakAppPlan)(nil),                  // 39: lindm.resource.v1.FlatpakAppPlan
+	(*OSUpdatePlan)(nil),                    // 40: lindm.resource.v1.OSUpdatePlan
+	(*SessionPolicyPlan)(nil),               // 41: lindm.resource.v1.SessionPolicyPlan
+	(*PasswordPolicyPlan)(nil),              // 42: lindm.resource.v1.PasswordPolicyPlan
+	(*SnapAppPlan)(nil),                     // 43: lindm.resource.v1.SnapAppPlan
+	(*CertificateEnrollmentPlan)(nil),       // 44: lindm.resource.v1.CertificateEnrollmentPlan
+	(*DirectoryClientPlan)(nil),             // 45: lindm.resource.v1.DirectoryClientPlan
+	(*FlatpakTransactionEntry)(nil),         // 46: lindm.resource.v1.FlatpakTransactionEntry
+	(*SnapTransactionEntry)(nil),            // 47: lindm.resource.v1.SnapTransactionEntry
+	(*AppTransactionEntry)(nil),             // 48: lindm.resource.v1.AppTransactionEntry
+	(*ResourceDigestBinding)(nil),           // 49: lindm.resource.v1.ResourceDigestBinding
+	(*AppTransactionManifest)(nil),          // 50: lindm.resource.v1.AppTransactionManifest
+	(*DeploymentTransactionManifest)(nil),   // 51: lindm.resource.v1.DeploymentTransactionManifest
+	(*ManagedFilePlan)(nil),                 // 52: lindm.resource.v1.ManagedFilePlan
+	(*SysctlPlan)(nil),                      // 53: lindm.resource.v1.SysctlPlan
+	(*SystemdDefinitionPlan)(nil),           // 54: lindm.resource.v1.SystemdDefinitionPlan
+	(*EncryptionCompliancePlan)(nil),        // 55: lindm.resource.v1.EncryptionCompliancePlan
+	(ClaimDomain)(0),                        // 56: lindm.resource.v1.ClaimDomain
+	(*ArtifactRef)(nil),                     // 57: lindm.resource.v1.ArtifactRef
+	(*timestamppb.Timestamp)(nil),           // 58: google.protobuf.Timestamp
+	(*SystemdServiceDesired)(nil),           // 59: lindm.resource.v1.SystemdServiceDesired
+	(*SystemdServiceObservation)(nil),       // 60: lindm.resource.v1.SystemdServiceObservation
+	(*InstallLink)(nil),                     // 61: lindm.resource.v1.InstallLink
+	(*ResourceRef)(nil),                     // 62: lindm.resource.v1.ResourceRef
+	(*LocalGroupDesired)(nil),               // 63: lindm.resource.v1.LocalGroupDesired
+	(*LocalUserDesired)(nil),                // 64: lindm.resource.v1.LocalUserDesired
+	(*SudoRuleDesired)(nil),                 // 65: lindm.resource.v1.SudoRuleDesired
+	(*ProbeReceipt)(nil),                    // 66: lindm.resource.v1.ProbeReceipt
+	(*SSHServerDesired)(nil),                // 67: lindm.resource.v1.SSHServerDesired
+	(*TimeSyncDesired)(nil),                 // 68: lindm.resource.v1.TimeSyncDesired
+	(*TrustCADesired)(nil),                  // 69: lindm.resource.v1.TrustCADesired
+	(*FirewallRule)(nil),                    // 70: lindm.resource.v1.FirewallRule
+	(*FirewallZoneDesired)(nil),             // 71: lindm.resource.v1.FirewallZoneDesired
+	(*FirewallZoneObservation)(nil),         // 72: lindm.resource.v1.FirewallZoneObservation
+	(*NetworkConnectionDesired)(nil),        // 73: lindm.resource.v1.NetworkConnectionDesired
+	(ConnectionMedium)(0),                   // 74: lindm.resource.v1.ConnectionMedium
+	(*DNSDesired)(nil),                      // 75: lindm.resource.v1.DNSDesired
+	(*ProxyDesired)(nil),                    // 76: lindm.resource.v1.ProxyDesired
+	(*PackageIdentity)(nil),                 // 77: lindm.resource.v1.PackageIdentity
+	(*NativeVersion)(nil),                   // 78: lindm.resource.v1.NativeVersion
+	(*SourceSnapshot)(nil),                  // 79: lindm.resource.v1.SourceSnapshot
+	(*FileIdentity)(nil),                    // 80: lindm.resource.v1.FileIdentity
+	(*NativePackageDesired)(nil),            // 81: lindm.resource.v1.NativePackageDesired
+	(*RepositoryDesired)(nil),               // 82: lindm.resource.v1.RepositoryDesired
+	(*FlatpakAppDesired)(nil),               // 83: lindm.resource.v1.FlatpakAppDesired
+	(*FlatpakPermissionPolicy)(nil),         // 84: lindm.resource.v1.FlatpakPermissionPolicy
+	(*OSUpdateDesired)(nil),                 // 85: lindm.resource.v1.OSUpdateDesired
+	(OSUpdateBackend)(0),                    // 86: lindm.resource.v1.OSUpdateBackend
+	(OSUpdateNativeFile)(0),                 // 87: lindm.resource.v1.OSUpdateNativeFile
+	(*SessionPolicyDesired)(nil),            // 88: lindm.resource.v1.SessionPolicyDesired
+	(*PasswordPolicyDesired)(nil),           // 89: lindm.resource.v1.PasswordPolicyDesired
+	(*SnapAppDesired)(nil),                  // 90: lindm.resource.v1.SnapAppDesired
+	(*SnapInterfaceGrant)(nil),              // 91: lindm.resource.v1.SnapInterfaceGrant
+	(*CertificateEnrollmentDesired)(nil),    // 92: lindm.resource.v1.CertificateEnrollmentDesired
+	(*DirectoryClientDesired)(nil),          // 93: lindm.resource.v1.DirectoryClientDesired
+	(*InstallationBinding)(nil),             // 94: lindm.resource.v1.InstallationBinding
+	(SnapConfinement)(0),                    // 95: lindm.resource.v1.SnapConfinement
+	(*DeploymentIdentity)(nil),              // 96: lindm.resource.v1.DeploymentIdentity
+	(*ManagedFileDesired)(nil),              // 97: lindm.resource.v1.ManagedFileDesired
+	(*ManagedFileObservation)(nil),          // 98: lindm.resource.v1.ManagedFileObservation
+	(*SysctlDesired)(nil),                   // 99: lindm.resource.v1.SysctlDesired
+	(*SysctlObservation)(nil),               // 100: lindm.resource.v1.SysctlObservation
+	(*SystemdDefinitionDesired)(nil),        // 101: lindm.resource.v1.SystemdDefinitionDesired
+	(*SystemdDefinitionObservation)(nil),    // 102: lindm.resource.v1.SystemdDefinitionObservation
+	(*EncryptionComplianceDesired)(nil),     // 103: lindm.resource.v1.EncryptionComplianceDesired
+	(*EncryptionComplianceObservation)(nil), // 104: lindm.resource.v1.EncryptionComplianceObservation
 }
 var file_lindm_resource_v1_plans_proto_depIdxs = []int32{
-	54,  // 0: lindm.resource.v1.PlanSafety.lock_domains:type_name -> lindm.resource.v1.ClaimDomain
+	56,  // 0: lindm.resource.v1.PlanSafety.lock_domains:type_name -> lindm.resource.v1.ClaimDomain
 	0,   // 1: lindm.resource.v1.PlanSafety.reversibility:type_name -> lindm.resource.v1.Reversibility
 	1,   // 2: lindm.resource.v1.PlanSafety.rollback_scope:type_name -> lindm.resource.v1.RollbackScope
 	2,   // 3: lindm.resource.v1.PlanSafety.confirmation:type_name -> lindm.resource.v1.ConfirmationPolicy
-	55,  // 4: lindm.resource.v1.PlanSafety.prerequisite_manifests:type_name -> lindm.resource.v1.ArtifactRef
-	56,  // 5: lindm.resource.v1.CheckpointRef.rollback_deadline:type_name -> google.protobuf.Timestamp
-	57,  // 6: lindm.resource.v1.SystemdServicePlan.desired:type_name -> lindm.resource.v1.SystemdServiceDesired
-	58,  // 7: lindm.resource.v1.SystemdServicePlan.before:type_name -> lindm.resource.v1.SystemdServiceObservation
-	59,  // 8: lindm.resource.v1.SystemdServicePlan.install_projection:type_name -> lindm.resource.v1.InstallLink
-	60,  // 9: lindm.resource.v1.SystemdServicePlan.related_units:type_name -> lindm.resource.v1.ResourceRef
-	19,  // 10: lindm.resource.v1.SystemdServicePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	61,  // 11: lindm.resource.v1.LocalGroupPlan.desired:type_name -> lindm.resource.v1.LocalGroupDesired
+	57,  // 4: lindm.resource.v1.PlanSafety.prerequisite_manifests:type_name -> lindm.resource.v1.ArtifactRef
+	58,  // 5: lindm.resource.v1.CheckpointRef.rollback_deadline:type_name -> google.protobuf.Timestamp
+	59,  // 6: lindm.resource.v1.SystemdServicePlan.desired:type_name -> lindm.resource.v1.SystemdServiceDesired
+	60,  // 7: lindm.resource.v1.SystemdServicePlan.before:type_name -> lindm.resource.v1.SystemdServiceObservation
+	61,  // 8: lindm.resource.v1.SystemdServicePlan.install_projection:type_name -> lindm.resource.v1.InstallLink
+	62,  // 9: lindm.resource.v1.SystemdServicePlan.related_units:type_name -> lindm.resource.v1.ResourceRef
+	20,  // 10: lindm.resource.v1.SystemdServicePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	63,  // 11: lindm.resource.v1.LocalGroupPlan.desired:type_name -> lindm.resource.v1.LocalGroupDesired
 	3,   // 12: lindm.resource.v1.LocalGroupPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	21,  // 13: lindm.resource.v1.LocalGroupPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
-	19,  // 14: lindm.resource.v1.LocalGroupPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	62,  // 15: lindm.resource.v1.LocalUserPlan.desired:type_name -> lindm.resource.v1.LocalUserDesired
+	22,  // 13: lindm.resource.v1.LocalGroupPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
+	20,  // 14: lindm.resource.v1.LocalGroupPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	64,  // 15: lindm.resource.v1.LocalUserPlan.desired:type_name -> lindm.resource.v1.LocalUserDesired
 	3,   // 16: lindm.resource.v1.LocalUserPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
 	4,   // 17: lindm.resource.v1.LocalUserPlan.fields:type_name -> lindm.resource.v1.UserField
-	21,  // 18: lindm.resource.v1.LocalUserPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
-	19,  // 19: lindm.resource.v1.LocalUserPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	63,  // 20: lindm.resource.v1.SudoRulePlan.desired:type_name -> lindm.resource.v1.SudoRuleDesired
+	22,  // 18: lindm.resource.v1.LocalUserPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
+	20,  // 19: lindm.resource.v1.LocalUserPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	65,  // 20: lindm.resource.v1.SudoRulePlan.desired:type_name -> lindm.resource.v1.SudoRuleDesired
 	3,   // 21: lindm.resource.v1.SudoRulePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	64,  // 22: lindm.resource.v1.SudoRulePlan.aggregate_validation:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 23: lindm.resource.v1.SudoRulePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	65,  // 24: lindm.resource.v1.SSHServerPlan.desired:type_name -> lindm.resource.v1.SSHServerDesired
+	66,  // 22: lindm.resource.v1.SudoRulePlan.aggregate_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	20,  // 23: lindm.resource.v1.SudoRulePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	67,  // 24: lindm.resource.v1.SSHServerPlan.desired:type_name -> lindm.resource.v1.SSHServerDesired
 	5,   // 25: lindm.resource.v1.SSHServerPlan.changed_directives:type_name -> lindm.resource.v1.SSHDirective
 	6,   // 26: lindm.resource.v1.SSHServerPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	64,  // 27: lindm.resource.v1.SSHServerPlan.syntax_validation:type_name -> lindm.resource.v1.ProbeReceipt
-	18,  // 28: lindm.resource.v1.SSHServerPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 29: lindm.resource.v1.SSHServerPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	66,  // 30: lindm.resource.v1.TimeSyncPlan.desired:type_name -> lindm.resource.v1.TimeSyncDesired
-	60,  // 31: lindm.resource.v1.TimeSyncPlan.daemon:type_name -> lindm.resource.v1.ResourceRef
-	19,  // 32: lindm.resource.v1.TimeSyncPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	67,  // 33: lindm.resource.v1.TrustCAPlan.desired:type_name -> lindm.resource.v1.TrustCADesired
+	66,  // 27: lindm.resource.v1.SSHServerPlan.syntax_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	19,  // 28: lindm.resource.v1.SSHServerPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	20,  // 29: lindm.resource.v1.SSHServerPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	68,  // 30: lindm.resource.v1.TimeSyncPlan.desired:type_name -> lindm.resource.v1.TimeSyncDesired
+	62,  // 31: lindm.resource.v1.TimeSyncPlan.daemon:type_name -> lindm.resource.v1.ResourceRef
+	20,  // 32: lindm.resource.v1.TimeSyncPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	69,  // 33: lindm.resource.v1.TrustCAPlan.desired:type_name -> lindm.resource.v1.TrustCADesired
 	3,   // 34: lindm.resource.v1.TrustCAPlan.anchor_change:type_name -> lindm.resource.v1.NativeObjectChange
-	19,  // 35: lindm.resource.v1.TrustCAPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	20,  // 35: lindm.resource.v1.TrustCAPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
 	3,   // 36: lindm.resource.v1.FirewallObjectDelta.change:type_name -> lindm.resource.v1.NativeObjectChange
-	68,  // 37: lindm.resource.v1.FirewallObjectDelta.rule:type_name -> lindm.resource.v1.FirewallRule
-	69,  // 38: lindm.resource.v1.FirewallZonePlan.desired:type_name -> lindm.resource.v1.FirewallZoneDesired
-	28,  // 39: lindm.resource.v1.FirewallZonePlan.objects:type_name -> lindm.resource.v1.FirewallObjectDelta
-	18,  // 40: lindm.resource.v1.FirewallZonePlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 41: lindm.resource.v1.FirewallZonePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	70,  // 42: lindm.resource.v1.FirewallZonePlan.before:type_name -> lindm.resource.v1.FirewallZoneObservation
+	70,  // 37: lindm.resource.v1.FirewallObjectDelta.rule:type_name -> lindm.resource.v1.FirewallRule
+	71,  // 38: lindm.resource.v1.FirewallZonePlan.desired:type_name -> lindm.resource.v1.FirewallZoneDesired
+	29,  // 39: lindm.resource.v1.FirewallZonePlan.objects:type_name -> lindm.resource.v1.FirewallObjectDelta
+	19,  // 40: lindm.resource.v1.FirewallZonePlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	20,  // 41: lindm.resource.v1.FirewallZonePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	72,  // 42: lindm.resource.v1.FirewallZonePlan.before:type_name -> lindm.resource.v1.FirewallZoneObservation
 	3,   // 43: lindm.resource.v1.FirewallZonePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	71,  // 44: lindm.resource.v1.NetworkConnectionPlan.desired:type_name -> lindm.resource.v1.NetworkConnectionDesired
+	73,  // 44: lindm.resource.v1.NetworkConnectionPlan.desired:type_name -> lindm.resource.v1.NetworkConnectionDesired
 	7,   // 45: lindm.resource.v1.NetworkConnectionPlan.steps:type_name -> lindm.resource.v1.ConnectionStep
-	72,  // 46: lindm.resource.v1.NetworkConnectionPlan.plugin:type_name -> lindm.resource.v1.ConnectionMedium
-	18,  // 47: lindm.resource.v1.NetworkConnectionPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	64,  // 48: lindm.resource.v1.NetworkConnectionPlan.rollback_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 49: lindm.resource.v1.NetworkConnectionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	73,  // 50: lindm.resource.v1.DNSPlan.desired:type_name -> lindm.resource.v1.DNSDesired
+	74,  // 46: lindm.resource.v1.NetworkConnectionPlan.plugin:type_name -> lindm.resource.v1.ConnectionMedium
+	19,  // 47: lindm.resource.v1.NetworkConnectionPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	66,  // 48: lindm.resource.v1.NetworkConnectionPlan.rollback_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	20,  // 49: lindm.resource.v1.NetworkConnectionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	75,  // 50: lindm.resource.v1.DNSPlan.desired:type_name -> lindm.resource.v1.DNSDesired
 	8,   // 51: lindm.resource.v1.DNSPlan.fields:type_name -> lindm.resource.v1.DNSField
 	6,   // 52: lindm.resource.v1.DNSPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	18,  // 53: lindm.resource.v1.DNSPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 54: lindm.resource.v1.DNSPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	74,  // 55: lindm.resource.v1.ProxyPlan.desired:type_name -> lindm.resource.v1.ProxyDesired
+	19,  // 53: lindm.resource.v1.DNSPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	20,  // 54: lindm.resource.v1.DNSPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	76,  // 55: lindm.resource.v1.ProxyPlan.desired:type_name -> lindm.resource.v1.ProxyDesired
 	9,   // 56: lindm.resource.v1.ProxyPlan.fields:type_name -> lindm.resource.v1.ProxyField
 	6,   // 57: lindm.resource.v1.ProxyPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	18,  // 58: lindm.resource.v1.ProxyPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 59: lindm.resource.v1.ProxyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	75,  // 60: lindm.resource.v1.PackageTransactionEntry.package:type_name -> lindm.resource.v1.PackageIdentity
+	19,  // 58: lindm.resource.v1.ProxyPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	20,  // 59: lindm.resource.v1.ProxyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	77,  // 60: lindm.resource.v1.PackageTransactionEntry.package:type_name -> lindm.resource.v1.PackageIdentity
 	10,  // 61: lindm.resource.v1.PackageTransactionEntry.operation:type_name -> lindm.resource.v1.PackageTransactionOperation
-	76,  // 62: lindm.resource.v1.PackageTransactionEntry.before:type_name -> lindm.resource.v1.NativeVersion
-	76,  // 63: lindm.resource.v1.PackageTransactionEntry.after:type_name -> lindm.resource.v1.NativeVersion
-	55,  // 64: lindm.resource.v1.PackageTransactionEntry.artifact:type_name -> lindm.resource.v1.ArtifactRef
-	60,  // 65: lindm.resource.v1.PackageTransactionEntry.source:type_name -> lindm.resource.v1.ResourceRef
-	33,  // 66: lindm.resource.v1.PackageTransactionManifest.entries:type_name -> lindm.resource.v1.PackageTransactionEntry
-	77,  // 67: lindm.resource.v1.PackageTransactionManifest.sources:type_name -> lindm.resource.v1.SourceSnapshot
-	60,  // 68: lindm.resource.v1.PackageTransactionManifest.affected_resources:type_name -> lindm.resource.v1.ResourceRef
-	55,  // 69: lindm.resource.v1.PackageTransactionManifest.native_transaction:type_name -> lindm.resource.v1.ArtifactRef
-	78,  // 70: lindm.resource.v1.PackageTransactionManifest.original_pin:type_name -> lindm.resource.v1.FileIdentity
-	79,  // 71: lindm.resource.v1.NativePackagePlan.desired:type_name -> lindm.resource.v1.NativePackageDesired
-	55,  // 72: lindm.resource.v1.NativePackagePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	19,  // 73: lindm.resource.v1.NativePackagePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	80,  // 74: lindm.resource.v1.RepositoryPlan.desired:type_name -> lindm.resource.v1.RepositoryDesired
-	3,   // 75: lindm.resource.v1.RepositoryPlan.stanza_change:type_name -> lindm.resource.v1.NativeObjectChange
-	55,  // 76: lindm.resource.v1.RepositoryPlan.key_artifacts:type_name -> lindm.resource.v1.ArtifactRef
-	78,  // 77: lindm.resource.v1.RepositoryPlan.owned_objects:type_name -> lindm.resource.v1.FileIdentity
-	64,  // 78: lindm.resource.v1.RepositoryPlan.signature_validation:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 79: lindm.resource.v1.RepositoryPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	81,  // 80: lindm.resource.v1.FlatpakAppPlan.desired:type_name -> lindm.resource.v1.FlatpakAppDesired
-	11,  // 81: lindm.resource.v1.FlatpakAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
-	55,  // 82: lindm.resource.v1.FlatpakAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	82,  // 83: lindm.resource.v1.FlatpakAppPlan.permission_delta:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
-	19,  // 84: lindm.resource.v1.FlatpakAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	19,  // 85: lindm.resource.v1.OSUpdatePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	83,  // 86: lindm.resource.v1.OSUpdatePlan.desired:type_name -> lindm.resource.v1.OSUpdateDesired
-	84,  // 87: lindm.resource.v1.OSUpdatePlan.backend:type_name -> lindm.resource.v1.OSUpdateBackend
-	85,  // 88: lindm.resource.v1.OSUpdatePlan.changed_files:type_name -> lindm.resource.v1.OSUpdateNativeFile
-	86,  // 89: lindm.resource.v1.SessionPolicyPlan.desired:type_name -> lindm.resource.v1.SessionPolicyDesired
-	13,  // 90: lindm.resource.v1.SessionPolicyPlan.fields:type_name -> lindm.resource.v1.SessionField
-	78,  // 91: lindm.resource.v1.SessionPolicyPlan.owned_settings:type_name -> lindm.resource.v1.FileIdentity
-	19,  // 92: lindm.resource.v1.SessionPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	87,  // 93: lindm.resource.v1.PasswordPolicyPlan.desired:type_name -> lindm.resource.v1.PasswordPolicyDesired
-	14,  // 94: lindm.resource.v1.PasswordPolicyPlan.fields:type_name -> lindm.resource.v1.PasswordField
-	78,  // 95: lindm.resource.v1.PasswordPolicyPlan.owned_profile_objects:type_name -> lindm.resource.v1.FileIdentity
-	19,  // 96: lindm.resource.v1.PasswordPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	88,  // 97: lindm.resource.v1.SnapAppPlan.desired:type_name -> lindm.resource.v1.SnapAppDesired
-	11,  // 98: lindm.resource.v1.SnapAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
-	55,  // 99: lindm.resource.v1.SnapAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	89,  // 100: lindm.resource.v1.SnapAppPlan.interface_delta:type_name -> lindm.resource.v1.SnapInterfaceGrant
-	19,  // 101: lindm.resource.v1.SnapAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	90,  // 102: lindm.resource.v1.CertificateEnrollmentPlan.desired:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
-	15,  // 103: lindm.resource.v1.CertificateEnrollmentPlan.steps:type_name -> lindm.resource.v1.CredentialStep
-	19,  // 104: lindm.resource.v1.CertificateEnrollmentPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	91,  // 105: lindm.resource.v1.DirectoryClientPlan.desired:type_name -> lindm.resource.v1.DirectoryClientDesired
-	16,  // 106: lindm.resource.v1.DirectoryClientPlan.steps:type_name -> lindm.resource.v1.DirectoryStep
-	64,  // 107: lindm.resource.v1.DirectoryClientPlan.remote_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 108: lindm.resource.v1.DirectoryClientPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	92,  // 109: lindm.resource.v1.FlatpakTransactionEntry.installation:type_name -> lindm.resource.v1.InstallationBinding
-	11,  // 110: lindm.resource.v1.FlatpakTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
-	60,  // 111: lindm.resource.v1.FlatpakTransactionEntry.remote:type_name -> lindm.resource.v1.ResourceRef
-	55,  // 112: lindm.resource.v1.FlatpakTransactionEntry.objects:type_name -> lindm.resource.v1.ArtifactRef
-	11,  // 113: lindm.resource.v1.SnapTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
-	93,  // 114: lindm.resource.v1.SnapTransactionEntry.confinement:type_name -> lindm.resource.v1.SnapConfinement
-	55,  // 115: lindm.resource.v1.SnapTransactionEntry.snap:type_name -> lindm.resource.v1.ArtifactRef
-	55,  // 116: lindm.resource.v1.SnapTransactionEntry.assertion_chain:type_name -> lindm.resource.v1.ArtifactRef
-	44,  // 117: lindm.resource.v1.AppTransactionEntry.flatpak:type_name -> lindm.resource.v1.FlatpakTransactionEntry
-	45,  // 118: lindm.resource.v1.AppTransactionEntry.snap:type_name -> lindm.resource.v1.SnapTransactionEntry
-	60,  // 119: lindm.resource.v1.ResourceDigestBinding.ref:type_name -> lindm.resource.v1.ResourceRef
-	46,  // 120: lindm.resource.v1.AppTransactionManifest.entries:type_name -> lindm.resource.v1.AppTransactionEntry
-	47,  // 121: lindm.resource.v1.AppTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
-	77,  // 122: lindm.resource.v1.DeploymentTransactionManifest.source:type_name -> lindm.resource.v1.SourceSnapshot
-	94,  // 123: lindm.resource.v1.DeploymentTransactionManifest.before:type_name -> lindm.resource.v1.DeploymentIdentity
-	94,  // 124: lindm.resource.v1.DeploymentTransactionManifest.target:type_name -> lindm.resource.v1.DeploymentIdentity
-	55,  // 125: lindm.resource.v1.DeploymentTransactionManifest.content_objects:type_name -> lindm.resource.v1.ArtifactRef
-	47,  // 126: lindm.resource.v1.DeploymentTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
-	12,  // 127: lindm.resource.v1.DeploymentTransactionManifest.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
-	95,  // 128: lindm.resource.v1.ManagedFilePlan.desired:type_name -> lindm.resource.v1.ManagedFileDesired
-	96,  // 129: lindm.resource.v1.ManagedFilePlan.before:type_name -> lindm.resource.v1.ManagedFileObservation
-	3,   // 130: lindm.resource.v1.ManagedFilePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	19,  // 131: lindm.resource.v1.ManagedFilePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	97,  // 132: lindm.resource.v1.SysctlPlan.desired:type_name -> lindm.resource.v1.SysctlDesired
-	98,  // 133: lindm.resource.v1.SysctlPlan.before:type_name -> lindm.resource.v1.SysctlObservation
-	3,   // 134: lindm.resource.v1.SysctlPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	19,  // 135: lindm.resource.v1.SysctlPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	99,  // 136: lindm.resource.v1.SystemdDefinitionPlan.desired:type_name -> lindm.resource.v1.SystemdDefinitionDesired
-	100, // 137: lindm.resource.v1.SystemdDefinitionPlan.before:type_name -> lindm.resource.v1.SystemdDefinitionObservation
-	3,   // 138: lindm.resource.v1.SystemdDefinitionPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	19,  // 139: lindm.resource.v1.SystemdDefinitionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	101, // 140: lindm.resource.v1.EncryptionCompliancePlan.desired:type_name -> lindm.resource.v1.EncryptionComplianceDesired
-	102, // 141: lindm.resource.v1.EncryptionCompliancePlan.before:type_name -> lindm.resource.v1.EncryptionComplianceObservation
-	3,   // 142: lindm.resource.v1.EncryptionCompliancePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	143, // [143:143] is the sub-list for method output_type
-	143, // [143:143] is the sub-list for method input_type
-	143, // [143:143] is the sub-list for extension type_name
-	143, // [143:143] is the sub-list for extension extendee
-	0,   // [0:143] is the sub-list for field type_name
+	78,  // 62: lindm.resource.v1.PackageTransactionEntry.before:type_name -> lindm.resource.v1.NativeVersion
+	78,  // 63: lindm.resource.v1.PackageTransactionEntry.after:type_name -> lindm.resource.v1.NativeVersion
+	57,  // 64: lindm.resource.v1.PackageTransactionEntry.artifact:type_name -> lindm.resource.v1.ArtifactRef
+	62,  // 65: lindm.resource.v1.PackageTransactionEntry.source:type_name -> lindm.resource.v1.ResourceRef
+	77,  // 66: lindm.resource.v1.InstalledProvenanceProof.package:type_name -> lindm.resource.v1.PackageIdentity
+	78,  // 67: lindm.resource.v1.InstalledProvenanceProof.version:type_name -> lindm.resource.v1.NativeVersion
+	62,  // 68: lindm.resource.v1.InstalledProvenanceProof.source:type_name -> lindm.resource.v1.ResourceRef
+	57,  // 69: lindm.resource.v1.InstalledProvenanceProof.artifact:type_name -> lindm.resource.v1.ArtifactRef
+	11,  // 70: lindm.resource.v1.InstalledProvenanceProof.method:type_name -> lindm.resource.v1.InstalledProvenanceMethod
+	34,  // 71: lindm.resource.v1.PackageTransactionManifest.entries:type_name -> lindm.resource.v1.PackageTransactionEntry
+	79,  // 72: lindm.resource.v1.PackageTransactionManifest.sources:type_name -> lindm.resource.v1.SourceSnapshot
+	62,  // 73: lindm.resource.v1.PackageTransactionManifest.affected_resources:type_name -> lindm.resource.v1.ResourceRef
+	57,  // 74: lindm.resource.v1.PackageTransactionManifest.native_transaction:type_name -> lindm.resource.v1.ArtifactRef
+	80,  // 75: lindm.resource.v1.PackageTransactionManifest.original_pin:type_name -> lindm.resource.v1.FileIdentity
+	35,  // 76: lindm.resource.v1.PackageTransactionManifest.installed_provenance:type_name -> lindm.resource.v1.InstalledProvenanceProof
+	81,  // 77: lindm.resource.v1.NativePackagePlan.desired:type_name -> lindm.resource.v1.NativePackageDesired
+	57,  // 78: lindm.resource.v1.NativePackagePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	20,  // 79: lindm.resource.v1.NativePackagePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	82,  // 80: lindm.resource.v1.RepositoryPlan.desired:type_name -> lindm.resource.v1.RepositoryDesired
+	3,   // 81: lindm.resource.v1.RepositoryPlan.stanza_change:type_name -> lindm.resource.v1.NativeObjectChange
+	57,  // 82: lindm.resource.v1.RepositoryPlan.key_artifacts:type_name -> lindm.resource.v1.ArtifactRef
+	80,  // 83: lindm.resource.v1.RepositoryPlan.owned_objects:type_name -> lindm.resource.v1.FileIdentity
+	66,  // 84: lindm.resource.v1.RepositoryPlan.signature_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	20,  // 85: lindm.resource.v1.RepositoryPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	83,  // 86: lindm.resource.v1.FlatpakAppPlan.desired:type_name -> lindm.resource.v1.FlatpakAppDesired
+	12,  // 87: lindm.resource.v1.FlatpakAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
+	57,  // 88: lindm.resource.v1.FlatpakAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	84,  // 89: lindm.resource.v1.FlatpakAppPlan.permission_delta:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
+	20,  // 90: lindm.resource.v1.FlatpakAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	20,  // 91: lindm.resource.v1.OSUpdatePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	85,  // 92: lindm.resource.v1.OSUpdatePlan.desired:type_name -> lindm.resource.v1.OSUpdateDesired
+	86,  // 93: lindm.resource.v1.OSUpdatePlan.backend:type_name -> lindm.resource.v1.OSUpdateBackend
+	87,  // 94: lindm.resource.v1.OSUpdatePlan.changed_files:type_name -> lindm.resource.v1.OSUpdateNativeFile
+	88,  // 95: lindm.resource.v1.SessionPolicyPlan.desired:type_name -> lindm.resource.v1.SessionPolicyDesired
+	14,  // 96: lindm.resource.v1.SessionPolicyPlan.fields:type_name -> lindm.resource.v1.SessionField
+	80,  // 97: lindm.resource.v1.SessionPolicyPlan.owned_settings:type_name -> lindm.resource.v1.FileIdentity
+	20,  // 98: lindm.resource.v1.SessionPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	89,  // 99: lindm.resource.v1.PasswordPolicyPlan.desired:type_name -> lindm.resource.v1.PasswordPolicyDesired
+	15,  // 100: lindm.resource.v1.PasswordPolicyPlan.fields:type_name -> lindm.resource.v1.PasswordField
+	80,  // 101: lindm.resource.v1.PasswordPolicyPlan.owned_profile_objects:type_name -> lindm.resource.v1.FileIdentity
+	20,  // 102: lindm.resource.v1.PasswordPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	90,  // 103: lindm.resource.v1.SnapAppPlan.desired:type_name -> lindm.resource.v1.SnapAppDesired
+	12,  // 104: lindm.resource.v1.SnapAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
+	57,  // 105: lindm.resource.v1.SnapAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	91,  // 106: lindm.resource.v1.SnapAppPlan.interface_delta:type_name -> lindm.resource.v1.SnapInterfaceGrant
+	20,  // 107: lindm.resource.v1.SnapAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	92,  // 108: lindm.resource.v1.CertificateEnrollmentPlan.desired:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
+	16,  // 109: lindm.resource.v1.CertificateEnrollmentPlan.steps:type_name -> lindm.resource.v1.CredentialStep
+	20,  // 110: lindm.resource.v1.CertificateEnrollmentPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	93,  // 111: lindm.resource.v1.DirectoryClientPlan.desired:type_name -> lindm.resource.v1.DirectoryClientDesired
+	17,  // 112: lindm.resource.v1.DirectoryClientPlan.steps:type_name -> lindm.resource.v1.DirectoryStep
+	66,  // 113: lindm.resource.v1.DirectoryClientPlan.remote_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	20,  // 114: lindm.resource.v1.DirectoryClientPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	94,  // 115: lindm.resource.v1.FlatpakTransactionEntry.installation:type_name -> lindm.resource.v1.InstallationBinding
+	12,  // 116: lindm.resource.v1.FlatpakTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
+	62,  // 117: lindm.resource.v1.FlatpakTransactionEntry.remote:type_name -> lindm.resource.v1.ResourceRef
+	57,  // 118: lindm.resource.v1.FlatpakTransactionEntry.objects:type_name -> lindm.resource.v1.ArtifactRef
+	12,  // 119: lindm.resource.v1.SnapTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
+	95,  // 120: lindm.resource.v1.SnapTransactionEntry.confinement:type_name -> lindm.resource.v1.SnapConfinement
+	57,  // 121: lindm.resource.v1.SnapTransactionEntry.snap:type_name -> lindm.resource.v1.ArtifactRef
+	57,  // 122: lindm.resource.v1.SnapTransactionEntry.assertion_chain:type_name -> lindm.resource.v1.ArtifactRef
+	46,  // 123: lindm.resource.v1.AppTransactionEntry.flatpak:type_name -> lindm.resource.v1.FlatpakTransactionEntry
+	47,  // 124: lindm.resource.v1.AppTransactionEntry.snap:type_name -> lindm.resource.v1.SnapTransactionEntry
+	62,  // 125: lindm.resource.v1.ResourceDigestBinding.ref:type_name -> lindm.resource.v1.ResourceRef
+	48,  // 126: lindm.resource.v1.AppTransactionManifest.entries:type_name -> lindm.resource.v1.AppTransactionEntry
+	49,  // 127: lindm.resource.v1.AppTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
+	79,  // 128: lindm.resource.v1.DeploymentTransactionManifest.source:type_name -> lindm.resource.v1.SourceSnapshot
+	96,  // 129: lindm.resource.v1.DeploymentTransactionManifest.before:type_name -> lindm.resource.v1.DeploymentIdentity
+	96,  // 130: lindm.resource.v1.DeploymentTransactionManifest.target:type_name -> lindm.resource.v1.DeploymentIdentity
+	57,  // 131: lindm.resource.v1.DeploymentTransactionManifest.content_objects:type_name -> lindm.resource.v1.ArtifactRef
+	49,  // 132: lindm.resource.v1.DeploymentTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
+	13,  // 133: lindm.resource.v1.DeploymentTransactionManifest.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
+	97,  // 134: lindm.resource.v1.ManagedFilePlan.desired:type_name -> lindm.resource.v1.ManagedFileDesired
+	98,  // 135: lindm.resource.v1.ManagedFilePlan.before:type_name -> lindm.resource.v1.ManagedFileObservation
+	3,   // 136: lindm.resource.v1.ManagedFilePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	20,  // 137: lindm.resource.v1.ManagedFilePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	99,  // 138: lindm.resource.v1.SysctlPlan.desired:type_name -> lindm.resource.v1.SysctlDesired
+	100, // 139: lindm.resource.v1.SysctlPlan.before:type_name -> lindm.resource.v1.SysctlObservation
+	3,   // 140: lindm.resource.v1.SysctlPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	20,  // 141: lindm.resource.v1.SysctlPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	101, // 142: lindm.resource.v1.SystemdDefinitionPlan.desired:type_name -> lindm.resource.v1.SystemdDefinitionDesired
+	102, // 143: lindm.resource.v1.SystemdDefinitionPlan.before:type_name -> lindm.resource.v1.SystemdDefinitionObservation
+	3,   // 144: lindm.resource.v1.SystemdDefinitionPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	20,  // 145: lindm.resource.v1.SystemdDefinitionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	103, // 146: lindm.resource.v1.EncryptionCompliancePlan.desired:type_name -> lindm.resource.v1.EncryptionComplianceDesired
+	104, // 147: lindm.resource.v1.EncryptionCompliancePlan.before:type_name -> lindm.resource.v1.EncryptionComplianceObservation
+	3,   // 148: lindm.resource.v1.EncryptionCompliancePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	149, // [149:149] is the sub-list for method output_type
+	149, // [149:149] is the sub-list for method input_type
+	149, // [149:149] is the sub-list for extension type_name
+	149, // [149:149] is the sub-list for extension extendee
+	0,   // [0:149] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_plans_proto_init() }
@@ -5025,10 +5224,10 @@ func file_lindm_resource_v1_plans_proto_init() {
 	file_lindm_resource_v1_software_proto_init()
 	file_lindm_resource_v1_plans_proto_msgTypes[6].OneofWrappers = []any{}
 	file_lindm_resource_v1_plans_proto_msgTypes[16].OneofWrappers = []any{}
-	file_lindm_resource_v1_plans_proto_msgTypes[17].OneofWrappers = []any{}
-	file_lindm_resource_v1_plans_proto_msgTypes[27].OneofWrappers = []any{}
+	file_lindm_resource_v1_plans_proto_msgTypes[18].OneofWrappers = []any{}
 	file_lindm_resource_v1_plans_proto_msgTypes[28].OneofWrappers = []any{}
-	file_lindm_resource_v1_plans_proto_msgTypes[29].OneofWrappers = []any{
+	file_lindm_resource_v1_plans_proto_msgTypes[29].OneofWrappers = []any{}
+	file_lindm_resource_v1_plans_proto_msgTypes[30].OneofWrappers = []any{
 		(*AppTransactionEntry_Flatpak)(nil),
 		(*AppTransactionEntry_Snap)(nil),
 	}
@@ -5037,8 +5236,8 @@ func file_lindm_resource_v1_plans_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_plans_proto_rawDesc), len(file_lindm_resource_v1_plans_proto_rawDesc)),
-			NumEnums:      17,
-			NumMessages:   37,
+			NumEnums:      18,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

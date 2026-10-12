@@ -47,6 +47,9 @@ message NativePackageTransactionRequest {
   optional bytes candidate_pin_contents = 15 [(buf.validate.field).bytes.max_len = 32768];
   optional bytes candidate_pin_sha256 = 16 [(buf.validate.field).bytes.len = 32];
   lindm.resource.v1.FileIdentity original_pin = 17;
+  // PREPARE-only: prove that the installed target, which lindm did not
+  // install, is the approved source's artifact (approved adoption evidence).
+  bool prove_installed_provenance = 18;
   option (buf.validate.message).cel = {
     id: "native_package_helper.pin_projection"
     message: "pin projection binds existing native RPM versionlock evidence and exact candidate bytes"
@@ -61,6 +64,11 @@ message NativePackageTransactionRequest {
     id: "native_package_helper.apply_binding"
     message: "application requires the complete admitted plan and transaction manifest"
     expression: "this.operation != 2 || (has(this.manifest) && has(this.plan) && this.plan.ref == this.desired.ref && has(this.plan.native_package) && this.plan.native_package.desired == this.desired.native_package)"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_package_helper.provenance_proof"
+    message: "installed provenance is proven only while preparing a present package"
+    expression: "!this.prove_installed_provenance || (this.operation == 1 && this.effective_desired.presence == 1)"
   };
 }
 

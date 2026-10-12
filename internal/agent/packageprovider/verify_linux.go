@@ -57,6 +57,15 @@ func (p *Provider) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*
 	if err != nil {
 		return nil, err
 	}
+	// An adopted package that already satisfies an unpinned row has no effect to
+	// apply and so no ownership baseline: its provenance is the plan's proof for
+	// this exact installation, and acquisition is rechecked independently.
+	if (ledger == nil || ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED) && plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
+		applyInstalledProvenance(after.GetNativePackage().GetRecord(), manifest.GetInstalledProvenance(), desired.GetNativePackage().GetRepository())
+		if err := p.acquisitionAllowed(after, ledger, plan.GetOperation()); err != nil {
+			return nil, err
+		}
+	}
 	return packageVerification(plan, after, ledger, manifest, manifestMatchesDatabase(manifest, db))
 }
 func packageVerification(plan *resourcev1.ResourcePlan, after *resourcev1.ResourceObservation, ledger *agentv1.ResourceOwnershipLedger, manifest *resourcev1.PackageTransactionManifest, sideEffects bool) (*resourcev1.ResourceVerification, error) {
@@ -71,7 +80,7 @@ func packageVerification(plan *resourcev1.ResourcePlan, after *resourcev1.Resour
 		// desired state that is deliberately no longer managed.
 		baseline := ledger.GetBaseline().GetObservation().GetNativePackage()
 		target := baseline
-		if ledger.GetOwner().GetPolicy().GetRelease() == resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN || desired.GetRemoval() == resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_RETAIN_INSTALLATION {
+		if releaseKeepsInstallation(desired, ledger) {
 			target = plan.GetBefore().GetNativePackage()
 		}
 		databaseMatches = observed.GetInstalled() == target.GetInstalled()
@@ -172,6 +181,11 @@ func ValidateNativePlan(plan *resourcev1.ResourcePlan, manifest *resourcev1.Pack
 	}
 	if len(manifest.GetAffectedResources()) != 1 || len(manifest.GetAffectedDesiredSha256()) != 1 || !proto.Equal(manifest.GetAffectedResources()[0], plan.GetRef()) || !bytes.Equal(manifest.GetAffectedDesiredSha256()[0], plan.GetDesiredSha256()) {
 		return errors.New("packageprovider: manifest is not bound to signed resource plan")
+	}
+	// A proof is acquisition evidence for the exact installed baseline the plan
+	// carries; it never accompanies an owned reconcile or a release.
+	if proof := manifest.GetInstalledProvenance(); proof != nil && (plan.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE || !provenFrom(plan.GetBefore().GetNativePackage().GetRecord(), proof)) {
+		return ErrConflict
 	}
 	if manifest.GetOriginalPin() != nil {
 		if !proto.Equal(manifest.GetOriginalPin(), plan.GetBefore().GetNativePackage().GetPinFile()) {

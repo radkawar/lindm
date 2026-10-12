@@ -407,6 +407,9 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 		if lab.Updater.Unit != "" {
 			required = append(required, packageVendorBusyScenario)
 		}
+		if packageAdoptionSupported(rpm) {
+			required = append(required, packageAdoptionScenarios...)
+		}
 		if err := qualifyResourceEvidence(&kinds[0], required); err != nil {
 			return err
 		}
@@ -479,6 +482,9 @@ func exerciseResourcePackages(ctx context.Context, r *resourceDispatch, rpm reso
 	release.Native = []VMResourceNativeRecord{native}
 	release.FinishedAt = time.Now().UTC()
 	release.Passed = true
+	if err := exercisePackageAdoption(ctx, r, rpm, evidence); err != nil {
+		return err
+	}
 	if err := exercisePackageDrift(ctx, r, rpm, evidence); err != nil {
 		return err
 	}

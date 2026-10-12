@@ -479,6 +479,24 @@ installed architecture of that name. Unit coverage only: no native record exerci
 a row without an architecture yet; see
 [package identity](../engineering.md#native-package-resource-provider).
 
+An installed package lindm did not install (one the image ships, or one
+installed by hand) is acquired only if preparation proves its provenance. With the
+metalink-authenticated metadata refreshed, `dnf5 repoquery --available` must
+list the exact installed NEVRA in `fedora` or `updates`, and `dnf5 download`
+fetches it into private staging scratch. The approved key must verify its
+signature in the isolated keyring, its `SHA256HEADER` must equal the installed
+header's (rpm keeps the installed header, which binds payload and file
+digests), and `rpm --verify --nodeps --noscripts` must report no missing
+non-config file and no size, digest or link-target change. `updates` keeps only
+current builds, so a package the image installed and `updates` has since
+superseded is `existing_package_unverified` until the device is updated. A
+proven package is BLOCKED `existing_package` under create-only ownership.
+Approved adoption pins it in `versionlock.toml`; `RESTORE_OWNED` release removes
+only that entry. Server dispatch of approved package adoption is pending native
+qualification, DNF4 (EL) has no proof, and a stock 44 image still refuses
+package rows as `native_tool_outdated` first. Unit coverage only: no Fedora
+record exercises the proof yet.
+
 The typed kernel-module blocklist needs the kernel-module blocklist device
 capability (a signed capability policy) or the root executor's local
 `fileProvider.kernelModuleBlocklist`. Fedora 44 uses native `modprobe` and

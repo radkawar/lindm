@@ -75,6 +75,11 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if err != nil {
 		return nil, err
 	}
+	// The plan's baseline carries the provenance its preparation proved for this
+	// exact installation; the ownership claim records that proven baseline.
+	if proof := manifest.GetInstalledProvenance(); proof != nil && !applyInstalledProvenance(current.GetNativePackage().GetRecord(), proof, desired.GetNativePackage().GetRepository()) {
+		return nil, ErrConflict
+	}
 	if !proto.Equal(current.GetNativePackage(), plan.GetBefore().GetNativePackage()) {
 		return nil, ErrConflict
 	}

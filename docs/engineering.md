@@ -3690,16 +3690,75 @@ and its checked signing key are prerequisites, not authority supplied by a
 profile. Immutable OSTree and Nix installations are rejected. Existing native
 records with unprovable repository provenance remain explicitly unknown and
 cannot be acquired by inventing a signer or copying the desired repository.
-Provenance is known only for a package lindm installed (its transaction receipt
-names source, signer and metadata revision). A package already installed by the
-image or by hand is therefore refused under every ownership mode as
-`existing_package_unverified`, a typed `PRECONDITION`; it does not verify
-read-only as converged either, because convergence requires the approved source
-and the persistent pin. The staging failure carries the detail in
-`ResourcePreparationOutcome.detail`, which becomes the row's BLOCKED reason
+Provenance is known for a package lindm installed (its transaction receipt names
+source, signer and metadata revision) or for an installed package whose
+provenance preparation proved against the approved source, described below.
+Anything else (a locally built or modified package, a version the approved
+source no longer lists, DNF4, zypper and pacman, which have no proof) is refused
+under every ownership mode as `existing_package_unverified`, a typed
+`PRECONDITION`; it does not verify read-only as converged either, because
+convergence requires the approved source and the persistent pin. The staging
+failure carries the detail in `ResourcePreparationOutcome.detail`, which becomes
+the row's BLOCKED reason
 ([architecture](architecture.md#adoption-required-refusals)). The APT snapshot
 lists each signer digest once, although every suite of an archive (for example
 `noble`, `noble-updates`, `noble-security`) is signed by the same key.
+
+**Approved adoption of an installed package.** Neither dpkg nor rpm records the
+repository a package came from. When an unowned (or released) row asks for the
+presence of a package that lindm did not install, `Plan` asks PREPARE to prove
+that the installed native records are those of the exact artifact the approved
+source's authenticated metadata lists (`provenance_linux.go`). The proof runs
+after the isolated metadata refresh, before the solver uses that metadata:
+
+- APT: every approved suite's InRelease is verified with the approved key, and
+  APT checks the Packages indexes against it. `apt-cache show` must return the
+  index record (`Filename`, `SHA256`) for the installed `name:arch=version`, not
+  only the dpkg status record. `apt-get download` fetches that .deb into private
+  scratch under the staging budget, and it must equal the index's SHA256 and
+  size. dpkg keeps no archive digest, so the strongest available evidence is
+  that the archive's control fields (rendered by the same dpkg formatter through
+  `dpkg-deb --show` and `dpkg-query --show`), its `md5sums` member and its
+  conffile list equal the installed dpkg records, and that `dpkg --verify` finds
+  every installed non-conffile matching those MD5 sums. An archive without
+  `md5sums` is not provable.
+- DNF5: `dnf5 repoquery --available` must list the exact NEVRA in an approved
+  repository of the authenticated (signed, or release-pinned metalink) metadata.
+  `dnf5 download` fetches it, the approved key must verify its signature in the
+  isolated keyring, and its `SHA256HEADER` must equal the installed header's.
+  That header binds the payload and per-file digests. `rpm --verify --nodeps
+--noscripts` must find no missing non-config file and no size, digest or link
+  target difference.
+
+What this does not prove: that this very archive was the one unpacked (an
+identical rebuild is indistinguishable, and harmless), MD5 collision
+resistance, conffile contents (administrator configuration, never owned),
+maintainer-script side effects, or integrity against a root compromise that
+rewrote the package database. The fetched artifact is evidence only; it never
+joins the transaction and is removed before planning continues. An unproven
+installation is a definitive answer: PREPARE writes a manifest without a proof
+and logs the reason in its helper journal. Removing a package lindm did not
+install is never offered through adoption.
+
+The manifest's `InstalledProvenanceProof` names the package, version, approved
+repository, signer, bound metadata revision, the artifact and the installed
+identity (`native_identity_sha256`) it proved. `Plan` records that provenance on
+the plan's baseline only for exactly that installation, so the observation
+digest binds it. Then acquisition decides as for a package lindm installed:
+`CREATE_ONLY` is `ErrAdoptionRequired` with detail `existing_package`, which
+links the console to Rollouts approved adoption; `APPROVED_ADOPTION` (with its
+assignment-bound approval) acquires it. Apply re-observes and reapplies the
+same proof before it compares the baseline, so the journal's ownership claim
+records the proven baseline. The owned effect is the persistent version pin,
+and the row converges with `approved_source_matches`. An unpinned (`any`) row
+that the installation already satisfies has no effect and therefore no
+ownership baseline. Like an already satisfied managed file, it verifies read-only
+from the plan's proof, and each reconcile proves again. Release never removes or
+downgrades a package that was installed when its row was acquired:
+`RESTORE_OWNED` restores the recorded pin bytes and retains the installed
+version, including a version lindm later upgraded it to. Dispatch of
+`APPROVED_ADOPTION` for packages is pending native qualification
+([verification](verification.md#native-package-approved-adoption-pending)).
 
 Preparation runs asynchronously in the bounded native helper, keyed by the exact
 signed action and its preparation deadline. It downloads authenticated metadata

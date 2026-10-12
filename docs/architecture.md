@@ -665,19 +665,41 @@ A provider whose `CREATE_ONLY` acquisition meets an existing unowned native
 object returns its `ErrAdoptionRequired`, which also satisfies its `ErrConflict`
 so existing classification holds: the file (`existing_file`), SSH banner
 (`existing_banner_file`), account (`existing_account`), systemd definition
-(`existing_definition`), package/pin (`existing_package`, only for a package
-whose provenance lindm recorded when it installed it) and sysctl
-(`existing_kernel_setting`) providers. `internal/agent/admissiondetail` attaches
-the closed snake_case detail. Objects that approval can never acquire stay plain
+(`existing_definition`), package/pin (`existing_package`) and sysctl
+(`existing_kernel_setting`) providers. A package qualifies for
+`existing_package` when lindm installed it, or when preparation proved that the
+installed package is the approved source's artifact. `internal/agent/admissiondetail`
+attaches the closed snake_case detail. Objects that approval can never acquire stay plain
 `ErrConflict` with a detail: the Fedora `/etc/issue.net` symlink
 (`existing_banner_symlink`), the reserved banner drop-in
 (`existing_banner_dropin`), an existing OS-update timer or path
-(`existing_update_timer`) and a package installed without lindm
-(`existing_package_unverified`). That last one cannot converge read-only either:
-`NativePackageChecks.converged` requires `approved_source_matches` (lindm's
-recorded origin equals the desired repository) and the package's persistent
-version pin, and dpkg/rpm keep no artifact digest that could prove a preinstalled
-package came from the approved repository. Account creation without explicit
+(`existing_update_timer`) and an installed package whose provenance cannot be
+proven (`existing_package_unverified`). That last one cannot converge read-only either:
+`NativePackageChecks.converged` requires `approved_source_matches` (the recorded
+or proven origin equals the desired repository) and the package's persistent
+version pin.
+
+dpkg and rpm keep no record of the repository a package came from, so an
+installed package that lindm did not install is proven instead. PREPARE checks
+that the approved source's authenticated metadata lists the exact installed
+name, architecture and version, fetches that artifact, and compares it with the
+installed native records. For APT, the InRelease is verified with the approved
+key, the Packages index entry gives the .deb's SHA256, and the .deb's control
+fields, md5sums and conffile list must equal dpkg's records, with
+`dpkg --verify` clean for non-conffiles. For DNF5, the NEVRA must be in the
+authenticated repository metadata, the approved key must sign the package, and
+its `SHA256HEADER` must equal the installed header's, with `rpm --verify` clean
+for non-config content. The proof sits in the digest-bound transaction manifest
+and is bound to the installed identity. The plan baseline and the journal's
+ownership claim carry the proven provenance. DNF4, zypper and pacman have no
+proof. The approved adoption pins the package; `RESTORE_OWNED` release restores
+only the recorded pin and never removes or downgrades a package lindm did not
+install. The server does not yet dispatch `APPROVED_ADOPTION` for
+`NATIVE_PACKAGE` (pending native qualification), so out of the box a provable
+preinstalled package is BLOCKED `existing_package` and an unprovable one
+`existing_package_unverified`.
+
+Account creation without explicit
 numeric identity (a group's GID; a user's UID, primary group, home and shell) is
 `ErrConflict` with `explicit_account_identity_required`; the provider never
 allocates IDs. Other actionable details are `native_tool_outdated`

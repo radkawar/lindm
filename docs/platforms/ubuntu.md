@@ -749,9 +749,22 @@ suites are signed by the same archive key; the repository snapshot lists that
 signer once (a duplicate failed the staging helper's validation,
 `signer_sha256: repeated value must contain unique items`, before 2026-10-12).
 A package the image already installed (the lab golden ships `git
-1:2.43.0-1ubuntu7.3` and `htop 3.3.0-4build1`) has no lindm provenance and is
-refused as `existing_package_unverified`; only packages lindm installs (for
-example `podman` from `noble-updates`) converge.
+1:2.43.0-1ubuntu7.3` and `htop 3.3.0-4build1`) has no lindm transaction receipt.
+Preparation proves its provenance instead: `apt-cache show` in the isolated
+configuration must return the signed index record for the installed
+`name:arch=version`, and `apt-get download` fetches that `.deb` against the
+index SHA256. Its control fields, `md5sums` and conffile list must equal the dpkg
+records, and `dpkg --verify` must be clean for non-conffiles. On an Ubuntu 24.04
+amd64 host (2026-10-12) the installed `git` and `htop` matched the archive
+`.deb`s for exactly those versions (`git` from `noble-updates`, SHA-256
+`099bb129…8f87` in its index); this is a unit-level comparison, not a lane run.
+A proven package is BLOCKED `existing_package` under create-only ownership,
+linking to Rollouts approved adoption. An unprovable one is BLOCKED
+`existing_package_unverified`: each pocket's index lists only its newest
+version, so an installed version that no approved suite still lists cannot be
+proven, and neither can a locally built or modified package. Server dispatch of
+approved package adoption is pending native qualification, so today only
+packages lindm installs (for example `podman` from `noble-updates`) converge.
 
 Ubuntu 22.04 uses the same repository identity, URIs, components and key path
 with suites `jammy`, `jammy-updates`, `jammy-security`. Its key file comes from

@@ -158,7 +158,10 @@ func dnfSpec(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdent
 	}
 	return nativeSpec(target, ".")
 }
-func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource) ([]*resourcev1.PackageTransactionEntry, *resourcev1.RepositorySnapshot, error) {
+
+// afterRefresh runs once the approved metadata is authenticated, before the
+// solver and the source snapshot use it (the installed-provenance proof).
+func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource, afterRefresh func() error) ([]*resourcev1.PackageTransactionEntry, *resourcev1.RepositorySnapshot, error) {
 	signer, err := p.prepareDNF(ctx, directory, source)
 	if err != nil {
 		return nil, nil, err
@@ -171,6 +174,9 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		if _, err := p.dnf(ctx, directory, []string{"makecache", "--refresh"}); err != nil {
 			return nil, nil, err
 		}
+	}
+	if err := afterRefresh(); err != nil {
+		return nil, nil, err
 	}
 	target, err := p.nativeTarget(db, d.GetPackage())
 	if err != nil {

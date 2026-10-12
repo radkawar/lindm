@@ -391,6 +391,44 @@ message PackageTransactionEntry {
     expression: "this.package.architecture != ''"
   };
 }
+// How an installed package that lindm did not install was proven to be the
+// approved source's artifact. Neither dpkg nor rpm records the repository a
+// package came from, so each method compares the installed native records with
+// the exact artifact the approved source's authenticated metadata lists.
+enum InstalledProvenanceMethod {
+  INSTALLED_PROVENANCE_METHOD_UNSPECIFIED = 0;
+  // dpkg keeps no archive digest. The indexed .deb was fetched and checked
+  // against the signed index; its control fields, md5sums and conffile list
+  // equal the installed dpkg records, and dpkg --verify finds every installed
+  // non-conffile matching those MD5 sums. MD5 is not collision resistant.
+  INSTALLED_PROVENANCE_METHOD_DPKG_CONTROL = 1;
+  // rpm keeps the installed header. Its SHA256HEADER equals that of the
+  // repository package signed by the approved key, and rpm --verify finds every
+  // installed non-config file's size, digest and link target unchanged.
+  INSTALLED_PROVENANCE_METHOD_RPM_HEADER = 2;
+}
+// Effect-free preparation evidence for approved adoption: the installed package
+// (exactly this native record) is the approved source's artifact.
+message InstalledProvenanceProof {
+  PackageIdentity package = 1 [(buf.validate.field).required = true];
+  NativeVersion version = 2 [(buf.validate.field).required = true];
+  ResourceRef source = 3 [(buf.validate.field).required = true];
+  bytes signer_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  bytes metadata_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // The approved artifact exactly as the authenticated metadata declares it.
+  ArtifactRef artifact = 6 [(buf.validate.field).required = true];
+  InstalledProvenanceMethod method = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // NativePackageRecord.native_identity_sha256 of the proven installation.
+  bytes native_identity_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "installed_provenance_proof.shape"
+    message: "an installed-provenance proof names a concrete package of its approved repository"
+    expression: "this.source.kind == 13 && this.package.architecture != '' && (this.method == 1 ? this.package.ecosystem == 1 : this.package.ecosystem == 2)"
+  };
+}
 message PackageTransactionManifest {
   repeated PackageTransactionEntry entries = 1 [(buf.validate.field).repeated = {max_items: 4096}];
   bytes native_database_revision = 2 [(buf.validate.field).bytes.len = 32];
@@ -414,6 +452,9 @@ message PackageTransactionManifest {
   ArtifactRef native_transaction = 7 [(buf.validate.field).required = true];
   optional bytes candidate_pin_sha256 = 8 [(buf.validate.field).bytes.len = 32];
   FileIdentity original_pin = 9;
+  // Present only when preparation was asked to prove an installed package's
+  // provenance for acquisition and the proof succeeded.
+  InstalledProvenanceProof installed_provenance = 10;
   option (buf.validate.message).cel = {
     id: "package_manifest.bindings"
     message: "every affected resource binds a desired digest"

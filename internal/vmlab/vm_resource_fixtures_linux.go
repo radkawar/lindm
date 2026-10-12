@@ -141,6 +141,9 @@ fi
 EOF
     chmod 0755 "build/$name-$version/DEBIAN/postinst"
    fi
+   # Like every distribution archive package (dh_md5sums), ship md5sums:
+   # approved adoption compares them with the installed dpkg records.
+   (cd "build/$name-$version" && find usr -type f -exec md5sum {} + | LC_ALL=C sort -k 2 > DEBIAN/md5sums)
    dpkg-deb --root-owner-group --build "build/$name-$version" "repo/$name-$version.deb"
   elif [ -n "${ALPM_ARCH:-}" ]; then
    cat > "build/$name-$version/.PKGINFO" <<EOF
