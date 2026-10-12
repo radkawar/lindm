@@ -81,8 +81,13 @@ func vmAdvisoryCompareCommand(manager, a, b string) (string, error) {
 		// Lua quoting nor RPM macro expansion can interpret vendor input as code.
 		lua := "%{lua:local a=rpm.ver(" + advisoryLuaBytes(a) + ");local b=rpm.ver(" + advisoryLuaBytes(b) + ");if a < b then print(-1) elseif a == b then print(0) else print(1) end}"
 		return "rpm --eval " + nativeQuote(lua), nil
+	case "dpkg":
+		// dpkg reports ordering only through exit status; vendor strings stay
+		// positional parameters, and a version dpkg cannot order exits 2.
+		script := `if dpkg --compare-versions "$1" lt "$2"; then echo -1; elif dpkg --compare-versions "$1" eq "$2"; then echo 0; elif dpkg --compare-versions "$1" gt "$2"; then echo 1; else exit 2; fi`
+		return "sh -c " + nativeQuote(script) + " sh " + nativeQuote(a) + " " + nativeQuote(b), nil
 	default:
-		return "", errors.New("advisory boundary oracle requires native pacman or RPM")
+		return "", errors.New("advisory boundary oracle requires native pacman, RPM or dpkg")
 	}
 }
 

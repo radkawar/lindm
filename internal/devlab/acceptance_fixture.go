@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
@@ -112,7 +113,18 @@ func (f *AuthorityFixture) RefreshVendorFeeds(ctx context.Context, cacheDirector
 	defer func() { result.Artifacts = cache.artifacts }()
 	client := *resources.HTTPClient
 	client.Transport = cache
-	cfg := &configv1.AdvisoryConfig{Feeds: feeds}
+	// The cache materializes and hashes each complete vendor artifact before
+	// the production parser reads a byte, so a slow link would trip the
+	// production idle watchdog without any stalled stream. The lab duration
+	// already bounds the refresh; an unset idle bound inherits it.
+	cfg := &configv1.AdvisoryConfig{}
+	for _, feed := range feeds {
+		feed = proto.CloneOf(feed)
+		if feed.ProgressTimeoutSeconds == nil {
+			feed.ProgressTimeoutSeconds = proto.Uint32(uint32(min(max(duration.Seconds(), 1), 3600)))
+		}
+		cfg.Feeds = append(cfg.Feeds, feed)
+	}
 	service, err := advisory.New(ctx, pool, cfg, &client)
 	if err != nil {
 		return result, err

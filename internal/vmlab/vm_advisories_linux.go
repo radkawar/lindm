@@ -91,6 +91,20 @@ func vmAdvisorySource(release *platform.Release, architecture string) (*advisory
 	return source, nil
 }
 
+// vmAdvisoryRefreshBounds bounds the lab's vendor acquisition and publication.
+// The default fits the paired RHEL CSAF archives: 480,655,133 bytes on
+// 2026-10-11, with a measured 7.5-minute full publication. Exports declaring a
+// larger registry archive allowance (Ubuntu's OSV all.zip, over 700 MB and
+// 500,000 claims) get it with a longer window: on a 0.6 MB/s controller link
+// the first fetch alone takes over 20 minutes. Revalidated cache hits are fast.
+func vmAdvisoryRefreshBounds(source *advisoryv1.FeedSource) (int64, time.Duration) {
+	byteBudget, duration := int64(1<<30), 30*time.Minute
+	if allowance := int64(source.GetMaxArchiveBytes()); allowance > byteBudget {
+		byteBudget, duration = allowance, 45*time.Minute
+	}
+	return byteBudget, duration
+}
+
 func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPlane, fixture *devlab.AuthorityFixture, manifest *labv1.ImageManifest, cacheDir, deviceID string) (evidence *VMAdvisoryEvidence, err error) {
 	release := manifestRelease(manifest)
 	source, err := vmAdvisorySource(release, manifest.GetArchitecture())
@@ -120,9 +134,8 @@ func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPl
 	if err != nil {
 		return evidence, err
 	}
-	// The paired RHEL CSAF archives are the largest export: 480,655,133 bytes
-	// on 2026-10-11, with a measured 7.5-minute full publication.
-	evidence.Refresh, err = fixture.RefreshVendorFeeds(ctx, filepath.Join(cacheDir, "advisories"), 1<<30, 30*time.Minute, []*advisoryv1.FeedSource{source})
+	byteBudget, duration := vmAdvisoryRefreshBounds(source)
+	evidence.Refresh, err = fixture.RefreshVendorFeeds(ctx, filepath.Join(cacheDir, "advisories"), byteBudget, duration, []*advisoryv1.FeedSource{source})
 	if err != nil {
 		evidence.Outcome = "feed_refresh_failed"
 		return evidence, err

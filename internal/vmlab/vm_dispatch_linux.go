@@ -139,6 +139,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return nil, errors.New("advisory exception qualification requires isolated local authority without other dispatch scenarios")
 	}
 	release := manifestRelease(manifest)
+	var advisoryRefresh time.Duration
 	if options.Advisories {
 		if err := release.LabLaneOn(platform.LaneAdvisories, manifest.GetArchitecture()); err != nil {
 			return nil, err
@@ -146,9 +147,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		if options.Resources || options.PowerActions || options.Hold != 0 {
 			return nil, errors.New("advisories run without resource, power or hold scenarios")
 		}
-		if _, err := vmAdvisorySource(release, manifest.GetArchitecture()); err != nil {
+		source, err := vmAdvisorySource(release, manifest.GetArchitecture())
+		if err != nil {
 			return nil, err
 		}
+		_, advisoryRefresh = vmAdvisoryRefreshBounds(source)
 	}
 	if options.Resources {
 		if err := release.LabLane(platform.LaneResources); err != nil {
@@ -165,7 +168,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.ResourceKinds["local-admin"] && !options.LocalAuthority {
 		return nil, errors.New("the local-admin kind requires -local-authority for reveal step-up and approval")
 	}
-	budget := 50 * time.Minute
+	budget := 50*time.Minute + advisoryRefresh
 	if options.ReleaseUpgrade {
 		if !options.Resources || options.ResourceExecutionOnly || options.Hardware == nil || !options.Hardware.AllowNetwork {
 			return nil, errors.New("release upgrade requires the connected resource phase and explicit guest egress (-allow-network) to the vendor archive")
