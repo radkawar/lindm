@@ -139,3 +139,23 @@ export function ObservedTime({
     <span className="text-muted-foreground">{formatted.local}</span>
   );
 }
+
+const clockTime = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+const clockDateTime = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+// Short "since" time for current state: time of day today, otherwise date and time.
+export function ObservedClock({ value }: { value: Timestamp | undefined }) {
+  const formatted = formatTimestamp(value);
+  if (!formatted.date) return <span>{formatted.local}</span>;
+  const today = formatted.date.toDateString() === new Date().toDateString();
+  return (
+    <time dateTime={formatted.utc} title={`${formatted.local} · ${formatted.utc}`}>
+      {(today ? clockTime : clockDateTime).format(formatted.date)}
+    </time>
+  );
+}

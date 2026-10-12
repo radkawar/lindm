@@ -263,6 +263,15 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	if err != nil || !encryption.Msg.GetEscrow().GetRetirementConfirmed() {
 		t.Fatalf("final escrow state: %v", err)
 	}
+	configured := f.svc.RevealApproval
+	for _, required := range []bool{false, true} {
+		f.svc.RevealApproval = required
+		state, err := f.svc.GetDeviceEncryption(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: f.deviceID}))
+		if err != nil || state.Msg.GetRecoveryKeyRevealApprovalRequired() != required {
+			t.Fatalf("reveal approval requirement %v not reported: %v", required, err)
+		}
+	}
+	f.svc.RevealApproval = configured
 	// A later session/network action must not replace a volume observation with
 	// its unrelated targetless observation.
 	for _, spec := range []*agentv1.DeviceActionSpec{

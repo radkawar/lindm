@@ -184,7 +184,7 @@ export function ProfileEditor({
             }
             if (attempt) return;
             if (mode === "edit" && expectedRevisionId === undefined) {
-              setFieldErrors(["Load the latest revision before publishing."]);
+              setFieldErrors(["Load the latest version before publishing."]);
               return;
             }
             try {
@@ -213,7 +213,7 @@ export function ProfileEditor({
           <TechnicalDetails
             items={[
               { label: "Profile ID", value: profileId },
-              { label: "Based on revision", value: shownExpected },
+              { label: "Based on version", value: shownExpected },
               { label: "Request ID", value: shownRequestId },
             ]}
           />
@@ -337,7 +337,7 @@ export function ProfileEditor({
                     .finally(() => setRefreshing(false));
                 }}
               >
-                {refreshing ? "Loading latest revision…" : "Load latest revision"}
+                {refreshing ? "Loading latest version…" : "Load latest version"}
               </Button>
             ) : null}
             {attempt?.status === "conflict" && attempt.refreshedHead ? (
@@ -354,10 +354,10 @@ export function ProfileEditor({
                       head.revisionId,
                       attempt.payload.reason,
                     );
-                    setNote("Your changes now build on the latest revision. Not published yet.");
+                    setNote("Your changes now build on the latest version. Not published yet.");
                   }}
                 >
-                  Keep my changes on the latest revision
+                  Keep my changes on the latest version
                 </Button>
                 <Button
                   type="button"
@@ -368,10 +368,10 @@ export function ProfileEditor({
                     const head = attempt.refreshedHead;
                     if (!head?.spec) return;
                     unlock(draftFromSpec(head.spec), head.revisionId, attempt.payload.reason);
-                    setNote("Draft replaced with the latest revision. Not published yet.");
+                    setNote("Draft replaced with the latest version. Not published yet.");
                   }}
                 >
-                  Discard my changes and use the latest revision
+                  Discard my changes and use the latest version
                 </Button>
               </>
             ) : null}
@@ -435,7 +435,7 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
         <AlertTitle>Profile published</AlertTitle>
         <AlertDescription>
           <p>
-            Revision {formatRevisionNumber(published.revisionNumber)} is saved. To apply it to
+            Version {formatRevisionNumber(published.revisionNumber)} is saved. To apply it to
             devices, assign it in Rollouts.
           </p>
           <p>
@@ -445,7 +445,7 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
               search={{ revision: published.revisionId }}
               className="underline underline-offset-4"
             >
-              View this revision
+              View this version
             </Link>
           </p>
         </AlertDescription>
@@ -465,7 +465,7 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
       <RpcError failure={attempt.failure}>
         <p>
           {attempt.conflict
-            ? "Someone published a newer revision first. Load it, then choose whether to keep your changes."
+            ? "Someone published a newer version first. Load it, then choose whether to keep your changes."
             : attempt.failure.ambiguous
               ? "We couldn't confirm the save. Retry: it won't publish twice."
               : ""}
@@ -490,18 +490,18 @@ function RefreshedHead({
   const same = expected !== undefined && expected === head.revisionId;
   return (
     <Alert>
-      <AlertTitle>Latest revision</AlertTitle>
+      <AlertTitle>Latest version</AlertTitle>
       <AlertDescription>
         <p>
-          {head.spec?.name.trim() || "Unnamed profile"}, revision{" "}
+          {head.spec?.name.trim() || "Unnamed profile"}, version{" "}
           {formatRevisionNumber(head.revisionNumber)}, {head.spec?.resources.length ?? 0} settings.
           {published.date ? ` Published ${published.local}.` : ""}
         </p>
         <p>
           {same
-            ? "Your draft is already based on this revision."
+            ? "Your draft is already based on this version."
             : expected
-              ? "This is newer than the revision your draft started from."
+              ? "This is newer than the version your draft started from."
               : "A profile with this ID already exists. Keep your changes only if you meant to update it."}
         </p>
         <p>
@@ -511,7 +511,7 @@ function RefreshedHead({
             search={{ revision: head.revisionId }}
             className="underline underline-offset-4"
           >
-            View this revision
+            View this version
           </Link>
         </p>
       </AlertDescription>

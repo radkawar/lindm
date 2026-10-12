@@ -68,18 +68,14 @@ export function ProfileDetailView({
     revision === "" ||
     (record !== undefined && head !== undefined && record.revisionId === head.revisionId);
   const headKnown = record !== undefined && head !== undefined && headFailure === null;
-  const revisionLabel = !headKnown
-    ? "Saved revision"
-    : isHead
-      ? "Latest revision"
-      : "Older revision";
+  const revisionLabel = !headKnown ? "Saved version" : isHead ? "Latest version" : "Older version";
   const headLabel = !headKnown
     ? headFailure
-      ? "Couldn't check whether this is the latest revision."
-      : "Checking whether this is the latest revision…"
+      ? "Couldn't check whether this is the latest version."
+      : "Checking whether this is the latest version…"
     : isHead
-      ? "This is the latest revision."
-      : "This is an older revision. A newer one is available.";
+      ? "This is the latest version."
+      : "This is an older version. A newer one is available.";
   const published = formatTimestamp(record?.publishedAt);
 
   function displayedSource(): EditorSource | null {
@@ -87,7 +83,7 @@ export function ProfileDetailView({
     return {
       draft: draftFromSpec(record.spec),
       expectedRevisionId: head.revisionId,
-      sourceNote: "This draft starts from the revision shown above.",
+      sourceNote: "This draft starts from the version shown above.",
     };
   }
 
@@ -126,7 +122,7 @@ export function ProfileDetailView({
               if (revision !== "") void headQuery.refetch();
             }}
           >
-            Refresh revision
+            Refresh version
           </Button>
         }
       />
@@ -135,7 +131,7 @@ export function ProfileDetailView({
       </p>
       <Card>
         <CardHeader>
-          <CardTitle>Find a revision</CardTitle>
+          <CardTitle>Find a version</CardTitle>
           <CardDescription>Choose a saved version to inspect.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,7 +141,7 @@ export function ProfileDetailView({
               event.preventDefault();
               const canonical = usableUuid(lookup);
               if (canonical === null) {
-                setLookupError("Choose a revision.");
+                setLookupError("Choose a version.");
                 return;
               }
               setLookupError("");
@@ -154,20 +150,20 @@ export function ProfileDetailView({
           >
             <div className="grid min-w-0 grow basis-64 gap-1.5">
               <ProfileRevisionPicker
-                label="Saved revision"
+                label="Saved version"
                 profileId={profileId}
                 value={lookup}
                 onChange={setLookup}
               />
             </div>
-            <Button type="submit">Open revision</Button>
+            <Button type="submit">Open version</Button>
             <Button
               type="button"
               variant="outline"
               disabled={revision === ""}
               onClick={() => onSearch({ revision: "" })}
             >
-              Latest revision
+              Latest version
             </Button>
           </form>
           {lookupError !== "" ? (
@@ -188,7 +184,7 @@ export function ProfileDetailView({
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Revision</CardTitle>
+              <CardTitle>Version</CardTitle>
               <CardDescription>{headLabel}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -203,12 +199,12 @@ export function ProfileDetailView({
                     search={{ revision: "" }}
                     className="text-sm underline underline-offset-4"
                   >
-                    Open latest revision
+                    Open latest version
                   </Link>
                 ) : null}
               </div>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Fact label="Revision">{formatRevisionNumber(record.revisionNumber)}</Fact>
+                <Fact label="Version">{formatRevisionNumber(record.revisionNumber)}</Fact>
                 <Fact label="Published">
                   {published.date ? (
                     <time dateTime={published.utc}>{published.local}</time>
@@ -232,7 +228,7 @@ export function ProfileDetailView({
                 className="mt-4"
                 items={[
                   { label: "Profile ID", value: profileId },
-                  { label: "Revision ID", value: record.revisionId },
+                  { label: "Version ID", value: record.revisionId },
                   { label: "Publisher ID", value: record.actorId },
                   { label: "Spec SHA-256", value: formatSha256(record.specSha256) },
                 ]}
@@ -255,14 +251,14 @@ export function ProfileDetailView({
       {headFailure ? (
         <RpcError failure={headFailure}>
           <p>
-            Couldn't load the latest revision. Refresh before editing.
+            Couldn't load the latest version. Refresh before editing.
             {attempt ? " You can still retry saving your draft." : ""}
           </p>
         </RpcError>
       ) : null}
       {revision !== "" && headQuery.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Loading latest revision…
+          Loading latest version…
         </p>
       ) : null}
       {editorSource && canPermission(principal, "profiles.manage") ? (
@@ -279,7 +275,7 @@ export function ProfileDetailView({
                 setCopyGeneration((current) => current + 1);
               }}
             >
-              Start over from this revision
+              Start over from this version
             </Button>
           </div>
           <p className="max-w-3xl text-sm text-muted-foreground">

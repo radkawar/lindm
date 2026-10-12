@@ -182,7 +182,7 @@ export function ResourceAssignmentForm({
       payload,
       targetLabel: clear
         ? "Remove profile"
-        : `${head!.name} (revision ${head!.revisionNumber.toString()})`,
+        : `${head!.name}, version ${head!.revisionNumber.toString()}`,
       status: "inflight",
       failure: null,
     });
@@ -270,7 +270,7 @@ export function ResourceAssignmentForm({
         </p>
       ) : (
         <div className="grid min-w-0 gap-2">
-          <Label htmlFor="resource-profile">Profile revision</Label>
+          <Label htmlFor="resource-profile">Profile version</Label>
           <SelectField
             id="resource-profile"
             className="h-9 w-full min-w-0"
@@ -281,7 +281,7 @@ export function ResourceAssignmentForm({
               { value: "", label: "Select a profile" },
               ...(heads.data?.profiles.map((profile) => ({
                 value: profile.revisionId,
-                label: `${profile.name} (revision ${profile.revisionNumber.toString()})`,
+                label: `${profile.name}, version ${profile.revisionNumber.toString()}`,
               })) ?? []),
             ]}
           />
@@ -487,7 +487,7 @@ export function ResourceAssignmentDialog({
           <DialogTitle>Assign profile</DialogTitle>
           <DialogDescription>
             Choose the profile this device should follow. Later edits to the profile are not applied
-            until you assign the new revision.
+            until you assign the new version.
           </DialogDescription>
         </DialogHeader>
         {state.error ? (

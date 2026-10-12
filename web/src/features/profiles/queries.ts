@@ -34,7 +34,7 @@ export function profileRevisionQueryOptions(
       );
       lifetime.signal.throwIfAborted();
       if (!response.revision?.spec || response.revision.revisionId === "") {
-        throw new Error("Couldn't load this profile revision.");
+        throw new Error("Couldn't load this profile version.");
       }
       return response.revision;
     },

@@ -170,6 +170,46 @@ message Device {
   string agent_release = 21 [(buf.validate.field).string.max_len = 128];
   uint32 agent_protocol_version = 22 [(buf.validate.field).uint32.lte = 2147483647];
   google.protobuf.Timestamp agent_version_accepted_at = 23;
+  // Populated by ListDevices and ExportDevices from the current generation's
+  // latest successful host observation; UNKNOWN when never reported.
+  DeviceRootEncryption root_encryption = 24 [(buf.validate.field).enum.defined_only = true];
+  // Current generation's latest reported OS update status. Absent when never
+  // reported or the update backend was unavailable on the device.
+  DeviceUpdateStatus updates = 25;
+  // Open advisory findings of the current, fresh evaluation minus active
+  // exceptions. Absent when the device has no current advisory evaluation.
+  DeviceFindingCounts findings = 26;
+}
+
+// Encryption of the filesystem mounted at "/", as the agent classified it:
+// LUKS or dm-crypt on the root or one of its ancestors is ENCRYPTED, an observed
+// root without a known encryption signature is NOT_ENCRYPTED. Missing storage
+// evidence, a failed collection or no observed root is UNKNOWN, never a guess.
+enum DeviceRootEncryption {
+  DEVICE_ROOT_ENCRYPTION_UNSPECIFIED = 0;
+  DEVICE_ROOT_ENCRYPTION_UNKNOWN = 1;
+  DEVICE_ROOT_ENCRYPTION_ENCRYPTED = 2;
+  DEVICE_ROOT_ENCRYPTION_NOT_ENCRYPTED = 3;
+}
+
+message DeviceUpdateStatus {
+  uint32 pending_updates = 1 [(buf.validate.field).uint32.lte = 100000];
+  uint32 pending_security_updates = 2 [(buf.validate.field).uint32.lte = 100000];
+  bool reboot_required = 3;
+  // Server receipt of the observation that carried this status.
+  google.protobuf.Timestamp received_at = 4;
+  // Older than the fleet patch freshness bound; counts may be out of date.
+  bool stale = 5;
+}
+
+message DeviceFindingCounts {
+  uint32 critical = 1;
+  uint32 high = 2;
+  uint32 medium = 3;
+  uint32 low = 4;
+  uint32 other = 5;
+  // Only verified base-archive packages were matched; others are unchecked.
+  bool partial = 6;
 }
 
 message ListDevicesRequest {

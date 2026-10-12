@@ -29,6 +29,42 @@ export function deviceEncryptionQueryOptions(
   });
 }
 
+// Observed storage candidates for one action kind (`escrow_rotate`, `tpm2_bind`,
+// `crypto_erase` or `sanitize`). A sanitize `recoveryDigest` (64 hex characters)
+// selects the offline-signed recovery image whose readiness is reported.
+export function deviceStorageTargetsQueryOptions(
+  lifetime: AuthLifetime,
+  deviceId: string,
+  actionKind: string,
+  recoveryDigest = "",
+) {
+  return queryOptions({
+    queryKey: [
+      "device-storage-targets",
+      lifetime.generation,
+      deviceId,
+      actionKind,
+      recoveryDigest,
+    ] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.listDeviceStorageTargets(
+        {
+          deviceId,
+          actionKind,
+          recoveryImageSha256: recoveryDigest
+            ? Uint8Array.from(recoveryDigest.match(/../g)!, (byte) => Number.parseInt(byte, 16))
+            : undefined,
+        },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+  });
+}
+
 export function deviceActionsQueryOptions(
   lifetime: AuthLifetime,
   deviceId: string,

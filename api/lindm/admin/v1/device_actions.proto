@@ -22,6 +22,8 @@ message DeviceAction {
   lindm.agent.v1.DeviceActionStatus status = 8;
   string closed_reason = 9;
   uint64 action_revision = 10;
+  // Current account label projected for readers; actor_id stays authoritative.
+  string actor_display_name = 11 [(buf.validate.field).string.max_len = 256];
 }
 message CreateDeviceActionRequest {
   string request_id = 1 [
@@ -90,6 +92,9 @@ message GetDeviceEncryptionResponse {
   DeviceRecoveryEscrow escrow = 2;
   string escrow_key_id = 3;
   bytes escrow_public_key = 4;
+  // True when revealing a recovery key needs a second human's approval for this
+  // caller: escrow.reveal_approval_required or the authorization policy.
+  bool recovery_key_reveal_approval_required = 5;
 }
 // Requires dedicated permission, recent step-up, reason and audited custody access.
 // Return bytes must remain memory-only, outside query caches, URLs and logs.

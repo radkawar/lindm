@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
-import { CohortControl, NumberControl, ReasonControl, OptionalControls } from "./controls";
+import { NumberControl, ReasonControl, OptionalControls, TargetControl } from "./controls";
 import { TargetMutation } from "./mutation";
 
 function newStage(index: number) {
@@ -69,8 +69,8 @@ export function RolloutForm() {
                       onChange={(event) => set({ name: event.target.value })}
                     />
                   </label>
-                  <CohortControl
-                    label={`Devices for stage ${index + 1}`}
+                  <TargetControl
+                    label={`Stage ${index + 1} target`}
                     value={stage.cohort}
                     disabled={disabled}
                     onChange={(cohort) => set({ cohort })}

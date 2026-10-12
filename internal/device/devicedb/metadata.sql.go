@@ -246,21 +246,21 @@ const searchDevices = `-- name: SearchDevices :many
 WITH page AS MATERIALIZED (
     SELECT d.id, d.state, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture, d.enrolled_at, d.last_seen_at, d.open_snapshot_id, d.reserved_inventory_bytes, d.published_sequence, d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.revoked_at, d.revoked_by, d.revoke_reason, d.metadata, d.owner_principal_id
     FROM devices d
-    WHERE device_scope_matches(d.id, $1::boolean, $2::jsonb)
-      AND d.enrolled_at <= $3::timestamptz
-      AND (NOT $4::boolean OR (d.enrolled_at, d.id) < ($5::timestamptz, $6::uuid))
-      AND ($7::text = '' OR d.os_id = $7)
-      AND ($8::text = '' OR d.os_version = $8)
-      AND starts_with(d.hostname, $9::text)
-      AND ($10::text = '' OR EXISTS (
+    WHERE device_scope_matches(d.id, $2::boolean, $3::jsonb)
+      AND d.enrolled_at <= $4::timestamptz
+      AND (NOT $5::boolean OR (d.enrolled_at, d.id) < ($6::timestamptz, $7::uuid))
+      AND ($8::text = '' OR d.os_id = $8)
+      AND ($9::text = '' OR d.os_version = $9)
+      AND starts_with(d.hostname, $10::text)
+      AND ($11::text = '' OR EXISTS (
           SELECT 1 FROM device_release_reports r
-          WHERE r.generation_id = d.current_generation_id AND r.agent_release = $10::text
+          WHERE r.generation_id = d.current_generation_id AND r.agent_release = $11::text
       ))
-      AND ($11::timestamptz IS NULL OR d.last_seen_at >= $11::timestamptz)
-      AND ($12::timestamptz IS NULL OR d.last_seen_at <= $12::timestamptz)
-      AND d.metadata @> $13::jsonb
+      AND ($12::timestamptz IS NULL OR d.last_seen_at >= $12::timestamptz)
+      AND ($13::timestamptz IS NULL OR d.last_seen_at <= $13::timestamptz)
+      AND d.metadata @> $14::jsonb
     ORDER BY d.enrolled_at DESC, d.id DESC
-    LIMIT $14::int
+    LIMIT $15::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
     d.state, d.enrolled_at, d.last_seen_at, d.published_sequence,
@@ -270,10 +270,44 @@ SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.archi
     compliance.compliance_rank, compliance.last_verified_at,
     coalesce(r.agent_release, '')::text AS agent_release,
     coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
-    r.reported_at AS agent_version_accepted_at
+    r.reported_at AS agent_version_accepted_at,
+    -- Latest OS update status of the current generation; unavailable is unknown.
+    (hp.available IS TRUE)::boolean AS updates_reported,
+    coalesce(hp.pending_updates, 0)::int AS pending_updates,
+    coalesce(hp.pending_security_updates, 0)::int AS pending_security_updates,
+    coalesce(hp.reboot_required, false)::boolean AS reboot_required,
+    hp.received_at AS updates_received_at,
+    -- Same freshness rule as FleetSummaryPatch: never trust the device clock alone.
+    coalesce(LEAST(hp.observed_at, hp.received_at) < CURRENT_TIMESTAMP - make_interval(secs => $1::integer), false)::boolean AS updates_stale,
+    (findings.critical IS NOT NULL)::boolean AS findings_checked,
+    coalesce(findings.partial, false)::boolean AS findings_partial,
+    coalesce(findings.critical, 0)::bigint AS findings_critical,
+    coalesce(findings.high, 0)::bigint AS findings_high,
+    coalesce(findings.medium, 0)::bigint AS findings_medium,
+    coalesce(findings.low, 0)::bigint AS findings_low,
+    coalesce(findings.other, 0)::bigint AS findings_other
 FROM page d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
 LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
+LEFT JOIN host_patch_status hp ON hp.generation_id = d.current_generation_id
+LEFT JOIN LATERAL (
+    -- FleetSummaryFindings' open-finding population for one device: the fresh
+    -- evaluation's shared finding set minus this device's active exceptions.
+    -- No fresh evaluation yields no row: advisory coverage is missing.
+    SELECT e.state = 'partial' AS partial,
+        fs.critical_count - count(f.finding_key) FILTER (WHERE f.severity = 'critical') AS critical,
+        fs.high_count - count(f.finding_key) FILTER (WHERE f.severity = 'high') AS high,
+        fs.medium_count - count(f.finding_key) FILTER (WHERE f.severity = 'medium') AS medium,
+        fs.low_count - count(f.finding_key) FILTER (WHERE f.severity = 'low') AS low,
+        fs.other_count - count(f.finding_key) FILTER (WHERE f.severity NOT IN ('critical', 'high', 'medium', 'low')) AS other
+    FROM advisory_device_status s
+    JOIN advisory_evaluations e ON e.device_id = s.device_id
+    JOIN advisory_finding_sets fs ON fs.id = s.finding_set_id
+    LEFT JOIN advisory_exceptions x ON x.device_id = s.device_id AND x.expires_at > CURRENT_TIMESTAMP
+    LEFT JOIN advisory_set_findings f ON f.set_id = fs.id AND f.finding_key = x.finding_id
+    WHERE s.device_id = d.id AND NOT s.unknown
+    GROUP BY e.state, fs.id
+) findings ON true
 CROSS JOIN LATERAL (
     -- Explicit worst rank, independent of protobuf enum numbering:
     -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.
@@ -293,20 +327,21 @@ ORDER BY d.enrolled_at DESC, d.id DESC
 `
 
 type SearchDevicesParams struct {
-	ScopeUnrestricted bool
-	Scopes            []byte
-	UpperEnrolledAt   pgtype.Timestamptz
-	HasCursor         bool
-	CursorEnrolledAt  pgtype.Timestamptz
-	CursorID          uuid.UUID
-	OsID              string
-	OsVersion         string
-	NamePrefix        string
-	AgentRelease      string
-	SeenFrom          pgtype.Timestamptz
-	SeenUntil         pgtype.Timestamptz
-	MetadataFilter    []byte
-	RowLimit          int32
+	PatchStaleAfterSeconds int32
+	ScopeUnrestricted      bool
+	Scopes                 []byte
+	UpperEnrolledAt        pgtype.Timestamptz
+	HasCursor              bool
+	CursorEnrolledAt       pgtype.Timestamptz
+	CursorID               uuid.UUID
+	OsID                   string
+	OsVersion              string
+	NamePrefix             string
+	AgentRelease           string
+	SeenFrom               pgtype.Timestamptz
+	SeenUntil              pgtype.Timestamptz
+	MetadataFilter         []byte
+	RowLimit               int32
 }
 
 type SearchDevicesRow struct {
@@ -331,11 +366,25 @@ type SearchDevicesRow struct {
 	AgentRelease             string
 	AgentProtocolVersion     int32
 	AgentVersionAcceptedAt   pgtype.Timestamptz
+	UpdatesReported          bool
+	PendingUpdates           int32
+	PendingSecurityUpdates   int32
+	RebootRequired           bool
+	UpdatesReceivedAt        pgtype.Timestamptz
+	UpdatesStale             bool
+	FindingsChecked          bool
+	FindingsPartial          bool
+	FindingsCritical         int64
+	FindingsHigh             int64
+	FindingsMedium           int64
+	FindingsLow              int64
+	FindingsOther            int64
 }
 
 // Restrict scope, filters and keyset before projecting bounded page resources.
 func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([]SearchDevicesRow, error) {
 	rows, err := q.db.Query(ctx, searchDevices,
+		arg.PatchStaleAfterSeconds,
 		arg.ScopeUnrestricted,
 		arg.Scopes,
 		arg.UpperEnrolledAt,
@@ -380,6 +429,19 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 			&i.AgentRelease,
 			&i.AgentProtocolVersion,
 			&i.AgentVersionAcceptedAt,
+			&i.UpdatesReported,
+			&i.PendingUpdates,
+			&i.PendingSecurityUpdates,
+			&i.RebootRequired,
+			&i.UpdatesReceivedAt,
+			&i.UpdatesStale,
+			&i.FindingsChecked,
+			&i.FindingsPartial,
+			&i.FindingsCritical,
+			&i.FindingsHigh,
+			&i.FindingsMedium,
+			&i.FindingsLow,
+			&i.FindingsOther,
 		); err != nil {
 			return nil, err
 		}

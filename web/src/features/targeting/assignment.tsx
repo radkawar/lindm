@@ -25,10 +25,10 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import {
-  CohortControl,
   NumberControl,
   OptionalControls,
   ReasonControl,
+  TargetControl,
   TimeControl,
 } from "./controls";
 import { RolloutPicker, useTargetPickers } from "./pickers";
@@ -214,14 +214,14 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
       >
         <fieldset disabled={frozen || read.isPending} className="grid min-w-0 gap-4">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-            <CohortControl
-              label="Cohort"
+            <TargetControl
+              label="Target"
               value={assignment.target}
               disabled={frozen || read.isPending}
               onChange={(target) => change(create(TargetAssignmentSchema, { ...draft, target }))}
             />
             <ProfileRevisionPicker
-              label="Baseline revision"
+              label="Version"
               value={assignment.profileRevisionId}
               disabled={frozen || read.isPending}
               onChange={(profileRevisionId) =>
@@ -268,8 +268,8 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
             </div>
             {assignment.exclusions.map((exclusion, index) => (
               <div className="grid gap-2 border p-3" key={index}>
-                <CohortControl
-                  label={`Exclude ${index + 1}`}
+                <TargetControl
+                  label={`Exclusion ${index + 1}`}
                   value={exclusion}
                   disabled={frozen || read.isPending}
                   onChange={(next) =>
@@ -489,7 +489,7 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
               setAcknowledged(false);
             }}
           >
-            {candidate ? "Review another change" : "Assign another baseline"}
+            {candidate ? "Review another change" : "Start another rollout"}
           </Button>
         </div>
       ) : null}

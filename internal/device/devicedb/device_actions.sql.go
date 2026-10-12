@@ -494,6 +494,38 @@ func (q *Queries) LatestDeviceActionObservation(ctx context.Context, arg LatestD
 	return i, err
 }
 
+const listDeviceActionActorNames = `-- name: ListDeviceActionActorNames :many
+SELECT p.id, coalesce(nullif(p.display_name, ''), account.username, '')::text AS display_name
+FROM principals p
+LEFT JOIN local_accounts account ON account.id = p.id
+WHERE p.id = ANY($1::uuid[])
+`
+
+type ListDeviceActionActorNamesRow struct {
+	ID          uuid.UUID
+	DisplayName string
+}
+
+func (q *Queries) ListDeviceActionActorNames(ctx context.Context, ids []uuid.UUID) ([]ListDeviceActionActorNamesRow, error) {
+	rows, err := q.db.Query(ctx, listDeviceActionActorNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDeviceActionActorNamesRow{}
+	for rows.Next() {
+		var i ListDeviceActionActorNamesRow
+		if err := rows.Scan(&i.ID, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeviceActions = `-- name: ListDeviceActions :many
 SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions
 WHERE device_id = $1

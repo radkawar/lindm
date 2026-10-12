@@ -6,18 +6,23 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Info,
   MoreHorizontal,
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DeviceCompliance, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
+import {
+  DeviceCompliance,
+  DeviceRootEncryption,
+  type Device,
+} from "../../../gen/lindm/admin/v1/admin_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { TechnicalDetails } from "@/components/ui/technical-details";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +52,6 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { PAGE_SIZES } from "@/lib/list-search";
 import { canPermission } from "@/lib/permissions";
-import { AttributeDefinitions } from "./definitions";
 import { DeviceExport, DeviceFilters } from "./filters";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
 import { ObservedTime } from "./observations";
@@ -58,10 +62,13 @@ const columns = [
   { id: "hostname", label: "Device", sortable: true },
   { id: "state", label: "State", sortable: false },
   { id: "compliance", label: "Compliance", sortable: false },
+  { id: "encryption", label: "Encryption", sortable: false },
+  { id: "updates", label: "Updates", sortable: false },
+  { id: "findings", label: "Findings", sortable: false },
   { id: "contact", label: "Last contact", sortable: true },
   { id: "os", label: "Operating system", sortable: true },
   { id: "host", label: "Host received", sortable: false },
-  { id: "inventory", label: "Inventory", sortable: false },
+  { id: "inventory", label: "Last inventory", sortable: false },
   { id: "metadata", label: "Owner / labels / attributes", sortable: false },
   { id: "id", label: "Device ID", sortable: true },
 ] as const;
@@ -100,6 +107,51 @@ const complianceLabels: Record<DeviceCompliance, string> = {
   [DeviceCompliance.UNKNOWN]: "Unknown",
   [DeviceCompliance.ATTENTION]: "Attention",
 };
+
+const unknownEncryption: [string, StatusTone, string] = [
+  "Unknown",
+  "neutral",
+  "No inventory report has identified how the root filesystem is stored yet.",
+];
+const encryptionLabels: Record<DeviceRootEncryption, [string, StatusTone, string]> = {
+  [DeviceRootEncryption.UNSPECIFIED]: unknownEncryption,
+  [DeviceRootEncryption.UNKNOWN]: unknownEncryption,
+  [DeviceRootEncryption.ENCRYPTED]: [
+    "Encrypted",
+    "success",
+    "The root filesystem is on an encrypted volume.",
+  ],
+  [DeviceRootEncryption.NOT_ENCRYPTED]: [
+    "Not encrypted",
+    "warning",
+    "No disk encryption was found under the root filesystem.",
+  ],
+};
+
+// Posture cells share the compliance cell's pattern: a focusable status badge
+// whose tooltip carries the evidence behind the one-word state.
+function PostureBadge({
+  tone,
+  label,
+  children,
+}: {
+  tone: StatusTone;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<StatusBadge dot tabIndex={0} status={tone} />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipContent className="block max-w-72 space-y-2">{children}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function plural(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
 
 function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
   switch (column) {
@@ -153,6 +205,71 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
           </TooltipContent>
         </Tooltip>
       );
+    case "encryption": {
+      const [label, tone, detail] = encryptionLabels[device.rootEncryption] ?? unknownEncryption;
+      return (
+        <PostureBadge tone={tone} label={label}>
+          <p>{detail}</p>
+          <p>From the latest inventory report.</p>
+        </PostureBadge>
+      );
+    }
+    case "updates": {
+      const updates = device.updates;
+      if (!updates)
+        return (
+          <PostureBadge tone="neutral" label="Unknown">
+            <p>No update status reported, or the update service is unavailable.</p>
+          </PostureBadge>
+        );
+      const tone: StatusTone =
+        updates.stale || updates.pendingSecurityUpdates > 0 || updates.rebootRequired
+          ? "warning"
+          : updates.pendingUpdates > 0
+            ? "neutral"
+            : "success";
+      const label = updates.pendingUpdates > 0 ? `${updates.pendingUpdates} pending` : "Up to date";
+      const security = plural(updates.pendingSecurityUpdates, "security update");
+      return (
+        <PostureBadge tone={tone} label={label}>
+          <p>
+            {security} pending{updates.rebootRequired ? " · Restart required" : ""}
+          </p>
+          <p>
+            Reported <ObservedTime value={updates.receivedAt} server />
+            {updates.stale ? ". This report is old; counts may be out of date." : "."}
+          </p>
+        </PostureBadge>
+      );
+    }
+    case "findings": {
+      const findings = device.findings;
+      if (!findings)
+        return (
+          <PostureBadge tone="neutral" label="Not checked">
+            <p>No current advisory check covers this device. Advisories shows why.</p>
+          </PostureBadge>
+        );
+      const tone: StatusTone = findings.partial
+        ? "neutral"
+        : findings.critical > 0
+          ? "destructive"
+          : findings.high > 0
+            ? "warning"
+            : "success";
+      const label = `${findings.critical} critical · ${findings.high} high`;
+      const rest = `${findings.medium} medium, ${findings.low} low, ${findings.other} unrated`;
+      return (
+        <PostureBadge tone={tone} label={findings.partial ? `${label} · partial` : label}>
+          <p>
+            Open findings: {label}, {rest}. Accepted risks are excluded.
+          </p>
+          {findings.partial ? (
+            <p>Partial check: only packages from the distribution archive were matched.</p>
+          ) : null}
+        </PostureBadge>
+      );
+    }
     case "contact":
       return <ObservedTime value={device.lastSeenAt} server relative />;
     case "os":
@@ -169,10 +286,7 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
       return device.publishedSnapshotSequence === 0n ? (
         "Not published"
       ) : (
-        <>
-          #{device.publishedSnapshotSequence.toString()} ·{" "}
-          <ObservedTime value={device.snapshotReceivedAt} server relative />
-        </>
+        <ObservedTime value={device.snapshotReceivedAt} server relative />
       );
     case "metadata":
       return (
@@ -214,6 +328,9 @@ export function DevicesView({
     "hostname",
     "state",
     "compliance",
+    "encryption",
+    "updates",
+    "findings",
     "contact",
     "os",
     "inventory",
@@ -443,6 +560,22 @@ export function DevicesView({
             >
               New search / latest devices
             </Button>
+            {data ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button size="icon-sm" variant="ghost" aria-label="About paging this search" />
+                  }
+                >
+                  <Info aria-hidden="true" />
+                </TooltipTrigger>
+                <TooltipContent className="block max-w-72">
+                  {"You can page through this search until "}
+                  <ObservedTime value={data.cursorExpiresAt} />
+                  {" at the latest. Start a new search to see newly enrolled devices."}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
             <Button
               size="sm"
               variant="outline"
@@ -462,21 +595,9 @@ export function DevicesView({
           </div>
         </div>
       </div>
-      {data ? (
-        <p className="text-xs text-muted-foreground">
-          You can page through this search until <ObservedTime value={data.cursorExpiresAt} /> at
-          the latest. Start a new search to see newly enrolled devices.
-        </p>
-      ) : null}
       <details className="border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Export devices</summary>
         <DeviceExport key={`${search.filter ?? ""}:${search.pageSize}`} search={search} />
-      </details>
-      <details className="border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-          Custom attributes
-        </summary>
-        <AttributeDefinitions />
       </details>
     </section>
   );

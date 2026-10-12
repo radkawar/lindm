@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { DynamicGroupPicker, useTargetPickers } from "./pickers";
 
-export function CohortControl({
+// Each control gets its own visible label: "<label> type" for the kind and
+// "<label>" for the chosen group or device, so no two fields share a name.
+export function TargetControl({
   label,
   value,
   onChange,
@@ -27,22 +29,24 @@ export function CohortControl({
         ? DynamicGroupPicker
         : GroupPicker;
   return (
-    <fieldset className="grid min-w-0 gap-3" disabled={disabled}>
-      <legend className="mb-2 text-sm font-medium">{label}</legend>
-      <SelectField
-        aria-label={`${label} type`}
-        disabled={disabled}
-        value={kind}
-        options={[
-          { value: "staticGroupId", label: "Device group" },
-          { value: "dynamicGroupId", label: "Dynamic group" },
-          { value: "deviceId", label: "One device" },
-        ]}
-        onValueChange={(next) => {
-          if (next === "deviceId" || next === "staticGroupId" || next === "dynamicGroupId")
-            onChange(create(TargetRefSchema, { target: { case: next, value: "" } }));
-        }}
-      />
+    <div className="grid min-w-0 gap-3">
+      <label className="grid gap-1.5 text-sm font-medium">
+        {`${label} type`}
+        <SelectField
+          aria-label={`${label} type`}
+          disabled={disabled}
+          value={kind}
+          options={[
+            { value: "staticGroupId", label: "Device group" },
+            { value: "dynamicGroupId", label: "Dynamic group" },
+            { value: "deviceId", label: "One device" },
+          ]}
+          onValueChange={(next) => {
+            if (next === "deviceId" || next === "staticGroupId" || next === "dynamicGroupId")
+              onChange(create(TargetRefSchema, { target: { case: next, value: "" } }));
+          }}
+        />
+      </label>
       <Picker
         label={label}
         value={value?.target.value ?? ""}
@@ -51,7 +55,7 @@ export function CohortControl({
           onChange(create(TargetRefSchema, { target: { case: kind, value: next } }))
         }
       />
-    </fieldset>
+    </div>
   );
 }
 

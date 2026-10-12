@@ -133,7 +133,7 @@ const commands = {
     const label = { view: "View screen", control: "View and request control" }[args.mode];
     if (!label) throw new Error("invalid_mode");
     await driver.goto(`${config.origin}/devices/${args.deviceId}`);
-    await ui.click({ role: "tab", text: "Actions" });
+    await ui.click({ role: "tab", text: "Remote assistance" });
     await ui.select("Mode", label);
     await ui.fill({ label: "Maximum duration (minutes, 1 to 30)" }, String(args.minutes));
     await ui.fill({ label: "Reason (shown to the local user and audited)" }, args.reason);

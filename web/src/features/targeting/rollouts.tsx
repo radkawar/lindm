@@ -1,13 +1,21 @@
 import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ControlRolloutRequest_Operation,
   ControlRolloutRequestSchema,
   type RolloutState,
 } from "../../../gen/lindm/admin/v1/targeting_pb";
+import type { TargetCandidate, TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { SelectField } from "@/components/ui/select-field";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -19,13 +27,17 @@ import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { AssignmentForm } from "./assignment";
-import { CohortControl, ReasonControl } from "./controls";
+import { ReasonControl } from "./controls";
 import { TargetMutation } from "./mutation";
-import { rolloutsQueryOptions, targetAssignmentsQueryOptions } from "./queries";
+import {
+  dynamicGroupsQueryOptions,
+  rolloutsQueryOptions,
+  targetAssignmentsQueryOptions,
+} from "./queries";
 import { ListStatus, TargetPagination } from "./list";
 import { TargetPreviewView } from "./preview";
 import { RolloutForm } from "./rollout-form";
-import { useTargetPickers } from "./pickers";
+import { rolloutName, type TargetNames } from "./pickers";
 
 const ROLLOUT_REASON_MESSAGES: Record<string, string> = {
   failure_threshold:
@@ -38,37 +50,81 @@ const ROLLOUT_REASON_MESSAGES: Record<string, string> = {
     "The rollout's creator is no longer authorized to advance it. Ask an administrator to review their access.",
 };
 
-export function RolloutsView({ initialDevice = "" }: { initialDevice?: string }) {
+export function RolloutsView({
+  initialDevice = "",
+  names,
+}: {
+  initialDevice?: string;
+  names: TargetNames;
+}) {
   const principal = usePrincipal();
-  const [stagedOpen, setStagedOpen] = useState(false);
+  const canAssign = canPermission(principal, "resources.assign", true);
+  const [creating, setCreating] = useState(false);
+  const formHeading = useRef<HTMLHeadingElement>(null);
+  const newRollout = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!creating) return;
+    formHeading.current?.scrollIntoView({ block: "start" });
+    formHeading.current?.focus();
+  }, [creating]);
+  const inspect = <TargetPreviewView key={initialDevice} initialDevice={initialDevice} />;
   return (
     <section className="grid min-w-0 gap-6">
       <PageHeader
         title="Rollouts"
-        description="Review who would receive a baseline before saving an assignment."
+        description="Who gets which profile version, and how far each staged rollout has progressed."
+        actions={
+          canAssign ? (
+            <Button
+              ref={newRollout}
+              type="button"
+              aria-controls={creating ? "new-rollout" : undefined}
+              aria-expanded={creating}
+              onClick={() => {
+                if (!creating) setCreating(true);
+                else formHeading.current?.focus();
+              }}
+            >
+              New rollout
+            </Button>
+          ) : null
+        }
       />
-      {canPermission(principal, "resources.assign", true) ? (
+      {initialDevice ? inspect : null}
+      {canAssign ? (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Assign a baseline</h2>
-              </CardTitle>
-              <CardDescription>
-                Choose a cohort and a saved baseline revision. Review the affected devices before
-                committing.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AssignmentForm />
-            </CardContent>
-          </Card>
-          <details className="border p-4">
-            <summary className="cursor-pointer text-base font-semibold">Saved assignments</summary>
-            <div className="mt-4">
-              <Assignments />
-            </div>
-          </details>
+          <StagedRollouts names={names} />
+          <SavedAssignments names={names} />
+          {creating ? (
+            <Card id="new-rollout" role="region" aria-labelledby="new-rollout-title">
+              <CardHeader>
+                <CardTitle>
+                  <h2 id="new-rollout-title" ref={formHeading} tabIndex={-1}>
+                    New rollout
+                  </h2>
+                </CardTitle>
+                <CardDescription>
+                  Choose a target and a profile version, then review the affected devices before
+                  saving.
+                </CardDescription>
+                <CardAction>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setCreating(false);
+                      newRollout.current?.focus();
+                    }}
+                  >
+                    Close
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <AssignmentForm />
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
@@ -76,164 +132,278 @@ export function RolloutsView({ initialDevice = "" }: { initialDevice?: string })
           access to change assignments or rollouts.
         </p>
       )}
-      <details className="border p-4" open={initialDevice ? true : undefined}>
-        <summary className="cursor-pointer text-base font-semibold">
-          Inspect and activate one device
-        </summary>
-        <div className="mt-4">
-          <TargetPreviewView key={initialDevice} initialDevice={initialDevice} />
+      {initialDevice ? null : inspect}
+    </section>
+  );
+}
+
+function DynamicGroupName({ value }: { value: string }) {
+  const query = useQuery(dynamicGroupsQueryOptions(useAuthLifetime(), ""));
+  const group = query.data?.find((item) => item.groupId === value);
+  if (group) return group.name || "(unnamed)";
+  if (query.isPending) return "(loading name…)";
+  if (query.error) return "(name unavailable)";
+  return "(not among the first 100 dynamic groups)";
+}
+
+function TargetName({ target, names }: { target?: TargetRef; names: TargetNames }) {
+  const value = target?.target.value ?? "";
+  const DeviceName = names.deviceName;
+  const GroupName = names.groupName;
+  if (!value) return <>no target chosen</>;
+  switch (target?.target.case) {
+    case "deviceId":
+      return (
+        <>
+          device <DeviceName value={value} />
+        </>
+      );
+    case "dynamicGroupId":
+      return (
+        <>
+          dynamic group <DynamicGroupName value={value} />
+        </>
+      );
+    default:
+      return (
+        <>
+          device group <GroupName value={value} />
+        </>
+      );
+  }
+}
+
+// What a saved assignment delivers and to whom, in one line.
+function Delivery({ candidate, names }: { candidate: TargetCandidate; names: TargetNames }) {
+  const ProfileVersionName = names.profileVersionName;
+  const assignment = candidate.assignment;
+  if (!assignment) return null;
+  return (
+    <span className="break-words">
+      <span className="font-medium">
+        <ProfileVersionName value={assignment.profileRevisionId} />
+      </span>{" "}
+      to <TargetName target={assignment.target} names={names} />
+    </span>
+  );
+}
+
+function StagedRollouts({ names }: { names: TargetNames }) {
+  const lifetime = useAuthLifetime();
+  const [afterId, setAfterId] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const list = useQuery({
+    ...rolloutsQueryOptions(lifetime, afterId),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+  });
+  // Assignments name what each rollout delivers; the first page shares the
+  // Saved assignments cache entry.
+  const assignments = useQuery(targetAssignmentsQueryOptions(lifetime, ""));
+  const states = list.data?.filter((state) => state.rollout) ?? [];
+  const paused = states.filter((state) => state.paused).length;
+  return (
+    <section aria-labelledby="staged-rollouts-title" className="grid min-w-0 gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="grid gap-1">
+          <h2 id="staged-rollouts-title" className="text-base font-semibold">
+            Staged rollouts
+          </h2>
+          {list.data && !list.error ? (
+            <p className="text-sm text-muted-foreground">
+              {states.length - paused} in progress, {paused} paused
+              {list.data.length === 100 ? " on this page" : ""}.
+            </p>
+          ) : null}
         </div>
-      </details>
-      {canPermission(principal, "resources.assign", true) ? (
-        <details
-          className="border p-4"
-          onToggle={(event) => setStagedOpen(event.currentTarget.open)}
-        >
-          <summary className="cursor-pointer text-base font-semibold">Staged rollouts</summary>
-          <div className="mt-4">
-            <Rollouts active={stagedOpen} />
-          </div>
-        </details>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={planning}
+            onClick={() => setPlanning(!planning)}
+          >
+            Plan staged rollout
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={list.isFetching}
+            onClick={() => void list.refetch()}
+          >
+            Refresh rollouts
+          </Button>
+        </div>
+      </div>
+      {planning ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h3>Plan staged rollout</h3>
+            </CardTitle>
+            <CardAction>
+              <Button type="button" variant="outline" onClick={() => setPlanning(false)}>
+                Close
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <RolloutForm />
+          </CardContent>
+        </Card>
+      ) : null}
+      <ListStatus
+        pending={list.isPending}
+        error={list.error}
+        empty={list.data?.length === 0}
+        noun="staged rollouts"
+      />
+      {!list.error
+        ? states.map((state) => (
+            <RolloutCard
+              key={state.rollout?.rolloutId}
+              state={state}
+              names={names}
+              deliveries={assignments.data?.filter(
+                (candidate) => candidate.assignment?.rolloutId === state.rollout?.rolloutId,
+              )}
+              deliveriesComplete={!!assignments.data && assignments.data.length < 100}
+            />
+          ))
+        : null}
+      {afterId || list.data?.length === 100 ? (
+        <TargetPagination
+          afterId={afterId}
+          nextId={list.data?.length === 100 ? list.data.at(-1)?.rollout?.rolloutId : undefined}
+          busy={list.isFetching}
+          onPage={setAfterId}
+        />
       ) : null}
     </section>
   );
 }
 
-function Assignments() {
+function SavedAssignments({ names }: { names: TargetNames }) {
   const lifetime = useAuthLifetime();
-  const { profileRevisionPicker: ProfileRevisionPicker } = useTargetPickers();
   const [afterId, setAfterId] = useState("");
+  const [editing, setEditing] = useState("");
   const list = useQuery(targetAssignmentsQueryOptions(lifetime, afterId));
+  const rollouts = useQuery(rolloutsQueryOptions(lifetime, ""));
   return (
-    <div className="grid min-w-0 gap-4">
-      <Button
-        type="button"
-        className="w-fit"
-        variant="outline"
-        disabled={list.isFetching}
-        onClick={() => void list.refetch()}
-      >
-        Refresh assignments
-      </Button>
+    <section aria-labelledby="saved-assignments-title" className="grid min-w-0 gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="saved-assignments-title" className="text-base font-semibold">
+          Saved assignments
+        </h2>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={list.isFetching}
+          onClick={() => void list.refetch()}
+        >
+          Refresh assignments
+        </Button>
+      </div>
       <ListStatus
         pending={list.isPending}
         error={list.error}
         empty={list.data?.length === 0}
-        noun="assignments"
+        noun="saved assignments"
       />
-      {!list.error
-        ? list.data?.map((candidate) =>
-            candidate.assignment ? (
-              <article
-                key={candidate.assignment.assignmentId}
-                className="grid min-w-0 gap-3 border p-4"
-              >
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <StatusBadge status={candidate.assignment.disabled ? "neutral" : "info"}>
-                    {candidate.assignment.disabled ? "Disabled" : "Saved, not proof of activation"}
+      {!list.error && list.data?.length ? (
+        <ul className="grid min-w-0 gap-3">
+          {list.data.map((candidate) => {
+            const assignment = candidate.assignment;
+            if (!assignment) return null;
+            const rollout = assignment.rolloutId
+              ? rollouts.data?.find((state) => state.rollout?.rolloutId === assignment.rolloutId)
+              : undefined;
+            const open = editing === assignment.assignmentId;
+            return (
+              <li key={assignment.assignmentId} className="grid min-w-0 gap-2 border p-3 text-sm">
+                <Delivery candidate={candidate} names={names} />
+                <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                  <StatusBadge status={assignment.disabled ? "neutral" : "info"}>
+                    {assignment.disabled ? "Disabled" : "Saved, not proof of activation"}
                   </StatusBadge>
-                  <span>Priority {candidate.assignment.priority}</span>
+                  <span>Priority {assignment.priority}</span>
+                  {assignment.rolloutId ? (
+                    <span>
+                      Staged rollout: {rollout ? rolloutName(rollout) : "not on the first page"}
+                    </span>
+                  ) : null}
+                  {assignment.exclusions.length ? (
+                    <span>
+                      {assignment.exclusions.length}{" "}
+                      {assignment.exclusions.length === 1 ? "exclusion" : "exclusions"}
+                    </span>
+                  ) : null}
+                  {assignment.activatesAt ? (
+                    <span>Eligible from {formatTimestamp(assignment.activatesAt).local}</span>
+                  ) : null}
+                  {assignment.expiresAt ? (
+                    <span>Expires {formatTimestamp(assignment.expiresAt).local}</span>
+                  ) : null}
                 </div>
-                <ProfileRevisionPicker
-                  label="Assigned baseline revision"
-                  value={candidate.assignment.profileRevisionId}
-                  disabled
-                  onChange={() => {}}
-                />
-                <CohortControl
-                  label="Assigned cohort"
-                  value={candidate.assignment.target}
-                  disabled
-                  onChange={() => {}}
-                />
-                <details>
-                  <summary className="cursor-pointer text-sm font-medium">
-                    Review a change to this assignment
-                  </summary>
-                  <div className="mt-4">
-                    <AssignmentForm
-                      key={`${candidate.assignment.assignmentId}:${candidate.revision}`}
-                      candidate={candidate}
-                    />
-                  </div>
-                </details>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-fit"
+                  aria-expanded={open}
+                  onClick={() => setEditing(open ? "" : assignment.assignmentId)}
+                >
+                  {open ? "Close change review" : "Review a change"}
+                </Button>
+                {open ? (
+                  <AssignmentForm
+                    key={`${assignment.assignmentId}:${candidate.revision}`}
+                    candidate={candidate}
+                  />
+                ) : null}
                 <TechnicalDetails
                   items={[
-                    { label: "Assignment ID", value: candidate.assignment.assignmentId },
+                    { label: "Assignment ID", value: assignment.assignmentId },
                     { label: "Revision", value: candidate.revision.toString() },
                   ]}
                 />
-              </article>
-            ) : null,
-          )
-        : null}
-      <TargetPagination
-        afterId={afterId}
-        nextId={list.data?.length === 100 ? list.data.at(-1)?.assignment?.assignmentId : undefined}
-        busy={list.isFetching}
-        onPage={setAfterId}
-      />
-    </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {afterId || list.data?.length === 100 ? (
+        <TargetPagination
+          afterId={afterId}
+          nextId={
+            list.data?.length === 100 ? list.data.at(-1)?.assignment?.assignmentId : undefined
+          }
+          busy={list.isFetching}
+          onPage={setAfterId}
+        />
+      ) : null}
+    </section>
   );
 }
 
-function Rollouts({ active }: { active: boolean }) {
-  const lifetime = useAuthLifetime();
-  const [afterId, setAfterId] = useState("");
-  const list = useQuery({
-    ...rolloutsQueryOptions(lifetime, afterId),
-    refetchInterval: active ? 10_000 : false,
-    refetchIntervalInBackground: false,
-  });
-  return (
-    <div className="grid min-w-0 gap-4">
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">Plan a staged rollout</summary>
-        <div className="mt-4">
-          <RolloutForm />
-        </div>
-      </details>
-      <Button
-        type="button"
-        className="w-fit"
-        variant="outline"
-        disabled={list.isFetching}
-        onClick={() => void list.refetch()}
-      >
-        Refresh rollouts
-      </Button>
-      <ListStatus
-        pending={list.isPending}
-        error={list.error}
-        empty={list.data?.length === 0}
-        noun="rollouts"
-      />
-      {!list.error
-        ? list.data?.map((state) =>
-            state.rollout ? <RolloutCard key={state.rollout.rolloutId} state={state} /> : null,
-          )
-        : null}
-      <TargetPagination
-        afterId={afterId}
-        nextId={list.data?.length === 100 ? list.data.at(-1)?.rollout?.rolloutId : undefined}
-        busy={list.isFetching}
-        onPage={setAfterId}
-      />
-    </div>
-  );
-}
-
-function RolloutCard({ state }: { state: RolloutState }) {
+function RolloutCard({
+  state,
+  names,
+  deliveries,
+  deliveriesComplete,
+}: {
+  state: RolloutState;
+  names: TargetNames;
+  deliveries?: TargetCandidate[];
+  deliveriesComplete: boolean;
+}) {
   const rollout = state.rollout;
   if (!rollout) return null;
   const stage = rollout.rings[state.ringIndex];
   const next = rollout.rings[state.ringIndex + 1];
   return (
     <article className="grid min-w-0 gap-3 border p-4">
-      <h3 className="break-words text-sm font-semibold">
-        {rollout.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout"}
-      </h3>
-      <p className="flex flex-wrap gap-2 text-sm">
+      <h3 className="break-words text-sm font-semibold">{rolloutName(state)}</h3>
+      <p className="flex flex-wrap items-center gap-2 text-sm">
         <StatusBadge status={state.paused ? "warning" : "info"}>
           {state.paused
             ? "Paused"
@@ -243,8 +413,25 @@ function RolloutCard({ state }: { state: RolloutState }) {
                 ? "Manual promotion required"
                 : "Waiting to advance"}
         </StatusBadge>
-        <span>Current stage: {stage?.name ?? "Unknown"}</span>
+        <span>
+          Stage {state.ringIndex + 1} of {rollout.rings.length}: {stage?.name ?? "Unknown"}
+        </span>
       </p>
+      {deliveries?.length ? (
+        <ul className="grid gap-1 text-sm">
+          {deliveries.map((candidate) => (
+            <li key={candidate.assignment?.assignmentId}>
+              <Delivery candidate={candidate} names={names} />
+            </li>
+          ))}
+        </ul>
+      ) : deliveries ? (
+        <p className="text-sm text-muted-foreground">
+          {deliveriesComplete
+            ? "No saved assignment uses this rollout yet. Choose it in a new rollout to stage a profile version."
+            : "No saved assignment on the first page uses this rollout."}
+        </p>
+      ) : null}
       {state.pauseReason ? (
         <p className="break-words text-sm">
           Paused: {ROLLOUT_REASON_MESSAGES[state.pauseReason] ?? state.pauseReason}
@@ -290,12 +477,9 @@ function RolloutCard({ state }: { state: RolloutState }) {
               <h4 className="font-medium">
                 {ring.name}: {ring.cumulativeBasisPoints / 100}% cumulative share
               </h4>
-              <CohortControl
-                label="Stage cohort"
-                value={ring.cohort}
-                disabled
-                onChange={() => {}}
-              />
+              <p>
+                Target: <TargetName target={ring.cohort} names={names} />
+              </p>
               <p>
                 At least {ring.minimumCanaries} initial devices and {ring.minimumObserved}{" "}
                 observations; observe for {ring.soakSeconds} seconds. Observations must be no older
@@ -369,7 +553,7 @@ function RolloutCard({ state }: { state: RolloutState }) {
                 ? "Pause selection for this rollout; previously activated changes are not undone."
                 : request.operation === ControlRolloutRequest_Operation.RESUME
                   ? "Resume selection under the saved stage guardrails; this does not activate device changes."
-                  : "Advance from the reviewed stage only if its saved revision, health and soak checks still match. This does not activate device changes."}
+                  : "Advance from the reviewed stage only if its saved stage, health and soak checks still match. This does not activate device changes."}
             </p>
             <ReasonControl
               value={request.reason}

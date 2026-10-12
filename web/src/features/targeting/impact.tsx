@@ -46,13 +46,13 @@ const reasonLabels: Record<string, string> = {
   host_inventory_unknown: "Inventory is missing. Request fresh inventory on this device.",
   host_inventory_stale: "Inventory is older than 24 hours. Request fresh inventory on this device.",
   membership_inventory_stale:
-    "Inventory is too old to confirm cohort membership. Request fresh inventory on this device.",
+    "Inventory is too old to confirm target membership. Request fresh inventory on this device.",
   device_not_active: "This device is not enrolled for active management.",
-  membership_unknown: "Cohort membership is unknown. Check group rules and fresh inventory.",
+  membership_unknown: "Target membership is unknown. Check group rules and fresh inventory.",
   resolution_has_unknown_membership:
     "Other assignments have unknown membership. Resolve these before activation.",
-  candidate_limit: "The cohort exceeds the review device limit. Narrow the cohort.",
-  report_byte_limit: "The impact report exceeds the review size limit. Narrow the cohort.",
+  candidate_limit: "The target exceeds the review device limit. Narrow the target.",
+  report_byte_limit: "The impact report exceeds the review size limit. Narrow the target.",
   device_visibility_incomplete:
     "Some affected devices are outside your access. Ask an administrator with full device access to review.",
 };
@@ -107,17 +107,20 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
               </div>
               {resource.reason ? <p>{resource.reason.replaceAll("_", " ")}</p> : null}
               {resource.overriddenRevisionIds.length ? (
-                <p>Overrides {resource.overriddenRevisionIds.length} other profile revision(s).</p>
+                <p>
+                  Overrides {resource.overriddenRevisionIds.length} other profile{" "}
+                  {resource.overriddenRevisionIds.length === 1 ? "version" : "versions"}.
+                </p>
               ) : null}
               <TechnicalDetails
                 items={[
                   { label: "Required capability", value: resource.capabilityId },
                   {
-                    label: "Contributing profile revisions",
+                    label: "Contributing profile versions",
                     value: resource.contributingRevisionIds.join(", "),
                   },
                   {
-                    label: "Overridden profile revisions",
+                    label: "Overridden profile versions",
                     value: resource.overriddenRevisionIds.join(", "),
                   },
                 ]}
@@ -166,7 +169,7 @@ export function AssignmentImpact({
         <Alert>
           <AlertTitle>Impact coverage is incomplete</AlertTitle>
           <AlertDescription>
-            Do not treat these devices as the complete affected set. Narrow the cohort or ask an
+            Do not treat these devices as the complete affected set. Narrow the target or ask an
             administrator with full device access to review it. Saving is blocked.
           </AlertDescription>
         </Alert>
@@ -202,7 +205,7 @@ export function AssignmentImpact({
       </p>
       {review.devices.length === 0 ? (
         <p className="text-sm">
-          No devices appear in this review. Check the selected cohort, exclusions and timing before
+          No devices appear in this review. Check the selected target, exclusions and timing before
           saving.
         </p>
       ) : (

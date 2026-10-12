@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DeviceFindings } from "@/features/advisories/device-findings";
+import { DeviceFindingsSummary } from "@/features/advisories/device-findings-summary";
 import { DeviceAssistanceCard } from "@/features/assistance/panel";
 import { AccountPicker } from "@/features/auth/picker";
 import { DeviceActionHistory } from "@/features/devices/actions";
@@ -58,6 +59,7 @@ function DeviceDetailRoute() {
         <ResourceAssignmentDialog deviceId={deviceId} open={open} onOpenChange={onOpenChange} />
       )}
       findings={<DeviceFindings deviceId={deviceId} />}
+      findingsSummary={<DeviceFindingsSummary deviceId={deviceId} />}
       history={<DeviceActionHistory deviceId={deviceId} />}
       revoke={(device) => <RevokeApprovalRequest deviceId={device.id} />}
       assistance={<DeviceAssistanceCard deviceId={deviceId} />}

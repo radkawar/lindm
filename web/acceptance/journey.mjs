@@ -320,9 +320,6 @@ export async function confirmEnrolledDevice(ui, config) {
         // not an enrollment-history row or a phrase elsewhere on the page.
         const badge = section?.querySelector('[data-slot="badge"]');
         const visible = badge && badge.getClientRects().length > 0;
-        const refresh = [...(section?.querySelectorAll("button") ?? [])].find(
-          (button) => button.textContent.trim() === "Refresh page",
-        );
         const alert = section?.querySelector('[data-review-state="tool-custody"]');
         const codes = [...(alert?.querySelectorAll("code") ?? [])].map((code) =>
           code.textContent.trim(),
@@ -331,7 +328,6 @@ export async function confirmEnrolledDevice(ui, config) {
           exactDevicePage: location.pathname === expectedPath,
           lifecycle: visible ? badge.textContent.trim() : "",
           busy: section?.getAttribute("aria-busy") !== "false",
-          canRefresh: !!refresh && !refresh.disabled,
           toolCustody:
             alert && alert.getClientRects().length > 0 && codes[0] === expectedToolPath
               ? {
@@ -354,9 +350,9 @@ export async function confirmEnrolledDevice(ui, config) {
       };
     if (state.lifecycle === "Revoked" || state.lifecycle === "Recovery hold")
       throw new Error("enrollment_device_not_active");
-    if (state.canRefresh && Date.now() >= nextRefresh) {
-      // Read-only query refresh, never Request inventory or an enrollment retry.
-      await ui.click({ role: "button", text: "Refresh page" });
+    if (!state.busy && Date.now() >= nextRefresh) {
+      // Read-only page reload, never Request inventory or an enrollment retry.
+      await ui.driver.goto(`${config.origin}${path}`);
       nextRefresh = Date.now() + 2_000;
     }
     await delay(250);
@@ -369,12 +365,12 @@ export async function confirmEnrolledDevice(ui, config) {
 export async function assignProfile(ui, config) {
   await ui.driver.goto(`${config.origin}/devices/${encodeURIComponent(config.deviceId)}`);
   await ui.click({ role: "button", text: "Assign profile" });
-  await ui.wait({ label: "Profile revision", enabled: true });
+  await ui.wait({ label: "Profile version", enabled: true });
   let label = "";
   // Choose visible options with real input. Base UI's hidden form input
   // reflects the exact selected server revision; read it before submitting.
   for (let page = 0; page < 20 && !label; page++) {
-    await ui.click({ label: "Profile revision" });
+    await ui.click({ label: "Profile version" });
     // The placeholder option is always rendered; wait for the popup to mount
     // before reading the page's options once.
     await ui.wait({ role: "option", text: "Select a profile" });
@@ -388,7 +384,7 @@ export async function assignProfile(ui, config) {
     );
     if (labels.length > 200) throw new Error("profile_catalog_page_limit");
     for (let index = 0; index < labels.length; index++) {
-      if (index) await ui.click({ label: "Profile revision" });
+      if (index) await ui.click({ label: "Profile version" });
       await ui.click({ role: "option", text: labels[index] });
       // Base UI commits the hidden input value asynchronously after input.
       let selected = false;
@@ -407,7 +403,7 @@ export async function assignProfile(ui, config) {
         break;
       }
     }
-    if (!labels.length) await ui.click({ label: "Profile revision" });
+    if (!labels.length) await ui.click({ label: "Profile version" });
     if (!label) {
       const next = await ui.driver.find({
         role: "button",
@@ -416,7 +412,7 @@ export async function assignProfile(ui, config) {
       });
       if (!next) throw new Error("supplied_profile_revision_not_in_catalog");
       await ui.driver.click(next);
-      await ui.wait({ label: "Profile revision", enabled: true });
+      await ui.wait({ label: "Profile version", enabled: true });
     }
   }
   if (!label) throw new Error("profile_catalog_page_limit");

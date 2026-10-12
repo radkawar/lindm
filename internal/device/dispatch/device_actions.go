@@ -74,6 +74,24 @@ func actionMessage(row devicedb.DeviceAction) (*adminv1.DeviceAction, error) {
 	return result, nil
 }
 
+// actionActorNames projects current account labels for admin readers. A
+// missing principal keeps an empty label; actor_id stays the audited identity.
+func actionActorNames(ctx context.Context, q *devicedb.Queries, rows ...devicedb.DeviceAction) (map[uuid.UUID]string, error) {
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ActorID)
+	}
+	labels, err := q.ListDeviceActionActorNames(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[uuid.UUID]string, len(labels))
+	for _, label := range labels {
+		names[label.ID] = label.DisplayName
+	}
+	return names, nil
+}
+
 // Inventory gates freshness and exact observed selection, not destructive
 // authority. Root-owned signed preflight independently qualifies native effects.
 func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation uuid.UUID, spec *agentv1.DeviceActionSpec, now time.Time) error {

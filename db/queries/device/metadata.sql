@@ -92,10 +92,44 @@ SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.archi
     compliance.compliance_rank, compliance.last_verified_at,
     coalesce(r.agent_release, '')::text AS agent_release,
     coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
-    r.reported_at AS agent_version_accepted_at
+    r.reported_at AS agent_version_accepted_at,
+    -- Latest OS update status of the current generation; unavailable is unknown.
+    (hp.available IS TRUE)::boolean AS updates_reported,
+    coalesce(hp.pending_updates, 0)::int AS pending_updates,
+    coalesce(hp.pending_security_updates, 0)::int AS pending_security_updates,
+    coalesce(hp.reboot_required, false)::boolean AS reboot_required,
+    hp.received_at AS updates_received_at,
+    -- Same freshness rule as FleetSummaryPatch: never trust the device clock alone.
+    coalesce(LEAST(hp.observed_at, hp.received_at) < CURRENT_TIMESTAMP - make_interval(secs => sqlc.arg('patch_stale_after_seconds')::integer), false)::boolean AS updates_stale,
+    (findings.critical IS NOT NULL)::boolean AS findings_checked,
+    coalesce(findings.partial, false)::boolean AS findings_partial,
+    coalesce(findings.critical, 0)::bigint AS findings_critical,
+    coalesce(findings.high, 0)::bigint AS findings_high,
+    coalesce(findings.medium, 0)::bigint AS findings_medium,
+    coalesce(findings.low, 0)::bigint AS findings_low,
+    coalesce(findings.other, 0)::bigint AS findings_other
 FROM page d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
 LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
+LEFT JOIN host_patch_status hp ON hp.generation_id = d.current_generation_id
+LEFT JOIN LATERAL (
+    -- FleetSummaryFindings' open-finding population for one device: the fresh
+    -- evaluation's shared finding set minus this device's active exceptions.
+    -- No fresh evaluation yields no row: advisory coverage is missing.
+    SELECT e.state = 'partial' AS partial,
+        fs.critical_count - count(f.finding_key) FILTER (WHERE f.severity = 'critical') AS critical,
+        fs.high_count - count(f.finding_key) FILTER (WHERE f.severity = 'high') AS high,
+        fs.medium_count - count(f.finding_key) FILTER (WHERE f.severity = 'medium') AS medium,
+        fs.low_count - count(f.finding_key) FILTER (WHERE f.severity = 'low') AS low,
+        fs.other_count - count(f.finding_key) FILTER (WHERE f.severity NOT IN ('critical', 'high', 'medium', 'low')) AS other
+    FROM advisory_device_status s
+    JOIN advisory_evaluations e ON e.device_id = s.device_id
+    JOIN advisory_finding_sets fs ON fs.id = s.finding_set_id
+    LEFT JOIN advisory_exceptions x ON x.device_id = s.device_id AND x.expires_at > CURRENT_TIMESTAMP
+    LEFT JOIN advisory_set_findings f ON f.set_id = fs.id AND f.finding_key = x.finding_id
+    WHERE s.device_id = d.id AND NOT s.unknown
+    GROUP BY e.state, fs.id
+) findings ON true
 CROSS JOIN LATERAL (
     -- Explicit worst rank, independent of protobuf enum numbering:
     -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.
@@ -112,3 +146,8 @@ CROSS JOIN LATERAL (
     WHERE p.device_id = d.id
 ) compliance
 ORDER BY d.enrolled_at DESC, d.id DESC;
+
+-- name: HostObservationDetails :batchone
+-- Native details of a generation's latest successful host observation. Batched
+-- so a device list page decodes one row at a time, never every page's details.
+SELECT details FROM host_observations WHERE generation_id = $1;

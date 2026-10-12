@@ -1,5 +1,5 @@
 import { toJsonString } from "@bufbuild/protobuf";
-import { useId } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { ListDeviceStorageTargetsResponse } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import {
   NvmeIdentityBasis,
@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { StorageTargetView, type DeviceActionKind } from "./action-display";
-import { Fact } from "./observations";
+import { Fact, ObservedTime } from "./observations";
+import { formatBytes } from "@/lib/bytes";
 
 export type ObservedStorageSelection = {
   target: StorageTarget;
@@ -24,13 +25,21 @@ export type ObservedStorageSelection = {
 
 const unavailableMessages: Record<string, string> = {
   device_action_inventory_unavailable: "No storage reported yet. Refresh inventory.",
-  device_action_inventory_stale: "Storage info is out of date. Refresh inventory first.",
+  device_action_inventory_stale: "Storage info is too old. Refresh inventory first.",
   device_action_storage_unavailable: "No storage reported yet. Refresh inventory.",
   device_action_storage_identity_unavailable:
     "No disk can be used for this action yet. Refresh inventory.",
   device_action_tpm2_unavailable: "No TPM 2.0 reported. Refresh inventory.",
   device_action_tpm2_binding_unsupported:
     "This OS release cannot bind the disk to the TPM (systemd 252 or newer is required).",
+};
+
+// Completes "Storage info from 12 min ago is too old …" per action.
+const staleUses: Partial<Record<DeviceActionKind, string>> = {
+  cryptoErase: "for a wipe",
+  sanitize: "for a wipe",
+  escrowRotate: "for a key rotation",
+  tpm2Bind: "for TPM binding",
 };
 
 export function observedStorageSelections(
@@ -68,6 +77,8 @@ export function ObservedStorageTargetPicker({
   selectedKey,
   onSelect,
   onRefresh,
+  refreshNote,
+  refreshStatus,
   disabled = false,
 }: {
   targets: ListDeviceStorageTargetsResponse | undefined;
@@ -75,11 +86,24 @@ export function ObservedStorageTargetPicker({
   selectedKey: string;
   onSelect: (key: string, selection: ObservedStorageSelection) => void;
   onRefresh: () => void;
+  // Shown above Refresh inventory, e.g. why the last refresh didn't complete.
+  refreshNote?: ReactNode;
+  // Replaces Refresh inventory while a requested refresh is still pending.
+  refreshStatus?: ReactNode;
   disabled?: boolean;
 }) {
   const id = useId();
   const entries = observedStorageSelections(targets, kind);
   const selected = entries.find((entry) => entry.key === selectedKey);
+  // The server gates on receipt time (five minutes); show its age, kept current.
+  const staleSince = targets && !targets.fresh ? targets.receivedAt : undefined;
+  const stale = staleSince !== undefined;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!stale) return;
+    const timer = window.setInterval(() => setTick((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, [stale]);
   const unavailable = targets?.unavailableReason
     ? (unavailableMessages[targets.unavailableReason] ??
       "Storage can't be selected right now. Refresh inventory.")
@@ -103,7 +127,7 @@ export function ObservedStorageTargetPicker({
               { value: "", label: "Select observed storage", disabled: true },
               ...entries.map(({ key, selection }) => ({
                 value: key,
-                label: `${selection.name || "Name not reported"} · ${selection.target.sizeBytes.toLocaleString()} bytes · ${selection.model || "Model not reported"} · ${selection.encryption || "Encryption not reported"}`,
+                label: `${selection.name || "Name not reported"} · ${formatBytes(selection.target.sizeBytes)} · ${selection.model || "Model not reported"} · ${selection.encryption || "Encryption not reported"}`,
               })),
             ]}
             onValueChange={(key) => {
@@ -121,22 +145,37 @@ export function ObservedStorageTargetPicker({
           ) : null}
           {selected ? <ObservedStorageIdentity selection={selected.selection} /> : null}
         </>
+      ) : staleSince ? (
+        <div className="grid gap-1">
+          <p role="status" className="text-sm text-warning">
+            Storage info from <ObservedTime value={staleSince} relative server /> is too old{" "}
+            {staleUses[kind] ?? "for this action"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Disk actions need storage info received in the last 5 minutes.
+          </p>
+        </div>
       ) : (
         <p role="status" className="text-sm text-muted-foreground">
           {unavailable}
         </p>
       )}
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          aria-haspopup="dialog"
-          disabled={disabled}
-          onClick={onRefresh}
-        >
-          Refresh inventory
-        </Button>
-      </div>
+      {refreshStatus ?? (
+        <>
+          {refreshNote}
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              aria-haspopup="dialog"
+              disabled={disabled}
+              onClick={onRefresh}
+            >
+              Refresh inventory
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -175,7 +214,7 @@ function ObservedStorageIdentity({ selection }: { selection: ObservedStorageSele
                 <Fact label="Controller firmware">
                   {identity.controllerFirmware || "Not reported"}
                 </Fact>
-                <Fact label="Namespace size (bytes)">{identity.namespaceSizeBytes.toString()}</Fact>
+                <Fact label="Namespace size">{formatBytes(identity.namespaceSizeBytes)}</Fact>
                 <Fact label="LBA data size shift (LBADS)">{identity.lbaDataSizeShift}</Fact>
               </>
             ) : null}

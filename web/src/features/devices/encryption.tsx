@@ -1,9 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import type { DeviceActionObservation } from "../../../gen/lindm/agent/v1/device_actions_pb";
+import type { DeviceRecoveryEscrow } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import {
@@ -21,13 +30,49 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { actionLabels, actionPermissions, StorageTargetView } from "./action-display";
+import {
+  actionLabels,
+  actionPermissions,
+  StorageTargetFacts,
+  storageTargetDetailItems,
+} from "./action-display";
 import { deviceActionsQueryOptions, deviceEncryptionQueryOptions } from "./action-queries";
 import { Fact, ObservedTime } from "./observations";
+
+// One sentence answering "can this disk be unlocked if the passphrase is lost?",
+// from the escrow record and the latest observation of the escrowed volume.
+function recoverability(
+  volume: DeviceActionObservation | undefined,
+  escrow: DeviceRecoveryEscrow | undefined,
+  escrowVolume: string,
+): ReactNode {
+  const tpm = volume?.encrypted
+    ? volume.tpm2Bound
+      ? "TPM unlock on"
+      : "TPM unlock off"
+    : "TPM unlock not reported";
+  if (!escrow) {
+    if (!volume) return "Unknown: no encryption status or recovery key reported yet";
+    if (!volume.encrypted)
+      return "Not recoverable: the latest report shows this volume isn't encrypted and no recovery key is stored";
+    return `Not recoverable: no recovery key escrowed, ${tpm}`;
+  }
+  if (volume && !volume.encrypted)
+    return "Not recoverable: the latest report shows this volume is no longer encrypted";
+  if (volume?.occupiedKeyslots.length && !volume.occupiedKeyslots.includes(escrow.keyslot))
+    return `Not recoverable: the escrowed key's slot ${escrow.keyslot} is no longer on this volume`;
+  return (
+    <>
+      Recoverable: recovery key{escrowVolume ? ` for ${escrowVolume}` : ""} escrowed{" "}
+      <ObservedTime value={escrow.storedAt} server relative />, {tpm}
+    </>
+  );
+}
 
 export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
+  const navigate = useNavigate();
   const [luksUuid, setLuksUuid] = useState("");
   const [volumePageToken, setVolumePageToken] = useState("");
   const history = useQuery(deviceActionsQueryOptions(lifetime, deviceId, volumePageToken));
@@ -62,34 +107,141 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
     value: uuid,
     label: `Volume ${index + 1}`,
   }));
+  // A single known volume needs no picker; paging stays while older history may hold more.
+  const multipleVolumes = volumeOptions.length > 1 || !!luksUuid;
+  const morePages = !!volumePageToken || !!history.data?.nextPageToken;
+  const escrowVolume =
+    !luksUuid && volumeOptions.length > 1
+      ? (volumeOptions.find((volume) => volume.value === escrow?.luksUuid)?.label ?? "")
+      : "";
+  // The verdict and slot facts use the observation only when it describes the escrowed volume;
+  // either record may omit its volume, so only two different reported UUIDs disagree.
+  const verdictVolume =
+    !escrow ||
+    !observed?.target?.luksUuid ||
+    !escrow.luksUuid ||
+    observed.target.luksUuid === escrow.luksUuid
+      ? observed
+      : undefined;
+  // Slot lists are empty when the device did not report them; never present that as "None".
+  const slotsReported = !!observed?.occupiedKeyslots.length;
+  const escrowSlotPresent = !!escrow && !!verdictVolume?.occupiedKeyslots.includes(escrow.keyslot);
+  const canReveal = !!escrow && canPermission(principal, "recovery_keys.read");
+  const secondary = [
+    ...(["escrowRotate", "tpm2Bind"] as const)
+      .filter((kind) => canPermission(principal, actionPermissions[kind]))
+      .map((kind) => ({
+        label: actionLabels[kind],
+        open: () =>
+          void navigate({
+            to: "/devices/$deviceId/actions/new/$kind",
+            params: { deviceId, kind },
+            search: { luksUuid },
+          }),
+      })),
+    ...(canPermission(principal, "device.revoke")
+      ? [
+          {
+            label: "Recover device enrollment",
+            open: () =>
+              void navigate({ to: "/devices/$deviceId/recovery-enrollment", params: { deviceId } }),
+          },
+        ]
+      : []),
+  ];
+  // Without an escrowed key, escrowing one (listed first when permitted) is the next step.
+  const primary =
+    !escrow && canPermission(principal, actionPermissions.escrowRotate) ? secondary[0] : null;
+  const menu = primary ? secondary.slice(1) : secondary;
+  const details = [
+    ...(multipleVolumes
+      ? volumeOptions.map((volume) => ({ label: `${volume.label} LUKS UUID`, value: volume.value }))
+      : []),
+    ...(observed?.target ? storageTargetDetailItems(observed.target) : []),
+    ...(escrow
+      ? [
+          { label: "Recovery key action ID", value: escrow.actionId },
+          ...(escrow.luksUuid !== observed?.target?.luksUuid
+            ? [{ label: "Recovery key LUKS UUID", value: escrow.luksUuid }]
+            : []),
+        ]
+      : []),
+  ];
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Encryption and recovery keys</CardTitle>
-        <CardDescription>
-          Pick a volume to see its encryption status and recovery key.
-        </CardDescription>
+        <CardTitle>
+          {failure
+            ? "Unknown: encryption status couldn't be loaded"
+            : data
+              ? recoverability(verdictVolume, escrow, escrowVolume)
+              : "Encryption and recovery key"}
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`encryption-volume-${deviceId}`}>Encrypted volume</Label>
-          <SelectField
-            id={`encryption-volume-${deviceId}`}
-            value={luksUuid}
-            onValueChange={setLuksUuid}
-            options={[{ value: "", label: "Most recent records (any volume)" }, ...volumeOptions]}
-          />
-          <TechnicalDetails
-            items={volumeOptions.map((volume) => ({
-              label: `${volume.label} LUKS UUID`,
-              value: volume.value,
-            }))}
-          />
-          {historyFailure ? (
-            <RpcError failure={historyFailure} title="Couldn't load volume history">
-              <p>Only the most recently reported volumes are listed.</p>
-            </RpcError>
-          ) : null}
+        {query.isPending ? <p role="status">Loading encryption status…</p> : null}
+        {failure ? <RpcError failure={failure} /> : null}
+        {data ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {canReveal && escrow ? (
+              <Button
+                onClick={() =>
+                  void navigate({
+                    to: "/devices/$deviceId/recovery/$actionId",
+                    params: { deviceId, actionId: escrow.actionId },
+                  })
+                }
+              >
+                Reveal recovery key
+              </Button>
+            ) : primary ? (
+              <Button onClick={primary.open}>{primary.label}</Button>
+            ) : null}
+            {canReveal && data.recoveryKeyRevealApprovalRequired ? (
+              <p className="text-sm text-muted-foreground">
+                Requires approval from another administrator.
+              </p>
+            ) : null}
+            {menu.length ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" />}>
+                  Other encryption actions <ChevronDown aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-56">
+                  {menu.map((item) => (
+                    <DropdownMenuItem key={item.label} onClick={item.open}>
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            <Button
+              variant="outline"
+              disabled={query.isFetching}
+              onClick={() => void query.refetch()}
+            >
+              Refresh
+            </Button>
+          </div>
+        ) : null}
+        {multipleVolumes ? (
+          <div className="grid gap-2">
+            <Label htmlFor={`encryption-volume-${deviceId}`}>Encrypted volume</Label>
+            <SelectField
+              id={`encryption-volume-${deviceId}`}
+              value={luksUuid}
+              onValueChange={setLuksUuid}
+              options={[{ value: "", label: "Most recent records (any volume)" }, ...volumeOptions]}
+            />
+          </div>
+        ) : null}
+        {historyFailure ? (
+          <RpcError failure={historyFailure} title="Couldn't load volume history">
+            <p>Only the most recently reported volumes are listed.</p>
+          </RpcError>
+        ) : null}
+        {morePages ? (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -106,12 +258,27 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
               Older volumes
             </Button>
           </div>
-        </div>
-        <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Refresh
-        </Button>
-        {query.isPending ? <p role="status">Loading encryption status…</p> : null}
-        {failure ? <RpcError failure={failure} /> : null}
+        ) : null}
+        {escrow ? (
+          <>
+            <h3 className="font-semibold">
+              {luksUuid ? "Recovery key for selected volume" : "Most recent recovery key"}
+            </h3>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <Fact label="Key slot">{escrow.keyslot}</Fact>
+              <Fact label="Stored on server">
+                <ObservedTime value={escrow.storedAt} server />
+              </Fact>
+              <Fact label="Old key removed">
+                <StatusBadge status={escrow.retirementConfirmed ? "success" : "warning"}>
+                  {escrow.retirementConfirmed ? "Yes" : "Not confirmed"}
+                </StatusBadge>
+              </Fact>
+            </dl>
+          </>
+        ) : data ? (
+          <p className="text-sm">No recovery key stored yet.</p>
+        ) : null}
         {observed ? (
           <>
             <h3 className="font-semibold">
@@ -135,18 +302,16 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
                   {observed.tpm2Bound ? "On" : "Off"}
                 </StatusBadge>
               </Fact>
-              <Fact label="Key slots managed by lindm">
-                {observed.lindmKeyslots.length ? observed.lindmKeyslots.join(", ") : "None"}
-              </Fact>
+              {slotsReported ? (
+                <Fact label="Key slots in use">{observed.occupiedKeyslots.join(", ")}</Fact>
+              ) : null}
+              {observed.lindmKeyslots.length ? (
+                <Fact label="Key slots managed by lindm">{observed.lindmKeyslots.join(", ")}</Fact>
+              ) : slotsReported && !escrowSlotPresent ? (
+                <Fact label="Key slots managed by lindm">None</Fact>
+              ) : null}
               <Fact label="Running from recovery">
                 {observed.recoveryEnvironment ? "Yes" : "No"}
-              </Fact>
-            </dl>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="All used key slots">
-                {observed.occupiedKeyslots.length
-                  ? observed.occupiedKeyslots.join(", ")
-                  : "None reported"}
               </Fact>
             </dl>
             {observed.luksTokens.length ? (
@@ -171,73 +336,17 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
                   ))}
                 </TableBody>
               </Table>
+            ) : null}
+            {observed.target ? (
+              <StorageTargetFacts target={observed.target} />
             ) : (
-              <p>No unlock tokens reported.</p>
+              <p className="text-sm">No storage target reported.</p>
             )}
-            <StorageTargetView target={observed.target} />
           </>
         ) : data ? (
           <p className="text-sm">No encryption status reported yet.</p>
         ) : null}
-        {escrow ? (
-          <>
-            <h3 className="font-semibold">
-              {luksUuid ? "Recovery key for selected volume" : "Most recent recovery key"}
-            </h3>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="Key slot">{escrow.keyslot}</Fact>
-              <Fact label="Stored on server">
-                <ObservedTime value={escrow.storedAt} server />
-              </Fact>
-              <Fact label="Old key removed">
-                <StatusBadge status={escrow.retirementConfirmed ? "success" : "warning"}>
-                  {escrow.retirementConfirmed ? "Yes" : "Not confirmed"}
-                </StatusBadge>
-              </Fact>
-            </dl>
-            <TechnicalDetails
-              items={[
-                { label: "Action ID", value: escrow.actionId },
-                { label: "LUKS UUID", value: escrow.luksUuid },
-              ]}
-            />
-            {canPermission(principal, "recovery_keys.read") ? (
-              <Link
-                to="/devices/$deviceId/recovery/$actionId"
-                params={{ deviceId, actionId: escrow.actionId }}
-                className="w-fit text-sm underline"
-              >
-                Reveal recovery key
-              </Link>
-            ) : null}
-          </>
-        ) : data ? (
-          <p className="text-sm">No recovery key stored yet.</p>
-        ) : null}
-        <div className="flex flex-wrap gap-4">
-          {(["escrowRotate", "tpm2Bind"] as const)
-            .filter((kind) => canPermission(principal, actionPermissions[kind]))
-            .map((kind) => (
-              <Link
-                key={kind}
-                to="/devices/$deviceId/actions/new/$kind"
-                params={{ deviceId, kind }}
-                search={{ luksUuid }}
-                className="text-sm underline"
-              >
-                {actionLabels[kind]}
-              </Link>
-            ))}
-          {canPermission(principal, "device.revoke") ? (
-            <Link
-              to="/devices/$deviceId/recovery-enrollment"
-              params={{ deviceId }}
-              className="text-sm underline"
-            >
-              Recover device enrollment
-            </Link>
-          ) : null}
-        </div>
+        <TechnicalDetails items={details} />
       </CardContent>
     </Card>
   );

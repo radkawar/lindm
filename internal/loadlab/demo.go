@@ -71,7 +71,8 @@ type demoSeed struct {
 }
 
 // DemoPresence keeps the route device checking in after seeding, so the console
-// can request remote assistance from it. Stop ends it and releases the device.
+// can request remote assistance and inventory refreshes from it. Stop ends it
+// and releases the device.
 type DemoPresence struct {
 	cancel context.CancelFunc
 	done   chan error
@@ -92,8 +93,9 @@ func (p *DemoPresence) Stop() error {
 // assistance, approval, secret and integration state reached only through
 // product RPCs and simulated devices. Devices are labelled synthetic. All but
 // the route device stop reporting afterwards; that one keeps polling its
-// assistance state (a real check-in) until the caller stops the returned
-// presence, which it must do before closing the fixture. It reconfigures the
+// assistance state and action work (real check-ins) and completes requested
+// inventory refreshes until the caller stops the returned presence, which it
+// must do before closing the fixture. It reconfigures the
 // fixture once through ConfigureConsoleDemo, never returns or logs secret
 // material, and releases its sessions and other device transports before
 // return. The caller must not concurrently close or reconfigure the fixture.
@@ -163,20 +165,27 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	presence = &DemoPresence{cancel: stop, done: done}
 	go func() {
 		defer present.close()
-		done <- demoCheckIns(presenceCtx, present)
+		done <- s.checkIns(presenceCtx, present)
 	}()
 	return s.demo, presence, nil
 }
 
-// demoCheckIns polls the device's assistance state, as an idle agent does,
-// until cancelled. Requested sessions stay unanswered: no user is present.
-func demoCheckIns(ctx context.Context, d *simulatedDevice) error {
+// checkIns polls the device's assistance state and action work, as an idle
+// agent does, until cancelled. Requested sessions stay unanswered: no user is
+// present. A requested inventory refresh completes, so console flows waiting for
+// fresh storage can finish; any other work is left to expire unstarted.
+func (s *demoSeed) checkIns(ctx context.Context, d *simulatedDevice) error {
 	ticker := time.NewTicker(demoPresenceInterval)
 	defer ticker.Stop()
 	for {
 		call, cancel := context.WithTimeout(ctx, 15*time.Second)
 		_, err := d.client.SyncAssistance(call, connect.NewRequest(&devicev1.SyncAssistanceRequest{SessionEpoch: d.epoch}))
 		cancel()
+		if err == nil {
+			call, cancel = context.WithTimeout(ctx, time.Minute)
+			err = s.answerRefresh(call, d)
+			cancel()
+		}
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -189,6 +198,32 @@ func demoCheckIns(ctx context.Context, d *simulatedDevice) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+// answerRefresh completes delivered, unstarted refresh-inventory work and
+// leaves every other action untouched.
+func (s *demoSeed) answerRefresh(ctx context.Context, d *simulatedDevice) error {
+	response, err := d.client.GetDeviceActionWork(ctx, connect.NewRequest(&devicev1.GetDeviceActionWorkRequest{SessionEpoch: d.epoch}))
+	if err != nil {
+		return err
+	}
+	work := response.Msg.GetWork()
+	if work == nil || len(work.GetStartGrantEnvelope()) > 0 {
+		return nil
+	}
+	// As an agent does, pick up any trust update before verifying the intent.
+	if err := s.syncTrust(ctx, d); err != nil {
+		return err
+	}
+	intent, err := s.verifier.VerifyDeviceActionIntent(ctx, d.root, d.delegation, work.GetIntentEnvelope(), time.Now())
+	if err != nil {
+		return errors.Join(errProtocolViolation, err)
+	}
+	if intent.GetSpec().GetRefreshInventory() == nil {
+		return nil
+	}
+	_, err = s.completeDeviceAction(ctx, d, work, intent.GetSpec())
+	return err
 }
 
 func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObservation) error {
@@ -232,6 +267,13 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	}
 	if err := s.acceptFinding(ctx, rich); err != nil {
 		return err
+	}
+	for _, d := range s.devices {
+		if d.demo.proposal {
+			if err := s.proposeAdvisoryAcceptance(ctx, d); err != nil {
+				return err
+			}
+		}
 	}
 	for _, d := range s.devices {
 		if d.demo.state == "stale" {
@@ -403,10 +445,18 @@ func (s *demoSeed) deviceAction(ctx context.Context, d *simulatedDevice, spec *a
 	if err != nil {
 		return "", err
 	}
+	return s.completeDeviceAction(ctx, d, work, spec)
+}
+
+// completeDeviceAction runs the simulated executor protocol for delivered work
+// and returns its action ID.
+func (s *demoSeed) completeDeviceAction(ctx context.Context, d *simulatedDevice, work *devicev1.DeviceActionWork, spec *agentv1.DeviceActionSpec) (string, error) {
+	id := work.GetActionId()
 	rotate := spec.GetEscrowRotate()
 	p, err := s.prepareDeviceAction(ctx, d, work, func(intent *agentv1.DeviceActionIntent, plan *agentv1.DeviceActionPlan) bool {
 		if rotate != nil {
-			plan.Before.Target, plan.Before.Encrypted = rotate.GetTarget(), true
+			// A fresh install's passphrase occupies slot 0; rotation adds lindm's slot 1.
+			plan.Before.Target, plan.Before.Encrypted, plan.Before.OccupiedKeyslots = rotate.GetTarget(), true, []uint32{0}
 			plan.RecoveryBinding = &agentv1.RecoveryKeyBinding{DeviceId: d.id, EnrollmentGeneration: d.generation, ActionId: id, LuksUuid: rotate.GetTarget().GetLuksUuid(), NewKeyslot: 1}
 		}
 		return proto.Equal(intent.GetSpec(), spec)
@@ -443,6 +493,7 @@ func (s *demoSeed) deviceAction(ctx context.Context, d *simulatedDevice, spec *a
 			return "", err
 		}
 		verification.Verified, verification.After.Target, verification.After.Encrypted = false, rotate.GetTarget(), true
+		verification.After.LindmKeyslots, verification.After.OccupiedKeyslots = []uint32{1}, []uint32{0, 1}
 		status.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW
 		if err := s.attestDeviceAction(ctx, d, p, status, revision); err != nil {
 			return "", err
@@ -705,7 +756,7 @@ func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error 
 				if err != nil {
 					return fmt.Errorf("accept demo finding: %w", err)
 				}
-				return s.proposeAdvisoryAcceptance(ctx, d)
+				return nil
 			}
 		}
 		select {

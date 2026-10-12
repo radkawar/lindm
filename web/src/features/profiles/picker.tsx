@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
 import { Button } from "@/components/ui/button";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
+import { formatRevisionNumber } from "./model";
 import {
   profilesQueryOptions,
   profileRevisionQueryOptions,
@@ -25,13 +26,13 @@ export function ProfilePicker({
   const options = (query.data?.profiles ?? []).map((profile) => ({
     value: profile.profileId,
     label: profile.name,
-    description: `Revision ${profile.revisionNumber}`,
+    description: `Latest version ${profile.revisionNumber}`,
   }));
   if (selected.data && !options.some((option) => option.value === props.value))
     options.unshift({
       value: props.value,
       label: selected.data.spec?.name || "Unnamed profile",
-      description: `Revision ${selected.data.revisionNumber}`,
+      description: `Latest version ${selected.data.revisionNumber}`,
     });
   return (
     <SearchPicker
@@ -100,12 +101,12 @@ export function ProfileRevisionPicker({
   });
   const options = (query.data?.revisions ?? []).map((revision) => ({
     value: revision.revisionId,
-    label: `${revision.name || "Unnamed profile"}, revision ${revision.revisionNumber}`,
+    label: `${revision.name || "Unnamed profile"}, version ${revision.revisionNumber}`,
   }));
   if (exact.data && !options.some((option) => option.value === props.value))
     options.unshift({
       value: props.value,
-      label: `${exact.data.spec?.name || "Unnamed profile"}, revision ${exact.data.revisionNumber}`,
+      label: `${exact.data.spec?.name || "Unnamed profile"}, version ${exact.data.revisionNumber}`,
     });
   return (
     <div className="grid gap-2">
@@ -122,9 +123,9 @@ export function ProfileRevisionPicker({
         {...props}
         disabled={props.disabled || !profileId}
         options={options}
-        note="Search within this page of up to 100 saved revisions."
+        note="Search within this page of up to 100 saved versions."
       >
-        {profileId && query.isPending ? <p role="status">Loading revisions…</p> : null}
+        {profileId && query.isPending ? <p role="status">Loading versions…</p> : null}
         {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
         {exact.error ? <RpcError failure={toRpcFailure(exact.error)} /> : null}
         <div className="flex gap-2">
@@ -135,7 +136,7 @@ export function ProfileRevisionPicker({
               disabled={props.disabled || query.isFetching}
               onClick={() => setCursor({ profile: profileId, token: "" })}
             >
-              Latest revisions
+              Latest versions
             </Button>
           ) : null}
           {query.data?.nextPageToken ? (
@@ -147,11 +148,44 @@ export function ProfileRevisionPicker({
                 setCursor({ profile: profileId, token: query.data?.nextPageToken ?? "" })
               }
             >
-              Older revisions
+              Older versions
             </Button>
           ) : null}
         </div>
       </SearchPicker>
     </div>
   );
+}
+
+// Names a saved profile version for read-only lists. An assignment carries
+// only the version identity, so older versions are found in the version
+// history of the first page of profiles, fetched only when no latest matches.
+export function ProfileVersionName({ value }: { value: string }) {
+  const lifetime = useAuthLifetime();
+  const heads = useQuery(profilesQueryOptions(lifetime, 100, ""));
+  const latest = heads.data?.profiles.find((profile) => profile.revisionId === value);
+  const histories = useQueries({
+    queries:
+      latest || !heads.data
+        ? []
+        : heads.data.profiles.map((profile) =>
+            profileRevisionsQueryOptions(lifetime, profile.profileId, ""),
+          ),
+  });
+  const older = histories
+    .flatMap((history) => history.data?.revisions ?? [])
+    .find((revision) => revision.revisionId === value);
+  const match = latest ?? older;
+  if (match)
+    return (
+      <>
+        {match.name || "Unnamed profile"}, version {formatRevisionNumber(match.revisionNumber)}
+        {latest ? "" : " (a newer version exists)"}
+      </>
+    );
+  if (heads.isPending || histories.some((history) => history.isPending))
+    return <>Loading profile name…</>;
+  if (heads.error || histories.some((history) => history.error))
+    return <>Profile name unavailable</>;
+  return <>Profile version not found on the first page of profiles</>;
 }

@@ -275,7 +275,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                         { label: "Assignment ID", value: candidate.assignment?.assignmentId },
                         { label: "Revision", value: candidate.revision.toString() },
                         {
-                          label: "Profile revision ID",
+                          label: "Profile version ID",
                           value: candidate.assignment?.profileRevisionId,
                         },
                       ]}
@@ -332,11 +332,11 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                       items={[
                         { label: "Required capability", value: resolved.capabilityId },
                         {
-                          label: "From profile revisions",
+                          label: "From profile versions",
                           value: resolved.contributingRevisionIds.join(", "),
                         },
                         {
-                          label: "Overridden profile revisions",
+                          label: "Overridden profile versions",
                           value: resolved.overriddenRevisionIds.join(", "),
                         },
                       ]}

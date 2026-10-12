@@ -43,7 +43,7 @@ export async function reviewSSHBanner({
       await page
         .getByText("Setting 1: Enter the notice shown before SSH sign-in.", { exact: true })
         .waitFor();
-      if (await page.getByRole("link", { name: "View this revision", exact: true }).count())
+      if (await page.getByRole("link", { name: "View this version", exact: true }).count())
         throw new Error("Empty banner published");
       await review(
         page,
@@ -66,15 +66,15 @@ export async function reviewSSHBanner({
       );
       step = "publish typed profile";
       await page.getByRole("button", { name: "Publish profile", exact: true }).click();
-      await page.getByRole("link", { name: "View this revision", exact: true }).click();
+      await page.getByRole("link", { name: "View this version", exact: true }).click();
       step = "reload persisted notice";
       await page.reload({ waitUntil: "domcontentloaded" });
       await settle(page);
       await field.waitFor();
       if ((await field.inputValue()) !== notice) throw new Error("Saved banner bytes changed");
-      await page.getByText("This is the latest revision.", { exact: true }).waitFor();
-      if (await page.getByText(/^Older revision\./).count())
-        throw new Error("Pinned latest revision is labelled older");
+      await page.getByText("This is the latest version.", { exact: true }).waitFor();
+      if (await page.getByText(/^Older version\./).count())
+        throw new Error("Pinned latest version is labelled older");
       // Check the fetched revision as well as the editable draft, which can
       // survive reload in the existing publication-outbox recovery state.
       const saved = page

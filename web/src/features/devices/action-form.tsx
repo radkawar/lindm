@@ -1,15 +1,19 @@
 import { create, equals, toBinary } from "@bufbuild/protobuf";
-import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CreateDeviceActionRequestSchema } from "../../../gen/lindm/admin/v1/device_actions_pb";
+import {
+  CreateDeviceActionRequestSchema,
+  type DeviceAction,
+} from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
 import {
   CryptoEraseActionSchema,
   CryptoEraseMode,
   DeviceActionSpecSchema,
+  DeviceActionState,
   EscrowRotateActionSchema,
   LockSessionsActionSchema,
   NVMeSanitizeScopeSchema,
@@ -73,7 +77,12 @@ import {
   StorageTargetView,
   type DeviceActionKind,
 } from "./action-display";
-import { deviceActionsQueryOptions, deviceEncryptionQueryOptions } from "./action-queries";
+import {
+  deviceActionQueryOptions,
+  deviceActionsQueryOptions,
+  deviceEncryptionQueryOptions,
+  deviceStorageTargetsQueryOptions,
+} from "./action-queries";
 import { deviceQueryOptions } from "./queries";
 import { validateInventory } from "./validation";
 import {
@@ -125,6 +134,20 @@ const actionSummaries: Record<DeviceActionKind, string> = {
   localAdminPasswordRotate: "Set a new password for the managed local admin account.",
   patchNow: "Install OS updates now. Results appear in Patch status.",
 };
+
+// Where a requested inventory refresh stands as of its last poll. Polling stops
+// at a terminal state, a server close, or a minute past the request's expiry
+// (at most 10 minutes after it was sent), so waiting is always bounded.
+function refreshOutcome(action: DeviceAction | undefined, polledAt: number) {
+  const state = action?.status?.state;
+  if (state === DeviceActionState.SUCCEEDED) return "succeeded";
+  if (state === DeviceActionState.FAILED) return "failed";
+  if (state === DeviceActionState.OUTCOME_UNKNOWN) return "unknown";
+  if (state === DeviceActionState.EXPIRED || action?.closedReason) return "expired";
+  const expiresAt = action?.expiresAt ? timestampDate(action.expiresAt).getTime() : NaN;
+  if (polledAt > expiresAt + 60_000) return action?.status ? "unknown" : "expired";
+  return "waiting";
+}
 
 function QuarantineActionPicker({ deviceId, ...props }: PickerProps & { deviceId: string }) {
   const lifetime = useAuthLifetime();
@@ -227,6 +250,7 @@ export function DeviceActionForm({
     selection: ObservedStorageSelection;
   } | null>(null);
   const [refreshOpen, setRefreshOpen] = useState(false);
+  const [refreshActionId, setRefreshActionId] = useState("");
   const [retireSlot, setRetireSlot] = useState("");
   const [pcrs, setPcrs] = useState("");
   const [endpoints, setEndpoints] = useState("");
@@ -276,6 +300,30 @@ export function DeviceActionForm({
     enabled: storage,
   });
   const liveErase = kind === "cryptoErase" && eraseMode === CryptoEraseMode.LIVE_ROOT_HEADER;
+  // A refresh requested from this form: follow it, then reload storage as soon as
+  // the device reports success so the target list appears without a reload.
+  const refreshAction = useQuery({
+    ...deviceActionQueryOptions(lifetime, deviceId, refreshActionId),
+    enabled: storage && refreshActionId !== "",
+    refetchInterval: (query) =>
+      query.state.status !== "error" &&
+      refreshOutcome(query.state.data, query.state.dataUpdatedAt) === "waiting"
+        ? 3_000
+        : false,
+  });
+  const refreshResult =
+    !storage || !refreshActionId
+      ? undefined
+      : refreshAction.error
+        ? "error"
+        : refreshOutcome(refreshAction.data, refreshAction.dataUpdatedAt);
+  const refreshSucceeded = refreshResult === "succeeded";
+  useEffect(() => {
+    if (!refreshSucceeded) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["device-storage-targets", lifetime.generation, deviceId],
+    });
+  }, [refreshSucceeded, queryClient, lifetime.generation, deviceId]);
   const destructive = kind === "cryptoErase" || kind === "sanitize";
   const frozen = attempt !== null;
   const ready =
@@ -293,33 +341,18 @@ export function DeviceActionForm({
     ? Array.from(frozenRecovery.imageSha256, (byte) => byte.toString(16).padStart(2, "0")).join("")
     : recoveryImageSha256.trim().toLowerCase();
   const recoveryDigest = needsRecovery && /^[a-f0-9]{64}$/.test(recoveryHash) ? recoveryHash : "";
-  const storageQuery = queryOptions({
-    queryKey: [
-      "device-storage-targets",
-      lifetime.generation,
-      deviceId,
-      kind,
-      recoveryDigest,
-    ] as const,
-    meta: { authGeneration: lifetime.generation },
-    retry: false,
-    refetchInterval: 10_000,
-    queryFn: async ({ signal }) => {
-      const result = await adminClient.listDeviceStorageTargets(
-        {
-          deviceId,
-          actionKind: storageActionKinds[kind] ?? "",
-          recoveryImageSha256: recoveryDigest
-            ? Uint8Array.from(recoveryDigest.match(/../g)!, (byte) => Number.parseInt(byte, 16))
-            : undefined,
-        },
-        { signal: AbortSignal.any([signal, lifetime.signal]) },
-      );
-      lifetime.signal.throwIfAborted();
-      return result;
-    },
+  const storageQuery = deviceStorageTargetsQueryOptions(
+    lifetime,
+    deviceId,
+    storageActionKinds[kind] ?? "",
+    recoveryDigest,
+  );
+  const storageTargets = useQuery({
+    ...storageQuery,
+    enabled: storage,
+    refetchInterval: (query) =>
+      refreshResult === "waiting" && !query.state.data?.fresh ? 3_000 : 10_000,
   });
-  const storageTargets = useQuery({ ...storageQuery, enabled: storage });
   const eligibleTargets =
     !storageTargets.error &&
     storageTargets.data?.enrollmentGeneration === detail.data?.device?.enrollmentGeneration
@@ -345,6 +378,42 @@ export function DeviceActionForm({
   const currentSelection =
     selectedTarget && isStillObserved(selectedTarget) ? selectedTarget.selection : undefined;
 
+  // What still blocks review, named inline instead of a disabled button. Empty
+  // required text fields are reported by native form validation instead.
+  const missing = (
+    storage && !currentSelection
+      ? [
+          storageTargets.error
+            ? "storage info (retry loading it below)"
+            : !eligibleTargets
+              ? ""
+              : selectableTargets.length
+                ? "a target"
+                : eligibleTargets.fresh
+                  ? "a disk this action can use"
+                  : "current storage info, then a target",
+        ]
+      : [
+          needsRecovery && !recoveryReady ? "a ready recovery image" : "",
+          storage && confirmation !== confirmationName ? "the typed hostname confirmation" : "",
+          liveErase && !liveTargets.length ? "volumes added to the list" : "",
+          liveErase && liveTargets.some((entry) => !isStillObserved(entry))
+            ? "removal of volumes the device no longer reports"
+            : "",
+          kind === "sanitize" &&
+          method >= SanitizeMethod.NVME_FORMAT_USER_DATA &&
+          !currentSelection?.nvmeScope
+            ? "NVMe details for this disk"
+            : "",
+        ]
+  ).filter(Boolean);
+  if (
+    !canPermission(principal, actionPermissions[kind]) ||
+    (kind === "refreshInventory" && !canPermission(principal, "fleet.read"))
+  )
+    missing.unshift("permission for this action");
+  else if (!detail.isPending && !ready) missing.unshift("an enrolled device");
+
   function addLiveTarget() {
     if (inFlight.current || frozen || !currentSelection) return;
     setError("");
@@ -360,7 +429,15 @@ export function DeviceActionForm({
   }
 
   async function freeze() {
-    if (inFlight.current || frozen || !ready) return;
+    if (inFlight.current || frozen) return;
+    if (!ready || missing.length) {
+      setError(
+        missing.length
+          ? `Missing before review: ${missing.join("; ")}.`
+          : "The device is still loading. Try again in a moment.",
+      );
+      return;
+    }
     inFlight.current = true;
     setBusy(true);
     setError("");
@@ -694,18 +771,57 @@ export function DeviceActionForm({
     }
   }
 
+  const deviceName = detail.data?.device?.hostname.trim() || "The device";
+  const refreshLink = refreshActionId ? (
+    <Link
+      to="/devices/$deviceId/actions/$actionId"
+      params={{ deviceId, actionId: refreshActionId }}
+      className="underline"
+    >
+      View request
+    </Link>
+  ) : null;
+  const refreshStatus =
+    refreshResult === "waiting" || (refreshSucceeded && storageTargets.isFetching) ? (
+      <p role="status" className="text-sm text-muted-foreground">
+        Inventory refresh requested. Waiting for {deviceName} to report its storage; targets appear
+        here when it does. {refreshLink}
+      </p>
+    ) : refreshResult === "error" ? (
+      <RpcError failure={toRpcFailure(refreshAction.error)} title="Couldn't check the refresh">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={refreshAction.isFetching}
+          onClick={() => void refreshAction.refetch()}
+        >
+          Check again
+        </Button>
+      </RpcError>
+    ) : undefined;
+  const refreshNote =
+    refreshResult === "failed" ? (
+      <p className="text-sm text-warning">
+        The device reported that the last refresh failed. {refreshLink}
+      </p>
+    ) : refreshResult === "expired" ? (
+      <p className="text-sm text-warning">
+        {deviceName} didn&apos;t start the last refresh before it expired. Check that it&apos;s
+        online, then request it again. {refreshLink}
+      </p>
+    ) : refreshResult === "unknown" ? (
+      <p className="text-sm text-warning">
+        The outcome of the last refresh is unknown. Check the request before asking again.{" "}
+        {refreshLink}
+      </p>
+    ) : undefined;
+
   return (
     <div className="grid gap-4">
       {!frozen ? (
-        <form
-          className="grid gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void freeze();
-          }}
-        >
+        <>
           {!selectedKind ? (
-            <>
+            <div className="grid gap-3">
               <Label htmlFor={`${prefix}-kind`}>Action</Label>
               <SelectField
                 id={`${prefix}-kind`}
@@ -720,92 +836,7 @@ export function DeviceActionForm({
                   label: actionLabels[value],
                 }))}
               />
-            </>
-          ) : null}
-          {kind === "restart" || kind === "shutdown" ? (
-            <>
-              <Label htmlFor={`${prefix}-power-delay`}>Delay in seconds (optional)</Label>
-              <Input
-                id={`${prefix}-power-delay`}
-                inputMode="numeric"
-                value={powerDelay}
-                onChange={(event) => setPowerDelay(event.target.value)}
-              />
-              <Label htmlFor={`${prefix}-power-message`}>User notification (optional)</Label>
-              <Input
-                id={`${prefix}-power-message`}
-                value={powerMessage}
-                onChange={(event) => setPowerMessage(event.target.value)}
-              />
-            </>
-          ) : null}
-          {kind === "patchNow" ? (
-            <>
-              <Label htmlFor={`${prefix}-patch-selection`}>Updates to install</Label>
-              <SelectField
-                id={`${prefix}-patch-selection`}
-                value={patchSelection}
-                disabled={busy}
-                onValueChange={(value) =>
-                  setPatchSelection(
-                    Number(value) === UpdateSelection.ALL
-                      ? UpdateSelection.ALL
-                      : UpdateSelection.SECURITY,
-                  )
-                }
-                options={[
-                  { value: UpdateSelection.SECURITY, label: "Security updates" },
-                  { value: UpdateSelection.ALL, label: "All updates" },
-                ]}
-              />
-              <Label htmlFor={`${prefix}-patch-reboot`}>Reboot after updates</Label>
-              <SelectField
-                id={`${prefix}-patch-reboot`}
-                value={patchRebootMode}
-                disabled={busy}
-                onValueChange={(value) =>
-                  setPatchRebootMode(
-                    Number(value) === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
-                      ? OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
-                      : OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
-                  )
-                }
-                options={[
-                  {
-                    value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
-                    label: "Never: only report that a reboot is required",
-                  },
-                  {
-                    value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED,
-                    label: "Schedule a reboot when one is required",
-                  },
-                ]}
-              />
-              {patchRebootMode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED ? (
-                <>
-                  <Label htmlFor={`${prefix}-patch-delay`}>
-                    Reboot delay in minutes, 5 to 10080
-                  </Label>
-                  <Input
-                    id={`${prefix}-patch-delay`}
-                    inputMode="numeric"
-                    value={patchRebootDelay}
-                    onChange={(event) => setPatchRebootDelay(event.target.value)}
-                  />
-                  <Label htmlFor={`${prefix}-patch-notice`}>User notice (optional)</Label>
-                  <Input
-                    id={`${prefix}-patch-notice`}
-                    maxLength={256}
-                    value={patchRebootNotice}
-                    onChange={(event) => setPatchRebootNotice(event.target.value)}
-                  />
-                </>
-              ) : null}
-              <p className="text-sm text-muted-foreground">
-                This action only starts the device&apos;s native update run. Its result, installed
-                updates and any pending reboot appear in Patch status on this device.
-              </p>
-            </>
+            </div>
           ) : null}
           {storage && storageTargets.isPending ? (
             <div role="status" className="grid gap-2">
@@ -830,6 +861,8 @@ export function DeviceActionForm({
                 setError("");
               }}
               onRefresh={() => setRefreshOpen(true)}
+              refreshNote={refreshNote}
+              refreshStatus={refreshStatus}
               disabled={busy}
             />
           ) : null}
@@ -839,7 +872,98 @@ export function DeviceActionForm({
             </div>
           ) : null}
           {!storage || currentSelection ? (
-            <>
+            <form
+              className="grid gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void freeze();
+              }}
+            >
+              {kind === "restart" || kind === "shutdown" ? (
+                <>
+                  <Label htmlFor={`${prefix}-power-delay`}>Delay in seconds (optional)</Label>
+                  <Input
+                    id={`${prefix}-power-delay`}
+                    inputMode="numeric"
+                    value={powerDelay}
+                    onChange={(event) => setPowerDelay(event.target.value)}
+                  />
+                  <Label htmlFor={`${prefix}-power-message`}>User notification (optional)</Label>
+                  <Input
+                    id={`${prefix}-power-message`}
+                    value={powerMessage}
+                    onChange={(event) => setPowerMessage(event.target.value)}
+                  />
+                </>
+              ) : null}
+              {kind === "patchNow" ? (
+                <>
+                  <Label htmlFor={`${prefix}-patch-selection`}>Updates to install</Label>
+                  <SelectField
+                    id={`${prefix}-patch-selection`}
+                    value={patchSelection}
+                    disabled={busy}
+                    onValueChange={(value) =>
+                      setPatchSelection(
+                        Number(value) === UpdateSelection.ALL
+                          ? UpdateSelection.ALL
+                          : UpdateSelection.SECURITY,
+                      )
+                    }
+                    options={[
+                      { value: UpdateSelection.SECURITY, label: "Security updates" },
+                      { value: UpdateSelection.ALL, label: "All updates" },
+                    ]}
+                  />
+                  <Label htmlFor={`${prefix}-patch-reboot`}>Reboot after updates</Label>
+                  <SelectField
+                    id={`${prefix}-patch-reboot`}
+                    value={patchRebootMode}
+                    disabled={busy}
+                    onValueChange={(value) =>
+                      setPatchRebootMode(
+                        Number(value) === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
+                          ? OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED
+                          : OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
+                      )
+                    }
+                    options={[
+                      {
+                        value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
+                        label: "Never: only report that a reboot is required",
+                      },
+                      {
+                        value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED,
+                        label: "Schedule a reboot when one is required",
+                      },
+                    ]}
+                  />
+                  {patchRebootMode === OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED ? (
+                    <>
+                      <Label htmlFor={`${prefix}-patch-delay`}>
+                        Reboot delay in minutes, 5 to 10080
+                      </Label>
+                      <Input
+                        id={`${prefix}-patch-delay`}
+                        inputMode="numeric"
+                        value={patchRebootDelay}
+                        onChange={(event) => setPatchRebootDelay(event.target.value)}
+                      />
+                      <Label htmlFor={`${prefix}-patch-notice`}>User notice (optional)</Label>
+                      <Input
+                        id={`${prefix}-patch-notice`}
+                        maxLength={256}
+                        value={patchRebootNotice}
+                        onChange={(event) => setPatchRebootNotice(event.target.value)}
+                      />
+                    </>
+                  ) : null}
+                  <p className="text-sm text-muted-foreground">
+                    This action only starts the device&apos;s native update run. Its result,
+                    installed updates and any pending reboot appear in Patch status on this device.
+                  </p>
+                </>
+              ) : null}
               {kind === "cryptoErase" ? (
                 <>
                   <Label htmlFor={`${prefix}-erase-mode`}>Wipe mode</Label>
@@ -1137,40 +1261,26 @@ export function DeviceActionForm({
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
               />
-              {!ready ? (
-                <p className="text-warning">
-                  You don&apos;t have permission for this action, or the device isn&apos;t ready.
+              {missing.length ? (
+                <p id={`${prefix}-missing`} className="text-sm text-muted-foreground">
+                  Missing before review: {missing.join("; ")}.
                 </p>
               ) : null}
               <Button
                 type="submit"
-                disabled={
-                  busy ||
-                  !ready ||
-                  (needsRecovery && !recoveryReady) ||
-                  (storage && confirmation !== confirmationName) ||
-                  (liveErase &&
-                    (!liveTargets.length ||
-                      !liveTargets.every((entry) => isStillObserved(entry)))) ||
-                  (kind === "sanitize" &&
-                    method >= SanitizeMethod.NVME_FORMAT_USER_DATA &&
-                    !currentSelection?.nvmeScope)
-                }
+                className="w-fit"
+                disabled={busy}
+                aria-describedby={missing.length ? `${prefix}-missing` : undefined}
               >
                 Review action
               </Button>
-            </>
-          ) : (
-            <>
-              <p id={`${prefix}-target-required`} className="text-sm text-muted-foreground">
-                Choose a storage target above to continue.
-              </p>
-              <Button type="submit" disabled aria-describedby={`${prefix}-target-required`}>
-                Review action
-              </Button>
-            </>
-          )}
-        </form>
+            </form>
+          ) : missing.length ? (
+            <p className="text-sm text-muted-foreground">
+              Missing before review: {missing.join("; ")}.
+            </p>
+          ) : null}
+        </>
       ) : (
         <div className="grid gap-3">
           {selectedKind && attempt.payload.spec?.action.case !== selectedKind ? (
@@ -1365,7 +1475,12 @@ export function DeviceActionForm({
                 deviceId={deviceId}
                 mode="actions"
                 kind="refreshInventory"
-                onCreated={() => setRefreshOpen(false)}
+                onCreated={(actionId) => {
+                  setRefreshOpen(false);
+                  // Followed here from now on; the next request starts a new form.
+                  setDeviceActionAttempt(lifetime, `${deviceId}:refreshInventory`, null);
+                  setRefreshActionId(actionId);
+                }}
               />
             </DialogContent>
           ) : null}

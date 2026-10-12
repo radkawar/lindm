@@ -140,7 +140,7 @@ func (s *Service) GetDeviceEncryption(ctx context.Context, req *connect.Request[
 	if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionReadFleet, id); err != nil {
 		return nil, core.MapErr(err)
 	}
-	response := &adminv1.GetDeviceEncryptionResponse{}
+	response := &adminv1.GetDeviceEncryptionResponse{RecoveryKeyRevealApprovalRequired: s.RevealApproval || actor.ApprovalRequired(identity.PermissionReadRecoveryKeys)}
 	if s.Escrow != nil {
 		response.EscrowKeyId = s.Escrow.KeyID()
 		response.EscrowPublicKey = s.Escrow.PublicKey()

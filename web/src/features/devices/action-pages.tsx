@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
-import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { DeviceActionForm } from "./action-form";
@@ -21,12 +20,15 @@ import { RecoveryKeyReveal } from "./recovery-reveal";
 export function DeviceActionPage({
   deviceId,
   title,
-  description = "Check the device and fill in the details.",
+  description,
+  lead,
   children,
 }: {
   deviceId: string;
   title: string;
   description?: string;
+  // Rendered before the device and every input, e.g. a destructive action's consequences.
+  lead?: (device: Device) => ReactNode;
   children: (device: Device) => ReactNode;
 }) {
   const lifetime = useAuthLifetime();
@@ -50,23 +52,18 @@ export function DeviceActionPage({
       {detail.isPending ? <p role="status">Loading device…</p> : null}
       {device ? (
         <>
+          {lead?.(device)}
           <Card>
             <CardHeader>
               <CardTitle>Device</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3">
+            <CardContent>
               <dl className="grid gap-3 break-all text-sm sm:grid-cols-2">
                 <Fact label="Hostname">{device.hostname.trim() || "Unnamed device"}</Fact>
                 <Fact label="Operating system">
                   {[device.osId, device.osVersion].filter(Boolean).join(" ") || "Not reported"}
                 </Fact>
               </dl>
-              <TechnicalDetails
-                items={[
-                  { label: "Device ID", value: device.id },
-                  { label: "Enrollment generation", value: String(device.enrollmentGeneration) },
-                ]}
-              />
             </CardContent>
           </Card>
           {children(device)}
@@ -88,7 +85,15 @@ export function DeviceActionCreatePage({
   const lifetime = useAuthLifetime();
   const navigate = useNavigate();
   return (
-    <DeviceActionPage deviceId={deviceId} title={actionLabels[kind]}>
+    <DeviceActionPage
+      deviceId={deviceId}
+      title={actionLabels[kind]}
+      lead={
+        kind === "cryptoErase" || kind === "sanitize"
+          ? (device) => <DestructiveConsequences kind={kind} hostname={device.hostname.trim()} />
+          : undefined
+      }
+    >
       {() => (
         <Card>
           <CardContent className="pt-6">
@@ -109,6 +114,64 @@ export function DeviceActionCreatePage({
         </Card>
       )}
     </DeviceActionPage>
+  );
+}
+
+// What a destructive action does, stated before any choice. Facts follow the
+// executor and server: crypto erase overwrites the LUKS header and keyslot area,
+// then powers off; escrow and header backups are untouched; admission needs
+// contact within a minute and the console's request expires 10 minutes after review.
+function DestructiveConsequences({
+  kind,
+  hostname,
+}: {
+  kind: "cryptoErase" | "sanitize";
+  hostname: string;
+}) {
+  const id = useId();
+  const wipe = kind === "cryptoErase";
+  const target = hostname || "this device";
+  const subject = hostname || "The device";
+  return (
+    <section
+      aria-labelledby={id}
+      data-slot="action-consequences"
+      className="grid gap-2 rounded-lg border border-destructive/50 p-4 text-sm"
+    >
+      <h2 id={id} className="text-base font-semibold text-destructive">
+        {wipe ? "Wiping can't be undone" : "Erasing can't be undone"}
+      </h2>
+      <ul className="grid list-disc gap-1 pl-5">
+        {wipe ? (
+          <>
+            <li>
+              Destroys the encryption header and key slots of the volumes you select on {target}.
+              Their data becomes unreadable.
+            </li>
+            <li>{subject} powers off when the wipe finishes.</li>
+          </>
+        ) : (
+          <>
+            <li>Erases everything on the unencrypted disk you select on {target}.</li>
+            <li>
+              If you choose to boot into lindm recovery first, {target} restarts into recovery and
+              powers off when the erase finishes.
+            </li>
+          </>
+        )}
+        <li>Another admin must approve this {wipe ? "wipe" : "erase"} before you can send it.</li>
+        <li>
+          {wipe
+            ? "Not destroyed: recovery keys escrowed on this server and any header backups. Anyone with a header backup and a recovery key can still read the data."
+            : "Not erased: backups and snapshots stored elsewhere."}
+        </li>
+        <li>
+          The device must be online: sending is refused unless it checked in during the last minute.
+          If it hasn&apos;t started within 10 minutes of your review, the request expires and
+          nothing is {wipe ? "wiped" : "erased"}.
+        </li>
+      </ul>
+    </section>
   );
 }
 

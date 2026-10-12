@@ -4,6 +4,7 @@ package device
 
 import (
 	"crypto/ed25519"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,10 @@ func TestDeviceActionLockReleaseVerifiedOwnershipAndAudit(t *testing.T) {
 	stored, err := f.svc.GetDeviceAction(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: release.GetActionId()}))
 	if err != nil || !proto.Equal(stored.Msg.GetAction().GetStatus().GetVerification(), verification) {
 		t.Fatalf("release public evidence changed: %v", err)
+	}
+	// Readers get the requesting account's current label beside its audited ID.
+	if name := stored.Msg.GetAction().GetActorDisplayName(); !strings.HasPrefix(name, "test-") {
+		t.Fatalf("release actor label = %q", name)
 	}
 	newer := startCompletedLock(t, f)
 	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(result)); err != nil {

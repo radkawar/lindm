@@ -38,8 +38,10 @@ type DeviceAction struct {
 	Status               *v1.DeviceActionStatus `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
 	ClosedReason         string                 `protobuf:"bytes,9,opt,name=closed_reason,json=closedReason,proto3" json:"closed_reason,omitempty"`
 	ActionRevision       uint64                 `protobuf:"varint,10,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Current account label projected for readers; actor_id stays authoritative.
+	ActorDisplayName string `protobuf:"bytes,11,opt,name=actor_display_name,json=actorDisplayName,proto3" json:"actor_display_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DeviceAction) Reset() {
@@ -140,6 +142,13 @@ func (x *DeviceAction) GetActionRevision() uint64 {
 		return x.ActionRevision
 	}
 	return 0
+}
+
+func (x *DeviceAction) GetActorDisplayName() string {
+	if x != nil {
+		return x.ActorDisplayName
+	}
+	return ""
 }
 
 type CreateDeviceActionRequest struct {
@@ -649,8 +658,11 @@ type GetDeviceEncryptionResponse struct {
 	Escrow          *DeviceRecoveryEscrow       `protobuf:"bytes,2,opt,name=escrow,proto3" json:"escrow,omitempty"`
 	EscrowKeyId     string                      `protobuf:"bytes,3,opt,name=escrow_key_id,json=escrowKeyId,proto3" json:"escrow_key_id,omitempty"`
 	EscrowPublicKey []byte                      `protobuf:"bytes,4,opt,name=escrow_public_key,json=escrowPublicKey,proto3" json:"escrow_public_key,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// True when revealing a recovery key needs a second human's approval for this
+	// caller: escrow.reveal_approval_required or the authorization policy.
+	RecoveryKeyRevealApprovalRequired bool `protobuf:"varint,5,opt,name=recovery_key_reveal_approval_required,json=recoveryKeyRevealApprovalRequired,proto3" json:"recovery_key_reveal_approval_required,omitempty"`
+	unknownFields                     protoimpl.UnknownFields
+	sizeCache                         protoimpl.SizeCache
 }
 
 func (x *GetDeviceEncryptionResponse) Reset() {
@@ -709,6 +721,13 @@ func (x *GetDeviceEncryptionResponse) GetEscrowPublicKey() []byte {
 		return x.EscrowPublicKey
 	}
 	return nil
+}
+
+func (x *GetDeviceEncryptionResponse) GetRecoveryKeyRevealApprovalRequired() bool {
+	if x != nil {
+		return x.RecoveryKeyRevealApprovalRequired
+	}
+	return false
 }
 
 // Requires dedicated permission, recent step-up, reason and audited custody access.
@@ -1203,7 +1222,7 @@ var File_lindm_admin_v1_device_actions_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\n" +
-	"#lindm/admin/v1/device_actions.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a&lindm/validation/v1/string_rules.proto\"\xce\x03\n" +
+	"#lindm/admin/v1/device_actions.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#lindm/agent/v1/device_actions.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a&lindm/validation/v1/string_rules.proto\"\x86\x04\n" +
 	"\fDeviceAction\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1217,7 +1236,8 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\x06status\x18\b \x01(\v2\".lindm.agent.v1.DeviceActionStatusR\x06status\x12#\n" +
 	"\rclosed_reason\x18\t \x01(\tR\fclosedReason\x12'\n" +
 	"\x0faction_revision\x18\n" +
-	" \x01(\x04R\x0eactionRevision\"\xee\x03\n" +
+	" \x01(\x04R\x0eactionRevision\x126\n" +
+	"\x12actor_display_name\x18\v \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x10actorDisplayName\"\xee\x03\n" +
 	"\x19CreateDeviceActionRequest\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12K\n" +
@@ -1255,12 +1275,13 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\tluks_uuid\x18\x02 \x01(\tR\bluksUuid\x12\x18\n" +
 	"\akeyslot\x18\x03 \x01(\rR\akeyslot\x127\n" +
 	"\tstored_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x121\n" +
-	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\xf6\x01\n" +
+	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\xc8\x02\n" +
 	"\x1bGetDeviceEncryptionResponse\x12I\n" +
 	"\vobservation\x18\x01 \x01(\v2'.lindm.agent.v1.DeviceActionObservationR\vobservation\x12<\n" +
 	"\x06escrow\x18\x02 \x01(\v2$.lindm.admin.v1.DeviceRecoveryEscrowR\x06escrow\x12\"\n" +
 	"\rescrow_key_id\x18\x03 \x01(\tR\vescrowKeyId\x12*\n" +
-	"\x11escrow_public_key\x18\x04 \x01(\fR\x0fescrowPublicKey\"\xe2\x01\n" +
+	"\x11escrow_public_key\x18\x04 \x01(\fR\x0fescrowPublicKey\x12P\n" +
+	"%recovery_key_reveal_approval_required\x18\x05 \x01(\bR!recoveryKeyRevealApprovalRequired\"\xe2\x01\n" +
 	"\x18RevealRecoveryKeyRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +

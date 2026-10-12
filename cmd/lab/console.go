@@ -91,7 +91,7 @@ func demoSummary(demo loadlab.Demo) string {
 	}
 	routes := demo.Routes
 	fmt.Fprintf(&b, "Routes: device %s, profile %s, secret %s, action %s, assistance %s, recovery %s\n", routes.DeviceID, routes.ProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID)
-	fmt.Fprintf(&b, "Device %s keeps checking in so remote assistance can be requested; no user answers.\n", routes.DeviceID)
+	fmt.Fprintf(&b, "Device %s keeps checking in so remote assistance and inventory refreshes can be requested; it completes refreshes, no user answers.\n", routes.DeviceID)
 	if demo.HistoricalDeviceID != "" {
 		fmt.Fprintf(&b, "Historical host replay device: %s\nOriginal observation fields and collection times are preserved; package inventory and action results remain synthetic.\n", demo.HistoricalDeviceID)
 	}

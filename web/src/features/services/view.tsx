@@ -108,7 +108,7 @@ export function DeviceResources({
               {assignment?.profileId ? (
                 <>
                   <p>
-                    {assignment.profileName} (revision {assignment.revisionNumber.toString()})
+                    {assignment.profileName}, version {assignment.revisionNumber.toString()}
                   </p>
                   <p className="break-words text-muted-foreground">
                     Assigned by {actor} on {formatTimestamp(assignment.assignedAt).local}. Checked

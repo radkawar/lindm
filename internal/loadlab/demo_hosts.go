@@ -51,6 +51,7 @@ type demoDevice struct {
 	service        serviceOutcome
 	profile        int // index into demoProfiles; -1 is unassigned
 	historical     bool
+	proposal       bool // carries the advisory risk-acceptance proposal; needs a complete feed
 	labels         []string
 	platform       *inventoryv1.PlatformDetails
 	backend        string
@@ -72,7 +73,9 @@ func rpm(name, version string, module bool) *inventoryv1.Package {
 
 // Affected versions match the checked-in vendor feed fixtures served by
 // devlab.ConfigureConsoleDemo: USN-6859-1, DSA-5724-1, FEDORA sudo and
-// RHSA-2024:6783.
+// RHSA-2024:6783. Only the Fedora source is complete, so only Fedora's sudo
+// 0:1.9.17-7.p2.fc44 (fixed 0:1.9.17-10.p2.fc44) evaluates AFFECTED; the
+// others' matches stay UNKNOWN under partial coverage.
 func ubuntuPackages(openssh string) []*inventoryv1.Package {
 	return []*inventoryv1.Package{
 		dpkg("base-files", "13ubuntu10.3", "base-files", "13ubuntu10.3"), dpkg("bash", "5.2.21-2ubuntu4", "bash", "5.2.21-2ubuntu4"),
@@ -129,7 +132,7 @@ func demoDevices() ([]*demoDevice, error) {
 	devices := []*demoDevice{
 		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "engineering"}},
 		{hostname: "ubuntu-ws-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionNone, service: serviceApplies, profile: 0, labels: []string{"workstation", "engineering"}},
-		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "design"}},
+		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "design"}, proposal: true},
 		{hostname: "debian-srv-04", key: "debian-12", kernel: "6.1.0-37-amd64", encryption: encryptionUnknown, service: serviceFails, profile: 1, labels: []string{"server", "build"}},
 		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.4", kernel: "5.14.0-427.13.1.el9_4.x86_64", encryption: encryptionNone, service: serviceApplies, profile: 1, labels: []string{"server", "database"}, platform: el},
 		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionUnknown, service: serviceConverged, profile: 2, labels: []string{"kiosk", "lobby"}, state: "stale"},

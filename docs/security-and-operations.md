@@ -427,7 +427,9 @@ effects may safely be repeated.
 
 Recovery reveal requires `recovery_keys.read`, a reason and recent verified
 step-up. Set `escrow.reveal_approval_required` when a second authorized human
-must approve the exact reveal request. The returned 64 hexadecimal characters are
+must approve the exact reveal request; the device Encryption tab then marks Reveal
+as requiring approval, as it does when the authorization policy requires approval
+for `recovery_keys.read`. The returned 64 hexadecimal characters are
 the literal unlock passphrase, not a hex encoding to decode into binary. Reveal
 responses are no-store; the console dismisses its memory-only display and never
 caches secrets. Record the actual cold-boot unlock separately from escrow status.

@@ -144,7 +144,7 @@ export function ProfilesView({
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Settings</TableHead>
-              <TableHead>Revision</TableHead>
+              <TableHead>Version</TableHead>
               <TableHead>Published</TableHead>
               <TableHead>Published by</TableHead>
             </TableRow>

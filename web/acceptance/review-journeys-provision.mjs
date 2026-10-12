@@ -6,7 +6,7 @@ const timeout = 30_000;
 const groupRemedy =
   "Choose member devices by hostname, OS and last contact; show the resulting named membership before saving.";
 const rolloutRemedy =
-  "Choose the Finance group and baseline revision by name, preview all affected devices and conflicts before saving, then review stages and activation separately.";
+  "Choose the Finance group and profile version by name, preview all affected devices and conflicts before saving, then review stages and activation separately.";
 
 async function visible(locator) {
   await locator.waitFor({ state: "visible", timeout });
@@ -305,43 +305,41 @@ async function baseline(ctx) {
     "The new baseline requires LUKS root-encryption reporting only; publishing is catalog-only, not activation.",
   );
   await page.getByRole("button", { name: "Publish profile", exact: true }).click();
-  const revisionLink = page.getByRole("link", { name: "View this revision", exact: true });
+  const revisionLink = page.getByRole("link", { name: "View this version", exact: true });
   await visible(revisionLink);
   await shot(
     ctx,
     "baseline-profile-published",
     "Profiles / published baseline",
     "partly",
-    "Publication acknowledges a saved revision but sends the operator to Rollouts without carrying its identity.",
+    "Publication acknowledges a saved version but sends the operator to Rollouts without carrying its identity.",
     rolloutRemedy,
-    "A new revision is saved. No existing profile was edited, and no device has been activated.",
+    "A new version is saved. No existing profile was edited, and no device has been activated.",
   );
   await navigate(ctx, "Rollouts", "Rollouts");
-  await visible(page.getByRole("heading", { name: "Assign a baseline", exact: true }));
+  await visible(page.getByRole("heading", { name: "Staged rollouts", exact: true }));
+  await visible(page.getByRole("heading", { name: "Saved assignments", exact: true }));
   await shot(
     ctx,
     "baseline-rollouts",
-    "Rollouts / assign a baseline",
+    "Rollouts / staged rollouts and saved assignments",
     "yes",
-    "The leading task is the proposed cohort and baseline, not an RPC editor.",
-    "Owner should verify that existing assignments and stage controls stay secondary but discoverable.",
-    "No assignment has been saved; the new baseline remains catalog-only.",
+    "Rollouts in progress and saved assignments lead the page; the new-rollout form waits behind its button.",
+    "Owner should verify that existing assignments and stage controls stay visible without crowding the new rollout.",
+    "No assignment has been saved; the new profile version remains catalog-only.",
   );
-  await chooseNamed(ctx, page.getByRole("main"), "Cohort", group.name, "baseline-cohort");
-  await chooseNamed(ctx, page.getByRole("main"), "Profile", profileName, "baseline-profile-choice");
-  await chooseNamed(
-    ctx,
-    page.getByRole("main"),
-    "Baseline revision",
-    `${profileName}, revision 1`,
-    "baseline-revision",
-  );
+  await page.getByRole("button", { name: "New rollout", exact: true }).click();
+  const proposal = page.getByRole("region", { name: "New rollout", exact: true });
+  await visible(proposal);
+  await chooseNamed(ctx, proposal, "Target", group.name, "baseline-cohort");
+  await chooseNamed(ctx, proposal, "Profile", profileName, "baseline-profile-choice");
+  await chooseNamed(ctx, proposal, "Version", `${profileName}, version 1`, "baseline-revision");
   await shot(
     ctx,
     "baseline-proposed-scope",
     "Rollouts / proposed Finance scope",
     "yes",
-    "The proposal carries named Finance membership and the selected baseline revision.",
+    "The proposal carries named Finance membership and the selected profile version.",
     "Keep review invalidation obvious when any target, revision, exclusion or timing input changes.",
     "Finance and the new read-only encryption-compliance baseline are selected; no assignment exists yet.",
   );
@@ -392,7 +390,7 @@ async function baseline(ctx) {
     "Keep the next authorized activation and its full combined-device effects explicit.",
     "The real save accepted the reviewed proposal; no native activation or policy execution is claimed.",
   );
-  await page.getByText("Staged rollouts", { exact: true }).click();
+  await visible(page.getByRole("heading", { name: "Staged rollouts", exact: true }));
   const staged = page.locator("article").filter({
     has: page.getByRole("heading", { name: "pilot, fleet", exact: true }),
   });
@@ -457,7 +455,7 @@ async function helpdesk(ctx) {
   const device = representative(ctx.config, "Engineering");
   await start(ctx, "helpdesk", "giving a new helpdesk hire limited Engineering access");
   const group = await createGroup(ctx, "helpdesk", "Engineering", device);
-  await navigate(ctx, "Accounts", "Local accounts");
+  await navigate(ctx, "Accounts", "Accounts");
   await shot(
     ctx,
     "helpdesk-accounts",
@@ -509,9 +507,9 @@ async function helpdesk(ctx) {
     "Show the chosen Engineering membership and effective access before creating the account.",
     "A scope rule exists but is not yet populated; account submission is withheld until its group is explicit.",
   );
-  const groups = form.getByRole("group", { name: "Groups", exact: true });
+  const groups = form.getByRole("group", { name: "Device groups", exact: true });
   await groups.getByRole("button", { name: "Add selection", exact: true }).click();
-  await chooseNamed(ctx, groups, "Groups 1", group.name, "helpdesk-scope");
+  await chooseNamed(ctx, groups, "Device groups 1", group.name, "helpdesk-scope");
   await shot(
     ctx,
     "helpdesk-access-review",
@@ -549,13 +547,13 @@ async function helpdesk(ctx) {
   const saved = formWithHeading(page, username);
   await visible(saved);
   await visible(saved.getByText("Not set up yet", { exact: true }));
-  await visible(saved.getByRole("button", { name: `Groups 1 ${group.name}`, exact: true }));
+  await visible(saved.getByRole("button", { name: `Device groups 1 ${group.name}`, exact: true }));
   const role = (
     await saved.getByRole("combobox", { name: "Role", exact: true }).innerText()
   ).trim();
   if (
     role !== "helpdesk" ||
-    (await saved.getByRole("button", { name: /^Groups \d+ / }).count()) !== 1 ||
+    (await saved.getByRole("button", { name: /^Device groups \d+ / }).count()) !== 1 ||
     (await saved.getByRole("button", { name: /^Devices \d+ / }).count()) !== 0 ||
     (await saved
       .getByRole("textbox", { name: "Labels (device must have all, one per line)", exact: true })

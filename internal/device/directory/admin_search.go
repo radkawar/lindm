@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/csv"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -20,6 +21,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/device/inventory"
 	"lindm/internal/identity"
 )
 
@@ -117,7 +119,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		now := s.Now()
 		cursor := devicedb.DeviceSearchCursor{ActorID: actor.ID, FilterDigest: digest, UpperEnrolledAt: core.Timestamptz(now), ExpiresAt: core.Timestamptz(now.Add(15 * time.Minute))}
 		params := devicedb.SearchDevicesParams{
-			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter,
+			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter, PatchStaleAfterSeconds: inventory.PatchStaleAfterSeconds,
 			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
 			AgentRelease:     filter.GetAgentRelease(),
 			CursorEnrolledAt: core.Timestamptz(now), CursorID: uuid.Nil,
@@ -138,8 +140,12 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		if err != nil {
 			return err
 		}
+		encryption, err := rootEncryptions(ctx, q, rows)
+		if err != nil {
+			return err
+		}
 		var content bytes.Buffer
-		if err := appendDeviceSearchRows(page, rows, limit, format, &content); err != nil {
+		if err := appendDeviceSearchRows(page, rows, encryption, limit, format, &content); err != nil {
 			return err
 		}
 		if token == "" && (len(page.devices) < len(rows) || format == adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED) {
@@ -231,19 +237,19 @@ func resumeDeviceSearchCursor(ctx context.Context, q *devicedb.Queries, cursor *
 	return nil
 }
 
-func appendDeviceSearchRows(page *deviceSearchPage, rows []devicedb.SearchDevicesRow, limit int32, format adminv1.DeviceExportFormat, content *bytes.Buffer) error {
+func appendDeviceSearchRows(page *deviceSearchPage, rows []devicedb.SearchDevicesRow, encryption []adminv1.DeviceRootEncryption, limit int32, format adminv1.DeviceExportFormat, content *bytes.Buffer) error {
 	var budget core.ResponsePageBudget
 	switch format {
 	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_JSON:
 		content.WriteByte('[')
 	case adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_CSV:
-		content.WriteString("id,hostname,os_id,os_version,architecture,state,enrolled_at,last_seen_at,labels,owner_principal_id,owner_text,attributes,compliance,last_verified_at\n")
+		content.WriteString("id,hostname,os_id,os_version,architecture,state,enrolled_at,last_seen_at,labels,owner_principal_id,owner_text,attributes,compliance,last_verified_at,root_encryption,pending_updates,pending_security_updates,reboot_required,critical_findings,high_findings,medium_findings,low_findings,other_findings\n")
 	}
-	for _, row := range rows {
+	for i, row := range rows {
 		if len(page.devices) == int(limit) {
 			break
 		}
-		item, err := searchDevice(row)
+		item, err := searchDevice(row, encryption[i])
 		if err != nil {
 			return err
 		}
@@ -274,9 +280,13 @@ func appendDeviceSearchRows(page *deviceSearchPage, rows []devicedb.SearchDevice
 	return nil
 }
 
-func searchDevice(row devicedb.SearchDevicesRow) (*adminv1.Device, error) {
+func searchDevice(row devicedb.SearchDevicesRow, encryption adminv1.DeviceRootEncryption) (*adminv1.Device, error) {
 	enrolled, ok := core.FiniteTime(row.EnrolledAt)
 	if !ok || row.PublishedSequence < 0 || row.HostSequence < 0 || row.PackageSequence < 0 {
+		return nil, core.ErrInternalState
+	}
+	if row.PendingUpdates < 0 || row.PendingSecurityUpdates < 0 || min(row.FindingsCritical, row.FindingsHigh, row.FindingsMedium, row.FindingsLow, row.FindingsOther) < 0 ||
+		max(row.FindingsCritical, row.FindingsHigh, row.FindingsMedium, row.FindingsLow, row.FindingsOther) > int64(^uint32(0)) {
 		return nil, core.ErrInternalState
 	}
 	state, err := core.DeviceState(row.State)
@@ -304,7 +314,7 @@ func searchDevice(row devicedb.SearchDevicesRow) (*adminv1.Device, error) {
 	default:
 		return nil, core.ErrInternalState
 	}
-	return &adminv1.Device{
+	item := &adminv1.Device{
 		Id: row.ID.String(), EnrollmentGeneration: core.GenerationString(row.CurrentGenerationID),
 		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, Architecture: row.Architecture,
 		LifecycleState: state, EnrolledAt: timestamppb.New(enrolled), LastSeenAt: core.ProtoTime(row.LastSeenAt),
@@ -314,7 +324,21 @@ func searchDevice(row devicedb.SearchDevicesRow) (*adminv1.Device, error) {
 		Compliance: compliance, LastVerifiedAt: core.ProtoTime(row.LastVerifiedAt),
 		AgentRelease: row.AgentRelease, AgentProtocolVersion: uint32(row.AgentProtocolVersion),
 		AgentVersionAcceptedAt: core.ProtoTime(row.AgentVersionAcceptedAt),
-	}, nil
+		RootEncryption:         encryption,
+	}
+	if row.UpdatesReported {
+		item.Updates = &adminv1.DeviceUpdateStatus{
+			PendingUpdates: uint32(row.PendingUpdates), PendingSecurityUpdates: uint32(row.PendingSecurityUpdates),
+			RebootRequired: row.RebootRequired, ReceivedAt: core.ProtoTime(row.UpdatesReceivedAt), Stale: row.UpdatesStale,
+		}
+	}
+	if row.FindingsChecked {
+		item.Findings = &adminv1.DeviceFindingCounts{
+			Critical: uint32(row.FindingsCritical), High: uint32(row.FindingsHigh), Medium: uint32(row.FindingsMedium),
+			Low: uint32(row.FindingsLow), Other: uint32(row.FindingsOther), Partial: row.FindingsPartial,
+		}
+	}
+	return item, nil
 }
 
 func exportDeviceRow(item *adminv1.Device, format adminv1.DeviceExportFormat) ([]byte, error) {
@@ -333,9 +357,22 @@ func exportDeviceRow(item *adminv1.Device, format adminv1.DeviceExportFormat) ([
 	if item.GetLastVerifiedAt() != nil {
 		verified = item.GetLastVerifiedAt().AsTime().Format(time.RFC3339Nano)
 	}
+	// Empty update and finding cells mean not reported / not checked, never zero.
+	var pending, security, reboot string
+	if updates := item.GetUpdates(); updates != nil {
+		pending, security = strconv.FormatUint(uint64(updates.GetPendingUpdates()), 10), strconv.FormatUint(uint64(updates.GetPendingSecurityUpdates()), 10)
+		reboot = strconv.FormatBool(updates.GetRebootRequired())
+	}
+	findings := make([]string, 5)
+	if counts := item.GetFindings(); counts != nil {
+		for i, count := range []uint32{counts.GetCritical(), counts.GetHigh(), counts.GetMedium(), counts.GetLow(), counts.GetOther()} {
+			findings[i] = strconv.FormatUint(uint64(count), 10)
+		}
+	}
 	fields := []string{item.GetId(), item.GetHostname(), item.GetOsId(), item.GetOsVersion(), item.GetArchitecture(), item.GetLifecycleState().String(), item.GetEnrolledAt().AsTime().Format(time.RFC3339Nano), seen,
 		strings.Join(item.GetMetadata().GetLabels(), ";"), item.GetMetadata().GetOwnerPrincipalId(), item.GetMetadata().GetOwnerText(), string(attributes),
-		item.GetCompliance().String(), verified}
+		item.GetCompliance().String(), verified, item.GetRootEncryption().String(), pending, security, reboot}
+	fields = append(fields, findings...)
 	for i, value := range fields {
 		// Quoting CSV alone does not prevent spreadsheet formulas. Inspect after
 		// leading whitespace/control characters, but retain the original text.

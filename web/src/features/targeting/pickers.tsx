@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { RolloutState } from "../../../gen/lindm/admin/v1/targeting_pb";
 import { Button } from "@/components/ui/button";
 import { SearchPicker, type PickerSlot, type PickerProps } from "@/components/ui/search-picker";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -27,6 +28,13 @@ export type TargetPickers = {
   devicePicker: PickerSlot;
   groupPicker: PickerSlot;
   profileRevisionPicker: PickerSlot;
+};
+// Read-only names for saved records, composed by the route like the pickers.
+export type NameSlot = (props: { value: string }) => ReactNode;
+export type TargetNames = {
+  deviceName: NameSlot;
+  groupName: NameSlot;
+  profileVersionName: NameSlot;
 };
 
 export function DynamicGroupPicker(props: PickerProps) {
@@ -84,6 +92,11 @@ export function DynamicGroupPicker(props: PickerProps) {
     </SearchPicker>
   );
 }
+// A rollout has no name of its own; its stage names identify it everywhere.
+export function rolloutName(state: RolloutState) {
+  return state.rollout?.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout";
+}
+
 export function RolloutPicker(props: PickerProps) {
   const [after, setAfter] = useState("");
   const query = useQuery(rolloutsQueryOptions(useAuthLifetime(), after));
@@ -95,8 +108,8 @@ export function RolloutPicker(props: PickerProps) {
           ? [
               {
                 value: state.rollout.rolloutId,
-                label: state.rollout.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout",
-                description: state.paused ? "Paused" : "Running",
+                label: rolloutName(state),
+                description: state.paused ? "Paused" : "In progress",
               },
             ]
           : [],
@@ -122,8 +135,8 @@ export function RolloutPicker(props: PickerProps) {
       ) : null}
       {!query.error && query.data?.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No staged rollouts on this page. Leave this optional selection empty, or use Plan a staged
-          rollout below.
+          No staged rollouts on this page. Leave this optional selection empty, or plan one under
+          Staged rollouts above.
         </p>
       ) : null}
       {after ? (

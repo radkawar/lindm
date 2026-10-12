@@ -52,8 +52,8 @@ const modeOptions = [
   { value: String(AssistanceMode.CONTROL), label: "View and request control" },
 ] as const;
 
-// Device-detail card: request form for operators holding remote_assistance.run and the
-// device's assistance history for every reader.
+// Device-detail Remote assistance tab: request form for operators holding
+// remote_assistance.run and the device's assistance history for every reader.
 export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
   const principal = usePrincipal();
   return (

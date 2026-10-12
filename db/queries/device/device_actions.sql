@@ -20,6 +20,12 @@ WHERE device_id = sqlc.arg('device_id')
 AND (NOT sqlc.arg('has_cursor')::boolean OR (issued_at, id) < (sqlc.arg('cursor_time')::timestamptz, sqlc.arg('cursor_id')::uuid))
 ORDER BY issued_at DESC, id DESC LIMIT sqlc.arg('page_limit');
 
+-- name: ListDeviceActionActorNames :many
+SELECT p.id, coalesce(nullif(p.display_name, ''), account.username, '')::text AS display_name
+FROM principals p
+LEFT JOIN local_accounts account ON account.id = p.id
+WHERE p.id = ANY(sqlc.arg('ids')::uuid[]);
+
 -- name: SetDeviceActionNonce :exec
 UPDATE device_actions SET result_nonce = sqlc.arg('result_nonce'), nonce_expires_at = sqlc.arg('nonce_expires_at') WHERE id = sqlc.arg('id');
 

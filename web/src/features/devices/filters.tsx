@@ -241,7 +241,11 @@ function FilterForm({
             />
           </div>
         </div>
-        <AttributeFields attributes={attributes} onChange={setAttributes} />
+        <AttributeFields
+          legend="Filter by custom attribute"
+          attributes={attributes}
+          onChange={setAttributes}
+        />
       </details>
       {error ? (
         <p role="alert" className="text-sm text-destructive">

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -109,7 +111,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		t.Fatalf("missing compliant/drifting/failed outcomes: %v", compliance)
 	}
 	encryption, err := admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: routes.DeviceID}))
-	if err != nil || encryption.Msg.GetEscrow().GetActionId() != routes.RecoveryActionID || !encryption.Msg.GetEscrow().GetRetirementConfirmed() || !encryption.Msg.GetObservation().GetEncrypted() {
+	if err != nil || encryption.Msg.GetEscrow().GetActionId() != routes.RecoveryActionID || !encryption.Msg.GetEscrow().GetRetirementConfirmed() || !encryption.Msg.GetObservation().GetEncrypted() || !slices.Contains(encryption.Msg.GetObservation().GetLindmKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) || !slices.Contains(encryption.Msg.GetObservation().GetOccupiedKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) {
 		t.Fatalf("route device lacks escrowed encrypted root: %v %v", encryption, err)
 	}
 	actions, err := admin.GetDeviceActions(ctx, connect.NewRequest(&adminv1.GetDeviceActionsRequest{DeviceId: routes.DeviceID, PageSize: 50}))
@@ -166,6 +168,25 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		}
 		t.Logf("%s: compliance=%v findings=%d freshness=%v/%s", device.Hostname, listed[device.ID].GetCompliance(), len(findings.Msg.GetFindings()), findings.Msg.GetFreshness().GetState(), findings.Msg.GetFreshness().GetReason())
 	}
+	// Proposed risk: an AFFECTED finding pending independent review beside a
+	// proposal whose finding evidence is unavailable.
+	proposals := map[string]*adminv1.Approval{}
+	for _, approval := range approvals.Msg.GetApprovals() {
+		if approval.GetAcceptAdvisoryFinding() != nil && approval.GetState() == adminv1.ApprovalState_APPROVAL_STATE_PENDING {
+			proposals[approval.GetAcceptAdvisoryFinding().GetReason()] = approval
+		}
+	}
+	proposed, missing := proposals["Review the isolated management-network exposure before the scheduled patch window"], proposals["Review stopped because finding evidence is unavailable"]
+	if len(proposals) != 2 || proposed.GetAdvisoryFinding() == nil || missing == nil || missing.GetAdvisoryFinding() != nil {
+		t.Fatalf("advisory acceptance proposals: %v", proposals)
+	}
+	request := proposed.GetAcceptAdvisoryFinding()
+	findings, err = admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: request.GetDeviceId(), PageSize: 50}))
+	if err != nil || !slices.ContainsFunc(findings.Msg.GetFindings(), func(finding *adminv1.AdvisoryFinding) bool {
+		return finding.GetId() == request.GetFindingId() && finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED
+	}) {
+		t.Fatalf("proposed finding is not AFFECTED: %v %v", findings, err)
+	}
 	pending, err := admin.GetPendingEnrollments(ctx, connect.NewRequest(&adminv1.GetPendingEnrollmentsRequest{PageSize: 10}))
 	if err != nil || len(pending.Msg.GetEnrollments()) != 1 {
 		t.Fatalf("pending enrollments: %v %v", pending, err)
@@ -183,5 +204,33 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	schedules, err := owner.Reports().ListReportSchedules(ctx, connect.NewRequest(&integrationsv1.ListReportSchedulesRequest{}))
 	if err != nil || len(schedules.Msg.GetSchedules()) != 1 {
 		t.Fatalf("report schedule: %v %v", schedules, err)
+	}
+	// The present route device completes a console-requested refresh on a later
+	// check-in, which makes wipe storage selectable again without reseeding.
+	refresh, err := admin.CreateDeviceAction(ctx, connect.NewRequest(&adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: routes.DeviceID, EnrollmentGeneration: listed[routes.DeviceID].GetEnrollmentGeneration(),
+		Spec: &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}, ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Minute)), Reason: "Refresh storage before reviewing a wipe"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	poll := time.NewTicker(2 * time.Second)
+	defer poll.Stop()
+	deadline := time.After(90 * time.Second)
+	for {
+		action, err := admin.GetDeviceAction(ctx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: refresh.Msg.GetAction().GetActionId()}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if action.Msg.GetAction().GetStatus().GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+			break
+		}
+		select {
+		case <-poll.C:
+		case <-deadline:
+			t.Fatalf("present device did not complete the console refresh: %v", action.Msg.GetAction())
+		}
+	}
+	targets, err := admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: routes.DeviceID, ActionKind: "crypto_erase"}))
+	if err != nil || !targets.Msg.GetFresh() || targets.Msg.GetUnavailableReason() != "" || len(targets.Msg.GetTargets()) == 0 {
+		t.Fatalf("refreshed wipe storage: %v %v", targets, err)
 	}
 }

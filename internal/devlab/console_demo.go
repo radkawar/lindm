@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -55,23 +56,58 @@ func (o *consoleDemoOrigin) close() error {
 
 // consoleDemoFeed is one checked-in vendor fixture served as
 // /feeds/<release>/<name>, for the platform registry row release. Signed
-// documents also serve their vendor .sha256 and .asc proofs.
+// documents also serve their vendor .sha256 and .asc proofs. A repository feed
+// is the complete updateinfo of the fixture-owned controlled repository: the
+// recorded vendor node inside an <updates> root, its only change.
 type consoleDemoFeed struct {
 	release, name, fixture string
 	format                 advisoryv1.FeedFormat
 	stream                 string
-	signed                 bool
+	signed, repository     bool
 }
 
-// Provenance of these partial vendor snapshots is recorded in
+// Single notices are partial vendor snapshots, so their devices' evaluations,
+// and with them every finding, stay UNKNOWN (feed_partial_coverage). The
+// Fedora controlled repository is the one complete source: only Fedora
+// devices can report AFFECTED. Provenance is recorded in
 // internal/advisory/feed/testdata/provenance.txt.
 func consoleDemoFeeds() []consoleDemoFeed {
 	return []consoleDemoFeed{
 		{release: "ubuntu-24.04", name: "USN-6859-1.json", fixture: "ubuntu-USN-6859-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
 		{release: "debian-12", name: "DSA-5724-1.json", fixture: "debian-DSA-5724-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
-		{release: "fedora-44", name: "updateinfo.xml", fixture: "fedora44-sudo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO},
+		{release: "fedora-44", name: "updateinfo.xml", fixture: "fedora44-sudo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true},
 		{release: "rhel-9", name: "rhsa-2024_6783.json", fixture: "redhat-rhsa-2024_6783.json", format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, stream: "standard", signed: true},
 	}
+}
+
+// consoleDemoAdvisories reads the served documents, keyed by origin-relative
+// path, and their feed sources, whose URLs are still origin-relative.
+func consoleDemoAdvisories(repository string) (map[string][]byte, []*advisoryv1.FeedSource, error) {
+	files := make(map[string][]byte)
+	var sources []*advisoryv1.FeedSource
+	for _, feed := range consoleDemoFeeds() {
+		release, ok := platform.Lookup(feed.release)
+		if !ok {
+			return nil, nil, fmt.Errorf("console demo release %s is not registered", feed.release)
+		}
+		path := "/feeds/" + feed.release + "/" + feed.name
+		suffixes := []string{""}
+		if feed.signed {
+			suffixes = append(suffixes, ".sha256", ".asc")
+		}
+		for _, suffix := range suffixes {
+			data, err := os.ReadFile(filepath.Join(repository, "internal", "advisory", "feed", "testdata", feed.fixture+suffix))
+			if err != nil {
+				return nil, nil, fmt.Errorf("read demo advisory fixture: %w", err)
+			}
+			files[path+suffix] = data
+		}
+		if feed.repository {
+			files[path] = slices.Concat([]byte("<updates>"), files[path], []byte("</updates>"))
+		}
+		sources = append(sources, &advisoryv1.FeedSource{Id: "demo-" + feed.release, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: path, MaxAgeSeconds: 604800})
+	}
+	return files, sources, nil
 }
 
 // ConfigureConsoleDemo serves the repository's checked-in vendor advisory
@@ -91,26 +127,9 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context) (*ConsoleDe
 	if document.Proto.GetAdvisories() != nil || document.Proto.GetAssistance() != nil {
 		return nil, errors.New("console demo advisories or assistance are already configured")
 	}
-	files := make(map[string][]byte)
-	var sources []*advisoryv1.FeedSource
-	for _, feed := range consoleDemoFeeds() {
-		release, ok := platform.Lookup(feed.release)
-		if !ok {
-			return nil, fmt.Errorf("console demo release %s is not registered", feed.release)
-		}
-		path := "/feeds/" + feed.release + "/" + feed.name
-		suffixes := []string{""}
-		if feed.signed {
-			suffixes = append(suffixes, ".sha256", ".asc")
-		}
-		for _, suffix := range suffixes {
-			data, err := os.ReadFile(filepath.Join(f.repository, "internal", "advisory", "feed", "testdata", feed.fixture+suffix))
-			if err != nil {
-				return nil, fmt.Errorf("read demo advisory fixture: %w", err)
-			}
-			files[path+suffix] = data
-		}
-		sources = append(sources, &advisoryv1.FeedSource{Id: "demo-" + feed.release, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: path, MaxAgeSeconds: 604800})
+	files, sources, err := consoleDemoAdvisories(f.repository)
+	if err != nil {
+		return nil, err
 	}
 	authority, certificate, err := consoleDemoCertificate()
 	if err != nil {

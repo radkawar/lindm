@@ -308,6 +308,10 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 	} else if !errors.Is(restrictionErr, pgx.ErrNoRows) {
 		return nil, core.MapErr(restrictionErr)
 	}
+	names, err := actionActorNames(ctx, q, rows...)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
 	var budget core.ResponsePageBudget
 	for _, row := range rows {
 		if len(response.Actions) == int(params.PageLimit)-1 {
@@ -317,6 +321,7 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 		if err != nil {
 			return nil, core.MapErr(err)
 		}
+		action.ActorDisplayName = names[row.ActorID]
 		fits, err := budget.Take(action)
 		if err != nil {
 			return nil, core.MapErr(err)
@@ -369,6 +374,11 @@ func (s *Service) GetDeviceAction(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
+	names, err := actionActorNames(ctx, q, row)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	action.ActorDisplayName = names[row.ActorID]
 	if err := tx.Commit(ctx); err != nil {
 		return nil, core.MapErr(err)
 	}

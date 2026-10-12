@@ -48,10 +48,12 @@ export function AttributeFields({
   attributes,
   onChange,
   disabled = false,
+  legend = "Custom attributes",
 }: {
   attributes: Record<string, AttributeValue>;
   onChange: (attributes: Record<string, AttributeValue>) => void;
   disabled?: boolean;
+  legend?: string;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -66,7 +68,7 @@ export function AttributeFields({
   const choices = failure ? [] : (definitions.data?.definitions ?? []);
   return (
     <fieldset className="grid min-w-0 gap-3" disabled={disabled}>
-      <legend className="mb-2 text-sm font-medium">Custom attributes</legend>
+      <legend className="mb-2 text-sm font-medium">{legend}</legend>
       {Object.entries(attributes).map(([key, attribute]) => {
         const field = attribute.value;
         const definition = choices.find((item) => item.key === key);

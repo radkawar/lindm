@@ -26,6 +26,6 @@ export function parseProfileDetailSearch(
 ): ProfileDetailSearch {
   if (search.revision === undefined || search.revision === "") return { revision: "" };
   const revision = typeof search.revision === "string" ? usableUuid(search.revision) : null;
-  if (revision === null) throw new Error("The revision URL must contain a valid revision ID.");
+  if (revision === null) throw new Error("The version link must contain a valid version ID.");
   return { revision };
 }

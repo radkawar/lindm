@@ -89,6 +89,10 @@ fedora44-sudo.xml (14113 bytes)
   Extraction is the only local change. A single update is partial coverage.
   Synthetic transport/compression envelopes in tests are labelled as such and
   do not pretend to be a complete downloaded vendor snapshot.
+  The console demo (devlab.ConfigureConsoleDemo) serves this node inside a
+  synthetic <updates> root as the complete updateinfo of its fixture-owned
+  controlled repository: complete coverage of that demo repository, never of
+  the Fedora 44 updates repository.
 
 fedora45-shim.xml (1877 bytes)
   Exact contiguous original node for FEDORA-2026-47312bda9b from the same

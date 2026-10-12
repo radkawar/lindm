@@ -219,7 +219,14 @@ export function AssistanceViewerPage({
       ) : null}
       {session ? (
         <>
-          <SessionStatus session={session} />
+          <SessionStatus
+            session={session}
+            identifiers={[
+              { label: "Device ID", value: deviceId },
+              { label: "Session ID", value: sessionId },
+              { label: "Operator ID", value: session.operatorId },
+            ]}
+          />
           {creator && allowed && !ended ? (
             <AssistanceConnection
               key={`${lifetime.generation}:${sessionId}`}
@@ -239,18 +246,26 @@ export function AssistanceViewerPage({
           ) : null}
         </>
       ) : null}
-      <TechnicalDetails
-        items={[
-          { label: "Device ID", value: deviceId },
-          { label: "Session ID", value: sessionId },
-          { label: "Operator ID", value: session?.operatorId },
-        ]}
-      />
+      {ended ? null : (
+        <TechnicalDetails
+          items={[
+            { label: "Device ID", value: deviceId },
+            { label: "Session ID", value: sessionId },
+            { label: "Operator ID", value: session?.operatorId },
+          ]}
+        />
+      )}
     </section>
   );
 }
 
-function SessionStatus({ session }: { session: AssistanceSession }) {
+function SessionStatus({
+  session,
+  identifiers,
+}: {
+  session: AssistanceSession;
+  identifiers: readonly { label: string; value: ReactNode }[];
+}) {
   const ended = session.state === AssistanceState.ENDED;
   const now = useNow(!ended);
   const endsAt = session.endsAt ? timestampDate(session.endsAt).getTime() : NaN;
@@ -295,6 +310,12 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
         ) : null}
       </div>
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        {ended ? (
+          <>
+            <Fact label="Reason shown to the user">{session.reason}</Fact>
+            <Fact label="Duration">{sessionDuration(session)}</Fact>
+          </>
+        ) : null}
         <Fact label={ended ? "Device user during the session" : "Person on the device"}>
           {localSessionText(session)}
         </Fact>
@@ -304,21 +325,20 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
           {controlText(session)}
         </Fact>
       </dl>
-      <details className="border-t pt-3 text-sm">
-        <summary className="w-fit cursor-pointer font-medium">Session record</summary>
-        <dl className="mt-3 grid gap-4 sm:grid-cols-2">
-          {ended ? <Fact label="Support reason">{session.reason}</Fact> : null}
-          <Fact label="Requested">
-            <TimeCell value={session.createdAt} />
-          </Fact>
-          <Fact label="Started">
-            <TimeCell value={session.startedAt} />
-          </Fact>
-          <Fact label={ended ? "Original time limit" : "Ends by"}>
-            <TimeCell value={session.endsAt} />
-          </Fact>
-        </dl>
-      </details>
+      {ended ? (
+        <TechnicalDetails
+          summary="Session record"
+          className="border-t pt-3 text-sm text-foreground"
+          items={identifiers}
+        >
+          <SessionTimes session={session} ended />
+        </TechnicalDetails>
+      ) : (
+        <details className="border-t pt-3 text-sm">
+          <summary className="w-fit cursor-pointer font-medium">Session record</summary>
+          <SessionTimes session={session} ended={false} />
+        </details>
+      )}
       {!ended ? (
         <p className="text-xs text-muted-foreground">
           Remaining time is an estimate from this browser&apos;s clock.
@@ -326,6 +346,46 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
       ) : null}
     </section>
   );
+}
+
+function SessionTimes({ session, ended }: { session: AssistanceSession; ended: boolean }) {
+  return (
+    <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-2">
+      <Fact label="Requested">
+        <TimeCell value={session.createdAt} />
+      </Fact>
+      <Fact label="Started">
+        <TimeCell value={session.startedAt} />
+      </Fact>
+      {ended ? (
+        <Fact label="Ended">
+          <TimeCell value={session.endedAt} />
+        </Fact>
+      ) : null}
+      <Fact label={ended ? "Original time limit" : "Ends by"}>
+        <TimeCell value={session.endsAt} />
+      </Fact>
+    </dl>
+  );
+}
+
+// Time screen sharing was live: start to end. Requests that were declined or
+// expired before the user accepted never started.
+function sessionDuration(session: AssistanceSession): string {
+  if (!session.startedAt || !session.endedAt) return "Never started";
+  const seconds = Math.max(
+    0,
+    Math.round(
+      (timestampDate(session.endedAt).getTime() - timestampDate(session.startedAt).getTime()) /
+        1000,
+    ),
+  );
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  if (hours) return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
+  if (minutes) return rest ? `${minutes} min ${rest} sec` : `${minutes} min`;
+  return `${rest} sec`;
 }
 
 function Fact({

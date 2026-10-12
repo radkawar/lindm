@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,34 +97,13 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Dialog
-        open={kind !== null}
-        onOpenChange={(open) => {
-          if (!open) setKind(null);
-        }}
-      >
-        {kind ? (
-          <DialogContent finalFocus={trigger} className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>{actionLabels[kind]}</DialogTitle>
-              <DialogDescription>{device.hostname.trim() || "Unnamed device"}</DialogDescription>
-            </DialogHeader>
-            <DeviceActionForm
-              key={kind}
-              deviceId={device.id}
-              mode="actions"
-              kind={kind}
-              onCreated={(actionId) => {
-                setKind(null);
-                void navigate({
-                  to: "/devices/$deviceId/actions/$actionId",
-                  params: { deviceId: device.id, actionId },
-                });
-              }}
-            />
-          </DialogContent>
-        ) : null}
-      </Dialog>
+      <DeviceActionDialog
+        deviceId={device.id}
+        deviceName={device.hostname.trim() || "Unnamed device"}
+        kind={kind}
+        finalFocus={trigger}
+        onClose={() => setKind(null)}
+      />
       <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
         {revokeVisited ? (
           <DialogContent
@@ -145,5 +124,55 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
         ) : null}
       </Dialog>
     </>
+  );
+}
+
+// One simple action form in a dialog; on success opens the created action's page.
+export function DeviceActionDialog({
+  deviceId,
+  deviceName,
+  kind,
+  finalFocus,
+  onClose,
+}: {
+  deviceId: string;
+  deviceName: string;
+  kind: DeviceActionKind | null;
+  finalFocus?: RefObject<HTMLElement | null>;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <Dialog
+      open={kind !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      {kind ? (
+        <DialogContent
+          finalFocus={finalFocus}
+          className="max-h-[90svh] overflow-y-auto sm:max-w-xl"
+        >
+          <DialogHeader>
+            <DialogTitle>{actionLabels[kind]}</DialogTitle>
+            <DialogDescription>{deviceName}</DialogDescription>
+          </DialogHeader>
+          <DeviceActionForm
+            key={kind}
+            deviceId={deviceId}
+            mode="actions"
+            kind={kind}
+            onCreated={(actionId) => {
+              onClose();
+              void navigate({
+                to: "/devices/$deviceId/actions/$actionId",
+                params: { deviceId, actionId },
+              });
+            }}
+          />
+        </DialogContent>
+      ) : null}
+    </Dialog>
   );
 }
