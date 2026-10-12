@@ -9495,6 +9495,68 @@
       "verified": true,
       "manifestSha256": "875fa1011c8dc818c2993aa04233e1b474cf1808f581d33db185841729e9cb41",
       "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
+    },
+    {
+      "platform": "almalinux-9",
+      "cell": "device-actions",
+      "architecture": "x86_64",
+      "manifest": "almalinux-9.8-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/debianel2-elact2-x86-20261012T151219Z/almalinux-9/device-actions-x86_64.json",
+      "sha256": "1d6c7c3de7bd6b5f7d8605b4ce175a0e4e368faf9f58952aa259a32503bfd389",
+      "recorded": "2026-10-12T17:59:49.762755203Z",
+      "revision": "939f2fe8df519e25dadd47332dc548f5340712f7-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bd5cd11035502c75403ec6a6884865d7d2dd318eb974a15a118f41932939dbf0",
+      "recoveryManifest": "almalinux-9.8-20261005-x86-64",
+      "recoveryManifestSha256": "1e408855142a84fddf7d97526759e2e7cc2f723ae8f79a37603ab2d57d681134"
+    },
+    {
+      "platform": "rocky-9",
+      "cell": "advisories",
+      "architecture": "x86_64",
+      "manifest": "rocky-9.8-20260525.0-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel2-el9adv-x86-20261012T140544Z/rocky-9/advisories-x86_64.json",
+      "sha256": "2db514f428ff16a7c21d56fa0658638f77c9b408e9066be3621eaccaefd8217d",
+      "recorded": "2026-10-12T18:24:40.548733211Z",
+      "revision": "939f2fe8df519e25dadd47332dc548f5340712f7-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "scope": "partial-feed matching",
+      "manifestSha256": "1eaec491a807f8a15baf697fdf6e335976d97a034cbd11014158ce4b821d93c2"
+    },
+    {
+      "platform": "ubuntu-22.04",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-jammy-encrypted-22.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel2-tpm-x86-20261012T165350Z/ubuntu-22.04/tpm-unattended-boots-x86_64.json",
+      "sha256": "59bc200d754d6da3db8971aeec77c358e09f4bc63e242c3ea22192a4126e933c",
+      "recorded": "2026-10-12T20:01:31.959442229Z",
+      "revision": "907c175185ab4cdf40b3e2535e3d241ab364cb5d",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5450ea89cf6bab1fcc8127476fde22a1f62d4ee1332658a15af2629041ea58be",
+      "recoveryManifest": "ubuntu-jammy-20261004-amd64",
+      "recoveryManifestSha256": "0565a11b33d9b5b9b61700a0011419a91fd3f147faf6491b083a61840651c088",
+      "mainlineRevision": "907c175185ab4cdf40b3e2535e3d241ab364cb5d"
+    },
+    {
+      "platform": "almalinux-9",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "almalinux-9.8-20261005-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel-alma9-x86-20261012T160953Z/almalinux-9/resources-x86_64.json",
+      "sha256": "d32aa116ca5e3b25f0515fa430569cccc6d12854f1ef61dcfea97d58e4c0bfe9",
+      "recorded": "2026-10-12T19:31:03.748706876Z",
+      "revision": "0a25c88ab05aa3d76b53c78a75101f1d898d483d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "1e408855142a84fddf7d97526759e2e7cc2f723ae8f79a37603ab2d57d681134"
     }
   ]
 }
