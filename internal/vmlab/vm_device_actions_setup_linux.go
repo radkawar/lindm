@@ -228,9 +228,15 @@ func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv
 		// require them rather than reaching an unentitled or third-party source.
 		command = "rpm -q " + strings.Join(release.Lab.Guest.Actions, " ")
 	}
+	// The disposable clone's vendor updaters are quiesced first, as in the
+	// cloud fixture: Ubuntu's persistent apt-daily-upgrade timer may fire
+	// within its 60-minute randomized delay of a golden's first boot, and the
+	// wait for a running updater could consume the whole bound (aarch64 24.04
+	// live-actions exceeded it four times). Stopping lets unattended-upgrade
+	// finish its current package; the golden itself is unchanged.
 	// Vendor-configured signature verification remains enabled. Network access
 	// is explicit disposable-QEMU user egress, never host routing or namespaces.
-	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, 1<<20, 10*time.Minute)
+	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(labQuiescePackageUnits+"; "+command), nil, 1<<20, 20*time.Minute)
 	if err != nil {
 		return err
 	}

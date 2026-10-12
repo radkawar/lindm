@@ -144,7 +144,7 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	}()
 	machine.boot, err = vm.ColdBoot(ctx, vm.InitialUnlockSecret())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initial cold boot: %w", err)
 	}
 	if !machine.boot.PromptSeen {
 		return nil, errors.New("initial unbound encrypted clone did not request owner credential")
@@ -160,10 +160,11 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 		}
 	}
 	if _, err := observeEncryptedGuest(ctx, vm, options.Encrypted.Firmware.SecureBoot); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("observe encrypted guest: %w", err)
 	}
+	vm.guest.captureDiagnostics = options.Encrypted.DiagnosticsDir != ""
 	if err := installActionPrerequisites(ctx, vm.guest, manifest); err != nil {
-		return nil, err
+		return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("install native action prerequisites: %w", err))
 	}
 	targets, err := observeActionTargets(ctx, vm)
 	if err != nil {
@@ -182,7 +183,7 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return nil, errors.New("installed encrypted root target unavailable")
 	}
 	if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
-		return nil, err
+		return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("install agent packages: %w", err))
 	}
 	provider := &agentv1.DeviceActionProviderConfig{AllowSessionLock: true, AllowQuarantine: true, ManagementEndpoints: []string{"127.0.0.1", "10.0.2.2"}, DnsServers: []string{"10.0.2.3"}, QuarantineSeconds: 60, Targets: []*agentv1.QualifiedActionTarget{{Target: machine.target.Identity, OwnerRecoveryKeyslot: 0, AllowRecoveryRotation: true, AllowTpm2Binding: options.Encrypted.Hardware.TPM}}}
 	if err := configureActionGuest(ctx, vm.guest, provider, nil); err != nil {

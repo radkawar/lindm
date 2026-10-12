@@ -957,8 +957,9 @@ waits for the server's evaluation of the enrolled agent's snapshot, requires eve
 finding to name an installed dpkg package, and cross-checks a real vulnerable/fixed
 pair from the publication with native `dpkg --compare-versions` (vendor versions are
 positional shell data). The registry's 4 GiB archive allowance sizes the lab refresh
-(45 minutes; a first fetch at 0.6 MB/s takes over 20). Qualified on aarch64 for
-both releases ([records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)):
+(45 minutes; a first fetch at 0.6 MB/s takes over 20). Qualified on both
+architectures for 26.04 and on aarch64 for 24.04
+([records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)):
 native matching, not complete device coverage.
 
 ## Lab
@@ -969,6 +970,12 @@ lane. Keep runner/source/package/image hashes and native firmware/TPM/storage/de
 settings with each record. Cloud smoke is not installer acceptance. The ordinary
 cloud fixture masks native automatic-update timers; stock acceptance removes this
 fixture override ([fixture distinction](../../internal/vmlab/vm_linux.go#L221)).
+Device-action lanes stop and mask the same units in their disposable encrypted
+clone before installing action prerequisites: the persistent
+`apt-daily-upgrade.timer` can start `unattended-upgrade` within an hour of the
+clone's first boot, and waiting for it could exhaust the prerequisite bound (24.04
+aarch64 timed out there four times, then passed once quiesced;
+[records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)).
 The encrypted golden's first-boot posture check permits an explicitly absent TPM;
 that is separate from installing the TPM-capable boot stack. Failed native checks
 now identify root ancestry, TPM version, SecureBoot or SetupMode independently
