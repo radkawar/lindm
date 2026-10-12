@@ -191,6 +191,9 @@ message Device {
   // was revoked. An empty display name means the revoker was not recorded.
   google.protobuf.Timestamp revoked_at = 27;
   string revoked_by_display_name = 28 [(buf.validate.field).string.max_len = 512];
+  // Operating system as administrators name it ("Ubuntu 24.04 LTS", "RHEL 9.4"),
+  // from the platform registry; empty when the reported release is not registered.
+  string os_name = 29 [(buf.validate.field).string.max_len = 128];
 }
 
 // Encryption of the filesystem mounted at "/", as the agent classified it:

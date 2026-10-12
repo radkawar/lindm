@@ -10,7 +10,6 @@ import {
   type NativeDetails,
 } from "../../../gen/lindm/inventory/v1/observation_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PickerSlot } from "@/components/ui/search-picker";
@@ -21,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
+import { deviceOsLabel } from "./os";
 import { DevicePackages } from "./packages";
 import type { DeviceTab, PackageSearch } from "./package-search";
 import { deviceQueryOptions } from "./queries";
@@ -148,17 +148,26 @@ export function DeviceDetailView({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <PageHeader title={device ? device.hostname.trim() || "Unnamed device" : "Device"} />
+          <PageHeader
+            title={
+              device
+                ? device.hostname.trim() ||
+                  (device.lifecycleState === DeviceState.PENDING
+                    ? "Device awaiting approval"
+                    : "Unnamed device")
+                : "Device"
+            }
+          />
+          {device ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {deviceOsLabel(device) || "OS not reported"} ·{" "}
+              {device.architecture || "architecture not reported"} · Last contact{" "}
+              <ObservedTime value={device.lastSeenAt} server relative />
+            </p>
+          ) : null}
           {device ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <DeviceLifecycleBadge state={device.lifecycleState} />
-              <Badge variant="outline">
-                {[device.osId, device.osVersion].filter(Boolean).join(" ") || "OS unknown"}
-              </Badge>
-              <Badge variant="outline">{device.architecture || "Architecture unknown"}</Badge>
-              <Badge variant="outline">
-                Contact <ObservedTime value={device.lastSeenAt} server relative />
-              </Badge>
               {compliance}
               <Tooltip>
                 <TooltipTrigger render={<span tabIndex={0} className="inline-flex" />}>
@@ -442,7 +451,6 @@ export function DeviceDetailView({
                   </CardContent>
                 </Card>
                 <AccessAndReporting device={device} details={hardware} />
-                <DeviceNativeDetails details={host?.details} osId={host?.osId} />
                 <DevicePatchStatus status={host?.details?.patchStatus} />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Card>
@@ -553,6 +561,15 @@ export function DeviceDetailView({
                     onSearch={onSearch}
                   />
                 ) : null}
+                {/* Full hardware/software collections are reference, not the first read. */}
+                <details className="border bg-card">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                    Hardware, storage, network and local accounts
+                  </summary>
+                  <div className="border-t">
+                    <DeviceNativeDetails details={host?.details} osId={host?.osId} />
+                  </div>
+                </details>
               </>
             ) : null}
           </section>

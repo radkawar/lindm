@@ -16,6 +16,7 @@ import { DeviceActionResult } from "./actions";
 import { deviceActionQueryOptions } from "./action-queries";
 import { deviceQueryOptions } from "./queries";
 import { Fact } from "./observations";
+import { deviceOsLabel } from "./os";
 import { RecoveryKeyReveal } from "./recovery-reveal";
 
 export function DeviceActionPage({
@@ -60,9 +61,7 @@ export function DeviceActionPage({
             <CardContent>
               <dl className="grid gap-3 break-all text-sm sm:grid-cols-2">
                 <Fact label="Hostname">{device.hostname.trim() || "Unnamed device"}</Fact>
-                <Fact label="Operating system">
-                  {[device.osId, device.osVersion].filter(Boolean).join(" ") || "Not reported"}
-                </Fact>
+                <Fact label="Operating system">{deviceOsLabel(device) || "Not reported"}</Fact>
               </dl>
             </CardContent>
           </Card>

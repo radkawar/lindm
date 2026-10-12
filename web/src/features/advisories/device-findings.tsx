@@ -1,6 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { AdvisoryFindingState } from "../../../gen/lindm/admin/v1/advisories_pb";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Fragment, useDeferredValue, useState } from "react";
+import {
+  AdvisoryFindingState,
+  DeviceFindingSort,
+  type AdvisoryFinding,
+} from "../../../gen/lindm/admin/v1/advisories_pb";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -8,6 +22,15 @@ import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
@@ -25,12 +48,31 @@ import {
 import { deviceFindingsQueryOptions } from "./queries";
 import { UncoveredPackages } from "./uncovered-packages";
 
+// Debian/RPM epoch 0 is the implicit default; showing "0:" only adds noise.
+function packageVersion(version: string) {
+  return version.startsWith("0:") ? version.slice(2) : version;
+}
 export function DeviceFindings({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const [pageToken, setPageToken] = useState("");
+  const [accepting, setAccepting] = useState<AdvisoryFinding | null>(null);
+  const [sort, setSort] = useState(DeviceFindingSort.SEVERITY);
+  const [packageText, setPackageText] = useState("");
+  const [advisoryText, setAdvisoryText] = useState("");
+  const packagePrefix = useDeferredValue(packageText.trim());
+  const advisoryPrefix = useDeferredValue(advisoryText.trim());
   const now = useFreshnessClock();
-  const findings = useQuery(deviceFindingsQueryOptions(lifetime, deviceId, pageToken));
+  const findings = useQuery({
+    ...deviceFindingsQueryOptions(lifetime, deviceId, pageToken, {
+      sort,
+      packagePrefix,
+      advisoryPrefix,
+    }),
+    placeholderData: keepPreviousData,
+  });
+  const totals = findings.error ? undefined : findings.data?.totals;
+  const filtered = packagePrefix !== "" || advisoryPrefix !== "";
   const freshness = findings.data?.freshness;
   const current =
     !findings.error &&
@@ -48,28 +90,92 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
         <CardDescription>Packages on this device with known security advisories.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <Button
-          className="w-fit"
-          variant="outline"
-          disabled={findings.isFetching}
-          onClick={() => void findings.refetch()}
-        >
-          Refresh findings
-        </Button>
-        <p role="status" className="flex flex-wrap items-center gap-2 text-sm">
-          Status:{" "}
-          <StatusBadge
-            status={
-              state === "Affected"
-                ? "destructive"
-                : state === "Accepted" || state === "Partial"
-                  ? "warning"
-                  : "neutral"
-            }
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p role="status" className="flex flex-wrap items-center gap-2 text-sm">
+            Status:{" "}
+            <StatusBadge
+              status={
+                state === "Affected"
+                  ? "destructive"
+                  : state === "Accepted" || state === "Partial"
+                    ? "warning"
+                    : "neutral"
+              }
+            >
+              {state}
+            </StatusBadge>
+          </p>
+          <Button
+            variant="outline"
+            disabled={findings.isFetching}
+            onClick={() => void findings.refetch()}
           >
-            {state}
-          </StatusBadge>
-        </p>
+            {findings.isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
+        {totals ? (
+          <p className="text-sm" data-finding-totals>
+            <strong className="font-semibold tabular-nums">
+              {totals.open.toLocaleString()} open {totals.open === 1n ? "finding" : "findings"}
+            </strong>
+            {filtered ? " matching the search" : ""}
+            {" · "}
+            {[
+              `${totals.critical.toLocaleString()} critical`,
+              `${totals.high.toLocaleString()} high`,
+              `${totals.medium.toLocaleString()} medium`,
+              `${totals.low.toLocaleString()} low`,
+              `${totals.unrated.toLocaleString()} not rated by the vendor`,
+            ].join(" · ")}
+            {totals.accepted > 0n ? ` · ${totals.accepted.toLocaleString()} accepted risks` : ""}
+          </p>
+        ) : null}
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_12rem] sm:items-end">
+          <div className="grid gap-1.5">
+            <Label htmlFor={`finding-package-${deviceId}`}>Search packages</Label>
+            <Input
+              id={`finding-package-${deviceId}`}
+              type="search"
+              data-freeform="package name prefix search"
+              placeholder="Package name starts with…"
+              value={packageText}
+              onChange={(event) => {
+                setPackageText(event.target.value);
+                setPageToken("");
+              }}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`finding-advisory-${deviceId}`}>Search advisories and CVEs</Label>
+            <Input
+              id={`finding-advisory-${deviceId}`}
+              type="search"
+              data-freeform="advisory or CVE ID prefix search"
+              placeholder="e.g. USN-6859 or CVE-2024"
+              value={advisoryText}
+              onChange={(event) => {
+                setAdvisoryText(event.target.value);
+                setPageToken("");
+              }}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`finding-sort-${deviceId}`}>Sort by</Label>
+            <SelectField
+              id={`finding-sort-${deviceId}`}
+              value={String(sort)}
+              onValueChange={(value) => {
+                setSort(Number(value) as DeviceFindingSort);
+                setPageToken("");
+              }}
+              options={[
+                { value: String(DeviceFindingSort.SEVERITY), label: "Severity" },
+                { value: String(DeviceFindingSort.PUBLISHED), label: "Newest advisory" },
+                { value: String(DeviceFindingSort.PACKAGE), label: "Package name" },
+              ]}
+            />
+          </div>
+        </div>
         {!current ? (
           <p className="border bg-muted/30 p-3 text-sm">
             Status unknown. The device inventory or advisory sources are out of date.
@@ -126,109 +232,157 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             description="If the inventory or advisory sources are out of date, the device may still be affected."
           />
         ) : null}
-        {findings.data?.findings.map((finding) => {
-          const accepted =
-            finding.state === AdvisoryFindingState.ACCEPTED &&
-            unexpired(finding.exception?.expiresAt, now);
-          const label =
-            finding.reason === "source_record_rejected"
-              ? "Unknown (advisory unreadable)"
-              : !current || freshness?.state === AdvisoryFindingState.UNKNOWN
-                ? "Unknown"
-                : finding.state === AdvisoryFindingState.ACCEPTED && !accepted
-                  ? "Affected (acceptance expired)"
-                  : findingStateLabel(finding.state);
-          return (
-            <article key={finding.id} className="grid min-w-0 gap-4 border p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="break-words font-semibold">{finding.advisoryId}</h3>
-                <StatusBadge
-                  status={
-                    label.startsWith("Affected")
-                      ? "destructive"
-                      : label === "Accepted"
-                        ? "warning"
-                        : "neutral"
-                  }
-                >
-                  {label}
-                </StatusBadge>
-              </div>
-              <dl className="grid gap-3 break-words text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="inline font-medium">Package: </dt>
-                  <dd className="inline">
-                    {finding.packageName}
-                    {finding.architecture ? ` (${finding.architecture})` : ""}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="inline font-medium">Installed version: </dt>
-                  <dd className="inline">{finding.installedVersion || "Unknown"}</dd>
-                </div>
-                <div>
-                  <dt className="inline font-medium">Fixed version: </dt>
-                  <dd className="inline">{finding.fixedVersion || "No fix yet"}</dd>
-                </div>
-                <div>
-                  <dt className="inline font-medium">Severity: </dt>
-                  <dd className="inline">
-                    <Severity value={finding.severity} badge={false} />
-                  </dd>
-                </div>
-                {finding.cves.length ? (
-                  <div>
-                    <dt className="inline font-medium">CVEs: </dt>
-                    <dd className="inline">{finding.cves.join(", ")}</dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt className="inline font-medium">Published: </dt>
-                  <dd className="inline">{formatTimestamp(finding.publishedAt).local}</dd>
-                </div>
-              </dl>
-              <TechnicalDetails items={[{ label: "Source URL", value: finding.sourceUrl }]} />
-              {finding.exception ? (
-                <div className="space-y-2 border bg-muted/30 p-3 text-sm">
-                  <p>
-                    Risk accepted by{" "}
-                    {!finding.exception.actorId.trim()
-                      ? "the system"
-                      : finding.exception.actorId === principal.id
-                        ? "you"
-                        : "another administrator"}
-                    . Acceptance expiry: {formatTimestamp(finding.exception.expiresAt).local}.
-                  </p>
-                  <p className="whitespace-pre-wrap break-words">
-                    Reason: {finding.exception.reason}
-                  </p>
-                  <TechnicalDetails
-                    items={[{ label: "Actor ID", value: finding.exception.actorId }]}
-                  />
-                </div>
-              ) : null}
-              {finding.reason !== "source_record_rejected" &&
-              canPermission(principal, "advisory_exceptions.manage") ? (
-                <details>
-                  <summary className="cursor-pointer font-medium">Accept this risk</summary>
-                  <div className="mt-3">
-                    <AcceptanceForm
-                      key={`${lifetime.generation}/${finding.id}`}
-                      deviceId={deviceId}
-                      findingId={finding.id}
-                    />
-                  </div>
-                </details>
-              ) : null}
-            </article>
-          );
-        })}
-        <AdvisoryPaging
-          token={pageToken}
-          next={findings.data?.nextPageToken ?? ""}
-          busy={findings.isFetching}
-          onPage={setPageToken}
-        />
+        {findings.data?.findings.length ? (
+          <Table>
+            <TableCaption className="sr-only">Security findings on this device</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Advisory</TableHead>
+                <TableHead>Package</TableHead>
+                <TableHead>Installed → fixed</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>
+                  <span className="sr-only">Risk</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {findings.data.findings.map((finding) => {
+                const accepted =
+                  finding.state === AdvisoryFindingState.ACCEPTED &&
+                  unexpired(finding.exception?.expiresAt, now);
+                const label =
+                  finding.reason === "source_record_rejected"
+                    ? "Unknown (advisory unreadable)"
+                    : !current || freshness?.state === AdvisoryFindingState.UNKNOWN
+                      ? "Unknown"
+                      : finding.state === AdvisoryFindingState.ACCEPTED && !accepted
+                        ? "Affected (acceptance expired)"
+                        : findingStateLabel(finding.state);
+                const canAccept =
+                  finding.reason !== "source_record_rejected" &&
+                  canPermission(principal, "advisory_exceptions.manage");
+                return (
+                  <Fragment key={finding.id}>
+                    <TableRow data-finding-row className="align-top">
+                      <TableCell className="whitespace-normal">
+                        {finding.sourceUrl ? (
+                          <a
+                            href={finding.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium underline underline-offset-4"
+                          >
+                            {finding.advisoryId}
+                          </a>
+                        ) : (
+                          <span className="font-medium">{finding.advisoryId}</span>
+                        )}
+                        {finding.cves.length ? (
+                          <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                            {finding.cves.join(", ")}
+                          </span>
+                        ) : null}
+                        <span className="block text-xs text-muted-foreground">
+                          Published {formatTimestamp(finding.publishedAt).local}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-normal [overflow-wrap:anywhere]">
+                        {finding.packageName}
+                        {finding.architecture ? (
+                          <span className="text-muted-foreground"> · {finding.architecture}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="whitespace-normal font-mono text-xs [overflow-wrap:anywhere]">
+                        {packageVersion(finding.installedVersion) || "Unknown"} →{" "}
+                        {packageVersion(finding.fixedVersion) || "no fix yet"}
+                      </TableCell>
+                      <TableCell>
+                        <Severity value={finding.severity} badge={false} />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          className="h-auto whitespace-normal"
+                          status={
+                            label.startsWith("Affected")
+                              ? "destructive"
+                              : label === "Accepted"
+                                ? "warning"
+                                : "neutral"
+                          }
+                        >
+                          {label}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell>
+                        {canAccept ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-haspopup="dialog"
+                            onClick={() => setAccepting(finding)}
+                          >
+                            {finding.exception ? "Renew acceptance" : "Accept this risk"}
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                    {finding.exception ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="whitespace-normal pt-0 text-sm">
+                          <p className="text-muted-foreground">
+                            Risk accepted by{" "}
+                            {!finding.exception.actorId.trim()
+                              ? "the system"
+                              : finding.exception.actorId === principal.id
+                                ? "you"
+                                : "another administrator"}{" "}
+                            until {formatTimestamp(finding.exception.expiresAt).local}:{" "}
+                            <span className="whitespace-pre-wrap break-words">
+                              {finding.exception.reason}
+                            </span>
+                          </p>
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        ) : null}
+        <Dialog
+          open={accepting !== null}
+          onOpenChange={(open) => {
+            if (!open) setAccepting(null);
+          }}
+        >
+          {accepting ? (
+            <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Accept risk: {accepting.advisoryId}</DialogTitle>
+                <DialogDescription>
+                  {accepting.packageName} {packageVersion(accepting.installedVersion)} on this
+                  device. Severity: <Severity value={accepting.severity} badge={false} />.
+                </DialogDescription>
+              </DialogHeader>
+              <AcceptanceForm
+                key={`${lifetime.generation}/${accepting.id}`}
+                deviceId={deviceId}
+                findingId={accepting.id}
+              />
+            </DialogContent>
+          ) : null}
+        </Dialog>
+        {pageToken || findings.data?.nextPageToken ? (
+          <AdvisoryPaging
+            token={pageToken}
+            next={findings.data?.nextPageToken ?? ""}
+            busy={findings.isFetching}
+            onPage={setPageToken}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );

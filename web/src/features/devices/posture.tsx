@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import type { PatchStatusObservation } from "../../../gen/lindm/agent/v1/os_update_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
@@ -9,6 +9,10 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { deviceEncryptionQueryOptions } from "./action-queries";
 import { DeviceRestrictions } from "./actions";
+import { actionPermissions } from "./action-display";
+import { DeviceActionDialog } from "./action-menu";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { ObservedTime } from "./observations";
 
 export type PostureTab = "encryption" | "inventory" | "findings" | "resources" | "actions";
@@ -109,18 +113,27 @@ function UpdateState({ status }: { status: PatchStatusObservation | undefined })
       </span>
     );
   const security = status.pendingSecurityUpdates;
+  const pending = status.pendingUpdates;
   const parts = [
-    security
-      ? `${security.toLocaleString()} security ${security === 1 ? "update" : "updates"} pending`
-      : "No security updates pending",
+    pending === 0
+      ? "No updates pending"
+      : `${pending.toLocaleString()} ${pending === 1 ? "update" : "updates"} pending, ${
+          security ? `${security.toLocaleString()} security` : "none are security updates"
+        }`,
   ];
   if (status.rebootRequired) parts.push("restart required");
   return (
     <span className="flex flex-wrap items-center gap-2">
       <StatusBadge
-        status={security ? "destructive" : status.rebootRequired ? "warning" : "success"}
+        status={security ? "destructive" : status.rebootRequired || pending ? "warning" : "success"}
       >
-        {security ? "Updates pending" : status.rebootRequired ? "Restart required" : "Up to date"}
+        {security
+          ? "Security updates pending"
+          : pending
+            ? "Updates pending"
+            : status.rebootRequired
+              ? "Restart required"
+              : "Up to date"}
       </StatusBadge>
       {parts.join(" · ")}
     </span>
@@ -145,6 +158,9 @@ export function DevicePosture({
   compliance: ReactNode;
   onOpen: (tab: PostureTab) => void;
 }) {
+  const principal = usePrincipal();
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshButton = useRef<HTMLButtonElement>(null);
   return (
     <section aria-labelledby={`posture-${device.id}`} data-device-posture className="grid gap-1">
       <h2 id={`posture-${device.id}`} className="text-base font-semibold">
@@ -166,6 +182,28 @@ export function DevicePosture({
           onOpen={() => onOpen("inventory")}
         >
           <UpdateState status={patchStatus} />
+          {!patchStatus?.available &&
+          canPermission(principal, actionPermissions.refreshInventory) ? (
+            <>
+              <Button
+                ref={refreshButton}
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                aria-haspopup="dialog"
+                onClick={() => setRefreshing(true)}
+              >
+                Request fresh inventory
+              </Button>
+              <DeviceActionDialog
+                deviceId={device.id}
+                deviceName={device.hostname.trim() || "Unnamed device"}
+                kind={refreshing ? "refreshInventory" : null}
+                finalFocus={refreshButton}
+                onClose={() => setRefreshing(false)}
+              />
+            </>
+          ) : null}
         </PostureRow>
         <PostureRow
           id="findings"

@@ -174,7 +174,11 @@ export function DashboardView() {
     >
       <PageHeader
         title="Dashboard"
-        description="Review work in your authorized scopes."
+        description={
+          observed.date
+            ? `Fleet snapshot ${freshnessLabel(observed.date, new Date())}. Work in your authorized scopes, in the order to review it.`
+            : "Work in your authorized scopes, in the order to review it."
+        }
         actions={
           <>
             {canPermission(principal, "enrollment.manage", true) ? (
@@ -225,23 +229,11 @@ export function DashboardView() {
       ) : null}
 
       {data ? (
-        <>
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <section aria-labelledby="work-queue-title" className="grid gap-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="work-queue-title" className="text-base font-semibold">
-                Needs review
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Fleet snapshot{" "}
-                {observed.date ? (
-                  <time dateTime={observed.utc} title={observed.local}>
-                    {freshnessLabel(observed.date, new Date())}
-                  </time>
-                ) : (
-                  observed.local
-                )}
-              </p>
-            </div>
+            <h2 id="work-queue-title" className="text-base font-semibold">
+              Needs review
+            </h2>
             <div className="divide-y border-y" data-testid="needs-review">
               {canApprove ? (
                 <WorkItem
@@ -573,7 +565,7 @@ export function DashboardView() {
               />
             )}
           </section>
-        </>
+        </div>
       ) : null}
     </section>
   );

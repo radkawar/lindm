@@ -506,8 +506,12 @@ async function toast(page, prefix) {
     .filter({ has: page.getByText("Owner, labels and attributes", { exact: true }) });
   try {
     await card.getByRole("button", { name: "Edit", exact: true }).click({ timeout: 10_000 });
+    // Saving needs a real change, reviewed first; the owner name is fixture text.
+    const owner = card.locator("#metadata-owner");
+    if (await owner.count()) await owner.fill(`${await owner.inputValue()} (reviewed)`);
     await card.locator("#metadata-reason").fill("UI review toast check");
-    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await card.getByRole("button", { name: "Review changes", exact: true }).click();
+    await card.getByRole("button", { name: "Save these changes", exact: true }).click();
   } catch {
     return {
       findings: [

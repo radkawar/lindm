@@ -447,6 +447,54 @@ func (q *Queries) CountAdvisoryDevices(ctx context.Context, arg CountAdvisoryDev
 	return i, err
 }
 
+const countDeviceAdvisoryFindings = `-- name: CountDeviceAdvisoryFindings :one
+SELECT
+ count(*) FILTER (WHERE f.state<>'accepted')::bigint AS open,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
+ count(*) FILTER (WHERE f.state='accepted')::bigint AS accepted
+FROM advisory_finding_status f
+WHERE f.device_id=$1
+ AND starts_with(lower(f.package_name), lower($2::text))
+ AND ($3::text='' OR starts_with(lower(f.advisory_id), lower($3::text))
+  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower($3::text))))
+`
+
+type CountDeviceAdvisoryFindingsParams struct {
+	DeviceID       uuid.UUID
+	PackagePrefix  string
+	AdvisoryPrefix string
+}
+
+type CountDeviceAdvisoryFindingsRow struct {
+	Open     int64
+	Critical int64
+	High     int64
+	Medium   int64
+	Low      int64
+	Unrated  int64
+	Accepted int64
+}
+
+// Same filters as ListDeviceAdvisoryFindings; active exceptions count as accepted only.
+func (q *Queries) CountDeviceAdvisoryFindings(ctx context.Context, arg CountDeviceAdvisoryFindingsParams) (CountDeviceAdvisoryFindingsRow, error) {
+	row := q.db.QueryRow(ctx, countDeviceAdvisoryFindings, arg.DeviceID, arg.PackagePrefix, arg.AdvisoryPrefix)
+	var i CountDeviceAdvisoryFindingsRow
+	err := row.Scan(
+		&i.Open,
+		&i.Critical,
+		&i.High,
+		&i.Medium,
+		&i.Low,
+		&i.Unrated,
+		&i.Accepted,
+	)
+	return i, err
+}
+
 const deleteAdvisoryPublicationBatch = `-- name: DeleteAdvisoryPublicationBatch :exec
 DELETE FROM advisory_publication_batch WHERE publication_id=$1
 `
@@ -1129,8 +1177,15 @@ SELECT f.id, f.device_id, f.advisory_id, f.package_name, f.installed_version, f.
  )
 ) AS source_record_rejected
 FROM advisory_finding_status f
-WHERE f.device_id=$4 AND f.id>$5
-ORDER BY f.id LIMIT $6
+WHERE f.device_id=$4
+ AND starts_with(lower(f.package_name), lower($5::text))
+ AND ($6::text='' OR starts_with(lower(f.advisory_id), lower($6::text))
+  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower($6::text))))
+ORDER BY
+ CASE WHEN $7::integer=1 THEN CASE lower(f.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END END,
+ CASE WHEN $7::integer=3 THEN f.package_name END,
+ f.published_at DESC NULLS LAST, f.advisory_id, f.id
+OFFSET $8 LIMIT $9
 `
 
 type ListDeviceAdvisoryFindingsParams struct {
@@ -1138,7 +1193,10 @@ type ListDeviceAdvisoryFindingsParams struct {
 	RejectedPackages []string
 	SnapshotID       *uuid.UUID
 	DeviceID         uuid.UUID
-	ID               uuid.UUID
+	PackagePrefix    string
+	AdvisoryPrefix   string
+	Sort             int32
+	RowOffset        int32
 	RowLimit         int32
 }
 
@@ -1167,13 +1225,17 @@ type ListDeviceAdvisoryFindingsRow struct {
 	SourceRecordRejected bool
 }
 
+// sort: 1 severity (critical first), 2 newest published, 3 package name.
 func (q *Queries) ListDeviceAdvisoryFindings(ctx context.Context, arg ListDeviceAdvisoryFindingsParams) ([]ListDeviceAdvisoryFindingsRow, error) {
 	rows, err := q.db.Query(ctx, listDeviceAdvisoryFindings,
 		arg.RejectedIds,
 		arg.RejectedPackages,
 		arg.SnapshotID,
 		arg.DeviceID,
-		arg.ID,
+		arg.PackagePrefix,
+		arg.AdvisoryPrefix,
+		arg.Sort,
+		arg.RowOffset,
 		arg.RowLimit,
 	)
 	if err != nil {

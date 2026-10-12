@@ -85,6 +85,62 @@ func TestVendorBackportsPersistWithoutUpstreamFalsePositives(t *testing.T) {
 	}
 }
 
+func TestDeviceFindingsSortFiltersTotals(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "sudo-devel", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	all, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), Sort: adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_PACKAGE}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Findings) != 2 || all.Findings[0].PackageName != "sudo" || all.Findings[1].PackageName != "sudo-devel" {
+		t.Fatalf("package order: %v", all.Findings)
+	}
+	if all.GetTotals().GetOpen() != 2 || all.GetTotals().GetAccepted() != 0 {
+		t.Fatalf("totals: %v", all.GetTotals())
+	}
+	filtered, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PackagePrefix: "SUDO-D"}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered.Findings) != 1 || filtered.Findings[0].PackageName != "sudo-devel" || filtered.GetTotals().GetOpen() != 1 {
+		t.Fatalf("package prefix filter: %v", filtered)
+	}
+	advisory := all.Findings[0].AdvisoryId
+	byAdvisory, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), AdvisoryPrefix: strings.ToLower(advisory[:4])}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byAdvisory.Findings) != 2 {
+		t.Fatalf("advisory prefix filter: %v", byAdvisory)
+	}
+	none, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), AdvisoryPrefix: "NO-SUCH-"}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(none.Findings) != 0 || none.GetTotals().GetOpen() != 0 {
+		t.Fatalf("unmatched advisory prefix: %v", none)
+	}
+	first, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, Sort: adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_PACKAGE}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, Sort: adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_PACKAGE, PageToken: first.NextPageToken}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Findings) != 1 || second.Findings[0].PackageName != "sudo-devel" || second.NextPageToken != "" {
+		t.Fatalf("second page: %v", second)
+	}
+	// A token is bound to its sort and filters.
+	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken, PackagePrefix: "sudo"}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
+		t.Fatalf("token reused with different filters: %v", err)
+	}
+}
+
 func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")

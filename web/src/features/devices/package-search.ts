@@ -44,8 +44,7 @@ export function parsePackageSearch(
     ...list,
     manager,
     namePrefix,
-    // Package filters and pages only exist on Inventory; older links carry them alone.
-    tab: tab ?? (list.pageToken || manager || namePrefix ? "inventory" : "overview"),
+    tab: tab ?? "overview",
     ...(action ? { action } : {}),
   };
 }

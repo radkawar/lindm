@@ -11,7 +11,7 @@ import {
 } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -45,7 +45,6 @@ export function DeviceMetadataCard({
     <Card>
       <CardHeader>
         <CardTitle>Owner, labels and attributes</CardTitle>
-        <CardDescription>Saving replaces all of these at once.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <dl className="grid gap-2 text-sm">
@@ -71,8 +70,7 @@ export function DeviceMetadataCard({
                 {Object.entries(value.attributes).map(([key, attribute]) => (
                   <li key={key}>
                     <span className="font-mono">{key}</span>:{" "}
-                    {attribute.value.value?.toString() ?? "Not set"} (
-                    {attribute.value.case?.replace("Value", "") ?? "unknown"})
+                    {attribute.value.value?.toString() ?? "Not set"}
                   </li>
                 ))}
               </ul>
@@ -90,7 +88,7 @@ export function DeviceMetadataCard({
               onClose={() => setEditing(null)}
             />
           ) : (
-            <Button className="w-fit" onClick={() => setEditing(value)}>
+            <Button className="w-fit" variant="outline" onClick={() => setEditing(value)}>
               Edit
             </Button>
           )
@@ -164,8 +162,9 @@ function MetadataForm({
         event.preventDefault();
         if (inFlight.current) return;
         try {
-          let request = captured;
-          if (!request) {
+          // First submit captures the exact request and shows what changes;
+          // the second sends that same request.
+          if (!captured) {
             const data = new FormData(event.currentTarget);
             const ownerText = String(data.get("owner") ?? "").trim();
             const value = create(DeviceMetadataSchema, {
@@ -178,18 +177,24 @@ function MetadataForm({
                     : undefined,
               attributes: readAttributeInputs(data, attributes),
             });
-            request = create(SetDeviceMetadataRequestSchema, {
+            const request = create(SetDeviceMetadataRequestSchema, {
               requestId: newRequestId(),
               deviceId,
               metadata: value,
               reason: String(data.get("reason") ?? "").trim(),
             });
             validateRequest(SetDeviceMetadataRequestSchema, request);
+            if (metadataChanges(metadata, value).length === 0) {
+              setInputError("Nothing changed. Edit a field, or cancel.");
+              return;
+            }
+            setInputError("");
             setCaptured(request);
+            return;
           }
           setInputError("");
           inFlight.current = true;
-          mutation.mutate(request);
+          mutation.mutate(captured);
         } catch (error) {
           setInputError(toRpcFailure(error).message);
         }
@@ -197,18 +202,21 @@ function MetadataForm({
     >
       <fieldset disabled={captured !== null} className="grid gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="metadata-owner-kind">Owner type</Label>
+          <Label htmlFor="metadata-owner-kind">Who owns this device</Label>
           <SelectField
             id="metadata-owner-kind"
             value={ownerKind}
             disabled={captured !== null}
             onValueChange={(value) => setOwnerKind(value as typeof ownerKind)}
             options={[
-              { value: "", label: "Unassigned" },
-              { value: "ownerText", label: "Name" },
-              { value: "ownerPrincipalId", label: "Console account" },
+              { value: "", label: "No owner recorded" },
+              { value: "ownerPrincipalId", label: "Someone with a console account" },
+              { value: "ownerText", label: "Someone without a console account" },
             ]}
           />
+          <p className="text-xs text-muted-foreground">
+            Pick the account when the owner signs in to this console; otherwise type their name.
+          </p>
         </div>
         {ownerKind === "ownerPrincipalId" ? (
           accountPicker({
@@ -290,8 +298,24 @@ function MetadataForm({
           />
         </div>
       </fieldset>
-      {captured ? (
-        <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
+      {captured?.metadata ? (
+        <section
+          aria-labelledby="metadata-review"
+          className="grid gap-2 border bg-muted/30 p-3 text-sm"
+        >
+          <h3 id="metadata-review" className="font-medium">
+            Review before saving
+          </h3>
+          <ul className="grid gap-1">
+            {metadataChanges(metadata, captured.metadata).map((change) => (
+              <li key={change}>{change}</li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">
+            Everything else stays as it is. Labels can change who is allowed to see this device.
+          </p>
+          <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
+        </section>
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
@@ -306,7 +330,13 @@ function MetadataForm({
       {mutation.isSuccess ? <p role="status">Saved.</p> : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={mutation.isPending || mutation.isSuccess}>
-          {mutation.isPending ? "Saving…" : captured ? "Retry" : "Save"}
+          {mutation.isPending
+            ? "Saving…"
+            : failure
+              ? "Retry"
+              : captured
+                ? "Save these changes"
+                : "Review changes"}
         </Button>
         <Button
           type="button"
@@ -316,7 +346,7 @@ function MetadataForm({
         >
           {mutation.isSuccess ? "Close" : "Cancel"}
         </Button>
-        {captured && !failure?.ambiguous ? (
+        {captured && !failure?.ambiguous && !mutation.isSuccess ? (
           <Button
             type="button"
             variant="outline"
@@ -326,10 +356,51 @@ function MetadataForm({
               mutation.reset();
             }}
           >
-            Edit and try again
+            {failure ? "Edit and try again" : "Change something"}
           </Button>
         ) : null}
       </div>
     </form>
   );
+}
+
+function ownerLabel(metadata: DeviceMetadata) {
+  return metadata.owner.case === "ownerPrincipalId"
+    ? "a console account"
+    : metadata.owner.case === "ownerText"
+      ? `“${metadata.owner.value}”`
+      : "no owner";
+}
+
+// Plain sentences naming each field that changes, old → new.
+function metadataChanges(before: DeviceMetadata, after: DeviceMetadata): string[] {
+  const changes: string[] = [];
+  if (
+    before.owner.case !== after.owner.case ||
+    (before.owner.value ?? "") !== (after.owner.value ?? "")
+  ) {
+    changes.push(
+      before.owner.case === "ownerPrincipalId" && after.owner.case === "ownerPrincipalId"
+        ? "Owner: a different console account"
+        : `Owner: ${ownerLabel(before)} → ${ownerLabel(after)}`,
+    );
+  }
+  const added = after.labels.filter((label) => !before.labels.includes(label));
+  const removed = before.labels.filter((label) => !after.labels.includes(label));
+  if (added.length) changes.push(`Add labels: ${added.join(", ")}`);
+  if (removed.length) changes.push(`Remove labels: ${removed.join(", ")}`);
+  const keys = new Set([...Object.keys(before.attributes), ...Object.keys(after.attributes)]);
+  for (const key of [...keys].sort()) {
+    const old = before.attributes[key]?.value.value?.toString();
+    const next = after.attributes[key]?.value.value?.toString();
+    if (old === next) continue;
+    changes.push(
+      old === undefined
+        ? `Set ${key} to ${next}`
+        : next === undefined
+          ? `Clear ${key} (was ${old})`
+          : `${key}: ${old} → ${next}`,
+    );
+  }
+  return changes;
 }

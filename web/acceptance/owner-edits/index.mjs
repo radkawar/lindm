@@ -50,6 +50,7 @@ import * as pass2AssignmentProgress from "./pass2-assignment-progress.mjs";
 import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
 import * as pass2RevokedDevice from "./pass2-bug9-revoked-device.mjs";
+import * as fleetPass2 from "./fleet-pass-2.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -92,6 +93,7 @@ export const ownerEdits = [
   commandPaletteTyping,
   wipeForm,
   pass2SafetyWipe,
+  fleetPass2,
   // Creates the "Cost center" custom attribute.
   customAttributeNames,
   // Creates a one-time code, then approves the seed's pending enrollment.

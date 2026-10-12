@@ -54,12 +54,12 @@ export async function reviewAdvisoryControls(page, route) {
 }
 
 async function proposalForm(page) {
-  const accepted = page.locator("article").filter({ hasText: "Risk accepted by" });
+  const accepted = page.locator("tr").filter({ hasText: "Risk accepted by" });
   if ((await accepted.count()) === 0)
     return [{ message: "No real accepted finding is visible", elements: [] }];
   for (const card of await accepted.all()) {
     if (
-      (await card.getByText(/Acceptance expiry:/).count()) !== 1 ||
+      (await card.getByText(/ until /).count()) !== 1 ||
       (await card.getByText(/Acceptance expire[ds]/).count()) !== 0
     )
       return [
@@ -74,7 +74,7 @@ async function proposalForm(page) {
     return [{ message: "No seeded finding offers risk proposal", elements: [] }];
   await summary.click();
   const approval = page.getByRole("checkbox", {
-    name: "Request independent approval (valid for one hour)",
+    name: "Ask another administrator to approve first (they have one hour to decide)",
     exact: true,
   });
   if (!(await approval.isChecked()))
@@ -83,5 +83,6 @@ async function proposalForm(page) {
     !(await page.getByRole("button", { name: "Propose risk acceptance", exact: true }).isVisible())
   )
     return [{ message: "Approval-aware proposal action is missing", elements: [] }];
+  await page.keyboard.press("Escape");
   return [];
 }

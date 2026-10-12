@@ -421,6 +421,19 @@ func (r *Release) Native() *Release {
 // Known reports whether the release is a registry row.
 func (r *Release) Known() bool { return r.Key != "" }
 
+// DisplayName names a registered release as administrators read it, keeping
+// the reported point release when the registry entry covers a major version
+// ("RHEL 9" reported as 9.4 is "RHEL 9.4"). Empty for unregistered releases.
+func (r *Release) DisplayName(versionID string) string {
+	if !r.Known() {
+		return ""
+	}
+	if versionID == "" || strings.Contains(r.Name, versionID) {
+		return r.Name
+	}
+	return r.Distribution + " " + versionID
+}
+
 // Supported reports whether the capability is implemented for the release.
 func (r *Release) Supported(c Capability) bool { return slices.Contains(r.Supports, c) }
 

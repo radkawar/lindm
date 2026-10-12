@@ -71,7 +71,8 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   const summary = first.locator(":scope > summary");
   await summary.click();
   require(await first.evaluate((item) => item.open), "Action row does not expand");
-  for (const label of ["Requested by", "Created", "Expires"])
+  // Expiry is shown only while an action is open; the seeded actions are closed.
+  for (const label of ["Requested by", "Created"])
     require(await first
       .getByText(label, { exact: true })
       .first()

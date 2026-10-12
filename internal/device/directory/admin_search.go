@@ -342,7 +342,7 @@ func searchDevice(row devicedb.SearchDevicesRow, encryption adminv1.DeviceRootEn
 	}
 	item := &adminv1.Device{
 		Id: row.ID.String(), EnrollmentGeneration: core.GenerationString(row.CurrentGenerationID),
-		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, Architecture: row.Architecture,
+		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, OsName: platform.Identify(platform.OSRelease{ID: row.OsID, VersionID: row.OsVersion}).DisplayName(row.OsVersion), Architecture: row.Architecture,
 		LifecycleState: state, EnrolledAt: timestamppb.New(enrolled), LastSeenAt: core.ProtoTime(row.LastSeenAt),
 		HostSequence: uint64(row.HostSequence), PackageSequence: uint64(row.PackageSequence),
 		HostReceivedAt: core.ProtoTime(row.HostReceivedAt), PackageAttemptReceivedAt: core.ProtoTime(row.PackageAttemptReceivedAt),

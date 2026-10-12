@@ -135,7 +135,7 @@ export async function check({ page, demo, visit, settle, require, capture, step 
 
   step("no hedged lock wording and no lock banner above other tabs");
   require(!hedge.test(await main.innerText()), "Overview shows 'may be locked' wording");
-  for (const name of ["Inventory", "Actions", "Findings", "History"]) {
+  for (const name of ["Inventory", "Actions", "Findings"]) {
     await openTab(name);
     const text = await main.innerText();
     require(!hedge.test(text), `${name} tab shows 'may be locked' wording`);

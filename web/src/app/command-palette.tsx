@@ -248,7 +248,8 @@ export function CommandPalette({
                         <DeviceLifecycleBadge state={device.lifecycleState} />
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {[device.osId, device.osVersion].filter(Boolean).join(" ")}
+                          {device.osName ||
+                            [device.osId, device.osVersion].filter(Boolean).join(" ")}
                         </span>
                       )}
                     </CommandItem>

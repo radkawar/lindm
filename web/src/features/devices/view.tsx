@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DeviceCompliance,
   DeviceRootEncryption,
+  DeviceState,
   type Device,
 } from "../../../gen/lindm/admin/v1/admin_pb";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -54,6 +55,7 @@ import { PAGE_SIZES } from "@/lib/list-search";
 import { canPermission } from "@/lib/permissions";
 import { DeviceExport, DeviceFilters } from "./filters";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
+import { deviceOsLabel } from "./os";
 import { ObservedTime } from "./observations";
 import { devicesQueryOptions } from "./queries";
 import type { DeviceSearch, DeviceSortColumn } from "./search";
@@ -141,13 +143,23 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
   switch (column) {
     case "hostname":
       return (
-        <Link
-          to="/devices/$deviceId"
-          params={{ deviceId: device.id }}
-          className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline"
-        >
-          {device.hostname.trim() || "Unnamed device"}
-        </Link>
+        <span className="grid">
+          <Link
+            to="/devices/$deviceId"
+            params={{ deviceId: device.id }}
+            className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline"
+          >
+            {device.hostname.trim() ||
+              (device.lifecycleState === DeviceState.PENDING
+                ? "Device awaiting approval"
+                : "Unnamed device")}
+          </Link>
+          {!device.hostname.trim() && device.enrolledAt ? (
+            <span className="text-xs text-muted-foreground">
+              Requested <ObservedTime value={device.enrolledAt} server relative />
+            </span>
+          ) : null}
+        </span>
       );
     case "state":
       return <DeviceLifecycleBadge state={device.lifecycleState} />;
@@ -228,16 +240,19 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
           : findings.high > 0
             ? "warning"
             : "success";
-      const counts = [
-        findings.critical > 0 ? `${findings.critical} critical` : "",
-        findings.high > 0 ? `${findings.high} high` : "",
-      ].filter(Boolean);
-      const label = counts.length ? counts.join(" · ") : "No critical or high";
+      // The cell names the worst severity only; the tooltip carries every count.
+      const label =
+        findings.critical > 0
+          ? `${findings.critical} critical`
+          : findings.high > 0
+            ? `${findings.high} high`
+            : "No critical or high";
+      const counts = `${findings.critical} critical, ${findings.high} high`;
       const rest = `${findings.medium} medium, ${findings.low} low, ${findings.other} unrated`;
       return (
         <PostureBadge tone={tone} label={findings.partial ? `${label} · partial` : label}>
           <p>
-            Open findings: {label}, {rest}. Accepted risks are excluded.
+            Open findings: {counts}, {rest}. Accepted risks are excluded.
           </p>
           {findings.partial ? (
             <p>Partial check: only packages from the distribution archive were matched.</p>
@@ -248,7 +263,7 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
     case "contact":
       return <ObservedTime value={device.lastSeenAt} server relative />;
     case "os": {
-      const os = [device.osId, device.osVersion].filter((part) => part.trim() !== "").join(" ");
+      const os = deviceOsLabel(device);
       return os ? (
         <span>
           {os}
@@ -386,7 +401,7 @@ export function DevicesView({
               </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             {sort ? (
               <Button size="sm" variant="ghost" onClick={() => setSort(null)}>
                 Reset sort
@@ -459,82 +474,125 @@ export function DevicesView({
           />
         ) : null}
         {rows.length > 0 ? (
-          <Table className={compact ? "[&_td]:h-12 [&_td]:py-2" : "[&_td]:py-4"}>
-            <caption className="sr-only">Enrolled devices.</caption>
-            <TableHeader className="bg-muted/40">
-              <TableRow>
-                {visibleColumns.map((column) => (
-                  <TableHead
-                    key={column.id}
-                    className="px-3"
-                    aria-sort={
-                      sort?.column === column.id
-                        ? sort.descending
-                          ? "descending"
-                          : "ascending"
-                        : undefined
-                    }
-                  >
-                    {column.sortable ? (
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 py-2 text-xs font-medium focus-visible:outline focus-visible:outline-ring"
-                        aria-label={`Sort all devices by ${column.label}`}
-                        onClick={() =>
-                          setSort({
-                            column: column.id as DeviceSortColumn,
-                            descending: sort?.column === column.id && !sort.descending,
-                          })
-                        }
-                      >
-                        {column.label}
-                        {sort?.column === column.id ? (
-                          sort.descending ? (
-                            <ArrowDown className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            <ArrowUp className="size-3.5" aria-hidden="true" />
-                          )
-                        ) : (
-                          <ArrowUpDown
-                            className="size-3.5 text-muted-foreground"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </button>
-                    ) : (
-                      <span className="text-xs">{column.label}</span>
-                    )}
-                  </TableHead>
-                ))}
-                {renderRevoke && canRevoke ? (
-                  <TableHead className="sticky right-0 bg-muted px-3 text-xs">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((device) => (
-                <TableRow key={device.id}>
+          // Narrow screens read one device per row in decision order; the table needs width.
+          <ul className="divide-y sm:hidden" aria-label="Devices">
+            {rows.map((device) => (
+              <li key={device.id} className="grid gap-2 px-4 py-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    <DeviceCell device={device} column="hostname" />
+                  </span>
+                  {renderRevoke && canRevoke ? (
+                    <DeviceRevokeDialog device={device}>{renderRevoke(device)}</DeviceRevokeDialog>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <DeviceCell device={device} column="state" />
+                  {(["compliance", "encryption", "findings"] as const).map((column) => (
+                    <span key={column} className="inline-flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">
+                        {columns.find((item) => item.id === column)?.label}
+                      </span>
+                      <DeviceCell device={device} column={column} />
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <DeviceCell device={device} column="os" /> · Last contact{" "}
+                  <DeviceCell device={device} column="contact" />
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {rows.length > 0 ? (
+          <div className="hidden sm:block">
+            <Table className={compact ? "[&_td]:h-12 [&_td]:py-2" : "[&_td]:py-4"}>
+              <caption className="sr-only">Enrolled devices.</caption>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
                   {visibleColumns.map((column) => (
-                    <TableCell
+                    <TableHead
                       key={column.id}
-                      className="max-w-80 whitespace-normal px-3 [overflow-wrap:anywhere]"
+                      className="whitespace-normal px-3"
+                      aria-sort={
+                        sort?.column === column.id
+                          ? sort.descending
+                            ? "descending"
+                            : "ascending"
+                          : undefined
+                      }
                     >
-                      <DeviceCell device={device} column={column.id} />
-                    </TableCell>
+                      {column.sortable ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 py-2 text-left text-xs font-medium focus-visible:outline focus-visible:outline-ring"
+                          aria-label={`Sort all devices by ${column.label}`}
+                          onClick={() =>
+                            setSort({
+                              column: column.id as DeviceSortColumn,
+                              descending: sort?.column === column.id && !sort.descending,
+                            })
+                          }
+                        >
+                          {column.label}
+                          {sort?.column === column.id ? (
+                            sort.descending ? (
+                              <ArrowDown className="size-3.5" aria-hidden="true" />
+                            ) : (
+                              <ArrowUp className="size-3.5" aria-hidden="true" />
+                            )
+                          ) : (
+                            <ArrowUpDown
+                              className="size-3.5 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-xs">{column.label}</span>
+                      )}
+                    </TableHead>
                   ))}
                   {renderRevoke && canRevoke ? (
-                    <TableCell className="sticky right-0 w-12 bg-card px-3">
-                      <DeviceRevokeDialog device={device}>
-                        {renderRevoke(device)}
-                      </DeviceRevokeDialog>
-                    </TableCell>
+                    <TableHead className="px-3 text-xs">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   ) : null}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((device) => (
+                  <TableRow key={device.id}>
+                    {visibleColumns.map((column) => (
+                      <TableCell
+                        key={column.id}
+                        // Hostnames wrap only when genuinely long; status words never break.
+                        className={
+                          column.id === "hostname" || column.id === "metadata"
+                            ? "min-w-36 max-w-56 whitespace-normal px-3 [overflow-wrap:anywhere]"
+                            : column.id === "os" ||
+                                column.id === "inventory" ||
+                                column.id === "contact"
+                              ? "whitespace-normal px-3"
+                              : "px-3"
+                        }
+                      >
+                        <DeviceCell device={device} column={column.id} />
+                      </TableCell>
+                    ))}
+                    {renderRevoke && canRevoke ? (
+                      <TableCell className="w-12 px-3">
+                        <DeviceRevokeDialog device={device}>
+                          {renderRevoke(device)}
+                        </DeviceRevokeDialog>
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
           <div className="flex items-center gap-2">

@@ -252,10 +252,6 @@ export function DeviceActionsPanel({
   deviceId: string;
   deviceName: string;
 }) {
-  const principal = usePrincipal();
-  const starts = (["cryptoErase", "sanitize", "escrowRotate", "tpm2Bind"] as const).filter((kind) =>
-    canPermission(principal, actionPermissions[kind]),
-  );
   return (
     <div className="grid gap-4">
       <section className="grid gap-2 border-b pb-4" aria-labelledby={`restrictions-${deviceId}`}>
@@ -266,27 +262,6 @@ export function DeviceActionsPanel({
           <DeviceRestrictions deviceId={deviceId} deviceName={deviceName} />
         </div>
       </section>
-      {starts.length ? (
-        <section className="grid gap-2">
-          <h2 className="text-base font-semibold">Storage and encryption actions</h2>
-          <p className="text-sm text-muted-foreground">
-            These open their own page. Other actions are under Actions at the top of the page.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            {starts.map((kind) => (
-              <Link
-                key={kind}
-                to="/devices/$deviceId/actions/new/$kind"
-                params={{ deviceId, kind }}
-                search={{ luksUuid: "" }}
-                className="text-sm underline"
-              >
-                {actionLabels[kind]}
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
       <DeviceActionHistory deviceId={deviceId} />
     </div>
   );
@@ -300,29 +275,24 @@ function DeviceActionHistory({ deviceId }: { deviceId: string }) {
   const data = failure ? undefined : query.data;
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Device action history</CardTitle>
-        <CardDescription>
-          One line per action, newest first. Open a line for its full result.
-        </CardDescription>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
+        <div className="grid gap-1.5">
+          <CardTitle>Device action history</CardTitle>
+          <CardDescription>
+            One line per action, newest first. Open a line for its full result.
+          </CardDescription>
+        </div>
+        <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
+          {query.isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold">Recent actions</h3>
-          <Button
-            variant="outline"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            Refresh
-          </Button>
-        </div>
         {query.isPending ? <p role="status">Loading action history…</p> : null}
         {failure ? <RpcError failure={failure} /> : null}
         {data?.actions.length === 0 ? (
           <EmptyState
             title="No actions yet"
-            description="Use Actions at the top of the page to start one."
+            description="Start one from the Actions menu next to the device name."
           />
         ) : null}
         {data?.actions.length ? (
@@ -334,22 +304,24 @@ function DeviceActionHistory({ deviceId }: { deviceId: string }) {
             ))}
           </ul>
         ) : null}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={!pageToken || query.isFetching}
-            onClick={() => setPageToken("")}
-          >
-            Newest actions
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!data?.nextPageToken || query.isFetching}
-            onClick={() => setPageToken(data?.nextPageToken ?? "")}
-          >
-            Older actions
-          </Button>
-        </div>
+        {pageToken || data?.nextPageToken ? (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              disabled={!pageToken || query.isFetching}
+              onClick={() => setPageToken("")}
+            >
+              Newest actions
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!data?.nextPageToken || query.isFetching}
+              onClick={() => setPageToken(data?.nextPageToken ?? "")}
+            >
+              Older actions
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -60,15 +60,44 @@ message AdvisoryFreshness {
   uint64 uncovered_packages = 10;
 }
 
+// Order of a device's findings. UNSPECIFIED is SEVERITY: critical first, then
+// newest published within a severity.
+enum DeviceFindingSort {
+  DEVICE_FINDING_SORT_UNSPECIFIED = 0;
+  DEVICE_FINDING_SORT_SEVERITY = 1;
+  DEVICE_FINDING_SORT_PUBLISHED = 2;
+  DEVICE_FINDING_SORT_PACKAGE = 3;
+}
+
 message ListDeviceFindingsRequest {
   string device_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  // Bound to the evaluation, sort and filters it was issued for.
   string page_token = 3 [(buf.validate.field).string.max_len = 1024];
+  DeviceFindingSort sort = 4 [(buf.validate.field).enum.defined_only = true];
+  // ASCII case-insensitive prefix of the installed package name.
+  string package_prefix = 5 [(buf.validate.field).string.max_len = 256];
+  // ASCII case-insensitive prefix of the advisory ID or of any of its CVE IDs.
+  string advisory_prefix = 6 [(buf.validate.field).string.max_len = 128];
 }
+
+// Findings matching the request's filters, across all pages, by vendor
+// severity. Accepted findings (active exception) are counted only in accepted.
+message DeviceFindingTotals {
+  uint64 open = 1;
+  uint64 critical = 2;
+  uint64 high = 3;
+  uint64 medium = 4;
+  uint64 low = 5;
+  uint64 unrated = 6;
+  uint64 accepted = 7;
+}
+
 message ListDeviceFindingsResponse {
   repeated AdvisoryFinding findings = 1;
   string next_page_token = 2;
   AdvisoryFreshness freshness = 3;
+  DeviceFindingTotals totals = 4;
 }
 
 message ListDeviceUncoveredPackagesRequest {

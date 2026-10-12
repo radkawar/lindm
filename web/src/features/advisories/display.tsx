@@ -112,7 +112,7 @@ const evaluationReasonText: Record<string, string> = {
   rhel_platform_stream_unavailable: "the device did not report its RHEL platform stream",
   feed_unavailable: "no advisory source covers this operating system",
   feed_stale: "the advisory source is out of date",
-  feed_partial_coverage: "the advisory source does not list every advisory for this release",
+  feed_partial_coverage: "vulnerability data for this release is incomplete",
   matching_capacity_exceeded: "too many packages to match in one check",
 };
 

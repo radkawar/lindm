@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -27,6 +29,41 @@ import (
 // device's current evidence, or a device not yet evaluated. The background
 // job replaces it; it is UNKNOWN, never stale certainty.
 const evaluationPending = "evaluation_pending"
+
+// findingCursor binds a findings page offset to the device, the evaluated
+// finding set (immutable for that evaluation) and the exact sort and filters,
+// so an offset stays meaningful and is refused for any other query.
+type findingCursor struct {
+	device, evaluation uuid.UUID
+	query              [sha256.Size]byte
+}
+
+func (c findingCursor) encode(offset uint64) string {
+	var token [72]byte
+	copy(token[:16], c.device[:])
+	copy(token[16:32], c.evaluation[:])
+	copy(token[32:64], c.query[:])
+	binary.BigEndian.PutUint64(token[64:], offset)
+	return base64.RawURLEncoding.EncodeToString(token[:])
+}
+
+func (c findingCursor) decode(token string) (uint64, error) {
+	if token == "" {
+		return 0, nil
+	}
+	data, err := base64.RawURLEncoding.Strict().DecodeString(token)
+	if err != nil || len(data) != 72 {
+		return 0, ErrInvalid
+	}
+	if !bytes.Equal(data[:16], c.device[:]) || !bytes.Equal(data[16:32], c.evaluation[:]) || !bytes.Equal(data[32:64], c.query[:]) {
+		return 0, ErrConflict
+	}
+	offset := binary.BigEndian.Uint64(data[64:])
+	if offset > math.MaxInt32 {
+		return 0, ErrInvalid
+	}
+	return offset, nil
+}
 
 // ListDevice serves the persisted evaluation only. Matching runs in the
 // background job (EvaluatePending) when a snapshot, host observation or feed
@@ -63,16 +100,14 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 	if err != nil {
 		return nil, err
 	}
-	after := uuid.Nil
-	if req.GetPageToken() != "" {
-		data, err := base64.RawURLEncoding.Strict().DecodeString(req.GetPageToken())
-		if err != nil || len(data) != 48 {
-			return nil, ErrInvalid
-		}
-		if !bytes.Equal(data[:16], deviceID[:]) || !bytes.Equal(data[16:32], e.ID[:]) {
-			return nil, ErrConflict
-		}
-		copy(after[:], data[32:])
+	sort := req.GetSort()
+	if sort == adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_UNSPECIFIED {
+		sort = adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_SEVERITY
+	}
+	cursor := findingCursor{device: deviceID, evaluation: e.ID, query: sha256.Sum256([]byte(fmt.Sprintf("%d\x00%s\x00%s", sort, req.GetPackagePrefix(), req.GetAdvisoryPrefix())))}
+	offset, err := cursor.decode(req.GetPageToken())
+	if err != nil {
+		return nil, err
 	}
 	// Project rejection reasons only for the exact evaluated revision and
 	// implicated binary/source package. Device-wide UNKNOWN is not evidence
@@ -97,7 +132,11 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		}
 	}
 	limit := pageSize(req.GetPageSize())
-	rows, err := q.ListDeviceAdvisoryFindings(ctx, advisorydb.ListDeviceAdvisoryFindingsParams{DeviceID: deviceID, ID: after, RowLimit: limit + 1, SnapshotID: e.SnapshotID, RejectedIds: rejectedIDs, RejectedPackages: rejectedPackages})
+	rows, err := q.ListDeviceAdvisoryFindings(ctx, advisorydb.ListDeviceAdvisoryFindingsParams{DeviceID: deviceID, PackagePrefix: req.GetPackagePrefix(), AdvisoryPrefix: req.GetAdvisoryPrefix(), Sort: int32(sort), RowOffset: int32(offset), RowLimit: limit + 1, SnapshotID: e.SnapshotID, RejectedIds: rejectedIDs, RejectedPackages: rejectedPackages})
+	if err != nil {
+		return nil, err
+	}
+	totals, err := q.CountDeviceAdvisoryFindings(ctx, advisorydb.CountDeviceAdvisoryFindingsParams{DeviceID: deviceID, PackagePrefix: req.GetPackagePrefix(), AdvisoryPrefix: req.GetAdvisoryPrefix()})
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +144,7 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 	if err != nil {
 		return nil, err
 	}
-	response := &adminv1.ListDeviceFindingsResponse{Freshness: fresh}
+	response := &adminv1.ListDeviceFindingsResponse{Freshness: fresh, Totals: &adminv1.DeviceFindingTotals{Open: uint64(totals.Open), Critical: uint64(totals.Critical), High: uint64(totals.High), Medium: uint64(totals.Medium), Low: uint64(totals.Low), Unrated: uint64(totals.Unrated), Accepted: uint64(totals.Accepted)}}
 	bytesUsed := 0
 	for i, row := range rows {
 		if i == int(limit) {
@@ -133,12 +172,7 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		response.Findings = append(response.Findings, f)
 	}
 	if len(rows) > len(response.Findings) {
-		last := rows[len(response.Findings)-1].ID
-		var token [48]byte
-		copy(token[:16], deviceID[:])
-		copy(token[16:32], e.ID[:])
-		copy(token[32:], last[:])
-		response.NextPageToken = base64.RawURLEncoding.EncodeToString(token[:])
+		response.NextPageToken = cursor.encode(offset + uint64(len(response.Findings)))
 	}
 	// A partial evaluation stays PARTIAL with its vendor reason; only a
 	// complete evaluation is summarised as AFFECTED or CLEAR.

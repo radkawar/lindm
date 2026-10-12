@@ -439,3 +439,17 @@ func TestProvisionLanesMatchOfferedFormats(t *testing.T) {
 		t.Fatal("NixOS installation must stay gated with its self-hosting reason")
 	}
 }
+
+func TestDisplayName(t *testing.T) {
+	for _, tc := range []struct{ id, version, want string }{
+		{"ubuntu", "24.04", "Ubuntu 24.04 LTS"},
+		{"rhel", "9.4", "RHEL 9.4"},
+		{"fedora", "44", "Fedora 44"},
+		{"debian", "12", "Debian 12"},
+		{"plan9", "4", ""},
+	} {
+		if got := Identify(OSRelease{ID: tc.id, VersionID: tc.version}).DisplayName(tc.version); got != tc.want {
+			t.Errorf("%s %s: got %q, want %q", tc.id, tc.version, got, tc.want)
+		}
+	}
+}

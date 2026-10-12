@@ -247,8 +247,11 @@ type Device struct {
 	// was revoked. An empty display name means the revoker was not recorded.
 	RevokedAt            *timestamppb.Timestamp `protobuf:"bytes,27,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
 	RevokedByDisplayName string                 `protobuf:"bytes,28,opt,name=revoked_by_display_name,json=revokedByDisplayName,proto3" json:"revoked_by_display_name,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Operating system as administrators name it ("Ubuntu 24.04 LTS", "RHEL 9.4"),
+	// from the platform registry; empty when the reported release is not registered.
+	OsName        string `protobuf:"bytes,29,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -459,6 +462,13 @@ func (x *Device) GetRevokedAt() *timestamppb.Timestamp {
 func (x *Device) GetRevokedByDisplayName() string {
 	if x != nil {
 		return x.RevokedByDisplayName
+	}
+	return ""
+}
+
+func (x *Device) GetOsName() string {
+	if x != nil {
+		return x.OsName
 	}
 	return ""
 }
@@ -2501,7 +2511,7 @@ var File_lindm_admin_v1_admin_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\n" +
-	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/admin/v1/advisories.proto\x1a\x1elindm/admin/v1/approvals.proto\x1a lindm/admin/v1/assignments.proto\x1a\x1flindm/admin/v1/assistance.proto\x1a\"lindm/admin/v1/authorization.proto\x1a!lindm/admin/v1/authz_groups.proto\x1a#lindm/admin/v1/device_actions.proto\x1a&lindm/admin/v1/enrollment_grants.proto\x1a,lindm/admin/v1/enrollment_instructions.proto\x1a(lindm/admin/v1/enrollment_recovery.proto\x1a\"lindm/admin/v1/fleet_summary.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a'lindm/admin/v1/offline_enrollment.proto\x1a\x1dlindm/admin/v1/profiles.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1clindm/admin/v1/secrets.proto\x1a lindm/admin/v1/suggestions.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1blindm/agent/v1/update.proto\x1a\x1blindm/audit/v1/filter.proto\x1a$lindm/inventory/v1/observation.proto\x1a&lindm/validation/v1/string_rules.proto\"\x89\f\n" +
+	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/admin/v1/advisories.proto\x1a\x1elindm/admin/v1/approvals.proto\x1a lindm/admin/v1/assignments.proto\x1a\x1flindm/admin/v1/assistance.proto\x1a\"lindm/admin/v1/authorization.proto\x1a!lindm/admin/v1/authz_groups.proto\x1a#lindm/admin/v1/device_actions.proto\x1a&lindm/admin/v1/enrollment_grants.proto\x1a,lindm/admin/v1/enrollment_instructions.proto\x1a(lindm/admin/v1/enrollment_recovery.proto\x1a\"lindm/admin/v1/fleet_summary.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a'lindm/admin/v1/offline_enrollment.proto\x1a\x1dlindm/admin/v1/profiles.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1clindm/admin/v1/secrets.proto\x1a lindm/admin/v1/suggestions.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1blindm/agent/v1/update.proto\x1a\x1blindm/audit/v1/filter.proto\x1a$lindm/inventory/v1/observation.proto\x1a&lindm/validation/v1/string_rules.proto\"\xac\f\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12\x1a\n" +
@@ -2534,7 +2544,8 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\bfindings\x18\x1a \x01(\v2#.lindm.admin.v1.DeviceFindingCountsR\bfindings\x129\n" +
 	"\n" +
 	"revoked_at\x18\x1b \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\x12?\n" +
-	"\x17revoked_by_display_name\x18\x1c \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x14revokedByDisplayNameJ\x04\b\a\x10\bJ\x04\b\n" +
+	"\x17revoked_by_display_name\x18\x1c \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x14revokedByDisplayName\x12!\n" +
+	"\aos_name\x18\x1d \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06osNameJ\x04\b\a\x10\bJ\x04\b\n" +
 	"\x10\vR\x05stateR\x12inventory_sequence\"\x89\x02\n" +
 	"\x12DeviceUpdateStatus\x122\n" +
 	"\x0fpending_updates\x18\x01 \x01(\rB\t\xbaH\x06*\x04\x18\xa0\x8d\x06R\x0ependingUpdates\x12C\n" +

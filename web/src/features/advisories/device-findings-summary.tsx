@@ -16,7 +16,7 @@ export function DeviceFindingsSummary({ deviceId }: { deviceId: string }) {
   const findings = useQuery(deviceFindingsQueryOptions(lifetime, deviceId, ""));
   if (findings.isPending) return <span role="status">Checking findings…</span>;
   if (findings.error) return <span>Findings unavailable. Open Findings for the error.</span>;
-  const { freshness, nextPageToken } = findings.data;
+  const { freshness } = findings.data;
   const current =
     freshness !== undefined &&
     unexpired(freshness.inventoryExpiresAt, now) &&
@@ -31,16 +31,19 @@ export function DeviceFindingsSummary({ deviceId }: { deviceId: string }) {
       </span>
     );
   }
-  const more = nextPageToken !== "" ? "+" : "";
-  const affected = findings.data.findings.filter(
-    (finding) => finding.state === AdvisoryFindingState.AFFECTED,
-  ).length;
-  const accepted = findings.data.findings.filter(
-    (finding) => finding.state === AdvisoryFindingState.ACCEPTED,
-  ).length;
-  const noun = affected === 1 && !more ? "finding" : "findings";
+  // Totals cover every page; the first page alone undercounts large sets.
+  const totals = findings.data.totals;
+  const affected = Number(totals?.open ?? 0n);
+  const accepted = Number(totals?.accepted ?? 0n);
+  const severe = Number((totals?.critical ?? 0n) + (totals?.high ?? 0n));
   const parts = [
-    affected ? `${affected.toLocaleString()}${more} open ${noun}` : "No open findings",
+    affected
+      ? `${plural(affected, "open finding", "open findings")} · ${
+          severe
+            ? `${totals?.critical.toLocaleString()} critical, ${totals?.high.toLocaleString()} high`
+            : "none critical or high"
+        }`
+      : "No open findings",
   ];
   if (accepted) parts.push(plural(accepted, "accepted risk", "accepted risks"));
   if (freshness.state === AdvisoryFindingState.PARTIAL)

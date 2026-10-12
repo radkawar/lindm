@@ -169,11 +169,20 @@ export function DeviceEncryptionPanel({
     ...(escrow
       ? [
           { label: "Recovery key action ID", value: escrow.actionId },
+          { label: "Recovery key slot", value: String(escrow.keyslot) },
           ...(escrow.luksUuid !== observed?.target?.luksUuid
             ? [{ label: "Recovery key LUKS UUID", value: escrow.luksUuid }]
             : []),
         ]
       : []),
+    ...(slotsReported
+      ? [{ label: "Key slots in use", value: observed?.occupiedKeyslots.join(", ") ?? "" }]
+      : []),
+    ...(observed?.lindmKeyslots.length
+      ? [{ label: "Key slots managed by lindm", value: observed.lindmKeyslots.join(", ") }]
+      : slotsReported && !escrowSlotPresent
+        ? [{ label: "Key slots managed by lindm", value: "None" }]
+        : []),
   ];
   return (
     <Card>
@@ -263,94 +272,76 @@ export function DeviceEncryptionPanel({
             </Button>
           </div>
         ) : null}
-        {escrow ? (
-          <>
-            <h3 className="font-semibold">
-              {luksUuid ? "Recovery key for selected volume" : "Most recent recovery key"}
-            </h3>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="Key slot">{escrow.keyslot}</Fact>
-              <Fact label="Stored on server">
-                <ObservedTime value={escrow.storedAt} server />
-              </Fact>
-              <Fact label="Old key removed">
-                <StatusBadge status={escrow.retirementConfirmed ? "success" : "warning"}>
-                  {escrow.retirementConfirmed ? "Yes" : "Not confirmed"}
-                </StatusBadge>
-              </Fact>
-            </dl>
-          </>
-        ) : data ? (
-          <p className="text-sm">No recovery key stored yet.</p>
-        ) : null}
-        {observed ? (
-          <>
-            <h3 className="font-semibold">
-              {luksUuid ? "Selected volume" : "Most recently reported volume"}
-            </h3>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <Fact label="Reported">
-                <ObservedTime value={observed.observedAt} />
-              </Fact>
-              <Fact label="Encryption actions">
-                {observed.supported ? "Supported" : "Not supported"}
-                {observed.reason ? `: ${observed.reason}` : ""}
-              </Fact>
-              <Fact label="Encryption">
-                <StatusBadge status={observed.encrypted ? "success" : "warning"}>
-                  {observed.encrypted ? "Encrypted" : "Not encrypted"}
-                </StatusBadge>
-              </Fact>
-              <Fact label="TPM 2.0 unlock">
-                <StatusBadge status={observed.tpm2Bound ? "success" : "neutral"}>
-                  {observed.tpm2Bound ? "On" : "Off"}
-                </StatusBadge>
-              </Fact>
-              {slotsReported ? (
-                <Fact label="Key slots in use">{observed.occupiedKeyslots.join(", ")}</Fact>
-              ) : null}
-              {observed.lindmKeyslots.length ? (
-                <Fact label="Key slots managed by lindm">{observed.lindmKeyslots.join(", ")}</Fact>
-              ) : slotsReported && !escrowSlotPresent ? (
-                <Fact label="Key slots managed by lindm">None</Fact>
-              ) : null}
-              <Fact label="Running from recovery">
-                {observed.recoveryEnvironment ? "Yes" : "No"}
-              </Fact>
-            </dl>
-            {observed.luksTokens.length ? (
-              <Table>
-                <TableCaption>Unlock tokens on this volume. Secrets are never shown.</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Token ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Key slots</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {observed.luksTokens.map((token) => (
-                    <TableRow key={token.tokenId}>
-                      <TableCell>{token.tokenId}</TableCell>
-                      <TableCell>{token.type || "Not reported"}</TableCell>
-                      <TableCell>
-                        {token.keyslots.length ? token.keyslots.join(", ") : "None"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+        {escrow || observed ? (
+          <dl className="grid gap-3 sm:grid-cols-2">
+            {escrow ? (
+              <>
+                <Fact label={luksUuid ? "Recovery key for this volume" : "Recovery key stored"}>
+                  <ObservedTime value={escrow.storedAt} server />
+                </Fact>
+                {/* Custody of the escrowed key only; says nothing about old key slots. */}
+                <Fact label="Key custody">
+                  {escrow.retirementConfirmed ? (
+                    "Confirmed by the device"
+                  ) : (
+                    <StatusBadge status="warning">Not confirmed yet</StatusBadge>
+                  )}
+                </Fact>
+              </>
             ) : null}
-            {observed.target ? (
-              <StorageTargetFacts target={observed.target} />
-            ) : (
-              <p className="text-sm">No storage target reported.</p>
-            )}
-          </>
-        ) : data ? (
-          <p className="text-sm">No encryption status reported yet.</p>
+            {observed ? (
+              <>
+                <Fact label={luksUuid ? "Volume reported" : "Volume last reported"}>
+                  <ObservedTime value={observed.observedAt} />
+                </Fact>
+                {observed.encrypted ? null : (
+                  <Fact label="Encryption">
+                    <StatusBadge status="warning">Not encrypted</StatusBadge>
+                  </Fact>
+                )}
+                <Fact label="TPM 2.0 unlock">{observed.tpm2Bound ? "On" : "Off"}</Fact>
+                {observed.supported ? null : (
+                  <Fact label="Encryption actions">
+                    Not supported{observed.reason ? `: ${observed.reason}` : ""}
+                  </Fact>
+                )}
+                {observed.recoveryEnvironment ? (
+                  <Fact label="Boot">
+                    <StatusBadge status="warning">Running from lindm recovery</StatusBadge>
+                  </Fact>
+                ) : null}
+              </>
+            ) : null}
+          </dl>
         ) : null}
-        <TechnicalDetails items={details} />
+        {data && !escrow ? <p className="text-sm">No recovery key stored yet.</p> : null}
+        {observed?.target ? <StorageTargetFacts target={observed.target} /> : null}
+        {data && !observed ? <p className="text-sm">No encryption status reported yet.</p> : null}
+        <TechnicalDetails items={details}>
+          {observed?.luksTokens.length ? (
+            <Table>
+              <TableCaption>Unlock tokens on this volume. Secrets are never shown.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Token ID</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Key slots</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {observed.luksTokens.map((token) => (
+                  <TableRow key={token.tokenId}>
+                    <TableCell>{token.tokenId}</TableCell>
+                    <TableCell>{token.type || "Not reported"}</TableCell>
+                    <TableCell>
+                      {token.keyslots.length ? token.keyslots.join(", ") : "None"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : null}
+        </TechnicalDetails>
       </CardContent>
     </Card>
   );

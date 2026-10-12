@@ -21,6 +21,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/platform"
 )
 
 func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.GetDeviceRequest]) (*connect.Response[adminv1.GetDeviceResponse], error) {
@@ -352,7 +353,7 @@ func deviceFromDetail(row devicedb.GetDeviceDetailRow) (*adminv1.Device, error) 
 	}
 	return &adminv1.Device{
 		Id: row.ID.String(), EnrollmentGeneration: core.GenerationString(row.CurrentGenerationID),
-		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, Architecture: row.Architecture,
+		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, OsName: platform.Identify(platform.OSRelease{ID: row.OsID, VersionID: row.OsVersion}).DisplayName(row.OsVersion), Architecture: row.Architecture,
 		LifecycleState: state, EnrolledAt: timestamppb.New(enrolled), LastSeenAt: core.ProtoTime(row.LastSeenAt),
 		HostSequence: uint64(row.HostSequence), PackageSequence: uint64(row.PackageSequence),
 		HostReceivedAt: core.ProtoTime(row.HostReceivedAt), PackageAttemptReceivedAt: core.ProtoTime(row.PackageAttemptReceivedAt),

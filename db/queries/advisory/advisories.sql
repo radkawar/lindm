@@ -240,8 +240,32 @@ SELECT f.*, EXISTS (
  )
 ) AS source_record_rejected
 FROM advisory_finding_status f
-WHERE f.device_id=sqlc.arg('device_id') AND f.id>sqlc.arg('id')
-ORDER BY f.id LIMIT sqlc.arg('row_limit');
+WHERE f.device_id=sqlc.arg('device_id')
+ AND starts_with(lower(f.package_name), lower(sqlc.arg('package_prefix')::text))
+ AND (sqlc.arg('advisory_prefix')::text='' OR starts_with(lower(f.advisory_id), lower(sqlc.arg('advisory_prefix')::text))
+  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower(sqlc.arg('advisory_prefix')::text))))
+-- sort: 1 severity (critical first), 2 newest published, 3 package name.
+ORDER BY
+ CASE WHEN sqlc.arg('sort')::integer=1 THEN CASE lower(f.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END END,
+ CASE WHEN sqlc.arg('sort')::integer=3 THEN f.package_name END,
+ f.published_at DESC NULLS LAST, f.advisory_id, f.id
+OFFSET sqlc.arg('row_offset') LIMIT sqlc.arg('row_limit');
+
+-- name: CountDeviceAdvisoryFindings :one
+-- Same filters as ListDeviceAdvisoryFindings; active exceptions count as accepted only.
+SELECT
+ count(*) FILTER (WHERE f.state<>'accepted')::bigint AS open,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
+ count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
+ count(*) FILTER (WHERE f.state='accepted')::bigint AS accepted
+FROM advisory_finding_status f
+WHERE f.device_id=sqlc.arg('device_id')
+ AND starts_with(lower(f.package_name), lower(sqlc.arg('package_prefix')::text))
+ AND (sqlc.arg('advisory_prefix')::text='' OR starts_with(lower(f.advisory_id), lower(sqlc.arg('advisory_prefix')::text))
+  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower(sqlc.arg('advisory_prefix')::text))));
 
 -- name: GetAdvisoryFinding :one
 SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;

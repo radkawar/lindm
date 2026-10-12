@@ -10,7 +10,7 @@ import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -29,7 +29,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
   const key = `${deviceId}/${findingId}`;
   const attempt = useAcceptanceAttempt(key);
   const [reason, setReason] = useState("");
-  const [expiry, setExpiry] = useState("");
+  const [days, setDays] = useState("30");
   const [propose, setPropose] = useState(true);
   const [requestId, setRequestId] = useState(newRequestId);
   const [errors, setErrors] = useState<string[]>([]);
@@ -95,11 +95,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
       onSubmit={(event) => {
         event.preventDefault();
         if (attempt) return;
-        const date = new Date(expiry);
-        if (!Number.isFinite(date.getTime())) {
-          setErrors(["Enter when the acceptance should expire."]);
-          return;
-        }
+        const date = new Date(Date.now() + Number(days) * 86_400_000);
         const payload = create(AcceptAdvisoryFindingRequestSchema, {
           requestId,
           deviceId,
@@ -168,18 +164,22 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
           <Label htmlFor={`reason-${findingId}`}>Reason</Label>
           <Textarea
             id={`reason-${findingId}`}
+            data-freeform="risk acceptance reason"
             required
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            data-freeform="risk acceptance reason"
           />
-          <Label htmlFor={`expiry-${findingId}`}>Expires (local time)</Label>
-          <Input
+          <Label htmlFor={`expiry-${findingId}`}>Accept the risk for</Label>
+          <SelectField
             id={`expiry-${findingId}`}
-            type="datetime-local"
-            required
-            value={expiry}
-            onChange={(event) => setExpiry(event.target.value)}
+            className="w-48"
+            value={days}
+            onValueChange={setDays}
+            options={[
+              { value: "7", label: "7 days" },
+              { value: "30", label: "30 days" },
+              { value: "90", label: "90 days" },
+            ]}
           />
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -187,10 +187,10 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
               checked={propose}
               onChange={(event) => setPropose(event.target.checked)}
             />
-            Request independent approval (valid for one hour)
+            Ask another administrator to approve first (they have one hour to decide)
           </label>
           <p className="text-sm text-muted-foreground">
-            Direct acceptance is refused when organisation policy requires approval.
+            Accepting directly is refused when organisation policy requires approval.
           </p>
           <Button type="submit" className="w-fit">
             {propose ? "Propose risk acceptance" : "Accept risk"}

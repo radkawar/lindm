@@ -10,6 +10,7 @@ import { canPermission } from "@/lib/permissions";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { adminClient } from "@/lib/rpc";
 import { toRpcFailure } from "@/lib/errors";
+import { deviceOsLabel } from "./os";
 import { deviceQueryOptions, devicesQueryOptions } from "./queries";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
@@ -74,8 +75,7 @@ export function DevicePicker({
           value: device.id,
           label: device.hostname.trim() || "Unnamed device",
           description: [
-            device.osId,
-            device.osVersion,
+            deviceOsLabel(device),
             ...(groups.data?.groups
               .filter((item) => item.deviceIds.includes(device.id))
               .map((item) => item.name) ?? []),
