@@ -1980,7 +1980,12 @@ their current snapshot, host observation or bound feed generation (plus devices
 evaluated without an applicable feed once any process configures or re-enables a
 feed in the shared database, whatever the server's own feed list) and
 re-evaluates them in batches of 32, each device in its own bounded transaction,
-beside rather than behind a long feed refresh. Matching probes binary and source
+beside rather than behind a long feed refresh. Feed configuration holds an
+exclusive and each evaluation a shared transaction-scoped advisory lock while
+they write or read the enabled feed set, so a feed an evaluation could not see
+always has a `configured_at` after that evaluation's time and is rechecked; a
+device evaluated while a configuration was committing otherwise stayed
+`feed_unavailable` until its next inventory. Matching probes binary and source
 identities as separate index lookups on `(feed, generation, kind, name, id)`, never
 a scan of a multi-million-record generation. Candidates are read in 500-record
 keyset pages over `(package position, record id)`: one installed Ubuntu kernel

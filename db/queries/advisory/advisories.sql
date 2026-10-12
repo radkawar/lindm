@@ -1,3 +1,14 @@
+-- name: LockAdvisoryFeedConfiguration :exec
+-- Feed configuration and device evaluation serialize on this key. Configuration
+-- changes the enabled feed set under the exclusive lock; an evaluation reads
+-- its time and that set under the shared lock. A feed an evaluation could not
+-- see is therefore configured after the evaluation's time, so
+-- ClaimAdvisoryEvaluations rechecks the feed-less device.
+SELECT pg_advisory_xact_lock(6152883104475031217);
+
+-- name: ShareAdvisoryFeedConfiguration :exec
+SELECT pg_advisory_xact_lock_shared(6152883104475031217);
+
 -- name: DisableAdvisoryFeeds :exec
 UPDATE advisory_feeds SET enabled = false WHERE NOT (id = ANY(sqlc.arg('enabled_ids')::text[]));
 

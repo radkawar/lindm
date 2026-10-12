@@ -1320,6 +1320,20 @@ func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed
 	return i, err
 }
 
+const lockAdvisoryFeedConfiguration = `-- name: LockAdvisoryFeedConfiguration :exec
+SELECT pg_advisory_xact_lock(6152883104475031217)
+`
+
+// Feed configuration and device evaluation serialize on this key. Configuration
+// changes the enabled feed set under the exclusive lock; an evaluation reads
+// its time and that set under the shared lock. A feed an evaluation could not
+// see is therefore configured after the evaluation's time, so
+// ClaimAdvisoryEvaluations rechecks the feed-less device.
+func (q *Queries) LockAdvisoryFeedConfiguration(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockAdvisoryFeedConfiguration)
+	return err
+}
+
 const lockAdvisoryGenerationCleanup = `-- name: LockAdvisoryGenerationCleanup :one
 SELECT feed_id,generation FROM advisory_generation_cleanup
 WHERE cleanup_after<=clock_timestamp()
@@ -1467,6 +1481,15 @@ func (q *Queries) RenewAdvisoryGeneration(ctx context.Context, generation uuid.U
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const shareAdvisoryFeedConfiguration = `-- name: ShareAdvisoryFeedConfiguration :exec
+SELECT pg_advisory_xact_lock_shared(6152883104475031217)
+`
+
+func (q *Queries) ShareAdvisoryFeedConfiguration(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, shareAdvisoryFeedConfiguration)
+	return err
 }
 
 const startAdvisoryGeneration = `-- name: StartAdvisoryGeneration :exec

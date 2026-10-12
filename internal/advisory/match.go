@@ -95,6 +95,13 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	if len(locked) == 0 {
 		return advisorydb.AdvisoryEvaluation{}, ErrDeviceBusy
 	}
+	// The evaluation time and the enabled feed set are read under the shared
+	// feed-configuration lock: a configuration committing after the feed read
+	// takes its configured_at after this evaluated_at, so a device evaluated
+	// without an applicable feed is rechecked (ClaimAdvisoryEvaluations).
+	if err := q.ShareAdvisoryFeedConfiguration(ctx); err != nil {
+		return advisorydb.AdvisoryEvaluation{}, err
+	}
 	d, err := q.GetAdvisoryDevice(ctx, deviceID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return advisorydb.AdvisoryEvaluation{}, ErrNotFound

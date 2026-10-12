@@ -411,6 +411,58 @@ func TestEvaluatorRechecksFeedlessDevicesAfterExternalConfiguration(t *testing.T
 	}
 }
 
+// An evaluation concurrent with an uncommitted feed configuration waits for it
+// instead of reading the feed set first: evaluated before the configuration's
+// commit with a later time, the device would stay feed_unavailable, because
+// ClaimAdvisoryEvaluations rechecks only feeds configured after evaluated_at
+// (Debian 13 x86_64 matrix advisories, debianel2-debadv-x86-20261012T140542Z).
+func TestEvaluationWaitsForConcurrentFeedConfiguration(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	server, err := New(t.Context(), pool, nil, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	tx, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(t.Context())) }()
+	q := advisorydb.New(tx)
+	if err := q.LockAdvisoryFeedConfiguration(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	source := &advisoryv1.FeedSource{Id: "fedora-44", Distro: "fedora", Release: "44", Architecture: "x86_64", Url: "https://vendor.example/fedora44-sudo.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, MaxAgeSeconds: 86400}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.ConfigureAdvisoryFeed(t.Context(), advisorydb.ConfigureAdvisoryFeedParams{ID: source.GetId(), Distro: source.GetDistro(), Release: source.GetRelease(), SourceUrl: source.GetUrl(), ConfigBytes: encoded, Revision: uuid.New()}); err != nil {
+		t.Fatal(err)
+	}
+	type outcome struct {
+		evaluation advisorydb.AdvisoryEvaluation
+		err        error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		evaluation, err := server.Evaluate(t.Context(), id)
+		done <- outcome{evaluation, err}
+	}()
+	select {
+	case got := <-done:
+		t.Fatalf("evaluation read the feed set during an uncommitted configuration: %+v", got)
+	case <-time.After(500 * time.Millisecond):
+	}
+	if err := tx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	got := <-done
+	if got.err != nil || got.evaluation.FeedID != source.GetId() {
+		t.Fatalf("evaluation after the configuration committed = %+v, %v; want feed %s", got.evaluation, got.err, source.GetId())
+	}
+}
+
 // Native rpm reports imported signing keys as gpg-pubkey rows without an ARCH
 // tag. They are keyring entries, not packages, and must not make every RPM
 // device's architecture coverage UNKNOWN. Any other architecture-less row still

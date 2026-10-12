@@ -83,6 +83,11 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := advisorydb.New(tx)
+	// Evaluations read the enabled feed set under the shared side of this lock,
+	// so none can miss a feed whose configured_at precedes its own time.
+	if err := q.LockAdvisoryFeedConfiguration(ctx); err != nil {
+		return nil, err
+	}
 	ids := make([]string, 0, len(cfg.GetFeeds()))
 	var retired []advisoryGeneration
 	for _, source := range cfg.GetFeeds() {
