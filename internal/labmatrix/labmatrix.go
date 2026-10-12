@@ -7,11 +7,14 @@
 package labmatrix
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -84,9 +87,9 @@ type Cell struct {
 	// the original-device action lane; nil when none is pinned or required.
 	Recovery *Manifest
 	State    State
-	// Reason explains gated and no-lane states.
+	// Reason explains gated, no-lane and superseded (not run) states.
 	Reason string
-	// Entry is the latest ledger entry, if any.
+	// Entry is the latest counted ledger entry, if any.
 	Entry *labv1.MatrixLedgerEntry
 	// Kinds are the implemented capabilities a capability_kinds cell passes.
 	Kinds []platform.Capability
@@ -120,9 +123,13 @@ type Inputs struct {
 	Matrix            *labv1.LabMatrix
 	Manifests         []*Manifest
 	Ledger            *labv1.MatrixLedger
+	// superseded holds the ledger entries a cell's requalification floor
+	// excludes; they remain history but never decide a cell.
+	superseded map[*labv1.MatrixLedgerEntry]bool
 }
 
-// Load reads the matrix, image manifests and ledger under a repository root.
+// Load reads the matrix, image manifests and ledger under a repository root,
+// and resolves requalification floors against root's git history.
 func Load(root string) (*Inputs, error) {
 	matrix, err := LoadMatrix(filepath.Join(root, MatrixFile))
 	if err != nil {
@@ -136,7 +143,78 @@ func Load(root string) (*Inputs, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Inputs{Matrix: matrix, Manifests: manifests, Ledger: ledger}, nil
+	in := &Inputs{Matrix: matrix, Manifests: manifests, Ledger: ledger}
+	if err := in.applyFloors(gitDescends(root)); err != nil {
+		return nil, err
+	}
+	return in, nil
+}
+
+// descendsFunc reports whether revision descends from (or is) floor. An
+// unknown revision or floor does not descend; only a failure to ask is an error.
+type descendsFunc func(floor, revision string) (bool, error)
+
+var commitPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+
+// gitDescends asks root's repository with git merge-base --is-ancestor.
+func gitDescends(root string) descendsFunc {
+	return func(floor, revision string) (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := exec.CommandContext(ctx, "git", "-C", root, "merge-base", "--is-ancestor", floor, revision).Run()
+		var exit *exec.ExitError
+		switch {
+		case err == nil:
+			return true, nil
+		case errors.As(err, &exit) && (exit.ExitCode() == 1 || exit.ExitCode() == 128):
+			// 1: not an ancestor; 128: an object this clone does not know.
+			return false, nil
+		default:
+			return false, fmt.Errorf("lab matrix: git merge-base --is-ancestor %s %s: %w", floor, revision, err)
+		}
+	}
+}
+
+// applyFloors marks every ledger entry of a cell with a minimum_revision that
+// does not descend from it. The entry's mainline revision is the durable
+// ancestor; entries recorded before it existed fall back to their source
+// revision without the "-dirty" suffix. An unparseable revision is superseded.
+func (in *Inputs) applyFloors(descends descendsFunc) error {
+	floors := map[string]string{}
+	for _, spec := range in.Matrix.GetCells() {
+		if floor := spec.GetMinimumRevision(); floor != "" {
+			floors[spec.GetName()] = floor
+		}
+	}
+	in.superseded = map[*labv1.MatrixLedgerEntry]bool{}
+	if len(floors) == 0 {
+		return nil
+	}
+	type query struct{ floor, revision string }
+	answers := map[query]bool{}
+	for _, e := range in.Ledger.GetEntries() {
+		floor, ok := floors[e.GetCell()]
+		if !ok {
+			continue
+		}
+		revision := e.GetMainlineRevision()
+		if revision == "" {
+			revision = strings.TrimSuffix(e.GetRevision(), "-dirty")
+		}
+		q := query{floor, revision}
+		counted, known := answers[q]
+		if !known && commitPattern.MatchString(revision) {
+			var err error
+			if counted, err = descends(floor, revision); err != nil {
+				return err
+			}
+		}
+		answers[q] = counted
+		if !counted {
+			in.superseded[e] = true
+		}
+	}
+	return nil
 }
 
 // LoadMatrix strictly decodes and validates the cell table.
@@ -316,7 +394,8 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	if spec.GetLane() == "device-actions" || spec.GetImage() == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
 		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch, recoveryEdition)
 	}
-	c.Entry = in.latest(c)
+	var superseded bool
+	c.Entry, superseded = in.latest(c)
 	lane := platform.LabLane(spec.GetLane())
 	provisionGate := r.ProvisionGate(lane)
 	switch laneGate := r.LaneGateOn(lane, arch); {
@@ -335,6 +414,9 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		c.State, c.Reason = NoImage, "no matching primary and ordinary recovery image for the selected topology"
 	case c.Entry == nil:
 		c.State = NotRun
+		if superseded {
+			c.Reason = "superseded by " + spec.GetMinimumRevision()[:8]
+		}
 	case c.Entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_PASS:
 		c.State = Pass
 	default:
@@ -370,10 +452,11 @@ func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch, ed
 	return selected
 }
 
-// latest returns the newest entry for the cell's exact rolling snapshot.
-// Legacy fixed-release imports retain their historical scope.
-func (in *Inputs) latest(c *Cell) *labv1.MatrixLedgerEntry {
-	var out *labv1.MatrixLedgerEntry
+// latest returns the newest counted entry for the cell's exact rolling
+// snapshot, and whether a matching entry was superseded by the cell's
+// requalification floor. Legacy fixed-release imports retain their historical
+// scope.
+func (in *Inputs) latest(c *Cell) (out *labv1.MatrixLedgerEntry, superseded bool) {
 	for _, e := range in.Ledger.GetEntries() {
 		if e.GetPlatform() != c.Release.Key || e.GetCell() != c.Spec.GetName() || e.GetArchitecture() != c.Architecture {
 			continue
@@ -390,11 +473,15 @@ func (in *Inputs) latest(c *Cell) *labv1.MatrixLedgerEntry {
 				e.GetRecoveryRepositoryMetadataSha256() != c.Recovery.Image.GetRepositorySnapshotRepomdSha256()) {
 			continue
 		}
+		if in.superseded[e] {
+			superseded = true
+			continue
+		}
 		if out == nil || !e.GetRecorded().AsTime().Before(out.GetRecorded().AsTime()) {
 			out = e
 		}
 	}
-	return out
+	return out, superseded
 }
 
 func appendUnique(list []string, s string) []string {

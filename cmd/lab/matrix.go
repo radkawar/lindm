@@ -258,7 +258,7 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	if entry.Recorded == nil {
 		return errors.New("-recorded is required for an unreadable evidence file")
 	}
-	if entry.Revision, err = sourceRevision(ctx, *root); err != nil {
+	if entry.Revision, entry.MainlineRevision, err = sourceRevision(ctx, *root); err != nil {
 		return err
 	}
 	return labmatrix.Append(filepath.Join(*root, labmatrix.LedgerFile), entry)
@@ -303,27 +303,35 @@ func expandHome(path string) string {
 }
 
 // sourceRevision names the checkout commit, suffixed "-dirty" when the tree
-// has uncommitted or untracked changes.
-func sourceRevision(ctx context.Context, root string) (string, error) {
+// has uncommitted or untracked changes, and the newest main-branch commit it
+// contains: landing republishes a worktree's change rather than its commits,
+// so only the mainline ancestor stays resolvable for requalification floors.
+func sourceRevision(ctx context.Context, root string) (revision, mainline string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	head := &boundedBuffer{limit: 128}
 	cmd := exec.CommandContext(ctx, "git", "-C", root, "rev-parse", "HEAD")
 	cmd.Stdout = head
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("read source revision: %w", err)
+		return "", "", fmt.Errorf("read source revision: %w", err)
+	}
+	base := &boundedBuffer{limit: 128}
+	cmd = exec.CommandContext(ctx, "git", "-C", root, "merge-base", "HEAD", "main")
+	cmd.Stdout = base
+	if err := cmd.Run(); err != nil {
+		return "", "", fmt.Errorf("read mainline revision (git merge-base HEAD main): %w", err)
 	}
 	status := &boundedBuffer{limit: 1}
 	cmd = exec.CommandContext(ctx, "git", "-C", root, "status", "--porcelain")
 	cmd.Stdout = status
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("read source status: %w", err)
+		return "", "", fmt.Errorf("read source status: %w", err)
 	}
-	revision := strings.TrimSpace(head.String())
+	revision = strings.TrimSpace(head.String())
 	if status.written > 0 {
 		revision += "-dirty"
 	}
-	return revision, nil
+	return revision, strings.TrimSpace(base.String()), nil
 }
 
 // boundedBuffer keeps at most limit bytes and counts everything written.
@@ -346,6 +354,7 @@ var matrixVersions = [2]string{"0.1.0", "0.1.1"}
 // matrixRun holds the shared inputs one run prepares for every cell.
 type matrixRun struct {
 	root, repo, cache, evidence, self, lindmd, agent, redhatToken, revision string
+	mainline                                                                string
 	consoleBrowsers, consoleAdmin, consoleDevice                            string
 	bootstrapFirmwareVars                                                   string
 	signer                                                                  *packaging.SigningKey
@@ -436,7 +445,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	if run.self, err = os.Executable(); err != nil {
 		return err
 	}
-	if run.revision, err = sourceRevision(ctx, run.root); err != nil {
+	if run.revision, run.mainline, err = sourceRevision(ctx, run.root); err != nil {
 		return err
 	}
 	for _, c := range cells {
@@ -695,7 +704,7 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	if err != nil {
 		return err
 	}
-	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), ManifestSha256: c.Manifest.SHA256, RepositorySnapshotDate: c.Manifest.Image.GetRepositorySnapshotDate(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN, Verified: true}
+	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), ManifestSha256: c.Manifest.SHA256, RepositorySnapshotDate: c.Manifest.Image.GetRepositorySnapshotDate(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, MainlineRevision: r.mainline, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN, Verified: true}
 	entry.RepositoryClosureSha256 = c.Manifest.Image.GetRepositorySnapshotManifestSha256()
 	entry.RepositoryMetadataSha256 = c.Manifest.Image.GetRepositorySnapshotRepomdSha256()
 	if c.Recovery != nil {

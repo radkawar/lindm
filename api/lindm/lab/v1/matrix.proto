@@ -130,6 +130,12 @@ message MatrixCell {
   // The lane refuses without enforced Secure Boot (e.g. original-device signed
   // recovery); it receives LabMatrix.secure_boot_args for its architecture.
   bool secure_boot = 9;
+  // Requalification floor: the full commit SHA of a change that invalidates
+  // earlier results (e.g. a new native mechanism). A ledger entry counts only
+  // when its mainline (else source) revision descends from this commit; older
+  // entries stay in the ledger as history and the cell is "not run" until it
+  // passes again.
+  string minimum_revision = 10 [(buf.validate.field).string.pattern = "^([0-9a-f]{40})?$"];
 }
 
 // MatrixImage is the kind of pinned manifest a cell boots.
@@ -211,6 +217,10 @@ message MatrixLedgerEntry {
   string recovery_repository_snapshot_date = 20 [(buf.validate.field).string.pattern = "^([0-9]{4}-[0-9]{2}-[0-9]{2})?$"];
   string recovery_repository_closure_sha256 = 21 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
   string recovery_repository_metadata_sha256 = 22 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  // Newest main-branch commit the recording checkout contains (git merge-base
+  // HEAD main). Landing does not publish worktree commits, so requalification
+  // floors are checked against this durable ancestor rather than `revision`.
+  string mainline_revision = 23 [(buf.validate.field).string.pattern = "^([0-9a-f]{40})?$"];
 }
 
 // MatrixVerdict is a lane outcome.

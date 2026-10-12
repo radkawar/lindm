@@ -92,6 +92,9 @@ func Render(specs []*labv1.MatrixCell, cells []*Cell) (string, error) {
 func cellText(c *Cell, label func(ref string) string) string {
 	switch c.State {
 	case NotRun:
+		if c.Reason != "" {
+			return gendoc.Escape(c.Reason)
+		}
 		return "—"
 	case Pass, Fail:
 		text := string(c.State)

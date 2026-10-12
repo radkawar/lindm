@@ -2,8 +2,10 @@ package labmatrix
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -340,15 +342,134 @@ func TestRollingRecoveryEvidenceBindsSecondaryManifest(t *testing.T) {
 	e.RecoveryRepositoryClosureSha256 = recovery.Image.GetRepositorySnapshotManifestSha256()
 	e.RecoveryRepositoryMetadataSha256 = recovery.Image.GetRepositorySnapshotRepomdSha256()
 	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{e}}}
-	if in.latest(c) != e {
+	if got, _ := in.latest(c); got != e {
 		t.Fatal("exact recovery qualification was lost")
 	}
 	for _, field := range []*string{&e.RecoveryManifest, &e.RecoveryManifestSha256, &e.RecoveryRepositorySnapshotDate, &e.RecoveryRepositoryClosureSha256, &e.RecoveryRepositoryMetadataSha256} {
 		value := *field
 		*field = ""
-		if in.latest(c) != nil {
+		if got, _ := in.latest(c); got != nil {
 			t.Fatal("changed or unbound recovery input reused a rolling pass")
 		}
 		*field = value
+	}
+}
+
+// gitCommits creates a linear repository and returns its commit SHAs, oldest
+// first, so floors are decided by real git ancestry.
+func gitCommits(t *testing.T, n int) (string, []string) {
+	t.Helper()
+	root := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", root, "-c", "user.name=lab", "-c", "user.email=lab@example.invalid", "-c", "commit.gpgsign=false"}, args...)...).Output()
+		if err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	shas := make([]string, n)
+	for i := range shas {
+		git("commit", "-q", "--allow-empty", "-m", strconv.Itoa(i))
+		shas[i] = git("rev-parse", "HEAD")
+	}
+	return root, shas
+}
+
+// A requalification floor keeps earlier entries as history but never counts
+// them: the newest counted entry decides, a cell with only superseded entries
+// is "not run" with the floor named, and a mainline revision recorded beside
+// an unpublished worktree commit is the ancestry that counts.
+func TestRequalificationFloorSupersedesEarlierEntries(t *testing.T) {
+	root, shas := gitCommits(t, 3)
+	before, floor, after := shas[0], shas[1], shas[2]
+	ubuntu := release(t, "ubuntu-24.04")
+	spec := &labv1.MatrixCell{Name: "lifecycle", Title: "Lifecycle", Capabilities: []string{"lifecycle"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: "lifecycle", MinimumRevision: floor}
+	at := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	at2 := func(hours int, verdict labv1.MatrixVerdict, revision string) *labv1.MatrixLedgerEntry {
+		e := entry("ubuntu-24.04", "lifecycle", "x86_64", verdict, at.Add(time.Duration(hours)*time.Hour))
+		e.Revision = revision
+		return e
+	}
+	pass, fail := labv1.MatrixVerdict_MATRIX_VERDICT_PASS, labv1.MatrixVerdict_MATRIX_VERDICT_FAIL
+	postFail := at2(0, fail, after+"-dirty")
+	ledger := &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{
+		postFail,
+		at2(1, pass, before),
+		at2(2, pass, before+"-dirty"),
+		at2(3, pass, strings.Repeat("e", 40)),
+		at2(4, pass, "r"),
+	}}
+	in := &Inputs{
+		Matrix:    &labv1.LabMatrix{Cells: []*labv1.MatrixCell{spec}},
+		Manifests: []*Manifest{{Image: &labv1.ImageManifest{Id: "x", Edition: "server-cloudimg"}, Release: ubuntu, Architecture: "x86_64"}},
+		Ledger:    ledger,
+	}
+	plan := func() *Cell {
+		t.Helper()
+		if err := in.applyFloors(gitDescends(root)); err != nil {
+			t.Fatal(err)
+		}
+		return in.Plan([]*platform.Release{ubuntu}, []*labv1.MatrixCell{spec})[0]
+	}
+	if c := plan(); c.State != Fail || c.Entry != postFail {
+		t.Fatalf("newer pre-floor, unknown or malformed passes outranked the post-floor result: %s", c.State)
+	}
+	ledger.Entries = ledger.Entries[1:]
+	c := plan()
+	if c.State != NotRun || c.Entry != nil || c.Reason != "superseded by "+floor[:8] || !c.Runnable() {
+		t.Fatalf("pre-floor passes counted: %s %q", c.State, c.Reason)
+	}
+	table, err := Render([]*labv1.MatrixCell{spec}, []*Cell{c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(table, "superseded by "+floor[:8]) {
+		t.Fatalf("report hides the superseding floor:\n%s", table)
+	}
+	worktree := at2(5, pass, strings.Repeat("f", 40))
+	worktree.MainlineRevision = floor
+	ledger.Entries = append(ledger.Entries, worktree)
+	if c := plan(); c.State != Pass || c.Entry != worktree {
+		t.Fatalf("unpublished worktree commit on the floor's mainline did not count: %s", c.State)
+	}
+	worktree.MainlineRevision = before
+	worktree.Revision = after
+	if c := plan(); c.State != NotRun {
+		t.Fatalf("source revision outranked the recorded mainline ancestry: %s", c.State)
+	}
+	if len(ledger.GetEntries()) != 5 {
+		t.Fatal("superseded entries were removed from history")
+	}
+	spec.MinimumRevision = ""
+	if c := plan(); c.State != Pass {
+		t.Fatalf("cell without a floor ignored its history: %s", c.State)
+	}
+}
+
+// A rolling cell whose only pass predates its floor is due for requalification.
+func TestRequalificationFloorMakesRollingCellDue(t *testing.T) {
+	root, shas := gitCommits(t, 2)
+	arch := release(t, "arch")
+	spec := &labv1.MatrixCell{Name: "inventory", Capabilities: []string{"inventory"}, Image: labv1.MatrixImage_MATRIX_IMAGE_CLOUD, Lane: "inspect", MinimumRevision: shas[1]}
+	at := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	manifest := &Manifest{Release: arch, Architecture: "x86_64", SHA256: strings.Repeat("b", 64), Image: &labv1.ImageManifest{Id: "arch-snapshot", RepositorySnapshotDate: proto.String("2026-10-02")}}
+	record := entry("arch", "inventory", "x86_64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, at)
+	record.Manifest, record.ManifestSha256, record.RepositorySnapshotDate = manifest.Image.GetId(), manifest.SHA256, manifest.Image.GetRepositorySnapshotDate()
+	record.Revision = shas[0]
+	in := &Inputs{Matrix: &labv1.LabMatrix{Cells: []*labv1.MatrixCell{spec}}, Manifests: []*Manifest{manifest}, Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{record}}}
+	if err := in.applyFloors(gitDescends(root)); err != nil {
+		t.Fatal(err)
+	}
+	if c := in.cell(arch, spec, "x86_64"); c.State != NotRun || !c.RequalificationDue(at) {
+		t.Fatalf("superseded rolling pass suppressed requalification: %s", c.State)
+	}
+	record.Revision = shas[1]
+	if err := in.applyFloors(gitDescends(root)); err != nil {
+		t.Fatal(err)
+	}
+	if c := in.cell(arch, spec, "x86_64"); c.State != Pass || c.RequalificationDue(at) {
+		t.Fatalf("pass at the floor was not current: %s", c.State)
 	}
 }

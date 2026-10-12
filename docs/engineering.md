@@ -2764,8 +2764,10 @@ concurrent cells; host slots still bound guests). The child's output is kept in
 entry to `lab/ledger.json` (strict protobuf JSON `MatrixLedger`): platform key,
 cell, architecture, manifest id, `pass` only for a zero exit with a record,
 otherwise `fail` with the record or log as evidence, the evidence SHA-256, time,
-source revision (`-dirty` for local changes) and source. Writers lock the ledger
-directory and replace the file atomically. An interrupted run records nothing.
+source revision (`-dirty` for local changes), mainline revision (`git merge-base
+HEAD main`, so `run` and `import` need a local `main` branch) and source. Writers
+lock the ledger directory and replace the file atomically. An interrupted run
+records nothing.
 Remote lanes stage source from `-repo` (see above), so keep that tree buildable
 while aarch64 cells run.
 
@@ -2793,6 +2795,20 @@ matching manifest bytes and repository date cannot qualify the selected snapshot
 The date of the base image and the date of the repository are distinct pins.
 Historical `pass` remains a historical lane outcome, not an unbounded certificate;
 the periodic selector uses the registry interval to decide what must run again.
+
+A cell's `minimumRevision` (full commit SHA) is a requalification floor for a
+change that invalidates every earlier result of that cell, e.g. NVMe sanitize
+moving from nvme-cli to `NVME_IOCTL_ADMIN_CMD` on `recovery-sanitize`
+(9b4e6f5f). An entry counts only when its mainline revision, or for entries
+recorded before that field existed its source revision without `-dirty`,
+descends from the floor (`git merge-base --is-ancestor`); an unknown or malformed
+revision does not. Landing republishes a worktree's change, never its commits,
+so the mainline revision is the ancestor that stays resolvable on every clone;
+generated docs therefore need full history (CI checks out with `fetch-depth: 0`).
+Superseded entries stay in the ledger as history. With no counted entry, `plan`
+and `report` show the cell as `not run` with `superseded by <short sha>`;
+`run` selects it like any unrecorded cell, and `-rolling-requalification`
+treats it as due.
 
 For owner-selected boot topology, `-manifest-id ID` requires the exact single
 `-platform` and `-architecture` and prefers that pinned image for its image kind.

@@ -104,7 +104,8 @@
       "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
       "lane": "device-actions",
       "args": ["-scenario=wipe", "-wipe-phase=recovery-nvme"],
-      "secureBoot": true
+      "secureBoot": true,
+      "minimumRevision": "9b4e6f5fbf84aec197ab6922026d9be93d1da6b2"
     },
     {
       "name": "self-update",

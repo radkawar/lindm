@@ -319,9 +319,15 @@ type MatrixCell struct {
 	NoLane string   `protobuf:"bytes,8,opt,name=no_lane,json=noLane,proto3" json:"no_lane,omitempty"`
 	// The lane refuses without enforced Secure Boot (e.g. original-device signed
 	// recovery); it receives LabMatrix.secure_boot_args for its architecture.
-	SecureBoot    bool `protobuf:"varint,9,opt,name=secure_boot,json=secureBoot,proto3" json:"secure_boot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SecureBoot bool `protobuf:"varint,9,opt,name=secure_boot,json=secureBoot,proto3" json:"secure_boot,omitempty"`
+	// Requalification floor: the full commit SHA of a change that invalidates
+	// earlier results (e.g. a new native mechanism). A ledger entry counts only
+	// when its mainline (else source) revision descends from this commit; older
+	// entries stay in the ledger as history and the cell is "not run" until it
+	// passes again.
+	MinimumRevision string `protobuf:"bytes,10,opt,name=minimum_revision,json=minimumRevision,proto3" json:"minimum_revision,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *MatrixCell) Reset() {
@@ -417,6 +423,13 @@ func (x *MatrixCell) GetSecureBoot() bool {
 	return false
 }
 
+func (x *MatrixCell) GetMinimumRevision() string {
+	if x != nil {
+		return x.MinimumRevision
+	}
+	return ""
+}
+
 // MatrixLedger is the append-only record of matrix cell outcomes.
 type MatrixLedger struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -502,8 +515,12 @@ type MatrixLedgerEntry struct {
 	RecoveryRepositorySnapshotDate   string `protobuf:"bytes,20,opt,name=recovery_repository_snapshot_date,json=recoveryRepositorySnapshotDate,proto3" json:"recovery_repository_snapshot_date,omitempty"`
 	RecoveryRepositoryClosureSha256  string `protobuf:"bytes,21,opt,name=recovery_repository_closure_sha256,json=recoveryRepositoryClosureSha256,proto3" json:"recovery_repository_closure_sha256,omitempty"`
 	RecoveryRepositoryMetadataSha256 string `protobuf:"bytes,22,opt,name=recovery_repository_metadata_sha256,json=recoveryRepositoryMetadataSha256,proto3" json:"recovery_repository_metadata_sha256,omitempty"`
-	unknownFields                    protoimpl.UnknownFields
-	sizeCache                        protoimpl.SizeCache
+	// Newest main-branch commit the recording checkout contains (git merge-base
+	// HEAD main). Landing does not publish worktree commits, so requalification
+	// floors are checked against this durable ancestor rather than `revision`.
+	MainlineRevision string `protobuf:"bytes,23,opt,name=mainline_revision,json=mainlineRevision,proto3" json:"mainline_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *MatrixLedgerEntry) Reset() {
@@ -690,6 +707,13 @@ func (x *MatrixLedgerEntry) GetRecoveryRepositoryMetadataSha256() string {
 	return ""
 }
 
+func (x *MatrixLedgerEntry) GetMainlineRevision() string {
+	if x != nil {
+		return x.MainlineRevision
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_matrix_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
@@ -711,7 +735,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x1blab.matrix_secure_boot_args\x12@a Secure Boot cell needs secure_boot_args for every architecture\x1aa!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)\"7\n" +
 	"\n" +
 	"MatrixArgs\x12)\n" +
-	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\x99\x05\n" +
+	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xde\x05\n" +
 	"\n" +
 	"MatrixCell\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x04name\x12\x1f\n" +
@@ -724,11 +748,13 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x04args\x18\a \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\x12!\n" +
 	"\ano_lane\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x06noLane\x12\x1f\n" +
 	"\vsecure_boot\x18\t \x01(\bR\n" +
-	"secureBoot:\xf3\x01\xbaH\xef\x01\x1a\xec\x01\n" +
+	"secureBoot\x12C\n" +
+	"\x10minimum_revision\x18\n" +
+	" \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x0fminimumRevision:\xf3\x01\xbaH\xef\x01\x1a\xec\x01\n" +
 	"\x14lab.matrix_cell_lane\x12ia cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane\x1aithis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
-	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\x90\v\n" +
+	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xd7\v\n" +
 	"\x11MatrixLedgerEntry\x12%\n" +
 	"\bplatform\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\bplatform\x12\x1d\n" +
 	"\x04cell\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\x04cell\x12:\n" +
@@ -755,7 +781,8 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x18recovery_manifest_sha256\x18\x13 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x16recoveryManifestSha256\x12q\n" +
 	"!recovery_repository_snapshot_date\x18\x14 \x01(\tB&\xbaH#r!2\x1f^([0-9]{4}-[0-9]{2}-[0-9]{2})?$R\x1erecoveryRepositorySnapshotDate\x12e\n" +
 	"\"recovery_repository_closure_sha256\x18\x15 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x1frecoveryRepositoryClosureSha256\x12g\n" +
-	"#recovery_repository_metadata_sha256\x18\x16 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R recoveryRepositoryMetadataSha256*i\n" +
+	"#recovery_repository_metadata_sha256\x18\x16 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R recoveryRepositoryMetadataSha256\x12E\n" +
+	"\x11mainline_revision\x18\x17 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x10mainlineRevision*i\n" +
 	"\vMatrixImage\x12\x1c\n" +
 	"\x18MATRIX_IMAGE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MATRIX_IMAGE_CLOUD\x10\x01\x12$\n" +
