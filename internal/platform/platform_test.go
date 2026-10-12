@@ -78,6 +78,12 @@ func TestDerivativeUsesBaseTooling(t *testing.T) {
 	if _, ok := mint.PasswordPins("22.3"); !ok {
 		t.Fatal("Mint lost its base's measured password pins")
 	}
+	// Measured recovery readiness identifies the os-release row itself; with
+	// no chain, Mint reported recovery_readiness_measured_grub_unsupported
+	// although it boots its base's stock shim+GRUB.
+	if mint.Quirks.RecoveryGRUB != mint.Native().Quirks.RecoveryGRUB || mint.Quirks.RecoveryGRUB.Entries == "" {
+		t.Fatalf("Mint recovery GRUB chain = %+v", mint.Quirks.RecoveryGRUB)
+	}
 	// A derivative never names a feed itself: its advisories are the base's
 	// feed restricted to verified base-archive packages, always partial.
 	if len(mint.Advisory.Feeds) != 0 || mint.Advisory.Partial == "" || mint.BaseCoverage() != mint.Native() {

@@ -168,7 +168,63 @@ desktop-session lane).
 
 ## Lab records
 
-None yet.
+All records are under `~/.cache/lindm-desktopderiv-20261011/linuxmint/` on the
+local x86_64 KVM host (QEMU 8.2.2, OVMF `2024.02-2ubuntu0.10`), except the
+desktop-session records under `…/sessions/mint/`. Each lane ran from an immutable
+snapshot: `snap3` = DesktopDerivatives `9620057` plus the FIFO admission files
+(lab `47d5761b…`), `snap5` = main `7876a674` plus the APT-sources fix that landed
+as `464ad5cc` (lab `c944eb4b…`, lindmd `728fa7eb…`). Unencrypted lanes boot the
+installed golden with Secure Boot off (`OVMF_VARS_4M.fd`); encrypted and action
+lanes use `OVMF_VARS_4M.ms.fd` with Secure Boot enforced.
+
+| Cell                                                                                 | Result                       | Record                                                | SHA-256                                                            |
+| ------------------------------------------------------------------------------------ | ---------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| Inventory (golden v3, 1905 packages, APT origins verified)                           | pass                         | `inspect-05.json`                                     | `19ae97aa8fc414a5043e22ec99caac6ecde8c38c9d19f9b417c02005eaaa07ad` |
+| Lifecycle (signed DEB 0.7.0→0.7.1, control-plane trust, local authority)             | pass                         | `lifecycle-05.json`                                   | `c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2` |
+| Dispatch (service scenarios, clock skew, revocation)                                 | pass                         | `dispatch-03.json`                                    | `7169f45460f70f49dfe645d0bf4bf22f961c0c7aafe91930d393f59c27133721` |
+| Power actions (restart, refresh inventory, shutdown)                                 | pass                         | `power-03.json`                                       | `9593e9cafb9118e2a9b0aee037c0953ce8b2d1b56cc5ea34af9d642403316d5e` |
+| Agent self-update                                                                    | pass                         | `updates-03.json`                                     | `b4711034c9ead10d62cde03997d733aec7b553204f5679b554c20b6450657219` |
+| Resources, executor phase (packages, files, accounts, sysctl, definitions, password) | pass                         | `resources-executor-05b.json`                         | `bc3e79333a16a38b22deea5375474650af990f4c64c117da28c5ab8afbdce4ad` |
+| Resources, connected phase (same + secret-password, local-admin)                     | pass                         | `resources-connected-05.json`                         | `b33b84222eb7bf4bf89703604d69334c37f887895f8e1729f04ceae39b1651b0` |
+| Resources, connected firewall (probe-peer guest)                                     | pass                         | `resources-connected-05fw.json`                       | `ca8f29c0173fd03cbf73c2688dbc5be7e9f83731d7fb014c2b812c85e0f99d0c` |
+| Encrypted installer golden (LUKS2, TPM2, Secure Boot, two cold boots, headers)       | pass                         | `encrypted-05.json`                                   | `27a32bf1ec385eaf0e535fc8ad00b2fab22af921d1389c67f7e6122a7e2b0931` |
+| Device actions `-scenario all` (encryption, wipe, lock/quarantine, TPM)              | pass                         | `device-actions-all-all-05.json`                      | `228af3db99b280d06a99e8bac155df00c702bb327be9018b8b53081388eadafd` |
+| Lock/release/quarantine (desktop-session lane)                                       | pass, lock `OUTCOME_UNKNOWN` | `sessions/mint/mint223-lock-quarantine-01.json`       | `dbba0024735008971ccfff6d2d9043ca31df42fcdc4b0d300e0b9249eb7f9f81` |
+| Assistance VIEW/CONTROL                                                              | unavailable                  | `sessions/mint/mint223-assistance-02/assistance.json` | `ab55da8ff567ac164ddd272238fe7564c7af8f7d49f8e2455cafe1cefcc26ad3` |
+
+The device-action record covers encryption inventory (LUKS2 UUID, TPM 2.0,
+Secure Boot on, host oracle match), escrow (keyslot 1), audited reveal and custody
+KEK, committed and interrupted rotation (keyslot 2, retired slot absent), TPM2
+bind with an unattended cold boot, a mismatched PCR7 policy that falls back to the
+passphrase prompt and revealed-key recovery, live-root crypto-erase (attested before
+power-off, all headers absent) and report-loss (blocked report, outcome unknown by
+design), lock/release and account locks, and quarantine (DNS preserved, host
+endpoints verified, kernel expiry). Its original-device recovery sanitize sub-phase
+uses the recovery manifest's Ubuntu 24.04 cloud image as the original device, so
+it is not Mint evidence.
+
+Mint-native recovery sanitize runs the measured shim+GRUB mode with the Mint golden
+as the original device (`-recovery-manifest
+lab/images/linuxmint-22.3-cinnamon-amd64.json -recovery-boot-mode measured-grub`).
+The first attempt (`device-actions-mint-original-recovery-sata-05.json`,
+`b1a6fcab4c8cdd9cbef78063262f963fcb829908acc6555fb1ebbf9d8d83abb3`) was refused
+with `recovery_readiness_measured_grub_unsupported`: the agent's readiness reads
+the GRUB chain from the os-release row's own quirks, and the Mint row had none.
+The row now declares Ubuntu's stock chain (`Quirks.RecoveryGRUB`, regression in
+`TestDerivativeUsesBaseTooling`); the qualifying rerun is not yet recorded.
+
+Records that do not qualify a cell, kept for attribution:
+
+- `lifecycle-03.log` (no record): the collection-denied phase timed out after
+  seven minutes while the server rate-limited the agent's attempts; the rerun
+  above passed every phase.
+- `resources-executor-04-noegress.json` and `resources-executor-05.json`: the first
+  ran without `-allow-network` (operator error); the second exposed the cloud-init
+  APT-sources defect fixed in recipe v3.
+- `device-actions-all-all-05-nosupermin.json`
+  (`f945d20184d22dd12764d13d584c98294b87989c9b2736e17df6f5829764b7e3`): the host
+  header read lacked `SUPERMIN_KERNEL`/`SUPERMIN_MODULES` on this root-only-`/boot`
+  host (operator prerequisite).
 
 ## Remote assistance capability roadmap
 

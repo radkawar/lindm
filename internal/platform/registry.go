@@ -568,6 +568,9 @@ var registry = []*Release{
 		// packages.linuxmint.com publishes Release + Release.gpg with Origin
 		// "linuxmint" (observed 2026-10-11).
 		Advisory: Advisory{VendorOrigins: []string{"linuxmint"}, Partial: "vendor feed unavailable for Linux Mint packages"},
+		// Mint installs Ubuntu's signed shim and GRUB packages (EFI/ubuntu on the
+		// golden ESP); recovery readiness reads the os-release row's own quirk.
+		Quirks:   Quirks{RecoveryGRUB: debianGRUB},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
 		Gates:    gates(string(Assistance), "portal_screencast_unavailable: xdg-desktop-portal-xapp/-gtk implement no ScreenCast or RemoteDesktop; lindm has no X11 capture path"),
 	},
