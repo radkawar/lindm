@@ -560,7 +560,11 @@ until test "$(ss -Hltn '( sport = :8080 or sport = :8081 or sport = :8083 )' | w
 	if err != nil {
 		return nil, err
 	}
-	if err := lifecycleCommand(ctx, vm, "activate native firewall manager and install lab baseline and oracle listener", script); err != nil {
+	// Installing an absent native manager refreshes the vendor metadata first
+	// (registered RHEL 10.2 x86_64: BaseOS and AppStream from the CDN), which
+	// exceeded the one-minute step on a loaded host; bound it like the other
+	// repository-backed lab installs.
+	if err := lifecycleCommandWithin(ctx, vm, "activate native firewall manager and install lab baseline and oracle listener", script, 20*time.Minute); err != nil {
 		return nil, err
 	}
 	identity, err := vm.run(ctx, ". /etc/os-release; printf '%s\\n%s' \"$ID\" \"${VERSION_ID-}\"", nil, 128, 10*time.Second)

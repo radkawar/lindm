@@ -101,7 +101,11 @@ func probeGuestPrivileges(ctx context.Context, vm *guestVM) (*labv1.NetworkBound
 const systemctlKillWhom = `$(systemctl --kill-whom=main --version >/dev/null 2>&1 && echo --kill-whom || echo --kill-who)`
 
 func lifecycleCommand(ctx context.Context, vm *guestVM, phase, command string) error {
-	result, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(command), nil, 1<<20, time.Minute)
+	return lifecycleCommandWithin(ctx, vm, phase, command, time.Minute)
+}
+
+func lifecycleCommandWithin(ctx context.Context, vm *guestVM, phase, command string, timeout time.Duration) error {
+	result, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(command), nil, 1<<20, timeout)
 	if err != nil {
 		return fmt.Errorf("%s: %w", phase, err)
 	}
