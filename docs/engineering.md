@@ -4120,9 +4120,14 @@ absence of vulnerabilities.
 Pre-commit operates on the staged snapshot and runs fast formatting/lint checks.
 It must not silently reformat unrelated files or require booting VMs. Pre-push and CI
 run the broader affected checks; protected-branch CI is authoritative because hooks
-can be bypassed. Install hooks explicitly through bootstrap. The initial docs hook
-uses lint-staged to preserve partially staged changes; extend it with Go/proto/SQL/UI
-checks as those sources land, not no-op checks for files that do not exist.
+can be bypassed. Install hooks explicitly through bootstrap. The hook runs
+`lint-staged --no-stash` because lint-staged's backup lives in `refs/stash`, which all
+git worktrees share; concurrent agent commits would race and pop each other's entries.
+Without that backup lint-staged cannot hide unstaged hunks, so the hook rejects
+commits containing partially staged files rather than letting a rewriting formatter
+fold unstaged hunks into the commit. Lint or format failures still fail the commit.
+Extend it with Go/proto/SQL/UI checks as those sources land, not no-op checks for
+files that do not exist.
 
 ## 3. One repeatable command surface
 

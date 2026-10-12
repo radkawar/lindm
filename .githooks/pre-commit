@@ -1,3 +1,15 @@
 #!/bin/sh
 set -eu
-exec npm exec --no -- lint-staged
+# lint-staged runs with --no-stash: its backup stash lives in refs/stash, which
+# every git worktree shares, so concurrent commits race and pop each other's
+# entries. Without the backup, lint-staged cannot hide unstaged hunks, and any
+# formatter that rewrites a file (golangci-lint fmt, buf format -w) would fold
+# those hunks into the commit. Refuse partially staged files instead.
+partial=$(git diff --name-only --diff-filter=ACMR | while IFS= read -r f; do
+  git diff --cached --quiet -- "$f" || printf '%s\n' "$f"
+done)
+if [ -n "$partial" ]; then
+  printf 'pre-commit: partially staged files (stage or drop the remaining hunks; never git stash):\n%s\n' "$partial" >&2
+  exit 1
+fi
+exec npm exec --no -- lint-staged --no-stash
