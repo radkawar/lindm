@@ -56,6 +56,14 @@ const (
 	reasonDesignOnly     = "design-only: the declarative/image-based management model is not specified"
 	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
 	reasonEL8Packages    = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
+	// The release-upgrade lane drives ubuntu-release-upgrader's unattended
+	// frontend; Debian documents a manual sources rewrite plus apt full-upgrade.
+	reasonDebianUpgrade = "Debian has no unattended release upgrader (the documented path is a manual sources rewrite and apt full-upgrade); the lane drives only do-release-upgrade"
+	// EL rebuild major upgrades go through the separate ELevate/Leapp tooling.
+	reasonELMajorUpgrade = "EL major upgrades need ELevate/Leapp, for which lindm has no upgrader or lane"
+	reasonNoEL11         = "no successor release: EL 11 is not released"
+	// The APT runner renders Ubuntu's Allowed-Origins (origin:suite) list.
+	reasonDebianOSUpdate = "the os-update runner selects Ubuntu origin:suite pairs; Debian's security suites (stable-security/oldstable-security) need codename/label Origins-Pattern selection, which is not implemented"
 	reasonRockyOSV       = "Rocky's OSV export uses source-like package mappings without a complete binary universe"
 	// Omarchy's ALPM pre-transaction hook (00-omarchy-update-guard.hook)
 	// aborts any direct `pacman -Syu`; `omarchy update` owns the transaction.
@@ -138,6 +146,13 @@ var (
 	debianFeeds = []Feed{FeedOSV, FeedDebianTracker}
 	redHatFeed  = []Feed{FeedRedHatCSAF}
 	suseFeed    = []Feed{FeedSUSECSAF}
+	// Debian's OSV export (DSA/DLA/DEBIAN-CVE) covers every Debian release;
+	// records are selected by ecosystem. It is the primary (configured) feed.
+	debianExports = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Debian/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}
+	almaExports   = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/AlmaLinux/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 1 << 30}}
+	rockyExports  = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Rocky%20Linux/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 1 << 30}}
+	// Rocky Linux and AlmaLinux 9/10 lab lanes, on both architectures.
+	elRebuildLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}
 	// Encrypted-installer and device-action lab recipes.
 	dracutTPM      = []string{"systemd", "crypt", "tpm2-tss", "lvm"}
 	dracutSplitTPM = []string{"systemd", "crypt", "tpm2-tss", "lvm", "systemd-cryptsetup"}
@@ -251,7 +266,6 @@ var (
 	reasonNoUkify = "no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI"
 	// The native self-update lane (`lab vm updates`) is qualified per guest
 	// architecture: x86_64 on the local host, aarch64 on the arm64 KVM hosts.
-	// EL rows cite the 9.8/10.2 minors their records exercised.
 	updatesX86 = map[LabLane][]string{LaneUpdates: x86}
 	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
 	// The native advisories lane (`lab vm advisories`) per guest architecture.
@@ -263,22 +277,26 @@ var registry = []*Release{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy",
+			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}, RecoveryGRUB: debianGRUB},
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
 				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
 				Drivers: []string{"tpm_tis", "tpm_crb"}}},
 		// Recovery sanitize is measured GRUB only (amd64; jammy's arm64 GRUB
 		// records no PCR 8/9 measurements, so readiness refuses there).
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		// 249's verify has no --recursive-errors (systemd 250) and exits 0 on
-		// a candidate setting it ignores as invalid.
-		Gates: gates(string(Definitions), "systemd 249 is below the definition provider floor 255"),
+		// a candidate setting it ignores as invalid. A modelled 22.04→24.04
+		// do-release-upgrade completed natively, but owned resources then stayed
+		// unconverged (see ubuntu.md#release-upgrade-2204--2404).
+		Gates: without(gates(string(Definitions), "systemd 249 is below the definition provider floor 255",
+			string(ReleaseUpgrade), "22.04→24.04 post-upgrade reconvergence is not implemented: after do-release-upgrade the owned sysctl fails its postcondition and the managed file is refused at admission"), OSUpdate),
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
@@ -329,7 +347,7 @@ var registry = []*Release{
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",
 		Tier: TierOutside, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 247,
-		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:11", PURLNamespace: "debian", PURLDistro: "debian-11"},
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:11", PURLNamespace: "debian", PURLDistro: "bullseye"},
 		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
 		Supports: caps(agentCore, []Capability{Packages, Accounts, Advisories}),
 		Gates:    actionGates(string(Definitions), "systemd 247 is below the definition provider floor 255"),
@@ -338,29 +356,31 @@ var registry = []*Release{
 		Key: "debian-12", Name: "Debian 12", Distribution: "Debian", ID: "debian", Version: Exact("12"), Codename: "bookworm",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252,
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
-		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "debian-12"},
+		// Debian's OSV export qualifies purls with the codename (distro=bookworm).
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "bookworm", Exports: debianExports},
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		// Recovery sanitize is measured GRUB only, and amd64 only: the arm64
 		// kernel cannot bind QEMU virt's TPM, so readiness has no attestation.
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    gates(string(ReleaseUpgrade), reasonDebianUpgrade, string(OSUpdate), reasonDebianOSUpdate),
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257,
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
-		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "debian-13"},
+		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "trixie", Exports: debianExports},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
-		Gates:    gates(),
+		Gates:    gates(string(ReleaseUpgrade), "no successor release: Debian 14 is not released", string(OSUpdate), reasonDebianOSUpdate),
 	},
 	{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,
@@ -442,49 +462,49 @@ var registry = []*Release{
 		Key: "rocky-9", Name: "Rocky Linux 9", Distribution: "Rocky Linux", ID: "rocky", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor and
 		// architecture in verification.md; implemented capabilities stay
 		// admitted so their qualification lanes can run (see the rhel-9 row).
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(string(ReleaseUpgrade), reasonELMajorUpgrade), OSUpdate),
 	},
 	{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),
 	},
 	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux", ""),
 	{
 		Key: "almalinux-9", Name: "AlmaLinux 9", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(string(ReleaseUpgrade), reasonELMajorUpgrade), OSUpdate),
 	},
 	{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10"},
+		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),
 	},
 	{
 		Key: "centos-stream-9", Name: "CentOS Stream 9", Distribution: "CentOS Stream", ID: "centos", Version: Exact("9"),

@@ -197,7 +197,7 @@ func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
 			t.Fatalf("%s console enrollment inherited another lane's qualification: %s", key, got.State)
 		}
 	}
-	if got := in.cell(release(t, "debian-12"), cell, "aarch64"); got.State != NoLane {
+	if got := in.cell(release(t, "rhel-9"), cell, "aarch64"); got.State != NoLane {
 		t.Fatalf("unsupported console enrollment recipe became runnable: %s", got.State)
 	}
 }

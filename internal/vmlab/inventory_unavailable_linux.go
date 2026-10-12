@@ -37,6 +37,8 @@ var inventoryUnavailableRules = []struct {
 	{nil, "host.details.snap", "The Snap application inventory is inapplicable when its backend is not installed.", func(c inventoryHealthContext) bool {
 		return c.details.GetBackends().GetSnap().GetStatus() == truthSuccess && !c.details.GetBackends().GetSnap().GetValue()
 	}},
+	// Observed on snapd 2.77.1: /v2/snaps objects carry no architecture member.
+	{nil, "host.details.snap.applications.architecture", "snapd's /v2/snaps list reports no per-snap architecture.", nil},
 	{inventoryNonRPM, "host.details.platform.cpe", "Non-RPM stock os-release files need not publish CPE_NAME.", nil},
 	{nil, "host.details.platform.releasever_lock", "A releasever override is optional; absence does not imply a native repository read failure.", nil},
 	{nil, "host.details.platform.repositories", "The RPM/DNF repository capability is inapplicable to a native non-RPM or zypper system.", inventoryNonDNFPlatform},

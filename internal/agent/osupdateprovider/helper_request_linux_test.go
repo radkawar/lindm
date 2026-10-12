@@ -123,13 +123,16 @@ func TestOnlyQualifiedMutableProductsHaveABackend(t *testing.T) {
 		{"rhel", "10.2", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"arch", "", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN},
 		{"opensuse-tumbleweed", "20261007", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER},
+		{"ubuntu", "22.04", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES},
+		{"almalinux", "9.8", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
+		{"rocky", "10.2", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"opensuse-leap", "16.0", 0},
 		{"rhel", "8.10", 0},
 		{"rhel", "100.1", 0},
-		{"ubuntu", "22.04", 0},
 		{"fedora", "43", 0},
-		{"almalinux", "9.8", 0},
 		{"debian", "13", 0},
+		{"debian", "12", 0},
+		{"almalinux", "8.10", 0},
 	} {
 		got, _, ok := productBackend(&resourcev1.PlatformProduct{OsId: test.os, Version: test.version})
 		if ok != (test.want != 0) || got != test.want {

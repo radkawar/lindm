@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -254,14 +255,24 @@ func freezeNativeUnpack(ctx context.Context, group, binary string, original *uni
 			}
 			name := strings.TrimSpace(string(comm))
 			observed = append(observed, fmt.Sprintf("%d:%q", pid, name))
-			inPlace := file == binary
-			if (inPlace && name == "pacman") || (!inPlace && (name == "dnf" || name == "dnf5" || name == "zypper" || name == "dpkg" || name == "apt-get")) {
+			if nativeUnpackManager(name, file == binary) {
 				return fmt.Sprintf("%s pid=%d unpack=%s bytes=%d cgroup=%s frozen=1", name, pid, file, size, filepath.Base(group)), nil
 			}
 		}
 		return "", fmt.Errorf("partial native file %s (%d bytes) has no native manager in frozen cgroup %s: %s", file, size, group, strings.Join(observed, ","))
 	}
 	return "", nil
+}
+
+// nativeUnpackManager reports whether comm names the native manager that
+// unpacks the agent: pacman replaces the binary in place, the others stage a
+// partial file. EL's /usr/bin/dnf is a symlink to dnf-3, so DNF 4 started
+// through its resolved entrypoint reports comm dnf-3.
+func nativeUnpackManager(comm string, inPlace bool) bool {
+	if inPlace {
+		return comm == "pacman"
+	}
+	return slices.Contains([]string{"dnf", "dnf-3", "dnf5", "zypper", "dpkg", "apt-get"}, comm)
 }
 
 func guestUpdateUnpackTerminal(status *agentv1.AgentUpdateStatus) error {

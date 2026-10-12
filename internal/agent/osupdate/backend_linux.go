@@ -220,7 +220,7 @@ func prepareRuntimeDir() error {
 	return checkPrivateDir(runtimeDir)
 }
 
-// aptBackend drives unattended-upgrade(8) and needrestart(1) on Ubuntu 24.04.
+// aptBackend drives unattended-upgrade(8) and needrestart(1) on Ubuntu.
 type aptBackend struct{}
 
 const (
@@ -328,7 +328,7 @@ func (aptBackend) rebootRequired(ctx context.Context) (bool, error) {
 	return false, failure(reasonOracleFailed, agentv1.PatchRunTool_PATCH_RUN_TOOL_NEEDRESTART, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, result)
 }
 
-// dnfBackend drives dnf5 (Fedora 44) or dnf 4 with dnf-automatic (RHEL 9).
+// dnfBackend drives dnf5 (Fedora 44) or dnf 4 with dnf-automatic (EL 9/10).
 type dnfBackend struct{ dnf5 bool }
 
 const (

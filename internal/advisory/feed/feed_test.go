@@ -99,6 +99,23 @@ func TestVendorBackports(t *testing.T) {
 	}
 }
 
+// Debian's OSV export qualifies source purls with the release codename
+// (distro=bookworm, observed in the 2026-10-12 all.zip); another codename is a
+// different product.
+func TestDebianOSVCodenameQualifier(t *testing.T) {
+	dsa := fixture(t, "debian-DSA-5724-1.json")
+	for _, test := range []struct {
+		distro string
+		ok     bool
+	}{{"bookworm", true}, {"trixie", false}, {"debian-12", false}} {
+		record := bytes.ReplaceAll(dsa, []byte("arch=source"), []byte("arch=source&distro="+test.distro))
+		doc, err := Parse(source("debian", "12", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON), bytes.NewReader(record))
+		if test.ok != (err == nil && len(doc.GetAdvisories()) != 0) {
+			t.Fatalf("distro=%s: accepted=%t err=%v", test.distro, !test.ok, err)
+		}
+	}
+}
+
 func TestUnsupportedInputsFailClosed(t *testing.T) {
 	ubuntu := fixture(t, "ubuntu-USN-6859-1.json")
 	fedora := fixture(t, "fedora44-sudo.xml")
@@ -293,6 +310,13 @@ func TestProductAndRepositoryBindings(t *testing.T) {
 	config = source("rhel", "9.4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)
 	if Applies(config, "rhel", "9", "x86_64") || Applies(config, "rocky", "9.4", "x86_64") {
 		t.Fatal("inferred RHEL stream/vendor equivalence")
+	}
+	alma := source("almalinux", "10", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP)
+	if !Applies(alma, "almalinux", "10.2", "aarch64") || !Applies(alma, "almalinux", "10", "aarch64") || Applies(alma, "almalinux", "9.8", "aarch64") || Applies(alma, "rocky", "10.2", "aarch64") {
+		t.Fatal("major-scoped AlmaLinux:10 feed misapplied across minors, majors or vendors")
+	}
+	if minor := source("almalinux", "10.1", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP); Applies(minor, "almalinux", "10.2", "aarch64") {
+		t.Fatal("explicit minor feed applied to another minor")
 	}
 	location, checksum, err := updateLocation("https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", fixture(t, "fedora44-repomd.xml"))
 	if err != nil {

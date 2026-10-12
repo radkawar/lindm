@@ -76,10 +76,16 @@ func vmAdvisoryCompareCommand(manager, a, b string) (string, error) {
 	case "pacman":
 		return "vercmp " + nativeQuote(a) + " " + nativeQuote(b), nil
 	case "rpm":
-		// rpm.ver compares full epoch/version/release objects (RPM >=4.16).
+		// rpm.ver (RPM >=4.17) compares full epoch/version/release objects.
+		// EL 9's RPM 4.16 lacks it: there the epoch is compared numerically and
+		// version and release each with the native rpm.vercmp, as
+		// rpmVersionCompare does (a missing release compares equal).
 		// Vendor strings become numeric Lua byte literals: neither shell quoting,
 		// Lua quoting nor RPM macro expansion can interpret vendor input as code.
-		lua := "%{lua:local a=rpm.ver(" + advisoryLuaBytes(a) + ");local b=rpm.ver(" + advisoryLuaBytes(b) + ");if a < b then print(-1) elseif a == b then print(0) else print(1) end}"
+		lua := "%{lua:local function evr(s) local e=0;local c=s:find(':',1,true);if c then e=assert(tonumber(s:sub(1,c-1)));s=s:sub(c+1) end;local d=s:match('.*()-');if d then return e,s:sub(1,d-1),s:sub(d+1) end;return e,s,nil end;" +
+			"local function cmp(a,b) if rpm.ver then local x,y=rpm.ver(a),rpm.ver(b);if x < y then return -1 elseif x == y then return 0 else return 1 end end;" +
+			"local ae,av,ar=evr(a);local be,bv,br=evr(b);if ae ~= be then if ae < be then return -1 else return 1 end end;local v=rpm.vercmp(av,bv);if v ~= 0 or ar == nil or br == nil then return v end;return rpm.vercmp(ar,br) end;" +
+			"print(cmp(" + advisoryLuaBytes(a) + "," + advisoryLuaBytes(b) + "))}"
 		return "rpm --eval " + nativeQuote(lua), nil
 	case "dpkg":
 		// dpkg reports ordering only through exit status; vendor strings stay

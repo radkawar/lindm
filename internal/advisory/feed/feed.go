@@ -277,6 +277,8 @@ func boundedRead(r io.Reader, bound int64) ([]byte, error) {
 
 // Applies binds inventories to configured products. It deliberately does not
 // equate a Red Hat minor/EUS release with its major stream or another vendor's build.
+// A major-version row's feed configured by that major (the AlmaLinux:N and
+// Rocky Linux:N OSV ecosystems) covers each minor VERSION_ID of the row.
 func Applies(source *advisoryv1.FeedSource, distro, release, architecture string) bool {
 	if source == nil || source.GetDistro() != distro {
 		return false
@@ -287,6 +289,9 @@ func Applies(source *advisoryv1.FeedSource, distro, release, architecture string
 	}
 	configured, release := product.FeedRelease(source.GetRelease()), product.FeedRelease(release)
 	if product.Advisory.PlatformStreams && source.GetPlatformStream() == "standard" && !strings.Contains(configured, ".") {
+		release, _, _ = strings.Cut(release, ".")
+	}
+	if !product.Advisory.PlatformStreams && product.Version.Rule == platform.VersionMajor && configured == product.Version.Value {
 		release, _, _ = strings.Cut(release, ".")
 	}
 	if configured != release {

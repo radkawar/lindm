@@ -171,13 +171,17 @@ func TestDetectBackend(t *testing.T) {
 		{"NAME=\"Red Hat Enterprise Linux\"\nID=\"rhel\"\nVERSION_ID=\"10.2\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"ID=arch\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN},
 		{"ID=opensuse-tumbleweed\nVERSION_ID=20261007\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER},
+		{"ID=ubuntu\nVERSION_ID=\"22.04\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES},
+		{"ID=almalinux\nVERSION_ID=\"9.6\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
+		{"ID=rocky\nVERSION_ID=\"10.2\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 	} {
 		native, err := detectBackend([]byte(tc.release))
 		if err != nil || native.kind() != tc.want {
 			t.Errorf("detectBackend(%q) = %v, %v", tc.release, native, err)
 		}
 	}
-	for _, release := range []string{"ID=ubuntu\nVERSION_ID=\"22.04\"\n", "ID=fedora\nVERSION_ID=43\n", "ID=rhel\nVERSION_ID=\"8.10\"\n", "ID=rhel\nVERSION_ID=\"11.0\"\n", "ID=debian\nVERSION_ID=\"13\"\n", "ID=almalinux\nVERSION_ID=\"9.6\"\n"} {
+	// Debian's suites need Origins-Pattern selection the runner does not render.
+	for _, release := range []string{"ID=fedora\nVERSION_ID=43\n", "ID=rhel\nVERSION_ID=\"8.10\"\n", "ID=rhel\nVERSION_ID=\"11.0\"\n", "ID=debian\nVERSION_ID=\"13\"\n", "ID=debian\nVERSION_ID=\"12\"\n", "ID=almalinux\nVERSION_ID=\"8.10\"\n"} {
 		if _, err := detectBackend([]byte(release)); err == nil {
 			t.Errorf("detectBackend(%q) accepted an unqualified platform", release)
 		}

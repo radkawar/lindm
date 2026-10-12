@@ -2260,8 +2260,9 @@ browser signs in again and confirms the exact device's server-side **Enrolled**
 state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
-The `enroll-from-console` matrix cell targets Ubuntu 24.04, Ubuntu 26.04, Fedora 44,
-Arch Linux x86_64 and Tumbleweed x86_64/aarch64, including native aarch64 on a
+The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
+Fedora 44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
+x86_64/aarch64, including native aarch64 on a
 configured Spark. Use the declared pinned firmware arguments and normal host
 admission; never substitute an amd64 guest or pre-provision lindm's server CA, agent
 packages or bootstrap trust into the machine under test. The copied command must
@@ -2341,7 +2342,9 @@ architecture, the APT and pacman repositories and the rejection fixtures. The
 `airgap` cell additionally builds both complete attested releases with the
 maintained release builder, then exports B1/B2/B3 and an expired signed bundle
 with independent bundle/package/attestation/TUF custody and registry-derived
-advisories. The development OCI exports pin the fixture transport CA, not the
+advisories: the release's primary vendor export, including a registry-declared
+partial source (Rocky's OSV), whose evaluation the lane records rather than
+treating as complete. The development OCI exports pin the fixture transport CA, not the
 host's ambient trust store. Each selected runnable cell then runs as a child
 `lab vm <lane>` through the normal host admission (`-parallel`, default 4, bounds
 concurrent cells; host slots still bound guests). The child's output is kept in

@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS | Ubuntu 26.04 LTS                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------- |
-| inventory         | implemented                                                                                             | implemented      | implemented                                                      |
-| lifecycle         | implemented                                                                                             | implemented      | implemented                                                      |
-| dispatch          | implemented                                                                                             | implemented      | implemented                                                      |
-| packages          | implemented                                                                                             | implemented      | implemented                                                      |
-| accounts          | implemented                                                                                             | implemented      | implemented                                                      |
-| sysctl            | implemented                                                                                             | implemented      | implemented                                                      |
-| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented      | implemented                                                      |
-| password          | implemented                                                                                             | implemented      | implemented                                                      |
-| firewall          | implemented                                                                                             | implemented      | implemented                                                      |
-| encryption        | implemented                                                                                             | implemented      | implemented                                                      |
-| wipe              | implemented                                                                                             | implemented      | implemented                                                      |
-| report-loss       | implemented                                                                                             | implemented      | implemented                                                      |
-| lock              | implemented                                                                                             | implemented      | implemented                                                      |
-| recovery-sanitize | implemented                                                                                             | implemented      | implemented                                                      |
-| self-update       | implemented                                                                                             | implemented      | implemented                                                      |
-| assistance        | implemented                                                                                             | implemented      | implemented                                                      |
-| advisories        | implemented                                                                                             | implemented      | implemented                                                      |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented      | implemented                                                      |
-| release-upgrade   | gated: release upgrade is not implemented                                                               | implemented      | gated: no successor release: the next Ubuntu LTS is not released |
+| Capability        | Ubuntu 22.04 LTS                                                                                                                                                                 | Ubuntu 24.04 LTS | Ubuntu 26.04 LTS                                                 |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| inventory         | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| lifecycle         | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| dispatch          | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| packages          | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| accounts          | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| sysctl            | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                                                                                                                    | implemented      | implemented                                                      |
+| password          | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| firewall          | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| encryption        | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| wipe              | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| report-loss       | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| lock              | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| recovery-sanitize | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| self-update       | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| assistance        | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| advisories        | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| os-update         | implemented                                                                                                                                                                      | implemented      | implemented                                                      |
+| release-upgrade   | gated: 22.04→24.04 post-upgrade reconvergence is not implemented: after do-release-upgrade the owned sysctl fails its postcondition and the managed file is refused at admission | implemented      | gated: no successor release: the next Ubuntu LTS is not released |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -180,6 +180,22 @@ release-upgrade gate. Observed behaviour (upgrader `1:26.04.25`):
   kernel/libc reboot; the lane runs `apt-get full-upgrade` and reboots first.
 
 The cloud lane does not cover a GNOME 46→50 desktop or an encrypted-root upgrade.
+
+## Release upgrade 22.04 → 24.04
+
+Not implemented; the registry gates it with the observed reason. With a temporary
+`UpgradeTo: ubuntu-24.04` the same lane ran on native aarch64 (`dgx20`, AAVMF,
+upgrader `1:24.04.29`): `do-release-upgrade` finished in 980 s, the guest booted
+24.04 (`6.8.0-146-generic`, systemd 255) with the same installation, device and
+enrollment generation and both agent units active. Post-upgrade reconvergence then
+failed within its deadline: the owned `vm.swappiness` sysctl (runtime and persistent
+value still 31) failed its verification postcondition (`verification_drifted`), and
+the owned `/etc/lindm-resource-lab/release-upgrade.conf` was refused at executor
+admission (`admission_precondition`, native evidence unavailable). Record
+`release-upgrade-aarch64.log` in
+`~/.cache/lindm-matrix/debianel-u22ru-arm-20261011T225545Z/ubuntu-22.04/`
+([verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)).
+The 24.04 → 26.04 behaviour above does not transfer to this path.
 
 ## Packaging, signing, repositories, paths and LSM
 
@@ -583,6 +599,13 @@ back boolean bitwise expressions with an explicit `NFTA_BITWISE_OP=0`, which the
 expression digest normalizes.
 
 ### OS update policy (`os.update.v1`)
+
+Ubuntu 22.04 uses the same provider and runner (`unattended-upgrades 2.8ubuntu1`,
+`needrestart 3.5-5ubuntu2.5`, `update-notifier-common 3.192.54.8`) and passed on
+both architectures. Its scenario needs a pending reboot-requiring security update:
+the default `jammy-release-20261004` pin already carries the current kernel, so the
+records use the signed `jammy-release-20260926` serial
+([verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)).
 
 The provider configures native automatic updates; it never installs anything
 itself. It needs the root-local opt-in `os_update_provider: {"enabled": true}` in
