@@ -7,7 +7,7 @@ export const task = {
   route: "/dashboard",
   priority: "normal",
   acceptance:
-    "Typing 'wipe' lists 'Wipe device…'; choosing it and a device opens that device's wipe review; 'enrollment code' lists 'Create enrollment code', which opens the one-time code dialog; an unmatched search names what was searched; no 'first 200' text.",
+    "Typing 'wipe' lists 'Wipe device…'; choosing it and a device opens that device's wipe review; 'enrollment code' lists 'Create enrollment code', which opens the one-time code dialog; 'Create secret' opens the Create secret dialog; an unmatched search names what was searched; no 'first 200' text.",
 };
 
 const NOTHING = "zz-no-such-command";
@@ -69,6 +69,17 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await capture("enrollment-code-dialog");
   await page.keyboard.press("Escape");
   await issue.waitFor({ state: "hidden", timeout: 10_000 });
+
+  step("create a secret from the palette");
+  dialog = await search(page, "create secret");
+  const secret = dialog.getByRole("option", { name: "Create secret" });
+  await secret.waitFor({ timeout: 10_000 });
+  await secret.click();
+  await page.waitForURL(/\/secrets/, { timeout: 15_000 });
+  const create = page.getByRole("dialog", { name: "Create secret" });
+  await create.waitFor({ timeout: 30_000 });
+  await page.keyboard.press("Escape");
+  await create.waitFor({ state: "hidden", timeout: 10_000 });
 
   step("search for nothing");
   dialog = await search(page, NOTHING);
