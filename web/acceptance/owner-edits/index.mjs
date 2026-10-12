@@ -33,6 +33,7 @@ import * as accounts from "./accounts.mjs";
 import * as authorization from "./authorization.mjs";
 import * as pass2AssignmentProgress from "./pass2-assignment-progress.mjs";
 import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
+import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -59,6 +60,7 @@ export const ownerEdits = [
   approvals,
   audit,
   wipeForm,
+  pass2SafetyWipe,
   // Creates a one-time code, then approves the seed's pending enrollment.
   pass2Bug6,
   pass2Bug4,

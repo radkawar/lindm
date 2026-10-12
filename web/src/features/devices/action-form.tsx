@@ -90,6 +90,7 @@ import {
   observedStorageSelections,
   type ObservedStorageSelection,
 } from "./storage-target-picker";
+import { formatBytes } from "@/lib/bytes";
 
 const encryptionKinds: DeviceActionKind[] = ["escrowRotate", "tpm2Bind"];
 const storageActionKinds: Partial<Record<DeviceActionKind, string>> = {
@@ -299,7 +300,6 @@ export function DeviceActionForm({
     ),
     enabled: storage,
   });
-  const liveErase = kind === "cryptoErase" && eraseMode === CryptoEraseMode.LIVE_ROOT_HEADER;
   // A refresh requested from this form: follow it, then reload storage as soon as
   // the device reports success so the target list appears without a reload.
   const refreshAction = useQuery({
@@ -380,6 +380,35 @@ export function DeviceActionForm({
 
   const currentSelection =
     selectedTarget && isStillObserved(selectedTarget) ? selectedTarget.selection : undefined;
+  // The mode follows the target: a volume in use can only be wiped while the
+  // device runs, so offline mode is never offered for it.
+  const effectiveEraseMode = currentSelection?.inUse ? CryptoEraseMode.LIVE_ROOT_HEADER : eraseMode;
+  const liveErase =
+    kind === "cryptoErase" && effectiveEraseMode === CryptoEraseMode.LIVE_ROOT_HEADER;
+  // A wipe or disk erase always needs another admin's approval (server policy),
+  // so requesting it is the next step until it is granted.
+  const approvalFirst =
+    (frozenSpec?.case === "cryptoErase" || frozenSpec?.case === "sanitize") &&
+    attempt?.approvalState !== ApprovalState.APPROVED &&
+    attempt?.status !== "ambiguous" &&
+    attempt?.status !== "accepted";
+  // The frozen targets by device path and size, matched against reported storage.
+  const reviewVolumes = (
+    frozenSpec?.case === "cryptoErase"
+      ? frozenSpec.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER
+        ? frozenSpec.value.targets
+        : frozenSpec.value.target
+          ? [frozenSpec.value.target]
+          : []
+      : frozenSpec?.case === "sanitize" && frozenSpec.value.target
+        ? [frozenSpec.value.target]
+        : []
+  ).map((target, index) => {
+    const name = eligibleTargets?.targets.find(
+      (entry) => entry.target && equals(StorageTargetSchema, entry.target, target),
+    )?.name;
+    return { key: index, path: name ? `/dev/${name}` : "", sizeBytes: target.sizeBytes };
+  });
 
   // What still blocks review, named inline instead of a disabled button. Empty
   // required text fields are reported by native form validation instead.
@@ -537,7 +566,7 @@ export function DeviceActionForm({
           spec.action = {
             case: kind,
             value: create(CryptoEraseActionSchema, {
-              mode: eraseMode,
+              mode: effectiveEraseMode,
               target,
               targets: liveErase ? liveTargets.map((entry) => entry.selection.target) : [],
             }),
@@ -859,6 +888,14 @@ export function DeviceActionForm({
               selectedKey={selectedTarget?.key ?? ""}
               onSelect={(key, selection) => {
                 setSelectedTarget({ key, selection });
+                if (
+                  kind === "cryptoErase" &&
+                  selection.inUse &&
+                  !liveTargets.some(
+                    (entry) => entry.selection.target.luksUuid === selection.target.luksUuid,
+                  )
+                )
+                  setLiveTargets([...liveTargets, { key, selection }]);
                 setNvmeControllerWide(false);
                 setConfirmation("");
                 setError("");
@@ -972,8 +1009,11 @@ export function DeviceActionForm({
                   <Label htmlFor={`${prefix}-erase-mode`}>Wipe mode</Label>
                   <SelectField
                     id={`${prefix}-erase-mode`}
-                    value={eraseMode}
+                    value={effectiveEraseMode}
                     disabled={busy}
+                    aria-describedby={
+                      currentSelection?.inUse ? `${prefix}-erase-mode-help` : undefined
+                    }
                     onValueChange={(value) =>
                       setEraseMode(
                         Number(value) === CryptoEraseMode.LIVE_ROOT_HEADER
@@ -982,16 +1022,25 @@ export function DeviceActionForm({
                       )
                     }
                     options={[
-                      {
-                        value: CryptoEraseMode.OFFLINE,
-                        label: "Offline: one volume that isn't in use",
-                      },
+                      ...(currentSelection?.inUse
+                        ? []
+                        : [
+                            {
+                              value: CryptoEraseMode.OFFLINE,
+                              label: "Offline: one volume that isn't in use",
+                            },
+                          ]),
                       {
                         value: CryptoEraseMode.LIVE_ROOT_HEADER,
                         label: "While running: all encrypted volumes, then power off",
                       },
                     ]}
                   />
+                  {currentSelection?.inUse ? (
+                    <p id={`${prefix}-erase-mode-help`} className="text-sm text-muted-foreground">
+                      This volume is in use, so it can only be wiped while the device is running.
+                    </p>
+                  ) : null}
                 </>
               ) : null}
               {liveErase ? (
@@ -1286,6 +1335,25 @@ export function DeviceActionForm({
             <dt className="text-muted-foreground">Reason</dt>
             <dd>{attempt.payload.reason}</dd>
           </dl>
+          {reviewVolumes.length ? (
+            <div data-slot="review-targets" className="grid gap-1 text-sm break-words">
+              <p>
+                Device: <span className="font-medium">{confirmationName}</span>
+              </p>
+              <ul className="grid gap-1">
+                {reviewVolumes.map((volume) => (
+                  <li key={volume.key}>
+                    {volume.path ? (
+                      <code className="font-mono">{volume.path}</code>
+                    ) : (
+                      "Device path not reported"
+                    )}{" "}
+                    · {formatBytes(volume.sizeBytes)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <DeviceActionSpecView spec={attempt.payload.spec} />
           {needsRecovery ? (
             <RecoveryReadinessView readiness={eligibleTargets?.recoveryReadiness} />
@@ -1404,20 +1472,22 @@ export function DeviceActionForm({
             </Alert>
           ) : null}
           <div className="flex flex-wrap gap-2">
+            {approvalFirst ? null : (
+              <Button
+                disabled={
+                  busy ||
+                  (needsRecovery && !recoveryReady && attempt.status !== "ambiguous") ||
+                  attempt.status === "accepted" ||
+                  attempt.status === "inflight" ||
+                  attempt.approvalAmbiguous
+                }
+                onClick={() => void send(attempt)}
+              >
+                {attempt.status === "ambiguous" ? "Retry sending" : "Send action"}
+              </Button>
+            )}
             <Button
-              disabled={
-                busy ||
-                (needsRecovery && !recoveryReady && attempt.status !== "ambiguous") ||
-                attempt.status === "accepted" ||
-                attempt.status === "inflight" ||
-                attempt.approvalAmbiguous
-              }
-              onClick={() => void send(attempt)}
-            >
-              {attempt.status === "ambiguous" ? "Retry sending" : "Send action"}
-            </Button>
-            <Button
-              variant="outline"
+              variant={approvalFirst ? "default" : "outline"}
               disabled={
                 busy ||
                 (needsRecovery &&
@@ -1454,6 +1524,11 @@ export function DeviceActionForm({
               Edit action
             </Button>
           </div>
+          {approvalFirst ? (
+            <p className="text-sm text-muted-foreground">
+              You can send this action after another admin approves it.
+            </p>
+          ) : null}
         </div>
       )}
       {storage ? (

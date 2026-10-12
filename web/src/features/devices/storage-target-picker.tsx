@@ -21,6 +21,9 @@ export type ObservedStorageSelection = {
   name: string;
   model: string;
   encryption: string;
+  // In use: backs the running root file system or is mounted. A wipe of such a
+  // volume can only run while the device is running, then powers it off.
+  inUse: boolean;
 };
 
 const unavailableMessages: Record<string, string> = {
@@ -66,6 +69,7 @@ export function observedStorageSelections(
       name: entry.name,
       model: entry.model,
       encryption: entry.encryption,
+      inUse: entry.rootBacking || entry.mountpoint !== "",
     });
   }
   return Array.from(selections, ([key, selection]) => ({ key, selection }));
