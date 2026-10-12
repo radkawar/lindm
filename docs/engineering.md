@@ -162,7 +162,7 @@ secret or a confirmation ID. Title records by name: devices use the hostname and
 back to "Unnamed device"; lifecycle states read Waiting to enroll, Enrolled, Revoked
 and Recovery hold. Toasts state the outcome in a few words ("Assignment saved",
 "Couldn't confirm the assignment") with a description only when it adds a next step.
-Never ask operators to type a record ID. Choose devices, groups, profiles and revisions,
+Never ask operators to type a record ID. Choose devices, groups, profiles and versions,
 accounts and secrets with the searchable pickers in `components/ui/search-picker.tsx`
 (each domain owns its picker; routes compose them into other features). Typed
 confirmations use the displayed name (hostname, secret name), falling back to the ID
@@ -242,18 +242,30 @@ Boot and UKI capability. Missing, stale or insufficient observations block new
 approval/submission; exact ambiguous-request recovery remains available. Never
 treat locally configured artifact size as signed release metadata.
 
-Device Overview leads with inventory receipt and the next safe inspection, then
-access/reporting evidence and ownership. Hardware and storage stay available in a
-disclosure; full Inventory is unchanged. Header contact, compliance and root
-encryption are not duplicated as a uniform field grid. Keep collection states
-visible; do not infer a primary network interface or agent version from unrelated
-fields. Protocol sequence counters belong in collapsed Diagnostics, not the summary.
-Agent version is the current generation's accepted signed-session release and
-receipt time, not inferred from installed packages. Network summaries use the
-reported per-family default-route markers, and active session names preserve each
-collection/field state. Inventory retains the full interface and session tables.
-The route supplies a named account picker for owner editing. **Preview settings**
-carries the selected device into Rollouts; the administrator never copies its UUID.
+Device Overview leads with a security posture summary: encryption and recovery
+key escrow, pending security updates/restart, open findings, profile compliance,
+active restrictions and last contact, each row opening its tab. Then ownership;
+hardware and storage stay available in a disclosure. The header carries at most
+two buttons, Actions and Assign profile. A restriction is stated as confirmed
+("Accounts locked since 19:48 by owner") only when the server fence is set and
+the restricting action completed verified on the device; a fence without that
+evidence reads as sent but unconfirmed, never hedged. Each restriction has one
+Undo that opens the release action form, shown in the Overview restrictions row
+and Actions tab, with only a compact header badge elsewhere. Action actors use
+the server-projected account label (`actor_display_name`), never a client
+account lookup. Keep collection states visible; do not infer a primary network
+interface or agent version from unrelated fields. Protocol sequence counters and
+the device ID belong in collapsed support details. Inventory opens with Access
+and reporting: logged-in users, the current generation's accepted signed-session
+agent release and receipt time (not inferred from installed packages), and a
+network summary from the reported per-family default-route markers; active
+session names preserve each collection/field state. Inventory retains the full
+interface and session tables. The Actions tab lists each action as one collapsed
+line (what, by whom, when, outcome) that expands to the full result. Remote
+assistance has its own device tab with the request form and session history.
+The route supplies a named account picker for owner editing. The Services tab's
+settings preview link carries the selected device into Rollouts; the
+administrator never copies its UUID.
 
 `/dashboard` is the signed-in landing page. Its narrow `GetFleetSummary` admin RPC
 uses SQL aggregates across the caller's authorized device scopes, never page
@@ -291,8 +303,19 @@ Hostname prefix matching is literal and case-sensitive. Server SQL applies scope
 and the bounded page before projecting the worst current-head service disposition;
 no per-row RPC fanout occurs. Last verification is the oldest resource proof only
 when every current resource has proof; no resources means unassigned, not compliant.
+The same page projection carries default-visible Encryption, Updates and Findings
+columns. Encryption is the agent's classification of the device mounted at `/` in
+the current generation's host observation; the list batch-reads those details and
+decodes only storage, one row at a time. Updates come from the current generation's
+published patch status (stale after the fleet patch bound, judged by server receipt).
+Findings are the fresh evaluation's finding set minus active exceptions, flagged
+when partial. A missing report is Unknown or Not checked, never a zero. Last
+inventory is the published snapshot's relative receipt time; the cursor expiry
+sentence is a pager tooltip. Custom attribute definitions are managed in Settings.
 The prefix participates in cursor filter binding. Sorting never changes server
 order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
+CSV exports append root encryption, update and per-severity finding columns; empty
+cells mean not reported or not checked.
 Each administrator keeps at most 256 live search cursors (15 minutes each); a new
 search evicts that administrator's oldest, so browsing never locks the list. A page
 of an expired or evicted search fails as `page_expired` with a Start a new search action.
@@ -721,7 +744,20 @@ devices need 24 hours of silence and are not seeded; the one-time code expires
 after 15 minutes and the pending wipe's action after 10. `-host-observation FILE`
 replays a captured host on one demo device. The route device (`ubuntu-ws-01`) keeps
 checking in while the fixture runs, so remote assistance can be requested from it;
-no user answers, so requested sessions stay waiting.
+no user answers, so requested sessions stay waiting. It also fetches action work on
+each 30-second check-in and completes a requested inventory refresh (other work
+expires unstarted), so console flows waiting for fresh storage can finish.
+
+The Ubuntu, Debian and RHEL advisory fixtures are single vendor notices, so their
+feeds are partial: those devices evaluate `UNKNOWN`/`feed_partial_coverage` and
+every finding, including the route device's accepted one, reads Unknown. The
+Fedora fixture's recorded FEDORA-2026-7d4732cbab node is served inside an
+`<updates>` root as the complete updateinfo of the fixture's controlled
+repository (complete for that demo repository only, never Fedora 44 updates), so
+`fedora-ws-03` reports its sudo `0:1.9.17-7.p2.fc44` (fixed `0:1.9.17-10.p2.fc44`)
+Affected. That finding carries a risk-acceptance proposal awaiting independent
+approval, beside one whose finding evidence is unavailable; the seed fails when
+no Affected finding appears instead of omitting them.
 
 The runner reads every route from `web/src/routeTree.gen.ts`. Parameterised routes use
 the seeded IDs; `$kind` expands to every complex device action. A route the run cannot
@@ -741,6 +777,10 @@ each starting from scroll position zero:
   takes focus, traps Tab and Shift+Tab when modal, closes on Escape and returns focus;
 - copy: `copy-rules.json` applied to visible text, placeholders, labels and titles,
   excluding `TechnicalDetails`, `RpcError` support details and `pre`/`code`/`kbd`;
+  this includes raw byte counts (“510962909184 bytes”, or a bare four-digit-plus
+  number whose label, row or column header names bytes): format sizes with
+  `formatBytes` from `web/src/lib/bytes.ts` and keep exact counts in Details
+  ([design](design.md#visual-editing-beyond-the-component-preset));
 - forms: every rendered form has an explicit submit button (console buttons default
   to `type="button"`);
 - ID inputs: reject rendered inputs, textareas, selects and comboboxes whose labels
@@ -810,7 +850,10 @@ as a newly enrolled laptop or a queued action as a completed patch.
 
 The same run emits `edit-sheet.html`, linked from the contact sheet,
 `edit-sheet.json` (run-bound screen/evidence manifest) and
-`annotations-template.json` (empty, not owner feedback). Open the editing sheet
+`annotations-template.json` (empty, not owner feedback). Every capture in the
+manifest links a full-page screenshot (scenario reviews use their first captured
+state, failed scenarios their failure screenshot); a capture without one fails
+the review instead of writing a sheet the importer would refuse. Open the editing sheet
 locally, inspect its screenshot/dialog links and answer per-screen questions:
 what changed, what needs me, what acting does, and what is redundant. Complete a
 requested edit, observable acceptance criterion, assignee and priority for each
@@ -829,14 +872,23 @@ node web/acceptance/review-import.mjs \
 
 Inputs must be owner-held regular files with no group/other permissions, at most
 1 MiB each. The importer rejects unknown fields, mismatched run IDs, duplicate or
-unknown screens, blank required answers, invalid priorities and overlong text
-(120 characters for author/assignee; 2,000 for each answer/edit/criterion). It
+unknown screens, blank required answers, invalid priorities, overlong text
+(120 characters for author/assignee; 2,000 for each answer/edit/criterion) and a
+manifest whose referenced screenshots are not regular files beside it. It
 accepts 1–500 annotations, one task per screen, and requires a new output directory.
 It persists normalized `annotations.json` plus `tasks.json` with open actionable
 records, source author, assignee, acceptance criteria and screenshot references;
 it does not create tracker issues or infer owner approval. Keep the original
 evidence directory with those records. Reports and annotations may contain
 sensitive fleet information: keep them private and never enter credentials.
+
+Imported owner tasks become machine acceptance checks: one module per task in
+`web/acceptance/owner-edits/` (registered in its `index.mjs`) asserts the task's
+observable criterion through the console on the seeded fleet, once in light
+desktop after the route matrix and before the walkthroughs. Each saves its
+screenshots as `owner-edit-*.png`; the contact sheet lists the results under
+**Owner edit acceptance** and any failed criterion fails the review. A passing
+check establishes only that criterion, not owner approval of the screen.
 
 Organize `web/src` around working product features:
 
@@ -2194,9 +2246,13 @@ retained revisions remain durable.
 The existing **Groups** page retains static authorization membership under
 unrestricted `accounts.manage`; its dynamic targeting section uses unrestricted
 `inventory.manage` and never creates RBAC membership from inventory predicates.
-**Rollouts** starts with **Assign a baseline**: choose a named cohort and profile
-revision, review the actual affected devices, then acknowledge the evidence and
-save with a reason. The read-only report compares current recorded settings with
+**Rollouts** leads with visible lists of staged rollouts (in progress and paused, each
+naming the profile versions it delivers and to which targets) and saved assignments;
+no disclosure hides in-progress state. **New rollout** opens the form below them:
+choose a target (labelled **Target type** and **Target**), a **Profile** and its
+**Version**, review the actual affected devices, then acknowledge the evidence and
+save with a reason. Console text calls a profile revision a version. The read-only
+report compares current recorded settings with
 the proposed resolution, including conflicts, unknown membership and stale inventory.
 It is bounded to 10,000 candidates and 64 MiB, pages at most 20 device rows, expires
 within 15 minutes, and refuses save when incomplete or changed. Saving an assignment
@@ -2212,8 +2268,8 @@ Reading or refreshing a rollout list never advances a stage. Automatic rings sho
 completed, because entering it is not proof of device execution.
 System pause causes include a remedy, including loss of the creator's authorization;
 the exact recorded pause reason remains available in Details.
-While the staged-rollout disclosure is open in a visible tab, its retained state
-refreshes every ten seconds. Closing it or hiding the tab stops interval refreshes;
+While the Rollouts page is open in a visible tab, the retained staged-rollout state
+refreshes every ten seconds. Leaving the page or hiding the tab stops interval refreshes;
 server-side progression does not depend on this observer.
 Promotion evidence separates cumulative, deduplicated health counts from current-stage
 admission. Earliest soak completion is not a promised promotion time; passing health
@@ -2222,7 +2278,7 @@ Only manual rings with a next stage offer an administrator's advance action.
 Passive refresh preserves the unsent control request and its captured revision;
 a concurrent stage change must conflict, not silently rewrite that decision.
 Global edits require unrestricted `resources.assign`; device inspection and
-activation honor device scopes. Inspecting current settings is a separate disclosure:
+activation honor device scopes. Inspecting one device's current settings is a separate card:
 its immutable evidence includes resource conflicts, contributors and unsupported
 dispatch capabilities. Dispatch support is not a native qualification claim.
 Activation pins the reviewed device and evidence; it never rebases automatically.

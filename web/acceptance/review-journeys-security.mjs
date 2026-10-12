@@ -160,7 +160,7 @@ async function lostLaptop(ctx) {
   await visible(main.getByText(/^Contact /));
   await visible(main.getByText(/^(Root encrypted|Root not encrypted|Encryption unknown)$/));
   await main.getByRole("tab", { name: "Encryption", exact: true }).click();
-  await visible(main.getByText("Encryption and recovery keys", { exact: true }));
+  await visible(main.getByText(/^(Recoverable|Not recoverable|Unknown): /));
   await shot(
     ctx,
     "lost-laptop-encryption",
@@ -429,14 +429,14 @@ async function remoteHelp(ctx) {
   const main = page.getByRole("main");
   await start(ctx, "remote-help", "Devices");
   await findDevice(ctx, device, "remote-help");
-  await main.getByRole("tab", { name: "Actions", exact: true }).click();
+  await main.getByRole("tab", { name: "Remote assistance", exact: true }).click();
   await visible(main.getByRole("heading", { name: "Ask to help", exact: true }));
   await shot(
     ctx,
     "remote-help-request-entry",
     "Device assistance request",
     "partly",
-    "Remote help is buried below device action history rather than offered beside the person needing support.",
+    "Remote help has its own device tab, but is not yet offered beside the signed-in user's session context.",
     "Provide an Ask to help action beside user/session context, preserving consent and history.",
     "Opened the real remote assistance form on the named, checking-in route device.",
   );
@@ -519,7 +519,7 @@ async function remoteHelp(ctx) {
       "The ended record retains the supplied support reason without granting new sharing permission.",
     );
     await main.getByRole("link", { name: "Return to device", exact: true }).click();
-    await main.getByRole("tab", { name: "Actions", exact: true }).click();
+    await main.getByRole("tab", { name: "Remote assistance", exact: true }).click();
     await visible(main.getByRole("heading", { name: "Session history", exact: true }));
     await shot(
       ctx,
@@ -564,7 +564,7 @@ async function recoveryAudit(ctx) {
     "yes",
     "The log offers named investigation views instead of requiring action codes.",
     "Owner should edit the order and wording of the common investigation choices.",
-    "No recovery or time filter has been applied yet; the unfiltered log is not the answer.",
+    "No recovery or time filter has been applied yet; the default Human actions view is not the answer.",
   );
   await main.getByRole("button", { name: "Recovery key reveals", exact: true }).click();
   await shot(

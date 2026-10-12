@@ -26,6 +26,7 @@ import { reviewDirectoryAuthorization } from "./review-directory-authorization.m
 import { reviewSSHBanner } from "./review-ssh-banner.mjs";
 import { reviewOSUpdate } from "./review-os-update.mjs";
 import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
+import { reviewOwnerEdits } from "./review-owner-edits.mjs";
 
 process.umask(0o077);
 
@@ -793,6 +794,18 @@ async function main() {
       }),
     );
     report.sessions = sessions;
+    // Owner edit acceptance reads the seeded fleet before enrollment fixtures and
+    // task walkthroughs add requests, sessions and approvals of their own.
+    report.ownerEdits = await reviewOwnerEdits({
+      page: pages[0],
+      config,
+      visit,
+      settle,
+      screenshot,
+    });
+    for (const edit of report.ownerEdits)
+      for (const finding of edit.findings)
+        report.failures.push(`owner edit ${edit.route} ${edit.name}: ${finding}`);
     const enrollmentResults = await reviewEnrollmentFixtures({
       driver,
       pages,
@@ -846,8 +859,8 @@ async function main() {
     let viewerUrl = "";
     try {
       await visit(requester, `/devices/${config.deviceId}`);
-      step = "open Actions tab";
-      await requester.getByRole("tab", { name: "Actions", exact: true }).click();
+      step = "open Remote assistance tab";
+      await requester.getByRole("tab", { name: "Remote assistance", exact: true }).click();
       const form = requester.locator("form").filter({
         has: requester.getByRole("button", { name: "Request remote assistance" }),
       });
@@ -962,6 +975,16 @@ try {
 } finally {
   report.finishedAt = new Date().toISOString();
   if (config?.evidenceDirectory) {
+    // An edit sheet that the importer would refuse is a review failure, recorded
+    // in the report rather than discovered by the owner after annotating.
+    let manifest = null;
+    try {
+      manifest = editManifest(redact(report));
+    } catch (error) {
+      report.failures.push(`edit sheet: ${error.message}`);
+      report.passed = false;
+      exitCode = 1;
+    }
     const clean = redact(report);
     await writePrivateJSON(join(config.evidenceDirectory, "report.json"), clean);
     await writePrivate(join(config.evidenceDirectory, "index.html"), contactSheet(clean));
@@ -972,15 +995,14 @@ try {
         taskAuditSheet(clean.walkthroughs),
       );
     }
-    const manifest = editManifest(clean);
-    if (manifest.screens.length > 500 || Buffer.byteLength(JSON.stringify(manifest)) > 1024 * 1024)
-      throw new Error("edit_manifest_exceeds_import_bounds");
-    await writePrivateJSON(join(config.evidenceDirectory, "edit-sheet.json"), manifest);
-    await writePrivateJSON(
-      join(config.evidenceDirectory, "annotations-template.json"),
-      annotationTemplate(manifest),
-    );
-    await writePrivate(join(config.evidenceDirectory, "edit-sheet.html"), editSheet(manifest));
+    if (manifest) {
+      await writePrivateJSON(join(config.evidenceDirectory, "edit-sheet.json"), manifest);
+      await writePrivateJSON(
+        join(config.evidenceDirectory, "annotations-template.json"),
+        annotationTemplate(manifest),
+      );
+      await writePrivate(join(config.evidenceDirectory, "edit-sheet.html"), editSheet(manifest));
+    }
   }
   process.exitCode = exitCode;
 }

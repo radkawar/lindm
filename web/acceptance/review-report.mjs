@@ -66,6 +66,12 @@ export function contactSheet(report) {
     )
     .join("");
   const failures = report.failures.map((line) => `<li>${escape(line)}</li>`).join("");
+  const ownerEdits = (report.ownerEdits ?? [])
+    .map(
+      (edit) =>
+        `<li>${edit.passed ? "Pass" : "Fail"} · <b>${escape(edit.route)}</b> ${escape(edit.name)}: ${escape(edit.acceptance)} ${edit.screenshots.map((path, index) => `<a href="${escape(path)}">screenshot ${index + 1}</a>`).join(" ")}${edit.findings.length ? `<ul>${edit.findings.map((finding) => `<li>${escape(finding)}</li>`).join("")}</ul>` : ""}</li>`,
+    )
+    .join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>lindm console UI review</title>
 <style>
@@ -84,6 +90,7 @@ td ul{padding-left:16px;margin:4px 0;font-size:12px;word-break:break-word}
 <p><a href="edit-sheet.html">Owner editing pass</a> · <a href="edit-sheet.json">Screen manifest</a>. No owner review or approval is inferred. Semantic markers check presence, not truth or good choices; generic controls count only as structural action coverage. Unmarked metrics, unopened dialogs and unvisited states still need human review.</p>
 ${report.walkthroughs ? '<p><a href="task-audit.html">Seven administrator task walkthroughs</a> · <a href="task-audit.json">Task evidence and blockers</a>. Route green does not mean every administrator job is complete.</p>' : ""}
 <h2>Session checks</h2><ul>${sessions}</ul>
+${ownerEdits ? `<h2>Owner edit acceptance</h2><p>Each imported owner task's acceptance criterion against the seeded fleet. A pass is not owner approval.</p><ul>${ownerEdits}</ul>` : ""}
 ${failures ? `<h2>Failures (${report.failures.length})</h2><details><summary>Show all</summary><ul>${failures}</ul></details>` : ""}
 <h2>Routes</h2>
 <table><thead><tr><th>Route</th><th>Light 1440x900</th><th>Dark 1440x900</th><th>Light 390x844</th><th>Dark 390x844</th></tr></thead>
