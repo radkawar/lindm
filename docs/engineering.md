@@ -2669,7 +2669,11 @@ overrides the default one, and `-secure-boot`. A cell whose
 capability the registry gates is `gated`, and so is a cell whose lane the row's
 `Lab.LaneGates` gates on that architecture: a concrete product or vendor reason
 the lane cannot qualify the release there, never "not yet run" (the lane itself
-refuses it too). A cell without a maintained lane, or whose lane has no recipe in
+refuses it too). A `provision-*` cell whose installer format the row's
+`Release.Provisioning` does not declare is likewise `gated` as not applicable
+("RELEASE does not provision via FORMAT", derived from the registry, e.g.
+autoinstall on Fedora); a declared format without a lane recipe stays `no lane`.
+A cell without a maintained lane, or whose lane has no recipe in
 the row's `Lab.Lanes`, is `no lane`; a release without a pinned image for that
 architecture is `no image`; and a runnable cell without a ledger entry is
 `not run`. None of these is a pass.

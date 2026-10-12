@@ -207,7 +207,9 @@ func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
 
 // Each provisioning cell is admitted only where the registry maintains its
 // installer format, boots its own image kind, and never inherits the console
-// enrollment or lifecycle record of the same release.
+// enrollment or lifecycle record of the same release. A format the vendor does
+// not install through is not applicable (gated with the derived reason); an
+// offered format without a maintained recipe stays a visible missing lane.
 func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 	cloud, installer := labv1.MatrixImage_MATRIX_IMAGE_CLOUD, labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
 	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{
@@ -221,15 +223,16 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 			&Manifest{Image: &labv1.ImageManifest{Id: key + "-installer", Edition: "server-encrypted-lab"}, Release: r, Architecture: "aarch64"})
 	}
 	for _, tc := range []struct {
-		lane  platform.LabLane
-		image labv1.MatrixImage
-		admit []string
-		deny  []string
+		lane       platform.LabLane
+		image      labv1.MatrixImage
+		admit      []string
+		noRecipe   []string
+		notOffered []string
 	}{
-		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44"}, []string{"rhel-9", "opensuse-tumbleweed"}},
-		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, []string{"fedora-44", "rhel-9", "opensuse-tumbleweed"}},
-		{platform.LaneProvisionKickstart, installer, []string{"fedora-44", "rhel-9"}, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
-		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}},
+		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44"}, []string{"rhel-9", "opensuse-tumbleweed"}, nil},
+		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, nil, []string{"fedora-44", "rhel-9", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionKickstart, installer, []string{"fedora-44", "rhel-9"}, nil, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, nil, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}},
 	} {
 		cell := &labv1.MatrixCell{Name: string(tc.lane), Title: string(tc.lane), Capabilities: []string{"lifecycle"}, Image: tc.image, Lane: string(tc.lane)}
 		for _, key := range tc.admit {
@@ -245,9 +248,17 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 				t.Fatalf("%s %s boots %s, want %s", key, tc.lane, got.Manifest.Image.GetId(), want)
 			}
 		}
-		for _, key := range tc.deny {
-			if got := in.cell(release(t, key), cell, "aarch64"); got.Runnable() {
-				t.Fatalf("%s %s became runnable without a maintained recipe", key, tc.lane)
+		for _, key := range tc.noRecipe {
+			if got := in.cell(release(t, key), cell, "aarch64"); got.State != NoLane {
+				t.Fatalf("%s %s: offered format without a recipe is %s (%s), want no lane", key, tc.lane, got.State, got.Reason)
+			}
+		}
+		for _, key := range tc.notOffered {
+			r := release(t, key)
+			format, _ := platform.LaneProvisioning(tc.lane)
+			want := r.Name + " does not provision via " + string(format)
+			if got := in.cell(r, cell, "aarch64"); got.State != Gated || got.Reason != want {
+				t.Fatalf("%s %s: %s (%s), want gated %q", key, tc.lane, got.State, got.Reason, want)
 			}
 		}
 	}

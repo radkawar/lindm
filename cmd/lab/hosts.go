@@ -18,6 +18,7 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/labhost"
+	"lindm/internal/platform"
 	"lindm/internal/vmlab"
 )
 
@@ -204,7 +205,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 			return runSplitAssistance(ctx, chosen, arch, repo, clean, stdout, stderr)
 		}
 		var forwards []string
-		if _, provision := provisionLaneFormat(clean[1]); (clean[1] == "enroll-from-console" || provision) && chosen.Transport == "ssh" {
+		if _, provision := platform.LaneProvisioning(platform.LabLane(clean[1])); (clean[1] == "enroll-from-console" || provision) && chosen.Transport == "ssh" {
 			forwards, err = consoleEnrollmentReverseForwards(clean)
 			if err != nil {
 				return err

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 	"lindm/internal/vmlab"
 )
 
@@ -138,7 +139,7 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 		return runVMEnrollFromConsole(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "vm" {
-		if _, ok := provisionLaneFormat(args[1]); ok {
+		if _, ok := platform.LaneProvisioning(platform.LabLane(args[1])); ok {
 			return runVMProvision(ctx, args[1], args[2:], stdout, stderr)
 		}
 	}

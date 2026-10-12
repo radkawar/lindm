@@ -105,8 +105,8 @@ func provisionRelease(release *platform.Release, format, architecture string) er
 	if !ok {
 		return fmt.Errorf("no provisioning lane for format %q", format)
 	}
-	if !slices.Contains(release.Provisioning, platform.Provisioning(format)) {
-		return fmt.Errorf("%s does not offer %s provisioning", release.Name, format)
+	if reason := release.ProvisionGate(lane); reason != "" {
+		return errors.New(reason)
 	}
 	if err := release.LabLaneOn(lane, architecture); err != nil {
 		return err

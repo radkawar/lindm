@@ -313,15 +313,20 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch)
 	}
 	c.Entry = in.latest(c)
-	switch laneGate := r.LaneGateOn(platform.LabLane(spec.GetLane()), arch); {
+	lane := platform.LabLane(spec.GetLane())
+	provisionGate := r.ProvisionGate(lane)
+	switch laneGate := r.LaneGateOn(lane, arch); {
 	case gated:
 		c.State, c.Reason = Gated, strings.Join(reasons, "; ")
+	case provisionGate != "":
+		// Not applicable: the vendor does not install through this format.
+		c.State, c.Reason = Gated, provisionGate
 	case laneGate != "":
 		c.State, c.Reason = Gated, laneGate
 	case spec.GetLane() == "":
 		c.State, c.Reason = NoLane, spec.GetNoLane()
-	case slices.Contains(platform.LabLanes, platform.LabLane(spec.GetLane())) && r.LabLaneOn(platform.LabLane(spec.GetLane()), arch) != nil:
-		c.State, c.Reason = NoLane, r.LabLaneOn(platform.LabLane(spec.GetLane()), arch).Error()
+	case slices.Contains(platform.LabLanes, lane) && r.LabLaneOn(lane, arch) != nil:
+		c.State, c.Reason = NoLane, r.LabLaneOn(lane, arch).Error()
 	case c.Manifest == nil:
 		c.State = NoImage
 	case c.Entry == nil:

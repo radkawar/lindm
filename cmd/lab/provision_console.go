@@ -8,25 +8,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"lindm/internal/platform"
 	"lindm/internal/vmlab"
 )
 
-// provisionLaneFormat maps `lab vm provision-<format>` to its installer format.
-func provisionLaneFormat(lane string) (platform.Provisioning, bool) {
-	format := platform.Provisioning(strings.TrimPrefix(lane, "provision-"))
-	if candidate, ok := platform.ProvisionLane(format); !ok || string(candidate) != lane {
-		return "", false
-	}
-	return format, true
-}
-
 // provisionInstallerLane reports a lane that runs a vendor installer: like
 // the encrypted lanes it needs 4 GiB and native KVM by default.
 func provisionInstallerLane(lane string) bool {
-	format, ok := provisionLaneFormat(lane)
+	format, ok := platform.LaneProvisioning(platform.LabLane(lane))
 	return ok && format != platform.ProvisionCloudInit
 }
 
@@ -34,7 +24,7 @@ func provisionInstallerLane(lane string) bool {
 // from a real Chromium Copy, verbatim into a fresh first boot or vendor
 // installation, then drives the independent approval through the console.
 func runVMProvision(ctx context.Context, lane string, args []string, stdout, stderr io.Writer) (resultErr error) {
-	format, ok := provisionLaneFormat(lane)
+	format, ok := platform.LaneProvisioning(platform.LabLane(lane))
 	if !ok {
 		return fmt.Errorf("unknown provisioning lane %q", lane)
 	}

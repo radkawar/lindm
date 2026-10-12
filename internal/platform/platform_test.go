@@ -415,10 +415,22 @@ func TestProvisionLanesMatchOfferedFormats(t *testing.T) {
 		}
 		for _, p := range []Provisioning{ProvisionCloudInit, ProvisionAutoinstall, ProvisionKickstart, ProvisionAutoYaST} {
 			lane, _ := ProvisionLane(p)
+			if back, ok := LaneProvisioning(lane); !ok || back != p {
+				t.Fatalf("lane %s does not map back to %s", lane, p)
+			}
 			if slices.Contains(r.Lab.Lanes, lane) && !slices.Contains(r.Provisioning, p) {
 				t.Fatalf("%s has a %s lane but does not offer %s", r.Key, lane, p)
 			}
+			if gate := r.ProvisionGate(lane); (gate == "") != slices.Contains(r.Provisioning, p) {
+				t.Fatalf("%s %s: provision gate %q disagrees with offered formats", r.Key, p, gate)
+			}
 		}
+		if r.ProvisionGate(LaneEnrollFromConsole) != "" {
+			t.Fatalf("%s: a non-provision lane was gated as a provisioning format", r.Key)
+		}
+	}
+	if _, ok := LaneProvisioning("provision-nixos"); ok {
+		t.Fatal("a provisioning format without a lab lane mapped to a lane")
 	}
 	nixos, ok := Lookup("nixos")
 	if !ok || nixos.Supported(Lifecycle) || !strings.Contains(nixos.GateReason(Lifecycle), "lindmd serves no NixOS installation artifact") {

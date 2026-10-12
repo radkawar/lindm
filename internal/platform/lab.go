@@ -3,6 +3,7 @@ package platform
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // Lab records the virtual-machine lab recipes maintained for a release. A lane
@@ -131,11 +132,38 @@ var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended,
 
 // ProvisionLane is the lab lane qualifying a provisioning format.
 func ProvisionLane(p Provisioning) (LabLane, bool) {
-	lane, ok := map[Provisioning]LabLane{
-		ProvisionCloudInit: LaneProvisionCloudInit, ProvisionAutoinstall: LaneProvisionAutoinstall,
-		ProvisionKickstart: LaneProvisionKickstart, ProvisionAutoYaST: LaneProvisionAutoYaST,
-	}[p]
-	return lane, ok
+	switch p {
+	case ProvisionCloudInit:
+		return LaneProvisionCloudInit, true
+	case ProvisionAutoinstall:
+		return LaneProvisionAutoinstall, true
+	case ProvisionKickstart:
+		return LaneProvisionKickstart, true
+	case ProvisionAutoYaST:
+		return LaneProvisionAutoYaST, true
+	default:
+		return "", false
+	}
+}
+
+// LaneProvisioning is the provisioning format a provision lane qualifies.
+func LaneProvisioning(l LabLane) (Provisioning, bool) {
+	format := Provisioning(strings.TrimPrefix(string(l), "provision-"))
+	if lane, ok := ProvisionLane(format); !ok || lane != l {
+		return "", false
+	}
+	return format, true
+}
+
+// ProvisionGate is why the release cannot run provision lane l: its vendor
+// does not install through that format (Release.Provisioning omits it).
+// It is "" for an offered format and for every other lane.
+func (r *Release) ProvisionGate(l LabLane) string {
+	format, ok := LaneProvisioning(l)
+	if !ok || slices.Contains(r.Provisioning, format) {
+		return ""
+	}
+	return fmt.Sprintf("%s does not provision via %s", r.Name, format)
 }
 
 // LabLane returns nil when the release has a maintained recipe for the lane.
