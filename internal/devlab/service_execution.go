@@ -117,6 +117,8 @@ func fixtureResourceIntent(intent *agentv1.ResourceExecutionIntent) bool {
 			return pkg.GetArchitecture() == "amd64" && repository == "apt/d06a3d03-3118-4779-a00f-a5544ff095ad"
 		case resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM:
 			return pkg.GetArchitecture() == "x86_64" && repository == "rpm/d06a3d03-3118-4779-a00f-a5544ff095ad"
+		case resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM:
+			return pkg.GetArchitecture() == "x86_64" && repository == "alpm/d06a3d03-3118-4779-a00f-a5544ff095ad"
 		}
 	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
 		switch desired.GetManagedFile().GetPath() {
