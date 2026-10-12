@@ -5,21 +5,41 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createHash } from "node:crypto";
 import { writePrivate } from "./private-files.mjs";
 
-export async function enroll(ui, config) {
-  await ui.click({ role: "link", text: "Enroll a local administrator account" });
-  await ui.fill({ label: "One-time enrollment secret" }, config.enrollmentSecret);
-  await ui.fill({ label: "New password (at least 12 bytes)" }, config.password);
-  await ui.click({ role: "button", text: "Enroll account" });
-  await ui.wait({ role: "status", contains: "Account enrolled." });
+// enroll registers config's password and a fresh authenticator credential
+// with its one-time secret; origin (default the account's) lets an attempt a
+// network change interrupted start again from a reloaded sign-in page. The
+// server lets registration restart until a credential commits, so the same
+// secret is offered again; a refused secret is refused on every attempt. A
+// committed enrollment whose response was lost cannot be repeated (its secret
+// is spent) and still fails here rather than being assumed.
+export async function enroll(ui, config, origin = config.origin) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (attempt > 1) await reopen(ui, origin);
+      await ui.click({ role: "link", text: "Enroll a local administrator account" });
+      await ui.fill({ label: "One-time enrollment secret" }, config.enrollmentSecret);
+      await ui.fill({ label: "New password (at least 12 bytes)" }, config.password);
+      await ui.click({ role: "button", text: "Enroll account" });
+      await ui.wait({ role: "status", contains: "Account enrolled." });
+      break;
+    } catch (error) {
+      if (!origin || attempt >= interruptedAttempts || !interrupted(error)) throw error;
+    }
+  }
   await ui.click({ role: "link", text: "Back to sign in" });
 }
 
-// Shared lab hosts add and remove VM and container links while lanes run;
-// Chromium then aborts in-flight requests (net::ERR_NETWORK_CHANGED), so a
-// sign-in shows "Result unknown" or a page never finishes loading. Only
-// idempotent steps (sign-in/out, page reads) are repeated, on a fresh
-// navigation and a bounded number of times, so a product failure still fails
-// every attempt. Decisions use the console's own same-request retry.
+// Shared lab hosts add and remove container and VM links, and NetworkManager
+// may keep re-activating an unconnected port, while lanes run. Each such
+// address change (even IPv6 link-local) makes Chromium close its HTTP/2
+// sessions, aborting every in-flight console request with
+// net::ERR_NETWORK_CHANGED: a sign-in or enrollment shows "Result unknown", a
+// page never finishes loading, or the console reloads itself after an aborted
+// route chunk and destroys the step's page context. Only idempotent or
+// restartable steps (sign-in/out, enrollment before its credential commits,
+// page reads) are repeated, on a fresh navigation and a bounded number of
+// times, so a product failure still fails every attempt. Decisions use the
+// console's own same-request retry.
 const interruptedAttempts = 3;
 
 function interrupted(error) {
@@ -29,8 +49,11 @@ function interrupted(error) {
     /net::ERR_(NETWORK_CHANGED|ABORTED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE)/.test(
       message,
     ) ||
-    // An aborted navigation leaves an observation without its page.
-    message.includes("Execution context was destroyed")
+    // An aborted navigation (the console reloading itself after an aborted
+    // route chunk) leaves an observation without its page or element.
+    /Execution context was destroyed|Navigation interrupted the evaluation|Element is not attached to the DOM/.test(
+      message,
+    )
   );
 }
 
@@ -57,10 +80,13 @@ async function reopen(ui, origin) {
 }
 
 // signIn signs account in; origin (default the account's) lets an
-// interrupted attempt reopen the console.
+// interrupted attempt reopen the console. A reload that is itself interrupted
+// counts as that attempt's failure.
 export async function signIn(ui, account, origin = account.origin) {
   for (let attempt = 1; ; attempt++) {
     try {
+      // The sign-in may have completed before its response was lost.
+      if (attempt > 1 && (await reopen(ui, origin))) return;
       await ui.fill(signInForm, account.username);
       await ui.fill({ label: "Password" }, account.password);
       await ui.click({ role: "button", text: "Sign in locally" });
@@ -68,8 +94,6 @@ export async function signIn(ui, account, origin = account.origin) {
       return;
     } catch (error) {
       if (!origin || attempt >= interruptedAttempts || !interrupted(error)) throw error;
-      // The sign-in may have completed before its response was lost.
-      if (await reopen(ui, origin)) return;
     }
   }
 }
@@ -99,6 +123,11 @@ async function openPage(ui, config, path, ready) {
       if (attempt >= interruptedAttempts || !interrupted(error)) throw error;
     }
   }
+}
+
+// openSignIn loads the console until its sign-in form shows.
+export async function openSignIn(ui, origin) {
+  await openPage(ui, { origin }, "/", signInForm);
 }
 
 async function credentialDetails(ui) {

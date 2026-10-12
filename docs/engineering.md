@@ -649,10 +649,28 @@ and package-lock-selected Playwright Chromium under `assistance-browser/`.
 It changes neither system packages nor global PATH; missing browser libraries
 are a prerequisite failure, not permission to install packages.
 Browser startup failures retain a bounded allowlisted stage and classification,
-including module loading before the command loop. Raw exceptions, page contents
-and credential-bearing framework stderr stay private; EOF is not a successful
-process exit. Cleanup observes the unreaped owned leader before stopping its
-process group and preserves its actual exit status.
+including module loading before the command loop. Once Chromium has a page, a
+failed start also reports a bounded observation: the last main-frame
+navigations, same-origin request paths that failed (Chromium's `net::ERR_*`
+name), were refused (HTTP status) or are still pending, and the console's
+visible alert, status and heading text and support codes, with the runner's
+own password and enrollment secret scrubbed. Raw exceptions, input values,
+other page contents and credential-bearing framework stderr stay private; EOF
+is not a successful process exit. Cleanup observes the unreaped owned leader
+before stopping its process group and preserves its actual exit status.
+
+Lab hosts change link addresses while lanes run: other lanes' container veths
+come and go, and on `dgx20` NetworkManager re-activates an unconnected port
+every 45 seconds in three-minute bursts (see the pending host fix under Lab
+host configuration). Each change, even of an IPv6
+link-local address, makes Chromium close its HTTP/2 sessions and abort every
+in-flight console request with `net::ERR_NETWORK_CHANGED`; an aborted route
+chunk also makes the console reload itself. The operator browser therefore
+repeats an interrupted sign-in page load, enrollment (the server lets
+registration restart until its credential commits) or sign-in from a fresh
+navigation, at most three times. A refused secret or password fails every
+attempt, and a committed enrollment whose response was lost fails rather than
+being assumed.
 
 Remote `vm device-actions -scenario wipe` runs that include an original-device
 recovery phase build the owned-boot recovery UKI with the host's ukify. The
@@ -1713,6 +1731,22 @@ existing `~/work` is group-writable and shared with other projects, so it is not
 safe parent for package-signing state. The baseline never chmods that shared
 directory; configure the private alternative instead. Evidence records the work
 directory and whether it was created.
+
+Pending host fix for `dgx20`, to apply when the Sparks are reachable again
+(not applied yet): NetworkManager's auto-created "Wired connection" profile for
+the unconnected port `enP2p1s0f1np1` fails DHCP after 45 seconds and immediately
+auto-activates again, in three-minute bursts every eight minutes. Each cycle
+withdraws and re-adds the port's IPv6 link-local address, which aborts the
+operator browser's in-flight console requests (`net::ERR_NETWORK_CHANGED`,
+above). Find the profile bound to that port (`nmcli -f NAME,DEVICE,AUTOCONNECT
+connection show`, and the "auto-activating connection" lines in
+`journalctl -u NetworkManager`), disable it with
+`sudo nmcli connection modify '<profile>' connection.autoconnect no`, and confirm
+the journal shows no further activation cycles on `enP2p1s0f1np1`. Check
+`dgx21` the same way; only `dgx20` was observed. This is an authorized host
+change outside the baseline, which never edits NetworkManager configuration;
+container veth churn from other lanes remains, so the operator browser keeps
+its bounded retries.
 
 `systemd-ukify` (host-side recovery UKI builds) is not a static pin: the baseline
 derives `systemd-ukify=<installed systemd version>` so it never pulls a systemd

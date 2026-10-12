@@ -137,10 +137,13 @@ export class ChromiumDriver {
   }
   // Page-load diagnostics for a failed step: same-origin request paths only
   // (never queries, headers or bodies), so a request still awaiting its
-  // response (a stalled asset or RPC) or a failed one is named.
+  // response (a stalled asset or RPC), a failed one, a refused one (its HTTP
+  // status) and the main frame's recent navigations are named.
   trackNetwork(origin) {
     const pending = new Map();
     const failed = [];
+    const httpErrors = [];
+    const navigations = [];
     const errors = [];
     const path = (request) => {
       const url = new URL(request.url());
@@ -152,13 +155,24 @@ export class ChromiumDriver {
     });
     // A rejected fetch may never read its body, so only requests without
     // response headers are reported as stalled.
-    this.context.on("response", (response) => pending.delete(response.request()));
+    this.context.on("response", (response) => {
+      pending.delete(response.request());
+      const name = path(response.request());
+      if (name && response.status() >= 400 && httpErrors.length < 20)
+        httpErrors.push({ path: name, status: response.status() });
+    });
     this.context.on("requestfinished", (request) => pending.delete(request));
     this.context.on("requestfailed", (request) => {
       pending.delete(request);
       const name = path(request);
       if (name && failed.length < 20)
         failed.push({ path: name, error: (request.failure()?.errorText ?? "").slice(0, 80) });
+    });
+    this.page.on("framenavigated", (frame) => {
+      if (frame !== this.page.mainFrame()) return;
+      const url = new URL(frame.url());
+      navigations.push(url.origin === origin ? url.pathname.slice(0, 200) : url.protocol);
+      if (navigations.length > 5) navigations.shift();
     });
     this.page.on("pageerror", (error) => {
       if (errors.length < 10) errors.push(String(error?.name ?? "Error").slice(0, 80));
@@ -171,6 +185,8 @@ export class ChromiumDriver {
           .map((entry) => ({ path: entry.path, ageMs: now - entry.started })),
         pendingCount: pending.size,
         failed,
+        httpErrors,
+        navigations,
         pageErrors: errors,
         location: new URL(this.page.url()).pathname.slice(0, 200),
       };

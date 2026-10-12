@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { startupFailure } from "./assistance-startup.mjs";
+import { startupFailure, startupObservation } from "./assistance-startup.mjs";
 
 // Classification tests do not launch Chromium or qualify a native picker.
 test("startup evidence retains loader failure categories, not source or private paths", () => {
@@ -74,6 +74,105 @@ test("configuration diagnostic codes are an exact allowlist, not snake-case exce
     startupFailure(new Error("private_owned_bounded_json_required_secret"), "configuration").code,
     "browser_startup_failed",
   );
+});
+
+test("console-stage failures keep the UI driver's code, a navigation under the step and Chromium's net error name only", () => {
+  assert.deepEqual(startupFailure(new Error("ui_condition_timeout"), "enrollment"), {
+    code: "ui_condition_timeout",
+    errorType: "Error",
+    stage: "enrollment",
+  });
+  assert.equal(
+    startupFailure(new Error("ui_condition_timeout"), "configuration").code,
+    "browser_startup_failed",
+  );
+  assert.deepEqual(
+    startupFailure(
+      new Error("page.goto: net::ERR_NETWORK_CHANGED at https://localhost:1/?secret=x"),
+      "navigation",
+    ),
+    {
+      code: "browser_network_error",
+      errorType: "Error",
+      stage: "navigation",
+      netError: "ERR_NETWORK_CHANGED",
+    },
+  );
+  assert.equal(
+    startupFailure(new Error("net::ERR_NETWORK_CHANGED"), "chromium_launch").netError,
+    undefined,
+  );
+  const reloaded = new Error(
+    "page.evaluateHandle: Execution context was destroyed, most likely because of a navigation\n" +
+      "call log: https://localhost:1/enroll?secret=x",
+  );
+  assert.deepEqual(startupFailure(reloaded, "enrollment"), {
+    code: "page_navigated_during_step",
+    errorType: "Error",
+    stage: "enrollment",
+  });
+  assert.equal(
+    startupFailure(new Error("elementHandle.click: Element is not attached to the DOM"), "sign_in")
+      .code,
+    "element_detached_during_step",
+  );
+  assert.equal(startupFailure(reloaded, "chromium_launch").code, "browser_startup_failed");
+});
+
+test("startup observation is bounded, typed and never carries the runner's credentials", () => {
+  const password = "PRIVATEPASSWORD7Q";
+  const secret = "ENROLLMENTSECRET2Z";
+  const observation = startupObservation(
+    {
+      network: {
+        location: "/enroll",
+        navigations: ["about:", "/", "/enroll", `/x?${secret}`],
+        httpErrors: [
+          { path: "/auth/local/enroll/begin", status: 401, body: secret },
+          { path: "/auth/options", status: 9000 },
+        ],
+        failed: [
+          { path: "/auth/options", error: "net::ERR_NETWORK_CHANGED" },
+          { path: "/auth/session", error: `custom ${password}` },
+        ],
+        pending: Array.from({ length: 30 }, () => ({ path: "/auth/session", ageMs: 12.5 })),
+        pendingCount: 30,
+        pageErrors: ["TypeError", secret],
+        headers: { cookie: secret },
+      },
+      page: {
+        alerts: [`Sign-in failed (401).\n  Try again. ${password}`, "x".repeat(1_000)],
+        statuses: Array.from({ length: 9 }, (_, index) => `status ${index}`),
+        headings: ["Enroll local administrator"],
+        support: [{ code: "Unauthenticated", reason: `bad ${secret}`, message: secret }],
+        body: secret,
+      },
+    },
+    [password, secret, "", undefined],
+  );
+  const encoded = JSON.stringify(observation);
+  assert.equal(encoded.includes(password), false);
+  assert.equal(encoded.includes(secret), false);
+  assert.equal(observation.location, "/enroll");
+  assert.deepEqual(observation.navigations, ["about:", "/", "/enroll", ""]);
+  assert.deepEqual(observation.httpErrors, [
+    { path: "/auth/local/enroll/begin", status: 401 },
+    { path: "/auth/options", status: 0 },
+  ]);
+  assert.deepEqual(observation.failed, [
+    { path: "/auth/options", error: "net::ERR_NETWORK_CHANGED" },
+    { path: "/auth/session", error: "other" },
+  ]);
+  assert.equal(observation.pending.length, 20);
+  assert.deepEqual(observation.pending[0], { path: "/auth/session", ageMs: 0 });
+  assert.deepEqual(observation.pageErrors, ["TypeError", "Error"]);
+  assert.equal(observation.alerts[0], "Sign-in failed (401). Try again. [redacted]");
+  assert.equal(observation.alerts[1].length, 300);
+  assert.equal(observation.statuses.length, 5);
+  assert.deepEqual(observation.headings, ["Enroll local administrator"]);
+  assert.deepEqual(observation.support, [{ code: "Unauthenticated", reason: "" }]);
+  assert.equal("body" in observation || "headers" in observation, false);
+  assert.deepEqual(startupObservation({ network: {} }).pageUnavailable, true);
 });
 
 test("actual bootstrap retains pre-command failure and exits nonzero without exposing its config path", async () => {

@@ -3,9 +3,14 @@ import { createInterface } from "node:readline";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ChromiumDriver, UI } from "./drivers.mjs";
-import { enroll, signIn } from "./journey.mjs";
+import { enroll, openSignIn, signIn } from "./journey.mjs";
 import { privateDirectory, readPrivateJSON, writePrivate } from "./private-files.mjs";
-import { startupFailure, startupStage } from "./assistance-startup.mjs";
+import {
+  startupFailure,
+  startupObservation,
+  startupStage,
+  visibleOutcome,
+} from "./assistance-startup.mjs";
 
 // Line-oriented private control protocol for `lab vm assistance`
 // (internal/vmlab/vm_assistance_browser_linux.go). Each stdin line is one JSON
@@ -119,7 +124,7 @@ const commands = {
     await driver.context.addInitScript(observePeers, config.forwardedTurnUrl ?? "");
     ui = new UI(driver, config.actionTimeoutMs);
     starting("navigation");
-    await driver.goto(config.origin);
+    await openSignIn(ui, config.origin);
     starting("authenticator");
     await driver.authenticator([]);
     starting("enrollment");
@@ -248,6 +253,28 @@ function failure(error) {
   };
 }
 
+// A start that fails once Chromium has a page also names what the console
+// showed, the last navigation and how its same-origin requests ended. The
+// observation is collected from the page, never from the exception, and the
+// runner's own credentials are scrubbed from it.
+async function startFailure(error) {
+  const result = startupFailure(error, startStage);
+  if (!driver?.networkDiagnostics) return result;
+  try {
+    const page = await Promise.race([
+      driver.page.evaluate(visibleOutcome),
+      delay(5_000, undefined, { ref: false }).then(() => undefined),
+    ]).catch(() => undefined);
+    result.observation = startupObservation({ network: driver.networkDiagnostics(), page }, [
+      config.password,
+      config.enrollmentSecret,
+    ]);
+  } catch {
+    result.observationUnavailable = true;
+  }
+  return result;
+}
+
 function reply(value) {
   process.stdout.write(JSON.stringify(value) + "\n");
 }
@@ -318,7 +345,7 @@ for await (const line of lines) {
     reply({
       id: request.id,
       ok: false,
-      error: request.op === "start" ? startupFailure(error, startStage) : failure(error),
+      error: request.op === "start" ? await startFailure(error) : failure(error),
     });
   }
 }
