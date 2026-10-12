@@ -150,6 +150,8 @@ const (
 	PatchRunTool_PATCH_RUN_TOOL_PACMAN             PatchRunTool = 9
 	PatchRunTool_PATCH_RUN_TOOL_ZYPPER             PatchRunTool = 10
 	PatchRunTool_PATCH_RUN_TOOL_SNAPPER            PatchRunTool = 11
+	// update-notifier-common's reboot-required marker writers (APT).
+	PatchRunTool_PATCH_RUN_TOOL_UPDATE_NOTIFIER PatchRunTool = 12
 )
 
 // Enum value maps for PatchRunTool.
@@ -167,6 +169,7 @@ var (
 		9:  "PATCH_RUN_TOOL_PACMAN",
 		10: "PATCH_RUN_TOOL_ZYPPER",
 		11: "PATCH_RUN_TOOL_SNAPPER",
+		12: "PATCH_RUN_TOOL_UPDATE_NOTIFIER",
 	}
 	PatchRunTool_value = map[string]int32{
 		"PATCH_RUN_TOOL_UNSPECIFIED":        0,
@@ -181,6 +184,7 @@ var (
 		"PATCH_RUN_TOOL_PACMAN":             9,
 		"PATCH_RUN_TOOL_ZYPPER":             10,
 		"PATCH_RUN_TOOL_SNAPPER":            11,
+		"PATCH_RUN_TOOL_UPDATE_NOTIFIER":    12,
 	}
 )
 
@@ -1179,8 +1183,8 @@ type PatchStatusObservation struct {
 	Backend                v1.OSUpdateBackend     `protobuf:"varint,5,opt,name=backend,proto3,enum=lindm.resource.v1.OSUpdateBackend" json:"backend,omitempty"`
 	PendingSecurityUpdates uint32                 `protobuf:"varint,6,opt,name=pending_security_updates,json=pendingSecurityUpdates,proto3" json:"pending_security_updates,omitempty"`
 	PendingUpdates         uint32                 `protobuf:"varint,7,opt,name=pending_updates,json=pendingUpdates,proto3" json:"pending_updates,omitempty"`
-	// Native oracle: /run/reboot-required or needrestart kernel status on APT,
-	// `needs-restarting -r` on RPM.
+	// Native oracle: the registry's reboot-required marker or needrestart kernel
+	// status on APT, `needs-restarting -r` on RPM.
 	RebootRequired bool `protobuf:"varint,8,opt,name=reboot_required,json=rebootRequired,proto3" json:"reboot_required,omitempty"`
 	// Newest native repository metadata in the cache used for the counts.
 	MetadataRefreshedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=metadata_refreshed_at,json=metadataRefreshedAt,proto3" json:"metadata_refreshed_at,omitempty"`
@@ -1557,7 +1561,7 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\x17PATCH_RUN_RESULT_FAILED\x10\x02\x12+\n" +
 	"'PATCH_RUN_RESULT_SKIPPED_OUTSIDE_WINDOW\x10\x03\x12\x1d\n" +
 	"\x19PATCH_RUN_RESULT_DEFERRED\x10\x04\x12\x1d\n" +
-	"\x19PATCH_RUN_RESULT_REJECTED\x10\x05*\xf1\x02\n" +
+	"\x19PATCH_RUN_RESULT_REJECTED\x10\x05*\x95\x03\n" +
 	"\fPatchRunTool\x12\x1e\n" +
 	"\x1aPATCH_RUN_TOOL_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16PATCH_RUN_TOOL_APT_GET\x10\x01\x12%\n" +
@@ -1571,7 +1575,8 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\x15PATCH_RUN_TOOL_PACMAN\x10\t\x12\x19\n" +
 	"\x15PATCH_RUN_TOOL_ZYPPER\x10\n" +
 	"\x12\x1a\n" +
-	"\x16PATCH_RUN_TOOL_SNAPPER\x10\v*\x91\x02\n" +
+	"\x16PATCH_RUN_TOOL_SNAPPER\x10\v\x12\"\n" +
+	"\x1ePATCH_RUN_TOOL_UPDATE_NOTIFIER\x10\f*\x91\x02\n" +
 	"\rPatchRunPhase\x12\x1f\n" +
 	"\x1bPATCH_RUN_PHASE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aPATCH_RUN_PHASE_VALIDATION\x10\x01\x12\x1b\n" +

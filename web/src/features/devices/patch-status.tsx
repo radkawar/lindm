@@ -55,6 +55,7 @@ const toolLabels: Record<PatchRunTool, string> = {
   [PatchRunTool.PACMAN]: "pacman",
   [PatchRunTool.ZYPPER]: "zypper",
   [PatchRunTool.SNAPPER]: "snapper",
+  [PatchRunTool.UPDATE_NOTIFIER]: "update-notifier",
 };
 
 const phaseLabels: Record<PatchRunPhase, string> = {

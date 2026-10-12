@@ -460,7 +460,7 @@ message DeploymentIdentity {
 }
 enum OSUpdateBackend {
   OS_UPDATE_BACKEND_UNSPECIFIED = 0;
-  // unattended-upgrade(8) with needrestart(1) service restarts.
+  // unattended-upgrade(8), with needrestart(1) service restarts when installed.
   OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES = 1;
   // dnf5-plugin-automatic `dnf5 automatic`.
   OS_UPDATE_BACKEND_DNF5_AUTOMATIC = 2;
@@ -534,7 +534,8 @@ message OSUpdateObservation {
       string: {pattern: "^[a-zA-Z0-9@_.-]{1,128}[.](timer|service)$"}
     }
   }];
-  // needrestart (APT) or dnf needs-restarting (RPM) is installed.
+  // A native reboot oracle is installed: needrestart or the registry's
+  // reboot-required marker writers (APT), dnf needs-restarting (RPM).
   bool reboot_oracle_available = 16;
   option (buf.validate.message).cel = {
     id: "os_update_observation.files"

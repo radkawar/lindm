@@ -39,11 +39,10 @@ const (
 	maxMetadataFiles = 4096
 	// Per-run native configuration (never under /etc). Created 0700 root by
 	// the runner while it holds the run lock.
-	runtimeDir     = "/run/lindm-os-update"
-	aptConfigPath  = runtimeDir + "/apt.conf"
-	aptMainPath    = runtimeDir + "/apt-main.conf"
-	dnfAutoPath    = runtimeDir + "/automatic.conf"
-	rebootRequired = "/run/reboot-required"
+	runtimeDir    = "/run/lindm-os-update"
+	aptConfigPath = runtimeDir + "/apt.conf"
+	aptMainPath   = runtimeDir + "/apt-main.conf"
+	dnfAutoPath   = runtimeDir + "/automatic.conf"
 )
 
 // Status reasons published on unavailable observations.
@@ -156,7 +155,7 @@ func detectBackend(osRelease []byte) (backend, error) {
 	}
 	switch release.Native().Packages.Backend {
 	case platform.BackendAPT:
-		return aptBackend{}, nil
+		return aptBackend{needrestart: needrestartPath, signal: release.Native().RebootSignal}, nil
 	case platform.BackendDNF5:
 		return dnfBackend{dnf5: true}, nil
 	case platform.BackendDNF4:
@@ -220,33 +219,71 @@ func prepareRuntimeDir() error {
 	return checkPrivateDir(runtimeDir)
 }
 
-// aptBackend drives unattended-upgrade(8) and needrestart(1) on Ubuntu.
-type aptBackend struct{}
+// aptBackend drives unattended-upgrade(8) on Ubuntu. needrestart(1), when
+// installed, restarts services after a run and reports a pending kernel; the
+// registry's reboot signal (Ubuntu's update-notifier marker) is the reboot
+// oracle without it. Either suffices: a stock Ubuntu desktop ships only the
+// marker writers.
+type aptBackend struct {
+	needrestart string
+	signal      *platform.RebootSignal
+}
 
 const (
-	aptGet       = "/usr/bin/apt-get"
-	unattended   = "/usr/bin/unattended-upgrade"
-	needrestart  = "/usr/sbin/needrestart"
-	dpkgQuery    = "/usr/bin/dpkg-query"
-	aptListsGlob = "/var/lib/apt/lists/*Release"
+	aptGet          = "/usr/bin/apt-get"
+	unattended      = "/usr/bin/unattended-upgrade"
+	needrestartPath = "/usr/sbin/needrestart"
+	dpkgQuery       = "/usr/bin/dpkg-query"
+	aptListsGlob    = "/var/lib/apt/lists/*Release"
 )
 
 func (aptBackend) kind() resourcev1.OSUpdateBackend {
 	return resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES
 }
 
-func (aptBackend) missingTool(run bool) (agentv1.PatchRunTool, string) {
-	switch {
-	case !executable(aptGet):
+func (b aptBackend) missingTool(run bool) (agentv1.PatchRunTool, string) {
+	if !executable(aptGet) {
 		return agentv1.PatchRunTool_PATCH_RUN_TOOL_APT_GET, "apt"
-	case !executable(needrestart):
-		return agentv1.PatchRunTool_PATCH_RUN_TOOL_NEEDRESTART, "needrestart"
+	}
+	if tool, pkg := b.missingOracle(); pkg != "" {
+		return tool, pkg
+	}
+	switch {
 	case run && !executable(unattended):
 		return agentv1.PatchRunTool_PATCH_RUN_TOOL_UNATTENDED_UPGRADE, "unattended-upgrades"
 	case run && !executable(dpkgQuery):
 		return agentv1.PatchRunTool_PATCH_RUN_TOOL_APT_GET, "dpkg"
 	}
 	return agentv1.PatchRunTool_PATCH_RUN_TOOL_UNSPECIFIED, ""
+}
+
+// missingOracle names the package to install when no reboot oracle is: the
+// registry's reboot-signal package, or needrestart on a release without one.
+func (b aptBackend) missingOracle() (agentv1.PatchRunTool, string) {
+	switch {
+	case b.hasNeedrestart() || b.signalWritten():
+		return agentv1.PatchRunTool_PATCH_RUN_TOOL_UNSPECIFIED, ""
+	case b.signal != nil:
+		return agentv1.PatchRunTool_PATCH_RUN_TOOL_UPDATE_NOTIFIER, b.signal.Package
+	default:
+		return agentv1.PatchRunTool_PATCH_RUN_TOOL_NEEDRESTART, "needrestart"
+	}
+}
+
+func (b aptBackend) hasNeedrestart() bool { return executable(b.needrestart) }
+
+// signalWritten reports that every registry writer of the reboot-required
+// marker is installed; a partial set could miss a kernel installation.
+func (b aptBackend) signalWritten() bool {
+	if b.signal == nil || len(b.signal.Writers) == 0 {
+		return false
+	}
+	for _, writer := range b.signal.Writers {
+		if !executable(writer) {
+			return false
+		}
+	}
+	return true
 }
 
 func (aptBackend) metadataPatterns() []string { return []string{aptListsGlob} }
@@ -281,12 +318,14 @@ func (aptBackend) installed(ctx context.Context) (map[packageKey]string, error) 
 	return nil, failure("native_snapshot_failed", agentv1.PatchRunTool_PATCH_RUN_TOOL_APT_GET, agentv1.PatchRunPhase_PATCH_RUN_PHASE_INSTALL, result)
 }
 
-// install runs unattended-upgrade with the per-run APT configuration, then
-// lets needrestart restart affected services. NEEDRESTART_MODE=a also covers
-// needrestart's dpkg Post-Invoke hook during the run. The explicit pass uses
-// -l (libraries and services only): the kernel verdict is the reboot
-// oracle's job and must not prompt.
-func (aptBackend) install(ctx context.Context, run installRequest) error {
+// install runs unattended-upgrade with the per-run APT configuration, then,
+// when installed, lets needrestart restart affected services.
+// NEEDRESTART_MODE=a also covers needrestart's dpkg Post-Invoke hook during
+// the run. The explicit pass uses -l (libraries and services only): the
+// kernel verdict is the reboot oracle's job and must not prompt. Without
+// needrestart the run restarts exactly what Ubuntu's own unattended-upgrades
+// does: the units the upgraded packages' maintainer scripts restart.
+func (b aptBackend) install(ctx context.Context, run installRequest) error {
 	if err := prepareRuntimeDir(); err != nil {
 		return &nativeFailure{reason: "native_install_failed", diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_INSTALL, "per-run configuration directory unavailable")}
 	}
@@ -303,22 +342,35 @@ func (aptBackend) install(ctx context.Context, run installRequest) error {
 	if err != nil {
 		return failure("native_install_failed", agentv1.PatchRunTool_PATCH_RUN_TOOL_UNATTENDED_UPGRADE, agentv1.PatchRunPhase_PATCH_RUN_PHASE_INSTALL, result)
 	}
-	result, err = runCommand(ctx, step{timeout: restartTimeout, mutating: true, env: []string{"DEBIAN_FRONTEND=noninteractive", "NEEDRESTART_MODE=a"}}, needrestart, "-r", "a", "-l")
+	if !b.hasNeedrestart() {
+		return nil
+	}
+	result, err = runCommand(ctx, step{timeout: restartTimeout, mutating: true, env: []string{"DEBIAN_FRONTEND=noninteractive", "NEEDRESTART_MODE=a"}}, b.needrestart, "-r", "a", "-l")
 	if err != nil {
 		return failure("native_restart_failed", agentv1.PatchRunTool_PATCH_RUN_TOOL_NEEDRESTART, agentv1.PatchRunPhase_PATCH_RUN_PHASE_RESTART_SERVICES, result)
 	}
 	return nil
 }
 
-// rebootRequired: /run/reboot-required (update-notifier hooks) or a pending
-// kernel upgrade from `needrestart -b -k` (KSTA 2 or 3).
-func (aptBackend) rebootRequired(ctx context.Context) (bool, error) {
-	if _, err := os.Lstat(rebootRequired); err == nil {
-		return true, nil
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return false, &nativeFailure{reason: reasonOracleFailed, diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, "reboot-required marker unreadable")}
+// rebootRequired: the registry's reboot-required marker, else a pending
+// kernel upgrade from `needrestart -b -k` (KSTA 2 or 3) when needrestart is
+// installed. An absent marker means no reboot only while its writers are
+// installed.
+func (b aptBackend) rebootRequired(ctx context.Context) (bool, error) {
+	if b.signal != nil {
+		if _, err := os.Lstat(b.signal.Marker); err == nil {
+			return true, nil
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return false, &nativeFailure{reason: reasonOracleFailed, diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, "reboot-required marker unreadable")}
+		}
 	}
-	result, err := runCommand(ctx, step{timeout: oracleTimeout, stdoutLimit: oracleOutputMax}, needrestart, "-b", "-k")
+	if !b.hasNeedrestart() {
+		if b.signalWritten() {
+			return false, nil
+		}
+		return false, &nativeFailure{reason: reasonOracleFailed, diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, "no native reboot oracle is installed")}
+	}
+	result, err := runCommand(ctx, step{timeout: oracleTimeout, stdoutLimit: oracleOutputMax}, b.needrestart, "-b", "-k")
 	if err == nil {
 		var status int
 		if status, err = parseNeedrestartKernel(result.stdout); err == nil {

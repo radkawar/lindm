@@ -262,7 +262,7 @@ type OSUpdateBackend int32
 
 const (
 	OSUpdateBackend_OS_UPDATE_BACKEND_UNSPECIFIED OSUpdateBackend = 0
-	// unattended-upgrade(8) with needrestart(1) service restarts.
+	// unattended-upgrade(8), with needrestart(1) service restarts when installed.
 	OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES OSUpdateBackend = 1
 	// dnf5-plugin-automatic `dnf5 automatic`.
 	OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC OSUpdateBackend = 2
@@ -3113,7 +3113,8 @@ type OSUpdateObservation struct {
 	// Native automatic-update schedulers that are enabled or active and would
 	// install outside the window (for example dnf5-automatic.timer).
 	ConflictingUnits []string `protobuf:"bytes,15,rep,name=conflicting_units,json=conflictingUnits,proto3" json:"conflicting_units,omitempty"`
-	// needrestart (APT) or dnf needs-restarting (RPM) is installed.
+	// A native reboot oracle is installed: needrestart or the registry's
+	// reboot-required marker writers (APT), dnf needs-restarting (RPM).
 	RebootOracleAvailable bool `protobuf:"varint,16,opt,name=reboot_oracle_available,json=rebootOracleAvailable,proto3" json:"reboot_oracle_available,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache

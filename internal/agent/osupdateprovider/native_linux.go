@@ -195,13 +195,16 @@ func rpmArchitecture() string {
 	}
 }
 
-// packageVersion queries one fixed native package. Not installed is reported
-// as errNotInstalled; any other failure or ambiguous output is an error.
+// packageVersion queries one fixed native package: an OS-update tool or the
+// registry's reboot-signal package. Not installed is reported as
+// errNotInstalled; any other failure or ambiguous output is an error.
 func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, name string, run commandRunner) (string, error) {
 	switch name {
 	case "unattended-upgrades", "needrestart", "dnf5-plugin-automatic", "dnf5-plugins", "dnf-automatic", "dnf-plugins-core", "pacman", "zypper":
 	default:
-		return "", ErrUnsupported
+		if signal := lindmplatform.Of(platform).Native().RebootSignal; signal == nil || name != signal.Package {
+			return "", ErrUnsupported
+		}
 	}
 	var output []byte
 	var err error
@@ -252,7 +255,9 @@ func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, n
 // whether the native reboot oracle is installed. The runner needs the oracle
 // on every run, so it is a prerequisite like the tool itself: a missing
 // package is a typed precondition naming it, never a policy that converges
-// while every window run fails.
+// while every window run fails. Without the oracle tool, the registry's
+// reboot-signal package (whose marker the runner then reads) is the oracle,
+// and the refusal names it.
 func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run commandRunner) (string, bool, error) {
 	var tool, oracle string
 	update, _, _ := productBackend(platform)
@@ -281,7 +286,12 @@ func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run 
 	if oracle == "" {
 		return tool + " " + version, true, nil
 	}
-	if _, err := packageVersion(ctx, platform, oracle, run); errors.Is(err, errNotInstalled) {
+	_, err = packageVersion(ctx, platform, oracle, run)
+	if signal := lindmplatform.Of(platform).Native().RebootSignal; errors.Is(err, errNotInstalled) && signal != nil {
+		oracle = signal.Package
+		_, err = packageVersion(ctx, platform, oracle, run)
+	}
+	if errors.Is(err, errNotInstalled) {
 		return "", false, missingPackage(platform, oracle, err)
 	} else if err != nil {
 		return "", false, err

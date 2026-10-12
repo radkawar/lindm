@@ -459,6 +459,16 @@ type RollingUpdateTooling struct {
 	SnapshotCPEPrefix string
 }
 
+// RebootSignal is a native reboot-required marker the release's own package
+// hooks maintain: Writers, shipped by Package, create Marker when an
+// installed update needs a reboot. It is the OS-update reboot oracle when
+// the optional oracle tool (needrestart on APT) is not installed.
+type RebootSignal struct {
+	Marker  string
+	Package string
+	Writers []string
+}
+
 // Provisioning is a vendor unattended-installation input whose console
 // snippet installs lindm-agent from the customer's lindmd repository and
 // enrolls the device with a provisioning token.
@@ -497,11 +507,14 @@ type Release struct {
 	UpgradeTo string
 	Tier      Tier
 	// Page is the docs/platforms page describing the release.
-	Page            string
-	Family          Family
-	Architectures   []string
-	Packages        PackageTooling
-	RollingUpdate   *RollingUpdateTooling
+	Page          string
+	Family        Family
+	Architectures []string
+	Packages      PackageTooling
+	RollingUpdate *RollingUpdateTooling
+	// RebootSignal is nil when the release maintains no reboot-required
+	// marker; the OS-update runner then needs its oracle tool.
+	RebootSignal    *RebootSignal
 	Systemd         int
 	FDE             string
 	Desktop         Desktop

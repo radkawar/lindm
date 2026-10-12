@@ -1,7 +1,8 @@
 // Package osupdate is the root runner behind the packaged
 // lindm-os-update{,-now,-status}.service units (`lindm-agent os-update
 // run|run-now|status`). It drives the distribution's own update tooling:
-// unattended-upgrade plus needrestart on Ubuntu, dnf5 on Fedora 44 and
+// unattended-upgrade on Ubuntu (with needrestart when installed, else the
+// registry's update-notifier reboot marker), dnf5 on Fedora 44 and
 // dnf-automatic on RHEL, Rocky Linux and AlmaLinux. Releases the registry gates
 // on OS update are refused. It records a bounded run summary and an offline
 // patch-status observation.

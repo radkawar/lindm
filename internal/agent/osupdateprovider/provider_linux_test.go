@@ -158,6 +158,67 @@ func TestMissingNativeToolNamesDetail(t *testing.T) {
 	}
 }
 
+// dpkgStatus answers `dpkg-query -W -f=${db:Status-Abbrev}\t${Version}\n NAME`
+// for the listed installed packages; any other name gets dpkg-query's exit 1
+// ("no packages found matching"), which runNative maps to errNotInstalled.
+func dpkgStatus(installed map[string]string, queried *[]string) commandRunner {
+	return func(_ context.Context, path string, args ...string) ([]byte, error) {
+		name := args[len(args)-1]
+		*queried = append(*queried, name)
+		if path != "/usr/bin/dpkg-query" {
+			return nil, errors.New("unexpected native command " + path)
+		}
+		if version, ok := installed[name]; ok {
+			return []byte("ii \t" + version + "\n"), nil
+		}
+		return nil, errNotInstalled
+	}
+}
+
+// The stock Ubuntu 24.04 desktop (ubuntu-24.04.5.1-desktop-amd64.manifest)
+// has unattended-upgrades 2.9.1+nmu4ubuntu1 and update-notifier-common
+// 3.192.68.2 but no needrestart: the registry's reboot signal is the oracle.
+func TestStockUbuntuDesktopUsesRebootSignal(t *testing.T) {
+	ubuntu := &resourcev1.PlatformProduct{OsId: "ubuntu", Product: "Ubuntu", Version: "24.04", Architecture: "amd64"}
+	for _, tc := range []struct {
+		name      string
+		installed map[string]string
+		queried   []string
+	}{
+		{"stock desktop", map[string]string{"unattended-upgrades": "2.9.1+nmu4ubuntu1", "update-notifier-common": "3.192.68.2"}, []string{"unattended-upgrades", "needrestart", "update-notifier-common"}},
+		{"needrestart installed", map[string]string{"unattended-upgrades": "2.9.1+nmu4ubuntu1", "needrestart": "3.6-7ubuntu4.5"}, []string{"unattended-upgrades", "needrestart"}},
+	} {
+		var queried []string
+		version, oracle, err := nativeTools(t.Context(), ubuntu, dpkgStatus(tc.installed, &queried))
+		if err != nil || version != "unattended-upgrades 2.9.1+nmu4ubuntu1" || !oracle || !slices.Equal(queried, tc.queried) {
+			t.Fatalf("%s: nativeTools = %q, %v, %v (queried %q)", tc.name, version, oracle, err, queried)
+		}
+	}
+	// Neither oracle: the refusal names the registry's native signal package.
+	var queried []string
+	_, _, err := nativeTools(t.Context(), ubuntu, dpkgStatus(map[string]string{"unattended-upgrades": "2.9.1+nmu4ubuntu1"}, &queried))
+	var prerequisite *PrerequisiteError
+	if !errors.As(err, &prerequisite) || admissiondetail.Of(err) != "native_tool_missing" || prerequisite.Package.GetNativeName() != "update-notifier-common" ||
+		prerequisite.Package.GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB || prerequisite.Package.GetArchitecture() != "all" {
+		t.Fatalf("no oracle = %v", err)
+	}
+	// A release without a reboot signal keeps its oracle tool mandatory, and
+	// never queries Ubuntu's signal package.
+	fedora := &resourcev1.PlatformProduct{OsId: "fedora", Product: "Fedora Linux", Version: "44", Architecture: "x86_64"}
+	rpm := func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		if args[len(args)-1] == "dnf5-plugin-automatic" {
+			return []byte("5.4.6.0-1.fc44\n"), nil
+		}
+		return nil, errNotInstalled
+	}
+	if _, _, err := nativeTools(t.Context(), fedora, rpm); !errors.As(err, &prerequisite) || prerequisite.Package.GetNativeName() != "dnf5-plugins" {
+		t.Fatalf("fedora without dnf5-plugins = %v", err)
+	}
+	if _, err := packageVersion(t.Context(), fedora, "update-notifier-common", rpm); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("fedora queried Ubuntu's signal package: %v", err)
+	}
+}
+
 func TestCreationPlansEveryOwnedFileAndTimerStart(t *testing.T) {
 	p := fixtureProvider(t)
 	desired := fixtureDesired()

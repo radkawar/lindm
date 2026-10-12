@@ -68,6 +68,8 @@ enum PatchRunTool {
   PATCH_RUN_TOOL_PACMAN = 9;
   PATCH_RUN_TOOL_ZYPPER = 10;
   PATCH_RUN_TOOL_SNAPPER = 11;
+  // update-notifier-common's reboot-required marker writers (APT).
+  PATCH_RUN_TOOL_UPDATE_NOTIFIER = 12;
 }
 
 enum PatchRunPhase {
@@ -259,8 +261,8 @@ message PatchStatusObservation {
   lindm.resource.v1.OSUpdateBackend backend = 5 [(buf.validate.field).enum.defined_only = true];
   uint32 pending_security_updates = 6 [(buf.validate.field).uint32.lte = 100000];
   uint32 pending_updates = 7 [(buf.validate.field).uint32.lte = 100000];
-  // Native oracle: /run/reboot-required or needrestart kernel status on APT,
-  // `needs-restarting -r` on RPM.
+  // Native oracle: the registry's reboot-required marker or needrestart kernel
+  // status on APT, `needs-restarting -r` on RPM.
   bool reboot_required = 8;
   // Newest native repository metadata in the cache used for the counts.
   google.protobuf.Timestamp metadata_refreshed_at = 9;

@@ -142,6 +142,15 @@ var (
 	debianLike = []string{"debian"}
 	fedoraVar  = []string{"", "workstation", "server", "cloud", "container"}
 	apt        = PackageTooling{Backend: BackendAPT}
+	// update-notifier-common (jammy 3.192.54.8, noble 3.192.68.2, resolute
+	// 3.207.2; listed in the 24.04.5 desktop and live-server manifests) ships
+	// notify-reboot-required and its /etc/kernel/postinst.d symlink, which
+	// write /var/run/reboot-required (/var/run is /run) and .pkgs when a
+	// kernel, or a package whose maintainer script calls it, is installed.
+	// Read from the noble 3.192.68.2 deb (SHA-256
+	// 50c3303b52aaaaadcf11750e1a0afc905bdee0d6f75aa2f1febdd4416afe7fec).
+	ubuntuRebootSignal = &RebootSignal{Marker: "/run/reboot-required", Package: "update-notifier-common",
+		Writers: []string{"/usr/share/update-notifier/notify-reboot-required", "/etc/kernel/postinst.d/update-notifier"}}
 	// DNF5 up to 5.4.2.1 treats --store as system-modifying and refuses a
 	// read-only /usr (fixed in 5.4.3.0); 5.4.6.0 is the natively qualified
 	// floor (docs/platforms/fedora.md, DNF5 floor).
@@ -398,7 +407,7 @@ var (
 var registry = []*Release{
 	{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249, Provisioning: cloudInitAutoinstall,
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 249, Provisioning: cloudInitAutoinstall,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
@@ -426,7 +435,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
 		// Archive facts observed on every 24.04 pocket (archive, security,
 		// ports and the Pop!_OS mirror) on 2026-10-11: Ubuntu Archive Automatic
@@ -455,7 +464,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 259, Provisioning: cloudInitAutoinstall,
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 259, Provisioning: cloudInitAutoinstall,
 		Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},

@@ -782,18 +782,19 @@ records use the signed `jammy-release-20260926` serial
 The provider configures native automatic updates; it never installs anything
 itself. It needs the `OS_UPDATES` capability (in the deployment's default signed
 grant) or the root-local opt-in `os_update_provider: {"enabled": true}` in
-`executor.json`, and the native `unattended-upgrades`, `needrestart` and
-`update-notifier-common` packages (a missing `unattended-upgrades` or
-`needrestart` is refused before any effect as `native_tool_missing` naming it).
-The stock Ubuntu 24.04 desktop image ships no `needrestart`: the
-`ubuntu-24.04.5.1-desktop-amd64.manifest` lists `unattended-upgrades
-2.9.1+nmu4ubuntu1` and `update-notifier-common 3.192.68.2` but not
-`needrestart`, which only the live-server manifest carries (`3.6-7ubuntu4.5`;
-both fetched from releases.ubuntu.com on 2026-10-12). A stock desktop therefore
-refuses the policy until `needrestart` is installed, by hand or by a profile
-`NATIVE_PACKAGE deb/needrestart` row the policy depends on. The lab's Ubuntu
-golden is installed from the live-server ISO plus the desktop, so it has
-`needrestart` and the policy converges there
+`executor.json`, the native `unattended-upgrades` package, and a reboot oracle:
+`needrestart`, or else the registry's reboot signal, `update-notifier-common`
+([registry](../../internal/platform/registry.go) `RebootSignal` on every Ubuntu
+row). A missing `unattended-upgrades`, or neither oracle, is refused before any
+effect as `native_tool_missing` naming `unattended-upgrades` or
+`update-notifier-common`. The stock Ubuntu 24.04 desktop image ships no
+`needrestart`: the `ubuntu-24.04.5.1-desktop-amd64.manifest` lists
+`unattended-upgrades 2.9.1+nmu4ubuntu1` and `update-notifier-common 3.192.68.2`
+but not `needrestart`, which only the live-server manifest carries
+(`3.6-7ubuntu4.5`; both fetched from releases.ubuntu.com on 2026-10-12), so a
+stock desktop's policy uses the update-notifier marker as its oracle instead of
+being refused. Native verification on an image without `needrestart` is pending:
+the lab's Ubuntu golden (live-server ISO plus the desktop) has `needrestart`
 ([verification](../verification.md#out-of-box-capability-policy-two-desktop-demo-2026-10-12)).
 A signed policy owns exactly four objects:
 `/etc/lindm/os-update/policy.binpb` (0600, the runner's validated policy),
@@ -832,11 +833,25 @@ of its origin archives ends in `-security`. It then applies the deferral and run
 `${distro_id}:${distro_codename}-security` and the ESM apps/infra security
 origins; ALL adds `-updates` and the release pocket. Deferred names go to
 `Package-Blacklist`, and `Automatic-Reboot` is forced to `false`.
-`NEEDRESTART_MODE=a` and `needrestart -r a -l` restart affected services. Reboot
-required means `/run/reboot-required` or a needrestart kernel status
-(`NEEDRESTART-KSTA`) of 2 or 3. Native unattended-upgrades defaults stay in
-force: on battery, on a metered connection or for phased updates a run can
-succeed with nothing installed.
+With `needrestart` installed, `NEEDRESTART_MODE=a` and `needrestart -r a -l`
+restart services still mapping replaced libraries, and reboot required means
+`/run/reboot-required` or a needrestart kernel status (`NEEDRESTART-KSTA`) of 2
+or 3. Without it the run skips that pass and restarts what Ubuntu's own
+unattended-upgrades does on a stock desktop: the units the upgraded packages'
+maintainer scripts restart. Daemons that only map a replaced library keep the old
+code until restarted or rebooted. Patch status counts packages either way and
+never claims process freshness. Reboot required then means
+`/run/reboot-required`, which `update-notifier-common`'s `notify-reboot-required`
+writes from its `/etc/kernel/postinst.d/update-notifier` hook and from maintainer
+scripts that call it (read from the noble 3.192.68.2 deb). An absent marker counts
+as "no reboot" only while both writers are installed and executable; otherwise
+the run and status report `reboot_oracle_failed`. With Canonical Livepatch
+reporting no kernel upgrade required, the hook writes no marker for a kernel,
+where needrestart's kernel status would still report one. `needrestart` is not a
+safety prerequisite: it performs service restarts rather than preventing them,
+and no custody, signature or ownership check depends on it. Native
+unattended-upgrades defaults stay in force: on battery, on a metered connection
+or for phased updates a run can succeed with nothing installed.
 
 Deferral is per package name and architecture. It counts calendar days in the
 window's zone from the window start at which the update was first seen pending.

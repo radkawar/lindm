@@ -6134,7 +6134,11 @@ The stock Fedora 44 image has `dnf5 5.4.1.0`, `dnf5-plugins 5.4.1.0` and no
 can update DNF5 there (see [Fedora](platforms/fedora.md#capability-policy-facts-signed-provider-grants)).
 The Ubuntu golden (live-server ISO plus desktop) has `needrestart 3.6-7ubuntu4.5`,
 `unattended-upgrades 2.9.1+nmu4ubuntu1` and `update-notifier-common
-3.192.68.2`; the stock desktop ISO lacks `needrestart`.
+3.192.68.2`; the stock desktop ISO lacks `needrestart`. After this run the OS
+update policy stopped requiring it: without `needrestart` the registry's
+`update-notifier-common` reboot marker is the oracle (unit-tested; a native run on
+an image without `needrestart` is pending, see
+[Ubuntu](platforms/ubuntu.md#os-update-policy-osupdatev1)).
 
 The runs found and fixed these defects (each with a regression test):
 

@@ -29,7 +29,8 @@ func missingPackage(platform *resourcev1.PlatformProduct, name string, cause err
 	arch := "noarch"
 	switch {
 	case aptProduct(platform):
-		// unattended-upgrades and needrestart are Architecture: all.
+		// unattended-upgrades, needrestart and Ubuntu's reboot-signal package
+		// update-notifier-common are Architecture: all.
 		ecosystem, arch = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB, "all"
 	case name == "pacman":
 		ecosystem, arch = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_ALPM, rpmArchitecture()

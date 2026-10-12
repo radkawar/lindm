@@ -2717,9 +2717,10 @@ func (x *RollingUpdateSnapshot) GetMetadataSha256() []byte {
 }
 
 // Native automatic updates driven by a lindm-owned systemd timer: APT
-// unattended-upgrades plus needrestart, DNF5 `dnf5 automatic` or DNF4
-// `dnf-automatic`. The system's own configured and signed repositories are the
-// update source; lindm adds no repository and disables no signature check.
+// unattended-upgrades (plus needrestart when installed), DNF5 `dnf5 automatic`
+// or DNF4 `dnf-automatic`. The system's own configured and signed repositories
+// are the update source; lindm adds no repository and disables no signature
+// check.
 type OSUpdateDesired struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Selection    UpdateSelection        `protobuf:"varint,1,opt,name=selection,proto3,enum=lindm.resource.v1.UpdateSelection" json:"selection,omitempty"`

@@ -1461,7 +1461,8 @@ export type OSUpdateObservation = Message<"lindm.resource.v1.OSUpdateObservation
   conflictingUnits: string[];
 
   /**
-   * needrestart (APT) or dnf needs-restarting (RPM) is installed.
+   * A native reboot oracle is installed: needrestart or the registry's
+   * reboot-required marker writers (APT), dnf needs-restarting (RPM).
    *
    * @generated from field: bool reboot_oracle_available = 16;
    */
@@ -2396,7 +2397,7 @@ export enum OSUpdateBackend {
   OS_UPDATE_BACKEND_UNSPECIFIED = 0,
 
   /**
-   * unattended-upgrade(8) with needrestart(1) service restarts.
+   * unattended-upgrade(8), with needrestart(1) service restarts when installed.
    *
    * @generated from enum value: OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES = 1;
    */
