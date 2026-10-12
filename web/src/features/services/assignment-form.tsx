@@ -28,7 +28,12 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
-import { setAssignmentAttempt, useAssignmentAttempt, type AssignmentAttempt } from "./attempt";
+import {
+  setAssignmentApproval,
+  setAssignmentAttempt,
+  useAssignmentAttempt,
+  type AssignmentAttempt,
+} from "./attempt";
 import { resourceProfileHeadsQueryOptions, resourceStateQueryOptions } from "./queries";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
@@ -69,12 +74,7 @@ export function ResourceAssignmentForm({
   const [errors, setErrors] = useState<string[]>([]);
   const [rpcFailure, setRpcFailure] = useState<RpcFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [approvalRequired, setApprovalRequired] = useState(
-    attempt?.failure?.message === "approval_required",
-  );
-  const [approvalBusy, setApprovalBusy] = useState(false);
-  const [approvalId, setApprovalId] = useState("");
-  const [approvalAmbiguous, setApprovalAmbiguous] = useState(false);
+  const approval = attempt?.approval ?? null;
   const locked = attempt !== null || refreshing;
   const headFailure = heads.error ? toRpcFailure(heads.error) : null;
 
@@ -112,10 +112,9 @@ export function ResourceAssignmentForm({
     onError: (error, captured) => {
       const normalized = toRpcFailure(error);
       const rpcError = ConnectError.from(error);
-      setApprovalRequired(
+      const approvalRequired =
         rpcError.metadata.get("lindm-reason") === "approval_required" ||
-          rpcError.rawMessage === "approval_required",
-      );
+        rpcError.rawMessage === "approval_required";
       const conflict =
         rpcError.metadata.get("lindm-reason") === "resource_assignment_conflict" ||
         rpcError.rawMessage === "resource_assignment_conflict";
@@ -124,6 +123,7 @@ export function ResourceAssignmentForm({
         ...captured,
         status: failure.ambiguous ? "ambiguous" : "rejected",
         failure,
+        approval: approvalRequired ? { status: "needed", approvalId: "", failure: null } : null,
       });
       if (!lifetime.signal.aborted) {
         toast[
@@ -145,7 +145,12 @@ export function ResourceAssignmentForm({
   function send(captured: AssignmentAttempt) {
     if (inFlight.current || attempt?.status === "inflight") return;
     if (
-      !setAssignmentAttempt(lifetime, deviceId, { ...captured, status: "inflight", failure: null })
+      !setAssignmentAttempt(lifetime, deviceId, {
+        ...captured,
+        status: "inflight",
+        failure: null,
+        approval: null,
+      })
     )
       return;
     inFlight.current = true;
@@ -185,12 +190,21 @@ export function ResourceAssignmentForm({
         : `${head!.name}, version ${head!.revisionNumber.toString()}`,
       status: "inflight",
       failure: null,
+      approval: null,
     });
   }
 
   async function requestApproval() {
-    if (!attempt || approvalBusy || lifetime.signal.aborted) return;
-    setApprovalBusy(true);
+    if (!attempt || !approval || lifetime.signal.aborted) return;
+    if (approval.status === "inflight" || approval.status === "requested") return;
+    if (
+      !setAssignmentApproval(lifetime, deviceId, {
+        status: "inflight",
+        approvalId: "",
+        failure: null,
+      })
+    )
+      return;
     setErrors([]);
     setRpcFailure(null);
     try {
@@ -202,15 +216,21 @@ export function ResourceAssignmentForm({
         { signal: lifetime.signal, timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();
-      setApprovalId(result.approval?.id ?? "");
-      setApprovalAmbiguous(false);
+      setAssignmentApproval(lifetime, deviceId, {
+        status: "requested",
+        approvalId: result.approval?.id ?? "",
+        failure: null,
+      });
       toast.success("Approval requested");
       await queryClient.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     } catch (error) {
       if (!lifetime.signal.aborted) {
         const failure = toRpcFailure(error);
-        setApprovalAmbiguous(failure.ambiguous);
-        setRpcFailure(failure);
+        setAssignmentApproval(lifetime, deviceId, {
+          status: failure.ambiguous ? "ambiguous" : "failed",
+          approvalId: "",
+          failure,
+        });
         toast[
           classifyRpcFailure(failure).tone === "destructive"
             ? "error"
@@ -221,8 +241,6 @@ export function ResourceAssignmentForm({
           description: "Open Assign profile to see what happened.",
         });
       }
-    } finally {
-      if (!lifetime.signal.aborted) setApprovalBusy(false);
     }
   }
 
@@ -231,7 +249,8 @@ export function ResourceAssignmentForm({
       inFlight.current ||
       refreshing ||
       attempt?.status === "ambiguous" ||
-      attempt?.status === "inflight"
+      attempt?.status === "inflight" ||
+      approval?.status === "inflight"
     )
       return;
     setRefreshing(true);
@@ -242,9 +261,6 @@ export function ResourceAssignmentForm({
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
       setAssignmentAttempt(lifetime, deviceId, null);
       setRequestId(newRequestId());
-      setApprovalRequired(false);
-      setApprovalId("");
-      setApprovalAmbiguous(false);
       setReason("");
       setRevisionId("");
       setIntervalSeconds(defaultIntervalSeconds);
@@ -398,10 +414,10 @@ export function ResourceAssignmentForm({
           Services.
         </p>
       ) : null}
-      {approvalRequired ? (
+      {approval ? (
         <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
           <p>This change needs approval from another administrator.</p>
-          {approvalId ? (
+          {approval.status === "requested" ? (
             <p>
               Approval requested.{" "}
               <Link to="/approvals" className="underline">
@@ -409,14 +425,19 @@ export function ResourceAssignmentForm({
               </Link>
             </p>
           ) : (
-            <Button type="button" disabled={approvalBusy} onClick={() => void requestApproval()}>
-              {approvalBusy
+            <Button
+              type="button"
+              disabled={approval.status === "inflight"}
+              onClick={() => void requestApproval()}
+            >
+              {approval.status === "inflight"
                 ? "Requesting approval…"
-                : approvalAmbiguous
+                : approval.status === "ambiguous"
                   ? "Retry approval request"
                   : "Request approval"}
             </Button>
           )}
+          {approval.failure ? <RpcError failure={approval.failure} /> : null}
         </div>
       ) : null}
       <TechnicalDetails
@@ -427,7 +448,7 @@ export function ResourceAssignmentForm({
             value:
               (attempt ? attempt.payload.expectedAssignmentId : expectedAssignmentId) ?? "None",
           },
-          { label: "Approval ID", value: approvalId },
+          { label: "Approval ID", value: approval?.approvalId ?? "" },
         ]}
       />
       <div className="flex flex-wrap gap-2">
@@ -460,7 +481,12 @@ export function ResourceAssignmentForm({
           <Button
             type="button"
             variant="outline"
-            disabled={refreshing || approvalBusy || approvalAmbiguous || approvalId !== ""}
+            disabled={
+              refreshing ||
+              approval?.status === "inflight" ||
+              approval?.status === "ambiguous" ||
+              approval?.status === "requested"
+            }
             onClick={() => void prepareAnother()}
           >
             {refreshing ? "Refreshing…" : "Start a new assignment"}
@@ -484,7 +510,7 @@ export function ResourceAssignmentDialog({
   const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Assign profile</DialogTitle>
           <DialogDescription>

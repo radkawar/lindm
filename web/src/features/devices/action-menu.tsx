@@ -49,7 +49,6 @@ export function DeviceActionMenu({
   const trigger = useRef<HTMLButtonElement>(null);
   const [kind, setKind] = useState<DeviceActionKind | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
-  const [revokeVisited, setRevokeVisited] = useState(false);
   const simple = simpleKinds.filter((value) => permissions.includes(actionPermissions[value]));
   const complex = complexActionKinds.filter((value) =>
     permissions.includes(actionPermissions[value]),
@@ -89,10 +88,7 @@ export function DeviceActionMenu({
               <DropdownMenuItem
                 variant="destructive"
                 aria-haspopup="dialog"
-                onClick={() => {
-                  setRevokeVisited(true);
-                  setRevokeOpen(true);
-                }}
+                onClick={() => setRevokeOpen(true)}
               >
                 Revoke device
               </DropdownMenuItem>
@@ -108,23 +104,20 @@ export function DeviceActionMenu({
         onClose={() => setKind(null)}
       />
       <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
-        {revokeVisited ? (
-          <DialogContent
-            data-review-destructive="revoke-device"
-            keepMounted
-            finalFocus={trigger}
-            className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
-          >
-            <DialogHeader>
-              <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
-              <DialogDescription>
-                Review the access change before requesting approval.
-              </DialogDescription>
-            </DialogHeader>
-            <DeviceRevocationImpact device={device} />
-            {revoke}
-          </DialogContent>
-        ) : null}
+        <DialogContent
+          data-review-destructive="revoke-device"
+          finalFocus={trigger}
+          className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
+        >
+          <DialogHeader>
+            <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
+            <DialogDescription>
+              Review the access change before requesting approval.
+            </DialogDescription>
+          </DialogHeader>
+          <DeviceRevocationImpact device={device} />
+          {revoke}
+        </DialogContent>
       </Dialog>
     </>
   );

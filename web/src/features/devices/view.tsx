@@ -666,16 +666,9 @@ export function DeviceRevocationImpact({ device }: { device: Device }) {
 
 function DeviceRevokeDialog({ device, children }: { device: Device; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [visited, setVisited] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setVisited(true);
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -693,32 +686,26 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
           <DropdownMenuItem
             variant="destructive"
             aria-haspopup="dialog"
-            onClick={() => {
-              setVisited(true);
-              setOpen(true);
-            }}
+            onClick={() => setOpen(true)}
           >
             Revoke device…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {visited ? (
-        <DialogContent
-          data-review-destructive="revoke-device"
-          keepMounted
-          finalFocus={triggerRef}
-          className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
-        >
-          <DialogHeader>
-            <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
-            <DialogDescription>
-              Review the access change before requesting approval.
-            </DialogDescription>
-          </DialogHeader>
-          <DeviceRevocationImpact device={device} />
-          {children}
-        </DialogContent>
-      ) : null}
+      <DialogContent
+        data-review-destructive="revoke-device"
+        finalFocus={triggerRef}
+        className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
+      >
+        <DialogHeader>
+          <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
+          <DialogDescription>
+            Review the access change before requesting approval.
+          </DialogDescription>
+        </DialogHeader>
+        <DeviceRevocationImpact device={device} />
+        {children}
+      </DialogContent>
     </Dialog>
   );
 }

@@ -234,7 +234,9 @@ function NavigationGroup({
             onClick={() => setExpanded(!expanded)}
           />
         }
-        className="mb-1 flex w-full justify-between text-[11px] font-semibold tracking-wider uppercase"
+        // Icon mode hides the label over the previous group's last icon (-mt-8, opacity-0);
+        // clicks pass through to that icon instead of collapsing this group unseen.
+        className="mb-1 flex w-full justify-between text-[11px] font-semibold tracking-wider uppercase group-data-[collapsible=icon]:pointer-events-none"
       >
         {group}
         <ChevronDownIcon

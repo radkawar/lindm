@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import {
   RevokeDeviceRequestSchema,
@@ -12,19 +12,58 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
+import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";
 import { canPermission } from "@/lib/permissions";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
+
+// A device's revocation approval request. It lives outside the revoke dialog,
+// which unmounts its form on close, so an in-flight request, its exact payload
+// (retried with the same request ID when the outcome is ambiguous) and the
+// created approval survive closing and reopening the dialog.
+type RevokeRequest = {
+  payload: RevokeDeviceRequest | null;
+  busy: boolean;
+  approvalId: string;
+  failure: RpcFailure | null;
+};
+
+const idle: RevokeRequest = { payload: null, busy: false, approvalId: "", failure: null };
+const requests = new Map<string, RevokeRequest>();
+const listeners = new Set<() => void>();
+
+function emit() {
+  for (const listener of listeners) listener();
+}
+
+subscribeAuthLifetime(() => {
+  requests.clear();
+  emit();
+});
+
+function setRevokeRequest(lifetime: AuthLifetime, deviceId: string, request: RevokeRequest) {
+  if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return false;
+  requests.set(deviceId, request);
+  emit();
+  return true;
+}
+
+function useRevokeRequest(deviceId: string): RevokeRequest {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => requests.get(deviceId) ?? idle,
+  );
+}
 
 export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
   const principal = usePrincipal();
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const [reason, setReason] = useState("");
-  const [payload, setPayload] = useState<RevokeDeviceRequest | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [approvalId, setApprovalId] = useState("");
-  const [failure, setFailure] = useState<RpcFailure | null>(null);
+  const { payload, busy, approvalId, failure } = useRevokeRequest(deviceId);
   if (!canPermission(principal, "device.revoke")) return null;
 
   async function requestApproval() {
@@ -32,22 +71,30 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
     const exact =
       payload ??
       create(RevokeDeviceRequestSchema, { requestId: crypto.randomUUID(), deviceId, reason });
-    setPayload(exact);
-    setBusy(true);
-    setFailure(null);
+    if (!setRevokeRequest(lifetime, deviceId, { ...idle, payload: exact, busy: true })) return;
     try {
       const result = await adminClient.createApproval(
         { lifetimeSeconds: 3600, payload: { case: "revokeDevice", value: exact } },
         { signal: lifetime.signal, timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();
-      setApprovalId(result.approval?.id ?? "");
+      setRevokeRequest(lifetime, deviceId, {
+        payload: exact,
+        busy: false,
+        approvalId: result.approval?.id ?? "",
+        failure: null,
+      });
       toast.success("Approval requested");
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
     } catch (error) {
       if (!lifetime.signal.aborted) {
         const next = toRpcFailure(error);
-        setFailure(next);
+        setRevokeRequest(lifetime, deviceId, {
+          payload: next.ambiguous ? exact : null,
+          busy: false,
+          approvalId: "",
+          failure: next,
+        });
         const { tone, title } = classifyRpcFailure(next);
         toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
           title,
@@ -55,10 +102,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
             description: "Refresh before trying again.",
           },
         );
-        if (!next.ambiguous) setPayload(null);
       }
-    } finally {
-      if (!lifetime.signal.aborted) setBusy(false);
     }
   }
 
@@ -77,7 +121,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
           aria-label="Revocation reason"
           data-freeform="audit reason for revocation"
           required
-          value={reason}
+          value={payload?.reason ?? reason}
           disabled={busy || payload !== null || approvalId !== ""}
           onChange={(event) => setReason(event.target.value)}
         />
@@ -95,7 +139,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
           className="w-fit"
           type="submit"
           variant="default"
-          disabled={busy || reason.trim() === ""}
+          disabled={busy || (payload?.reason ?? reason).trim() === ""}
         >
           {busy
             ? "Requesting approval…"

@@ -1004,6 +1004,14 @@ each starting from scroll position zero:
   one "Filters · N active" toggle below the md breakpoint) and open decision forms
   on demand rather than expanding them by default.
 
+Modal dialogs and sheets lock the page through their backdrop
+(`components/ui/page-scroll-lock.tsx`): while one is open the page's scroll offset
+moves onto the app root and the document is exactly one viewport tall, so a
+full-page capture of a scrolled page shows the backdrop over everything, as the user
+sees it (Base UI's own lock left the document scrolled and captures drew the backdrop,
+sidebar and header at the scroll offset). The owner-edit check
+`pass2-bug7-dialog-scrolled.mjs` exercises this with overlay and classic scrollbars.
+
 Once per theme and viewport it also checks the Control-K and Command-K palette
 (open, search, Escape, focus restore) and saves device details to raise a real
 toast that must be styled and on screen. Controls that open dialogs must declare
