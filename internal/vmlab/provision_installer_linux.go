@@ -178,7 +178,20 @@ func ProvisionInstallerVM(ctx context.Context, manifest *labv1.ImageManifest, fo
 	}
 	vm := &EncryptedVM{dir: staging, config: config, firmware: firmware, initialSecret: secret, cacheDir: options.CacheDir, hardware: hardware}
 	defer func() { err = errors.Join(err, vm.Kill()) }()
-	if err := runProvisionInstaller(ctx, vm, installerPath); err != nil {
+	console := io.Discard
+	if options.DiagnosticsDir != "" {
+		// Private failure diagnostics only: the installer console can echo the
+		// snippet and its token, so the log is a new owner-only file in the
+		// caller's private directory, never evidence.
+		logFile, openErr := os.OpenFile(filepath.Join(options.DiagnosticsDir, "installer-console.log"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if openErr != nil {
+			return nil, fmt.Errorf("create private installer console log: %w", openErr)
+		}
+		defer func() { err = errors.Join(err, logFile.Close()) }()
+		console = &cappedWriter{w: logFile, remaining: maxInstallerLogBytes}
+		vm.bootConsole = console
+	}
+	if err := runProvisionInstaller(ctx, vm, installerPath, console); err != nil {
 		return nil, err
 	}
 	// The remastered media holds the token; it is no longer needed.
@@ -202,8 +215,9 @@ func ProvisionInstallerVM(ctx context.Context, manifest *labv1.ImageManifest, fo
 	return result, nil
 }
 
-// runProvisionInstaller runs the vendor installer to its own power-off.
-func runProvisionInstaller(ctx context.Context, vm *EncryptedVM, installerPath string) (err error) {
+// runProvisionInstaller runs the vendor installer to its own power-off,
+// draining its serial console into console.
+func runProvisionInstaller(ctx context.Context, vm *EncryptedVM, installerPath string, console io.Writer) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
 	defer cancel()
 	if err := vm.start(ctx, installerPath); err != nil {
@@ -213,9 +227,8 @@ func runProvisionInstaller(ctx context.Context, vm *EncryptedVM, installerPath s
 	if err != nil {
 		return err
 	}
-	// The console can echo installer input, including the snippet's token.
 	drained := make(chan struct{})
-	go func() { _, _ = io.Copy(io.Discard, serial); close(drained) }()
+	go func() { _, _ = io.Copy(console, serial); close(drained) }()
 	select {
 	case <-ctx.Done():
 		err = fmt.Errorf("provisioning installer deadline: %w", ctx.Err())

@@ -30,7 +30,11 @@ type VMProvisionOptions struct {
 	// the QEMU host with a lab-owned /etc/hosts line written before the snippet.
 	PublicHost string
 	// Hardware selects acceleration and, for installer lanes, UEFI firmware.
-	Hardware         *VMHardwareOptions
+	Hardware *VMHardwareOptions
+	// DiagnosticsDir, when set, names an existing private directory receiving
+	// a bounded installer and first-boot serial log. It may contain the
+	// snippet's token and must never be published as evidence.
+	DiagnosticsDir   string
 	Capture          func(format string) (snippetPath string, err error)
 	Approve          func(ctx context.Context, installationID string) (deviceID string, err error)
 	VerifyEnrollment func(context.Context, *VMProvisionResult) error

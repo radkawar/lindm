@@ -124,10 +124,52 @@ export class ChromiumDriver {
     });
     this.page = await this.context.newPage();
     this.page.setDefaultTimeout(config.actionTimeoutMs ?? 30_000);
+    this.trackNetwork(config.origin);
     this.metadata = {
       transport: "playwright-cdp",
       browserVersion: this.browser.version(),
       playwright: "1.64.0",
+    };
+  }
+  // Page-load diagnostics for a failed step: same-origin request paths only
+  // (never queries, headers or bodies), so a request still awaiting its
+  // response (a stalled asset or RPC) or a failed one is named.
+  trackNetwork(origin) {
+    const pending = new Map();
+    const failed = [];
+    const errors = [];
+    const path = (request) => {
+      const url = new URL(request.url());
+      return url.origin === origin ? url.pathname.slice(0, 200) : "";
+    };
+    this.context.on("request", (request) => {
+      const name = path(request);
+      if (name) pending.set(request, { path: name, started: Date.now() });
+    });
+    // A rejected fetch may never read its body, so only requests without
+    // response headers are reported as stalled.
+    this.context.on("response", (response) => pending.delete(response.request()));
+    this.context.on("requestfinished", (request) => pending.delete(request));
+    this.context.on("requestfailed", (request) => {
+      pending.delete(request);
+      const name = path(request);
+      if (name && failed.length < 20)
+        failed.push({ path: name, error: (request.failure()?.errorText ?? "").slice(0, 80) });
+    });
+    this.page.on("pageerror", (error) => {
+      if (errors.length < 10) errors.push(String(error?.name ?? "Error").slice(0, 80));
+    });
+    this.networkDiagnostics = () => {
+      const now = Date.now();
+      return {
+        pending: [...pending.values()]
+          .slice(0, 20)
+          .map((entry) => ({ path: entry.path, ageMs: now - entry.started })),
+        pendingCount: pending.size,
+        failed,
+        pageErrors: errors,
+        location: new URL(this.page.url()).pathname.slice(0, 200),
+      };
     };
   }
   async authenticator(credentials = []) {

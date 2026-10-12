@@ -379,9 +379,9 @@ var laneInputs = map[string][]string{
 	// Provisioning needs no registration: the snippet alone installs from the
 	// lindm repository, skipping prerequisites the installed system already has.
 	"provision-cloud-init":  {"provision-browser", "record"},
-	"provision-autoinstall": {"provision-browser", "record"},
-	"provision-kickstart":   {"provision-browser", "record"},
-	"provision-autoyast":    {"provision-browser", "record"},
+	"provision-autoinstall": {"provision-browser", "diagnostics", "record"},
+	"provision-kickstart":   {"provision-browser", "diagnostics", "record"},
+	"provision-autoyast":    {"provision-browser", "diagnostics", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {

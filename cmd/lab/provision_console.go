@@ -48,6 +48,7 @@ func runVMProvision(ctx context.Context, lane string, args []string, stdout, std
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "parent for owned disposable guest and installer state")
 	flags.StringVar(&options.LabBinary, "lab-binary", "", "matching guest-architecture read-only lab observer")
+	flags.StringVar(&options.DiagnosticsDir, "diagnostics", "", "existing private directory for a bounded installer and first-boot serial log; may hold the snippet's token, never evidence")
 	// Guests reach the public-host origin through QEMU's host address; these
 	// name the fixture listeners a remote lab host reverse-forwards.
 	adminAddress := flags.String("admin-address", "", "optional host-loopback console listener reverse-forwarded to a remote lab host")

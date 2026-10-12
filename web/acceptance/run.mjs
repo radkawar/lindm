@@ -532,6 +532,7 @@ try {
 } catch (error) {
   result.passed = false;
   result.failure = failure(error);
+  if (driver?.networkDiagnostics) result.failure.network = driver.networkDiagnostics();
   if (config?.evidenceDirectory && driver) {
     try {
       // The console's own support details (code and reason identifiers only,
