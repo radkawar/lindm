@@ -4,15 +4,23 @@ package vmlab
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/pem"
 	"encoding/xml"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -191,6 +199,93 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// In the DVD installation system /etc/pki/trust/anchors is read-only squashfs
+// and update-ca-certificates is absent: a pre-script that needs either fails,
+// and the snapshot add-on then stops AutoYaST on an error dialog. Run the
+// rendered pre-script with only the inst-sys tools it may use (paths rebased
+// into a private root whose anchors directory is read-only) and require OpenSSL
+// to trust a leaf issued by the lab CA through the hashed directory libzypp reads.
+func TestTumbleweedSnapshotTrustWorksInReadOnlyInstallationSystem(t *testing.T) {
+	openssl, err := exec.LookPath("openssl")
+	if err != nil {
+		t.Skip("openssl is required to verify the hashed CA directory")
+	}
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caTemplate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lindm snapshot test CA"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "10.0.2.2"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}, ca, &leafKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	leaf := filepath.Join(root, "leaf.pem")
+	if err := os.WriteFile(leaf, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leafDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	login, private, public := encryptedInstallerTestKeys(t)
+	recipe, err := tumbleweedInstallerRecipeWithEncryption(platform.ForManifest("opensuse-tumbleweed", "20261007"), "20261007", "/dev/vda", "aarch64", strings.Repeat("a", 64), login, private, public, "", "", false, &tumbleweedSnapshotRepository{URL: tumbleweedTestRepository, CAPEM: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile struct {
+		Scripts []string `xml:"scripts>pre-scripts>script>source"`
+	}
+	if err := xml.Unmarshal(recipe, &profile); err != nil {
+		t.Fatal(err)
+	}
+	if len(profile.Scripts) != 1 {
+		t.Fatalf("profile has %d pre-scripts, want the snapshot trust script", len(profile.Scripts))
+	}
+	// The inst-sys /etc/ssl/certs is a writable symlinked directory.
+	certs := filepath.Join(root, "etc", "ssl", "certs")
+	anchors := filepath.Join(root, "etc", "pki", "trust", "anchors")
+	for _, dir := range []string{certs, anchors} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(anchors, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	tools := filepath.Join(root, "bin")
+	if err := os.Mkdir(tools, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"base64", "ln", "openssl"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			t.Skipf("%s is required to run the installer pre-script", name)
+		}
+		if err := os.Symlink(path, filepath.Join(tools, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	script := strings.ReplaceAll(profile.Scripts[0], "/etc/", root+"/etc/")
+	command := exec.Command("/bin/sh", "-c", script)
+	command.Env = []string{"PATH=" + tools}
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("pre-script failed in the read-only installation system: %v\n%s", err, output)
+	}
+	verify := exec.Command(openssl, "verify", "-no-CAfile", "-no-CAstore", "-CApath", certs, leaf)
+	if output, err := verify.CombinedOutput(); err != nil {
+		t.Fatalf("installation-system CA directory does not trust the snapshot server: %v\n%s", err, output)
+	}
 }
 
 func TestTumbleweedRecipeRejectsWrongAuthorityAndTarget(t *testing.T) {

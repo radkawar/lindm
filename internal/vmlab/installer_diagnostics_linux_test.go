@@ -20,7 +20,7 @@ func TestInstallerFailureDiagnosticsBoundRedactAndPreserveCause(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := newInstallerDiagnostics(dir, "aarch64", strings.Repeat("a", 64), string(private), public)
+	d := newInstallerDiagnostics(dir, installerFailureSnapshot, "aarch64", strings.Repeat("a", 64), string(private), public)
 	for _, piece := range []string{"Linux version test\nLINDM_INSTALLER_STA", "GE=profile-pre\r\n", strings.Repeat("bounded installer output\n", 4096), string(private), public, base64.StdEncoding.EncodeToString(private), "\nNo installation repository found\n"} {
 		if _, err := d.Write([]byte(piece)); err != nil {
 			t.Fatal(err)
@@ -57,6 +57,7 @@ func TestInstallerFailureDiagnosticsBoundRedactAndPreserveCause(t *testing.T) {
 		t.Fatal("diagnostic escaped its bound or exposed the private run path")
 	}
 	var evidence struct {
+		Kind         string                      `json:"kind"`
 		SourceSHA256 string                      `json:"source_sha256"`
 		SerialTail   string                      `json:"serial_tail_redacted"`
 		QEMUStderr   string                      `json:"qemu_stderr"`
@@ -66,7 +67,7 @@ func TestInstallerFailureDiagnosticsBoundRedactAndPreserveCause(t *testing.T) {
 	if err := json.Unmarshal(data, &evidence); err != nil {
 		t.Fatal(err)
 	}
-	if evidence.SourceSHA256 != strings.Repeat("a", 64) || !evidence.Truncated || len(evidence.Stages) != 2 || evidence.Stages[1].Stage != "profile-pre" {
+	if evidence.Kind != installerFailureSnapshot || evidence.SourceSHA256 != strings.Repeat("a", 64) || !evidence.Truncated || len(evidence.Stages) != 2 || evidence.Stages[1].Stage != "profile-pre" {
 		t.Fatalf("lost immutable source or fragmented stage observations: %+v", evidence)
 	}
 	if !strings.Contains(evidence.SerialTail, "No installation repository found") || !strings.Contains(evidence.QEMUStderr, "QEMU diagnostic") {
@@ -83,7 +84,7 @@ func TestInstallerFailureDiagnosticsBoundRedactAndPreserveCause(t *testing.T) {
 }
 
 func TestInstallerStageRequiresObservedMarkerNotPrintedRecipe(t *testing.T) {
-	d := newInstallerDiagnostics(t.TempDir(), "aarch64", strings.Repeat("a", 64))
+	d := newInstallerDiagnostics(t.TempDir(), installerFailureOffline, "aarch64", strings.Repeat("a", 64))
 	if _, err := d.Write([]byte("printf '%s\\n' 'LINDM_INSTALLER_STAGE=provision-complete' > /dev/console\n")); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestInstallerCursesTailSurvivesWithoutLineFeeds(t *testing.T) {
 	for _, boundary := range []string{"\r", "\x1b[10;1H"} {
 		t.Run(fmt.Sprintf("%q", boundary), func(t *testing.T) {
 			dir := t.TempDir()
-			d := newInstallerDiagnostics(dir, "aarch64", strings.Repeat("a", 64))
+			d := newInstallerDiagnostics(dir, installerFailureOffline, "aarch64", strings.Repeat("a", 64))
 			output := strings.Repeat("x", installerSerialLimit+1) + boundary + "AutoYaST: No installation source found" + boundary + "Retry Abort"
 			if _, err := d.Write([]byte(output)); err != nil {
 				t.Fatal(err)

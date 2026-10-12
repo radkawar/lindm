@@ -41,7 +41,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 }
 
 func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	if len(args) >= 2 && args[0] == "images" && (args[1] == "snapshot-export" || args[1] == "snapshot-import") {
+	if len(args) >= 2 && args[0] == "images" && (args[1] == "snapshot-export" || args[1] == "snapshot-import" || args[1] == "snapshot-present") {
 		return runSnapshotTransfer(ctx, args[1], args[2:], os.Stdin, stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "snapshot" {

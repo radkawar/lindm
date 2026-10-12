@@ -26,7 +26,7 @@ import (
 const tumbleweedInstallerEdition = "dvd"
 
 // Bump when the AutoYaST profile or machine layout changes.
-const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v7"
+const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v8"
 
 // tumbleweedSSHDOrdering closes a vendor boot race. Tumbleweed starts sshd and
 // systemd-user-sessions in parallel once cloud-init's network stage finishes;
@@ -68,6 +68,9 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 		// YaST resolves the full DVD repository in memory.
 		memoryMiB: 4096,
 		snapshot:  snapshot,
+		// The ordinary profile carries no unlock secret; a stalled AutoYaST
+		// dialog is otherwise invisible until the installer deadline.
+		consoleDiagnostics: true,
 		recipe: func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error) {
 			return tumbleweedInstallerRecipeWithEncryption(release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, "", "", false, snapshot)
 		},
@@ -326,11 +329,20 @@ func tumbleweedInstallerRepository(snapshot *tumbleweedSnapshotRepository) (repo
 	if err := xml.EscapeText(&escaped, []byte(snapshot.URL)); err != nil {
 		return "", "", "", err
 	}
-	provision = "install -d -m 0755 /etc/pki/trust/anchors\n" +
-		encryptedInstallerProvisionFile("/etc/pki/trust/anchors/lindm-snapshot.pem", string(snapshot.CAPEM)) +
-		"update-ca-certificates\n"
+	provision = "install -d -m 0755 /etc/pki/trust/anchors\n" + encryptedInstallerProvisionFile("/etc/pki/trust/anchors/lindm-snapshot.pem", string(snapshot.CAPEM)) + "update-ca-certificates\n"
+	// In the DVD installation system /etc/pki/trust/anchors is read-only
+	// squashfs (observed on both architectures: the pre-script failed with
+	// "Read-only file system" and AutoYaST then stopped on "Failed to add
+	// product") and update-ca-certificates is absent. Its libzypp verifies
+	// against OpenSSL's hashed directory /etc/ssl/certs, which the initrd
+	// links into writable tmpfs: add the CA there under the subject hash the
+	// installation system's own openssl computes.
+	const instsys = "/etc/ssl/certs/lindm-snapshot.pem"
 	preScript = `<pre-scripts config:type="list"><script><filename>lindm-snapshot-trust</filename><interpreter>shell</interpreter><source><![CDATA[set -eu
-` + provision + `]]></source></script></pre-scripts>`
+` + encryptedInstallerProvisionFile(instsys, string(snapshot.CAPEM)) + `hash=$(openssl x509 -subject_hash -noout -in ` + instsys + `)
+test -n "$hash"
+ln -s lindm-snapshot.pem "/etc/ssl/certs/$hash.0"
+]]></source></script></pre-scripts>`
 	return escaped.String(), preScript, provision, nil
 }
 

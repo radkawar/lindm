@@ -41,7 +41,10 @@ type installerImage struct {
 	recipe       func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error)
 	// offline denies installer egress for the signed-DVD capture bootstrap.
 	offline bool
-	// diagnostics is enabled only for the offline, unencrypted capture guest.
+	// consoleDiagnostics retains a bounded, redacted serial tail when the
+	// installer fails. Only recipes without unlock secrets may set it.
+	consoleDiagnostics bool
+	// diagnostics is the failure sink of an unencrypted capture or golden install.
 	diagnostics *installerDiagnostics
 	// snapshot is populated only for the Tumbleweed recipe before rendering.
 	snapshot *tumbleweedSnapshotRepository
@@ -187,6 +190,9 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 		if err != nil {
 			return nil, err
 		}
+		if spec.consoleDiagnostics {
+			spec.diagnostics = newInstallerDiagnostics(workDir, installerFailureSnapshot, hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic, string(recipe))
+		}
 	}
 	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", "24G"); err != nil {
 		return nil, err
@@ -330,13 +336,10 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 	if spec.offline {
 		network += ",restrict=on"
 	}
-	// Other installers still discard serial, which can contain unlock secrets.
-	// Capture-only diagnostics use a separate bounded, redacted stdout sink.
+	// Encrypted installers discard serial, which can contain unlock secrets.
+	// Unencrypted profiles may opt into a separate bounded, redacted sink.
 	serial, console := "null", io.Writer(nil)
 	if spec.diagnostics != nil {
-		if !spec.offline {
-			return errors.New("installer console diagnostics require the offline capture profile")
-		}
 		serial, console = "stdio", spec.diagnostics
 	}
 	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", serial, "-monitor", "none", "-machine", machine, "-cpu", cpu, "-m", fmt.Sprint(spec.memoryMiB), "-smp", "2",

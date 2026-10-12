@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -64,7 +65,15 @@ func collectRepositorySnapshot(ctx context.Context, alias, remoteBinary, remoteC
 // stageRepositorySnapshot admits only authenticated, bounded manifest files to
 // the selected host's persistent cache. Captures are portable between hosts;
 // there is no dependency on scheduling a replay back onto its capture host.
+// A host whose cache already authenticates the exact closure keeps it: every
+// lane otherwise streamed the full multi-GiB closure again, and concurrent
+// lanes saturated the controller link until SSH keepalives failed (observed).
 func stageRepositorySnapshot(ctx context.Context, alias, remoteBinary, remoteCache, cache, digest string, stderr io.Writer) error {
+	present := executionCommand(ctx, alias, "exec "+QuoteShell(remoteBinary)+" images snapshot-present -cache "+QuoteShell(remoteCache)+" -sha256 "+QuoteShell(digest))
+	if present.Run() == nil {
+		_, err := fmt.Fprintf(stderr, "lab host %s: repository closure %s already authenticated in host cache\n", alias, digest)
+		return err
+	}
 	transferCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	command := "exec " + QuoteShell(remoteBinary) + " images snapshot-import -cache " + QuoteShell(remoteCache) + " -sha256 " + QuoteShell(digest)

@@ -84,7 +84,12 @@ and delegated keys, then streams only verified immutable bytes into the admitted
 Spark's private directory (at most 256 files and 512 MiB). The native capture
 authenticates those pins again. Existing RPM reuse uses a separately authenticated
 content-addressed snapshot and the bounded snapshot transfer protocol, not an
-arbitrary retained directory or a full mirror.
+arbitrary retained directory or a full mirror. Before each remote lane streams a
+closure, the controller runs `lab images snapshot-present` on the host; when the
+host cache already authenticates that exact closure (manifest address, retained
+tree, signed metadata and every file digest) the multi-GiB stream is skipped.
+Re-streaming it per lane let three concurrent aarch64 lanes saturate the
+controller link until SSH keepalives failed (`write |1: broken pipe`).
 
 ## Packaging, signing, repositories, paths and LSM
 
@@ -308,10 +313,22 @@ package name from those registry pins, rather than relying on an implicit
 chroot must report exactly the pinned RPM epoch, version and release; the
 ordinary first-boot probes repeat that check. A mismatch fails closed instead of
 accepting a different DVD kernel. Final recipe identity is
-`opensuse-tumbleweed-dvd-autoyast-v7`. It resets `/etc/machine-id` explicitly
+`opensuse-tumbleweed-dvd-autoyast-v8`. It resets `/etc/machine-id` explicitly
 to an empty mode-0644 file, rather than inheriting the credential writer's
 umask 077; unprivileged D-Bus must be able to read the first-boot identity.
 SSH private keys and source markers retain their separate private modes.
+In the DVD installation system `/etc/pki/trust/anchors` is read-only squashfs
+and `update-ca-certificates` is absent, so v7's snapshot-trust pre-script
+failed (`Read-only file system`) and AutoYaST stopped on `Failed to add product
+from https://10.0.2.2:…/snapshots/…` before partitioning. Observed on the
+aarch64 and x86_64 ordinary goldens, which then wait for the 45-minute installer
+deadline; the encrypted profile uses the same pre-script. The v8 pre-script
+writes the lab CA into `/etc/ssl/certs`, which the installation system's initrd
+links into writable tmpfs and its libzypp verifies against, under the OpenSSL
+subject hash the installation system's own `openssl` computes. The installed
+system still receives the anchor and runs `update-ca-certificates`. A failed
+ordinary golden install now retains a bounded, credential-redacted serial tail
+(`snapshot-dvd-installer-failure`) in the private lab work directory.
 The encrypted golden identity also includes this AutoYaST recipe revision,
 so a corrected installer cannot reuse an earlier encrypted disk merely because
 its ISO and repository closure are unchanged.

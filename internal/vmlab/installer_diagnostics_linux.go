@@ -19,18 +19,26 @@ import (
 
 const installerSerialLimit = 64 << 10
 
+// Diagnostic kinds name the installer profile whose serial tail was retained.
+const (
+	installerFailureOffline  = "offline-dvd-installer-failure"
+	installerFailureSnapshot = "snapshot-dvd-installer-failure"
+)
+
 type installerStageObservation struct {
 	Stage string    `json:"stage"`
 	At    time.Time `json:"at"`
 }
 
-// Only the offline unencrypted bootstrap may enable console diagnostics.
-// Serial bytes stay in bounded memory until failure; credentials and opaque
-// encoded payloads are removed before writing the owner-only diagnostic file.
-// Stage observations survive tail truncation and are observations, not success.
+// Only unencrypted installer profiles may enable console diagnostics: the
+// offline capture bootstrap and the snapshot-bound ordinary golden. Serial
+// bytes stay in bounded memory until failure; credentials and opaque encoded
+// payloads are removed before writing the owner-only diagnostic file. Stage
+// observations survive tail truncation and are observations, not success.
 type installerDiagnostics struct {
 	mu           sync.Mutex
 	directory    string
+	kind         string
 	architecture string
 	sourceDigest string
 	started      time.Time
@@ -41,11 +49,11 @@ type installerDiagnostics struct {
 	secrets      []string
 }
 
-func newInstallerDiagnostics(directory, architecture, sourceDigest string, secrets ...string) *installerDiagnostics {
+func newInstallerDiagnostics(directory, kind, architecture, sourceDigest string, secrets ...string) *installerDiagnostics {
 	if directory == "" {
 		directory = os.TempDir()
 	}
-	d := &installerDiagnostics{directory: directory, architecture: architecture, sourceDigest: sourceDigest, started: time.Now().UTC(), tail: nativeexec.NewTailBuffer(installerSerialLimit)}
+	d := &installerDiagnostics{directory: directory, kind: kind, architecture: architecture, sourceDigest: sourceDigest, started: time.Now().UTC(), tail: nativeexec.NewTailBuffer(installerSerialLimit)}
 	for _, secret := range secrets {
 		if secret == "" {
 			continue
@@ -157,7 +165,7 @@ func (d *installerDiagnostics) saveFailure(dir string, process *encryptedProcess
 		SerialTail   string                      `json:"serial_tail_redacted"`
 		QEMUStderr   string                      `json:"qemu_stderr"`
 		Stages       []installerStageObservation `json:"observed_stages"`
-	}{"offline-dvd-installer-failure", d.architecture, d.sourceDigest, d.started, time.Now().UTC(), d.redact(cause.Error(), dir), d.total, d.total > installerSerialLimit, d.redact(serial, dir), d.redact(stderr, dir), d.stages}, "", "  ")
+	}{d.kind, d.architecture, d.sourceDigest, d.started, time.Now().UTC(), d.redact(cause.Error(), dir), d.total, d.total > installerSerialLimit, d.redact(serial, dir), d.redact(stderr, dir), d.stages}, "", "  ")
 	if err != nil {
 		return errors.Join(cause, fmt.Errorf("encode private installer diagnostics: %w", err))
 	}

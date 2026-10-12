@@ -123,7 +123,7 @@ func newRepositorySnapshotGuest(ctx context.Context, image *labv1.ImageManifest,
 		return nil, nil, err
 	}
 	spec.offline = true
-	spec.diagnostics = newInstallerDiagnostics(diagnosticsDir, h.Architecture, verified.SHA256, string(loginPrivate), loginPublic, string(hostPrivate), hostPublic, string(recipe))
+	spec.diagnostics = newInstallerDiagnostics(diagnosticsDir, installerFailureOffline, h.Architecture, verified.SHA256, string(loginPrivate), loginPublic, string(hostPrivate), hostPublic, string(recipe))
 	if err = runImageInstaller(ctx, dir, installer, spec, h); err != nil {
 		return nil, nil, err
 	}

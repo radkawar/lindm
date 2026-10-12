@@ -66,6 +66,11 @@ func runSnapshotTransfer(ctx context.Context, operation string, args []string, s
 		return errors.New("snapshot transfer requires -cache and -sha256, without positional arguments")
 	}
 	switch operation {
+	case "snapshot-present":
+		// Succeeds only if this host's cache already authenticates the exact
+		// closure (manifest address, retained tree and every file digest).
+		_, _, err := reposnapshot.Load(*cache, *digest)
+		return err
 	case "snapshot-export":
 		return reposnapshot.Export(ctx, *cache, *digest, stdout)
 	case "snapshot-import":
