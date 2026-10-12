@@ -141,7 +141,7 @@ export function RepositoryReadinessSection() {
             <p className="max-w-prose text-sm">
               {setupSentence(server)}{" "}
               <a
-                className="text-primary underline underline-offset-4"
+                className="font-medium underline underline-offset-4"
                 href={SERVER_SETUP_GUIDE}
                 target="_blank"
                 rel="noreferrer"
