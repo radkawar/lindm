@@ -6221,6 +6221,34 @@
       "verified": true,
       "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
       "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "provision-cloud-init",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-20260926-arm64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/lab-evidence/provision-20261012-ci/ubuntu-24.04/provision-cloud-init-aarch64.log",
+      "sha256": "cebf5ecc539de8467c6e98d6e16c8f98a4e12c74283280a5ce9cdee782df34e0",
+      "recorded": "2026-10-12T05:58:23.908590268Z",
+      "revision": "27f1f802d9525d45da5e098684fd9af72960c51d",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "29be12a0c0841ed194f6d242792fa48f8dd9af0fd17b524822408dde92c029dd"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "provision-cloud-init",
+      "architecture": "aarch64",
+      "manifest": "fedora-cloud-44-1.7-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/lab-evidence/provision-20261012-ci/fedora-44/provision-cloud-init-aarch64.log",
+      "sha256": "704af29fed993d41978b504a8c9620461f7702474bafbc50cc08184082a2ac99",
+      "recorded": "2026-10-12T06:01:36.438749313Z",
+      "revision": "27f1f802d9525d45da5e098684fd9af72960c51d",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "47b8c9a986ed066ed2b1d91af7fd76144cff3eab8db99e3efddb380a31a0b9ae"
     }
   ]
 }
