@@ -140,6 +140,8 @@ export const ownerEdits = [
   pass2SafetyAssistance,
   // Adds an admin who approves one recovery-key reveal, run with step-up.
   pass2P2StepUp,
+  // Each adds an admin who approves one reveal; they run after pass2P2StepUp, which
+  // needs the review session's last identity check to be older than five minutes.
   pass2SafetyReveal,
   // Queues one audit evidence export.
   integrationsReportLink,
