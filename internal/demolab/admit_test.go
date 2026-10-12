@@ -23,16 +23,18 @@ func TestAdmitQualifiedDevices(t *testing.T) {
 }
 
 func TestAdmitMaintainedOrganizationDemo(t *testing.T) {
-	spec, err := Load("../../lab/demo/org-demo.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	ledger, err := labmatrix.LoadLedger("../../lab/ledger.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Admit(spec, ledger); err != nil {
-		t.Fatalf("maintained three-device demo is not qualified: %v", err)
+	for _, path := range []string{"../../lab/demo/org-demo.json", "../../lab/demo/org-desktops-demo.json"} {
+		spec, err := Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := Admit(spec, ledger); err != nil {
+			t.Fatalf("maintained demo %s is not qualified: %v", path, err)
+		}
 	}
 }
 

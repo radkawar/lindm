@@ -733,6 +733,10 @@ encrypted RHEL 9 aarch64 IT/Helpdesk server (no desktop) on `dgx21`. Only
 `lindmd`, PostgreSQL and TURN run on the controller workstation. Fedora aarch64
 explicitly does **not** enforce Secure Boot; TPM PCR7 binding in SetupMode is
 not an authenticated boot chain.
+The smallest footprint is `-spec lab/demo/org-desktops-demo.json`: the same two
+desktops, unchanged (a unit test keeps them identical to the full spec), without
+the RHEL server, so it needs no `-redhat-token-file`. It is a different device
+set, so it uses its own `-name`.
 No synthetic fleet is included. Registry capability gates and the maintained
 qualification ledger admit the exact release/architecture before allocating
 any fixture. Every real device requires encrypted-install qualification;
@@ -781,6 +785,13 @@ Each unattended boot stores its TPM evidence in the device's evidence
 directory (`tpm-boot-*`: TPM/cryptsetup journal and kernel lines, TPM devices
 and modules, crypttab, initramfs TPM content, PCRs 0-7 and the LUKS token
 metadata), plus the prompted boot's serial console when it fell back.
+
+While held, the runner polls each device's product resource state every 30
+seconds and records every changed report as `resources-KEY-NNN.json` in the
+evidence directory, with a `Resources KEY:` line: per row the kind, canonical
+key, server disposition and compliance, plus the device's failure or refusal.
+Desired values are not recorded. These are the product's own outcomes (an
+unopted provider's row shows its refusal), not a readiness condition.
 
 A golden booted long after it was built immediately runs its missed persistent
 `apt-daily-upgrade` timer (a first-boot unattended security upgrade). The

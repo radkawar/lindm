@@ -80,6 +80,11 @@ func openCustody(path string, readOnly bool) (_ *custody, err error) {
 		// systemd RestrictSUIDSGID= fails openat2 with ENOSYS. A single clean
 		// component opened with O_NOFOLLOW cannot escape or follow a link.
 		fd, err = unix.Openat(fd, parts[i], unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+		if errors.Is(err, unix.ENOENT) {
+			// An absent approved parent is a reported precondition, not an
+			// internal failure retried forever; the file is never created there.
+			return nil, fmt.Errorf("%w: protected ancestor %s absent: %w", ErrConflict, filepath.Join(append([]string{"/"}, parts[:i+1]...)...), err)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("open protected ancestor: %w", err)
 		}

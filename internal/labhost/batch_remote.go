@@ -129,7 +129,7 @@ func (r BatchRequest) Acquire(ctx context.Context) (_ *BatchReservation, err err
 		return nil, errors.Join(err, stdin.Close())
 	}
 	command.Stderr = r.Stderr
-	command.Cancel, command.WaitDelay = stdin.Close, 2*time.Minute
+	command.Cancel, command.WaitDelay = cancelByClosingLease(stdin), 2*time.Minute
 	if err := command.Start(); err != nil {
 		return nil, errors.Join(err, stdin.Close(), output.Close())
 	}

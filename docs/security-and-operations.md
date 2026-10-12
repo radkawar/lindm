@@ -610,11 +610,14 @@ both static membership and a `department/...` label. Dynamic groups select those
 labels for profile targeting; they do not substitute for authorization groups.
 The one-time grant carries no group or label, so assign its device deliberately
 after enrollment. Company baseline targets all four dynamic groups at priority 0;
-department profiles have priority 100 and override the same canonical password,
-firewall-zone or update-policy resource where applicable.
+department profiles have priority 100 and override the same canonical
+firewall-zone or update-policy resource where applicable. Every declared resource
+row is one the server dispatches under its qualified ownership operations (checked
+by a unit test); the rows removed for that reason are listed under
+[gaps](#declarative-organization-gaps).
 
-Company baseline sets password controls, deny-by-default ingress with TCP/22 allowed
-for both IP families, persistent sysctl hardening, `/etc/motd.d/50-company`,
+Company baseline sets deny-by-default ingress with TCP/22 allowed
+for both IP families, `/etc/motd.d/50-company`,
 disabled/stopped `cups.service`, and daily security-update starts between 02:00 and
 04:00 Europe/London. Reboots use `SCHEDULED` within an independent daily
 05:00–07:00 Europe/London reboot window, at most 360 minutes after the update, with
@@ -623,13 +626,12 @@ window end. The executor's managed-file `allowed_roots` must explicitly include
 `/etc/motd.d`; approving `/etc` is not a substitute. The host must use pam_motd to
 display that directory.
 
-Engineering adds git, htop and podman, the typed SSH login banner, plus the local
+Engineering adds git, htop and podman (DEB `arm64` for the demo's Ubuntu 24.04
+aarch64 laptop), the typed SSH login banner, plus the local
 `developers` group and a `developer` user with a locked password, not an embedded
-login secret. Finance strengthens password controls, blocks USB storage
-(`usb_storage`, `uas`) through the typed kernel-module template, removes the SSH
-firewall exception and stops/disables `sshd.service` for its native host; other
-service names need an explicit profile
-change. Contractors deny ingress and default egress, permitting only outbound
+login secret. Finance blocks USB storage
+(`usb_storage`, `uas`) through the typed kernel-module template and removes the SSH
+firewall exception. Contractors deny ingress and default egress, permitting only outbound
 TCP 80/443/53 and UDP 53 for both IP families, with a nightly 02:00–02:30 update
 start window. This restriction requires a compatible firewall backend and may block
 nonstandard control-plane ports. Preserve the executor's connectivity guard; do not
@@ -637,12 +639,11 @@ bypass a refused network change. Profiles use create-only ownership, so existing
 unowned native state may require the normal explicit adoption workflow rather than
 being silently taken over; service rows retain native state on release.
 
-**Executor native repository approvals:** Engineering's package resources apply
-only to Ubuntu 24.04 (`Ubuntu`, `x86_64` or `aarch64` platform observations), with DEB
-package architectures `amd64` and `arm64` respectively. Configure the executor's
-approved package sources with repository UUID
-`8053e72a-44e8-53fc-9472-825c068cf9b5` for the amd64 archive and
-`6ad79126-c32f-552b-89b7-6956410314fb` for the arm64 ports archive. Bind the appropriate
+**Executor native repository approvals:** Engineering's package resources are DEB
+`arm64` packages for Ubuntu 24.04 aarch64; the example declares no amd64 variants
+because selecting between them needs product applicability, which dispatch does
+not yet admit. Configure the executor's approved package sources with repository
+UUID `6ad79126-c32f-552b-89b7-6956410314fb` for the arm64 ports archive. Bind the
 official HTTPS archive, suite/components and authenticated signing key/digest
 through the existing native-package provider configuration. These are explicit
 operator approvals, not repositories created or trusted by apply. This example does
@@ -848,6 +849,23 @@ Every remaining item is either pending or an explicit gate with its closing
 condition.
 
 - Remote assistance has one permission for view and control, not separate grants.
+- **Pending: sysctl hardening and password controls in the example.** Native
+  `SYSCTL` and `PASSWORD_POLICY` rows are qualified only for
+  `OWNERSHIP_MODE_APPROVED_ADOPTION` (every kernel setting and authentication stack
+  already exists natively), so create-only rows are refused as
+  `resource_ownership_operation_unavailable`. Adoption rows currently put each
+  device activation behind its own independent approval, and `lindmctl apply`
+  stops at `ActivateTargetPreview` with `permission_denied`. `lab/demo/org.json`
+  therefore omits them until one rollout approval covers the adoption; then they
+  return as adoption rows.
+- **Pending: platform-scoped resource rows.** Dispatch refuses any row carrying
+  `applicability` products or features (`resource_capability_evidence_unavailable`)
+  until capability evidence is qualified, so the example declares only the arm64
+  Engineering packages, without applicability.
+- **Lab constraint: Finance keeps `sshd.service`.** The persistent demo manages its
+  guests (TPM cold-boot evidence, resume, assistance responses) over guest SSH, so
+  the example does not stop and disable `sshd.service`. A real organization can add
+  that service row; on a demo device it would sever the lab's management channel.
 - **Gate: membership-safe static group rename.** The existing replacement API
   rewrites membership without compare-and-swap. Automatically repairing name drift
   could restore revoked RBAC access, so apply reports it as unsupported. Closing

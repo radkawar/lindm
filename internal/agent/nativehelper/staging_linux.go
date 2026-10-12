@@ -157,26 +157,11 @@ func notCancelled(directory string) error {
 // waits for native helper termination and never deletes another transaction or
 // effect receipt. Repeated calls finish interrupted cleanup, never restart work.
 func CancelStage(ctx context.Context, stateDirectory, actionID string) (resultErr error) {
-	directory, err := transactionDirectory(stateDirectory, actionID)
-	if err != nil {
-		return err
-	}
-	if err := os.Mkdir(directory, 0700); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
-	unlock, err := stagingLock(directory)
+	directory, unlock, err := tombstoneStage(stateDirectory, actionID)
 	if err != nil {
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	marker := &agentv1.NativePackageStagingCancellation{ActionId: actionID}
-	encoded, err := encodeRecord(marker)
-	if err != nil {
-		return err
-	}
-	if err := writeProtected(directory, "cancelled.pb", encoded); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
 	if err := readRecordInto(directory, "apply-started.pb", new(agentv1.NativeEffectPermit)); err == nil {
 		return errors.New("package_staging_effect_already_started")
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -215,4 +200,35 @@ func CancelStage(ctx context.Context, stateDirectory, actionID string) (resultEr
 		return err
 	}
 	return errors.Join(unix.Fsync(fd), unix.Close(fd))
+}
+
+// tombstoneStage durably cancels the action under its staging lock and returns
+// the held lock. The provider's state directory exists only after a configured
+// provider opened; an action refused before that (no approved sources) is
+// still tombstoned, so its failure can be recorded instead of retried forever.
+func tombstoneStage(stateDirectory, actionID string) (_ string, _ func() error, resultErr error) {
+	if _, err := transactionDirectory(stateDirectory, actionID); err != nil {
+		return "", nil, err
+	}
+	directory, err := resourceDirectory(stateDirectory, "packageprovider", actionID, true)
+	if err != nil {
+		return "", nil, err
+	}
+	unlock, err := stagingLock(directory)
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() {
+		if resultErr != nil {
+			resultErr = errors.Join(resultErr, unlock())
+		}
+	}()
+	encoded, err := encodeRecord(&agentv1.NativePackageStagingCancellation{ActionId: actionID})
+	if err != nil {
+		return "", nil, err
+	}
+	if err := writeProtected(directory, "cancelled.pb", encoded); err != nil && !errors.Is(err, os.ErrExist) {
+		return "", nil, err
+	}
+	return directory, unlock, nil
 }

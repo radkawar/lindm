@@ -142,34 +142,6 @@
         "description": "Shared security baseline; executor file allowed_roots must include /etc/motd.d.",
         "resources": [
           {
-            "resourceId": "be829bf4-93b4-514f-b6ef-6edf2f1dbeba",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_PASSWORD_POLICY",
-                "canonicalKey": "system/local-auth"
-              },
-              "passwordPolicy": {
-                "minLength": 14,
-                "minClasses": 3,
-                "historyCount": 10,
-                "maxAgeDays": 90,
-                "minAgeDays": 1,
-                "warnDays": 14,
-                "failureLimit": 5,
-                "unlockAfterSeconds": 900,
-                "enforceForRoot": true
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
             "resourceId": "5a8a187a-d28c-506e-ae52-0b65fbda3535",
             "desired": {
               "ref": {
@@ -323,72 +295,6 @@
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
             }
-          },
-          {
-            "resourceId": "7dd6b7d0-e8ee-55df-9ac4-557bb1c9436b",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_SYSCTL",
-                "canonicalKey": "kernel.kptr_restrict"
-              },
-              "sysctl": {
-                "key": "kernel.kptr_restrict",
-                "value": "2",
-                "persistent": true
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "36169404-7674-5a33-b2ad-6e3d31f42af2",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_SYSCTL",
-                "canonicalKey": "kernel.dmesg_restrict"
-              },
-              "sysctl": {
-                "key": "kernel.dmesg_restrict",
-                "value": "1",
-                "persistent": true
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "f3beca00-8a31-5d41-aaad-96ffed27adf3",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_SYSCTL",
-                "canonicalKey": "net.ipv4.conf.all.accept_redirects"
-              },
-              "sysctl": {
-                "key": "net.ipv4.conf.all.accept_redirects",
-                "value": "0",
-                "persistent": true
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
           }
         ]
       }
@@ -397,7 +303,7 @@
       "id": "cab4ef19-709a-5471-87d3-520361903656",
       "spec": {
         "name": "Engineering tools",
-        "description": "Ubuntu 24.04 DEB amd64/arm64 package approvals required; developer starts with a locked password.",
+        "description": "Ubuntu 24.04 aarch64 DEB packages from an approved arm64 ports source; developer starts with a locked password.",
         "resources": [
           {
             "resourceId": "d15d570c-499a-5f34-bc07-5b020a0e4f53",
@@ -428,16 +334,6 @@
             "verification": {
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "aarch64"
-                }
-              ]
             }
           },
           {
@@ -469,16 +365,6 @@
             "verification": {
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "aarch64"
-                }
-              ]
             }
           },
           {
@@ -502,139 +388,6 @@
                 },
                 "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
               }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "aarch64"
-                }
-              ]
-            }
-          },
-          {
-            "resourceId": "d56a34d7-b596-58b7-945f-1d2c6b0b606e",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/git/amd64"
-              },
-              "nativePackage": {
-                "package": {
-                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "git",
-                  "architecture": "amd64"
-                },
-                "presence": "PRESENCE_PRESENT",
-                "any": {},
-                "repository": {
-                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
-                },
-                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
-              }
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "x86_64"
-                }
-              ]
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "546dbc3d-f046-506a-82e6-e8e325a1e8a9",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/htop/amd64"
-              },
-              "nativePackage": {
-                "package": {
-                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "htop",
-                  "architecture": "amd64"
-                },
-                "presence": "PRESENCE_PRESENT",
-                "any": {},
-                "repository": {
-                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
-                },
-                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
-              }
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "x86_64"
-                }
-              ]
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "ef766ec8-e189-5cf2-8ed5-7c5948e44960",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/podman/amd64"
-              },
-              "nativePackage": {
-                "package": {
-                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "podman",
-                  "architecture": "amd64"
-                },
-                "presence": "PRESENCE_PRESENT",
-                "any": {},
-                "repository": {
-                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
-                },
-                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
-              }
-            },
-            "applicability": {
-              "products": [
-                {
-                  "osId": "ubuntu",
-                  "product": "Ubuntu",
-                  "version": "24.04",
-                  "architecture": "x86_64"
-                }
-              ]
             },
             "ownership": {
               "mode": "OWNERSHIP_MODE_CREATE_ONLY",
@@ -727,7 +480,7 @@
       "id": "32e2cd56-942d-598e-ab1e-a08ab71a1769",
       "spec": {
         "name": "Finance hardened",
-        "description": "Higher-priority password and firewall policy; USB storage (usb_storage, uas) is blocked through the typed kernel-module template, which the executor must enable with fileProvider.kernelModuleBlocklist; sshd.service is stopped and disabled on the Finance host.",
+        "description": "Higher-priority firewall policy; USB storage (usb_storage, uas) is blocked through the typed kernel-module template, which the executor must enable with fileProvider.kernelModuleBlocklist.",
         "resources": [
           {
             "resourceId": "7a58ef8d-c669-512a-8ddd-f50363181dc1",
@@ -740,34 +493,6 @@
                 "path": "/etc/modprobe.d/99-lindm-blocklist.conf",
                 "presence": "PRESENCE_PRESENT",
                 "kernelModuleBlocklist": { "modules": ["usb_storage", "uas"] }
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "2d9b052d-75b6-5839-9985-e0925ac4b053",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_PASSWORD_POLICY",
-                "canonicalKey": "system/local-auth"
-              },
-              "passwordPolicy": {
-                "minLength": 18,
-                "minClasses": 4,
-                "historyCount": 20,
-                "maxAgeDays": 60,
-                "minAgeDays": 1,
-                "warnDays": 14,
-                "failureLimit": 3,
-                "unlockAfterSeconds": 900,
-                "enforceForRoot": true
               }
             },
             "ownership": {
@@ -797,28 +522,6 @@
             "ownership": {
               "mode": "OWNERSHIP_MODE_CREATE_ONLY",
               "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
-            },
-            "verification": {
-              "maxAgeSeconds": 3600,
-              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
-            }
-          },
-          {
-            "resourceId": "6a8c6979-af79-5627-b56d-d20e59739126",
-            "desired": {
-              "ref": {
-                "kind": "RESOURCE_KIND_SYSTEMD_SERVICE",
-                "canonicalKey": "sshd.service"
-              },
-              "systemdService": {
-                "unit": "sshd.service",
-                "runtime": "SERVICE_RUNTIME_STATE_INACTIVE",
-                "enablement": "SERVICE_ENABLEMENT_DISABLED"
-              }
-            },
-            "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
-              "release": "RELEASE_BEHAVIOR_RETAIN"
             },
             "verification": {
               "maxAgeSeconds": 3600,

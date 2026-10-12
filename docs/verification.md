@@ -5763,6 +5763,69 @@ the pre-landing private commits `1c12d163` (create), `53db7569` (resume) and
 `5217b45b` (destroy). This is virtual-machine evidence, not physical-device or
 assistance-scenario qualification.
 
+#### Organization demo resource convergence, two desktops (2026-10-12)
+
+`lab demo -name org-verify -spec lab/demo/org-desktops-demo.json` (the full
+demo's two desktops, without the RHEL server) passed create → Ctrl-C → resume →
+Ctrl-C → resume with the same `artifacts/bin/lab` → Ctrl-C → `-destroy`. It used
+`make acceptance-build` binaries from the private branch (`lab` SHA-256
+`35ffb7dd…92f6`, `lindmd` `64e76d0a…fdba4` for both final resumes), `-repo` the
+initialized shared fixture and `-build-repo` the branch.
+
+- Ubuntu 24.04 GNOME Engineering laptop on `dgx20` (Secure Boot on): device
+  `3e2ff381-7e1f-49d8-9570-4c2931942956`, product TPM bind
+  `ee40da6e-e703-4186-8d11-42be56ae6932`, Engineering static group.
+- Fedora 44 GNOME Finance desktop on `dgx21` (Secure Boot off): device
+  `c4e2855f-9837-4a14-ab40-c6ad513b92f0`, TPM bind
+  `9b2bb30f-3f27-4cad-b4e1-c4670e416751`, Finance static group.
+
+Neither the bind boot nor either resume boot fell back to the passphrase. The
+organization's target activation succeeded on both devices (`updated`); the
+second apply and both resumes returned only `unchanged` plus the two
+illustrative pending advisory exceptions. The product reported
+`MANAGED_FILE /etc/motd.d/50-company` as `SUCCEEDED`, natively verified
+`CONVERGED`, on both devices, and `/etc/modprobe.d/99-lindm-blocklist.conf`
+the same on the Fedora desktop. Read-only guest checks matched: the MOTD file
+on both is root:root 0644 with SHA-256 `36183972…6743` (the declared content).
+On Fedora, `modprobe --showconfig` and `lsinitrd` show the `usb_storage`/`uas`
+blacklist and `install … /bin/false` stanzas, and neither module is loaded. The
+Ubuntu `cups.service` row also converged (disabled, inactive). Neither agent
+journal contains `execution_signing_rejected`. Every other row shows the
+product's own refusal: package rows fail `PRECONDITION` (no approved sources),
+and firewall, OS-update, account and Fedora `cups.service` rows are
+`UNSUPPORTED_NATIVE`. The Ubuntu SSH banner row is `BLOCKED` with
+`admission_precondition`, and `developer` is blocked on its refused group.
+Both resumes kept both device IDs, TPM actions and the original owner
+enrollment (expiry 2026-10-12T12:30:31Z). All three Ctrl-C stops exited
+without error. After `-destroy`, no database holds either device, and no demo
+directory, process or console/TURN/guest-forward listener remains on the
+workstation, `dgx20` or `dgx21`; only empty sibling lock files remain.
+
+Real runs found and fixed these defects first:
+
+- An executor without approved package sources never creates its
+  `packageprovider` state directory. Tombstoning the refused preparation failed
+  with `ENOENT`, so it retried forever and blocked every later row on the
+  device.
+- Ubuntu 24.04 ships no `/etc/motd.d`. A managed file under that absent
+  approved root failed as an internal error, again retried forever. An absent
+  protected ancestor is now a reported precondition, and the demo's owner
+  opt-in creates absent approved roots.
+- A Ctrl-C stop could fail with `exec: canceling Cmd: close |1: file already
+closed` when the owner's lease close won the race with context cancellation.
+- `lab/demo/org.json` shipped sysctl and password-policy rows that dispatch
+  refuses as create-only, applicability-scoped package rows, and a Finance
+  `sshd.service` stop that would sever the lab's guest channel; see the
+  [organization gaps](security-and-operations.md#declarative-organization-gaps).
+
+Evidence: `~/.cache/lindm-assistqual-20261011/org-verify-manifest.sha256`,
+SHA-256 `a58b0a7238c74a3e756500214904214c47e381db8d79d649840fc0aa9eb47026`
+(43 files: per-run logs, apply outcomes, `ready.json`, `resources-*.json`,
+native guest checks `org-verify-03/native-*.txt`, TPM boot evidence, destroy
+output and audit, binary digests). Run `org-verify-01` is the failing run with
+the earlier binary. This is virtual-machine evidence, not physical-device or
+assistance-scenario qualification.
+
 #### Named split held lifecycle regression
 
 On 2026-10-11, a native aarch64 KVM run on `dgx20` exercised

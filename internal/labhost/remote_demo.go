@@ -109,7 +109,7 @@ func (r RemoteRun) destroyAssistance(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	command.Cancel, command.WaitDelay = stdin.Close, 2*time.Minute
+	command.Cancel, command.WaitDelay = cancelByClosingLease(stdin), 2*time.Minute
 	command.Stdout, command.Stderr = r.Stdout, r.Stderr
 	runErr := command.Run()
 	closeErr := stdin.Close()

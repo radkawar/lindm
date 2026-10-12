@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/device/dispatch"
 )
 
 func TestLoadOrganizationDemo(t *testing.T) {
@@ -24,6 +25,54 @@ func TestLoadOrganizationDemo(t *testing.T) {
 		if !device.Release.Known() || device.Config.GetFirmware().SecureBoot == nil {
 			t.Fatal("demo must have registered releases and explicit firmware security mode")
 		}
+	}
+}
+
+// The smallest-footprint demo is the full demo's two desktops, unchanged: the
+// same organization, groups, tokens, hosts, firmware and executor opt-ins, so a
+// live run of it verifies those devices as the full demo declares them.
+func TestDesktopDemoIsExactFullDemoSubset(t *testing.T) {
+	full := demoFixture(t)
+	desktops, err := Load("../../lab/demo/org-desktops-demo.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if desktops.OrganizationPath != full.OrganizationPath || len(desktops.Devices) != 2 {
+		t.Fatalf("desktop demo must use the maintained organization with two devices, got %s and %d", desktops.OrganizationPath, len(desktops.Devices))
+	}
+	for _, device := range desktops.Devices {
+		if device.Config.GetRole() != labv1.DemoRole_DEMO_ROLE_DESKTOP {
+			t.Errorf("%s is not a desktop", device.Config.GetKey())
+		}
+		found := false
+		for _, candidate := range full.Devices {
+			if candidate.Config.GetKey() == device.Config.GetKey() {
+				found = proto.Equal(candidate.Config, device.Config)
+			}
+		}
+		if !found {
+			t.Errorf("%s differs from or is absent in the full demo", device.Config.GetKey())
+		}
+	}
+}
+
+// The maintained organization ships only rows the server dispatches: qualified
+// kind, ownership mode and release, no unqualified applicability and only
+// native-state verification. A refused row would be a permanent unsupported
+// disposition rather than a demonstrated control.
+func TestMaintainedOrganizationRowsDispatch(t *testing.T) {
+	spec := demoFixture(t)
+	rows := 0
+	for _, profile := range spec.Organization.GetProfiles() {
+		for _, row := range profile.GetSpec().GetResources() {
+			rows++
+			if reason := dispatch.ResourceDispatchUnsupported(row); reason != "" {
+				t.Errorf("%s %s %s: %s", profile.GetSpec().GetName(), row.GetDesired().GetRef().GetKind(), row.GetDesired().GetRef().GetCanonicalKey(), reason)
+			}
+		}
+	}
+	if rows == 0 {
+		t.Fatal("maintained organization declares no resources")
 	}
 }
 

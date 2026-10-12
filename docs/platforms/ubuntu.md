@@ -550,6 +550,13 @@ POSIX access ACL is not adopted, and no file is created where a directory's
 default ACL would be inherited. Both are signed `UNSUPPORTED_NATIVE` refusals;
 `getfacl`, content and the directory stay unchanged.
 
+Ubuntu 24.04 ships no `/etc/motd.d`, although `pam_motd` (`noupdate` in
+`/etc/pam.d/sshd` and `login`) reads it. The provider never creates an approved
+root: a managed file under an absent protected ancestor is a signed
+`PRECONDITION` refusal. Create the approved root (root:root 0755) when opting in;
+the persistent organization demo does this for its `fileProvider` roots
+([verification](../verification.md#organization-demo-resource-convergence-two-desktops-2026-10-12)).
+
 Firewall zones are a dedicated `inet lindm_z_<zone>` nftables table written over
 netlink at priority 10 (the agent does not run the `nft` CLI). Native records for
 the two-guest lane exist (see

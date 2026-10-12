@@ -420,6 +420,11 @@ func (r *demoRun) holdDevices(ctx context.Context) (err error) {
 	if err := r.writeReady(); err != nil {
 		return err
 	}
+	workers.Go(func() {
+		if err := r.watchResources(ctx); err != nil && ctx.Err() == nil {
+			cancel(fmt.Errorf("resource report: %w", err))
+		}
+	})
 	<-ctx.Done()
 	return demoContextError(ctx)
 }

@@ -69,6 +69,18 @@ func executionCommand(ctx context.Context, alias, script string, sshOptions ...s
 	return exec.CommandContext(ctx, "ssh", append(args, "--", alias, "bash -c "+QuoteShell(script))...)
 }
 
+// cancelByClosingLease is a Cmd.Cancel that ends the worker's stdin lifetime
+// lease. The owner may already have closed the lease to stop the worker; that
+// is the requested stop, not a cancellation failure.
+func cancelByClosingLease(stdin io.Closer) func() error {
+	return func() error {
+		if err := stdin.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			return err
+		}
+		return nil
+	}
+}
+
 // reverseForwardOptions validates "PORT:HOST:PORT" entries (HOST an IP
 // literal) and returns ssh options that fail the connection if any remote
 // bind is refused.
@@ -483,7 +495,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		return err
 	}
 	// Let stdin EOF cancel the worker and finish teardown before SSH exits.
-	cmd.Cancel = stdin.Close
+	cmd.Cancel = cancelByClosingLease(stdin)
 	cmd.WaitDelay = 2 * time.Minute
 	cmd.Stdout, cmd.Stderr = r.Stdout, r.Stderr
 	runErr := cmd.Start()

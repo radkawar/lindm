@@ -359,13 +359,31 @@ func installDemoAgent(ctx context.Context, vm *EncryptedVM, input *DemoDeviceInp
 	return nil
 }
 
+// demoFileRootsScript creates each absent approved root, as root with umask 022
+// (root:root 0755). An existing directory is never changed.
+const demoFileRootsScript = `umask 022; for root do test -d "$root" || mkdir -p -- "$root"; done`
+
 // configureDemoFileProvider writes the owner's root executor file-provider
 // opt-in into /etc/lindm/executor.json, preserving every other setting, and
 // restarts only the executor when it changed. The network process never
-// receives it; this is the device owner's local configuration.
+// receives it; this is the device owner's local configuration. An approved root
+// must exist: Ubuntu 24.04 ships no /etc/motd.d although its pam_motd reads it.
 func configureDemoFileProvider(ctx context.Context, vm *guestVM, provider *agentv1.NativeFileProviderConfig) error {
 	if err := protovalidate.Validate(provider); err != nil {
 		return err
+	}
+	if roots := provider.GetAllowedRoots(); len(roots) != 0 {
+		command := "sudo -n sh -eu -c " + nativeQuote(demoFileRootsScript) + " sh"
+		for _, root := range roots {
+			command += " " + nativeQuote(root)
+		}
+		created, err := vm.runResult(ctx, command, nil, 16<<10, time.Minute)
+		if err != nil {
+			return fmt.Errorf("create approved file roots: %w", err)
+		}
+		if created.ExitCode != 0 {
+			return fmt.Errorf("create approved file roots: exit %d: %s", created.ExitCode, created.Stderr)
+		}
 	}
 	data, err := vm.run(ctx, "sudo -n cat /etc/lindm/executor.json", nil, 1<<20, 10*time.Second)
 	if err != nil {
