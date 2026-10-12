@@ -6534,6 +6534,23 @@
       "repositorySnapshotDate": "2026-10-07",
       "repositoryClosureSha256": "0d7092d787d82a590b2b1818db4c5516c940e05dc07d792657745269e87ff545",
       "repositoryMetadataSha256": "990c58b81cf28ff8d14ede123cfc6bc39c0cb0484ceba9f0e3e3e772e88d49ff"
+    },
+    {
+      "platform": "opensuse-tumbleweed",
+      "cell": "provision-autoyast",
+      "architecture": "aarch64",
+      "manifest": "opensuse-tumbleweed-20261007-encrypted-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/lab-evidence/provision-20261012-inst5/opensuse-tumbleweed/provision-autoyast-aarch64.log",
+      "sha256": "94a45447b60be13d17aa42fd49b9833aeaa8b302f88a83a565faa719153a310e",
+      "recorded": "2026-10-12T08:33:12.428045774Z",
+      "revision": "1039d50cc76baeb1dbe92d9b8a5f5f4687362424",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "374fbef4a9413c394be5fcec2e80e65d0b5430a4388d28a4b5a759da5d00d356",
+      "repositorySnapshotDate": "2026-10-07",
+      "repositoryClosureSha256": "0d7092d787d82a590b2b1818db4c5516c940e05dc07d792657745269e87ff545",
+      "repositoryMetadataSha256": "990c58b81cf28ff8d14ede123cfc6bc39c0cb0484ceba9f0e3e3e772e88d49ff"
     }
   ]
 }
