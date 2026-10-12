@@ -15,8 +15,10 @@ import (
 	"lindm/internal/pki"
 )
 
-// MaxDeviceClockSkew bounds control-plane acceptance of device-signed wall
-// timestamps. Server-held single-use nonces and leases still expire on server
+// MaxDeviceClockSkew bounds the wall-clock disagreement tolerated between a
+// device and the control plane: control-plane acceptance of device-signed
+// timestamps, and a device's acceptance of a server-stamped escrow custody
+// commit. Server-held single-use nonces and leases still expire on server
 // time; this tolerance never extends those independent freshness fences.
 const MaxDeviceClockSkew = 2 * time.Minute
 

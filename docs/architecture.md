@@ -1182,7 +1182,10 @@ The server verifies the device attestation and exact recovery binding before
 decrypting and storing a per-record AES-256-GCM envelope, with its random data key
 wrapped under the separately protected deployment wrapping key. A signed receipt
 is issued only after that transaction commits. It binds the original action, slot,
-recovery-key digest and encrypted result. The executor persists the receipt and
+recovery-key digest and encrypted result, and carries the server time of the
+commit; the executor refuses a commit later than its own clock plus the 2 minute
+device clock skew the control plane also tolerates, so an unsynchronized device
+slightly behind the server still confirms at once. The executor persists the receipt and
 `RETIRING_ESCROW` phase before removing a previous lindm-managed slot. Loss before
 that boundary retains both slots; uncertain retirement remains unknown and cannot
 remove an independent owner slot. Escrow durability is not proof of cold-boot

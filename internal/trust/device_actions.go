@@ -269,8 +269,12 @@ func (v *ExecutionVerifier) VerifyDeviceActionEscrowReceipt(ctx context.Context,
 	}
 	// StoredAt records the original durable custody commit, not signature
 	// issuance. A current signer may attest that same commit after rollover.
+	// It is server time: a device clock behind the server by up to the
+	// tolerance the control plane grants device clocks still accepts a receipt
+	// stored just now. An Arch guest without time synchronization refused one
+	// until the operator's 30 s retirement credential had expired.
 	stored := receipt.GetStoredAt().AsTime()
-	if stored.After(now) {
+	if stored.After(now.Add(MaxDeviceClockSkew)) {
 		return nil, errors.New("device action escrow receipt validity rejected")
 	}
 	return receipt, nil

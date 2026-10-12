@@ -236,7 +236,9 @@ func TestDeviceActionEscrowReceiptBindsDurableCiphertextAndSlot(t *testing.T) {
 		{name: "wrong slot", change: func(r *agentv1.DeviceActionEscrowReceipt) { r.NewKeyslot++ }},
 		{name: "wrong volume", change: func(r *agentv1.DeviceActionEscrowReceipt) { r.LuksUuid = uuid.NewString() }},
 		{name: "old delegation", change: func(r *agentv1.DeviceActionEscrowReceipt) { r.DelegationVersion++ }},
-		{name: "future receipt", change: func(r *agentv1.DeviceActionEscrowReceipt) { r.StoredAt = timestamppb.New(f.now.Add(time.Second)) }},
+		{name: "future receipt", change: func(r *agentv1.DeviceActionEscrowReceipt) {
+			r.StoredAt = timestamppb.New(f.now.Add(MaxDeviceClockSkew + time.Second))
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			candidate := proto.CloneOf(receipt)
@@ -248,6 +250,12 @@ func TestDeviceActionEscrowReceiptBindsDurableCiphertextAndSlot(t *testing.T) {
 	}
 	if _, err := f.verifier.VerifyDeviceActionEscrowReceipt(t.Context(), f.root, f.delegation, executionSign(t, f.authority, receipt, f.startKey), record, f.now.Add(10*time.Minute)); err != nil {
 		t.Fatalf("durable receipt rejected after intent expiry: %v", err)
+	}
+	// A device clock slightly behind the server accepts a commit stored now.
+	lagging := proto.CloneOf(receipt)
+	lagging.StoredAt = timestamppb.New(f.now.Add(time.Second))
+	if _, err := f.verifier.VerifyDeviceActionEscrowReceipt(t.Context(), f.root, f.delegation, executionSign(t, f.authority, lagging, f.startKey), record, f.now); err != nil {
+		t.Fatalf("receipt stored within device clock skew rejected: %v", err)
 	}
 	if _, err := f.verifier.VerifyDeviceActionEscrowReceipt(t.Context(), f.root, f.delegation, executionSign(t, f.authority, receipt, f.planKey), record, f.now); err == nil {
 		t.Fatal("plan role minted custody receipt")
