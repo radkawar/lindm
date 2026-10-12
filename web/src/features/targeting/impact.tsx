@@ -6,40 +6,14 @@ import {
   TargetMatch,
   type TargetResolution,
 } from "../../../gen/lindm/policy/v1/targeting_pb";
-import { ResourceKind } from "../../../gen/lindm/resource/v1/identity_pb";
 import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
+import { blockedReasonLabel } from "@/lib/errors";
+import { resourceKindLabel } from "@/lib/resource-labels";
 import { formatTimestamp } from "@/lib/time";
-
-const kindLabels: Record<number, string> = {
-  [ResourceKind.SYSTEMD_SERVICE]: "Service",
-  [ResourceKind.LOCAL_GROUP]: "Local group",
-  [ResourceKind.LOCAL_USER]: "Local account",
-  [ResourceKind.SUDO_RULE]: "Administrator access",
-  [ResourceKind.SSH_SERVER]: "SSH server",
-  [ResourceKind.TIME_SYNC]: "Time synchronization",
-  [ResourceKind.TRUST_CA]: "Trusted certificate",
-  [ResourceKind.FIREWALL_ZONE]: "Firewall zone",
-  [ResourceKind.NETWORK_CONNECTION]: "Network connection",
-  [ResourceKind.DNS]: "DNS",
-  [ResourceKind.PROXY]: "Proxy",
-  [ResourceKind.NATIVE_PACKAGE]: "System package",
-  [ResourceKind.PACKAGE_REPOSITORY]: "Package repository",
-  [ResourceKind.FLATPAK_APP]: "Flatpak application",
-  [ResourceKind.OS_UPDATE_POLICY]: "Operating system updates",
-  [ResourceKind.SESSION_POLICY]: "Session policy",
-  [ResourceKind.PASSWORD_POLICY]: "Password policy",
-  [ResourceKind.SNAP_APP]: "Snap application",
-  [ResourceKind.CERTIFICATE_ENROLLMENT]: "Certificate enrollment",
-  [ResourceKind.DIRECTORY_CLIENT]: "Directory connection",
-  [ResourceKind.MANAGED_FILE]: "Managed file",
-  [ResourceKind.SYSCTL]: "Kernel setting",
-  [ResourceKind.SYSTEMD_DEFINITION]: "Systemd configuration",
-  [ResourceKind.ENCRYPTION_COMPLIANCE]: "Encryption compliance check",
-};
 
 const reasonLabels: Record<string, string> = {
   native_capabilities_unknown:
@@ -78,9 +52,7 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
         <ul className="grid gap-2">
           {value.resources.map((resource, index) => (
             <li key={index} className="grid gap-1 border p-2 text-sm">
-              <span className="font-medium">
-                {kindLabels[resource.ref?.kind ?? 0] ?? "Unknown setting"}
-              </span>
+              <span className="font-medium">{resourceKindLabel(resource.ref?.kind)}</span>
               <span className="break-all">
                 {settingTitle(resource.ref, resource.resource?.desired) ??
                   "Setting identity unavailable"}
@@ -107,7 +79,7 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
                   <StatusBadge status="warning">Not supported by server</StatusBadge>
                 ) : null}
               </div>
-              {resource.reason ? <p>{resource.reason.replaceAll("_", " ")}</p> : null}
+              {resource.reason ? <p>{blockedReasonLabel(resource.reason)}</p> : null}
               {resource.overriddenRevisionIds.length ? (
                 <p>
                   Overrides {resource.overriddenRevisionIds.length} other profile{" "}
@@ -118,6 +90,7 @@ function Resolution({ title, value }: { title: string; value?: TargetResolution 
                 items={[
                   { label: "Required capability", value: resource.capabilityId },
                   ...settingTechnicalIds(resource.ref),
+                  { label: "Reason code", value: resource.reason },
                   {
                     label: "Contributing profile versions",
                     value: resource.contributingRevisionIds.join(", "),

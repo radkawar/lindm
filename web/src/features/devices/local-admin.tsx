@@ -130,6 +130,7 @@ export function DeviceLocalAdminPanel({ deviceId }: { deviceId: string }) {
               items={[
                 { label: "Policy set by (ID)", value: policy ? status.policyActorId : undefined },
                 { label: "Escrow key ID", value: status.escrowKeyId },
+                { label: "Paused reason code", value: status.blockedReason },
               ]}
             />
             {manage ? (

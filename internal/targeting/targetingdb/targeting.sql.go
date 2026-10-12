@@ -25,7 +25,7 @@ SELECT (CASE
 FROM resource_assignments a
 JOIN resource_assignment_heads h ON h.assignment_id=a.id AND h.generation_id=a.generation_id
 JOIN devices d ON d.id=a.device_id AND d.current_generation_id=a.generation_id AND d.state='active'
-LEFT JOIN resource_assignment_resources r ON r.assignment_id=a.id
+LEFT JOIN resource_assignment_resources r ON r.assignment_id=a.id AND r.disposition<>8
 WHERE a.id=$2 AND a.device_id=$3 AND a.generation_id=$4
 GROUP BY a.id
 `
@@ -43,6 +43,7 @@ type CurrentExecutionHealthRow struct {
 	NativeValidUntil pgtype.Timestamptz
 }
 
+// Rows not applicable to this device's platform are neither health nor evidence.
 func (q *Queries) CurrentExecutionHealth(ctx context.Context, arg CurrentExecutionHealthParams) (CurrentExecutionHealthRow, error) {
 	row := q.db.QueryRow(ctx, currentExecutionHealth,
 		arg.FreshAfter,

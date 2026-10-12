@@ -26,10 +26,13 @@ message PackageIdentity {
     max_len: 256
     pattern: "^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$"
   }];
+  // Native package architecture (dpkg `amd64`, rpm `x86_64`, `all`/`noarch`).
+  // Empty only in desired state: the device's own native package architecture,
+  // which the executor resolves from dpkg/rpm and records in every observation.
+  // Evidence and transaction entries always carry the resolved architecture.
   string architecture = 3 [(buf.validate.field).string = {
-    min_len: 1
     max_len: 64
-    pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$"
+    pattern: "^([a-zA-Z0-9_][a-zA-Z0-9_.-]*)?$"
   }];
 }
 message AnyApprovedVersion {}

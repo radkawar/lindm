@@ -111,11 +111,14 @@ func (p *Provider) prepareDNF(ctx context.Context, directory string, source *age
 	}
 	return digest[:], nil
 }
-func dnfSpec(d *resourcev1.NativePackageDesired) string {
+
+// dnfSpec asks DNF for the native target; for a bare name DNF selects its
+// best architecture for this host, never a multilib sibling.
+func dnfSpec(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity) string {
 	if d.GetExact() != nil && d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-		return d.GetPackage().GetNativeName() + "-" + nativeVersion(d.GetExact()) + "." + d.GetPackage().GetArchitecture()
+		return nativeSpec(&resourcev1.PackageIdentity{NativeName: target.GetNativeName() + "-" + nativeVersion(d.GetExact()), Architecture: target.GetArchitecture()}, ".")
 	}
-	return d.GetPackage().GetNativeName() + "." + d.GetPackage().GetArchitecture()
+	return nativeSpec(target, ".")
 }
 func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource) ([]*resourcev1.PackageTransactionEntry, *resourcev1.RepositorySnapshot, error) {
 	signer, err := p.prepareDNF(ctx, directory, source)
@@ -131,7 +134,12 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 			return nil, nil, err
 		}
 	}
-	resolved, declared, err := p.resolveDNFSizes(ctx, directory, command, d)
+	target, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return nil, nil, err
+	}
+	spec := dnfSpec(d, target)
+	resolved, declared, err := p.resolveDNFSizes(ctx, directory, command, d, spec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -154,10 +162,10 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 	}
 	if err := boundedDownload(ctx, directory, declarations, func(downloadContext context.Context) error {
 		if p.manager == dnf.DNF4 {
-			_, err := p.dnf4(downloadContext, "stage", directory, p.versionlock, command, dnfSpec(d))
+			_, err := p.dnf4(downloadContext, "stage", directory, p.versionlock, command, spec)
 			return err
 		}
-		_, err := p.dnf(downloadContext, directory, []string{command, "--store=" + filepath.Join(directory, "transaction"), dnfSpec(d)})
+		_, err := p.dnf(downloadContext, directory, []string{command, "--store=" + filepath.Join(directory, "transaction"), spec})
 		return err
 	}); err != nil {
 		return nil, nil, err
@@ -167,7 +175,7 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		// DNF writes no bundle for an already satisfied request. Its database
 		// observation, rather than a success exit or missing file alone, must
 		// independently establish that there is genuinely nothing to do.
-		if !nativeMatches(d, db.records[packageKey(d.GetPackage())]) {
+		if !nativeMatches(d, db.records[packageKey(target)]) {
 			return nil, nil, errors.New("packageprovider: DNF omitted unsatisfied transaction")
 		}
 		data = []byte(`{"version":"1.0","rpms":[]}`)
@@ -289,7 +297,7 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 			return nil, errors.New("packageprovider: duplicate DNF transaction package")
 		}
 		seen[key] = true
-		entry := &resourcev1.PackageTransactionEntry{Package: identity, Before: before.GetVersion(), Source: d.GetRepository(), DirectRequest: key == packageKey(d.GetPackage())}
+		entry := &resourcev1.PackageTransactionEntry{Package: identity, Before: before.GetVersion(), Source: d.GetRepository(), DirectRequest: p.requests(d.GetPackage(), identity)}
 		switch rpm.Action {
 		case "Remove":
 			if !entry.DirectRequest || d.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT || before == nil || !proto.Equal(version, before.GetVersion()) {

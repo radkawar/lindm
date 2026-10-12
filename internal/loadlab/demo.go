@@ -47,8 +47,9 @@ type Demo struct {
 	HistoricalDeviceID string
 }
 
-// DemoDevice is one seeded device. State is enrolled, pending, stale or
-// revoked; a pending enrollment has no host report, hostname or OS yet.
+// DemoDevice is one seeded device. State is enrolled, pending (a provisioning
+// enrollment awaiting approval), awaiting-inventory (enrolled, no host report
+// yet), stale or revoked; pending and awaiting-inventory have no hostname or OS.
 type DemoDevice struct{ ID, Hostname, OS, State string }
 
 // DemoRoutes are seeded IDs for every parameterised console route.
@@ -60,6 +61,9 @@ type DemoRoutes struct {
 	ActionID            string // device action on DeviceID, for /devices/$deviceId/actions/$actionId
 	AssistanceSessionID string // on DeviceID, for /devices/$deviceId/assistance/$sessionId
 	RecoveryActionID    string // escrow action on DeviceID for /devices/$deviceId/recovery/$actionId
+	// FactsPendingDeviceID has not reported its platform, so its profile's
+	// platform-limited item waits for device facts (/devices/$deviceId).
+	FactsPendingDeviceID string
 }
 
 // demoSeed drives the real Admin, Enrollment and Device APIs for one fixture.
@@ -263,6 +267,11 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	rich := s.devices[0]
 	s.demo.Routes.DeviceID = rich.id
 	for _, d := range s.devices {
+		if d.demo.factsWithheld {
+			s.demo.Routes.FactsPendingDeviceID = d.id
+		}
+	}
+	for _, d := range s.devices {
 		if err := s.describe(ctx, d, historical); err != nil {
 			return err
 		}
@@ -328,6 +337,9 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 // describe labels the device and records its summary row.
 func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical *inventoryv1.HostObservation) error {
 	row := DemoDevice{ID: d.id, Hostname: d.demo.hostname, OS: d.demo.release.Name, State: d.demo.state}
+	if d.demo.factsWithheld {
+		row.Hostname, row.OS = "", ""
+	}
 	metadata := &adminv1.DeviceMetadata{Labels: append([]string{"synthetic-demo"}, d.demo.labels...), Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a live host"}}
 	if d.demo.historical && historical != nil {
 		row.Hostname, row.OS = historical.GetHostname().GetValue(), platform.Identify(platform.OSRelease{ID: historical.GetOsId().GetValue(), VersionID: historical.GetOsVersion().GetValue()}).Name
@@ -358,12 +370,20 @@ func demoProfiles() []*policyv1.ResourceProfile {
 	service := func(unit string, age uint32) *policyv1.ProfileResource {
 		return &policyv1.ProfileResource{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: unit}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: unit, Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN), Verification: verification(age)}
 	}
+	// The registry's Fedora 44 row on x86_64, the only platform the item targets.
+	fedora, _ := platform.Lookup("fedora-44")
+	fedoraOnly := func(item *policyv1.ProfileResource) *policyv1.ProfileResource {
+		item.Applicability = &resourcev1.Applicability{Products: []*resourcev1.PlatformProduct{{OsId: fedora.ID, Product: fedora.Distribution, Version: fedora.Version.Value, Architecture: "x86_64"}}}
+		return item
+	}
 	week := uint32(7 * 24 * 3600)
 	guestZone := uuid.NewString()
 	profiles := []*policyv1.ResourceProfile{
-		{Name: "Workstation baseline", Description: "Printing service and LUKS root encryption compliance for staff laptops.", Resources: []*policyv1.ProfileResource{
+		{Name: "Workstation baseline", Description: "Printing service and LUKS root encryption compliance for staff laptops; Fedora laptops also run firewalld.", Resources: []*policyv1.ProfileResource{
 			service("cups.service", week),
 			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE, CanonicalKey: "system/root"}, State: &resourcev1.ResourceDesiredState_EncryptionCompliance{EncryptionCompliance: &resourcev1.EncryptionComplianceDesired{RequireLuksRoot: true}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
+			// Not applicable on the Ubuntu laptops; waits on a laptop without inventory.
+			fedoraOnly(service("firewalld.service", week)),
 		}},
 		{Name: "Server hardening", Description: "Audit daemon and a pre-login legal banner for shared servers.", Resources: []*policyv1.ProfileResource{
 			service("auditd.service", week),
@@ -409,7 +429,19 @@ func (s *demoSeed) converge(ctx context.Context, d *simulatedDevice, profile *ad
 	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(reconcile), Reason: "Assign console demo profile"})); err != nil {
 		return fmt.Errorf("assign demo profile: %w", err)
 	}
-	want := d.serviceReports + len(profile.GetSpec().GetResources())
+	state, err := s.owner.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: d.id}))
+	if err != nil {
+		return fmt.Errorf("read demo assignment: %w", err)
+	}
+	// Items outside the device's platform, or waiting for its facts, never run.
+	want := d.serviceReports
+	for _, item := range state.Msg.GetResources() {
+		switch item.GetDisposition() {
+		case adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE, adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS:
+		default:
+			want++
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)

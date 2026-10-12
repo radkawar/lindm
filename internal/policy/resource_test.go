@@ -185,6 +185,55 @@ func TestResolveCrossKindClaimsBlockDependents(t *testing.T) {
 	}
 }
 
+func packageResource(resourceID, architecture string) *policyv1.ProfileResource {
+	item := resource(resourceID, "unused.service", runtimeActive(), enablementUnmanaged(), nil)
+	key := "deb/git"
+	if architecture != "" {
+		key += "/" + architecture
+	}
+	item.Desired = &resourcev1.ResourceDesiredState{
+		Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: key},
+		State: &resourcev1.ResourceDesiredState_NativePackage{NativePackage: &resourcev1.NativePackageDesired{
+			Package:    &resourcev1.PackageIdentity{Ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB, NativeName: "git", Architecture: architecture},
+			Presence:   resourcev1.Presence_PRESENCE_PRESENT,
+			Version:    &resourcev1.NativePackageDesired_Any{Any: &resourcev1.AnyApprovedVersion{}},
+			Repository: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: "apt/11111111-1111-4111-8111-111111111111"},
+			Removal:    resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_PRESERVE_DATA,
+		}},
+	}
+	return item
+}
+
+// One native-architecture row serves every device; mixing it with a row pinned
+// to one architecture would own the same native package twice on such a device.
+func TestResolveNeutralAndPinnedPackageRowsConflict(t *testing.T) {
+	resolved, err := Resolve(t.Context(), []Assignment{
+		{ProfileID: profileLow, RevisionID: revisionLow, Priority: 1, Spec: spec("native", packageResource(resourceA, ""))},
+		{ProfileID: profileHigh, RevisionID: revisionHi, Priority: 10, Spec: spec("pinned", packageResource(resourceB, "amd64"))},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resolved) != 2 {
+		t.Fatalf("resolution count=%d", len(resolved))
+	}
+	for _, item := range resolved {
+		if item.State != ResolutionConflict || item.Reason != ReasonClaimConflict || item.Desired != nil {
+			t.Fatalf("neutral and pinned package rows=%v", item)
+		}
+	}
+	resolved, err = Resolve(t.Context(), []Assignment{
+		{ProfileID: profileLow, RevisionID: revisionLow, Spec: spec("native", packageResource(resourceA, ""))},
+		{ProfileID: profileHigh, RevisionID: revisionHi, Spec: spec("native-again", packageResource(resourceB, ""))},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resolved) != 1 || resolved[0].State != ResolutionReady || resolved[0].Ref.GetCanonicalKey() != "deb/git" {
+		t.Fatalf("one native-architecture package row=%v", resolved)
+	}
+}
+
 func TestCanonicalSetPermutationDigestAndMerge(t *testing.T) {
 	group := groupResource(resourceA, "operators")
 	group.Ownership.CompleteMembershipDimension = true

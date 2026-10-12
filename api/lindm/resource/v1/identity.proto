@@ -96,6 +96,9 @@ enum ClaimDomain {
   CLAIM_DOMAIN_SYSCTL = 19;
   CLAIM_DOMAIN_SYSTEMD_DEFINITION = 20;
   CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE = 21;
+  // Whether a native package name follows the device's native architecture or a
+  // pinned one; never mixed per name.
+  CLAIM_DOMAIN_PACKAGE_SELECTOR = 22;
 }
 
 message ResourceClaim {

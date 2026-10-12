@@ -252,18 +252,21 @@ func aptOptions(directory string) []string {
 func (p *Provider) apt(ctx context.Context, directory, tool string, args []string) (nativeResult, error) {
 	return p.run(ctx, tool, append(aptOptions(directory), args...), "/", []string{"APT_CONFIG=" + filepath.Join(directory, "apt.conf")})
 }
-func aptSpec(d *resourcev1.NativePackageDesired) string {
-	spec := d.GetPackage().GetNativeName() + ":" + d.GetPackage().GetArchitecture()
+
+// aptSpec asks APT for the native target; APT itself maps a bare name to the
+// native architecture (and `all` packages to it).
+func aptSpec(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity) string {
+	spec := nativeSpec(target, ":")
 	if d.GetExact() != nil && d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
 		spec += "=" + d.GetExact().GetDeb()
 	}
 	return spec
 }
-func aptTransactionArgs(d *resourcev1.NativePackageDesired) []string {
+func aptTransactionArgs(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity) []string {
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-		return []string{"remove", aptSpec(d)}
+		return []string{"remove", aptSpec(d, target)}
 	}
-	return []string{"--no-remove", "install", aptSpec(d)}
+	return []string{"--no-remove", "install", aptSpec(d, target)}
 }
 
 type aptChange struct {
@@ -309,7 +312,11 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 	if err != nil {
 		return nil, nil, err
 	}
-	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate"}, aptTransactionArgs(d)...))
+	target, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return nil, nil, err
+	}
+	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate"}, aptTransactionArgs(d, target)...))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -325,7 +332,7 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 	}
 	declarations := make(map[string]downloadDeclaration)
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT && len(changes) > 0 {
-		result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--print-uris", "--download-only"}, aptTransactionArgs(d)...))
+		result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--print-uris", "--download-only"}, aptTransactionArgs(d, target)...))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -341,7 +348,7 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 			return nil, nil, err
 		}
 		if err := boundedDownload(ctx, directory, declarations, func(downloadContext context.Context) error {
-			_, err := p.apt(downloadContext, directory, "/usr/bin/apt-get", append([]string{"--assume-yes", "--download-only"}, aptTransactionArgs(d)...))
+			_, err := p.apt(downloadContext, directory, "/usr/bin/apt-get", append([]string{"--assume-yes", "--download-only"}, aptTransactionArgs(d, target)...))
 			return err
 		}); err != nil {
 			return nil, nil, err
@@ -386,14 +393,15 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 	entries := make([]*resourcev1.PackageTransactionEntry, 0, len(changes))
 	for _, change := range changes {
 		if change.remove {
-			if d.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT || change.name != d.GetPackage().GetNativeName() || (change.architecture != "" && change.architecture != d.GetPackage().GetArchitecture()) {
+			if d.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT || change.name != target.GetNativeName() || (change.architecture != "" && change.architecture != target.GetArchitecture()) {
 				return nil, nil, errors.New("packageprovider: hidden dependency removal refused")
 			}
-			before := db.records[packageKey(d.GetPackage())]
+			// Only an installed target is removed, so it names its architecture.
+			before := db.records[packageKey(target)]
 			if before == nil {
 				return nil, nil, ErrConflict
 			}
-			entries = append(entries, &resourcev1.PackageTransactionEntry{Package: d.GetPackage(), Operation: resourcev1.PackageTransactionOperation_PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED, Before: before.GetVersion(), Source: d.GetRepository(), DirectRequest: true, OwnedInstallation: true})
+			entries = append(entries, &resourcev1.PackageTransactionEntry{Package: target, Operation: resourcev1.PackageTransactionOperation_PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED, Before: before.GetVersion(), Source: d.GetRepository(), DirectRequest: true, OwnedInstallation: true})
 			continue
 		}
 		identity := &resourcev1.PackageIdentity{Ecosystem: p.ecosystem, NativeName: change.name, Architecture: change.architecture}
@@ -421,7 +429,7 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 		if before != nil {
 			operation = resourcev1.PackageTransactionOperation_PACKAGE_TRANSACTION_OPERATION_UPGRADE
 		}
-		entry := &resourcev1.PackageTransactionEntry{Package: identity, Operation: operation, Before: before.GetVersion(), After: after, Artifact: file.ref, Source: d.GetRepository(), DirectRequest: packageKey(identity) == packageKey(d.GetPackage()), SignerSha256: snapshot.GetSignerSha256()[0], MetadataRevisionSha256: snapshot.GetMetadataSha256()}
+		entry := &resourcev1.PackageTransactionEntry{Package: identity, Operation: operation, Before: before.GetVersion(), After: after, Artifact: file.ref, Source: d.GetRepository(), DirectRequest: p.requests(d.GetPackage(), identity), SignerSha256: snapshot.GetSignerSha256()[0], MetadataRevisionSha256: snapshot.GetMetadataSha256()}
 		entries = append(entries, entry)
 	}
 	if len(files) != countInbound(entries) {

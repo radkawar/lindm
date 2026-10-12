@@ -215,10 +215,18 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 		return 5, ResourceReasonNativeBusy
 	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN:
 		return 4, "outcome_unknown"
+	case status.GetStartedAt() == nil && status.GetPreparationOutcome().GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION:
+		// A device safety check refused before any effect, such as create-only
+		// acquisition of a package installed without lindm.
+		return 4, ResourceReasonPreparationPrecondition
 	default:
 		return 4, "execution_failed"
 	}
 }
+
+// ResourceReasonPreparationPrecondition is the server reason for a device
+// safety check that stopped preparation before any native effect.
+const ResourceReasonPreparationPrecondition = "preparation_precondition_failed"
 
 func (k *resourceResult) settleRelease(ctx context.Context, st *resourceResultState, terminal bool) error {
 	latest, err := st.q.LatestResourceReleaseAction(ctx, k.action.ReleaseID)

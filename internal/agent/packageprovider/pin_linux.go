@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"lindm/internal/custody"
@@ -72,11 +73,25 @@ func pinClaimsPackage(ref *resourcev1.ResourceRef, o *resourcev1.NativePackageOb
 	return dnf.VersionlockClaims(o.GetPinFile().GetPath(), o.GetPinContents(), ref.GetCanonicalKey(), o.GetPackage().GetNativeName())
 }
 
+// Pins are rendered from the desired package alone, never from what happens
+// to be installed, so plan, apply and verify agree. A package that follows the
+// device's architecture is pinned with each tool's own native-name form: APT
+// matches a bare name only at the native architecture (and `all`); RPM locks
+// name the package without an architecture.
 func aptPin(d *resourcev1.NativePackageDesired) []byte {
 	if d.GetExact() == nil || d.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
 		return nil
 	}
-	return []byte("# Managed by lindm; exact native version, never implicit downgrade.\nPackage: " + d.GetPackage().GetNativeName() + ":" + d.GetPackage().GetArchitecture() + "\nPin: version " + d.GetExact().GetDeb() + "\nPin-Priority: 1000\n")
+	return []byte("# Managed by lindm; exact native version, never implicit downgrade.\nPackage: " + nativeSpec(d.GetPackage(), ":") + "\nPin: version " + d.GetExact().GetDeb() + "\nPin-Priority: 1000\n")
+}
+
+// dnfPinConditions bind the exact EVR and, for a pinned package, its architecture.
+func dnfPinConditions(d *resourcev1.NativePackageDesired) []dnf.VersionlockCondition {
+	conditions := []dnf.VersionlockCondition{{Key: "evr", Comparator: "=", Value: nativeVersion(d.GetExact())}}
+	if architecture := d.GetPackage().GetArchitecture(); architecture != "" {
+		conditions = append(conditions, dnf.VersionlockCondition{Key: "arch", Comparator: "=", Value: architecture})
+	}
+	return conditions
 }
 func pinMarker(ref *resourcev1.ResourceRef) string {
 	return dnf.VersionlockMarker(ref.GetCanonicalKey())
@@ -103,7 +118,7 @@ func renderDNFPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesire
 	}
 	document.Packages = entries
 	if d.GetExact() != nil && d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-		document.Packages = append(document.Packages, dnf.VersionlockPackage{Name: d.GetPackage().GetNativeName(), Comment: marker, Conditions: []dnf.VersionlockCondition{{Key: "evr", Comparator: "=", Value: nativeVersion(d.GetExact())}, {Key: "arch", Comparator: "=", Value: d.GetPackage().GetArchitecture()}}})
+		document.Packages = append(document.Packages, dnf.VersionlockPackage{Name: d.GetPackage().GetNativeName(), Comment: marker, Conditions: dnfPinConditions(d)})
 	}
 	if len(document.Packages) == 0 && len(current) == 0 {
 		return nil, nil
@@ -119,12 +134,13 @@ func renderDNFPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesire
 }
 
 // dnf4LockEntry is the plugin's own exact NEVRA lock form with an explicit
-// architecture (the plugin's add command writes "*" for every architecture).
+// architecture (the plugin's add command writes "*" for every architecture),
+// or its NEVR form for a package that follows the device's architecture.
 func dnf4LockEntry(d *resourcev1.NativePackageDesired) string {
 	if d.GetExact() == nil || d.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
 		return ""
 	}
-	return d.GetPackage().GetNativeName() + "-" + nativeVersion(d.GetExact()) + "." + d.GetPackage().GetArchitecture()
+	return nativeSpec(&resourcev1.PackageIdentity{NativeName: d.GetPackage().GetNativeName() + "-" + nativeVersion(d.GetExact()), Architecture: d.GetPackage().GetArchitecture()}, ".")
 }
 func (p *Provider) renderPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) ([]byte, error) {
 	switch {
@@ -176,20 +192,17 @@ func pinMatches(backend resourcev1.Backend, ref *resourcev1.ResourceRef, d *reso
 			continue
 		}
 		count++
-		if !want || entry.Name != d.GetPackage().GetNativeName() || len(entry.Conditions) != 2 {
+		if !want {
 			return false
 		}
-		evr, arch := false, false
-		for _, condition := range entry.Conditions {
-			if condition.Key == "evr" && condition.Comparator == "=" && condition.Value == nativeVersion(d.GetExact()) {
-				evr = true
-			}
-			if condition.Key == "arch" && condition.Comparator == "=" && condition.Value == d.GetPackage().GetArchitecture() {
-				arch = true
-			}
-		}
-		if !evr || !arch {
+		conditions := dnfPinConditions(d)
+		if entry.Name != d.GetPackage().GetNativeName() || len(entry.Conditions) != len(conditions) {
 			return false
+		}
+		for _, condition := range conditions {
+			if !slices.Contains(entry.Conditions, condition) {
+				return false
+			}
 		}
 	}
 	return want && count == 1 || !want && count == 0

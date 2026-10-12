@@ -132,11 +132,16 @@ func matchDemoState(state *labv1.DemoState, spec *demolab.Spec) (bool, error) {
 		}
 		immutable, wanted := proto.CloneOf(bound.GetDevice()), proto.CloneOf(device.Config)
 		immutable.FileProvider, wanted.FileProvider = nil, nil
+		immutable.PackageProvider, wanted.PackageProvider = nil, nil
 		if !proto.Equal(immutable, wanted) {
 			return false, fmt.Errorf("named device %s changed its immutable configuration; destroy before replacing it", device.Config.GetKey())
 		}
 		if !proto.Equal(bound.GetDevice().GetFileProvider(), device.Config.GetFileProvider()) {
 			bound.Device.FileProvider = proto.CloneOf(device.Config.GetFileProvider())
+			changed = true
+		}
+		if !proto.Equal(bound.GetDevice().GetPackageProvider(), device.Config.GetPackageProvider()) {
+			bound.Device.PackageProvider = proto.CloneOf(device.Config.GetPackageProvider())
 			changed = true
 		}
 	}

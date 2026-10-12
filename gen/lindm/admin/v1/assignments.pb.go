@@ -38,6 +38,12 @@ const (
 	ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED         ResourceDisposition = 5
 	ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED     ResourceDisposition = 6
 	ResourceDisposition_RESOURCE_DISPOSITION_RELEASE_PENDING ResourceDisposition = 7
+	// The device's recorded platform (OS, version, architecture) is outside the
+	// resource's applicability. Never dispatched and excluded from compliance.
+	ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE ResourceDisposition = 8
+	// The resource is limited to platforms, but the device has not yet reported
+	// the OS and architecture needed to decide. Never dispatched until it does.
+	ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS ResourceDisposition = 9
 )
 
 // Enum value maps for ResourceDisposition.
@@ -51,16 +57,20 @@ var (
 		5: "RESOURCE_DISPOSITION_BLOCKED",
 		6: "RESOURCE_DISPOSITION_UNSUPPORTED",
 		7: "RESOURCE_DISPOSITION_RELEASE_PENDING",
+		8: "RESOURCE_DISPOSITION_NOT_APPLICABLE",
+		9: "RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS",
 	}
 	ResourceDisposition_value = map[string]int32{
-		"RESOURCE_DISPOSITION_UNSPECIFIED":     0,
-		"RESOURCE_DISPOSITION_PENDING":         1,
-		"RESOURCE_DISPOSITION_IN_PROGRESS":     2,
-		"RESOURCE_DISPOSITION_SUCCEEDED":       3,
-		"RESOURCE_DISPOSITION_ATTENTION":       4,
-		"RESOURCE_DISPOSITION_BLOCKED":         5,
-		"RESOURCE_DISPOSITION_UNSUPPORTED":     6,
-		"RESOURCE_DISPOSITION_RELEASE_PENDING": 7,
+		"RESOURCE_DISPOSITION_UNSPECIFIED":              0,
+		"RESOURCE_DISPOSITION_PENDING":                  1,
+		"RESOURCE_DISPOSITION_IN_PROGRESS":              2,
+		"RESOURCE_DISPOSITION_SUCCEEDED":                3,
+		"RESOURCE_DISPOSITION_ATTENTION":                4,
+		"RESOURCE_DISPOSITION_BLOCKED":                  5,
+		"RESOURCE_DISPOSITION_UNSUPPORTED":              6,
+		"RESOURCE_DISPOSITION_RELEASE_PENDING":          7,
+		"RESOURCE_DISPOSITION_NOT_APPLICABLE":           8,
+		"RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS": 9,
 	}
 )
 
@@ -100,6 +110,8 @@ const (
 	ResourceCompliance_RESOURCE_COMPLIANCE_DRIFT_REMEDIATED ResourceCompliance = 3
 	ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION        ResourceCompliance = 4
 	ResourceCompliance_RESOURCE_COMPLIANCE_STALE            ResourceCompliance = 5
+	// Outside the resource's applicability; not counted for or against the device.
+	ResourceCompliance_RESOURCE_COMPLIANCE_NOT_APPLICABLE ResourceCompliance = 6
 )
 
 // Enum value maps for ResourceCompliance.
@@ -111,6 +123,7 @@ var (
 		3: "RESOURCE_COMPLIANCE_DRIFT_REMEDIATED",
 		4: "RESOURCE_COMPLIANCE_ATTENTION",
 		5: "RESOURCE_COMPLIANCE_STALE",
+		6: "RESOURCE_COMPLIANCE_NOT_APPLICABLE",
 	}
 	ResourceCompliance_value = map[string]int32{
 		"RESOURCE_COMPLIANCE_UNSPECIFIED":      0,
@@ -119,6 +132,7 @@ var (
 		"RESOURCE_COMPLIANCE_DRIFT_REMEDIATED": 3,
 		"RESOURCE_COMPLIANCE_ATTENTION":        4,
 		"RESOURCE_COMPLIANCE_STALE":            5,
+		"RESOURCE_COMPLIANCE_NOT_APPLICABLE":   6,
 	}
 )
 
@@ -654,7 +668,8 @@ type ResourceState struct {
 	Desired     *v11.ResourceDesiredState `protobuf:"bytes,2,opt,name=desired,proto3" json:"desired,omitempty"`
 	DependsOn   []*v12.ResourceDependency `protobuf:"bytes,3,rep,name=depends_on,json=dependsOn,proto3" json:"depends_on,omitempty"`
 	Disposition ResourceDisposition       `protobuf:"varint,4,opt,name=disposition,proto3,enum=lindm.admin.v1.ResourceDisposition" json:"disposition,omitempty"`
-	// snake_case reason for PENDING/BLOCKED/ATTENTION; empty otherwise.
+	// snake_case reason for PENDING/BLOCKED/ATTENTION/UNSUPPORTED/NOT_APPLICABLE/
+	// WAITING_FOR_DEVICE_FACTS; empty otherwise.
 	Reason string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	// Most recent action for this resource under the current head.
 	LatestAction *ResourceActionSummary `protobuf:"bytes,6,opt,name=latest_action,json=latestAction,proto3" json:"latest_action,omitempty"`
@@ -662,7 +677,9 @@ type ResourceState struct {
 	// Server receive time of the latest successful native verification.
 	LastVerifiedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_verified_at,json=lastVerifiedAt,proto3" json:"last_verified_at,omitempty"`
 	// Device wall clock of that native observation; never used for scheduling.
-	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	ObservedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	// The profile's platform and feature limits for this resource, if any.
+	Applicability *v11.Applicability `protobuf:"bytes,10,opt,name=applicability,proto3" json:"applicability,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -756,6 +773,13 @@ func (x *ResourceState) GetLastVerifiedAt() *timestamppb.Timestamp {
 func (x *ResourceState) GetObservedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *ResourceState) GetApplicability() *v11.Applicability {
+	if x != nil {
+		return x.Applicability
 	}
 	return nil
 }
@@ -1013,7 +1037,7 @@ var File_lindm_admin_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
+	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
 	"\x12ResourceAssignment\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1070,7 +1094,7 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"attestedAt\x12;\n" +
 	"\vreceived_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"receivedAt\"\xa9\x04\n" +
+	"receivedAt\"\xf1\x04\n" +
 	"\rResourceState\x12\x1f\n" +
 	"\vresource_id\x18\x01 \x01(\tR\n" +
 	"resourceId\x12A\n" +
@@ -1085,7 +1109,9 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"compliance\x12D\n" +
 	"\x10last_verified_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastVerifiedAt\x12;\n" +
 	"\vobserved_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"observedAt\"\xcd\x01\n" +
+	"observedAt\x12F\n" +
+	"\rapplicability\x18\n" +
+	" \x01(\v2 .lindm.resource.v1.ApplicabilityR\rapplicability\"\xcd\x01\n" +
 	"\x14DeviceResourceAction\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
@@ -1109,7 +1135,7 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\x05state\x18\x05 \x01(\tR\x05state\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12=\n" +
 	"\frequested_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vrequestedAt\x12=\n" +
-	"\fcompleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt*\xbd\x02\n" +
+	"\fcompleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt*\x99\x03\n" +
 	"\x13ResourceDisposition\x12$\n" +
 	" RESOURCE_DISPOSITION_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cRESOURCE_DISPOSITION_PENDING\x10\x01\x12$\n" +
@@ -1118,14 +1144,17 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\x1eRESOURCE_DISPOSITION_ATTENTION\x10\x04\x12 \n" +
 	"\x1cRESOURCE_DISPOSITION_BLOCKED\x10\x05\x12$\n" +
 	" RESOURCE_DISPOSITION_UNSUPPORTED\x10\x06\x12(\n" +
-	"$RESOURCE_DISPOSITION_RELEASE_PENDING\x10\a*\xe9\x01\n" +
+	"$RESOURCE_DISPOSITION_RELEASE_PENDING\x10\a\x12'\n" +
+	"#RESOURCE_DISPOSITION_NOT_APPLICABLE\x10\b\x121\n" +
+	"-RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS\x10\t*\x91\x02\n" +
 	"\x12ResourceCompliance\x12#\n" +
 	"\x1fRESOURCE_COMPLIANCE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bRESOURCE_COMPLIANCE_UNKNOWN\x10\x01\x12!\n" +
 	"\x1dRESOURCE_COMPLIANCE_COMPLIANT\x10\x02\x12(\n" +
 	"$RESOURCE_COMPLIANCE_DRIFT_REMEDIATED\x10\x03\x12!\n" +
 	"\x1dRESOURCE_COMPLIANCE_ATTENTION\x10\x04\x12\x1d\n" +
-	"\x19RESOURCE_COMPLIANCE_STALE\x10\x05B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x19RESOURCE_COMPLIANCE_STALE\x10\x05\x12&\n" +
+	"\"RESOURCE_COMPLIANCE_NOT_APPLICABLE\x10\x06B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_assignments_proto_rawDescOnce sync.Once
@@ -1158,8 +1187,9 @@ var file_lindm_admin_v1_assignments_proto_goTypes = []any{
 	(*v1.ResourceExecutionStatus)(nil),     // 13: lindm.agent.v1.ResourceExecutionStatus
 	(*v11.ResourceDesiredState)(nil),       // 14: lindm.resource.v1.ResourceDesiredState
 	(*v12.ResourceDependency)(nil),         // 15: lindm.policy.v1.ResourceDependency
-	(*v11.ResourceRef)(nil),                // 16: lindm.resource.v1.ResourceRef
-	(*v12.TargetPreview)(nil),              // 17: lindm.policy.v1.TargetPreview
+	(*v11.Applicability)(nil),              // 16: lindm.resource.v1.Applicability
+	(*v11.ResourceRef)(nil),                // 17: lindm.resource.v1.ResourceRef
+	(*v12.TargetPreview)(nil),              // 18: lindm.policy.v1.TargetPreview
 }
 var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	12, // 0: lindm.admin.v1.ResourceAssignment.assigned_at:type_name -> google.protobuf.Timestamp
@@ -1179,21 +1209,22 @@ var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	1,  // 14: lindm.admin.v1.ResourceState.compliance:type_name -> lindm.admin.v1.ResourceCompliance
 	12, // 15: lindm.admin.v1.ResourceState.last_verified_at:type_name -> google.protobuf.Timestamp
 	12, // 16: lindm.admin.v1.ResourceState.observed_at:type_name -> google.protobuf.Timestamp
-	16, // 17: lindm.admin.v1.DeviceResourceAction.ref:type_name -> lindm.resource.v1.ResourceRef
-	7,  // 18: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ResourceActionSummary
-	2,  // 19: lindm.admin.v1.GetDeviceResourceStateResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
-	8,  // 20: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
-	9,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction
-	11, // 22: lindm.admin.v1.GetDeviceResourceStateResponse.releases:type_name -> lindm.admin.v1.ResourceRelease
-	17, // 23: lindm.admin.v1.GetDeviceResourceStateResponse.active_target_preview:type_name -> lindm.policy.v1.TargetPreview
-	16, // 24: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
-	12, // 25: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
-	12, // 26: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	16, // 17: lindm.admin.v1.ResourceState.applicability:type_name -> lindm.resource.v1.Applicability
+	17, // 18: lindm.admin.v1.DeviceResourceAction.ref:type_name -> lindm.resource.v1.ResourceRef
+	7,  // 19: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ResourceActionSummary
+	2,  // 20: lindm.admin.v1.GetDeviceResourceStateResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
+	8,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
+	9,  // 22: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction
+	11, // 23: lindm.admin.v1.GetDeviceResourceStateResponse.releases:type_name -> lindm.admin.v1.ResourceRelease
+	18, // 24: lindm.admin.v1.GetDeviceResourceStateResponse.active_target_preview:type_name -> lindm.policy.v1.TargetPreview
+	17, // 25: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
+	12, // 26: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
+	12, // 27: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_assignments_proto_init() }

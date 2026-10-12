@@ -423,6 +423,14 @@ owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
 
+A package row without an architecture (`rpm/git`) follows `rpm --eval %{_arch}`
+(`x86_64` or `aarch64`) and also matches an installed `noarch` package. DNF is
+asked for the bare name, so its best-architecture choice never selects a multilib
+sibling, and the owned versionlock entry binds only the EVR, so it holds every
+installed architecture of that name. Unit coverage only: no native record exercises
+a row without an architecture yet; see
+[package identity](../engineering.md#native-package-resource-provider).
+
 The typed kernel-module blocklist is enabled explicitly in the root executor's
 `fileProvider.kernelModuleBlocklist`. Fedora 44 uses native `modprobe` and
 `dracut --regenerate-all --force`; both tools must be installed. While the stanza

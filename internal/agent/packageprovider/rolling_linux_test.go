@@ -147,12 +147,13 @@ func TestZypperSummaryRejectsHiddenEffects(t *testing.T) {
 	d := rollingDesired(false)
 	db := &database{records: map[string]*resourcev1.NativePackageRecord{}, multiple: map[string]bool{}}
 	valid := `<stream><install-summary packages-to-change="1" download-size="12"><to-install><solvable type="package" name="proof" edition="2.0-1" arch="x86_64" repository="approved"/></to-install></install-summary></stream>`
-	entries, size, err := parseZypperSummary([]byte(valid), d, db, "approved")
+	p := &Provider{}
+	entries, size, err := p.parseZypperSummary([]byte(valid), d, db, "approved")
 	if err != nil || len(entries) != 1 || size != 12 {
 		t.Fatalf("native summary: %v, %d, %v", entries, size, err)
 	}
 	for _, bad := range []string{strings.ReplaceAll(valid, "to-install", "to-downgrade"), strings.Replace(valid, "approved", "foreign", 1), strings.Replace(valid, `packages-to-change="1"`, `packages-to-change="2"`, 1), strings.Replace(valid, `type="package"`, `type="pattern"`, 1), strings.Replace(valid, "</stream>", `<message type="warning">incomplete</message></stream>`, 1)} {
-		if _, _, err := parseZypperSummary([]byte(bad), d, db, "approved"); err == nil {
+		if _, _, err := p.parseZypperSummary([]byte(bad), d, db, "approved"); err == nil {
 			t.Fatalf("unsafe summary accepted: %q", bad)
 		}
 	}
@@ -171,8 +172,9 @@ func TestALPMArchitectureReplacementRejectedForEveryEntry(t *testing.T) {
 			installed.Package.Architecture = archs[0]
 			installed.Version.GetAlpm().Pkgver = "3.0"
 			db := &database{records: map[string]*resourcev1.NativePackageRecord{packageKey(installed.GetPackage()): installed}}
-			entry := rollingEntry(incoming, d, db, false)
-			if err := validateEntries([]*resourcev1.PackageTransactionEntry{entry}, d, db); err == nil {
+			p := &Provider{}
+			entry := p.rollingEntry(incoming, d, db, false)
+			if err := p.validateEntries([]*resourcev1.PackageTransactionEntry{entry}, d, db); err == nil {
 				t.Fatalf("accepted native-name replacement %s -> %s, dependency=%t", archs[0], archs[1], dependency)
 			}
 		}

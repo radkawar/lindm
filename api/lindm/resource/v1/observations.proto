@@ -373,8 +373,14 @@ message NativePackageRecord {
     message: "known provenance binds authenticated source evidence; unknown provenance has no invented source"
     expression: "this.provenance_known ? has(this.source) && this.source.kind == 13 && has(this.signer_sha256) && has(this.metadata_revision_sha256) : !has(this.source) && !has(this.signer_sha256) && !has(this.metadata_revision_sha256)"
   };
+  option (buf.validate.message).cel = {
+    id: "native_package_record.architecture"
+    message: "native evidence names the resolved package architecture"
+    expression: "this.package.architecture != ''"
+  };
 }
 message NativePackageObservation {
+  // The resolved native identity, also for a desired package without architecture.
   PackageIdentity package = 1 [(buf.validate.field).required = true];
   bool installed = 2;
   NativePackageRecord record = 3;
@@ -387,6 +393,11 @@ message NativePackageObservation {
     id: "native_package_observation.record"
     message: "installed packages require their native record"
     expression: "this.installed == has(this.record)"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_package_observation.architecture"
+    message: "native evidence names the resolved package architecture"
+    expression: "this.package.architecture != ''"
   };
 }
 enum RepositoryEcosystem {

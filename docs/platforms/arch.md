@@ -256,6 +256,11 @@ preparation and reobserved before effect authority. The provider and journal sha
 one owned-block parser, so ordinary existing configuration is not mistaken for an
 existing managed package. Release requires the same owned baseline and never
 removes dependencies.
+A package without an architecture follows the approved sources' single pacman
+`Architecture` (approved sources that disagree make such rows unsupported) and also
+matches an installed `any` package; `IgnorePkg` has no architecture, so its pin is
+unchanged. Unit coverage only; see
+[package identity](../engineering.md#native-package-resource-provider).
 See the upstream [pacman manual](https://man.archlinux.org/man/pacman.8.en)
 and [configuration expansion contract](https://man.archlinux.org/man/pacman-conf.8.en).
 

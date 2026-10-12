@@ -35,7 +35,7 @@ type zypperSummary struct {
 	Groups   []zypperGroup `xml:",any"`
 }
 
-func parseZypperSummary(data []byte, d *resourcev1.NativePackageDesired, db *database, repository string) ([]*resourcev1.PackageTransactionEntry, uint64, error) {
+func (p *Provider) parseZypperSummary(data []byte, d *resourcev1.NativePackageDesired, db *database, repository string) ([]*resourcev1.PackageTransactionEntry, uint64, error) {
 	var document struct {
 		XMLName   xml.Name        `xml:"stream"`
 		Summaries []zypperSummary `xml:"install-summary"`
@@ -81,13 +81,13 @@ func parseZypperSummary(data []byte, d *resourcev1.NativePackageDesired, db *dat
 			if remove && !samePackageRecord(record, db.records[packageKey(identity)]) {
 				return nil, 0, ErrConflict
 			}
-			entries = append(entries, rollingEntry(record, d, db, remove))
+			entries = append(entries, p.rollingEntry(record, d, db, remove))
 		}
 	}
 	if uint64(len(entries)) != summary.Count {
 		return nil, 0, ErrConflict
 	}
-	if err := validateEntries(entries, d, db); err != nil {
+	if err := p.validateEntries(entries, d, db); err != nil {
 		return nil, 0, err
 	}
 	return entries, summary.Download, nil
@@ -103,12 +103,20 @@ func zypperEnv(directory string, preparation bool) []string {
 	}
 	return env
 }
-func zypperTarget(d *resourcev1.NativePackageDesired) string {
-	target := d.GetPackage().GetNativeName() + "." + d.GetPackage().GetArchitecture()
+func zypperTarget(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity) string {
+	spec := nativeSpec(target, ".")
 	if d.GetExact() != nil && d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-		target += "=" + nativeVersion(d.GetExact())
+		spec += "=" + nativeVersion(d.GetExact())
 	}
-	return target
+	return spec
+}
+
+// zypperDryRun solves the desired change against the staged repository only.
+func zypperDryRun(d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity) []string {
+	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
+		return []string{"remove", "--dry-run", "--", zypperTarget(d, target)}
+	}
+	return []string{"install", "--no-recommends", "--no-allow-vendor-change", "--dry-run", "--", zypperTarget(d, target)}
 }
 
 // zyppGPGCheckMarker reports libzypp's raw-cache record of the repository
@@ -194,18 +202,18 @@ func (p *Provider) planZypper(ctx context.Context, directory string, d *resource
 	if err := p.verifyRollingSignature(ctx, directory, repomd, source.GetRpmSigningKeyFingerprint()); err != nil {
 		return nil, err
 	}
-	if nativeMatches(d, db.records[packageKey(d.GetPackage())]) {
-		return nil, nil
-	}
-	command := []string{"install", "--no-recommends", "--no-allow-vendor-change", "--dry-run", "--", zypperTarget(d)}
-	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-		command = []string{"remove", "--dry-run", "--", zypperTarget(d)}
-	}
-	result, err := p.run(ctx, p.managerPath, zypperArgs(directory, command...), "/", zypperEnv(directory, true))
+	target, err := p.nativeTarget(db, d.GetPackage())
 	if err != nil {
 		return nil, err
 	}
-	entries, declared, err := parseZypperSummary(result.stdout, d, db, repo.GetNativeId())
+	if nativeMatches(d, db.records[packageKey(target)]) {
+		return nil, nil
+	}
+	result, err := p.run(ctx, p.managerPath, zypperArgs(directory, zypperDryRun(d, target)...), "/", zypperEnv(directory, true))
+	if err != nil {
+		return nil, err
+	}
+	entries, declared, err := p.parseZypperSummary(result.stdout, d, db, repo.GetNativeId())
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +317,7 @@ func sameRollingSelection(a, b []*resourcev1.PackageTransactionEntry) bool {
 // staging repository directory with this empty one instead.
 const zypperCommitRepos = "commit-repos"
 
-func zypperCommitArgs(directory string, d *resourcev1.NativePackageDesired, entries []*resourcev1.PackageTransactionEntry, preview bool) []string {
+func zypperCommitArgs(directory string, d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity, entries []*resourcev1.PackageTransactionEntry, preview bool) []string {
 	var paths []string
 	for _, entry := range entries {
 		if entry.GetArtifact() != nil {
@@ -318,7 +326,7 @@ func zypperCommitArgs(directory string, d *resourcev1.NativePackageDesired, entr
 	}
 	args := []string{"install", "--no-recommends", "--no-allow-vendor-change"}
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-		args, paths = []string{"remove"}, []string{zypperTarget(d)}
+		args, paths = []string{"remove"}, []string{zypperTarget(d, target)}
 	}
 	if preview {
 		args = append(args, "--dry-run")
@@ -358,15 +366,19 @@ func (p *Provider) previewZypperCommit(ctx context.Context, directory string, d 
 	if err := emptyZypperCommitRepos(directory); err != nil {
 		return err
 	}
-	result, err := p.run(ctx, p.managerPath, zypperCommitArgs(directory, d, entries, true), "/", zypperEnv(directory, false))
-	if err != nil {
-		return err
-	}
 	db, err := p.database(ctx)
 	if err != nil {
 		return err
 	}
-	selected, _, err := parseZypperSummary(result.stdout, d, db, "")
+	target, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return err
+	}
+	result, err := p.run(ctx, p.managerPath, zypperCommitArgs(directory, d, target, entries, true), "/", zypperEnv(directory, false))
+	if err != nil {
+		return err
+	}
+	selected, _, err := p.parseZypperSummary(result.stdout, d, db, "")
 	if err != nil {
 		return err
 	}
@@ -376,10 +388,10 @@ func (p *Provider) previewZypperCommit(ctx context.Context, directory string, d 
 	return nil
 }
 
-func (p *Provider) commitZypper(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, entries []*resourcev1.PackageTransactionEntry) error {
+func (p *Provider) commitZypper(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, target *resourcev1.PackageIdentity, entries []*resourcev1.PackageTransactionEntry) error {
 	if err := emptyZypperCommitRepos(directory); err != nil {
 		return err
 	}
-	_, err := commitNative(ctx, p.managerPath, zypperCommitArgs(directory, d, entries, false), "/", zypperEnv(directory, false))
+	_, err := commitNative(ctx, p.managerPath, zypperCommitArgs(directory, d, target, entries, false), "/", zypperEnv(directory, false))
 	return err
 }

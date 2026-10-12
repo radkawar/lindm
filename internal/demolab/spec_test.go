@@ -57,9 +57,10 @@ func TestDesktopDemoIsExactFullDemoSubset(t *testing.T) {
 }
 
 // The maintained organization ships only rows the server dispatches: qualified
-// kind, ownership mode and release, no unqualified applicability and only
-// native-state verification. A refused row would be a permanent unsupported
-// disposition rather than a demonstrated control.
+// kind, ownership mode and release, no feature requirement without device
+// evidence and only native-state verification. Platform limits are decided per
+// device. A refused row would be a permanent unsupported disposition rather
+// than a demonstrated control.
 func TestMaintainedOrganizationRowsDispatch(t *testing.T) {
 	spec := demoFixture(t)
 	rows := 0

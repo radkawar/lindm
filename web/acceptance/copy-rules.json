@@ -33,6 +33,12 @@
       "flags": ""
     },
     {
+      "name": "raw camelCase identifier",
+      "$comment": "Type names such as nativePackage. Dotted configuration paths (releaseRepository.directory) are values an operator types and stay allowed.",
+      "pattern": "(?<![\\w./])[a-z]+(?:[A-Z][a-z0-9]+)+(?![\\w./])",
+      "flags": ""
+    },
+    {
       "name": "raw byte count",
       "pattern": "\\b\\d{1,3}(?:[,.\\s\\u202f]\\d{3})+\\s*bytes?\\b|\\b\\d{4,}\\s*bytes?\\b",
       "flags": "i"

@@ -133,11 +133,60 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
   escrow_unconfigured: "Blocked: secret storage isn't set up on the server.",
   native_package_manager_busy:
     "Waiting: another package manager (such as a release upgrade) was running. Nothing changed; it retries at the next check.",
+  resource_executor_not_available:
+    "lindm can't manage this kind of setting on devices yet, so it isn't sent. Remove it from the profile or manage it another way.",
+  resource_ownership_operation_unavailable:
+    "lindm can't yet take over or undo this setting the way the profile asks, so it isn't sent. Change the profile's ownership choice for this item.",
+  resource_verification_not_available:
+    "lindm can't run the extra health checks this profile asks for, so it isn't sent. Keep only the device state check in the profile.",
+  resource_feature_evidence_unavailable:
+    "No device reports the capabilities this setting requires yet, so it isn't sent. Remove the capability requirement from the profile.",
+  resource_platform_not_applicable:
+    "Not applicable to this device: the profile limits it to other platforms.",
+  device_platform_facts_unavailable:
+    "Waiting for this device to report its operating system and architecture; lindm then decides whether this applies.",
+  adoption_approval_required:
+    "Taking over this existing setting needs an approved assignment. Assign the profile again with an approval.",
+  assignment_authority_changed:
+    "The admin who assigned this profile no longer has permission. Assign the profile again to resume.",
+  dependency_pending: "Waiting for the items it depends on to be applied first.",
+  dependency_attention: "An item this depends on needs attention. Fix that item first.",
+  dependency_not_applicable:
+    "An item this depends on doesn't apply to this device, so this can't be applied. Change the profile.",
+  native_unsupported: "The device reported it can't apply this setting. Nothing was changed.",
+  admission_precondition:
+    "The device refused to start because a required condition wasn't met. Nothing was changed.",
+  native_tool_path_unprotected:
+    "The device refused to run a system tool kept in an unprotected folder. Nothing was changed; the device inventory names the folder.",
+  not_applicable: "The device reported this setting doesn't apply to it.",
+  no_effect: "The last attempt ended before it started. Nothing was changed; lindm sends it again.",
+  verification_unknown: "The device couldn't confirm this setting's current state.",
+  verification_drifted: "The device found this setting changed away from the profile.",
+  outcome_unknown:
+    "The device couldn't confirm whether the last change finished. Check the device before assigning again.",
+  execution_failed: "The last change failed on the device. Its report is under Latest change.",
+  preparation_precondition_failed:
+    "The device stopped before changing anything because a safety check failed, for example a package that was already installed without lindm. Nothing was changed.",
+  ownership_baseline_unavailable:
+    "lindm has no record of this setting from before it took over, so it leaves the device as it is.",
+  precondition_failed:
+    "The device refused to undo this because a required condition wasn't met. Nothing was changed.",
+  release_failed: "The device couldn't undo this setting. Its report is under Recent changes.",
+  expired_unstarted: "It expired before the device started it. Nothing was changed.",
+  assignment_changed: "The profile changed before the device started it. Nothing was changed.",
+  targeting_paused_or_changed:
+    "The rollout paused or changed before the device started it. Nothing was changed.",
+  authority_changed:
+    "The assigning admin lost permission before the device started it. Nothing was changed.",
 };
 
-// Server-recorded blocked or attention reasons; unknown reasons are shown verbatim.
+// Server-recorded blocked, refused or attention reasons as one plain sentence.
+// The code itself belongs in Details; unknown codes never reach primary text.
 export function blockedReasonLabel(reason: string): string {
-  return BLOCKED_REASON_LABELS[reason] ?? reason;
+  return (
+    BLOCKED_REASON_LABELS[reason] ??
+    "lindm recorded a reason it can't describe in words yet. The code is in Details."
+  );
 }
 
 export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation {

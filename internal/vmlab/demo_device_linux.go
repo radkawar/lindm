@@ -40,6 +40,9 @@ type DemoDeviceInput struct {
 	// file-provider opt-in (agentv1.NativeFileProviderConfig).
 	FileRoots             []string `json:"file_roots,omitempty"`
 	KernelModuleBlocklist bool     `json:"kernel_module_blocklist,omitempty"`
+	// PackageProvider is the owner's protojson agentv1.NativePackageProviderConfig
+	// approving native package sources on this host.
+	PackageProvider json.RawMessage `json:"package_provider,omitempty"`
 }
 
 // ReadDemoDeviceInput consumes a protected staging file, including on failure.
@@ -229,9 +232,19 @@ func DemoDeviceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if _, err := waitVMExecutionTrust(ctx, vm.guest, authority, delegation); err != nil {
 		return err
 	}
+	var files *agentv1.NativeFileProviderConfig
 	if len(input.FileRoots) != 0 || input.KernelModuleBlocklist {
-		provider := &agentv1.NativeFileProviderConfig{AllowedRoots: input.FileRoots, KernelModuleBlocklist: input.KernelModuleBlocklist}
-		if err := configureDemoFileProvider(ctx, vm.guest, provider); err != nil {
+		files = &agentv1.NativeFileProviderConfig{AllowedRoots: input.FileRoots, KernelModuleBlocklist: input.KernelModuleBlocklist}
+	}
+	var packages *agentv1.NativePackageProviderConfig
+	if len(input.PackageProvider) != 0 {
+		packages = new(agentv1.NativePackageProviderConfig)
+		if err := protojson.Unmarshal(input.PackageProvider, packages); err != nil {
+			return fmt.Errorf("decode demo package provider: %w", err)
+		}
+	}
+	if files != nil || packages != nil {
+		if err := configureDemoExecutor(ctx, vm.guest, files, packages); err != nil {
 			return err
 		}
 	}
@@ -363,16 +376,22 @@ func installDemoAgent(ctx context.Context, vm *EncryptedVM, input *DemoDeviceInp
 // (root:root 0755). An existing directory is never changed.
 const demoFileRootsScript = `umask 022; for root do test -d "$root" || mkdir -p -- "$root"; done`
 
-// configureDemoFileProvider writes the owner's root executor file-provider
-// opt-in into /etc/lindm/executor.json, preserving every other setting, and
-// restarts only the executor when it changed. The network process never
-// receives it; this is the device owner's local configuration. An approved root
-// must exist: Ubuntu 24.04 ships no /etc/motd.d although its pam_motd reads it.
-func configureDemoFileProvider(ctx context.Context, vm *guestVM, provider *agentv1.NativeFileProviderConfig) error {
-	if err := protovalidate.Validate(provider); err != nil {
-		return err
+// configureDemoExecutor writes the owner's root executor file-provider and
+// package-source opt-ins (each only when given) into /etc/lindm/executor.json,
+// preserving every other setting, and restarts only the executor when it
+// changed. The network process never receives them; this is the device
+// owner's local configuration. An approved file root must exist: Ubuntu 24.04
+// ships no /etc/motd.d although its pam_motd reads it.
+func configureDemoExecutor(ctx context.Context, vm *guestVM, files *agentv1.NativeFileProviderConfig, packages *agentv1.NativePackageProviderConfig) error {
+	for _, provider := range []proto.Message{files, packages} {
+		if !provider.ProtoReflect().IsValid() {
+			continue
+		}
+		if err := protovalidate.Validate(provider); err != nil {
+			return err
+		}
 	}
-	if roots := provider.GetAllowedRoots(); len(roots) != 0 {
+	if roots := files.GetAllowedRoots(); len(roots) != 0 {
 		command := "sudo -n sh -eu -c " + nativeQuote(demoFileRootsScript) + " sh"
 		for _, root := range roots {
 			command += " " + nativeQuote(root)
@@ -393,20 +412,26 @@ func configureDemoFileProvider(ctx context.Context, vm *guestVM, provider *agent
 	if err := protojson.Unmarshal(data, config); err != nil {
 		return err
 	}
-	if proto.Equal(config.GetFileProvider(), provider) {
+	changed := false
+	if files != nil && !proto.Equal(config.GetFileProvider(), files) {
+		config.FileProvider, changed = files, true
+	}
+	if packages != nil && !proto.Equal(config.GetPackageProvider(), packages) {
+		config.PackageProvider, changed = packages, true
+	}
+	if !changed {
 		return nil
 	}
-	config.FileProvider = provider
 	if data, err = protojson.Marshal(config); err != nil {
 		return err
 	}
 	command := "sudo -n sh -eu -c " + nativeQuote("umask 077; cat > /etc/lindm/executor.json.lindm; chown root:root /etc/lindm/executor.json.lindm; chmod 0600 /etc/lindm/executor.json.lindm; mv /etc/lindm/executor.json.lindm /etc/lindm/executor.json; systemctl restart lindm-executor.service")
 	configured, err := vm.runResult(ctx, command, bytes.NewReader(data), 16<<10, time.Minute)
 	if err != nil {
-		return fmt.Errorf("configure executor file provider: %w", err)
+		return fmt.Errorf("configure executor providers: %w", err)
 	}
 	if configured.ExitCode != 0 {
-		return fmt.Errorf("configure executor file provider: exit %d: %s", configured.ExitCode, configured.Stderr)
+		return fmt.Errorf("configure executor providers: exit %d: %s", configured.ExitCode, configured.Stderr)
 	}
 	_, err = waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED)
 	return err

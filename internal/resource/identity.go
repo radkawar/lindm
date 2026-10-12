@@ -256,6 +256,8 @@ func canonicalUUID(value string) (string, error) {
 	return id.String(), nil
 }
 
+// packageKey is `<eco>/<name>` for a desired package that follows the device's
+// native architecture and `<eco>/<name>/<arch>` for a pinned architecture.
 func packageKey(identity *resourcev1.PackageIdentity) string {
 	var ecosystem string
 	switch identity.GetEcosystem() {
@@ -268,7 +270,17 @@ func packageKey(identity *resourcev1.PackageIdentity) string {
 	case resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_NIX:
 		ecosystem = "nix"
 	}
-	return ecosystem + "/" + identity.GetNativeName() + "/" + identity.GetArchitecture()
+	key := ecosystem + "/" + identity.GetNativeName()
+	if identity.GetArchitecture() == "" {
+		return key
+	}
+	return key + "/" + identity.GetArchitecture()
+}
+
+// neutralPackageKey is the native-architecture key `<eco>/<name>` of any
+// package identity, pinned or resolved.
+func neutralPackageKey(identity *resourcev1.PackageIdentity) string {
+	return packageKey(&resourcev1.PackageIdentity{Ecosystem: identity.GetEcosystem(), NativeName: identity.GetNativeName()})
 }
 
 func repositoryEcosystem(repository *resourcev1.RepositoryDesired) string {

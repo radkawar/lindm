@@ -160,8 +160,14 @@ func (p *Provider) alpmArgs(directory string, args ...string) []string {
 
 func (p *Provider) planALPM(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource) ([]*resourcev1.PackageTransactionEntry, error) {
 	repo := source.GetRepository().GetAlpm()
-	if repo == nil || repo.GetArchitecture() != d.GetPackage().GetArchitecture() && d.GetPackage().GetArchitecture() != "any" {
+	// A package without an architecture follows the repository's, which is
+	// this host's pacman Architecture.
+	if architecture := d.GetPackage().GetArchitecture(); repo == nil || (architecture != "" && repo.GetArchitecture() != architecture && architecture != "any") {
 		return nil, ErrUnsupported
+	}
+	resolved, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return nil, err
 	}
 	policy, inputs, err := p.alpmPolicy(ctx, directory, d)
 	if err != nil {
@@ -187,7 +193,7 @@ func (p *Provider) planALPM(ctx context.Context, directory string, d *resourcev1
 	if err := p.verifyRollingSignature(ctx, directory, filepath.Join(directory, "cache", "sync", repo.GetNativeName()+".db"), source.GetAlpmSigningKeyFingerprint()); err != nil {
 		return nil, err
 	}
-	if nativeMatches(d, db.records[packageKey(d.GetPackage())]) {
+	if nativeMatches(d, db.records[packageKey(resolved)]) {
 		return nil, nil
 	}
 	remove := d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT
@@ -219,9 +225,9 @@ func (p *Provider) planALPM(ctx context.Context, directory string, d *resourcev1
 			}
 			declarations[selection.filename] = downloadDeclaration{size: selection.size, sha256: selection.digest}
 		}
-		entries = append(entries, rollingEntry(selection.record, d, db, remove))
+		entries = append(entries, p.rollingEntry(selection.record, d, db, remove))
 	}
-	if err := validateEntries(entries, d, db); err != nil {
+	if err := p.validateEntries(entries, d, db); err != nil {
 		return nil, err
 	}
 	if remove {

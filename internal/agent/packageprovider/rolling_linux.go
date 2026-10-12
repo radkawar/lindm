@@ -127,7 +127,11 @@ func (p *Provider) planRolling(ctx context.Context, directory string, d *resourc
 	if err != nil {
 		return nil, nil, err
 	}
-	if !nativeMatches(d, db.records[packageKey(d.GetPackage())]) {
+	target, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return nil, nil, err
+	}
+	if !nativeMatches(d, db.records[packageKey(target)]) {
 		direct := false
 		for _, entry := range entries {
 			direct = direct || entry.GetDirectRequest()
@@ -212,9 +216,9 @@ func (p *Provider) checkRollingArtifacts(ctx context.Context, directory string, 
 	return p.previewZypperCommit(ctx, directory, request.GetEffectiveDesired(), manifest.GetEntries())
 }
 
-func rollingEntry(record *resourcev1.NativePackageRecord, d *resourcev1.NativePackageDesired, db *database, remove bool) *resourcev1.PackageTransactionEntry {
+func (p *Provider) rollingEntry(record *resourcev1.NativePackageRecord, d *resourcev1.NativePackageDesired, db *database, remove bool) *resourcev1.PackageTransactionEntry {
 	key := packageKey(record.GetPackage())
-	entry := &resourcev1.PackageTransactionEntry{Package: record.GetPackage(), Before: db.records[key].GetVersion(), Source: d.GetRepository(), DirectRequest: key == packageKey(d.GetPackage())}
+	entry := &resourcev1.PackageTransactionEntry{Package: record.GetPackage(), Before: db.records[key].GetVersion(), Source: d.GetRepository(), DirectRequest: p.requests(d.GetPackage(), record.GetPackage())}
 	if remove {
 		entry.Operation = resourcev1.PackageTransactionOperation_PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED
 		entry.OwnedInstallation = true

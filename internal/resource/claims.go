@@ -284,10 +284,21 @@ func (b *claimBuilder) networkConnection(connection *resourcev1.NetworkConnectio
 	return b.routes(connection.GetVpn().GetIpsecIkev2().GetRoutes())
 }
 
+// nativePackage claims presence on the row's own key and on the native name.
+// A neutral row (`<eco>/<name>`) and a pinned row (`<eco>/<name>/<arch>`) of
+// one name never mix in a resolution: on a device whose native architecture is
+// the pinned one both would own the same native object under two ledgers.
+// Exact versions claim the neutral key so either form detects a disagreement.
 func (b *claimBuilder) nativePackage(pkg *resourcev1.NativePackageDesired) error {
-	key := packageKey(pkg.GetPackage())
+	identity := pkg.GetPackage()
+	key, neutral := packageKey(identity), neutralPackageKey(identity)
+	selector := "explicit"
+	if identity.GetArchitecture() == "" {
+		selector = "native"
+	}
 	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, pkg.GetPresence())
-	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/"+pkg.GetPackage().GetNativeName(), pkg.GetPresence())
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/"+identity.GetNativeName(), pkg.GetPresence())
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE_SELECTOR, neutral, resourcev1.ClaimMode_CLAIM_MODE_VALUE, selector)
 	if pkg.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
 		return nil
 	}
@@ -300,6 +311,9 @@ func (b *claimBuilder) nativePackage(pkg *resourcev1.NativePackageDesired) error
 		return err
 	}
 	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+	if key != neutral {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, neutral, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+	}
 	return nil
 }
 

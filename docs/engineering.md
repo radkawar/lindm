@@ -156,7 +156,11 @@ concise, sentence case and names the operator's next action ("Assignment saved. 
 device changes were activated."). Primary UI text (titles, descriptions,
 labels, badges, buttons, toasts and alerts) must not use internal model terms
 (for example desired state, generation or receipt) and never shows request IDs,
-record UUIDs or raw enum names. The maintained banned-term list and identifier
+record UUIDs, raw enum names, snake_case reason codes or camelCase type names
+(`nativePackage`). Managed item kinds use `resourceKindLabel`
+(`web/src/lib/resource-labels.ts`, "System package"); server reason codes become
+one sentence through `blockedReasonLabel` (`web/src/lib/errors.ts`), whose unknown
+fallback never echoes the code, and the code itself goes in Details. The maintained banned-term list and identifier
 patterns are in [`web/acceptance/copy-rules.json`](../web/acceptance/copy-rules.json);
 `lab console review` enforces them. Identifiers, sequences, hashes, protocol
 values and server/device clock distinctions live only in a collapsed `TechnicalDetails`
@@ -896,13 +900,17 @@ Device-set, image, enrollment and host-binding changes require explicit
 destroy; changing the referenced product organization reapplies through the
 product API without replacing VMs or re-enrolling devices. Authorization
 changes apply at runtime without restart; advisory configuration changes
-restart only `lindmd`. A device's `fileProvider` is the owner's root executor
-opt-in (`agentv1.NativeFileProviderConfig`, written to `/etc/lindm/executor.json`
-with only the executor restarted); it is local configuration, not identity, so a
-changed value is recorded in `demo-state.json` and applied at the next start. Its
-`kernelModuleBlocklist` is admitted only on releases whose registry names
-qualified initramfs tooling. Other native providers are not opted in, so their
-profile resources report the product's refusal rather than converging.
+restart only `lindmd`. A device's `fileProvider` and `packageProvider` are the
+owner's root executor opt-ins (`agentv1.NativeFileProviderConfig` and
+`agentv1.NativePackageProviderConfig`, written to `/etc/lindm/executor.json`
+with only the executor restarted); they are local configuration, not identity, so
+a changed value is recorded in `demo-state.json` and applied at the next start. The
+file provider's `kernelModuleBlocklist` is admitted only on releases whose registry names
+qualified initramfs tooling. The Engineering laptop approves its own Ubuntu ports
+archive (`noble`, `main`/`universe`, arm64, the installed Ubuntu archive keyring)
+under the Engineering profile's repository UUID. Other native providers are not
+opted in, so their profile resources report the product's refusal rather than
+converging.
 
 Only `demos/NAME/owner-access` stores the human owner's original enrollment,
 role-account enrollment secrets, provisioning tokens and desktop passwords.
@@ -2606,6 +2614,23 @@ matches may select different priorities or revisions of one profile; identical
 revision/priority matches are deduplicated. A typed schema arm or ready catalog
 preview is not evidence that a native provider is implemented or qualified.
 
+**Applicability** is decided by the server against the device's own platform facts
+from its latest host observation, never on an assumption. A resource limited to
+products applies when one product has the device's os-release `ID`, names the same
+platform-registry release as its `VERSION_ID` (a major row such as RHEL 9 accepts
+its minors; values outside the registry match only exactly) and the same machine
+architecture in either spelling (`x86_64`/`amd64`, `aarch64`/`arm64`). Otherwise
+the row is **not applicable** (`resource_platform_not_applicable`): never
+dispatched and excluded from compliance, fleet, report, rollout-health and
+needs-attention counts; a dependent of it is blocked. Until the device reports its
+OS ID, version and architecture the row is **waiting for device facts**
+(`device_platform_facts_unavailable`), unknown rather than attention; failed
+collection is not a mismatch. The decision is made when the head is assigned and
+again at every work poll, so arriving facts or a release upgrade move rows in or out
+of scope. Required **features** have no device evidence yet, so any row requiring
+one is refused as unsupported (`resource_feature_evidence_unavailable`) instead of
+being sent on an assumption.
+
 The authenticated **Profiles** console uses the generic catalog RPCs. Each resource
 is edited as strict generated `ProfileResource` protobuf JSON, with an expandable
 generated field reference covering every declared desired-state arm. Unknown fields
@@ -3615,6 +3640,57 @@ readiness is not application launch or health evidence; native qualification
 must independently exercise the selected application's behavior and a real
 dependency-bearing transaction. Unit parser/ownership coverage does not certify
 Ubuntu or Fedora VM behavior. Those native qualification checks remain required.
+
+**Package identity.** A native package is `PackageIdentity{ecosystem, native_name,
+architecture}`. In desired state the architecture is optional: empty means the
+device's own native package architecture, with the architecture-neutral canonical
+key `<eco>/<name>` (`deb/git`, `rpm/git`). A chosen architecture keeps the pinned
+key `<eco>/<name>/<arch>` (`deb/git/amd64`) and is only for a package that must be
+exactly that build (foreign or multilib, or an architecture-independent one). So
+"install git on Engineering machines" is one row for amd64 and arm64 devices. Its
+repository stays one `apt/<uuid>` or `rpm/<uuid>`: each executor binds its approved
+source with that UUID to its own archive (archive.ubuntu.com on amd64,
+ports.ubuntu.com on arm64), so one logical repository serves every architecture.
+Evidence is always concrete: `NativePackageRecord`, `NativePackageObservation` and
+`PackageTransactionEntry` require a non-empty architecture. For a neutral ref the
+server accepts an observation of the same ecosystem and name at whichever
+architecture the device resolved; the record must still equal the observation
+package. A later observation at another architecture (a crossgrade) is drift on
+the owned package dimensions.
+
+The executor resolves the native architecture once per provider from the package
+tool, never `uname`: `dpkg --print-architecture`, `rpm --eval %{_arch}` for DNF and
+zypper, and the approved ALPM sources' single `Architecture` (sources that disagree
+leave neutral rows unsupported). A neutral package resolves to its one installed
+record at the native or architecture-independent architecture (`all`, `noarch`,
+`any`); both installed is refused as a conflict. With neither installed, evidence
+names the native architecture, and the solver is asked for the bare name, which
+the native tool resolves to its own architecture. The transaction must then select
+exactly that package at the native or architecture-independent architecture; a
+different providing package, a foreign architecture or two selections are refused.
+An installed neutral package is asked for by its resolved `name:arch`/`name.arch`.
+Journal ledgers, floors and pin markers keep the canonical key (`deb/git`), and a
+dependency at the native or independent architecture is also checked against a
+neutral owner's ledger. Pins are rendered from the desired package alone, so plan,
+apply and verify agree before and after installation: APT pins the bare name
+(`apt_preferences` matches only the native architecture, which includes `all`);
+the DNF5 versionlock binds only the EVR, the DNF4 list uses the NEVR form, zypper
+uses the documented versioned lock (`solvable_name` with `version: !=`), and pacman's
+`IgnorePkg` has no architecture. An exact RPM-family pin on a neutral row therefore
+holds every installed architecture of that name at the same EVR.
+
+Claims keep the two forms apart. Every row claims presence on its own key and on
+`native-name/<name>`; every exact version also claims its value on `<eco>/<name>`, so
+neutral and pinned rows (or two pinned architectures) with different exact versions
+conflict. A `CLAIM_DOMAIN_PACKAGE_SELECTOR` value on `<eco>/<name>` (`native` or
+`explicit`) makes a neutral and a pinned row for one package name a conflict in one
+resolution: on a device whose native architecture is the pinned one they would own
+one native object under two ledgers. It is a separate domain so a rolling-snapshot
+update policy, which claims the whole package domain, still accepts unpinned rows.
+Switching an existing pinned row to neutral is a new resource identity, not a
+rename: the old row is released (`RESTORE_OWNED` may remove the owned package and
+restore its pin) and the neutral row is a create-only acquisition, which an
+installed package with known provenance can only take through approved adoption.
 
 ### Read-only root encryption compliance
 

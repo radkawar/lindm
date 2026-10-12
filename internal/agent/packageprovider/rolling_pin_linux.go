@@ -37,6 +37,11 @@ func rollingPinBlock(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDes
 		// PoolQuery ORs ordinary attributes. A single predicated name matcher
 		// is required to conjoin the name, architecture and excluded EVR.
 		body = "type: package\nmatch_type: exact\ncase_sensitive: on\ncomplex: AttrMatchData solvable:name " + d.GetPackage().GetNativeName() + " T SolvableRange\\ !=\\ " + nativeVersion(d.GetExact()) + "\\ " + d.GetPackage().GetArchitecture() + "\n"
+		if d.GetPackage().GetArchitecture() == "" {
+			// Without an architecture the documented versioned lock applies:
+			// its version restriction filters the exact name match.
+			body = "type: package\nmatch_type: exact\ncase_sensitive: on\nsolvable_name: " + d.GetPackage().GetNativeName() + "\nversion: != " + nativeVersion(d.GetExact()) + "\n"
+		}
 	}
 	return []byte("# " + pinMarker(ref) + " begin\n" + body + "# " + pinMarker(ref) + " end\n")
 }
@@ -145,7 +150,8 @@ func checkZypperExternalLocks(data []byte, identity *resourcev1.PackageIdentity)
 			if len(parts) != 8 || parts[0] != "AttrMatchData" || parts[1] != "solvable:name" || parts[3] != "T" || parts[4] != "SolvableRange\\" || parts[5] != "!=\\" || !strings.HasSuffix(parts[6], "\\") || fields["solvable_name"] != "" {
 				return errors.New("packageprovider: unsupported external zypp predicate")
 			}
-			if parts[7] != identity.GetArchitecture() {
+			// A package without an architecture overlaps every architecture's lock.
+			if identity.GetArchitecture() != "" && parts[7] != identity.GetArchitecture() {
 				continue
 			}
 			fields["solvable_name"], fields["match_type"] = parts[2], "exact"

@@ -2659,12 +2659,13 @@ func (x *NativePackageRecord) GetNativeIdentitySha256() []byte {
 }
 
 type NativePackageObservation struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Package                *PackageIdentity       `protobuf:"bytes,1,opt,name=package,proto3" json:"package,omitempty"`
-	Installed              bool                   `protobuf:"varint,2,opt,name=installed,proto3" json:"installed,omitempty"`
-	Record                 *NativePackageRecord   `protobuf:"bytes,3,opt,name=record,proto3" json:"record,omitempty"`
-	DatabaseRevisionSha256 []byte                 `protobuf:"bytes,4,opt,name=database_revision_sha256,json=databaseRevisionSha256,proto3" json:"database_revision_sha256,omitempty"`
-	NativeLockHeld         bool                   `protobuf:"varint,5,opt,name=native_lock_held,json=nativeLockHeld,proto3" json:"native_lock_held,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resolved native identity, also for a desired package without architecture.
+	Package                *PackageIdentity     `protobuf:"bytes,1,opt,name=package,proto3" json:"package,omitempty"`
+	Installed              bool                 `protobuf:"varint,2,opt,name=installed,proto3" json:"installed,omitempty"`
+	Record                 *NativePackageRecord `protobuf:"bytes,3,opt,name=record,proto3" json:"record,omitempty"`
+	DatabaseRevisionSha256 []byte               `protobuf:"bytes,4,opt,name=database_revision_sha256,json=databaseRevisionSha256,proto3" json:"database_revision_sha256,omitempty"`
+	NativeLockHeld         bool                 `protobuf:"varint,5,opt,name=native_lock_held,json=nativeLockHeld,proto3" json:"native_lock_held,omitempty"`
 	// Provider-derived native pin object, not an operator-selected path.
 	PinFile       *FileIdentity `protobuf:"bytes,6,opt,name=pin_file,json=pinFile,proto3" json:"pin_file,omitempty"`
 	PinContents   []byte        `protobuf:"bytes,7,opt,name=pin_contents,json=pinContents,proto3" json:"pin_contents,omitempty"`
@@ -4885,7 +4886,7 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\vnativeOwner\x124\n" +
 	"\x11persistent_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x10persistentSha256\x122\n" +
 	"\x10effective_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x0feffectiveSha256\x12M\n" +
-	"\brequests\x18\x05 \x03(\v2'.lindm.resource.v1.ProxyRequestEvidenceB\b\xbaH\x05\x92\x01\x02\x10 R\brequests\"\xd1\x06\n" +
+	"\brequests\x18\x05 \x03(\v2'.lindm.resource.v1.ProxyRequestEvidenceB\b\xbaH\x05\x92\x01\x02\x10 R\brequests\"\xd1\a\n" +
 	"\x13NativePackageRecord\x12D\n" +
 	"\apackage\x18\x01 \x01(\v2\".lindm.resource.v1.PackageIdentityB\x06\xbaH\x03\xc8\x01\x01R\apackage\x12B\n" +
 	"\aversion\x18\x02 \x01(\v2 .lindm.resource.v1.NativeVersionB\x06\xbaH\x03\xc8\x01\x01R\aversion\x126\n" +
@@ -4893,10 +4894,11 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\rsigner_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h H\x00R\fsignerSha256\x88\x01\x01\x12F\n" +
 	"\x18metadata_revision_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h H\x01R\x16metadataRevisionSha256\x88\x01\x01\x12)\n" +
 	"\x10provenance_known\x18\x06 \x01(\bR\x0fprovenanceKnown\x12=\n" +
-	"\x16native_identity_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\x14nativeIdentitySha256:\xe3\x02\xbaH\xdf\x02\x1a\xdc\x02\n" +
-	"\x1cnative_package_record.source\x12_known provenance binds authenticated source evidence; unknown provenance has no invented source\x1a\xda\x01this.provenance_known ? has(this.source) && this.source.kind == 13 && has(this.signer_sha256) && has(this.metadata_revision_sha256) : !has(this.source) && !has(this.signer_sha256) && !has(this.metadata_revision_sha256)B\x10\n" +
+	"\x16native_identity_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\x14nativeIdentitySha256:\xe3\x03\xbaH\xdf\x03\x1a\xdc\x02\n" +
+	"\x1cnative_package_record.source\x12_known provenance binds authenticated source evidence; unknown provenance has no invented source\x1a\xda\x01this.provenance_known ? has(this.source) && this.source.kind == 13 && has(this.signer_sha256) && has(this.metadata_revision_sha256) : !has(this.source) && !has(this.signer_sha256) && !has(this.metadata_revision_sha256)\x1a~\n" +
+	"\"native_package_record.architecture\x127native evidence names the resolved package architecture\x1a\x1fthis.package.architecture != ''B\x10\n" +
 	"\x0e_signer_sha256B\x1b\n" +
-	"\x19_metadata_revision_sha256\"\x93\x04\n" +
+	"\x19_metadata_revision_sha256\"\x9b\x05\n" +
 	"\x18NativePackageObservation\x12D\n" +
 	"\apackage\x18\x01 \x01(\v2\".lindm.resource.v1.PackageIdentityB\x06\xbaH\x03\xc8\x01\x01R\apackage\x12\x1c\n" +
 	"\tinstalled\x18\x02 \x01(\bR\tinstalled\x12>\n" +
@@ -4904,8 +4906,9 @@ const file_lindm_resource_v1_observations_proto_rawDesc = "" +
 	"\x18database_revision_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x16databaseRevisionSha256\x12(\n" +
 	"\x10native_lock_held\x18\x05 \x01(\bR\x0enativeLockHeld\x12:\n" +
 	"\bpin_file\x18\x06 \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\apinFile\x12,\n" +
-	"\fpin_contents\x18\a \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02R\vpinContents:|\xbaHy\x1aw\n" +
-	"!native_package_observation.record\x12.installed packages require their native record\x1a\"this.installed == has(this.record)\"\x85\x05\n" +
+	"\fpin_contents\x18\a \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02R\vpinContents:\x83\x02\xbaH\xff\x01\x1aw\n" +
+	"!native_package_observation.record\x12.installed packages require their native record\x1a\"this.installed == has(this.record)\x1a\x83\x01\n" +
+	"'native_package_observation.architecture\x127native evidence names the resolved package architecture\x1a\x1fthis.package.architecture != ''\"\x85\x05\n" +
 	"\x15RepositoryObservation\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\x12C\n" +
 	"\astanzas\x18\x02 \x03(\v2\x1f.lindm.resource.v1.FileIdentityB\b\xbaH\x05\x92\x01\x02\x10 R\astanzas\x12J\n" +

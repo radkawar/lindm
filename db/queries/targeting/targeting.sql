@@ -156,7 +156,8 @@ SELECT (CASE
 FROM resource_assignments a
 JOIN resource_assignment_heads h ON h.assignment_id=a.id AND h.generation_id=a.generation_id
 JOIN devices d ON d.id=a.device_id AND d.current_generation_id=a.generation_id AND d.state='active'
-LEFT JOIN resource_assignment_resources r ON r.assignment_id=a.id
+-- Rows not applicable to this device's platform are neither health nor evidence.
+LEFT JOIN resource_assignment_resources r ON r.assignment_id=a.id AND r.disposition<>8
 WHERE a.id=sqlc.arg(assignment_id) AND a.device_id=sqlc.arg(device_id) AND a.generation_id=sqlc.arg(generation_id)
 GROUP BY a.id;
 

@@ -204,6 +204,35 @@ func (q *Queries) GetResourceAssignmentRequest(ctx context.Context, requestID uu
 	return i, err
 }
 
+const getResourcePlatformFacts = `-- name: GetResourcePlatformFacts :one
+SELECT os_id_status, os_id_value, os_version_status, os_version_value, architecture_status, architecture_value
+FROM host_observations WHERE generation_id = $1
+`
+
+type GetResourcePlatformFactsRow struct {
+	OsIDStatus         int16
+	OsIDValue          string
+	OsVersionStatus    int16
+	OsVersionValue     string
+	ArchitectureStatus int16
+	ArchitectureValue  string
+}
+
+// The latest host observation's platform facts decide resource applicability.
+func (q *Queries) GetResourcePlatformFacts(ctx context.Context, generationID uuid.UUID) (GetResourcePlatformFactsRow, error) {
+	row := q.db.QueryRow(ctx, getResourcePlatformFacts, generationID)
+	var i GetResourcePlatformFactsRow
+	err := row.Scan(
+		&i.OsIDStatus,
+		&i.OsIDValue,
+		&i.OsVersionStatus,
+		&i.OsVersionValue,
+		&i.ArchitectureStatus,
+		&i.ArchitectureValue,
+	)
+	return i, err
+}
+
 const getResourceRelease = `-- name: GetResourceRelease :one
 SELECT id, generation_id, source_assignment_id, resource_id, resource_kind, canonical_key, superseding_assignment_id, state, reason, requested_at, completed_at FROM resource_releases WHERE id = $1 FOR UPDATE
 `

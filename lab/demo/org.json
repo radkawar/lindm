@@ -303,26 +303,25 @@
       "id": "cab4ef19-709a-5471-87d3-520361903656",
       "spec": {
         "name": "Engineering tools",
-        "description": "Ubuntu 24.04 aarch64 DEB packages from an approved arm64 ports source; developer starts with a locked password.",
+        "description": "git, htop and podman from each host's approved distribution repository, one row per package family and the host's own architecture: Ubuntu 24.04 (DEB); Fedora 44 and RHEL 9/10 (RPM, htop on Fedora only because RHEL ships it in EPEL). The developer account starts with a locked password.",
         "resources": [
           {
-            "resourceId": "d15d570c-499a-5f34-bc07-5b020a0e4f53",
+            "resourceId": "16eb0787-548e-57f4-977a-a1be276ecbef",
             "desired": {
               "ref": {
                 "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/git/arm64"
+                "canonicalKey": "deb/git"
               },
               "nativePackage": {
                 "package": {
                   "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "git",
-                  "architecture": "arm64"
+                  "nativeName": "git"
                 },
                 "presence": "PRESENCE_PRESENT",
                 "any": {},
                 "repository": {
                   "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
                 },
                 "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
               }
@@ -334,26 +333,41 @@
             "verification": {
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
             }
           },
           {
-            "resourceId": "a98ce4a9-f0b5-5ce4-9995-e148a0407abc",
+            "resourceId": "c831a630-d73f-5b51-b776-a970b23120dd",
             "desired": {
               "ref": {
                 "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/htop/arm64"
+                "canonicalKey": "deb/htop"
               },
               "nativePackage": {
                 "package": {
                   "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "htop",
-                  "architecture": "arm64"
+                  "nativeName": "htop"
                 },
                 "presence": "PRESENCE_PRESENT",
                 "any": {},
                 "repository": {
                   "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
                 },
                 "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
               }
@@ -365,26 +379,41 @@
             "verification": {
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
             }
           },
           {
-            "resourceId": "5b7111f5-46d1-56c0-83f3-c8a3749a7b97",
+            "resourceId": "7a84bf82-ba7e-5e73-b47c-65906dc7be5d",
             "desired": {
               "ref": {
                 "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
-                "canonicalKey": "deb/podman/arm64"
+                "canonicalKey": "deb/podman"
               },
               "nativePackage": {
                 "package": {
                   "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
-                  "nativeName": "podman",
-                  "architecture": "arm64"
+                  "nativeName": "podman"
                 },
                 "presence": "PRESENCE_PRESENT",
                 "any": {},
                 "repository": {
                   "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
-                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
                 },
                 "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
               }
@@ -396,6 +425,208 @@
             "verification": {
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "9238d4c1-e4be-5e12-87e7-d9a26d04f81b",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "rpm/git"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_RPM",
+                  "nativeName": "git"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "rpm/12e3a0eb-c710-58d9-bd79-a491c614754c"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "aarch64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "9",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "9",
+                  "architecture": "aarch64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "10",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "10",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "b4ee3f84-1384-526a-a0ef-5ab2d8c3d345",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "rpm/htop"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_RPM",
+                  "nativeName": "htop"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "rpm/12e3a0eb-c710-58d9-bd79-a491c614754c"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "ed684d2f-0e2b-5d2b-b888-770a892fc7fc",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "rpm/podman"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_RPM",
+                  "nativeName": "podman"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "rpm/12e3a0eb-c710-58d9-bd79-a491c614754c"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "fedora",
+                  "product": "Fedora",
+                  "version": "44",
+                  "architecture": "aarch64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "9",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "9",
+                  "architecture": "aarch64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "10",
+                  "architecture": "x86_64"
+                },
+                {
+                  "osId": "rhel",
+                  "product": "RHEL",
+                  "version": "10",
+                  "architecture": "aarch64"
+                }
+              ]
             }
           },
           {
@@ -492,7 +723,9 @@
               "managedFile": {
                 "path": "/etc/modprobe.d/99-lindm-blocklist.conf",
                 "presence": "PRESENCE_PRESENT",
-                "kernelModuleBlocklist": { "modules": ["usb_storage", "uas"] }
+                "kernelModuleBlocklist": {
+                  "modules": ["usb_storage", "uas"]
+                }
               }
             },
             "ownership": {

@@ -59,3 +59,15 @@ func TestResourcePreparationDoesNotInventCompliance(t *testing.T) {
 		t.Fatalf("pending preparation refreshed old native evidence: %s", got)
 	}
 }
+
+func TestResourceResultNamesPreparationSafetyRefusal(t *testing.T) {
+	refused := &agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, PreparationOutcome: &agentv1.ResourcePreparationOutcome{Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION}}
+	if disposition, reason := resourceResultDisposition(refused); disposition != 4 || reason != ResourceReasonPreparationPrecondition {
+		t.Fatalf("preparation safety refusal = %d %q", disposition, reason)
+	}
+	// After the start grant the same failure may have had an effect.
+	refused.StartedAt = timestamppb.Now()
+	if _, reason := resourceResultDisposition(refused); reason != "execution_failed" {
+		t.Fatalf("started failure named a pre-effect refusal: %q", reason)
+	}
+}

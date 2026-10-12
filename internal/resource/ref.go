@@ -53,9 +53,10 @@ func ValidateRef(ref *resourcev1.ResourceRef) error {
 	case resourcev1.ResourceKind_RESOURCE_KIND_PROXY:
 		valid = key == "packages" || key == "system-environment" || validDesktopKey(parts)
 	case resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE:
-		if len(parts) == 3 {
-			ecosystem := packageEcosystem(parts[0])
-			identity = &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: parts[1], Architecture: parts[2]}
+		// `<eco>/<name>` follows the device's native architecture; the
+		// three-part form pins one. An empty third part is never canonical.
+		if len(parts) == 2 || (len(parts) == 3 && parts[2] != "") {
+			identity = &resourcev1.PackageIdentity{Ecosystem: packageEcosystem(parts[0]), NativeName: parts[1], Architecture: strings.Join(parts[2:], "")}
 		}
 	case resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY:
 		valid = len(parts) == 2 && validRepositoryEcosystem(parts[0]) && isCanonicalUUID(parts[1])

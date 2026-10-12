@@ -639,15 +639,18 @@ bypass a refused network change. Profiles use create-only ownership, so existing
 unowned native state may require the normal explicit adoption workflow rather than
 being silently taken over; service rows retain native state on release.
 
-**Executor native repository approvals:** Engineering's package resources are DEB
-`arm64` packages for Ubuntu 24.04 aarch64; the example declares no amd64 variants
-because selecting between them needs product applicability, which dispatch does
-not yet admit. Configure the executor's approved package sources with repository
-UUID `6ad79126-c32f-552b-89b7-6956410314fb` for the arm64 ports archive. Bind the
-official HTTPS archive, suite/components and authenticated signing key/digest
-through the existing native-package provider configuration. These are explicit
-operator approvals, not repositories created or trusted by apply. This example does
-not infer equivalent packages or repositories on other distributions.
+**Executor native repository approvals:** Engineering's package rows name each
+package once per package family and leave the architecture to the device: the
+executor resolves its native package architecture from dpkg or rpm and records the
+resolved architecture in its evidence. The DEB rows apply only to Ubuntu 24.04 and
+use repository UUID `8053e72a-44e8-53fc-9472-825c068cf9b5`; the RPM rows apply only
+to Fedora 44 and RHEL 9/10 (htop to Fedora only, because RHEL ships it in EPEL) and
+use `12e3a0eb-c710-58d9-bd79-a491c614754c`. Rows outside a device's platform show as
+not applicable and are never sent. In each executor's approved package sources,
+bind that UUID to the host's own official HTTPS archive (Ubuntu: `archive.ubuntu.com`
+on amd64, `ports.ubuntu.com` on arm64), suite/components and authenticated signing
+key/digest through the existing native-package provider configuration. These are
+explicit operator approvals, not repositories created or trusted by apply.
 
 Configure `demo-helpdesk` with `fleet.read`, `remote_assistance.run` and `actions.lock`;
 configure `demo-security-analyst` with `fleet.read`, `advisory_exceptions.manage`,

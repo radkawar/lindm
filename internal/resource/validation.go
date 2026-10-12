@@ -266,8 +266,14 @@ func ValidateObservation(observation *resourcev1.ResourceObservation) error {
 			key, err = desktopKey(scope.Person)
 		}
 	case *resourcev1.ResourceObservation_NativePackage:
-		key = packageKey(observed.NativePackage.GetPackage())
-		if record := observed.NativePackage.GetRecord(); record != nil && !proto.Equal(record.GetPackage(), observed.NativePackage.GetPackage()) {
+		observedPackage := observed.NativePackage.GetPackage()
+		key = packageKey(observedPackage)
+		// Evidence always names the resolved architecture (protovalidate); a
+		// neutral ref accepts whichever one this device resolved.
+		if neutral := neutralPackageKey(observedPackage); ref.GetCanonicalKey() == neutral {
+			key = neutral
+		}
+		if record := observed.NativePackage.GetRecord(); record != nil && !proto.Equal(record.GetPackage(), observedPackage) {
 			return errors.New("resource: package_record_identity_mismatch")
 		}
 	case *resourcev1.ResourceObservation_Repository:

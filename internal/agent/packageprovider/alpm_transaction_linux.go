@@ -182,7 +182,7 @@ func (p *Provider) executeALPM(ctx context.Context, directory string, request *a
 		if !bytes.Equal(before.revision, manifest.GetNativeDatabaseRevision()) || !bytes.Equal(before.revision, request.GetExpectedDatabaseRevision()) {
 			return ErrConflict
 		}
-		if err := validateEntries(manifest.GetEntries(), request.GetEffectiveDesired(), before); err != nil {
+		if err := p.validateEntries(manifest.GetEntries(), request.GetEffectiveDesired(), before); err != nil {
 			return err
 		}
 		if err := p.checkALPMPolicy(ctx, directory, request.GetEffectiveDesired()); err != nil {

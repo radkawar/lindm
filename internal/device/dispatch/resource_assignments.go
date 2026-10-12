@@ -172,7 +172,7 @@ func (s *Service) applyResourceAssignment(ctx context.Context, tx pgx.Tx, q *dev
 		}
 		return nil, core.MapErr(err)
 	}
-	if err := insertResourceRows(ctx, q, id, resources); err != nil {
+	if err := insertResourceRows(ctx, q, id, generationID, resources); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if resourceAdoptionRequired(resources) {
@@ -321,7 +321,7 @@ func populateResourceStates(ctx context.Context, q *devicedb.Queries, head devic
 		if err := proto.Unmarshal(row.Document, resource); err != nil {
 			return core.MapErr(core.ErrInternalState)
 		}
-		state := &adminv1.ResourceState{ResourceId: row.ResourceID.String(), Desired: resource.GetDesired(), DependsOn: resource.GetDependsOn(), Disposition: adminv1.ResourceDisposition(row.Disposition), Reason: row.Reason}
+		state := &adminv1.ResourceState{ResourceId: row.ResourceID.String(), Desired: resource.GetDesired(), DependsOn: resource.GetDependsOn(), Disposition: adminv1.ResourceDisposition(row.Disposition), Reason: row.Reason, Applicability: resource.GetApplicability()}
 		if state.Disposition == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING {
 			if head.BlockedReason != "" {
 				state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
@@ -332,6 +332,11 @@ func populateResourceStates(ctx context.Context, q *devicedb.Queries, head devic
 					if d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED {
 						state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
 						state.Reason = "dependency_attention"
+						break
+					}
+					if d == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE {
+						state.Disposition = adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED
+						state.Reason = "dependency_not_applicable"
 						break
 					}
 					if d != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_SUCCEEDED {
@@ -394,6 +399,9 @@ func orderedResources(resources []*policyv1.ProfileResource) ([]*policyv1.Profil
 }
 
 func resourceCompliance(row devicedb.ResourceAssignmentResource, state *adminv1.ResourceState, head devicedb.ResourceAssignment, now time.Time) adminv1.ResourceCompliance {
+	if state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE {
+		return adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_NOT_APPLICABLE
+	}
 	if head.BlockedReason != "" || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED || state.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED {
 		return adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION
 	}
@@ -464,7 +472,7 @@ func (s *Service) ActivateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	if err := q.InsertResourceAssignment(ctx, devicedb.InsertResourceAssignmentParams{ID: id, DeviceID: receipt.DeviceID, GenerationID: receipt.GenerationID, RequestID: receipt.TransactionID, RequestDigest: receipt.CsrSha256, ActorID: token.CreatedBy, AuthorizationVersion: token.AuthorizationVersion, RevisionID: &revision, Document: document, AssignedAt: core.Timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
 		return err
 	}
-	if err := insertResourceRows(ctx, q, id, resources); err != nil {
+	if err := insertResourceRows(ctx, q, id, receipt.GenerationID, resources); err != nil {
 		return err
 	}
 	// Enrollment approval is not approval of this exact native adoption. Keep

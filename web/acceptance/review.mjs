@@ -109,10 +109,18 @@ function concrete(path, params) {
     const values = params[`${path}:${name}`] ?? params[name];
     if (!values?.length) return { missing: name, urls: [] };
     urls = urls.flatMap((item) =>
-      values.map((value) => ({
-        url: item.url.replace(`$${name}`, encodeURIComponent(value)),
-        label: name === "kind" ? [item.label, value].filter(Boolean).join(" ") : item.label,
-      })),
+      values.map((value) => {
+        // A labelled value ({ value, label }) is a second seeded state of one route.
+        const labelled = typeof value === "object";
+        const raw = labelled ? value.value : value;
+        return {
+          url: item.url.replace(`$${name}`, encodeURIComponent(raw)),
+          label:
+            name === "kind" || labelled
+              ? [item.label, labelled ? value.label : raw].filter(Boolean).join(" ")
+              : item.label,
+        };
+      }),
     );
   }
   return { urls };
@@ -712,6 +720,11 @@ async function main() {
   config.deviceId = ids.DeviceID;
   const params = {
     deviceId: [ids.DeviceID],
+    // The device page also shows a device whose platform-limited item waits for facts.
+    "/devices/$deviceId:deviceId": [
+      ids.DeviceID,
+      ids.FactsPendingDeviceID && { value: ids.FactsPendingDeviceID, label: "facts-pending" },
+    ],
     profileId: [ids.ProfileID],
     secretId: [ids.SecretID],
     sessionId: [ids.AssistanceSessionID],

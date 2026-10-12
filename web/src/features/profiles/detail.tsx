@@ -19,6 +19,7 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
+import { applicabilityFeatures, applicabilityPlatforms } from "@/lib/resource-labels";
 import { usePublishAttempt } from "./attempt";
 import { ProfileEditor } from "./editor";
 import {
@@ -314,6 +315,8 @@ function ResourceFacts({
 }) {
   const kind = resource.desired?.state.case;
   const title = kind === "sshServer" ? undefined : settingTitle(undefined, resource.desired);
+  const platforms = applicabilityPlatforms(resource.applicability);
+  const features = applicabilityFeatures(resource.applicability);
   return (
     <article className="grid min-w-0 gap-3 border bg-muted/20 p-4" data-profile-setting>
       <h2 className="grid gap-0.5 text-sm font-medium">
@@ -345,6 +348,10 @@ function ResourceFacts({
               ))}
             </ul>
           )}
+        </Fact>
+        <Fact label="Applies to">
+          {platforms ? `Only ${platforms}` : "Every device it's assigned to"}
+          {features ? `, when the device supports ${features}` : ""}
         </Fact>
       </dl>
       <TechnicalDetails

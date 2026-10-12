@@ -4416,7 +4416,7 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\n" +
 	"checkpoint\x18\x05 \x01(\v2 .lindm.resource.v1.CheckpointRefR\n" +
 	"checkpoint\x12D\n" +
-	"\ainverse\x18\x06 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\x87\b\n" +
+	"\ainverse\x18\x06 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\x8f\t\n" +
 	"\x17PackageTransactionEntry\x12D\n" +
 	"\apackage\x18\x01 \x01(\v2\".lindm.resource.v1.PackageIdentityB\x06\xbaH\x03\xc8\x01\x01R\apackage\x12X\n" +
 	"\toperation\x18\x02 \x01(\x0e2..lindm.resource.v1.PackageTransactionOperationB\n" +
@@ -4429,8 +4429,9 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x12owned_installation\x18\b \x01(\bR\x11ownedInstallation\x121\n" +
 	"\rsigner_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02h H\x00R\fsignerSha256\x88\x01\x01\x12F\n" +
 	"\x18metadata_revision_sha256\x18\n" +
-	" \x01(\fB\a\xbaH\x04z\x02h H\x01R\x16metadataRevisionSha256\x88\x01\x01:\xdd\x02\xbaH\xd9\x02\x1a\xd6\x02\n" +
-	"\x1fpackage_transaction_entry.shape\x12Vinstall/upgrade entries bind exact bytes and versions; removal binds owned prior state\x1a\xda\x01this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))B\x10\n" +
+	" \x01(\fB\a\xbaH\x04z\x02h H\x01R\x16metadataRevisionSha256\x88\x01\x01:\xe5\x03\xbaH\xe1\x03\x1a\xd6\x02\n" +
+	"\x1fpackage_transaction_entry.shape\x12Vinstall/upgrade entries bind exact bytes and versions; removal binds owned prior state\x1a\xda\x01this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))\x1a\x85\x01\n" +
+	"&package_transaction_entry.architecture\x12:transaction entries name the resolved package architecture\x1a\x1fthis.package.architecture != ''B\x10\n" +
 	"\x0e_signer_sha256B\x1b\n" +
 	"\x19_metadata_revision_sha256\"\xea\x06\n" +
 	"\x1aPackageTransactionManifest\x12O\n" +

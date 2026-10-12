@@ -251,16 +251,21 @@ func (s *Service) selectResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb
 	if errors.Is(headErr, pgx.ErrNoRows) || head.BlockedReason != "" {
 		return nil, nil, tx.Commit(ctx)
 	}
+	resources, err := q.ListAssignmentResources(ctx, head.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	// The head is locked: decide platform-limited rows against the device's
+	// latest facts before any candidate, even while targeting withholds work.
+	if err := refreshApplicability(ctx, q, head, resources); err != nil {
+		return nil, nil, err
+	}
 	eligible, err := s.Targeting.CheckExecution(ctx, tx, fence, principal.DeviceID, principal.GenerationID, head.ID)
 	if err != nil {
 		return nil, nil, dispatchFenceError(err)
 	}
 	if !eligible {
 		return nil, nil, tx.Commit(ctx)
-	}
-	resources, err := q.ListAssignmentResources(ctx, head.ID)
-	if err != nil {
-		return nil, nil, err
 	}
 	release, candidate, source, err := pendingResourceRelease(ctx, q, head, resources)
 	if err != nil {

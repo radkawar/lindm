@@ -245,6 +245,15 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
       updated.exact =
         object(next).ecosystem === "PACKAGE_ECOSYSTEM_RPM" ? { rpm: {} } : { deb: "" };
     }
+    // Architecture names differ per package format; a new format starts from
+    // the device's own architecture again.
+    if (
+      schema.typeName === "lindm.resource.v1.PackageIdentity" &&
+      field.jsonName === "ecosystem" &&
+      value.ecosystem !== next
+    ) {
+      delete updated.architecture;
+    }
     onChange(updated);
   }
   return (
@@ -319,18 +328,94 @@ export function TypedFields({ schema, value, onChange, id, references, disabled 
             ),
         )
         .filter((field) => !field.oneof || value[field.jsonName] !== undefined)
-        .map((field) => (
-          <TypedField
-            key={field.number}
-            field={field}
-            value={value[field.jsonName]}
-            id={`${id}-${field.jsonName}`}
-            references={references}
-            siblings={value}
-            disabled={disabled || !!unavailableChoices[`${schema.typeName}.${field.jsonName}`]}
-            onChange={(next) => change(field, next)}
-          />
-        ))}
+        .map((field) =>
+          schema.typeName === "lindm.resource.v1.PackageIdentity" &&
+          field.jsonName === "architecture" ? (
+            <PackageArchitectureField
+              key={field.number}
+              id={`${id}-${field.jsonName}`}
+              ecosystem={String(value.ecosystem ?? "")}
+              value={String(value.architecture ?? "")}
+              disabled={disabled}
+              onChange={(next) => change(field, next === "" ? undefined : next)}
+            />
+          ) : (
+            <TypedField
+              key={field.number}
+              field={field}
+              value={value[field.jsonName]}
+              id={`${id}-${field.jsonName}`}
+              references={references}
+              siblings={value}
+              disabled={disabled || !!unavailableChoices[`${schema.typeName}.${field.jsonName}`]}
+              onChange={(next) => change(field, next)}
+            />
+          ),
+        )}
+    </div>
+  );
+}
+
+// Native spellings per package format, from each package database.
+const packageArchitectures: Record<string, [string, string][]> = {
+  PACKAGE_ECOSYSTEM_DEB: [
+    ["amd64", "64-bit PC (amd64) only"],
+    ["arm64", "64-bit ARM (arm64) only"],
+    ["i386", "32-bit PC (i386) only"],
+    ["armhf", "32-bit ARM (armhf) only"],
+    ["all", "Architecture-independent build (all) only"],
+  ],
+  PACKAGE_ECOSYSTEM_RPM: [
+    ["x86_64", "64-bit PC (x86_64) only"],
+    ["aarch64", "64-bit ARM (aarch64) only"],
+    ["i686", "32-bit PC (i686) only"],
+    ["noarch", "Architecture-independent build (noarch) only"],
+  ],
+  PACKAGE_ECOSYSTEM_ALPM: [
+    ["x86_64", "64-bit PC (x86_64) only"],
+    ["aarch64", "64-bit ARM (aarch64) only"],
+    ["any", "Architecture-independent build (any) only"],
+  ],
+};
+
+// An empty architecture follows each device's own package architecture, so one
+// setting serves amd64 and arm64 devices alike; pinning one is the exception.
+function PackageArchitectureField({
+  id,
+  ecosystem,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  ecosystem: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const known = packageArchitectures[ecosystem] ?? [];
+  const options = [
+    { value: "", label: "This device's architecture" },
+    ...known.map(([architecture, label]) => ({ value: architecture, label })),
+    ...(value !== "" && !known.some(([architecture]) => architecture === value)
+      ? [{ value, label: `${value} only` }]
+      : []),
+  ];
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      <Label htmlFor={id}>Architecture</Label>
+      <SelectField
+        id={id}
+        disabled={disabled}
+        value={value}
+        options={options}
+        aria-describedby={`${id}-description`}
+        onValueChange={onChange}
+      />
+      <p id={`${id}-description`} className="text-xs text-muted-foreground">
+        Each device installs its own build. Choose one architecture only when devices need that
+        specific build.
+      </p>
     </div>
   );
 }

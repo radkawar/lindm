@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/resource_execution.proto";
 import "lindm/policy/v1/profile.proto";
 import "lindm/policy/v1/targeting.proto";
+import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/resource.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -97,6 +98,12 @@ enum ResourceDisposition {
   RESOURCE_DISPOSITION_BLOCKED = 5;
   RESOURCE_DISPOSITION_UNSUPPORTED = 6;
   RESOURCE_DISPOSITION_RELEASE_PENDING = 7;
+  // The device's recorded platform (OS, version, architecture) is outside the
+  // resource's applicability. Never dispatched and excluded from compliance.
+  RESOURCE_DISPOSITION_NOT_APPLICABLE = 8;
+  // The resource is limited to platforms, but the device has not yet reported
+  // the OS and architecture needed to decide. Never dispatched until it does.
+  RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS = 9;
 }
 
 enum ResourceCompliance {
@@ -106,6 +113,8 @@ enum ResourceCompliance {
   RESOURCE_COMPLIANCE_DRIFT_REMEDIATED = 3;
   RESOURCE_COMPLIANCE_ATTENTION = 4;
   RESOURCE_COMPLIANCE_STALE = 5;
+  // Outside the resource's applicability; not counted for or against the device.
+  RESOURCE_COMPLIANCE_NOT_APPLICABLE = 6;
 }
 
 message ResourceActionSummary {
@@ -130,7 +139,8 @@ message ResourceState {
   lindm.resource.v1.ResourceDesiredState desired = 2;
   repeated lindm.policy.v1.ResourceDependency depends_on = 3;
   ResourceDisposition disposition = 4;
-  // snake_case reason for PENDING/BLOCKED/ATTENTION; empty otherwise.
+  // snake_case reason for PENDING/BLOCKED/ATTENTION/UNSUPPORTED/NOT_APPLICABLE/
+  // WAITING_FOR_DEVICE_FACTS; empty otherwise.
   string reason = 5;
   // Most recent action for this resource under the current head.
   ResourceActionSummary latest_action = 6;
@@ -139,6 +149,8 @@ message ResourceState {
   google.protobuf.Timestamp last_verified_at = 8;
   // Device wall clock of that native observation; never used for scheduling.
   google.protobuf.Timestamp observed_at = 9;
+  // The profile's platform and feature limits for this resource, if any.
+  lindm.resource.v1.Applicability applicability = 10;
 }
 
 // One recent server action for the device generation, across heads.

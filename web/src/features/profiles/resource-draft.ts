@@ -105,8 +105,9 @@ export function initialState(arm: string): JsonObject {
     case "localGroup":
       return { name: "", presence: "PRESENCE_PRESENT" };
     case "nativePackage":
+      // No architecture: each device installs its own native package build.
       return {
-        package: { ecosystem: "PACKAGE_ECOSYSTEM_DEB", nativeName: "", architecture: "amd64" },
+        package: { ecosystem: "PACKAGE_ECOSYSTEM_DEB", nativeName: "" },
         presence: "PRESENCE_PRESENT",
         any: {},
         removal: "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA",
@@ -200,7 +201,10 @@ export function withDerivedRef(document: JsonObject): JsonObject {
         "3": "alpm",
         "4": "nix",
       };
-      key = `${ecosystems[String(pkg.ecosystem)] ?? ""}/${String(pkg.nativeName ?? "")}/${String(pkg.architecture ?? "")}`;
+      // `<eco>/<name>` follows each device's architecture; a chosen one is
+      // the third part, exactly as the server derives it.
+      const architecture = String(pkg.architecture ?? "");
+      key = `${ecosystems[String(pkg.ecosystem)] ?? ""}/${String(pkg.nativeName ?? "")}${architecture === "" ? "" : `/${architecture}`}`;
       break;
     }
     case "repository": {

@@ -385,6 +385,11 @@ message PackageTransactionEntry {
     message: "install/upgrade entries bind exact bytes and versions; removal binds owned prior state"
     expression: "this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))"
   };
+  option (buf.validate.message).cel = {
+    id: "package_transaction_entry.architecture"
+    message: "transaction entries name the resolved package architecture"
+    expression: "this.package.architecture != ''"
+  };
 }
 message PackageTransactionManifest {
   repeated PackageTransactionEntry entries = 1 [(buf.validate.field).repeated = {max_items: 4096}];

@@ -51,7 +51,12 @@ func TestDemoStateRejectsIdentityDrift(t *testing.T) {
 	if changed, err := matchDemoState(state, &demolab.Spec{Devices: []demolab.Device{{Config: optIn, Manifest: manifest}}}); err != nil || !changed || !proto.Equal(state.Bindings[0].Device.GetFileProvider(), optIn.FileProvider) {
 		t.Fatalf("executor opt-in not adopted: changed=%t err=%v", changed, err)
 	}
-	state.Bindings[0].Device.FileProvider = nil
+	optIn = proto.CloneOf(device)
+	optIn.PackageProvider = &agentv1.NativePackageProviderConfig{Sources: []*agentv1.NativePackageSource{{SigningKeyFile: "/usr/share/keyrings/ubuntu-archive-keyring.gpg"}}}
+	if changed, err := matchDemoState(state, &demolab.Spec{Devices: []demolab.Device{{Config: optIn, Manifest: manifest}}}); err != nil || !changed || !proto.Equal(state.Bindings[0].Device.GetPackageProvider(), optIn.PackageProvider) || state.Bindings[0].Device.GetFileProvider() != nil {
+		t.Fatalf("package source opt-in not adopted: changed=%t err=%v", changed, err)
+	}
+	state.Bindings[0].Device.FileProvider, state.Bindings[0].Device.PackageProvider = nil, nil
 	for name, mutate := range map[string]func(*labv1.DemoDevice){
 		"host":     func(d *labv1.DemoDevice) { d.Host = proto.String("other") },
 		"hostname": func(d *labv1.DemoDevice) { d.Hostname = "replacement" },

@@ -152,7 +152,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if err := q.InsertResourceAssignment(ctx, devicedb.InsertResourceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generation, RequestID: id, RequestDigest: preview.GetPreviewSha256(), ActorID: actor, AuthorizationVersion: int64(authorizationVersion), Document: document, AssignedAt: core.Timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
 		return err
 	}
-	if err := insertResourceRows(ctx, q, id, ordered); err != nil {
+	if err := insertResourceRows(ctx, q, id, generation, ordered); err != nil {
 		return err
 	}
 	if resourceAdoptionRequired(resources) {

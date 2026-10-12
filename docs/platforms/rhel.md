@@ -234,6 +234,10 @@ at provider start); without it exact versions are `unsupported`. Staging sees
 the candidate list through the read-only bind already used for DNF5; the list
 is a packaged configuration file, so an empty rendering truncates rather than
 deletes it.
+A package without an architecture follows `rpm --eval %{_arch}` and uses the
+plugin's NEVR form, `name-epoch:version-release`, which locks every installed
+architecture of that name ([package identity](../engineering.md#native-package-resource-provider);
+unit coverage only, no native record yet).
 
 Scriptlets run under RPM's SELinux plugin: the transient apply unit runs in
 `unconfined_service_t`, which the targeted policy allows to transition into

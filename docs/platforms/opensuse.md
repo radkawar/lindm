@@ -260,6 +260,13 @@ must match, while the wanted EVR, unrelated same-architecture package and target
 on `noarch` must not. Byte equality alone is not native pin evidence.
 See [libzypp's predicate implementation](https://github.com/openSUSE/libzypp/blob/master/zypp/zypp/PoolQuery.cc)
 and [locks(5)](https://github.com/openSUSE/libzypp/blob/master/zypp/doc/locks.5.txt).
+A package without an architecture follows `rpm --eval %{_arch}`; its owned block is
+instead the documented versioned lock (`solvable_name` with `match_type: exact` and
+`version: != EVR`), whose version restriction filters the exact name match and so
+holds every architecture of that name. It also treats an external complex lock on
+any architecture of the name as overlapping. Not yet natively queried with
+`zypper locks --solvables`; see
+[package identity](../engineering.md#native-package-resource-provider).
 The provider recognizes native ndb `Packages.db` as well as SQLite RPM databases.
 The shadow provider queries the package owning `useradd`, not Fedora's
 `shadow-utils` package name.

@@ -3,6 +3,7 @@ syntax = "proto3";
 package lindm.lab.v1;
 
 import "buf/validate/validate.proto";
+import "lindm/agent/v1/config.proto";
 import "lindm/agent/v1/resource_native.proto";
 import "lindm/lab/v1/hosts.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -66,6 +67,10 @@ message DemoDevice {
   // customer writes it in /etc/lindm/executor.json. The kernel-module template
   // is admitted only where the registry names qualified initramfs tooling.
   lindm.agent.v1.NativeFileProviderConfig file_provider = 11;
+  // The device owner's explicit root executor approval of native package
+  // sources, as a customer writes it in /etc/lindm/executor.json: each
+  // repository UUID bound to this host's own archive and signing key.
+  lindm.agent.v1.NativePackageProviderConfig package_provider = 12;
 }
 
 // DemoRole selects the installed system's role, independently of its group.

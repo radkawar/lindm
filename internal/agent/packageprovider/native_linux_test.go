@@ -204,7 +204,7 @@ func TestDependencyCannotReplaceSignedAgentPackage(t *testing.T) {
 	}
 	desired := &resourcev1.NativePackageDesired{Package: &resourcev1.PackageIdentity{Ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB, NativeName: "proof", Architecture: "amd64"}}
 	entry := &resourcev1.PackageTransactionEntry{Package: db.records["lindm-agent/amd64"].GetPackage(), Before: debVersion("1.0-1"), After: debVersion("2.0-1")}
-	if err := validateEntries([]*resourcev1.PackageTransactionEntry{entry}, desired, db); err == nil {
+	if err := (&Provider{}).validateEntries([]*resourcev1.PackageTransactionEntry{entry}, desired, db); err == nil {
 		t.Fatal("dependency resolution bypassed signed agent self-update")
 	}
 }

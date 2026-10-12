@@ -64,11 +64,11 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	for _, device := range demo.Devices {
 		states[device.State]++
 	}
-	if len(demo.Devices) != 10 || states["enrolled"] != 7 || states["pending"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
+	if len(demo.Devices) != 11 || states["enrolled"] != 7 || states["pending"] != 1 || states["awaiting-inventory"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes
-	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.FirewallProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID} {
+	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.FirewallProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID, routes.FactsPendingDeviceID} {
 		if id == "" {
 			t.Fatalf("missing route ID: %+v", routes)
 		}
@@ -99,8 +99,8 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		if row == nil {
 			t.Fatalf("device %s not listed", device.ID)
 		}
-		want := map[string]adminv1.DeviceState{"enrolled": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "stale": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "pending": adminv1.DeviceState_DEVICE_STATE_PENDING, "revoked": adminv1.DeviceState_DEVICE_STATE_REVOKED}[device.State]
-		if row.GetLifecycleState() != want || device.State != "pending" && row.GetHostname() != device.Hostname {
+		want := map[string]adminv1.DeviceState{"enrolled": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "stale": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "pending": adminv1.DeviceState_DEVICE_STATE_PENDING, "awaiting-inventory": adminv1.DeviceState_DEVICE_STATE_PENDING, "revoked": adminv1.DeviceState_DEVICE_STATE_REVOKED}[device.State]
+		if row.GetLifecycleState() != want || device.State != "pending" && device.State != "awaiting-inventory" && row.GetHostname() != device.Hostname {
 			t.Fatalf("device %+v listed as %v %q", device, row.GetLifecycleState(), row.GetHostname())
 		}
 		if device.State == "stale" && row.GetCompliance() != adminv1.DeviceCompliance_DEVICE_COMPLIANCE_STALE {
@@ -112,6 +112,19 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	// failure and unsupported kinds need attention.
 	if listed[routes.DeviceID].GetCompliance() != adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT] != 2 || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION] != 3 || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED] == 0 {
 		t.Fatalf("missing compliant/drifting/failed outcomes: %v", compliance)
+	}
+	// The Fedora-only item is outside the Ubuntu route device's platform and
+	// waits on the laptop that has not reported inventory.
+	for id, want := range map[string]adminv1.ResourceDisposition{routes.DeviceID: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE, routes.FactsPendingDeviceID: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS} {
+		state, err := admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: id}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(state.Msg.GetResources(), func(item *adminv1.ResourceState) bool {
+			return item.GetDesired().GetRef().GetCanonicalKey() == "firewalld.service" && item.GetDisposition() == want && len(item.GetApplicability().GetProducts()) == 1
+		}) {
+			t.Fatalf("device %s lacks the %v firewalld row: %v", id, want, state.Msg.GetResources())
+		}
 	}
 	encryption, err := admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: routes.DeviceID}))
 	if err != nil || encryption.Msg.GetEscrow().GetActionId() != routes.RecoveryActionID || !encryption.Msg.GetEscrow().GetRetirementConfirmed() || !encryption.Msg.GetObservation().GetEncrypted() || !slices.Contains(encryption.Msg.GetObservation().GetLindmKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) || !slices.Contains(encryption.Msg.GetObservation().GetOccupiedKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) {

@@ -549,6 +549,15 @@ owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
 
+A package row without an architecture (`deb/git`) follows
+`dpkg --print-architecture` (`amd64` or `arm64`) and also matches an installed
+`all` package. APT is asked for the bare name and its exact-version pin names the
+bare package (`Package: git`), which `apt_preferences(5)` applies only to the native
+architecture. One repository UUID serves both architectures because each host binds
+it to its own archive (archive.ubuntu.com or ports.ubuntu.com). Unit coverage only:
+no native record exercises a row without an architecture yet; see
+[package identity](../engineering.md#native-package-resource-provider).
+
 The typed kernel-module blocklist is enabled explicitly in the root executor's
 `fileProvider.kernelModuleBlocklist`. Ubuntu 24.04 uses native `modprobe` and
 `update-initramfs -u -k all`; `initramfs-tools` must be installed. Existing dracut

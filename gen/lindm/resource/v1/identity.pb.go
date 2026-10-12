@@ -323,6 +323,9 @@ const (
 	ClaimDomain_CLAIM_DOMAIN_SYSCTL                ClaimDomain = 19
 	ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION    ClaimDomain = 20
 	ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE ClaimDomain = 21
+	// Whether a native package name follows the device's native architecture or a
+	// pinned one; never mixed per name.
+	ClaimDomain_CLAIM_DOMAIN_PACKAGE_SELECTOR ClaimDomain = 22
 )
 
 // Enum value maps for ClaimDomain.
@@ -350,6 +353,7 @@ var (
 		19: "CLAIM_DOMAIN_SYSCTL",
 		20: "CLAIM_DOMAIN_SYSTEMD_DEFINITION",
 		21: "CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE",
+		22: "CLAIM_DOMAIN_PACKAGE_SELECTOR",
 	}
 	ClaimDomain_value = map[string]int32{
 		"CLAIM_DOMAIN_UNSPECIFIED":           0,
@@ -374,6 +378,7 @@ var (
 		"CLAIM_DOMAIN_SYSCTL":                19,
 		"CLAIM_DOMAIN_SYSTEMD_DEFINITION":    20,
 		"CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE": 21,
+		"CLAIM_DOMAIN_PACKAGE_SELECTOR":      22,
 	}
 )
 
@@ -595,7 +600,7 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\x13CLAIM_MODE_REQUIRED\x10\x02\x12\x18\n" +
 	"\x14CLAIM_MODE_FORBIDDEN\x10\x03\x12\x18\n" +
 	"\x14CLAIM_MODE_EXACT_SET\x10\x04\x12\x15\n" +
-	"\x11CLAIM_MODE_MEMBER\x10\x05*\xbc\x05\n" +
+	"\x11CLAIM_MODE_MEMBER\x10\x05*\xdf\x05\n" +
 	"\vClaimDomain\x12\x1c\n" +
 	"\x18CLAIM_DOMAIN_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cCLAIM_DOMAIN_SERVICE_RUNTIME\x10\x01\x12!\n" +
@@ -619,7 +624,8 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\x18CLAIM_DOMAIN_NATIVE_FILE\x10\x12\x12\x17\n" +
 	"\x13CLAIM_DOMAIN_SYSCTL\x10\x13\x12#\n" +
 	"\x1fCLAIM_DOMAIN_SYSTEMD_DEFINITION\x10\x14\x12&\n" +
-	"\"CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE\x10\x15B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
+	"\"CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE\x10\x15\x12!\n" +
+	"\x1dCLAIM_DOMAIN_PACKAGE_SELECTOR\x10\x16B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
 
 var (
 	file_lindm_resource_v1_identity_proto_rawDescOnce sync.Once

@@ -474,3 +474,36 @@ func TestDisplayName(t *testing.T) {
 		}
 	}
 }
+
+func TestSameReleaseAndArchitecture(t *testing.T) {
+	for _, tc := range []struct {
+		id, a, b string
+		want     bool
+	}{
+		{"ubuntu", "24.04", "24.04", true},
+		{"ubuntu", "24.04", "22.04", false},
+		{"rhel", "9", "9.4", true},
+		{"rhel", "9.4", "9.6", true},
+		{"rhel", "9.4", "10.0", false},
+		{"debian", "12", "13", false},
+		{"unregistered", "1.1", "1.2", false},
+	} {
+		if got := SameRelease(tc.id, tc.a, tc.b); got != tc.want {
+			t.Errorf("SameRelease(%q, %q, %q) = %v, want %v", tc.id, tc.a, tc.b, got, tc.want)
+		}
+	}
+	for _, tc := range []struct {
+		a, b string
+		want bool
+	}{
+		{"x86_64", "amd64", true},
+		{"aarch64", "arm64", true},
+		{"arm64", "arm64", true},
+		{"x86_64", "aarch64", false},
+		{"amd64", "arm64", false},
+	} {
+		if got := SameArchitecture(tc.a, tc.b); got != tc.want {
+			t.Errorf("SameArchitecture(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}

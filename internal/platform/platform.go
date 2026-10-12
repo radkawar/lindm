@@ -654,6 +654,25 @@ func Of(p Product) *Release {
 	return Identify(OSRelease{ID: p.GetOsId(), VersionID: p.GetVersion()})
 }
 
+// SameRelease reports whether two VERSION_IDs of one os-release ID name the
+// same release: equal values, or values the registry assigns to one versioned
+// row (a major row accepts its minors, so "9.4" and "9.6" are both RHEL 9; a
+// snapshot row accepts every snapshot). Rows accepting any VERSION_ID, and
+// values outside the registry, match only exactly.
+func SameRelease(id, a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, rb := Identify(OSRelease{ID: id, VersionID: a}), Identify(OSRelease{ID: id, VersionID: b})
+	return ra.Known() && ra == rb && ra.Version.Rule != VersionAny
+}
+
+// SameArchitecture reports whether two machine architectures are equal in
+// either spelling: kernel (x86_64, aarch64) or Debian (amd64, arm64).
+func SameArchitecture(a, b string) bool {
+	return kernelArchitecture(a) == kernelArchitecture(b)
+}
+
 // ForManifest identifies a lab image manifest's distribution and version.
 // Rolling rows use their manifest convention ("rolling" for Arch, the
 // snapshot date for Tumbleweed).

@@ -146,9 +146,13 @@ type DemoDevice struct {
 	// The device owner's explicit root executor opt-in for managed files, as a
 	// customer writes it in /etc/lindm/executor.json. The kernel-module template
 	// is admitted only where the registry names qualified initramfs tooling.
-	FileProvider  *v1.NativeFileProviderConfig `protobuf:"bytes,11,opt,name=file_provider,json=fileProvider,proto3" json:"file_provider,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	FileProvider *v1.NativeFileProviderConfig `protobuf:"bytes,11,opt,name=file_provider,json=fileProvider,proto3" json:"file_provider,omitempty"`
+	// The device owner's explicit root executor approval of native package
+	// sources, as a customer writes it in /etc/lindm/executor.json: each
+	// repository UUID bound to this host's own archive and signing key.
+	PackageProvider *v1.NativePackageProviderConfig `protobuf:"bytes,12,opt,name=package_provider,json=packageProvider,proto3" json:"package_provider,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *DemoDevice) Reset() {
@@ -254,6 +258,13 @@ func (x *DemoDevice) GetFirmware() *DemoFirmware {
 func (x *DemoDevice) GetFileProvider() *v1.NativeFileProviderConfig {
 	if x != nil {
 		return x.FileProvider
+	}
+	return nil
+}
+
+func (x *DemoDevice) GetPackageProvider() *v1.NativePackageProviderConfig {
+	if x != nil {
+		return x.PackageProvider
 	}
 	return nil
 }
@@ -463,12 +474,12 @@ var File_lindm_lab_v1_demo_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_demo_proto_rawDesc = "" +
 	"\n" +
-	"\x17lindm/lab/v1/demo.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x18lindm/lab/v1/hosts.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcc\x02\n" +
+	"\x17lindm/lab/v1/demo.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1blindm/agent/v1/config.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x18lindm/lab/v1/hosts.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcc\x02\n" +
 	"\bDemoSpec\x12-\n" +
 	"\forganization\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\forganization\x12>\n" +
 	"\adevices\x18\x02 \x03(\v2\x18.lindm.lab.v1.DemoDeviceB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10dR\adevices:\xd0\x01\xbaH\xcc\x01\x1a\xc9\x01\n" +
-	"\x13demo.unique_devices\x12(device keys and hostnames must be unique\x1a\x87\x01this.devices.all(d, this.devices.filter(o, o.key == d.key).size() == 1 && this.devices.filter(o, o.hostname == d.hostname).size() == 1)\"\xc2\x05\n" +
+	"\x13demo.unique_devices\x12(device keys and hostnames must be unique\x1a\x87\x01this.devices.all(d, this.devices.filter(o, o.key == d.key).size() == 1 && this.devices.filter(o, o.hostname == d.hostname).size() == 1)\"\x9a\x06\n" +
 	"\n" +
 	"DemoDevice\x12.\n" +
 	"\x03key\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x03key\x12F\n" +
@@ -485,7 +496,8 @@ const file_lindm_lab_v1_demo_proto_rawDesc = "" +
 	"\x04host\x18\t \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$H\x00R\x04host\x88\x01\x01\x12>\n" +
 	"\bfirmware\x18\n" +
 	" \x01(\v2\x1a.lindm.lab.v1.DemoFirmwareB\x06\xbaH\x03\xc8\x01\x01R\bfirmware\x12M\n" +
-	"\rfile_provider\x18\v \x01(\v2(.lindm.agent.v1.NativeFileProviderConfigR\ffileProvider:t\xbaHq\x1ao\n" +
+	"\rfile_provider\x18\v \x01(\v2(.lindm.agent.v1.NativeFileProviderConfigR\ffileProvider\x12V\n" +
+	"\x10package_provider\x18\f \x01(\v2+.lindm.agent.v1.NativePackageProviderConfigR\x0fpackageProvider:t\xbaHq\x1ao\n" +
 	"\x17demo.desktop_assistance\x120assistance is only available for DESKTOP devices\x1a\"!this.assistance || this.role == 1B\a\n" +
 	"\x05_host\"\xd6\x01\n" +
 	"\fDemoFirmware\x12\x1d\n" +
@@ -529,28 +541,30 @@ func file_lindm_lab_v1_demo_proto_rawDescGZIP() []byte {
 var file_lindm_lab_v1_demo_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_lindm_lab_v1_demo_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_lindm_lab_v1_demo_proto_goTypes = []any{
-	(DemoRole)(0),                       // 0: lindm.lab.v1.DemoRole
-	(*DemoSpec)(nil),                    // 1: lindm.lab.v1.DemoSpec
-	(*DemoDevice)(nil),                  // 2: lindm.lab.v1.DemoDevice
-	(*DemoFirmware)(nil),                // 3: lindm.lab.v1.DemoFirmware
-	(*DemoState)(nil),                   // 4: lindm.lab.v1.DemoState
-	(*DemoBinding)(nil),                 // 5: lindm.lab.v1.DemoBinding
-	(*v1.NativeFileProviderConfig)(nil), // 6: lindm.agent.v1.NativeFileProviderConfig
-	(*LabHost)(nil),                     // 7: lindm.lab.v1.LabHost
+	(DemoRole)(0),                          // 0: lindm.lab.v1.DemoRole
+	(*DemoSpec)(nil),                       // 1: lindm.lab.v1.DemoSpec
+	(*DemoDevice)(nil),                     // 2: lindm.lab.v1.DemoDevice
+	(*DemoFirmware)(nil),                   // 3: lindm.lab.v1.DemoFirmware
+	(*DemoState)(nil),                      // 4: lindm.lab.v1.DemoState
+	(*DemoBinding)(nil),                    // 5: lindm.lab.v1.DemoBinding
+	(*v1.NativeFileProviderConfig)(nil),    // 6: lindm.agent.v1.NativeFileProviderConfig
+	(*v1.NativePackageProviderConfig)(nil), // 7: lindm.agent.v1.NativePackageProviderConfig
+	(*LabHost)(nil),                        // 8: lindm.lab.v1.LabHost
 }
 var file_lindm_lab_v1_demo_proto_depIdxs = []int32{
 	2, // 0: lindm.lab.v1.DemoSpec.devices:type_name -> lindm.lab.v1.DemoDevice
 	0, // 1: lindm.lab.v1.DemoDevice.role:type_name -> lindm.lab.v1.DemoRole
 	3, // 2: lindm.lab.v1.DemoDevice.firmware:type_name -> lindm.lab.v1.DemoFirmware
 	6, // 3: lindm.lab.v1.DemoDevice.file_provider:type_name -> lindm.agent.v1.NativeFileProviderConfig
-	5, // 4: lindm.lab.v1.DemoState.bindings:type_name -> lindm.lab.v1.DemoBinding
-	7, // 5: lindm.lab.v1.DemoBinding.host:type_name -> lindm.lab.v1.LabHost
-	2, // 6: lindm.lab.v1.DemoBinding.device:type_name -> lindm.lab.v1.DemoDevice
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7, // 4: lindm.lab.v1.DemoDevice.package_provider:type_name -> lindm.agent.v1.NativePackageProviderConfig
+	5, // 5: lindm.lab.v1.DemoState.bindings:type_name -> lindm.lab.v1.DemoBinding
+	8, // 6: lindm.lab.v1.DemoBinding.host:type_name -> lindm.lab.v1.LabHost
+	2, // 7: lindm.lab.v1.DemoBinding.device:type_name -> lindm.lab.v1.DemoDevice
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_lab_v1_demo_proto_init() }

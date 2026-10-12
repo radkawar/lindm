@@ -21,7 +21,10 @@ func resourceRefKey(ref *resourcev1.ResourceRef) string {
 	return strconv.FormatInt(int64(ref.GetKind()), 10) + ":" + ref.GetCanonicalKey()
 }
 
-func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment uuid.UUID, resources []*policyv1.ProfileResource) error {
+// insertResourceRows stores the head's rows with their initial disposition:
+// unsupported, outside the device's platform, waiting for its platform facts,
+// or pending. Platform-limited rows are re-decided at each work poll.
+func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment, generation uuid.UUID, resources []*policyv1.ProfileResource) error {
 	ids := make(map[string]uuid.UUID, len(resources))
 	for _, item := range resources {
 		if err := resource.ValidateDesired(item.GetDesired()); err != nil {
@@ -37,6 +40,7 @@ func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment uui
 		}
 		ids[key] = id
 	}
+	var facts *platformFacts
 	for position, item := range resources {
 		ref := item.GetDesired().GetRef()
 		encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(item)
@@ -55,8 +59,19 @@ func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment uui
 		if err := q.InsertAssignmentResource(ctx, devicedb.InsertAssignmentResourceParams{AssignmentID: assignment, ResourceID: id, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Position: int32(position), Document: encoded, DependsOn: dependencies, VerificationMaxAgeSeconds: int32(item.GetVerification().GetMaxAgeSeconds())}); err != nil {
 			return err
 		}
-		if reason := ResourceDispatchUnsupported(item); reason != "" {
-			if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: 6, Reason: reason}); err != nil {
+		disposition, reason := int16(6), ResourceDispatchUnsupported(item)
+		if reason == "" && len(item.GetApplicability().GetProducts()) != 0 {
+			if facts == nil {
+				loaded, err := loadPlatformFacts(ctx, q, generation)
+				if err != nil {
+					return err
+				}
+				facts = &loaded
+			}
+			disposition, reason = resourceApplicability(item, *facts)
+		}
+		if reason != "" {
+			if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: disposition, Reason: reason}); err != nil {
 				return err
 			}
 		}
@@ -135,7 +150,8 @@ var QualifiedResourceKinds = map[resourcev1.ResourceKind]resourceQualification{
 }
 
 // The generic wire is not native qualification. Keep unqualified kinds and
-// unsupported ownership, applicability and verification operations blocked.
+// unsupported ownership, feature and verification operations blocked. Platform
+// limits depend on the device and are decided by resourceApplicability.
 func ResourceDispatchUnsupported(item *policyv1.ProfileResource) string {
 	if item.GetDesired().GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER && !resource.SSHBannerOnly(item.GetDesired().GetSshServer()) {
 		return "resource_executor_not_available"
@@ -144,8 +160,9 @@ func ResourceDispatchUnsupported(item *policyv1.ProfileResource) string {
 	if !ok {
 		return "resource_executor_not_available"
 	}
-	if len(item.GetApplicability().GetProducts()) != 0 || len(item.GetApplicability().GetFeatures()) != 0 {
-		return "resource_capability_evidence_unavailable"
+	// No device reports feature evidence yet; never send on an assumption.
+	if len(item.GetApplicability().GetFeatures()) != 0 {
+		return ResourceReasonFeatureEvidenceUnavailable
 	}
 	if reason := resourceOwnershipUnsupported(qualification, item.GetOwnership()); reason != "" {
 		return reason

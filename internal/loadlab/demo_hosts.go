@@ -46,18 +46,21 @@ type demoDevice struct {
 	// key names the platform registry row; versionID overrides its VERSION_ID.
 	key, versionID string
 	release        *platform.Release
-	state          string // enrolled, stale or revoked once seeded
+	state          string // enrolled, awaiting-inventory, stale or revoked once seeded
 	sessions       uint64
 	encryption     encryptionState
 	service        serviceOutcome
 	profile        int // index into demoProfiles; -1 is unassigned
 	historical     bool
 	proposal       bool // carries the advisory risk-acceptance proposal; needs a complete feed
-	labels         []string
-	platform       *inventoryv1.PlatformDetails
-	backend        string
-	packages       packageData
-	serial, luks   string
+	// factsWithheld never reports host inventory, so platform-limited items
+	// wait for its facts while unrestricted items still apply.
+	factsWithheld bool
+	labels        []string
+	platform      *inventoryv1.PlatformDetails
+	backend       string
+	packages      packageData
+	serial, luks  string
 }
 
 func dpkg(name, version, source, sourceVersion string) *inventoryv1.Package {
@@ -140,11 +143,13 @@ func demoDevices() ([]*demoDevice, error) {
 		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionNone, profile: -1, labels: []string{"workstation", "retired"}, state: "revoked"},
 		{hostname: "debian-ws-08", key: "debian-12", kernel: "6.1.0-37-amd64", sessions: 1, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "support"}, historical: true},
 		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", encryption: encryptionLUKS, profile: -1, labels: []string{"server", "ci-runner", "gpu"}},
+		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
 	}
 	inventories := [][]*inventoryv1.Package{
 		slices.Concat(ubuntuPackages("1:9.6p1-3ubuntu13"), bulkPackages("dpkg", demoRoutePackages)), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u2"),
 		rhelPackages(), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u3"),
 		slices.Concat(fedoraPackages(), affectedPackages(), bulkPackages("rpm", demoScalePackages)),
+		ubuntuPackages("1:9.6p1-3ubuntu13.19"),
 	}
 	for i, device := range devices {
 		if device.release, ok = platform.Lookup(device.key); !ok {

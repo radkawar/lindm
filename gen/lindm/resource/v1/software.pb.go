@@ -573,7 +573,11 @@ type PackageIdentity struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Ecosystem PackageEcosystem       `protobuf:"varint,1,opt,name=ecosystem,proto3,enum=lindm.resource.v1.PackageEcosystem" json:"ecosystem,omitempty"`
 	// For Nix this is an owner-approved catalog identity, not a nixpkgs expression.
-	NativeName    string `protobuf:"bytes,2,opt,name=native_name,json=nativeName,proto3" json:"native_name,omitempty"`
+	NativeName string `protobuf:"bytes,2,opt,name=native_name,json=nativeName,proto3" json:"native_name,omitempty"`
+	// Native package architecture (dpkg `amd64`, rpm `x86_64`, `all`/`noarch`).
+	// Empty only in desired state: the device's own native package architecture,
+	// which the executor resolves from dpkg/rpm and records in every observation.
+	// Evidence and transaction entries always carry the resolved architecture.
 	Architecture  string `protobuf:"bytes,3,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2842,13 +2846,13 @@ var File_lindm_resource_v1_software_proto protoreflect.FileDescriptor
 
 const file_lindm_resource_v1_software_proto_rawDesc = "" +
 	"\n" +
-	" lindm/resource/v1/software.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\"\xfa\x01\n" +
+	" lindm/resource/v1/software.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\"\xfb\x01\n" +
 	"\x0fPackageIdentity\x12M\n" +
 	"\tecosystem\x18\x01 \x01(\x0e2#.lindm.resource.v1.PackageEcosystemB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\tecosystem\x12J\n" +
 	"\vnative_name\x18\x02 \x01(\tB)\xbaH&r$\x10\x01\x18\x80\x022\x1d^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$R\n" +
-	"nativeName\x12L\n" +
-	"\farchitecture\x18\x03 \x01(\tB(\xbaH%r#\x10\x01\x18@2\x1d^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$R\farchitecture\"\x14\n" +
+	"nativeName\x12M\n" +
+	"\farchitecture\x18\x03 \x01(\tB)\xbaH&r$\x18@2 ^([a-zA-Z0-9_][a-zA-Z0-9_.-]*)?$R\farchitecture\"\x14\n" +
 	"\x12AnyApprovedVersion\"\x92\x01\n" +
 	"\n" +
 	"RPMVersion\x12\x14\n" +

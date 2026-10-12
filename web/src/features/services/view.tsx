@@ -12,6 +12,7 @@ import {
   ResourceCompliance,
   ResourceDisposition,
   type ResourceActionSummary,
+  type ResourceState,
 } from "../../../gen/lindm/admin/v1/assignments_pb";
 import {
   ResourceExecutionFailure,
@@ -39,6 +40,11 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { blockedReasonLabel, toRpcFailure } from "@/lib/errors";
 import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
+import {
+  applicabilityFeatures,
+  applicabilityPlatforms,
+  resourceKindLabel,
+} from "@/lib/resource-labels";
 import { formatTimestamp } from "@/lib/time";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { resourceStateQueryOptions } from "./queries";
@@ -89,6 +95,26 @@ const releaseReasonLabels: Record<string, string> = {
   resource_verification_not_available:
     "The device can't verify this kind of item, so it was left in place.",
 };
+
+// Rows lindm never sends get one state instead of check, result and change
+// columns that would all restate "nothing happened".
+const SINGLE_STATE_LABELS: Partial<Record<ResourceDisposition, string>> = {
+  [ResourceDisposition.UNSUPPORTED]: "Can't be applied",
+  [ResourceDisposition.NOT_APPLICABLE]: "Not applicable to this device",
+  [ResourceDisposition.WAITING_FOR_DEVICE_FACTS]: "Waiting for device facts",
+};
+
+function singleStateSentence(resource: ResourceState): string {
+  const platforms = applicabilityPlatforms(resource.applicability);
+  if (resource.disposition === ResourceDisposition.NOT_APPLICABLE && platforms) {
+    return `It targets ${platforms}. lindm doesn't send it to this device or count it for compliance.`;
+  }
+  const features = applicabilityFeatures(resource.applicability);
+  if (resource.reason === "resource_feature_evidence_unavailable" && features) {
+    return `It requires ${features}, and no device reports evidence of that yet, so it isn't sent. Remove that requirement from the profile.`;
+  }
+  return blockedReasonLabel(resource.reason);
+}
 
 export function DeviceResources({
   deviceId,
@@ -216,9 +242,13 @@ export function DeviceResources({
                   {state.data.resources.map((resource) => (
                     <TableRow key={resource.resourceId}>
                       <TableCell className="align-top">
-                        <p className="font-medium break-all">{itemTitle(resource.desired?.ref)}</p>
+                        <p className="font-medium break-all">
+                          {(resource.desired?.state.case === "nativePackage"
+                            ? resource.desired.state.value.package?.nativeName
+                            : undefined) ?? itemTitle(resource.desired?.ref)}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          {resource.desired?.state.case ?? "Unknown type"}
+                          {resourceKindLabel(resource.desired?.ref?.kind)}
                         </p>
                         {resource.dependsOn.length ? (
                           <p className="mt-1 whitespace-normal text-xs text-muted-foreground">
@@ -228,71 +258,92 @@ export function DeviceResources({
                               .join(", ")}
                           </p>
                         ) : null}
-                        {resource.desired ? (
+                        {resource.desired || resource.reason ? (
                           <TechnicalDetails
-                            summary="Settings"
-                            items={settingTechnicalIds(resource.desired?.ref)}
+                            items={[
+                              ...settingTechnicalIds(resource.desired?.ref),
+                              { label: "Reason code", value: resource.reason },
+                            ]}
                           >
-                            <pre className="mt-2 max-w-lg overflow-auto whitespace-pre-wrap break-all">
-                              {toJsonString(ResourceDesiredStateSchema, resource.desired, {
-                                prettySpaces: 2,
-                              })}
-                            </pre>
+                            {resource.desired ? (
+                              <pre className="mt-2 max-w-lg overflow-auto whitespace-pre-wrap break-all">
+                                {toJsonString(ResourceDesiredStateSchema, resource.desired, {
+                                  prettySpaces: 2,
+                                })}
+                              </pre>
+                            ) : null}
                           </TechnicalDetails>
                         ) : null}
                       </TableCell>
-                      <TableCell className="min-w-48 align-top">
-                        <StatusBadge
-                          status={
-                            resource.compliance === ResourceCompliance.ATTENTION
-                              ? "destructive"
-                              : resource.compliance === ResourceCompliance.STALE
+                      {SINGLE_STATE_LABELS[resource.disposition] ? (
+                        <TableCell colSpan={3} className="align-top whitespace-normal">
+                          <StatusBadge
+                            status={
+                              resource.disposition === ResourceDisposition.UNSUPPORTED
                                 ? "warning"
-                                : resource.compliance === ResourceCompliance.COMPLIANT ||
-                                    resource.compliance === ResourceCompliance.DRIFT_REMEDIATED
-                                  ? "success"
-                                  : "neutral"
-                          }
-                        >
-                          {complianceLabels[resource.compliance] ?? "Unknown"}
-                        </StatusBadge>
-                        <p className="mt-2 whitespace-normal text-xs text-muted-foreground">
-                          {resource.lastVerifiedAt
-                            ? `Last checked ${formatTimestamp(resource.lastVerifiedAt).local}`
-                            : "Not checked yet"}
-                        </p>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <StatusBadge
-                          status={
-                            resource.disposition === ResourceDisposition.ATTENTION
-                              ? "destructive"
-                              : resource.disposition === ResourceDisposition.BLOCKED
-                                ? "warning"
-                                : resource.disposition === ResourceDisposition.SUCCEEDED
-                                  ? "success"
-                                  : resource.disposition === ResourceDisposition.IN_PROGRESS
-                                    ? "info"
-                                    : "neutral"
-                          }
-                        >
-                          {enumLabel(ResourceDisposition[resource.disposition])}
-                        </StatusBadge>
-                        {resource.reason ? (
-                          <p className="mt-2 whitespace-normal break-words">
-                            {blockedReasonLabel(resource.reason)}
-                          </p>
-                        ) : null}
-                        {resource.disposition === ResourceDisposition.ATTENTION ? (
-                          <p className="mt-2 whitespace-normal">
-                            lindm won't retry automatically. Fix the cause, then assign the profile
-                            again.
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="min-w-64 align-top">
-                        <ActionHistory action={resource.latestAction} />
-                      </TableCell>
+                                : "neutral"
+                            }
+                          >
+                            {SINGLE_STATE_LABELS[resource.disposition]}
+                          </StatusBadge>
+                          <p className="mt-2 max-w-prose">{singleStateSentence(resource)}</p>
+                        </TableCell>
+                      ) : (
+                        <>
+                          <TableCell className="min-w-48 align-top">
+                            <StatusBadge
+                              status={
+                                resource.compliance === ResourceCompliance.ATTENTION
+                                  ? "destructive"
+                                  : resource.compliance === ResourceCompliance.STALE
+                                    ? "warning"
+                                    : resource.compliance === ResourceCompliance.COMPLIANT ||
+                                        resource.compliance === ResourceCompliance.DRIFT_REMEDIATED
+                                      ? "success"
+                                      : "neutral"
+                              }
+                            >
+                              {complianceLabels[resource.compliance] ?? "Unknown"}
+                            </StatusBadge>
+                            <p className="mt-2 whitespace-normal text-xs text-muted-foreground">
+                              {resource.lastVerifiedAt
+                                ? `Last checked ${formatTimestamp(resource.lastVerifiedAt).local}`
+                                : "Not checked yet"}
+                            </p>
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <StatusBadge
+                              status={
+                                resource.disposition === ResourceDisposition.ATTENTION
+                                  ? "destructive"
+                                  : resource.disposition === ResourceDisposition.BLOCKED
+                                    ? "warning"
+                                    : resource.disposition === ResourceDisposition.SUCCEEDED
+                                      ? "success"
+                                      : resource.disposition === ResourceDisposition.IN_PROGRESS
+                                        ? "info"
+                                        : "neutral"
+                              }
+                            >
+                              {enumLabel(ResourceDisposition[resource.disposition])}
+                            </StatusBadge>
+                            {resource.reason ? (
+                              <p className="mt-2 whitespace-normal break-words">
+                                {blockedReasonLabel(resource.reason)}
+                              </p>
+                            ) : null}
+                            {resource.disposition === ResourceDisposition.ATTENTION ? (
+                              <p className="mt-2 whitespace-normal">
+                                lindm won't retry automatically. Fix the cause, then assign the
+                                profile again.
+                              </p>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="min-w-64 align-top">
+                            <ActionHistory action={resource.latestAction} />
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -330,6 +381,7 @@ export function DeviceResources({
                               ...settingTechnicalIds(release.ref),
                               { label: "From assignment", value: release.sourceAssignmentId },
                               { label: "To assignment", value: release.supersedingAssignmentId },
+                              { label: "Reason code", value: release.reason },
                             ]}
                           />
                         </TableCell>
@@ -421,10 +473,11 @@ export function DeviceResources({
                             <StatusBadge status="neutral">Waiting for device</StatusBadge>
                           )}
                           <FailureNote failure={recent.action?.status?.failure} />
-                          {recent.action?.closedReason ? (
+                          {recent.action?.closedReason &&
+                          recent.action.closedReason !== "result" ? (
                             <p className="mt-1 text-muted-foreground">
-                              {recent.action.closedAt ? "Closed" : "Cancelling"}:{" "}
-                              {recent.action.closedReason}
+                              {recent.action.closedAt ? "" : "Cancelling: "}
+                              {blockedReasonLabel(recent.action.closedReason)}
                             </p>
                           ) : null}
                         </TableCell>
@@ -501,14 +554,16 @@ function ActionHistory({ action }: { action: ResourceActionSummary | undefined }
       <FailureNote failure={status?.failure} />
       <p>Sent {formatTimestamp(action.issuedAt).local}</p>
       {status?.completedAt ? <p>Finished {formatTimestamp(status.completedAt).local}</p> : null}
-      {action.closedReason ? (
+      {action.closedReason && action.closedReason !== "result" ? (
         <p>
-          {action.closedAt ? "Closed" : "Cancelling"}: {action.closedReason}
+          {action.closedAt ? "" : "Cancelling: "}
+          {blockedReasonLabel(action.closedReason)}
         </p>
       ) : null}
       <TechnicalDetails
         items={[
           { label: "Action ID", value: action.actionId },
+          { label: "Closed reason code", value: action.closedReason },
           { label: "Sequence", value: action.resourceSequence.toString() },
           { label: "Issued (server)", value: formatTimestamp(action.issuedAt).local },
           { label: "Expires (server)", value: formatTimestamp(action.expiresAt).local },
@@ -648,7 +703,10 @@ export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }
     return <RpcError failure={toRpcFailure(state.error)} title="Service compliance unavailable" />;
   }
   const data = state.data;
-  const resources = data?.resources ?? [];
+  // Items outside this device's platform are neither for nor against it.
+  const resources = (data?.resources ?? []).filter(
+    (resource) => resource.compliance !== ResourceCompliance.NOT_APPLICABLE,
+  );
   const pendingReleases = data?.releases.some((release) => release.state === "pending") ?? false;
   const attention = resources.some(
     (resource) => resource.compliance === ResourceCompliance.ATTENTION,
@@ -682,7 +740,9 @@ export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }
             ? "Profile drift fixed"
             : "Profile compliant"
           : data && resources.length === 0
-            ? "No profile"
+            ? data.resources.length
+              ? "No profile items apply to this device"
+              : "No profile"
             : "Profile status unknown";
   return (
     <Tooltip>

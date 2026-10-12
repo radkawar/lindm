@@ -79,6 +79,9 @@ func helperProvider(ctx context.Context, stateDirectory string, request *agentv1
 			return nil, "", err
 		}
 	}
+	if err := p.resolveNativeArchitecture(ctx); err != nil {
+		return nil, "", err
+	}
 	return p, directory, nil
 }
 
@@ -141,11 +144,15 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 		return ErrConflict
 	}
 	d := request.GetEffectiveDesired()
-	if db.multiple[packageKey(d.GetPackage())] {
+	target, err := p.nativeTarget(db, d.GetPackage())
+	if err != nil {
+		return err
+	}
+	if db.multiple[packageKey(target)] {
 		return fmt.Errorf("%w: multi-version target", ErrUnsupported)
 	}
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-		if err := checkNoDowngrade(db.records[packageKey(d.GetPackage())].GetVersion(), d.GetExact()); err != nil {
+		if err := checkNoDowngrade(db.records[packageKey(target)].GetVersion(), d.GetExact()); err != nil {
 			return err
 		}
 	}
@@ -161,7 +168,7 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if err != nil {
 		return err
 	}
-	if err := validateEntries(entries, d, db); err != nil {
+	if err := p.validateEntries(entries, d, db); err != nil {
 		return err
 	}
 	if err := validateArtifactCapacity(entries, directory); err != nil {
@@ -250,7 +257,7 @@ func validateArtifactCapacity(entries []*resourcev1.PackageTransactionEntry, dir
 	}
 	return reserveSpace(directory, 64<<20)
 }
-func validateEntries(entries []*resourcev1.PackageTransactionEntry, d *resourcev1.NativePackageDesired, db *database) error {
+func (p *Provider) validateEntries(entries []*resourcev1.PackageTransactionEntry, d *resourcev1.NativePackageDesired, db *database) error {
 	// libalpm indexes installed packages by name, not name/architecture.
 	// Refuse all architecture transitions before looking up Before, including
 	// dependencies: otherwise an implicit replacement masquerades as INSTALL.
@@ -270,6 +277,7 @@ func validateEntries(entries []*resourcev1.PackageTransactionEntry, d *resourcev
 		}
 	}
 	seen := make(map[string]bool, len(entries))
+	direct := 0
 	for _, entry := range entries {
 		if entry.GetPackage().GetNativeName() == "lindm-agent" {
 			return errors.New("packageprovider: dependency transaction crosses signed self-update authority")
@@ -279,19 +287,27 @@ func validateEntries(entries []*resourcev1.PackageTransactionEntry, d *resourcev
 			return ErrConflict
 		}
 		seen[key] = true
-		if entry.GetDirectRequest() != proto.Equal(entry.GetPackage(), d.GetPackage()) {
+		if entry.GetDirectRequest() != p.requests(d.GetPackage(), entry.GetPackage()) {
 			return ErrConflict
+		}
+		if entry.GetDirectRequest() {
+			direct++
 		}
 		if entry.GetDirectRequest() && entry.GetAfter() != nil && d.GetExact() != nil && !proto.Equal(entry.GetAfter(), d.GetExact()) {
 			return errors.New("packageprovider: solver did not select exact native version")
 		}
 		if entry.GetAfter() == nil {
-			if !entry.GetDirectRequest() || d.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT || !proto.Equal(entry.GetPackage(), d.GetPackage()) {
+			if !entry.GetDirectRequest() || d.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT {
 				return errors.New("packageprovider: hidden dependency removal refused")
 			}
 		} else if err := checkNoDowngrade(entry.GetBefore(), entry.GetAfter()); err != nil {
 			return err
 		}
+	}
+	// A bare native name may resolve to another package that provides it;
+	// such a transaction never installs the package that was asked for.
+	if d.GetPackage().GetArchitecture() == "" && (direct > 1 || (len(entries) != 0 && direct == 0)) {
+		return fmt.Errorf("%w: native solver did not select %s itself", ErrConflict, d.GetPackage().GetNativeName())
 	}
 	return nil
 }
@@ -356,10 +372,14 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if !bytes.Equal(before.revision, manifest.GetNativeDatabaseRevision()) || !bytes.Equal(before.revision, request.GetExpectedDatabaseRevision()) {
 		return ErrConflict
 	}
-	if err := validateEntries(manifest.GetEntries(), request.GetEffectiveDesired(), before); err != nil {
+	if err := p.validateEntries(manifest.GetEntries(), request.GetEffectiveDesired(), before); err != nil {
 		return err
 	}
 	if err := validateEffectiveTarget(request); err != nil {
+		return err
+	}
+	target, err := p.nativeTarget(before, request.GetEffectiveDesired().GetPackage())
+	if err != nil {
 		return err
 	}
 	if err := p.checkStagedArtifacts(ctx, directory, request, manifest, before); err != nil {
@@ -388,7 +408,7 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	}
 	if len(manifest.GetEntries()) != 0 {
 		if p.rolling() {
-			err = p.commitZypper(ctx, directory, request.GetEffectiveDesired(), manifest.GetEntries())
+			err = p.commitZypper(ctx, directory, request.GetEffectiveDesired(), target, manifest.GetEntries())
 		} else if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 			for _, args := range dpkgArgs {
 				if _, err = commitNative(ctx, "/usr/bin/dpkg", args, "/", []string{"DPKG_FRONTEND_LOCKED=true"}); err != nil {
@@ -550,7 +570,11 @@ func (p *Provider) checkStagedArtifacts(ctx context.Context, directory string, r
 	}
 	// Simulation never fetches; --no-download would instead demand archives under
 	// APT's native file names, while staged artifacts are digest-named.
-	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate"}, aptTransactionArgs(request.GetEffectiveDesired())...))
+	target, err := p.nativeTarget(before, request.GetEffectiveDesired().GetPackage())
+	if err != nil {
+		return err
+	}
+	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate"}, aptTransactionArgs(request.GetEffectiveDesired(), target)...))
 	if err != nil {
 		return err
 	}

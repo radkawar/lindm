@@ -194,13 +194,13 @@ func parseAPTDownloadDeclarations(output []byte) (map[string]downloadDeclaration
 	}
 	return declarations, total, nil
 }
-func (p *Provider) resolveDNFSizes(ctx context.Context, directory, operation string, d *resourcev1.NativePackageDesired) (*dnfResolved, uint64, error) {
+func (p *Provider) resolveDNFSizes(ctx context.Context, directory, operation string, d *resourcev1.NativePackageDesired, spec string) (*dnfResolved, uint64, error) {
 	var result nativeResult
 	var err error
 	if p.manager == dnf.DNF4 {
-		result, err = p.dnf4(ctx, "resolve", directory, p.versionlock, operation, dnfSpec(d))
+		result, err = p.dnf4(ctx, "resolve", directory, p.versionlock, operation, spec)
 	} else {
-		result, err = p.run(ctx, "/usr/bin/python3", []string{"-I", "-c", dnfResolver, directory, operation, dnfSpec(d)}, "/", nil)
+		result, err = p.run(ctx, "/usr/bin/python3", []string{"-I", "-c", dnfResolver, directory, operation, spec}, "/", nil)
 	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("packageprovider: native %s Python resolver prerequisite: %w", p.manager, err)
@@ -235,7 +235,7 @@ func (p *Provider) resolveDNFSizes(ctx context.Context, directory, operation str
 			}
 			total += entry.DownloadSize
 		case "Remove":
-			if operation != "remove" || packageKey(identity) != packageKey(d.GetPackage()) {
+			if operation != "remove" || !p.requests(d.GetPackage(), identity) {
 				return nil, 0, errors.New("packageprovider: native solver removes unrequested package")
 			}
 		case "Replaced":

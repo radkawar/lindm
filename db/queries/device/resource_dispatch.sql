@@ -136,3 +136,8 @@ UPDATE resource_releases SET state = $2, reason = $3, completed_at = $4 WHERE id
 
 -- name: LatestResourceReleaseAction :one
 SELECT * FROM resource_actions WHERE release_id = $1 ORDER BY resource_sequence DESC LIMIT 1;
+
+-- The latest host observation's platform facts decide resource applicability.
+-- name: GetResourcePlatformFacts :one
+SELECT os_id_status, os_id_value, os_version_status, os_version_value, architecture_status, architecture_value
+FROM host_observations WHERE generation_id = $1;

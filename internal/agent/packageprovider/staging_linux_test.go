@@ -302,7 +302,7 @@ func TestZypperCommitKeepsCommandLineRPMRepository(t *testing.T) {
 	directory := t.TempDir()
 	desired := &resourcev1.NativePackageDesired{Package: &resourcev1.PackageIdentity{NativeName: "fixture", Architecture: "x86_64"}, Presence: resourcev1.Presence_PRESENCE_PRESENT}
 	for _, preview := range []bool{true, false} {
-		args := zypperCommitArgs(directory, desired, nil, preview)
+		args := zypperCommitArgs(directory, desired, desired.GetPackage(), nil, preview)
 		if slices.Contains(args, "--disable-repositories") {
 			t.Fatalf("commit disables the command-line repository: %q", args)
 		}

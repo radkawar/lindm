@@ -88,7 +88,10 @@ type Provider struct {
 	interpreter string
 	versionlock bool
 	// rpmdb is the located native RPM database directory.
-	rpmdb  string
+	rpmdb string
+	// native is the device's own package architecture in the package
+	// database's spelling; packages without an architecture follow it.
+	native string
 	run    nativeRunner
 	gate   sync.Mutex
 	closed bool
@@ -207,6 +210,9 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		return nil, errors.New("packageprovider: invalid native backend version")
 	}
 	p.backend = &resourcev1.BackendSelection{Backend: backend, NativeVersion: version, ProviderVersion: "1", Product: proto.CloneOf(config.Platform)}
+	if err := p.resolveNativeArchitecture(ctx); err != nil {
+		return nil, err
+	}
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
 	if err != nil {
 		return nil, err
@@ -341,18 +347,22 @@ func (p *Provider) validateDesired(desired *resourcev1.ResourceDesiredState) err
 }
 func (p *Provider) observe(ctx context.Context, desired *resourcev1.ResourceDesiredState, db *database, ledger *agentv1.ResourceOwnershipLedger, receipt *resourcev1.PackageTransactionManifest) (*resourcev1.ResourceObservation, error) {
 	d := desired.GetNativePackage()
-	if db.multiple[packageKey(d.GetPackage())] {
+	identity, err := p.resolveIdentity(db, d.GetPackage())
+	if err != nil {
+		return nil, err
+	}
+	if db.multiple[packageKey(identity)] {
 		return nil, fmt.Errorf("%w: multi-version target", ErrUnsupported)
 	}
-	record := proto.CloneOf(db.records[packageKey(d.GetPackage())])
+	record := proto.CloneOf(db.records[packageKey(identity)])
 	if record != nil {
-		identity, err := p.installedIdentity(ctx, record)
+		installed, err := p.installedIdentity(ctx, record)
 		if err != nil {
 			return nil, err
 		}
-		record.NativeIdentitySha256 = identity
+		record.NativeIdentitySha256 = installed
 		prior := ledger.GetLastApplied().GetObservation().GetNativePackage().GetRecord()
-		if prior.GetProvenanceKnown() && samePackageRecord(prior, record) && bytes.Equal(prior.GetNativeIdentitySha256(), identity) {
+		if prior.GetProvenanceKnown() && samePackageRecord(prior, record) && bytes.Equal(prior.GetNativeIdentitySha256(), installed) {
 			copyProvenance(record, prior)
 		}
 		if receipt != nil {
@@ -370,7 +380,7 @@ func (p *Provider) observe(ctx context.Context, desired *resourcev1.ResourceDesi
 	if err != nil {
 		return nil, err
 	}
-	observation := &resourcev1.ResourceObservation{Ref: proto.CloneOf(desired.GetRef()), Metadata: &resourcev1.ObservationMetadata{BootId: p.boot, ExecutorIncarnation: p.config.ExecutorIncarnation, ObservedAt: timestamppb.New(time.Now()), Backend: proto.CloneOf(p.backend), NativeRevision: bytes.Clone(db.revision), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK}, Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: proto.CloneOf(d.GetPackage()), Installed: record != nil, Record: record, DatabaseRevisionSha256: bytes.Clone(db.revision), PinFile: pin, PinContents: contents}}}
+	observation := &resourcev1.ResourceObservation{Ref: proto.CloneOf(desired.GetRef()), Metadata: &resourcev1.ObservationMetadata{BootId: p.boot, ExecutorIncarnation: p.config.ExecutorIncarnation, ObservedAt: timestamppb.New(time.Now()), Backend: proto.CloneOf(p.backend), NativeRevision: bytes.Clone(db.revision), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK}, Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: identity, Installed: record != nil, Record: record, DatabaseRevisionSha256: bytes.Clone(db.revision), PinFile: pin, PinContents: contents}}}
 	if err := resource.ValidateObservation(observation); err != nil {
 		return nil, err
 	}
