@@ -55,7 +55,9 @@ export function AuditFilters({
         </div>
       </div>
       <FilterPanel activeCount={active}>
-        <div className="grid gap-3 md:flex md:flex-wrap md:items-end">
+        {/* Top-aligned: a long selected hostname wraps the picker trigger downward
+            without pushing the other filters' labels out of line. */}
+        <div className="grid gap-3 md:flex md:flex-wrap md:items-start">
           <div className="min-w-0 md:w-56">
             <AccountPicker
               label="Actor"
@@ -73,7 +75,7 @@ export function AuditFilters({
           <TimeRange key={`${search.from}:${search.through}`} search={search} onChange={onChange} />
           {filtered ? (
             <Button
-              className="w-fit"
+              className="w-fit md:mt-7"
               variant="ghost"
               onClick={() =>
                 onChange({

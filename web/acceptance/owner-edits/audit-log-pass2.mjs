@@ -10,7 +10,7 @@ export const task = {
   route: "/audit",
   priority: "normal",
   acceptance:
-    "At 1440x900 the first audit row starts within 250 px of the filters' top; no stray 'All time' text outside the time-range control; every row's Details control lies inside the viewport at 1440 and 390 px; at 390x844 the page does not scroll sideways and a row is visible on the first screen; every action caption is a human name from action-names.json (no 'Device action create'/'Identity local enrolled'); device-action rows name their kind ('Requested device action: Restart'); 'Changed device details' rows name the device; Human actions shows no 'Signed out'/'Signed in' rows.",
+    "At 1440x900 the first audit row starts within 250 px of the filters' top; no stray 'All time' text outside the time-range control; every row's Details control lies inside the viewport at 1440 and 390 px; at 390x844 the page does not scroll sideways and a row is visible on the first screen; every action caption is a human name from action-names.json (no 'Device action create'/'Identity local enrolled'); device-action rows name their kind ('Requested device action: Restart'); 'Changed device details' rows name the device; Human actions shows no 'Signed out'/'Signed in' rows; with a long hostname selected the Actor, Device and Time range labels stay in one line.",
 };
 
 const names = Object.values(
@@ -140,6 +140,31 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     require(unnamed.length ===
       0, `device-action rows without their kind: ${[...new Set(unnamed)].join(", ")}`);
     await capture("audit-pass2-device-actions-desktop");
+
+    // A long selected hostname wraps its picker trigger (design.md: hostnames
+    // wrap, never truncate); the other filters' labels must stay in one line.
+    step("long hostname keeps the filter bar aligned");
+    const bar = main.getByRole("region", { name: "Audit filters" });
+    await bar.getByRole("button", { name: /^Device\b/ }).click();
+    await page.getByRole("combobox", { name: "Search device" }).pressSequentially("fedora-ci-gpu");
+    await page
+      .getByRole("option", { name: /^fedora-ci-gpu-runner/ })
+      .first()
+      .click({ timeout: 15_000 });
+    await page.waitForURL(/[?&]deviceId=/, { timeout: 30_000 });
+    await settle();
+    const labelTops = {};
+    for (const name of ["Actor", "Device", "Time range"]) {
+      labelTops[name] = Math.round(
+        (await bar.getByText(name, { exact: true }).first().boundingBox())?.y ?? -1,
+      );
+    }
+    const tops = Object.values(labelTops);
+    require(Math.max(...tops) - Math.min(...tops) <= 2 &&
+      !tops.includes(
+        -1,
+      ), `filter labels out of line with a long hostname selected: ${JSON.stringify(labelTops)}`);
+    await capture("audit-pass2-long-hostname-desktop");
     await visit("/audit?view=all");
     await idle(main);
 
