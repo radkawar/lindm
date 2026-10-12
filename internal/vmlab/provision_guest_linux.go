@@ -318,7 +318,9 @@ func recordProvisionAPT(ctx context.Context, vm *guestVM, pins provisionPins, re
 	if !slices.ContainsFunc(result.Origin.Observed, func(origin string) bool { return strings.HasPrefix(origin, strings.TrimSuffix(pins.Repository, "/")) }) {
 		return errors.New("installed agent version is not offered by the snippet's repository")
 	}
-	keys, err := vm.run(ctx, "gpg --batch --no-default-keyring --with-colons --show-keys "+keyring, nil, 64<<10, time.Minute)
+	// A private empty homedir: without one gpg reports creating the lab
+	// user's ~/.gnupg, keybox and trustdb on stderr, which the lane refuses.
+	keys, err := vm.run(ctx, `home=$(mktemp -d) && { gpg --batch --quiet --homedir "$home" --with-colons --show-keys `+keyring+`; status=$?; rm -rf -- "$home"; exit "$status"; }`, nil, 64<<10, time.Minute)
 	if err != nil {
 		return err
 	}
