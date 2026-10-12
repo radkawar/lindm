@@ -108,57 +108,100 @@ func hold(file *os.File) (unlock func() error) {
 type Change struct {
 	Source string   // worktree the change comes from
 	Base   string   // merge base with Trunk
-	Patch  []byte   // binary patch with rename detection, outside DerivedRoots
+	Patch  []byte   // binary patch with rename detection, outside the derived files
 	Files  []string // every path the patch creates, modifies or deletes
-	// DerivedRoots are generator output directories. The worktree's own
-	// output there is not applied: a landing regenerates it in the main
-	// checkout from main plus Patch, so landings that both change generator
-	// inputs compose instead of conflicting on each other's output.
-	DerivedRoots []string
-	// Derived lists the worktree's changed paths under DerivedRoots, and
-	// DerivedDeleted those it deleted, which Land removes before the gate
-	// regenerates: generators that never delete stale output (sqlc) would
-	// otherwise keep them.
+	// Derivation names what the landing derives in the main checkout instead
+	// of applying the worktree's bytes; see Derivation.
+	Derivation Derivation
+	// Derived lists the worktree's changed paths under the derivation's
+	// roots, and DerivedDeleted those it deleted, which Land removes before
+	// the gate regenerates: generators that never delete stale output (sqlc)
+	// would otherwise keep them.
 	Derived, DerivedDeleted []string
+	// Merged holds the worktree's change to each structurally merged file.
+	Merged []MergedFile
+}
+
+// MergedFile is a worktree's change to a file Land merges structurally.
+type MergedFile struct {
+	Path         string
+	Base, Theirs []byte // nil when absent
 }
 
 // Change computes the change of the worktree at path, limited to paths when
-// any are given, with its output under the derived roots (repository-relative
-// directories) held out of the patch. The worktree's own index is never
-// modified.
-func (r *Repository) Change(ctx context.Context, path string, paths, derived []string) (Change, error) {
-	change := Change{Source: path, DerivedRoots: derived}
+// any are given, holding derived content out of the patch as derivation
+// describes. The worktree's own index is never modified.
+func (r *Repository) Change(ctx context.Context, path string, paths []string, derivation Derivation) (Change, error) {
+	change := Change{Source: path, Derivation: derivation}
 	if _, ok, err := r.registered(ctx, path); err != nil || !ok {
 		return change, errors.Join(err, fmt.Errorf("%s is not a registered worktree of %s", path, r.Main))
 	}
 	err := r.snapshot(ctx, path, paths, func(base string, git gitFunc, scope []string) error {
 		change.Base = base
-		applied := slices.Clone(scope)
-		for _, root := range derived {
-			applied = append(applied, ":(exclude)"+root)
-		}
-		patch, err := git(append([]string{"diff", "--cached", "--binary", "--find-renames", base}, applied...)...)
-		if err != nil {
-			return err
-		}
 		statuses, err := git(append([]string{"diff", "--cached", "--name-status", "--no-renames", "-z", base}, scope...)...)
 		if err != nil {
 			return err
 		}
-		change.Patch = []byte(patch)
+		applied := slices.Clone(scope)
+		for _, root := range derivation.Roots {
+			applied = append(applied, ":(exclude)"+root)
+		}
+		var rebased []string // files whose generated regions the base tree must lose
 		fields := strings.Split(statuses, "\x00")
 		for i := 0; i+1 < len(fields); i += 2 {
 			status, name := fields[i], fields[i+1]
 			switch {
-			case !underAny(name, derived):
-				change.Files = append(change.Files, name)
-			case status == "D":
-				change.DerivedDeleted = append(change.DerivedDeleted, name)
-				fallthrough
-			default:
+			case underAny(name, derivation.Roots):
+				if status == "D" {
+					change.DerivedDeleted = append(change.DerivedDeleted, name)
+				}
 				change.Derived = append(change.Derived, name)
+			case derivation.Merge[name] != nil:
+				merged := MergedFile{Path: name}
+				if status != "A" {
+					if merged.Base, err = blob(git, base+":"+name); err != nil {
+						return err
+					}
+				}
+				if status != "D" {
+					if merged.Theirs, err = blob(git, ":"+name); err != nil {
+						return err
+					}
+				}
+				change.Merged = append(change.Merged, merged)
+				applied = append(applied, ":(exclude,literal)"+name)
+			default:
+				change.Files = append(change.Files, name)
+				if derivation.Blank == nil {
+					continue
+				}
+				if status != "D" {
+					if err := blankIndexed(git, name, derivation.Blank); err != nil {
+						return err
+					}
+				}
+				if status != "A" {
+					content, err := blob(git, base+":"+name)
+					if err != nil {
+						return err
+					}
+					if !bytes.Equal(derivation.Blank(name, content), content) {
+						rebased = append(rebased, name)
+					}
+				}
 			}
 		}
+		from := base
+		if len(rebased) != 0 {
+			if from, err = blankedTree(ctx, path, base, rebased, derivation.Blank); err != nil {
+				return err
+			}
+		}
+		patch, err := git(append([]string{"diff", "--cached", "--binary", "--find-renames", from}, applied...)...)
+		if err != nil {
+			return err
+		}
+		change.Patch = []byte(patch)
 		return nil
 	})
 	return change, err
@@ -242,12 +285,14 @@ func (r *Repository) registered(ctx context.Context, path string) (Entry, bool, 
 // upstream, holding nothing back for a later batch commit. Call it under the
 // landing lock. It refuses unless the main checkout is on Trunk, has no
 // uncommitted change and contains its freshly fetched upstream; local commits
-// ahead of upstream are pushed with the landing. It applies the change
-// atomically, removes the derived files the worktree deleted, and runs gate on
-// the touched files; the gate regenerates the derived roots. It commits the
-// touched files and every derived file the gate changed with message, and
-// pushes; any failure restores the checkout, its derived roots included, and
-// the local branch to their prior state.
+// ahead of upstream are pushed with the landing. It blanks the generated
+// regions of the files the change touches, applies the change atomically,
+// removes the derived files the worktree deleted, merges the structurally
+// merged files, and runs gate on the touched files; the gate regenerates the
+// derived roots and generated regions. It commits what the landing changed
+// (refusing any other change the gate made) with message, and pushes; any
+// failure restores the checkout, derived content included, and the local
+// branch to their prior state.
 func (r *Repository) Land(ctx context.Context, change Change, message string, gate func(files []string) error) error {
 	if strings.TrimSpace(message) == "" {
 		return errors.New("land requires a commit message")
@@ -291,10 +336,21 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		return err
 	}
 	defer func() { _ = os.Remove(r.landingPath()) }()
-	if err := r.Apply(ctx, change.Patch, false); err != nil {
+	blank := change.Derivation.Blank
+	blanked, err := r.blankFiles(change.Files, blank)
+	if err == nil {
+		err = r.Apply(ctx, change.Patch, false)
+	}
+	if err != nil {
+		if len(blanked) != 0 {
+			_, restoreErr := gitWith(context.WithoutCancel(ctx), r.Main, nil, []byte(strings.Join(blanked, "\x00")), "--literal-pathspecs", "checkout", "--quiet", "HEAD", "--pathspec-from-file=-", "--pathspec-file-nul")
+			err = errors.Join(err, restoreErr)
+		}
 		return fmt.Errorf("refused, nothing applied (rebase the worktree onto %s): %w", Trunk, err)
 	}
-	// Restoration outlives an interrupted or expired landing.
+	// Restoration outlives an interrupted or expired landing. The patch was
+	// made between blanked documents, so it reverses only once their
+	// regenerated regions are blanked again.
 	restore := func(cause error) error {
 		cleanup, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -303,10 +359,19 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 			_, resetErr = git(cleanup, r.Main, "reset", "--quiet")
 		}
 		if resetErr == nil {
-			resetErr = r.restoreDerived(cleanup, change.DerivedRoots, prior)
+			resetErr = r.restoreDerived(cleanup, change.Derivation.Roots, prior)
 		}
-		if err := errors.Join(resetErr, r.Apply(cleanup, change.Patch, true)); err != nil {
-			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds the change: %w", cause, err)
+		if resetErr == nil {
+			_, resetErr = r.blankFiles(change.Files, blank)
+		}
+		if resetErr == nil {
+			resetErr = r.Apply(cleanup, change.Patch, true)
+		}
+		if resetErr == nil {
+			resetErr = r.restoreDerivedFiles(cleanup, change, prior)
+		}
+		if resetErr != nil {
+			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds the change: %w", cause, resetErr)
 		}
 		return fmt.Errorf("%w; rolled back", cause)
 	}
@@ -315,19 +380,27 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 			return restore(err)
 		}
 	}
-	if err := gate(change.Files); err != nil {
+	gated := slices.Clone(change.Files)
+	for _, merged := range change.Merged {
+		if err := r.merge(merged, change.Derivation.Merge[merged.Path]); err != nil {
+			return restore(fmt.Errorf("merge %s: %w", merged.Path, err))
+		}
+		gated = append(gated, merged.Path)
+	}
+	if err := gate(gated); err != nil {
 		return restore(fmt.Errorf("gate failed: %w", err))
 	}
-	derived, err := r.DerivedChanges(ctx, change)
+	files, err := r.landed(ctx, change)
 	if err != nil {
 		return restore(err)
 	}
-	files := slices.Concat(change.Files, derived) // disjoint: Files lie outside the derived roots
-	if len(files) == 0 {
-		return restore(fmt.Errorf("nothing to land: %s changes only derived files, and regenerating them changed nothing on %s", change.Source, Trunk))
+	if len(files) != 0 {
+		if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, files...)...); err != nil {
+			return restore(err)
+		}
 	}
-	if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, files...)...); err != nil {
-		return restore(err)
+	if _, err := git(ctx, r.Main, "diff", "--cached", "--quiet"); err == nil {
+		return restore(fmt.Errorf("nothing to land: %s changes only derived content, and deriving it changed nothing on %s", change.Source, Trunk))
 	}
 	// The gate has just run; hooks would only repeat it.
 	if _, err := git(ctx, r.Main, "commit", "--quiet", "--no-verify", "-m", message); err != nil {
@@ -346,9 +419,11 @@ type Landing struct {
 	Worktree string   `json:"worktree"`
 	Message  string   `json:"message"`
 	Files    []string `json:"files"`
-	// DerivedRoots are regenerated by the landing; their changed files are
-	// its own, not stray edits.
+	// DerivedRoots are regenerated by the landing and Merged merged into;
+	// their changes, like regenerated document regions, are its own, not
+	// stray edits.
 	DerivedRoots []string  `json:"derived_roots,omitempty"`
+	Merged       []string  `json:"merged,omitempty"`
 	StartedAt    time.Time `json:"started_at"`
 	// Stale is set by CurrentLanding when no process holds the landing lock,
 	// i.e. the lander died before removing its marker.
@@ -360,7 +435,7 @@ func (r *Repository) landingPath() string {
 }
 
 func (r *Repository) writeLanding(change Change, message string) error {
-	data, err := json.MarshalIndent(Landing{Owner: owner(change.Source), PID: os.Getpid(), Worktree: change.Source, Message: message, Files: change.Files, DerivedRoots: change.DerivedRoots, StartedAt: time.Now().UTC()}, "", "  ")
+	data, err := json.MarshalIndent(Landing{Owner: owner(change.Source), PID: os.Getpid(), Worktree: change.Source, Message: message, Files: change.Files, DerivedRoots: change.Derivation.Roots, Merged: mergedPaths(change), StartedAt: time.Now().UTC()}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -399,8 +474,8 @@ func (l *Landing) String() string {
 		state = "STALE marker (no lander holds the lock)"
 	}
 	line := fmt.Sprintf("landing %s since %s by %s (pid %d) from %s: %q, %d files: %s", state, l.StartedAt.Format(time.RFC3339), l.Owner, l.PID, l.Worktree, l.Message, len(l.Files), strings.Join(l.Files, " "))
-	if len(l.DerivedRoots) != 0 {
-		line += fmt.Sprintf("; plus generator output it regenerates under %s", strings.Join(l.DerivedRoots, " "))
+	if len(l.DerivedRoots) != 0 || len(l.Merged) != 0 {
+		line += fmt.Sprintf("; plus generated output and document regions it regenerates (%s) and files it merges (%s)", strings.Join(l.DerivedRoots, " "), strings.Join(l.Merged, " "))
 	}
 	return line
 }

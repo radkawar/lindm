@@ -14,7 +14,7 @@ import (
 // derived files it removed). Call it under the landing lock, where the
 // checkout was clean before the landing began.
 func (r *Repository) DerivedChanges(ctx context.Context, change Change) ([]string, error) {
-	tracked, untracked, err := r.derivedStatus(ctx, change.DerivedRoots)
+	tracked, untracked, err := r.derivedStatus(ctx, change.Derivation.Roots)
 	return append(tracked, untracked...), err
 }
 

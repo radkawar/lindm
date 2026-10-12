@@ -98,7 +98,7 @@ func TestLandsRegenerateDerivedOutputAndCompose(t *testing.T) {
 
 	land := func(path, message string) {
 		t.Helper()
-		change, err := repo.Change(ctx, path, nil, roots)
+		change, err := repo.Change(ctx, path, nil, Derivation{Roots: roots})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,14 +108,14 @@ func TestLandsRegenerateDerivedOutputAndCompose(t *testing.T) {
 	}
 	land(first, "first")
 	// Applied whole, the second tree's output conflicts with the first's.
-	whole, err := repo.Change(ctx, second, nil, nil)
+	whole, err := repo.Change(ctx, second, nil, Derivation{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.Land(ctx, whole, "whole", regenerating); err == nil || !strings.Contains(err.Error(), "nothing applied") {
 		t.Fatalf("conflicting generated output applied: %v", err)
 	}
-	change, err := repo.Change(ctx, second, nil, roots)
+	change, err := repo.Change(ctx, second, nil, Derivation{Roots: roots})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestFailedLandingRestoresDerivedRoots(t *testing.T) {
 		}
 	}
 	generateFixture(t, path)
-	change, err := repo.Change(ctx, path, nil, []string{"out"})
+	change, err := repo.Change(ctx, path, nil, Derivation{Roots: []string{"out"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestFailedLandingRestoresDerivedRoots(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(path, "out", "all.txt"), []byte("hand edit\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	only, err := repo.Change(ctx, path, []string{"out"}, []string{"out"})
+	only, err := repo.Change(ctx, path, []string{"out"}, Derivation{Roots: []string{"out"}})
 	if err != nil {
 		t.Fatal(err)
 	}

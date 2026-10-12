@@ -95,7 +95,7 @@ const maxListedDerived = 20
 // lock with the change applied, and returns the derived files it changed:
 // this landing's generated output, composed with every landing before it.
 func regenerate(ctx context.Context, repo *worktree.Repository, change worktree.Change) ([]string, error) {
-	if len(change.DerivedRoots) == 0 {
+	if len(change.Derivation.Roots) == 0 {
 		return nil, nil
 	}
 	fmt.Println("land: regenerating buf/sqlc output (make generate-code)")

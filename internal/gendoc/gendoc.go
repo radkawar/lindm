@@ -147,3 +147,17 @@ func Escape(s string) string {
 	}
 	return b.String()
 }
+
+// Blank returns doc with the content of each named generated block emptied,
+// the markers kept: the hand-written part of a document, against which a
+// change can be compared or applied whatever the generated content is. A name
+// whose markers are not present exactly once is left as it is (Sync reports
+// it).
+func Blank(doc []byte, names ...string) []byte {
+	for _, name := range names {
+		if blanked, err := Replace(doc, name, ""); err == nil {
+			doc = blanked
+		}
+	}
+	return doc
+}

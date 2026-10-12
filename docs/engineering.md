@@ -2371,7 +2371,17 @@ output), and `make generate-code` (buf and sqlc) regenerates them in the shared
 tree under the lock. Two landings that both change protos or queries therefore
 compose instead of the later one failing its apply check on the earlier one's
 output; the regenerated files are gated (the build, lint and race tests cover
-them) and committed with the landing, and a rollback restores them. It then
+them) and committed with the landing, and a rollback restores them. Generated
+document regions are derived the same way: the patch is computed between base
+and worktree documents whose `generate-docs` blocks (the lab matrix table,
+platform tiers, support and capability tables) are emptied, applied to the
+shared documents emptied likewise, and `go run ./cmd/dev generate-docs`
+refills every block after code generation, so column widths that change with
+every ledger row no longer conflict. `lab/ledger.json` is merged as records,
+not text (`labmatrix.MergeLedger`): the entries the worktree adds to its base
+are appended to `main`'s ledger once and those it removes are removed, so
+concurrent `lab matrix` imports compose. A gate that changes any other file
+fails the landing, and that change is discarded with the rollback. It then
 runs the quick gate on the touched files in the shared tree (build, golangci-lint
 run for both tags and fmt on touched packages, buf when protos changed,
 prettier/markdownlint on touched docs and web files, a refusal of any added

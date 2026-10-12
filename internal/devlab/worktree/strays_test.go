@@ -43,7 +43,7 @@ func TestLandRefusalTracesStraysToTheirWorktree(t *testing.T) {
 	write(partial, "README", "README\nadded by the culprit agent\nand further work\n")
 	write(repo.Main, "orphan.txt", "nobody's worktree has this\n")
 	write(bystander, "feature.txt", "the work being landed\n")
-	change, err := repo.Change(ctx, bystander, nil, nil)
+	change, err := repo.Change(ctx, bystander, nil, Derivation{})
 	if err != nil {
 		t.Fatal(err)
 	}

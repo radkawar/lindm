@@ -24,15 +24,10 @@ func generateDocs(args []string) error {
 	if flags.NArg() != 0 {
 		return errors.New("generate-docs takes no positional arguments")
 	}
-	blocks, err := platform.DocBlocks()
+	blocks, err := docBlocks(*root)
 	if err != nil {
 		return err
 	}
-	matrix, err := labmatrix.DocBlock(*root)
-	if err != nil {
-		return err
-	}
-	blocks = append(blocks, matrix)
 	stale, err := gendoc.Sync(*root, blocks, !*check)
 	if err != nil {
 		return err
@@ -46,4 +41,33 @@ func generateDocs(args []string) error {
 		}
 	}
 	return nil
+}
+
+// docBlocks returns every Markdown block generate-docs maintains under root.
+func docBlocks(root string) ([]gendoc.Block, error) {
+	blocks, err := platform.DocBlocks()
+	if err != nil {
+		return nil, err
+	}
+	matrix, err := labmatrix.DocBlock(root)
+	if err != nil {
+		return nil, err
+	}
+	return append(blocks, matrix), nil
+}
+
+// blankGenerated empties the generate-docs blocks of the repository-relative
+// file name, so a landing patches and compares only its hand-written part.
+func blankGenerated(root string) (func(name string, content []byte) []byte, error) {
+	blocks, err := docBlocks(root)
+	if err != nil {
+		return nil, err
+	}
+	names := map[string][]string{}
+	for _, block := range blocks {
+		names[block.File] = append(names[block.File], block.Name)
+	}
+	return func(name string, content []byte) []byte {
+		return gendoc.Blank(content, names[name]...)
+	}, nil
 }
