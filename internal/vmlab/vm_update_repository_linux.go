@@ -29,7 +29,13 @@ func exerciseUpdateRepository(ctx context.Context, p *nativeGuestPackages, repos
 		return err
 	}
 	if p.backend == platform.BackendPacman {
-		config := "[options]\nArchitecture = auto\nGPGDir = " + nativeGuestDir + "/pacman-gnupg\nCacheDir = " + nativeGuestDir + "/https-archives\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nLocalFileSigLevel = Required TrustedOnly\nXferCommand = /usr/bin/curl --fail --silent --show-error --cacert " + caPath + " --output %o %u\n[lindm]\nServer = https://localhost:18444/repo/arch\n"
+		// As the console's pacman enrollment command, the device trusts the
+		// pinned signer in the system keyring: the agent's own pacman -U of a
+		// TUF-staged update verifies the detached signature against it.
+		if err := p.command(ctx, "trust pinned signer in system pacman keyring", "pacman-key --init; pacman-key --add "+p.keyPath+"; pacman-key --lsign-key "+nativeQuote(artifact.SignerFingerprint), nil); err != nil {
+			return err
+		}
+		config := "[options]\nArchitecture = auto\nCacheDir = " + nativeGuestDir + "/https-archives\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nLocalFileSigLevel = Required TrustedOnly\nXferCommand = /usr/bin/curl --fail --silent --show-error --cacert " + caPath + " --output %o %u\n[lindm]\nServer = https://localhost:18444/repo/arch\n"
 		if err := p.uploadBytes(ctx, nativeGuestDir+"/https-pacman.conf", []byte(config)); err != nil {
 			return err
 		}

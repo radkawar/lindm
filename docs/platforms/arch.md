@@ -611,6 +611,31 @@ packages `2f03beaa…` (0.7.0) / `4aa2d295…` (0.7.1) in signed repositories:
 
 Keep raw account/network/journal diagnostics private.
 
+### 2026-10-12 snapshot-pinned matrix (Archive 2026-10-02)
+
+`lab matrix run -platform arch -architecture x86_64` from main, local KVM, with
+each record in the [ledger](../verification.md#1-launch-platform-qualification):
+
+| Cell       | Result | Record / SHA-256                                                                                                                             |
+| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory  | pass   | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
+| Dispatch   | pass   | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
+| Assistance | pass   | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
+
+The first encrypted GRUB golden boots only since installer umask 077 was scoped to
+credential writers: pacstrap's `mkdir -p -m` had created `/etc` and `/var` as 0700,
+so dbus-broker could not read `/etc/machine-id` and NetworkManager never started.
+The agent's own `pacman -U` of a TUF-staged update verifies the detached signature
+against the system keyring, so devices must locally sign the pinned package signer
+there, as the console's pacman enrollment command does.
+
+Air-gap bundles carry a signed pacman repository at
+`https://SITE/offline/repositories/amd64/arch/` (database `lindm.db`, detached
+package and database signatures) built from the release's amd64 Arch agent
+package. Install with `SigLevel = PackageRequired DatabaseRequired TrustedOnly`,
+the station key locally signed into the system keyring and the site CA passed to
+`XferCommand` curl only for transport.
+
 ## Known gaps
 
 Whole-system upgrade, interruption/rollback, encryption, desktop consent and

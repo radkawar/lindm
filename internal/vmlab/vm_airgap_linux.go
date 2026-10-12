@@ -579,17 +579,15 @@ func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, archit
 	base := "https://localhost:18444/offline/repositories/" + architecture
 	switch guest.backend {
 	case platform.BackendPacman:
-		// An isolated keyring admits only the pinned station key; the site CA
-		// authenticates transport only. Database and package signatures are
+		// As the console's pacman enrollment command, the pinned station key is
+		// locally signed into the system keyring: the agent's later pacman -U of
+		// the TUF-staged update verifies its detached signature there. The site
+		// CA authenticates transport only; database and package signatures are
 		// both required, so a byte change anywhere fails before install.
-		gpgDir := airgapGuestDir + "/pacman-gnupg"
-		if err := guest.command(ctx, "pin station key in isolated pacman keyring", "install -d -m 0700 "+gpgDir+"; pacman-key --gpgdir "+gpgDir+" --init; pacman-key --gpgdir "+gpgDir+" --add "+airgapGuestDir+"/signer.asc; pacman-key --gpgdir "+gpgDir+" --lsign-key "+nativeQuote(fingerprint), nil); err != nil {
+		if err := guest.command(ctx, "trust pinned station key in system pacman keyring", "pacman-key --init; pacman-key --add "+airgapGuestDir+"/signer.asc; pacman-key --lsign-key "+nativeQuote(fingerprint), nil); err != nil {
 			return err
 		}
-		if err := guest.uploadBytes(ctx, gpgDir+"/gpg.conf", []byte("no-auto-key-retrieve\nauto-key-locate clear\nkeyserver hkp://127.0.0.1:9\n")); err != nil {
-			return err
-		}
-		config := "[options]\nArchitecture = auto\nGPGDir = " + gpgDir + "\nCacheDir = " + airgapGuestDir + "/archives\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nLocalFileSigLevel = Required TrustedOnly\nXferCommand = /usr/bin/curl --fail --silent --show-error --cacert " + airgapGuestDir + "/site-ca.crt --output %o %u\n[lindm]\nServer = " + base + "/arch\n"
+		config := "[options]\nArchitecture = auto\nCacheDir = " + airgapGuestDir + "/archives\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nLocalFileSigLevel = Required TrustedOnly\nXferCommand = /usr/bin/curl --fail --silent --show-error --cacert " + airgapGuestDir + "/site-ca.crt --output %o %u\n[lindm]\nServer = " + base + "/arch\n"
 		if err := guest.uploadBytes(ctx, airgapGuestDir+"/pacman.conf", []byte(config)); err != nil {
 			return err
 		}

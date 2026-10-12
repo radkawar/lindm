@@ -6161,6 +6161,66 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "3499b90f1e57dfaf4a1cd92a8dc7e022e7c7496e09be258516f402ccc1700dd7"
+    },
+    {
+      "platform": "arch",
+      "cell": "self-update",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/self-update-x86_64.json",
+      "sha256": "69f468e3be982740861b3e21c1c2c96ccdac412f06e88fe70aaa833ac28f2f1d",
+      "recorded": "2026-10-12T04:55:40.493778692Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-grub-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json",
+      "sha256": "d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01",
+      "recorded": "2026-10-12T05:05:02.925583500Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "57f17e1bf6b7926bd56fb50c10deed97f48305bbe32bfa9051dd84ae7d41a9af",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "os-update",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/os-update-x86_64.json",
+      "sha256": "2675abfd6da56b26f724a85a043a2474662c7f88a86ca94596909a7743fbb64a",
+      "recorded": "2026-10-12T05:19:53.162164328Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "dispatch",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json",
+      "sha256": "d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd",
+      "recorded": "2026-10-12T05:19:57.019137177Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
     }
   ]
 }
