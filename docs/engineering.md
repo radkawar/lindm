@@ -2268,7 +2268,7 @@ The shared main checkout changes only through `go run ./cmd/dev land -from
 WORKTREE -m MSG [-paths a,b]`. It and `go run ./cmd/dev gate-commit -m MSG` hold
 the exclusive flock `<main>/.git/lindm-landing.lock`, whose file names the holder
 while it is waited for. `land` refuses unless the shared checkout is on `main`,
-has no uncommitted change (it prints them) and contains its freshly fetched
+has no uncommitted change and contains its freshly fetched
 upstream; local commits ahead of it (an unpushed `gate-commit`) are pushed with
 the landing. It computes the worktree's complete change against its merge base with
 `main` using a scratch index (commits, staged, unstaged and untracked non-ignored
@@ -2303,6 +2303,26 @@ and can be stale, since raw `flock` users never rewrite it. `worktree audit` als
 prints the landing marker first. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits any remaining change only
 when green.
+
+Outside landings the shared checkout's tracked regular files are read-only
+(`a-w`), so an edit that a relative path or a tool's default cwd aims at the
+shared tree instead of a private worktree fails at once with EACCES rather than
+dirtying it and blocking every landing. `land` and `gate-commit` restore `u+w`
+under the landing lock and protect again however they end (commit, refusal,
+rollback, failure, interrupt), including files the landing added.
+`go run ./cmd/dev protect` is idempotent and does nothing while another process
+holds the landing lock, whose run re-protects. The `post-merge` and
+`post-checkout` hooks run it in the main checkout only, because git recreates
+the files a pull or checkout changes with default (writable) permissions, and
+`dev status` runs it and names the tracked files it found writable. Directories
+and untracked files are not protected: `make check`, `acceptance-build` and
+`check-web` write only untracked outputs (`artifacts/`, `web/dist/`), and
+`signoff` and `pre-push` gate clean worktrees. `make generate` refuses in the
+protected checkout by design; generate in a private worktree and land the
+output. When `land` refuses a dirty shared checkout, it lists every uncommitted
+file with its mtime and the private worktrees whose working copy holds the
+same change (an identical file, or every line it adds and none it removes),
+likeliest first, so the agent that wrote into the shared tree is named.
 
 `go run ./cmd/dev worktree audit [PATH...]` answers whether work is stranded,
 which ahead/dirty counts cannot because most work landed by copying. For every

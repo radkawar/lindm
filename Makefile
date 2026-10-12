@@ -42,7 +42,11 @@ bootstrap: tools
 	npm ci --ignore-scripts
 	npm run hooks:install
 
+# Fails in the shared main checkout by design: its tracked files are read-only
+# outside landings (go run ./cmd/dev protect). Generate in a private worktree
+# and land the output.
 generate: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
+	@test -w go.mod || { echo "make generate: tracked files here are read-only (the protected shared checkout); generate in a private worktree and land the output" >&2; exit 1; }
 	$(BUF) generate
 	$(SQLC) generate
 	go run ./cmd/dev generate-docs
@@ -128,7 +132,7 @@ ui-review: acceptance-build
 # with gh signoff create --commit SHA, so a signoff attests to exactly what is
 # on GitHub even while this tree is dirty. Contexts: unit (make check),
 # integration (real PostgreSQL) and acceptance.
-.PHONY: signoff signoff-acceptance pre-push
+.PHONY: signoff signoff-acceptance pre-push protect
 signoff: dev-up
 	go run ./cmd/dev signoff
 
@@ -139,3 +143,8 @@ signoff-acceptance:
 # skipped when that SHA already carries a green signoff/unit.
 pre-push:
 	go run ./cmd/dev pre-push
+
+# Git post-merge/post-checkout hook body in the main checkout: git recreates
+# the files it changes writable; make every tracked file read-only again.
+protect:
+	go run ./cmd/dev protect

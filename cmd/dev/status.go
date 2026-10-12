@@ -16,7 +16,8 @@ import (
 
 // runStatus prints the shared checkout's landing state: HEAD against its
 // upstream, the landing in progress (whose applied files explain a dirty tree),
-// the landing and integration lock holders, and uncommitted files.
+// the landing and integration lock holders, and uncommitted files. Tracked
+// files it finds writable outside a landing it protects again and names.
 func runStatus(args []string) error {
 	if len(args) != 0 {
 		return errors.New("status takes no arguments")
@@ -67,6 +68,11 @@ func runStatus(args []string) error {
 			}
 		}
 	}
+	protection, err := protectShared(ctx, repo)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("protection: %s\n", protection)
 	dirty, err := output(ctx, repo.Main, "git", "status", "--porcelain")
 	if err != nil {
 		return err

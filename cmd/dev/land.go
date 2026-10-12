@@ -23,11 +23,15 @@ const landUsage = `Usage: go run ./cmd/dev land -from WORKTREE -m MESSAGE [-path
 
 The only way to change the shared main checkout. Both commands hold the
 exclusive lock <main>/.git/lindm-landing.lock, so no landing interleaves with
-another landing or with a gated commit.
+another landing or with a gated commit. Outside them the checkout's tracked
+files are read-only (dev protect); under the lock both restore u+w, then
+protect again however they end (commit, refusal, rollback, interrupt).
 
   land         Refuse unless the shared checkout is on main, clean and
                contains its freshly fetched upstream (local commits ahead of
-               it are pushed too). Apply WORKTREE's complete change
+               it are pushed too); a dirty refusal lists each file with its
+               mtime and the private worktree whose copy holds the same
+               change. Apply WORKTREE's complete change
                against main (commits since its merge base, staged, unstaged and
                untracked files, renames and deletions; -paths limits it). A
                conflict refuses with nothing applied. Run the quick gate on the
@@ -85,12 +89,20 @@ func runLand(args []string) (resultErr error) {
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	change, err := repo.Change(ctx, *from, limit)
+	// Tracked files are read-only outside landings (dev protect); Writable
+	// re-protects them whether the landing commits, rolls back or is refused.
+	return repo.Writable(ctx, func() error { return land(ctx, repo, *from, limit, *message) })
+}
+
+// land applies, gates, commits and pushes the worktree's change; the caller
+// holds the landing lock with the tracked files writable.
+func land(ctx context.Context, repo *worktree.Repository, from string, limit []string, message string) error {
+	change, err := repo.Change(ctx, from, limit)
 	if err != nil {
 		return err
 	}
 	if len(change.Files) == 0 {
-		return fmt.Errorf("%s has no change against %s", *from, worktree.Trunk)
+		return fmt.Errorf("%s has no change against %s", from, worktree.Trunk)
 	}
 	// Every worktree links the shared install, so it must match the lock the
 	// gate runs against: repair drift first, reinstall when this landing
@@ -98,9 +110,9 @@ func runLand(args []string) (resultErr error) {
 	if err := syncNodeModules(ctx, repo.Main, false); err != nil {
 		return err
 	}
-	fmt.Printf("land: %d files from %s (base %.12s); gating in %s\n", len(change.Files), *from, change.Base, repo.Main)
+	fmt.Printf("land: %d files from %s (base %.12s); gating in %s\n", len(change.Files), from, change.Base, repo.Main)
 	manifests := slices.ContainsFunc(change.Files, func(file string) bool { return file == "package.json" || file == "package-lock.json" })
-	if err := repo.Land(ctx, change, *message, func(files []string) error {
+	if err := repo.Land(ctx, change, message, func(files []string) error {
 		if manifests {
 			if err := syncNodeModules(ctx, repo.Main, true); err != nil {
 				return err
@@ -161,13 +173,17 @@ func runGateCommit(args []string) (resultErr error) {
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	if err := stream(ctx, repo.Main, nil, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners"); err != nil {
-		return fmt.Errorf("make check failed, nothing committed: %w", err)
-	}
-	if err := stream(ctx, repo.Main, nil, "git", "add", "--all"); err != nil {
-		return err
-	}
-	return stream(ctx, repo.Main, nil, "git", "commit", "--quiet", "-m", *message)
+	// The commit's lint-staged hook may rewrite tracked files; Writable
+	// re-protects them however the gate ends.
+	return repo.Writable(ctx, func() error {
+		if err := stream(ctx, repo.Main, nil, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners"); err != nil {
+			return fmt.Errorf("make check failed, nothing committed: %w", err)
+		}
+		if err := stream(ctx, repo.Main, nil, "git", "add", "--all"); err != nil {
+			return err
+		}
+		return stream(ctx, repo.Main, nil, "git", "commit", "--quiet", "-m", *message)
+	})
 }
 
 // quickGate is the AGENTS.md pre-landing gate scoped to the touched files.

@@ -25,24 +25,36 @@ func (r *Repository) Lock(ctx context.Context, waiting func(holder string)) (unl
 	return LockFile(ctx, r.LockPath(), waiting)
 }
 
+// TryLock takes the landing lock only if it is free; ok is false, with
+// nothing taken, while it is held.
+func (r *Repository) TryLock() (unlock func() error, ok bool, err error) {
+	file, err := openLock(r.LockPath())
+	if err != nil {
+		return nil, false, err
+	}
+	if ok, err := tryFlock(file); err != nil || !ok {
+		return nil, false, errors.Join(err, file.Close())
+	}
+	return hold(file), true, nil
+}
+
 // LockFile takes an exclusive flock on path, waiting until ctx ends. While the
 // lock is busy, waiting is called with the holder's record each time it
 // changes (a new holder, or a holder's progress). The flock is the authority;
 // the record is diagnostic. The returned unlock releases it; a crashed holder
 // releases it implicitly.
 func LockFile(ctx context.Context, path string, waiting func(holder string)) (unlock func() error, err error) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0o600)
+	file, err := openLock(path)
 	if err != nil {
 		return nil, err
 	}
-	fd := int(file.Fd())
 	for last := ""; ; {
-		err := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			break
+		ok, err := tryFlock(file)
+		if err != nil {
+			return nil, errors.Join(err, file.Close())
 		}
-		if !errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, errors.Join(fmt.Errorf("lock %s: %w", path, err), file.Close())
+		if ok {
+			return hold(file), nil
 		}
 		if waiting != nil {
 			// A record mid-rewrite reads empty; report only complete changes.
@@ -58,13 +70,35 @@ func LockFile(ctx context.Context, path string, waiting func(holder string)) (un
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
+}
+
+func openLock(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0o600)
+}
+
+// tryFlock takes the exclusive flock on file without waiting; it reports
+// false while another open file description holds it.
+func tryFlock(file *os.File) (bool, error) {
+	err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if errors.Is(err, syscall.EWOULDBLOCK) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("lock %s: %w", file.Name(), err)
+	}
+	return true, nil
+}
+
+// hold records this process as the holder of file's flock and returns its
+// release.
+func hold(file *os.File) (unlock func() error) {
 	holder := "pid " + strconv.Itoa(os.Getpid()) + " " + strings.Join(os.Args, " ") + "\n"
 	if err := file.Truncate(0); err == nil {
 		_, _ = file.WriteAt([]byte(holder), 0)
 	}
 	return func() error {
-		return errors.Join(file.Truncate(0), syscall.Flock(fd, syscall.LOCK_UN), file.Close())
-	}, nil
+		return errors.Join(file.Truncate(0), syscall.Flock(int(file.Fd()), syscall.LOCK_UN), file.Close())
+	}
 }
 
 // Change is a worktree's complete change against Trunk: commits since its
@@ -188,7 +222,7 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		return err
 	}
 	if dirty != "" {
-		return fmt.Errorf("refused: the shared checkout has uncommitted changes outside this landing; land or remove them first:\n%s", dirty)
+		return r.refuseDirty(ctx, dirty)
 	}
 	upstream, err := git(ctx, r.Main, "rev-parse", "--abbrev-ref", Trunk+"@{upstream}")
 	if err != nil {
