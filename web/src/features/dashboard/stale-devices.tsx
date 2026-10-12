@@ -91,7 +91,6 @@ export function StaleDevices({
                     <Link
                       to="/devices/$deviceId"
                       params={{ deviceId: device.id }}
-                      search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                       className="break-words text-sm font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {device.hostname.trim() || "Unnamed device"}

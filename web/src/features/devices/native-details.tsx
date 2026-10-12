@@ -45,12 +45,57 @@ function NativeValue({
   if (typeof field.value === "boolean") return <span>{field.value ? "Yes" : "No"}</span>;
   if (unit === "bytes" && typeof field.value === "bigint")
     return <span>{formatBytes(field.value)}</span>;
+  if (unit === "seconds" && typeof field.value === "bigint")
+    return <span>{formatDuration(field.value)}</span>;
+  if (unit === "unix-time" && typeof field.value === "bigint")
+    return <span>{unixTime.format(new Date(Number(field.value) * 1000))}</span>;
   return (
     <span>
       {typeof field.value === "bigint" ? field.value.toLocaleString() : field.value}
       {unit ? ` ${unit}` : ""}
     </span>
   );
+}
+
+const unixTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+function formatDuration(seconds: bigint) {
+  const total = Number(seconds);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days} ${days === 1 ? "day" : "days"} ${hours} hr`;
+  if (hours > 0) return `${hours} hr ${minutes} min`;
+  return `${minutes} min`;
+}
+
+// lsblk words, as administrators read them.
+const blockTypes: Record<string, string> = {
+  disk: "Disk",
+  part: "Partition",
+  crypt: "Unlocked encrypted volume",
+  lvm: "LVM volume",
+  raid1: "RAID 1",
+  rom: "Optical drive",
+  loop: "Loop device",
+};
+const blockEncryption: Record<string, string> = {
+  none: "None",
+  luks: "LUKS",
+  "dm-crypt": "dm-crypt",
+  "inherited-dm-crypt": "Inside an encrypted volume",
+};
+
+function ObservedWord({
+  field,
+  words,
+}: {
+  field: ObservedString | undefined;
+  words: Record<string, string>;
+}) {
+  if (field?.status !== CollectionStatus.SUCCESS)
+    return <CollectionStatusText status={field?.status} />;
+  return <span>{Object.hasOwn(words, field.value) ? words[field.value] : field.value}</span>;
 }
 
 export function NumberValue({ field, unit }: { field: ObservedUint64 | undefined; unit?: string }) {
@@ -122,9 +167,9 @@ function NativeRows<T>({
         <CollectionStatusText status={status} unavailableLabel={unavailableLabel} />
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
-            {rows.length.toLocaleString()} records observed
-          </p>
+          {rows.length > 50 ? (
+            <p className="text-sm text-muted-foreground">{rows.length.toLocaleString()} observed</p>
+          ) : null}
           {rows.length === 0 ? (
             <p className="text-sm">None observed in this collection.</p>
           ) : (
@@ -232,6 +277,16 @@ export function DeviceNativeDetails({
       (field) => !isOptionalCollectionAbsence(field?.status),
     ) ||
     !!platform?.repositories?.backend;
+  const backendFields: NativeFact[] = [
+    { label: "dpkg", field: details?.backends?.dpkg, optional: true },
+    { label: "RPM", field: details?.backends?.rpm, optional: true },
+    { label: "pacman", field: details?.backends?.pacman, optional: true },
+    { label: "zypper", field: details?.backends?.zypper, optional: true },
+    { label: "rpm-ostree", field: details?.backends?.rpmOstree, optional: true },
+    { label: "Nix", field: details?.backends?.nix, optional: true },
+    { label: "Flatpak", field: details?.backends?.flatpak, optional: true },
+    { label: "Snap", field: details?.backends?.snap, optional: true },
+  ];
   return (
     <Card>
       <CardHeader>
@@ -278,8 +333,9 @@ export function DeviceNativeDetails({
                 },
                 { label: "Uptime", field: details.uptimeSeconds, unit: "seconds" },
                 {
-                  label: "Boot time (Unix seconds, device clock)",
+                  label: "Booted (device clock)",
                   field: details.bootTimeUnixSeconds,
+                  unit: "unix-time",
                 },
               ]}
             />
@@ -374,12 +430,18 @@ export function DeviceNativeDetails({
                   header: "Name",
                   render: (row) => <code className="font-mono">{row.name}</code>,
                 },
-                { header: "Type", field: (row) => row.type },
+                {
+                  header: "Type",
+                  render: (row) => <ObservedWord field={row.type} words={blockTypes} />,
+                },
                 { header: "Parent", field: (row) => row.parent, optional: true },
                 { header: "Size", field: (row) => row.sizeBytes, unit: "bytes" },
                 { header: "Filesystem", field: (row) => row.filesystem, optional: true },
                 { header: "Mountpoint", field: (row) => row.mountpoint, optional: true },
-                { header: "Encryption", field: (row) => row.encryption },
+                {
+                  header: "Encryption",
+                  render: (row) => <ObservedWord field={row.encryption} words={blockEncryption} />,
+                },
               ]}
             />
             <NativeRows
@@ -437,22 +499,13 @@ export function DeviceNativeDetails({
                 { header: "Shell", render: (row) => row.shell || "No shell recorded" },
               ]}
             />
-            <section className="grid gap-3">
-              <h3 className="font-semibold">App platforms</h3>
-              <NativeFacts
-                showUnavailable={showUnavailable}
-                fields={[
-                  { label: "dpkg", field: details.backends?.dpkg },
-                  { label: "RPM", field: details.backends?.rpm },
-                  { label: "pacman", field: details.backends?.pacman },
-                  { label: "zypper", field: details.backends?.zypper },
-                  { label: "rpm-ostree", field: details.backends?.rpmOstree },
-                  { label: "Nix", field: details.backends?.nix },
-                  { label: "Flatpak", field: details.backends?.flatpak },
-                  { label: "Snap", field: details.backends?.snap },
-                ]}
-              />
-            </section>
+            {showUnavailable ||
+            backendFields.some((item) => !isOptionalCollectionAbsence(item.field?.status)) ? (
+              <section className="grid gap-3">
+                <h3 className="font-semibold">App platforms</h3>
+                <NativeFacts showUnavailable={showUnavailable} fields={backendFields} />
+              </section>
+            ) : null}
             <Applications
               title="Flatpak applications"
               data={details.flatpak}

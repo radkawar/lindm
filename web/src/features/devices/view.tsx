@@ -17,7 +17,7 @@ import {
   type Device,
 } from "../../../gen/lindm/admin/v1/admin_pb";
 import { RpcError } from "@/components/ui/rpc-error";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { PageHeader } from "@/components/ui/page-header";
@@ -100,7 +100,7 @@ function compareDevices(left: Device, right: Device, column: ColumnId) {
 
 const complianceLabels: Record<DeviceCompliance, string> = {
   [DeviceCompliance.UNSPECIFIED]: "Unknown",
-  [DeviceCompliance.UNASSIGNED]: "Unassigned",
+  [DeviceCompliance.UNASSIGNED]: "No profile",
   [DeviceCompliance.COMPLIANT]: "Compliant",
   [DeviceCompliance.DRIFT_REMEDIATED]: "Drift remediated",
   [DeviceCompliance.STALE]: "Stale",
@@ -128,8 +128,8 @@ const encryptionLabels: Record<DeviceRootEncryption, [string, StatusTone, string
   ],
 };
 
-// Posture cells share the compliance cell's pattern: a focusable status badge
-// whose tooltip carries the evidence behind the one-word state.
+// Posture cells: a focusable state whose tooltip carries the evidence. Neutral
+// states stay plain text so attention badges stand out in a long table.
 function PostureBadge({
   tone,
   label,
@@ -141,7 +141,15 @@ function PostureBadge({
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<StatusBadge dot tabIndex={0} status={tone} />}>
+      <TooltipTrigger
+        render={
+          tone === "neutral" ? (
+            <span tabIndex={0} className="text-muted-foreground" />
+          ) : (
+            <StatusBadge dot tabIndex={0} status={tone} />
+          )
+        }
+      >
         {label}
       </TooltipTrigger>
       <TooltipContent className="block max-w-72 space-y-2">{children}</TooltipContent>
@@ -160,7 +168,6 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
         <Link
           to="/devices/$deviceId"
           params={{ deviceId: device.id }}
-          search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
           className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline"
         >
           {device.hostname.trim() || "Unnamed device"}
@@ -168,43 +175,31 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
       );
     case "state":
       return <DeviceLifecycleBadge state={device.lifecycleState} />;
-    case "compliance":
+    case "compliance": {
+      const tone: StatusTone =
+        device.compliance === DeviceCompliance.ATTENTION
+          ? "destructive"
+          : device.compliance === DeviceCompliance.STALE
+            ? "warning"
+            : device.compliance === DeviceCompliance.COMPLIANT ||
+                device.compliance === DeviceCompliance.DRIFT_REMEDIATED
+              ? "success"
+              : "neutral";
       return (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <StatusBadge
-                dot
-                tabIndex={0}
-                status={
-                  device.compliance === DeviceCompliance.ATTENTION
-                    ? "destructive"
-                    : device.compliance === DeviceCompliance.STALE
-                      ? "warning"
-                      : device.compliance === DeviceCompliance.COMPLIANT ||
-                          device.compliance === DeviceCompliance.DRIFT_REMEDIATED
-                        ? "success"
-                        : "neutral"
-                }
-              />
-            }
-          >
-            {complianceLabels[device.compliance] ?? "Unknown"}
-          </TooltipTrigger>
-          <TooltipContent className="block space-y-2">
-            <p>Worst status across the services assigned to this device.</p>
-            <p>
-              {device.lastVerifiedAt ? (
-                <>
-                  Last fully checked: <ObservedTime value={device.lastVerifiedAt} server />.
-                </>
-              ) : (
-                "Not fully checked yet."
-              )}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        <PostureBadge tone={tone} label={complianceLabels[device.compliance] ?? "Unknown"}>
+          <p>Worst status across the services assigned to this device.</p>
+          <p>
+            {device.lastVerifiedAt ? (
+              <>
+                Last fully checked: <ObservedTime value={device.lastVerifiedAt} server />.
+              </>
+            ) : (
+              "Not fully checked yet."
+            )}
+          </p>
+        </PostureBadge>
       );
+    }
     case "encryption": {
       const [label, tone, detail] = encryptionLabels[device.rootEncryption] ?? unknownEncryption;
       return (
@@ -257,7 +252,11 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
           : findings.high > 0
             ? "warning"
             : "success";
-      const label = `${findings.critical} critical · ${findings.high} high`;
+      const counts = [
+        findings.critical > 0 ? `${findings.critical} critical` : "",
+        findings.high > 0 ? `${findings.high} high` : "",
+      ].filter(Boolean);
+      const label = counts.length ? counts.join(" · ") : "No critical or high";
       const rest = `${findings.medium} medium, ${findings.low} low, ${findings.other} unrated`;
       return (
         <PostureBadge tone={tone} label={findings.partial ? `${label} · partial` : label}>
@@ -272,14 +271,19 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
     }
     case "contact":
       return <ObservedTime value={device.lastSeenAt} server relative />;
-    case "os":
-      return (
+    case "os": {
+      const os = [device.osId, device.osVersion].filter((part) => part.trim() !== "").join(" ");
+      return os ? (
         <span>
-          {[device.osId, device.osVersion].filter((part) => part.trim() !== "").join(" ") ||
-            "Not reported"}
-          <span className="text-muted-foreground"> · {device.architecture || "Unknown arch"}</span>
+          {os}
+          {device.architecture ? (
+            <span className="text-muted-foreground"> · {device.architecture}</span>
+          ) : null}
         </span>
+      ) : (
+        <span className="text-muted-foreground">Not reported</span>
       );
+    }
     case "host":
       return <ObservedTime value={device.hostReceivedAt} server />;
     case "inventory":
@@ -366,7 +370,7 @@ export function DevicesView({
     <section className="flex min-w-0 flex-col gap-5" aria-busy={list.isFetching}>
       <PageHeader
         title="Devices"
-        description="Manage enrolled devices and their reported inventory."
+        description="Find a device by hostname, operating system or label, then open it to act."
         actions={
           <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
             <RefreshCw aria-hidden="true" /> Refresh
@@ -391,11 +395,13 @@ export function DevicesView({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="text-sm">
             <span className="font-medium">
-              {data ? `${data.devices.length} devices on this page` : "Device inventory"}
+              {!data
+                ? "Device inventory"
+                : data.nextPageToken || pagination.previousLabel === "Previous page"
+                  ? `${data.devices.length} devices on this page`
+                  : plural(data.devices.length, "device")}
             </span>
-            <p className="text-xs text-muted-foreground">
-              {sort ? "Sorted within this page" : "Default order"}
-            </p>
+            {sort ? <p className="text-xs text-muted-foreground">Sorted within this page</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {sort ? (
@@ -447,12 +453,25 @@ export function DevicesView({
         ) : null}
         {data?.devices.length === 0 ? (
           <EmptyState
-            title="No devices match this page"
-            description="Adjust your inventory filters or start a new search for the latest enrollments."
+            title={search.filter ? "No devices matched these filters" : "No devices enrolled yet"}
+            description={
+              search.filter
+                ? "Clear the filters, or check the hostname, operating system and labels you entered."
+                : "Enrolled and pending devices appear here. Create an enrollment token to add one."
+            }
             action={
-              <Button variant="outline" onClick={() => onSearch({ ...search, pageToken: "" })}>
-                Start new search
-              </Button>
+              search.filter ? (
+                <Button
+                  variant="outline"
+                  onClick={() => onSearch({ ...search, filter: "", pageToken: "" })}
+                >
+                  Clear filters
+                </Button>
+              ) : (
+                <Link to="/enrollment" className={buttonVariants({ variant: "outline" })}>
+                  Enroll a device
+                </Link>
+              )
             }
           />
         ) : null}
@@ -466,7 +485,7 @@ export function DevicesView({
                 {visibleColumns.map((column) => (
                   <TableHead
                     key={column.id}
-                    className="px-4"
+                    className="px-3"
                     aria-sort={
                       sort?.column === column.id
                         ? sort.descending
@@ -507,7 +526,7 @@ export function DevicesView({
                   </TableHead>
                 ))}
                 {renderRevoke && canRevoke ? (
-                  <TableHead className="px-4 text-xs">
+                  <TableHead className="sticky right-0 bg-muted px-3 text-xs">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 ) : null}
@@ -517,12 +536,15 @@ export function DevicesView({
               {rows.map((device) => (
                 <TableRow key={device.id}>
                   {visibleColumns.map((column) => (
-                    <TableCell key={column.id} className="max-w-80 truncate px-4">
+                    <TableCell
+                      key={column.id}
+                      className="max-w-80 whitespace-normal px-3 [overflow-wrap:anywhere]"
+                    >
                       <DeviceCell device={device} column={column.id} />
                     </TableCell>
                   ))}
                   {renderRevoke && canRevoke ? (
-                    <TableCell className="w-12 px-4">
+                    <TableCell className="sticky right-0 w-12 bg-card px-3">
                       <DeviceRevokeDialog device={device}>
                         {renderRevoke(device)}
                       </DeviceRevokeDialog>
@@ -558,7 +580,7 @@ export function DevicesView({
                 else void list.refetch();
               }}
             >
-              New search / latest devices
+              Show latest devices
             </Button>
             {data ? (
               <Tooltip>
@@ -572,26 +594,30 @@ export function DevicesView({
                 <TooltipContent className="block max-w-72">
                   {"You can page through this search until "}
                   <ObservedTime value={data.cursorExpiresAt} />
-                  {" at the latest. Start a new search to see newly enrolled devices."}
+                  {" at the latest. Show latest devices to include newly enrolled ones."}
                 </TooltipContent>
               </Tooltip>
             ) : null}
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pagination.previousLabel !== "Previous page" || list.isFetching}
-              onClick={pagination.previous}
-            >
-              <ChevronLeft aria-hidden="true" /> Previous page
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!data?.nextPageToken || list.isFetching || search.pageToken === ""}
-              onClick={() => pagination.next(data?.nextPageToken ?? "")}
-            >
-              Next page <ChevronRight aria-hidden="true" />
-            </Button>
+            {data?.nextPageToken || pagination.previousLabel === "Previous page" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pagination.previousLabel !== "Previous page" || list.isFetching}
+                  onClick={pagination.previous}
+                >
+                  <ChevronLeft aria-hidden="true" /> Previous page
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!data?.nextPageToken || list.isFetching || search.pageToken === ""}
+                  onClick={() => pagination.next(data?.nextPageToken ?? "")}
+                >
+                  Next page <ChevronRight aria-hidden="true" />
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </div>

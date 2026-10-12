@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Shield } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
-import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
+import { DeviceState, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import {
   CollectionStatus,
   SnapshotState,
@@ -21,7 +21,7 @@ import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
 import { DevicePackages } from "./packages";
-import type { PackageSearch } from "./package-search";
+import type { DeviceTab, PackageSearch } from "./package-search";
 import { deviceQueryOptions } from "./queries";
 import { CollectionStatusBadge, Fact, ObservedTime, ObservedValue } from "./observations";
 import { DeviceMetadataCard } from "./metadata";
@@ -55,9 +55,8 @@ const detailTabs = [
   { id: "actions", label: "Actions" },
   { id: "assistance", label: "Remote assistance" },
   { id: "findings", label: "Findings" },
-  { id: "history", label: "History" },
 ] as const;
-type DetailTab = (typeof detailTabs)[number]["id"];
+type DetailTab = DeviceTab;
 
 export function DeviceDetailView({
   deviceId,
@@ -67,7 +66,6 @@ export function DeviceDetailView({
   assignDialog,
   findings,
   findingsSummary,
-  history,
   compliance,
   revoke,
   assistance,
@@ -81,7 +79,6 @@ export function DeviceDetailView({
   findings: ReactNode;
   // One-line findings state for the Overview posture section.
   findingsSummary: ReactNode;
-  history: ReactNode;
   compliance: ReactNode;
   revoke?: (device: Device) => ReactNode;
   // Remote assistance request form and session history, shown on its own tab.
@@ -92,14 +89,13 @@ export function DeviceDetailView({
   const principal = usePrincipal();
   const tabId = useId();
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
-  const [activeTab, setActiveTab] = useState<DetailTab>(
-    search.pageToken || search.manager || search.namePrefix ? "inventory" : "overview",
-  );
+  const activeTab = search.tab;
   const [inventoryVisited, setInventoryVisited] = useState(activeTab === "inventory");
   const [assignOpen, setAssignOpen] = useState(false);
+  // The open tab lives in the URL so reload, Back and shared links keep it.
   function activateTab(tab: DetailTab) {
-    setActiveTab(tab);
     if (tab === "inventory") setInventoryVisited(true);
+    if (tab !== activeTab) onSearch({ ...search, tab }, true);
   }
   function openTab(tab: DetailTab) {
     activateTab(tab);
@@ -178,7 +174,9 @@ export function DeviceDetailView({
         {/* At most two page actions: Actions and Assign profile. */}
         <div data-review-next-action className="flex flex-wrap items-center gap-2">
           {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
-          {device && canPermission(principal, "resources.assign") ? (
+          {device &&
+          device.lifecycleState !== DeviceState.REVOKED &&
+          canPermission(principal, "resources.assign") ? (
             <Button variant="outline" aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
               <Plus aria-hidden="true" /> Assign profile
             </Button>
@@ -188,6 +186,26 @@ export function DeviceDetailView({
       {device && canPermission(principal, "resources.assign")
         ? assignDialog(assignOpen, setAssignOpen)
         : null}
+      {device?.lifecycleState === DeviceState.PENDING ? (
+        <Alert>
+          <AlertTitle>Waiting for enrollment approval</AlertTitle>
+          <AlertDescription>
+            This machine asked to enroll and has not reported inventory yet. Approve or reject it in{" "}
+            <Link to="/enrollment" className="underline underline-offset-4">
+              Enrollment
+            </Link>
+            .
+          </AlertDescription>
+        </Alert>
+      ) : device?.lifecycleState === DeviceState.REVOKED ? (
+        <Alert>
+          <AlertTitle>Revoked</AlertTitle>
+          <AlertDescription>
+            This device can no longer check in or receive actions. Its last reported evidence and
+            history stay here for review.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {failure ? (
         <div data-review-state="blocked">
           <RpcError failure={failure} />
@@ -584,16 +602,6 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {findings}
-          </section>
-          <section
-            role="tabpanel"
-            id={`${tabId}-history-panel`}
-            aria-labelledby={`${tabId}-history-tab`}
-            tabIndex={0}
-            hidden={activeTab !== "history"}
-            className="space-y-4"
-          >
-            {history}
           </section>
         </ToolCustodyContext.Provider>
       ) : null}

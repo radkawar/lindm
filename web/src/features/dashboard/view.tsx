@@ -1,7 +1,14 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRightIcon, InfoIcon, RefreshCwIcon, ServerIcon, Settings2Icon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  InfoIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  Settings2Icon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import {
   FleetActionOutcome,
@@ -19,7 +26,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
-import { formatTimestamp } from "@/lib/time";
+import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { fleetSummaryQueryOptions, staleContactUntil } from "./queries";
 import { StaleDevices } from "./stale-devices";
 
@@ -165,17 +172,24 @@ export function DashboardView() {
         title="Dashboard"
         description="Review work in your authorized scopes."
         actions={
-          <Button
-            variant="outline"
-            disabled={!canReadFleet || summary.isFetching}
-            data-review-next-action={failure && !summary.isFetching ? "" : undefined}
-            onClick={() => {
-              if (!lifetime.signal.aborted) void summary.refetch();
-            }}
-          >
-            <RefreshCwIcon aria-hidden="true" />
-            {summary.isFetching ? "Refreshing…" : "Refresh"}
-          </Button>
+          <>
+            {canPermission(principal, "enrollment.manage") ? (
+              <Link to="/enrollment" className={buttonVariants({ variant: "outline" })}>
+                <PlusIcon aria-hidden="true" /> Enroll a device
+              </Link>
+            ) : null}
+            <Button
+              variant="outline"
+              disabled={!canReadFleet || summary.isFetching}
+              data-review-next-action={failure && !summary.isFetching ? "" : undefined}
+              onClick={() => {
+                if (!lifetime.signal.aborted) void summary.refetch();
+              }}
+            >
+              <RefreshCwIcon aria-hidden="true" />
+              {summary.isFetching ? "Refreshing…" : "Refresh"}
+            </Button>
+          </>
         }
       />
 
@@ -210,7 +224,9 @@ export function DashboardView() {
               <p className="text-xs text-muted-foreground">
                 Fleet snapshot{" "}
                 {observed.date ? (
-                  <time dateTime={observed.utc}>{observed.local}</time>
+                  <time dateTime={observed.utc} title={observed.local}>
+                    {freshnessLabel(observed.date, new Date())}
+                  </time>
                 ) : (
                   observed.local
                 )}
@@ -228,10 +244,20 @@ export function DashboardView() {
               >
                 {approvals ? (
                   <p>
-                    <strong className="font-semibold tabular-nums">
-                      {approvals.pendingApprovals.toString()}
-                    </strong>{" "}
-                    pending requests in your inbox.
+                    {approvals.pendingApprovals > 0n ? (
+                      <>
+                        <strong className="font-semibold tabular-nums">
+                          {plural(
+                            approvals.pendingApprovals,
+                            "pending request",
+                            "pending requests",
+                          )}
+                        </strong>{" "}
+                        in your inbox.
+                      </>
+                    ) : (
+                      "No requests are waiting in your inbox."
+                    )}
                   </p>
                 ) : (
                   <Unavailable section="Approval summary" />
@@ -278,7 +304,7 @@ export function DashboardView() {
                 title="Stale contact"
                 primary={next === "contact"}
                 action={
-                  staleFilter ? (
+                  staleFilter && contact && contact.staleDevices > 0n ? (
                     <Link
                       to="/devices"
                       search={{ pageSize: 50, pageToken: "", filter: staleFilter }}
@@ -297,20 +323,29 @@ export function DashboardView() {
                 {contact ? (
                   <>
                     <p>
-                      <strong className="font-semibold tabular-nums">
-                        {contact.staleDevices.toString()}
-                      </strong>{" "}
-                      devices last seen over {contact.staleAfterSeconds / 3600} hours ago.
+                      {contact.staleDevices > 0n ? (
+                        <>
+                          <strong className="font-semibold tabular-nums">
+                            {plural(contact.staleDevices, "device", "devices")}
+                          </strong>{" "}
+                          last seen over {contact.staleAfterSeconds / 3600} hours ago.
+                        </>
+                      ) : (
+                        `No device has been out of contact for over ${contact.staleAfterSeconds / 3600} hours.`
+                      )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Devices with no recorded check-in: {contact.unknownDevices.toString()}.
-                      Excluded from the stale list. Review contact evidence before sending work.
-                    </p>
+                    {contact.unknownDevices > 0n ? (
+                      <p className="text-xs text-muted-foreground">
+                        {plural(contact.unknownDevices, "device has", "devices have")} never checked
+                        in and {contact.unknownDevices === 1n ? "is" : "are"} not counted here.
+                        Review contact evidence before sending work.
+                      </p>
+                    ) : null}
                   </>
                 ) : (
                   <Unavailable section="Contact summary" />
                 )}
-                {data.observedAt && contact ? (
+                {data.observedAt && contact && contact.staleDevices > 0n ? (
                   <details className="mt-1">
                     <summary className="cursor-pointer text-sm font-medium">
                       Preview stale devices
@@ -339,10 +374,10 @@ export function DashboardView() {
                   <>
                     <p>
                       <strong className="font-semibold tabular-nums">
-                        {compliance.attentionResources.toString()}
+                        {plural(compliance.attentionResources, "item needs", "items need")}
                       </strong>{" "}
-                      items need attention · {compliance.staleResources.toString()} not checked
-                      recently · {compliance.unknownResources.toString()} unknown.
+                      attention · {compliance.staleResources.toString()} not checked recently ·{" "}
+                      {compliance.unknownResources.toString()} unknown.
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Counts assigned items, not devices. Open a device's Services tab for the cause
@@ -367,9 +402,9 @@ export function DashboardView() {
                   <>
                     <p>
                       <strong className="font-semibold tabular-nums">
-                        {findings.criticalFindings.toString()}
+                        {plural(findings.criticalFindings, "critical finding", "critical findings")}
                       </strong>{" "}
-                      critical findings · {findings.highFindings.toString()} high findings.
+                      · {plural(findings.highFindings, "high finding", "high findings")}.
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Counts findings on{" "}
@@ -394,13 +429,25 @@ export function DashboardView() {
                 {patch ? (
                   <>
                     <p>
-                      {patch.securityPendingDevices.toString()} active devices with security updates
-                      pending · {patch.rebootRequiredDevices.toString()} requiring reboot.
+                      {patch.unknownDevices > 0n ? (
+                        <>
+                          <strong className="font-semibold tabular-nums">
+                            {plural(patch.unknownDevices, "device has", "devices have")}
+                          </strong>{" "}
+                          not reported update status ·{" "}
+                        </>
+                      ) : null}
+                      {plural(
+                        patch.securityPendingDevices,
+                        "device with security updates",
+                        "devices with security updates",
+                      )}{" "}
+                      pending · {patch.rebootRequiredDevices.toString()} requiring restart.
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {patch.staleDevices.toString()} stale · {patch.unknownDevices.toString()}{" "}
-                      unknown · {patch.failedRunDevices.toString()} whose last update run failed.
-                      Inspect device-reported status before choosing a maintenance action.
+                      {patch.staleDevices.toString()} with an old report ·{" "}
+                      {patch.failedRunDevices.toString()} whose last update run failed. Inspect
+                      device-reported status before choosing a maintenance action.
                     </p>
                   </>
                 ) : (
@@ -437,6 +484,7 @@ export function DashboardView() {
                 {activity.map((group) => {
                   const latest = group.actions[0];
                   const devices = new Set(group.actions.map((action) => action.deviceId)).size;
+                  const at = formatTimestamp(latest.createdAt);
                   return (
                     <li
                       key={group.key}
@@ -472,12 +520,13 @@ export function DashboardView() {
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>
                             {plural(devices, "device", "devices")} · latest{" "}
-                            {formatTimestamp(latest.createdAt).local}
+                            <time dateTime={at.utc} title={at.local}>
+                              {at.date ? freshnessLabel(at.date, new Date()) : at.local}
+                            </time>
                           </span>
                           <Link
                             to="/devices/$deviceId"
                             params={{ deviceId: latest.deviceId }}
-                            search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                             className={linkClass}
                           >
                             {devices === 1 ? "Open device" : "Open latest device"}

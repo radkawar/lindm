@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,14 @@ export function DeviceActionPage({
   deviceId,
   title,
   description,
+  actions,
   lead,
   children,
 }: {
   deviceId: string;
   title: string;
   description?: string;
+  actions?: ReactNode;
   // Rendered before the device and every input, e.g. a destructive action's consequences.
   lead?: (device: Device) => ReactNode;
   children: (device: Device) => ReactNode;
@@ -36,18 +39,15 @@ export function DeviceActionPage({
   const device = detail.error ? undefined : detail.data?.device;
   return (
     <section className="grid min-w-0 max-w-5xl gap-4">
-      <nav aria-label="Device action breadcrumbs" className="flex flex-wrap gap-2 text-sm">
-        <Link to="/devices" className="underline">
-          Devices
-        </Link>
-        <span aria-hidden="true">/</span>
-        <Link to="/devices/$deviceId" params={{ deviceId }} className="underline">
-          {device?.hostname.trim() || "Unnamed device"}
-        </Link>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{title}</span>
-      </nav>
-      <PageHeader title={title} description={description} />
+      <Link
+        to="/devices/$deviceId"
+        params={{ deviceId }}
+        className="flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:underline"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" /> Back to{" "}
+        {device?.hostname.trim() || "device"}
+      </Link>
+      <PageHeader title={title} description={description} actions={actions} />
       {detail.error ? <RpcError failure={toRpcFailure(detail.error)} /> : null}
       {detail.isPending ? <p role="status">Loading device…</p> : null}
       {device ? (
@@ -184,31 +184,33 @@ export function DeviceActionStatusPage({
 }) {
   const lifetime = useAuthLifetime();
   const query = useQuery(deviceActionQueryOptions(lifetime, deviceId, actionId));
+  const kind = query.data?.spec?.action.case;
   return (
     <DeviceActionPage
       deviceId={deviceId}
-      title="Action status"
-      description="Progress and result of this action."
+      title={kind ? actionLabels[kind] : "Action status"}
+      description="Progress and result as the device reported it."
+      actions={
+        <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
+          {query.isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
+      }
     >
       {() => (
         <div className="grid gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button
-              variant="outline"
-              disabled={query.isFetching}
-              onClick={() => void query.refetch()}
-            >
-              Refresh
-            </Button>
-          </div>
           {query.isPending ? <p role="status">Loading action result…</p> : null}
           {query.error ? (
             <RpcError failure={toRpcFailure(query.error)} />
           ) : query.data ? (
             <DeviceActionResult action={query.data} linked={false} />
           ) : null}
-          <Link to="/devices/$deviceId" params={{ deviceId }} className="w-fit text-sm underline">
-            Back to device
+          <Link
+            to="/devices/$deviceId"
+            params={{ deviceId }}
+            search={{ tab: "actions" }}
+            className="w-fit text-sm underline"
+          >
+            See all actions on this device
           </Link>
         </div>
       )}

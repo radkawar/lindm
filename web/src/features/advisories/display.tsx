@@ -76,6 +76,20 @@ const vendorFeedText: Record<string, string> = {
   vendor_feed_unavailable_pop: "vendor feed unavailable for Pop!_OS packages",
 };
 
+// Server evaluation reasons (internal/advisory/match.go), in operator words.
+const evaluationReasonText: Record<string, string> = {
+  device_not_active: "the device is not enrolled",
+  inventory_unavailable: "no package inventory received yet",
+  inventory_stale: "the package inventory is out of date",
+  host_inventory_stale_or_failed: "the latest host inventory is out of date or failed",
+  package_collection_failed: "the last package scan failed",
+  rhel_platform_stream_unavailable: "the device did not report its RHEL platform stream",
+  feed_unavailable: "no advisory source covers this operating system",
+  feed_stale: "the advisory source is out of date",
+  feed_partial_coverage: "the advisory source does not list every advisory for this release",
+  matching_capacity_exceeded: "too many packages to match in one check",
+};
+
 const uncoveredReasonText: Record<string, string> = {
   origin_unavailable: "APT origin evidence unavailable",
   origin_unlisted: "installed version not listed by any APT source",
@@ -86,7 +100,7 @@ const uncoveredReasonText: Record<string, string> = {
 };
 
 export function advisoryReasonText(reason: string) {
-  return vendorFeedText[reason] ?? reason.replaceAll("_", " ");
+  return vendorFeedText[reason] ?? evaluationReasonText[reason] ?? reason.replaceAll("_", " ");
 }
 
 export function uncoveredPackageReasonText(reason: string, evaluationReason: string) {

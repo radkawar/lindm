@@ -14,7 +14,8 @@ export const task = {
 
 const ENCRYPTION = new Set(["Encrypted", "Not encrypted", "Unknown"]);
 const UPDATES = /^(\d+ pending|Up to date|Unknown)$/;
-const FINDINGS = /^(\d+ critical · \d+ high( · partial)?|Not checked)$/;
+const FINDINGS =
+  /^((\d+ critical · \d+ high|\d+ critical|\d+ high|No critical or high)( · partial)?|Not checked)$/;
 const POSTURE = ["Encryption", "Updates", "Findings", "Last inventory"];
 
 async function headerTexts(table) {
@@ -107,7 +108,7 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   const help = page.getByRole("button", { name: "About paging this search" });
   require(await help.isVisible(), "no paging help control on the pager");
   if (await help.isVisible()) {
-    await page.getByRole("button", { name: "New search / latest devices" }).focus();
+    await page.getByRole("button", { name: "Show latest devices" }).focus();
     await page.keyboard.press("Tab");
     require(await help.evaluate(
       (node) => node === document.activeElement,

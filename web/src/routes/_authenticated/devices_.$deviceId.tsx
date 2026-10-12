@@ -1,12 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { DeviceFindings } from "@/features/advisories/device-findings";
 import { DeviceFindingsSummary } from "@/features/advisories/device-findings-summary";
 import { DeviceAssistanceCard } from "@/features/assistance/panel";
 import { AccountPicker } from "@/features/auth/picker";
-import { DeviceActionHistory } from "@/features/devices/actions";
 import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
-import { parsePackageSearch } from "@/features/devices/package-search";
+import { packageSearchDefaults, parsePackageSearch } from "@/features/devices/package-search";
 import { DeviceResourceComplianceBadge, DeviceResources } from "@/features/services/view";
 import { ResourceAssignmentDialog } from "@/features/services/assignment-form";
 import { RevokeApprovalRequest } from "@/features/approvals/revoke";
@@ -17,6 +16,7 @@ import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/devices_/$deviceId")({
   validateSearch: parsePackageSearch,
+  search: { middlewares: [stripSearchParams(packageSearchDefaults)] },
   params: {
     parse: ({ deviceId }) => {
       const canonical = canonicalUuid(deviceId);
@@ -60,7 +60,6 @@ function DeviceDetailRoute() {
       )}
       findings={<DeviceFindings deviceId={deviceId} />}
       findingsSummary={<DeviceFindingsSummary deviceId={deviceId} />}
-      history={<DeviceActionHistory deviceId={deviceId} />}
       revoke={(device) => <RevokeApprovalRequest deviceId={device.id} />}
       assistance={<DeviceAssistanceCard deviceId={deviceId} />}
       accountPicker={(props) => <AccountPicker {...props} />}

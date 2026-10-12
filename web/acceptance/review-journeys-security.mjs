@@ -378,7 +378,7 @@ async function criticalCVE(ctx) {
   );
   if (exposed) {
     await dialog.getByRole("button", { name: "Send action", exact: true }).click();
-    await visible(main.getByRole("heading", { name: "Action status", exact: true }));
+    await visible(main.getByRole("heading", { name: "Patch now", exact: true }));
     await visible(main.getByRole("article"));
     await visible(
       main
@@ -397,7 +397,10 @@ async function criticalCVE(ctx) {
       "Link the exact patch request to its native run, installed package versions and refreshed CVE finding.",
       "The server accepted the patch request and displays its recorded status. This does not prove packages changed or the CVE was fixed.",
     );
-    await main.getByRole("link", { name: "Back to device", exact: true }).click();
+    await main
+      .getByRole("link", { name: /^Back to / })
+      .first()
+      .click();
   } else {
     await dialog.getByRole("button", { name: "Edit action", exact: true }).click();
     await page.keyboard.press("Escape");

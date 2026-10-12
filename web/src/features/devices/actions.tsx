@@ -292,7 +292,7 @@ export function DeviceActionsPanel({
   );
 }
 
-export function DeviceActionHistory({ deviceId }: { deviceId: string }) {
+function DeviceActionHistory({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, pageToken));
@@ -428,9 +428,11 @@ export function DeviceActionResult({
         <Fact label="Created">
           <ObservedTime value={action.createdAt} server />
         </Fact>
-        <Fact label="Expires">
-          <ObservedTime value={action.expiresAt} server />
-        </Fact>
+        {action.closedReason ? null : (
+          <Fact label="Expires">
+            <ObservedTime value={action.expiresAt} server />
+          </Fact>
+        )}
         {closedReasonLabels[action.closedReason] ? (
           <Fact label="Closed because">{closedReasonLabels[action.closedReason]}</Fact>
         ) : null}
@@ -460,10 +462,11 @@ export function DeviceActionResult({
           status.failure !== DeviceActionFailure.UNSPECIFIED ? (
             <Fact label="Failure">{failureLabels[status.failure] ?? "Unknown failure"}</Fact>
           ) : null}
-          <Fact label="Supported on this device">
-            {status.before?.supported ? "Yes" : "No"}
-            {status.before?.reason ? `: ${status.before.reason}` : ""}
-          </Fact>
+          {status.before && !status.before.supported ? (
+            <Fact label="Not supported on this device">
+              {status.before.reason || "The device reported no reason."}
+            </Fact>
+          ) : null}
           <Fact label="Verified">
             {status.verification?.verified ? "Verified by device" : "Not verified"}
           </Fact>
@@ -478,8 +481,8 @@ export function DeviceActionResult({
             </>
           ) : null}
           {action.spec?.action.case === "refreshInventory" ? (
-            <Fact label="Inventory sequence">
-              {status.verification?.inventorySequence.toString() || "Not reported"}
+            <Fact label="Fresh inventory">
+              {status.verification?.inventorySequence ? "Received" : "Not received yet"}
             </Fact>
           ) : null}
           {action.spec?.action.case === "patchNow" ? (
