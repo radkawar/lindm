@@ -143,7 +143,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		arch = manifestArch
 	}
 	memory := uint32(2048)
-	if clean[1] == "snapshot" || clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" {
+	if clean[1] == "snapshot" || clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" || provisionInstallerLane(clean[1]) {
 		memory = 4096
 	}
 	cfg, err := labhost.Load()
@@ -206,7 +206,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 			return runSplitAssistance(ctx, chosen, arch, repo, clean, stdout, stderr)
 		}
 		var forwards []string
-		if clean[1] == "enroll-from-console" && chosen.Transport == "ssh" {
+		if _, provision := provisionLaneFormat(clean[1]); (clean[1] == "enroll-from-console" || provision) && chosen.Transport == "ssh" {
 			forwards, err = consoleEnrollmentReverseForwards(clean)
 			if err != nil {
 				return err
@@ -288,7 +288,8 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap":
+	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap",
+		"provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -306,7 +307,7 @@ func vmRequiresKVM(cfg *labv1.LabConfig, command, accelerator, architecture stri
 		return true
 	}
 	switch command {
-	case "encrypted", "inspect-storage", "device-actions", "assistance":
+	case "encrypted", "inspect-storage", "device-actions", "assistance", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
 		if accelerator == "" {
 			accelerator = "kvm"
 		}

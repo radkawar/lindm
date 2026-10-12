@@ -117,7 +117,7 @@ func TestControlPlaneHandleJSONRoundTrip(t *testing.T) {
 }
 
 func TestConnectedAuthorityRefusesControllerOperations(t *testing.T) {
-	owner, err := newLocalAccount("remote-owner", "00000000-0000-4000-8000-000000000001")
+	owner, err := newLocalAccount("localhost", "remote-owner", "00000000-0000-4000-8000-000000000001")
 	if err != nil {
 		t.Fatal(err)
 	}

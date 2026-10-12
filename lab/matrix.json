@@ -15,6 +15,34 @@
       "lane": "enroll-from-console"
     },
     {
+      "name": "provision-cloud-init",
+      "title": "Provision: cloud-init",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "provision-cloud-init"
+    },
+    {
+      "name": "provision-autoinstall",
+      "title": "Provision: Ubuntu autoinstall",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "provision-autoinstall"
+    },
+    {
+      "name": "provision-kickstart",
+      "title": "Provision: Kickstart",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "provision-kickstart"
+    },
+    {
+      "name": "provision-autoyast",
+      "title": "Provision: AutoYaST",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "provision-autoyast"
+    },
+    {
       "name": "airgap",
       "title": "Air-gap bundle",
       "capabilities": ["lifecycle", "self-update", "advisories"],
@@ -119,6 +147,7 @@
   "rollingRequalificationCells": [
     "inventory",
     "enroll-from-console",
+    "provision-autoyast",
     "lifecycle",
     "dispatch",
     "resources",

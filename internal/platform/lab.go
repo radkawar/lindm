@@ -95,11 +95,27 @@ const (
 	LaneAcceptance          LabLane = "acceptance"
 	LaneEncryptedAcceptance LabLane = "encrypted-acceptance"
 	LaneEnrollFromConsole   LabLane = "enroll-from-console"
+	// The provision lanes feed the console's copied provisioning snippet for
+	// one installer format, verbatim, into a real first boot or installation.
+	LaneProvisionCloudInit   LabLane = "provision-cloud-init"
+	LaneProvisionAutoinstall LabLane = "provision-autoinstall"
+	LaneProvisionKickstart   LabLane = "provision-kickstart"
+	LaneProvisionAutoYaST    LabLane = "provision-autoyast"
 )
 
 // LabLanes lists every lane whose recipes are tracked per release; a lane
 // outside this list needs no per-release recipe.
-var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole}
+var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole,
+	LaneProvisionCloudInit, LaneProvisionAutoinstall, LaneProvisionKickstart, LaneProvisionAutoYaST}
+
+// ProvisionLane is the lab lane qualifying a provisioning format.
+func ProvisionLane(p Provisioning) (LabLane, bool) {
+	lane, ok := map[Provisioning]LabLane{
+		ProvisionCloudInit: LaneProvisionCloudInit, ProvisionAutoinstall: LaneProvisionAutoinstall,
+		ProvisionKickstart: LaneProvisionKickstart, ProvisionAutoYaST: LaneProvisionAutoYaST,
+	}[p]
+	return lane, ok
+}
 
 // LabLane returns nil when the release has a maintained recipe for the lane.
 func (r *Release) LabLane(l LabLane) error {

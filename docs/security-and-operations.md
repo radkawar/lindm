@@ -204,6 +204,37 @@ Never place bearer credentials in arguments, environment variables, URLs, shared
 images or logs. Keep installer inputs private and remove them only after durable
 success; removal does not promise forensic erasure of installer/WAL copies.
 
+#### Automatic enrollment from an installer
+
+For machines installed unattended, issue a **provisioning token** instead of a
+single-use code; keep **Require another admin to approve each device** selected
+unless the site explicitly accepts direct enrollment.
+
+1. In the token result, choose the **Installer format** (cloud-init, Kickstart,
+   Ubuntu autoinstall or AutoYaST), then the **Operating system**. Only releases
+   whose installation media support that format are listed; the registry, not the
+   package family, decides. NixOS shows its design-only gate.
+2. Copy the one snippet and merge it into the complete installer configuration
+   (cloud-init user-data, the Kickstart profile, the autoinstall configuration or the
+   AutoYaST profile). It contains the reusable token and every trust pin; nothing
+   from lindm may be preinstalled in the image or installer.
+3. Make sure the machine reaches this server's HTTPS origin where the snippet runs:
+   in the installer for Kickstart and AutoYaST (Kickstart needs an active installer
+   network, e.g. `network --activate`), on the installed system's first boot for
+   cloud-init and autoinstall. Name resolution must work there too.
+4. After the first boot the device appears under **Devices waiting to enroll**.
+   Another admin approves it in the approval inbox; the token's creator executes the
+   approval. The device's provisioning unit is waiting for at most an hour and
+   completes once approved. Confirm the device is **Enrolled**.
+
+Kickstart fails the installation on any install or trust error. AutoYaST only
+reports a failed chroot script, so when an AutoYaST device does not appear, read
+`/var/adm/autoinstall/logs/` on it. On a timed-out approval, approve and then run
+`systemctl restart lindm-provision.service` (or
+`/usr/libexec/lindm/lindm-agent resume -wait-seconds 3600`) as root on the same
+device; never reinstall to retry. Delete retained installer copies of the token
+listed in the [enrollment contract](agent-enrollment.md#console-enrollment-operator-flow).
+
 ### Offline owner execution delegation
 
 `lindmctl execution delegation sign` is an offline owner operation, not an admin

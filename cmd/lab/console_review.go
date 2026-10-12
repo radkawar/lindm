@@ -123,7 +123,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	}
 	// Build publication from the checkout under review, never from the separate
 	// directory that supplies development database/TLS trust.
-	enrollmentFixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64"})
+	enrollmentFixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64"}, "")
 	if err != nil {
 		return fmt.Errorf("open published enrollment review fixture: %w", err)
 	}

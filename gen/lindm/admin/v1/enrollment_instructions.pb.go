@@ -298,9 +298,12 @@ type EnrollmentPlatform struct {
 	Architectures []string             `protobuf:"bytes,7,rep,name=architectures,proto3" json:"architectures,omitempty"`
 	Readiness     *EnrollmentReadiness `protobuf:"bytes,8,opt,name=readiness,proto3" json:"readiness,omitempty"`
 	// exact, major (value or value.N), absent, snapshot (YYYYMMDD), or any.
-	VersionRule   string `protobuf:"bytes,9,opt,name=version_rule,json=versionRule,proto3" json:"version_rule,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	VersionRule string `protobuf:"bytes,9,opt,name=version_rule,json=versionRule,proto3" json:"version_rule,omitempty"`
+	// Registry-declared vendor unattended installer formats for this release,
+	// in console order. A provisioning snippet is offered only for these.
+	ProvisioningFormats []string `protobuf:"bytes,10,rep,name=provisioning_formats,json=provisioningFormats,proto3" json:"provisioning_formats,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *EnrollmentPlatform) Reset() {
@@ -394,6 +397,13 @@ func (x *EnrollmentPlatform) GetVersionRule() string {
 		return x.VersionRule
 	}
 	return ""
+}
+
+func (x *EnrollmentPlatform) GetProvisioningFormats() []string {
+	if x != nil {
+		return x.ProvisioningFormats
+	}
+	return nil
 }
 
 type EnrollmentAPTRepository struct {
@@ -637,7 +647,7 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x13EnrollmentReadiness\x12\x14\n" +
 	"\x05ready\x18\x01 \x01(\bR\x05ready\x12 \n" +
 	"\x06reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06reason\x12 \n" +
-	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xc7\x03\n" +
+	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xbf\x04\n" +
 	"\x12EnrollmentPlatform\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x02id\x12\x1e\n" +
 	"\x05label\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05label\x12\x1d\n" +
@@ -649,7 +659,10 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x0epackage_family\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x18 R\rpackageFamily\x12@\n" +
 	"\rarchitectures\x18\a \x03(\tB\x1a\xbaH\x17\x92\x01\x14\x10\x02\"\x10r\x0eR\x05amd64R\x05arm64R\rarchitectures\x12A\n" +
 	"\treadiness\x18\b \x01(\v2#.lindm.admin.v1.EnrollmentReadinessR\treadiness\x12M\n" +
-	"\fversion_rule\x18\t \x01(\tB*\xbaH'r%R\x05exactR\x05majorR\x06absentR\bsnapshotR\x03anyR\vversionRule\"\xe7\x02\n" +
+	"\fversion_rule\x18\t \x01(\tB*\xbaH'r%R\x05exactR\x05majorR\x06absentR\bsnapshotR\x03anyR\vversionRule\x12v\n" +
+	"\x14provisioning_formats\x18\n" +
+	" \x03(\tBC\xbaH@\x92\x01=\x10\b\x18\x01\"7r5R\n" +
+	"cloud-initR\tkickstartR\vautoinstallR\bautoyastR\x05nixosR\x13provisioningFormats\"\xe7\x02\n" +
 	"\x17EnrollmentAPTRepository\x12'\n" +
 	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +

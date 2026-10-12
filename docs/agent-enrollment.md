@@ -1312,36 +1312,73 @@ revokes it, never a credential-bearing network URL. A lost issuance response is
 not recoverable: retry the exact request to identify its token, revoke that token,
 and issue a replacement with a new request ID.
 
-The one-time result generates cloud-init, Kickstart, Ubuntu autoinstall, AutoYaST
-and NixOS integration fragments. These are merged into the operator's complete
-trusted installation configuration, not substituted for an OS installer. The
-signed agent package, its executor/network configuration and independently
-authenticated execution root/bootstrap bundle must already be installed. Commands
-use `/usr/libexec/lindm/lindm-agent` with the maintained `-root`, `-bundle` and
-`-provisioning-token-file` flags, never bearer arguments or environment variables.
+The one-time result is task-shaped: choose the **Installer format**, then the
+**Operating system**, and copy one snippet. The platform registry
+(`internal/platform`, `Release.Provisioning`) declares which vendor formats each
+release's installation media support, and the server projects them as
+`EnrollmentPlatform.provisioning_formats`; the console never infers a format from
+the package family. Offered formats: cloud-init (cloud images of every packaged
+release), Ubuntu autoinstall (subiquity on Ubuntu 22.04/24.04/26.04 only — not
+Debian or Ubuntu derivatives), Kickstart (Anaconda on Fedora and the EL family),
+AutoYaST (openSUSE Tumbleweed, SLES/SLED 15; Leap 16.0's Agama installer is not
+modelled) and NixOS (a visible design-only gate; see below).
 
-- Cloud-init writes the actual token as root:root mode 0600 and starts the installed
-  first-boot unit. Autoinstall delivers this through target `user-data`, not a
-  secret-bearing `curtin` command argument.
-- Kickstart and AutoYaST write a root-only token through a quoted, base64-encoded
-  heredoc. Encoding is not encryption. Their chroot hooks only enable the unit;
-  enrollment occurs on the target's first boot.
-- NixOS expressions never contain the token because the Nix store is readable.
-  Download the actual token file and deliver it to the target as a root-only file.
-  The module includes exact target-local `systemd-creds encrypt` commands and uses
-  `LoadCredentialEncrypted`; the operator supplies the verified agent derivation
-  and executor module. No undefined secret-store integration is implied.
-- The root unit executes bootstrap followed by `resume -wait-seconds 3600`, with a
-  bounded systemd timeout. It removes the plaintext or encrypted delivery file only
-  after successful installation. Pending approval is not reported as installed.
-  After resolving a timeout/transient error, restarting the unit retries the same
-  protected transaction/key; it never resets the journal.
+Every snippet embeds the server's complete install script: it verifies any private
+HTTPS CA against its pinned SHA-256, the package signer's full fingerprint and the
+execution-root SHA-256, adds only this server's signed repository, installs
+lindm-agent and the authenticated bootstrap material, and installs
+`lindm-provision.service`. No agent, repository, CA or bootstrap may be preinstalled;
+the snippet is merged into the operator's complete trusted installer configuration,
+not substituted for it. The unit runs no script from `/etc`: `ExecStartPre` waits at
+most 30 seconds for the executor, then two `ExecStart` lines run the exact
+`provisioning_command` (`bootstrap -root … -bundle … -provisioning-token-file
+/etc/lindm/provisioning-token`) and `resume -wait-seconds 3600`, under
+`TimeoutStartSec=3700`. `ExecStartPost` removes the token only after successful
+installation; pending approval is not reported as installed. After a timeout or
+transient error, restarting the unit retries the same protected transaction/key;
+it never resets the journal.
 
-All generated seeds and browser downloads require controlled delivery and retention.
-Cloud-init/installer data sources may retain copies outside the installed token
-file; removing that file is not forensic erasure. Never bake credentials, journals,
-installation markers or keys into a reusable image. Remove delivered seed copies
-and revoke unused credentials within their bounded lifetime.
+- **cloud-init** writes the token as root:root 0600 (`write_files`) and the unit,
+  then `runcmd` runs the install script on first boot, enables and starts the
+  executor and network units, enables the provisioning unit and starts it with
+  `--no-block`. The approval wait can last an hour; a blocking start would hold
+  cloud-init's final stage and, through `systemd-user-sessions.service`, logins.
+- **Ubuntu autoinstall** delivers the same cloud-config as `autoinstall.user-data`,
+  which subiquity hands to the installed system's cloud-init for its first boot.
+  No secret appears in a `late-commands`/`curtin` argument. The installed system
+  needs network on first boot, not in the installer.
+- **Kickstart** (`%post --erroronfail`) and **AutoYaST** (a `chrooted` chroot-script)
+  run the install script inside the installed target before its first boot, using
+  the installer's network, DNS and the target's CA store. The installer network must
+  be active (Kickstart `network --activate` or the installer default). The target's
+  systemd is not running in that chroot, so the snippet only enables units (and the
+  package scriptlet's `systemctl restart` is a chroot no-op); enrollment occurs on
+  the first boot. The token is written through a quoted, base64-encoded heredoc
+  (encoding is not encryption). Where SELinux is enabled the snippet restores the
+  labels of `/etc/lindm` and the unit file. DNF and zypper install their
+  prerequisites only when `rpm -q` lacks them, because an unregistered RHEL DVD or
+  offline target may have no distribution repository. zypper refreshes and searches
+  only lindmd's repository (`--reposd-dir` holding a copy of `lindm.repo`), so
+  install media or unreachable mirrors listed in the target cannot fail or redirect
+  the install. Kickstart fails the installation on any error; an AutoYaST
+  chroot-script failure is only reported by YaST, so check
+  `/var/adm/autoinstall/logs/` (script `lindm-enroll.sh`) when the device does not
+  appear.
+- **NixOS** is gated in the registry. lindmd serves agents only as signed native
+  APT/RPM/pacman repositories and no NixOS artifact; a module that requires an
+  externally hosted derivation would violate the self-hosted model, so the console
+  shows the gate reason instead of a snippet. The design is in
+  [atomic-nixos](platforms/atomic-nixos.md#self-hosted-nixos-installation-design).
+
+All generated seeds require controlled delivery and retention. Installers retain
+copies outside the token file, and removing that file is not forensic erasure:
+cloud-init keeps `/var/lib/cloud/instance/user-data.txt` (and the seed source);
+subiquity keeps `/var/log/installer/autoinstall-user-data` and writes the user-data
+into `/etc/cloud/cloud.cfg.d/`; Anaconda keeps `/root/anaconda-ks.cfg` and
+`/root/original-ks.cfg`; AutoYaST keeps its profile and scripts under
+`/var/adm/autoinstall/`. Delete these after enrollment where the site keeps them,
+never bake credentials, journals, installation markers or keys into a reusable
+image, and revoke unused credentials within their bounded lifetime.
 
 Enrollment transactions expose pending, ready, rejected, expired and held lifecycle
 facts as returned by the server. The existing Approval inbox presents the exact

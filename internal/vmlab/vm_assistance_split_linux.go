@@ -203,7 +203,7 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 		}
 		fixture, err = devlab.OpenPersistentFixture(ctx, options.Repository, options.LindmdBinary, options.FixtureDir, enrollment)
 	} else if options.Hold != nil {
-		fixture, err = devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.Repository, VMBuildRepository(options.Repository, options.BuildRepository), options.LindmdBinary, []string{architecture})
+		fixture, err = devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.Repository, VMBuildRepository(options.Repository, options.BuildRepository), options.LindmdBinary, []string{architecture}, "")
 	} else {
 		fixture, err = devlab.OpenDeviceActionAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
 	}

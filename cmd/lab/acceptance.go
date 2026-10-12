@@ -70,6 +70,22 @@ type acceptanceBrowserConfig struct {
 	// ExpectToolCustodyPath requires the device page's unprotected-tool-path
 	// alert for this path with its remedy (enrollment-status mode).
 	ExpectToolCustodyPath string `json:"expectToolCustodyPath,omitempty"`
+	// HostResolverRules is Chromium's --host-resolver-rules, mapping a lab
+	// public console host to the fixture listeners without system DNS.
+	HostResolverRules    string                    `json:"hostResolverRules,omitempty"`
+	ProvisionFormat      string                    `json:"provisionFormat,omitempty"`
+	ProvisionPlatform    string                    `json:"provisionPlatform,omitempty"`
+	ProvisionSnippetPath string                    `json:"provisionSnippetPath,omitempty"`
+	InstallationID       string                    `json:"installationId,omitempty"`
+	Approver             *acceptanceBrowserAccount `json:"approver,omitempty"`
+}
+
+// acceptanceBrowserAccount is a second console human with its own password
+// and private passkey state, distinct from the configured owner.
+type acceptanceBrowserAccount struct {
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	CredentialPath string `json:"credentialPath"`
 }
 
 type acceptancePasswordProbe struct {
@@ -186,7 +202,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(private)) }()
-	fixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.fixture, options.repository, options.binary, []string{"amd64"})
+	fixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.fixture, options.repository, options.binary, []string{"amd64"}, "")
 	if err != nil {
 		return err
 	}

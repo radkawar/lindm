@@ -108,10 +108,16 @@ func TestEnrollmentInstructionsUseOnlyAuthoritativeConfiguration(t *testing.T) {
 	if len(response.Platforms) != len(platform.Releases()) {
 		t.Fatal("platform projection does not cover the authoritative registry")
 	}
+	// Installer formats are registry facts: autoinstall is subiquity's,
+	// Kickstart Anaconda's and AutoYaST SUSE's, never a package family guess.
+	wantFormats := map[string]string{"ubuntu-24.04": "cloud-init,autoinstall", "debian-13": "cloud-init", "fedora-44": "cloud-init,kickstart", "rhel-9": "cloud-init,kickstart", "opensuse-tumbleweed": "cloud-init,autoyast", "linuxmint-22.3": "", "nixos": "nixos"}
 	for _, choice := range response.Platforms {
 		release, ok := platform.Lookup(choice.Id)
 		if !ok || choice.Label != release.Name || choice.OsId != release.ID {
 			t.Fatalf("invented platform: %v", choice)
+		}
+		if want, listed := wantFormats[choice.Id]; listed && want != strings.Join(choice.ProvisioningFormats, ",") {
+			t.Fatalf("%s offers provisioning formats %v", choice.Id, choice.ProvisioningFormats)
 		}
 		switch choice.Id {
 		case "ubuntu-24.04", "fedora-44":
@@ -123,7 +129,7 @@ func TestEnrollmentInstructionsUseOnlyAuthoritativeConfiguration(t *testing.T) {
 				t.Fatalf("packaged native family incorrectly gated: %v", choice)
 			}
 		case "nixos":
-			if choice.Readiness.Ready || choice.Readiness.Reason != "platform_installation_gated" {
+			if choice.Readiness.Ready || choice.Readiness.Reason != "platform_installation_gated" || !strings.Contains(choice.Readiness.Remedy, "lindmd serves no NixOS installation artifact") {
 				t.Fatalf("design-only family admitted: %v", choice)
 			}
 		}

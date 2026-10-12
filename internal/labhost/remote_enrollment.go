@@ -9,11 +9,25 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"lindm/internal/platform"
 )
 
-// enrollmentBrowser relocates the capture runner's two filesystem boundaries:
-// the existing private passkey credential and the new returned screenshot tree.
-// Passwords stay in protected staging, never SSH argv or returned evidence.
+// consoleBrowserLane reports the lanes whose -browser-config drives the
+// maintained console browser runner on the lab host.
+func consoleBrowserLane(lane string) bool {
+	switch platform.LabLane(lane) {
+	case platform.LaneEnrollFromConsole, platform.LaneProvisionCloudInit, platform.LaneProvisionAutoinstall, platform.LaneProvisionKickstart, platform.LaneProvisionAutoYaST:
+		return true
+	default:
+		return false
+	}
+}
+
+// enrollmentBrowser relocates the capture runner's filesystem boundaries: the
+// existing private passkey credentials (the owner's and, for provisioning
+// approval, the approver's) and the new returned screenshot tree. Passwords
+// stay in protected staging, never SSH argv or returned evidence.
 func (s *remoteStage) enrollmentBrowser(path string, outputs map[string]string) (string, error) {
 	data, err := readEnrollmentBrowserFile(path)
 	if err != nil {
@@ -34,31 +48,35 @@ func (s *remoteStage) enrollmentBrowser(path string, outputs map[string]string) 
 	if prior, exists := outputs["evidence"]; exists && prior != evidence {
 		return "", errors.New("console browser evidence conflicts with lane evidence output")
 	}
-	credentialBytes, err := readEnrollmentBrowserFile(credential)
+	remoteCredential, err := s.enrollmentCredential(credential, "browser-credential")
 	if err != nil {
-		return "", err
-	}
-	defer clear(credentialBytes)
-	// The browser updates its authenticator counter. Return that state to its
-	// original private file, separately from the public screenshot evidence.
-	credentialFile, err := os.CreateTemp(s.local, "console-credential-*.json")
-	if err != nil {
-		return "", err
-	}
-	_, writeCredentialErr := credentialFile.Write(credentialBytes)
-	if err := errors.Join(writeCredentialErr, credentialFile.Close()); err != nil {
-		return "", err
-	}
-	remoteCredential := filepath.Join(s.remote, "records", "browser-credential")
-	if err := s.mkdir(filepath.Dir(remoteCredential)); err != nil {
-		return "", err
-	}
-	if err := s.sync(credentialFile.Name(), remoteCredential); err != nil {
 		return "", err
 	}
 	config["credentialPath"], err = json.Marshal(remoteCredential)
 	if err != nil {
 		return "", err
+	}
+	var approverCredential string
+	if raw, ok := config["approver"]; ok {
+		var approver map[string]json.RawMessage
+		if json.Unmarshal(raw, &approver) != nil || json.Unmarshal(approver["credentialPath"], &approverCredential) != nil || approverCredential == "" {
+			return "", errors.New("console browser approver requires credentialPath")
+		}
+		if approverCredential == credential {
+			return "", errors.New("console browser approver must use its own credential file")
+		}
+		remoteApprover, err := s.enrollmentCredential(approverCredential, "approver-credential")
+		if err != nil {
+			return "", err
+		}
+		approver["credentialPath"], err = json.Marshal(remoteApprover)
+		if err != nil {
+			return "", err
+		}
+		config["approver"], err = json.Marshal(approver)
+		if err != nil {
+			return "", err
+		}
 	}
 	config["evidenceDirectory"], err = json.Marshal(filepath.Join(s.remote, "records", "evidence"))
 	if err != nil {
@@ -69,6 +87,7 @@ func (s *remoteStage) enrollmentBrowser(path string, outputs map[string]string) 
 	delete(config, "resultPath")
 	delete(config, "enrollmentCommandPaths")
 	delete(config, "enrollmentSecret")
+	delete(config, "provisionSnippetPath")
 	encoded, err := json.Marshal(config)
 	if err != nil {
 		return "", err
@@ -90,8 +109,38 @@ func (s *remoteStage) enrollmentBrowser(path string, outputs map[string]string) 
 		return "", err
 	}
 	outputs["browser-credential"] = credential
+	if approverCredential != "" {
+		outputs["approver-credential"] = approverCredential
+	}
 	outputs["evidence"] = evidence
 	return target, nil
+}
+
+// enrollmentCredential stages one private passkey state file as records/name.
+// The browser updates its authenticator counter; the run returns that state to
+// its original private file, separately from the public screenshot evidence.
+func (s *remoteStage) enrollmentCredential(path, name string) (string, error) {
+	data, err := readEnrollmentBrowserFile(path)
+	if err != nil {
+		return "", err
+	}
+	defer clear(data)
+	file, err := os.CreateTemp(s.local, "console-credential-*.json")
+	if err != nil {
+		return "", err
+	}
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Close()); err != nil {
+		return "", err
+	}
+	remote := filepath.Join(s.remote, "records", name)
+	if err := s.mkdir(filepath.Dir(remote)); err != nil {
+		return "", err
+	}
+	if err := s.sync(file.Name(), remote); err != nil {
+		return "", err
+	}
+	return remote, nil
 }
 
 func readEnrollmentBrowserFile(path string) (_ []byte, err error) {

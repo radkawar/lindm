@@ -17,7 +17,7 @@ func newVerifiedGuestWithHardware(ctx context.Context, manifest *labv1.ImageMani
 	return newVerifiedSeededGuest(ctx, manifest, cacheDir, workDir, allowReboot, hardware, nil)
 }
 
-func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions, seed *unattendedSeed) (vm *guestVM, verified *VerifiedImage, err error) {
+func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions, seed guestUserData) (vm *guestVM, verified *VerifiedImage, err error) {
 	h, err := hardwareForManifest(manifest, hardware, runtime.GOARCH)
 	if err != nil {
 		return nil, nil, err

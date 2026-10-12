@@ -110,6 +110,15 @@ func designOnly() map[Capability]string {
 	return m
 }
 
+// nixosGates keeps NixOS design-only and names the installation boundary:
+// lindmd serves agents only as signed native APT/RPM/pacman repositories, and
+// a NixOS module must not depend on a derivation hosted elsewhere.
+func nixosGates() map[Capability]string {
+	m := designOnly()
+	m[Lifecycle] = "design-only: lindmd serves no NixOS installation artifact (no release-signed agent archive pinned through the console, no NixOS runtime for the agent's units, inventory or package backend); see the NixOS self-hosted design in atomic-nixos.md"
+	return m
+}
+
 var (
 	both       = []string{"x86_64", "aarch64"}
 	x86        = []string{"x86_64"}
@@ -267,12 +276,18 @@ var (
 	// The native self-update lane (`lab vm updates`) is qualified per guest
 	// architecture: aarch64 only on the arm64 KVM hosts.
 	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
+	// Vendor unattended installer formats; each must also exist in the
+	// release's installation media (see docs/agent-enrollment.md).
+	cloudInitOnly        = []Provisioning{ProvisionCloudInit}
+	cloudInitAutoinstall = []Provisioning{ProvisionCloudInit, ProvisionAutoinstall}
+	cloudInitKickstart   = []Provisioning{ProvisionCloudInit, ProvisionKickstart}
+	cloudInitAutoYaST    = []Provisioning{ProvisionCloudInit, ProvisionAutoYaST}
 )
 
 var registry = []*Release{
 	{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249,
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249, Provisioning: cloudInitAutoinstall,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
@@ -297,7 +312,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 255, UpgradeTo: "ubuntu-26.04",
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
 		// Archive facts observed on every 24.04 pocket (archive, security,
 		// ports and the Pop!_OS mirror) on 2026-10-11: Ubuntu Archive Automatic
@@ -309,7 +324,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate, SSHBannerUnit: "ssh.service",
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
 			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
 			// Image that GRUB unpacks; systemd 255's stub cannot embed it in a UKI.
@@ -321,7 +336,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
-		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 259,
+		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 259, Provisioning: cloudInitAutoinstall,
 		Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
@@ -343,7 +358,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",
-		Tier: TierOutside, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 247,
+		Tier: TierOutside, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 247, Provisioning: cloudInitOnly,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:11", PURLNamespace: "debian", PURLDistro: "bullseye"},
 		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate},
 		Supports: caps(agentCore, []Capability{Packages, Accounts, Advisories}),
@@ -351,7 +366,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "debian-12", Name: "Debian 12", Distribution: "Debian", ID: "debian", Version: Exact("12"), Codename: "bookworm",
-		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252,
+		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252, Provisioning: cloudInitOnly,
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		// Debian's OSV export qualifies purls with the codename (distro=bookworm).
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "bookworm", Exports: debianExports},
@@ -368,7 +383,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
-		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257,
+		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257, Provisioning: cloudInitOnly,
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "trixie", Exports: debianExports},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
@@ -381,7 +396,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,
-		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5,
+		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Provisioning: cloudInitKickstart,
 		Desktop: Desktop{Name: "Workstation GNOME; KDE edition", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
 		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43",
 			Exports: map[Feed]AdvisoryExport{FeedRPMUpdateinfo: {
@@ -409,7 +424,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "fedora-44", Name: "Fedora 44", Distribution: "Fedora", ID: "fedora", Version: Exact("44"), Variants: fedoraVar,
-		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Systemd: 259,
+		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Systemd: 259, Provisioning: cloudInitKickstart,
 		FDE: "LUKS2 (anaconda LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "Workstation GNOME; KDE edition", Version: "GNOME 50", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
 		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 44",
 			Exports: map[Feed]AdvisoryExport{FeedRPMUpdateinfo: {
@@ -422,7 +437,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect, SSHBannerUnit: "sshd.service",
 			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}, RecoveryGRUB: blsGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initramfs-%s.img", Rebuild: "/usr/bin/dracut", RebuildArgs: []string{"--regenerate-all", "--force"}, RebuildWithFileArgs: []string{"--regenerate-all", "--force", "--include", "/etc/modprobe.d/99-lindm-blocklist.conf", "/etc/modprobe.d/99-lindm-blocklist.conf"}, WritePaths: []string{"/boot"}},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
@@ -442,7 +457,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "rhel-8", Name: "RHEL 8", Distribution: "RHEL", ID: "rhel", Version: Major("8"),
-		Tier: TierOutside, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 239,
+		Tier: TierOutside, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 239, Provisioning: cloudInitKickstart,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:8", PURLNamespace: "redhat", PlatformStreams: true},
 		Lab:      Lab{Lanes: []LabLane{LaneServices}, Entitlement: true},
 		Supports: []Capability{Inventory, Advisories},
@@ -450,11 +465,11 @@ var registry = []*Release{
 	},
 	{
 		Key: "rhel-9", Name: "RHEL 9", Distribution: "RHEL", ID: "rhel", Version: Major("9"),
-		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
+		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true,
+		Lab: Lab{Lanes: slices.Concat(rhelLanes, []LabLane{LaneProvisionKickstart}), LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
@@ -466,7 +481,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
-		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
+		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks10, el10Pins),
@@ -481,7 +496,7 @@ var registry = []*Release{
 	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
 	{
 		Key: "rocky-9", Name: "Rocky Linux 9", Distribution: "Rocky Linux", ID: "rocky", Version: Major("9"),
-		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
@@ -495,7 +510,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
-		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
@@ -507,7 +522,7 @@ var registry = []*Release{
 	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux", ""),
 	{
 		Key: "almalinux-9", Name: "AlmaLinux 9", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("9"),
-		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252,
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
@@ -518,7 +533,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
-		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
+		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
@@ -529,12 +544,12 @@ var registry = []*Release{
 	},
 	{
 		Key: "centos-stream-9", Name: "CentOS Stream 9", Distribution: "CentOS Stream", ID: "centos", Version: Exact("9"),
-		Tier: TierOutside, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4,
+		Tier: TierOutside, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Provisioning: cloudInitKickstart,
 		Supports: []Capability{Inventory}, Gates: gates(),
 	},
 	{
 		Key: "centos-stream-10", Name: "CentOS Stream 10", Distribution: "CentOS Stream", ID: "centos", Version: Exact("10"),
-		Tier: TierOutside, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4,
+		Tier: TierOutside, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Provisioning: cloudInitKickstart,
 		Supports: []Capability{Inventory}, Gates: gates(),
 	},
 	{
@@ -582,7 +597,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),
-		Tier: Tier2, Page: "arch.md", Family: FamilyArch, Architectures: x86, Packages: pacman,
+		Tier: Tier2, Page: "arch.md", Family: FamilyArch, Architectures: x86, Packages: pacman, Provisioning: cloudInitOnly,
 		RollingUpdate:       &RollingUpdateTooling{ArchiveURL: "https://archive.archlinux.org/repos/", Repositories: []string{"core", "extra", "multilib"}},
 		RequalificationDays: 14,
 		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling", Partial: "tracker omits historical and non-repository packages", Exports: map[Feed]AdvisoryExport{
@@ -645,7 +660,7 @@ var registry = []*Release{
 	},
 	{
 		Key: "opensuse-tumbleweed", Name: "openSUSE Tumbleweed", Distribution: "openSUSE Tumbleweed", ID: "opensuse-tumbleweed", Version: Snapshot(),
-		Tier: Tier2, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
+		Tier: Tier2, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper, Provisioning: cloudInitAutoYaST,
 		RollingUpdate:       &RollingUpdateTooling{ArchiveURL: "https://download.opensuse.org/history/", SnapshotCPEPrefix: "cpe:/o:opensuse:opensuse:"},
 		RequalificationDays: 14,
 		Advisory: Advisory{Feeds: []Feed{FeedSUSEOVAL, FeedSUSECSAF}, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse", OVALPlatform: "openSUSE Tumbleweed", OVALReleasePackage: "openSUSE-release", Partial: "vendor package assessments do not cover all rolling or third-party packages", Exports: map[Feed]AdvisoryExport{
@@ -658,7 +673,7 @@ var registry = []*Release{
 		FDE:     "LUKS2 (AutoYaST); systemd-cryptenroll with dracut",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); KDE separately qualified", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
-			Lanes:            []LabLane{LaneUpdates, LaneAirgap, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
+			Lanes:            []LabLane{LaneUpdates, LaneAirgap, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole, LaneProvisionAutoYaST},
 			ResourcePackages: []string{"rpm-build", "rpm", "createrepo_c", "gpg2", "openssl", "python313", "attr", "acl", "curl", "nftables", "firewalld", "pam_pwquality", "libpwquality1", "libpwquality-tools", "pam", "pam-config"},
 			Installer:        AutoYaST,
 			// YaST's NetworkManager readiness check executes /bin/ip, while
@@ -681,26 +696,27 @@ var registry = []*Release{
 	},
 	{
 		Key: "opensuse-leap-16.0", Name: "openSUSE Leap 16.0", Distribution: "openSUSE Leap", ID: "opensuse-leap", Version: Exact("16.0"),
-		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
+		// Leap 16.0 installs with Agama; its AutoYaST compatibility is not modelled.
+		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper, Provisioning: cloudInitOnly,
 		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:opensuse:leap:16.0", PURLNamespace: "suse"},
 		Supports: caps(agentCore, []Capability{Advisories}),
 		Gates:    gates(),
 	},
 	{
 		Key: "sles-15", Name: "SLES 15", Distribution: "SLES", ID: "sles", Version: Major("15"),
-		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper,
+		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: both, Packages: zypper, Provisioning: cloudInitAutoYaST,
 		Advisory: Advisory{Feeds: suseFeed, Ecosystem: "cpe:/o:suse:sles:15:spN", PURLNamespace: "suse"},
 		Supports: []Capability{Inventory, Advisories}, Gates: gates(),
 	},
 	{
 		Key: "sled-15", Name: "SLED 15", Distribution: "SLED", ID: "sled", Version: Major("15"),
-		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: x86, Packages: zypper,
+		Tier: TierOutside, Page: "opensuse.md", Family: FamilySUSE, Architectures: x86, Packages: zypper, Provisioning: []Provisioning{ProvisionAutoYaST},
 		Supports: []Capability{Inventory},
 		Gates:    gates(string(Advisories), "SLED is not mapped by the SUSE CSAF feed"),
 	},
 	{
 		Key: "nixos", Name: "NixOS", Distribution: "NixOS", ID: "nixos", Version: Any(),
-		Tier: TierFuture, Page: "atomic-nixos.md", Family: FamilyNix, Gates: designOnly(),
+		Tier: TierFuture, Page: "atomic-nixos.md", Family: FamilyNix, Gates: nixosGates(), Provisioning: []Provisioning{ProvisionNixOS},
 	},
 }
 
@@ -723,7 +739,7 @@ func rhelGates() map[Capability]string {
 
 func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {
 	return &Release{
-		Key: key, Name: name, Distribution: distribution, ID: id, Version: Major(major),
+		Key: key, Name: name, Distribution: distribution, ID: id, Version: Major(major), Provisioning: cloudInitKickstart,
 		Tier: tier, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: systemd,
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Lab:      Lab{Lanes: []LabLane{LaneResources}},

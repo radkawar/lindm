@@ -43,6 +43,9 @@ type LoadAuthorityOptions struct {
 	airgap              *AirgapAuthorityOptions
 	splitDevice         netip.Addr
 	persistentDirectory string
+	// publicHost names the console and device origins instead of localhost so
+	// installers can reach them through a lab-owned hosts entry.
+	publicHost string
 	// ListenAddress binds admin/device listeners to one local IPv4 address
 	// (default loopback) so a generator on another host can reach them. TLS
 	// names and signed origins are unchanged; clients dial this address.

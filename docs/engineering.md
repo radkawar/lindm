@@ -2305,6 +2305,47 @@ authenticator counter to its original protected file, and returns only redacted
 screenshots through the evidence directory. Run lanes sharing one authenticator
 sequentially; never share its mutable state between concurrent browsers.
 
+### Installer provisioning from the console
+
+The `provision-cloud-init`, `provision-autoinstall`, `provision-kickstart` and
+`provision-autoyast` lanes (`lab vm provision-*`, matrix cells of the same names)
+feed the console's copied provisioning snippet, byte for byte, into a real first
+boot or vendor installation and pass only when the device is **Enrolled** in the
+console after independent approval. Start the fixture with a public host name,
+because installers and first boots have no SSH loopback forward:
+
+```sh
+artifacts/bin/lab console-enrollment \
+  -repo "$FIXTURE" -code "$SOURCE" -lindmd "$SOURCE/artifacts/bin/lindmd" \
+  -architectures arm64 -public-host lindm-console.test
+```
+
+Both origins become `https://lindm-console.test:PORT` with a run-owned TLS leaf
+from the shared transport CA. The fixture prints one-time secrets for
+`console-owner` and a second human, `console-approver`. Enroll each with the
+browser runner (`mode: enroll`, `hostResolverRules: "MAP lindm-console.test
+127.0.0.1"`) into separate private credential files. A provision browser
+configuration is the owner configuration plus
+`"approver": {"username", "password", "credentialPath"}`; for the matrix, store it as
+`PLATFORM-ARCH.provision.json` in `-console-browser-config-dir`.
+
+Each lane captures the snippet in Chromium before the guest boots (the token is
+approval-required), then merges it only as `lab/matrix.json`'s cells allow:
+cloud-init as the first part of a multipart NoCloud seed whose second, lab part
+appends lists; autoinstall by appending the lab's own keys after the snippet's
+`autoinstall:` body; Kickstart by appending the snippet after the lab's `%post`
+sections; AutoYaST by splicing its `<script>` items at the end of the lab's
+`chroot-scripts`. Lab-owned parts only add access keys and a hosts line mapping the
+public name to 10.0.2.2 (QEMU's host, where the fixture or its reverse forward
+listens), and are scanned to contain no lindm repository, CA or bootstrap. Installer
+lanes run the encrypted vendor-installer recipe in fresh staging, never a golden.
+After the copied unit has bootstrapped and is waiting (`PENDING_ENROLLMENT`), the
+approver approves the exact installation in the approval inbox, the owner executes
+it, and the lane requires the local enrolled identity, active units, a successful
+provisioning unit, the token file removed, the package origin on the fixture's
+repository and the package signer equal to the pinned fingerprint. Run these
+lanes with `-parallel 1`: they share the two accounts' passkey state.
+
 ### Lab qualification matrix
 
 The platform × cell matrix is declarative. `lab/matrix.json` (strict protobuf JSON

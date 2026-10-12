@@ -18,6 +18,11 @@ import {
   confirmEnrolledDevice,
   assignProfile,
   storageSelection,
+  provisioningFormatLabels,
+  createProvisioningSnippet,
+  findPendingEnrollment,
+  approvePendingEnrollment,
+  executeApprovedEnrollment,
 } from "./journey.mjs";
 
 // Private JSON-file API. The maintained caller contract is in docs/verification.md.
@@ -136,7 +141,16 @@ function validate(value) {
   }
   if (!["chromium", "firefox", "webkit"].includes(value.engine)) throw new Error("invalid_engine");
   if (
-    !["enroll", "credentials", "grant", "native", "login", "enrollment-status"].includes(value.mode)
+    ![
+      "enroll",
+      "credentials",
+      "grant",
+      "native",
+      "login",
+      "enrollment-status",
+      "provision",
+      "approve-enrollment",
+    ].includes(value.mode)
   )
     throw new Error("invalid_mode");
   if (value.enrollmentScreenshots && value.engine !== "chromium")
@@ -183,6 +197,44 @@ function validate(value) {
     if (!["escrowRotate", "cryptoErase", "tpm2Bind", "sanitize"].includes(kind))
       throw new Error("invalid_storage_action");
   }
+  if (value.hostResolverRules !== undefined) {
+    // One rule mapping exactly the origin's host; Chromium only.
+    const rule = /^MAP ([a-z0-9.-]{1,253}) ([0-9.]{7,15})$/.exec(value.hostResolverRules);
+    if (value.engine !== "chromium" || !rule || rule[1] !== origin.hostname)
+      throw new Error("invalid_host_resolver_rules");
+  }
+  if (value.mode === "provision") {
+    if (value.engine !== "chromium" || !value.enrollmentScreenshots || value.enrollmentCommandPaths)
+      throw new Error("provision_requires_chromium_screenshots");
+    if (
+      !Object.hasOwn(provisioningFormatLabels, value.provisionFormat) ||
+      typeof value.provisionPlatform !== "string" ||
+      !value.provisionPlatform ||
+      typeof value.provisionSnippetPath !== "string" ||
+      !value.provisionSnippetPath
+    )
+      throw new Error("provision_target_required");
+  }
+  if (value.mode === "approve-enrollment") {
+    const approver = value.approver;
+    if (
+      value.engine !== "chromium" ||
+      typeof value.installationId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value.installationId)
+    )
+      throw new Error("approval_installation_required");
+    if (!approver || typeof approver !== "object")
+      throw new Error("approver_configuration_missing");
+    for (const key of ["username", "password", "credentialPath"]) {
+      if (typeof approver[key] !== "string" || !approver[key])
+        throw new Error("approver_configuration_missing");
+    }
+    if (
+      approver.username === value.username ||
+      resolve(approver.credentialPath) === resolve(value.credentialPath)
+    )
+      throw new Error("approver_must_be_distinct");
+  }
   for (const [key, fallback, max] of [
     ["timeoutMs", 300_000, 900_000],
     ["actionTimeoutMs", 30_000, 120_000],
@@ -198,7 +250,7 @@ async function journey() {
   driver = config.engine === "chromium" ? new ChromiumDriver() : new WebDriver();
   activeStep = "browser_start";
   await driver.open(config);
-  if (config.enrollmentCommandPaths) {
+  if (config.enrollmentCommandPaths || config.mode === "provision") {
     await driver.context.grantPermissions(["clipboard-read", "clipboard-write"], {
       origin: config.origin,
     });
@@ -223,16 +275,7 @@ async function journey() {
     });
   }
   let credentials = [];
-  if (config.mode !== "enroll") {
-    const saved = await readPrivateJSON(config.credentialPath);
-    if (
-      saved.origin !== config.origin ||
-      saved.username !== config.username ||
-      !saved.credentials?.length
-    )
-      throw new Error("credential_binding_mismatch");
-    credentials = saved.credentials;
-  }
+  if (config.mode !== "enroll") credentials = await savedCredentials(config);
   activeStep = "native_authenticator";
   try {
     await driver.authenticator(credentials);
@@ -379,16 +422,63 @@ async function journey() {
     }
     if (storageFailure) throw storageFailure;
   }
+  if (config.mode === "provision") {
+    result.provision = await step("create_provisioning_snippet", () =>
+      createProvisioningSnippet(ui, config, enrollmentScreenshots),
+    );
+    await writePrivateJSON(config.resultPath, result);
+  }
+  if (config.mode === "approve-enrollment") {
+    // Two humans in one browser: each signs in through the UI with only its
+    // own passkey state loaded; no session or credential is shared.
+    await step("owner_sign_out_for_approver", () => signOut(ui));
+    await driver.authenticator(await savedCredentials(config.approver));
+    await step("approver_sign_in", () => signIn(ui, config.approver));
+    await saveCredential(config.approver);
+    const pending = await step("find_pending_enrollment", () => findPendingEnrollment(ui, config));
+    result.approval = {
+      ...pending,
+      approver: config.approver.username,
+      approved: false,
+      requesterExecuted: false,
+    };
+    await writePrivateJSON(config.resultPath, result);
+    await step("approve_device_enrollment", () => approvePendingEnrollment(ui, config, pending));
+    result.approval.approved = true;
+    await writePrivateJSON(config.resultPath, result);
+    await step("approver_sign_out", () => signOut(ui));
+    await driver.authenticator(await savedCredentials(config));
+    await step("owner_execute_sign_in", () => signIn(ui, config));
+    await saveCredential();
+    await step("execute_device_enrollment", () => executeApprovedEnrollment(ui, config, pending));
+    result.approval.requesterExecuted = true;
+    await writePrivateJSON(config.resultPath, result);
+    result.enrolledDevice = await step("confirm_enrolled_device", () =>
+      confirmEnrolledDevice(ui, { ...config, deviceId: pending.deviceId }),
+    );
+    await writePrivateJSON(config.resultPath, result);
+  }
   await step("final_sign_out", () => signOut(ui));
   result.passed = true;
 }
 
-async function saveCredential() {
+async function savedCredentials(account) {
+  const saved = await readPrivateJSON(account.credentialPath);
+  if (
+    saved.origin !== config.origin ||
+    saved.username !== account.username ||
+    !saved.credentials?.length
+  )
+    throw new Error("credential_binding_mismatch");
+  return saved.credentials;
+}
+
+async function saveCredential(account = config) {
   const credentials = await driver.credentials();
   if (credentials.length !== 1) throw new Error("expected_one_owner_credential");
-  await writePrivateJSON(config.credentialPath, {
+  await writePrivateJSON(account.credentialPath, {
     origin: config.origin,
-    username: config.username,
+    username: account.username,
     credentials,
   });
 }

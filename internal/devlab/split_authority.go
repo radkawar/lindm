@@ -111,7 +111,7 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	}
 	defer func() { enrollment.Secret = "" }()
 	f.exportedAccounts = append(f.exportedAccounts, enrollment.GetAccountId())
-	account, err := newLocalAccount(username, enrollment.GetAccountId())
+	account, err := newLocalAccount("localhost", username, enrollment.GetAccountId())
 	if err != nil {
 		return nil, fmt.Errorf("create remote owner credential: %w", err)
 	}

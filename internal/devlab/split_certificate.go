@@ -35,6 +35,16 @@ func writeSplitCertificate(shared, directory string, device netip.Addr) error {
 }
 
 func writeFixtureCertificate(shared, directory string, device netip.Addr, lifetime time.Duration) error {
+	return writeFixtureLeaf(shared, directory, "split-server", []string{"localhost"}, []net.IP{net.IP(device.AsSlice()), net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, lifetime)
+}
+
+// writePublicHostCertificate adds the lab public console name to the usual
+// loopback names; like split leaves it is run-owned and signed by the shared CA.
+func writePublicHostCertificate(shared, directory, host string) error {
+	return writeFixtureLeaf(shared, directory, "public-server", []string{"localhost", host}, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, 24*time.Hour)
+}
+
+func writeFixtureLeaf(shared, directory, name string, dnsNames []string, addresses []net.IP, lifetime time.Duration) error {
 	ca, err := tls.LoadX509KeyPair(filepath.Join(shared, "transport-ca.crt"), filepath.Join(shared, "transport-ca.key"))
 	if err != nil {
 		return fmt.Errorf("load split transport CA: %w", err)
@@ -63,8 +73,8 @@ func writeFixtureCertificate(shared, directory string, device netip.Addr, lifeti
 		SerialNumber: serial, Subject: pkix.Name{CommonName: "lindm split laboratory"},
 		NotBefore: now.Add(-time.Minute), NotAfter: expires,
 		BasicConstraintsValid: true,
-		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.IP(device.AsSlice()), net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+		DNSNames:              dnsNames,
+		IPAddresses:           addresses,
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
@@ -79,10 +89,10 @@ func writeFixtureCertificate(shared, directory string, device netip.Addr, lifeti
 	defer clear(keyDER)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 	defer clear(keyPEM)
-	if err := writeSplitPrivateFile(filepath.Join(directory, "split-server.key"), keyPEM); err != nil {
+	if err := writeSplitPrivateFile(filepath.Join(directory, name+".key"), keyPEM); err != nil {
 		return err
 	}
-	return writeSplitPrivateFile(filepath.Join(directory, "split-server.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	return writeSplitPrivateFile(filepath.Join(directory, name+".crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
 
 func writeSplitPrivateFile(path string, data []byte) (resultErr error) {

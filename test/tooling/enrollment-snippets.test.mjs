@@ -62,18 +62,6 @@ function checkShell(script) {
   assert.equal(result.status, 0, result.stderr);
 }
 
-function assertFirstBoot(script) {
-  assert.ok(script.includes(command));
-  assert.match(script, /resume -wait-seconds 3600/);
-  assert.match(script, /TimeoutStartSec=3660/);
-  assert.match(script, /ExecStartPost=\/usr\/bin\/rm -f \/etc\/lindm\/provisioning-token/);
-  assert.match(
-    script,
-    /systemctl enable lindm-executor.service lindm-agent.service lindm-provision.service/,
-  );
-  assert.doesNotMatch(script, /systemctl start|systemctl.*--now/);
-}
-
 function assertHeredocToken(script) {
   const content = script.split("<<'LINDM_TOKEN'\n")[1].split("\nLINDM_TOKEN")[0];
   assert.equal(Buffer.from(content, "base64").toString("utf8"), token);
@@ -175,11 +163,16 @@ test("all native provisioning formats reuse the secure install script", () => {
     const snippet = provisioningSnippet(format, token, instructions, install);
     assert.ok(snippet.includes(instructions.executionRootSha256));
     assert.ok(snippet.includes(instructions.aptRepository.signingKeyFingerprint));
-    assert.match(snippet, /resume -wait-seconds 3600/);
+    assert.ok(snippet.includes(`ExecStart=${command}\n`));
+    assert.ok(snippet.includes(`ExecStart=${instructions.resumeCommand}\n`));
+    assert.match(snippet, /TimeoutStartSec=3700/);
+    assert.match(snippet, /ExecStartPost=\/usr\/bin\/rm -f \/etc\/lindm\/provisioning-token/);
+    // No script under /etc is executed: SELinux labels it etc_t, not a service executable.
+    assert.doesNotMatch(snippet, /provision-at-boot/);
   }
 });
 
-test("cloud-init delivers the token as root-only data, never command arguments", () => {
+test("cloud-init delivers the token as root-only data and never blocks first boot", () => {
   const snippet = provisioningSnippet("cloud-init", token, instructions, install);
   const tokenEntry = snippet
     .split("  - path: /etc/lindm/provisioning-token\n")[1]
@@ -187,56 +180,70 @@ test("cloud-init delivers the token as root-only data, never command arguments",
   assert.match(tokenEntry, /owner: root:root/);
   assert.match(tokenEntry, /permissions: '0600'/);
   assert.equal(JSON.parse(tokenEntry.split("content: ")[1].trim()), token);
-  assert.ok(snippet.includes(`      ${command}`));
+  assert.ok(snippet.includes(`      ExecStart=${command}`));
   assert.ok(!snippet.split("runcmd:")[1].includes(token));
   const runcmd = JSON.parse(snippet.split("  - [sh, -c, ")[1].split("]\n")[0]);
   checkShell(runcmd);
-  assert.match(
-    runcmd,
-    /systemctl enable --now lindm-executor.service lindm-agent.service lindm-provision.service/,
-  );
+  assert.match(runcmd, /systemctl enable --now lindm-executor.service lindm-agent.service\n/);
+  // The approval wait lasts up to an hour; cloud-final must not wait for it.
+  assert.match(runcmd, /systemctl enable lindm-provision.service\n/);
+  assert.match(runcmd, /systemctl start --no-block lindm-provision.service$/);
+  assert.doesNotMatch(runcmd, /--now[^\n]*lindm-provision/);
 });
 
-test("Kickstart and AutoYaST stage first-boot enrollment without enrolling in chroot", () => {
+test("Kickstart and AutoYaST install in the target chroot and only enable first-boot units", () => {
   for (const format of ["kickstart", "autoyast"]) {
     const snippet = provisioningSnippet(format, token, instructions, install);
     const body =
       format === "kickstart"
-        ? snippet.split("%post --erroronfail\n")[1].split("%end")[0]
+        ? snippet.split("%post --erroronfail --interpreter=/bin/sh\n")[1].split("%end")[0]
         : snippet.split("<![CDATA[\n")[1].split("]]>")[0];
     checkShell(body);
-    assertFirstBoot(body);
     assertHeredocToken(body);
+    assert.ok(body.indexOf("install lindm-agent") < body.indexOf("<<'LINDM_TOKEN'"));
+    assert.match(body, /chmod 0644 \/etc\/systemd\/system\/lindm-provision.service/);
+    assert.match(body, /selinuxenabled; then\n {2}restorecon -RF \/etc\/lindm /);
+    assert.match(
+      body,
+      /systemctl enable lindm-executor.service lindm-agent.service lindm-provision.service\n?$/,
+    );
+    assert.doesNotMatch(body, /systemctl (start|restart)|--now|daemon-reload/);
   }
+  const autoyast = provisioningSnippet("autoyast", token, instructions, install);
+  assert.match(autoyast, /<chroot-scripts config:type="list">\n {6}<script>\n/);
+  assert.match(autoyast, /<chrooted config:type="boolean">true<\/chrooted>/);
 });
 
-test("autoinstall supplies cloud-init user-data, not secret shell arguments", () => {
+test("autoinstall supplies first-boot cloud-init user-data, not secret shell arguments", () => {
   const snippet = provisioningSnippet("autoinstall", token, instructions, install);
+  assert.match(snippet, /\nautoinstall:\n {2}version: 1\n {2}user-data:\n/);
   const body = snippet
     .split("  user-data:\n")[1]
     .split("\n")
     .map((line) => line.slice(4))
     .join("\n");
-  assert.equal(
-    body.trim(),
-    provisioningSnippet("cloud-init", token, instructions, install)
-      .split("\n")
-      .slice(1)
-      .join("\n")
-      .trim(),
-  );
-  assert.doesNotMatch(snippet, /curtin.*-ec|late-commands:/);
+  const cloudInit = provisioningSnippet("cloud-init", token, instructions, install);
+  assert.equal(body, `write_files:${cloudInit.split("\nwrite_files:")[1]}`);
+  assert.doesNotMatch(snippet, /curtin|late-commands:/);
 });
 
-test("NixOS retains the verified-derivation and target-encrypted credential path", () => {
-  const snippet = provisioningSnippet("nixos", token, instructions, "");
-  assert.match(snippet, /\$\{cfg.package\}\/libexec\/lindm\/lindm-agent bootstrap/);
-  assert.match(snippet, /LoadCredentialEncrypted = "lindm.provisioning-token:/);
+test("DNF and zypper installs work without distribution repositories in an installer target", () => {
+  const dnf = enrollmentInstallScript(instructions, { ...platform, packageFamily: "dnf" });
+  checkShell(dnf);
+  assert.match(dnf, /if ! rpm -q ca-certificates gnupg2 openssl >\/dev\/null 2>&1; then\n/);
+  const zypper = enrollmentInstallScript(instructions, { ...platform, packageFamily: "zypper" });
+  checkShell(zypper);
+  assert.match(zypper, /if ! rpm -q ca-certificates curl gpg2 openssl >\/dev\/null 2>&1; then\n/);
+  assert.match(zypper, /type=rpm-md\n/);
+  assert.doesNotMatch(zypper, /localpkg_gpgcheck|sslverify/);
+  // Only lindmd's repository is refreshed and searched; install media are not.
+  assert.match(zypper, /zypper --non-interactive --reposd-dir "\$work\/repos.d" refresh lindm\n/);
   assert.match(
-    snippet,
-    /-provisioning-token-file "\$CREDENTIALS_DIRECTORY\/lindm.provisioning-token"/,
+    zypper,
+    /zypper --non-interactive --reposd-dir "\$work\/repos.d" install --no-recommends --from lindm lindm-agent/,
   );
-  assert.ok(!snippet.includes(token));
-  assert.ok(!snippet.includes(btoa(token)));
-  assert.doesNotMatch(snippet, /writeText|readFile|environment.etc/);
+});
+
+test("NixOS is a registry gate, never a snippet depending on outside hosting", () => {
+  assert.equal(provisioningSnippet("nixos", token, instructions, install), "");
 });

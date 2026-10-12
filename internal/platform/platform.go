@@ -331,6 +331,25 @@ type RollingUpdateTooling struct {
 	SnapshotCPEPrefix string
 }
 
+// Provisioning is a vendor unattended-installation input whose console
+// snippet installs lindm-agent from the customer's lindmd repository and
+// enrolls the device with a provisioning token.
+type Provisioning string
+
+const (
+	// ProvisionCloudInit is first-boot cloud-config on a cloud image.
+	ProvisionCloudInit Provisioning = "cloud-init"
+	// ProvisionKickstart is an Anaconda %post section run in the target chroot.
+	ProvisionKickstart Provisioning = "kickstart"
+	// ProvisionAutoinstall is subiquity autoinstall user-data, which the
+	// installed system's cloud-init applies on first boot.
+	ProvisionAutoinstall Provisioning = "autoinstall"
+	// ProvisionAutoYaST is an AutoYaST chroot-script run in the target.
+	ProvisionAutoYaST Provisioning = "autoyast"
+	// ProvisionNixOS is a NixOS module; see the nixos row's Lifecycle gate.
+	ProvisionNixOS Provisioning = "nixos"
+)
+
 // Release is one registry row.
 type Release struct {
 	Key  string // stable key, e.g. "ubuntu-24.04"; lab matrix and docs key
@@ -374,6 +393,9 @@ type Release struct {
 	// ArchitectureGates gates a supported capability on one guest
 	// architecture (x86_64, aarch64) whose native stack refuses it.
 	ArchitectureGates map[string]map[Capability]string
+	// Provisioning lists the vendor's unattended installer formats the console
+	// offers for this release; installation readiness still follows Lifecycle.
+	Provisioning []Provisioning
 
 	base *Release
 }

@@ -10,8 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,7 +113,18 @@ func (f *AuthorityFixture) RequireConsoleRevealApproval(ctx context.Context) err
 // account. Named demos call this once and preserve the original private owner
 // access file. Never log the secret as evidence or place it in a URL. The browser
 // chooses its own password and authenticator.
-func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (_ *authv1.AccountEnrollment, resultErr error) {
+func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (*authv1.AccountEnrollment, error) {
+	return f.createConsoleAccount(ctx, "console-owner", "owner")
+}
+
+// CreateConsoleApproverEnrollment returns the one-time secret for the fixed
+// console-approver account: a distinct admin human who may decide enrollment
+// approvals that console-owner requested, but cannot execute them.
+func (f *AuthorityFixture) CreateConsoleApproverEnrollment(ctx context.Context) (*authv1.AccountEnrollment, error) {
+	return f.createConsoleAccount(ctx, "console-approver", "admin")
+}
+
+func (f *AuthorityFixture) createConsoleAccount(ctx context.Context, username, role string) (_ *authv1.AccountEnrollment, resultErr error) {
 	if f.local == nil || f.ConsoleOrigin == consoleOrigin {
 		return nil, errors.New("browser enrollment requires a dynamic local console fixture")
 	}
@@ -125,10 +138,42 @@ func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (_ *auth
 		resultErr = errors.Join(resultErr, owner.Close(cleanup))
 	}()
 	enrollment := new(authv1.AccountEnrollment)
-	if err := owner.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: "console-owner", Role: "owner"}, enrollment, http.StatusOK); err != nil {
+	if err := owner.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: username, Role: role}, enrollment, http.StatusOK); err != nil {
 		return nil, err
 	}
 	return enrollment, nil
+}
+
+// ValidatePublicHost admits only a lowercase multi-label DNS name for a lab
+// console origin: never an IP literal or a localhost name, which already
+// resolve without a lab hosts entry, and never a single label, which WebAuthn
+// treats as a public suffix and refuses as a relying party.
+func ValidatePublicHost(host string) error {
+	invalid := errors.New("public console host must be a lowercase multi-label DNS name, not localhost or an IP address")
+	if len(host) == 0 || len(host) > 253 || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return invalid
+	}
+	if _, err := netip.ParseAddr(host); err == nil {
+		return invalid
+	}
+	labels := strings.Split(host, ".")
+	if len(labels) < 2 {
+		return invalid
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return invalid
+		}
+		for _, c := range label {
+			if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
+				return invalid
+			}
+		}
+	}
+	if last := labels[len(labels)-1]; strings.Trim(last, "0123456789") == "" {
+		return invalid
+	}
+	return nil
 }
 
 // ReadAgentFixture returns this live fixture's public provisioning material,

@@ -223,12 +223,14 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	type executable struct{ name, arch, command string }
 	executables := []executable{{"lab", nativeArch, "./cmd/lab"}}
 	guestProbe := remote + "/bin/lab"
-	if r.Architecture != nativeArch {
-		switch args[1] {
-		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance", "advisories", "airgap":
-			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
-			guestProbe = remote + "/bin/lab-guest"
-		}
+	guestObserver := consoleBrowserLane(args[1])
+	switch args[1] {
+	case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "updates", "assistance", "advisories", "airgap":
+		guestObserver = true
+	}
+	if r.Architecture != nativeArch && guestObserver {
+		executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
+		guestProbe = remote + "/bin/lab-guest"
 	}
 	switch args[1] {
 	case "inspect", "inspect-storage":
@@ -281,7 +283,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" || args[1] == "assistance" || args[1] == "advisories" {
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}
-	if args[1] == "enroll-unattended" || args[1] == "enroll-from-console" {
+	if args[1] == "enroll-unattended" || consoleBrowserLane(args[1]) {
 		args = SetFlag(args, "lab-binary", guestProbe)
 	}
 	if (args[1] == "device-actions" || args[1] == "assistance") && FlagValue(args, "architecture") == "" {
@@ -397,7 +399,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			}
 		}
 	}
-	if args[1] == "enroll-from-console" && FlagValue(args, "browser-config") != "" {
+	if consoleBrowserLane(args[1]) && FlagValue(args, "browser-config") != "" {
 		browserConfig, err := stage.enrollmentBrowser(FlagValue(args, "browser-config"), outputs)
 		if err != nil {
 			return fmt.Errorf("stage enrollment browser: %w", err)
@@ -421,7 +423,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		command[i] = QuoteShell(s)
 	}
 	script := "cd " + QuoteShell(remote+"/source") + " && exec env " + QuoteShell("TMPDIR="+remote+"/work") + " " + strings.Join(command, " ")
-	if args[1] == "assistance" || (args[1] == "enroll-from-console" && FlagValue(args, "browser-config") != "") {
+	if args[1] == "assistance" || (consoleBrowserLane(args[1]) && FlagValue(args, "browser-config") != "") {
 		browserEnv, err := stage.assistanceBrowser(work, nativeArch)
 		if err != nil {
 			return err
@@ -508,7 +510,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	// InventoryRecordPath) are rewritten to their local copies; the record is
 	// returned last so it never names a local file that has not been copied.
 	relocated := map[string]string{}
-	for _, name := range []string{"browser-credential", "evidence", "inventory-record", "diagnostics", "fixture-output", "record"} {
+	for _, name := range []string{"browser-credential", "approver-credential", "evidence", "inventory-record", "diagnostics", "fixture-output", "record"} {
 		destination, ok := outputs[name]
 		if !ok {
 			continue
@@ -556,7 +558,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			preserveRemote = true
 			continue
 		}
-		if name == "browser-credential" {
+		if name == "browser-credential" || name == "approver-credential" {
 			if e := returnEnrollmentCredential(target, destination); e != nil {
 				err = errors.Join(err, e)
 				preserveRemote = true

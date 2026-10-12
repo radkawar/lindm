@@ -62,6 +62,9 @@ type AuthorityFixture struct {
 	exportedAccounts []string
 	persistent       bool
 	stateLock        *os.File
+	// publicHost replaces localhost in both origins, the TLS leaf and the
+	// WebAuthn relying party; empty for every other fixture.
+	publicHost string
 }
 
 type authorityFixtureMode uint8
@@ -105,13 +108,21 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
 		return nil, errors.New("control-plane trust requires an executable prebuilt lindmd binary")
 	}
+	if options.publicHost != "" {
+		if mode != authorityDeviceActions || options.splitDevice.IsValid() || options.persistentDirectory != "" || options.ListenAddress != "" {
+			return nil, errors.New("public console host requires a disposable loopback console-enrollment fixture")
+		}
+		if err := ValidatePublicHost(options.publicHost); err != nil {
+			return nil, err
+		}
+	}
 	material, err := ReadPublicAgentFixture(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 	shared := FixturePath(root)
 	f := &AuthorityFixture{
-		repository: root, binary: binary, ConsoleOrigin: consoleOrigin, serverCPUs: options.ServerCPUs,
+		repository: root, binary: binary, ConsoleOrigin: consoleOrigin, serverCPUs: options.ServerCPUs, publicHost: options.publicHost,
 		environment: LoadExperimentEnvironment{Storage: "storage: shared development PostgreSQL", ServerCPUs: options.ServerCPUs},
 	}
 	defer func() {
@@ -237,10 +248,14 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	}
 	deviceOrigin := "https://localhost:18445"
 	if mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityHA {
-		f.ConsoleOrigin = fmt.Sprintf("https://localhost:%d", adminAddress.Port)
+		host := "localhost"
+		if f.publicHost != "" {
+			host = f.publicHost
+		}
+		f.ConsoleOrigin = fmt.Sprintf("https://%s:%d", host, adminAddress.Port)
 		cfg.PublicUrl = f.ConsoleOrigin
 		if mode == authorityDeviceActions || mode == authorityHA {
-			deviceOrigin = fmt.Sprintf("https://localhost:%d", deviceAddress.Port)
+			deviceOrigin = fmt.Sprintf("https://%s:%d", host, deviceAddress.Port)
 		}
 		if options.splitDevice.IsValid() {
 			deviceOrigin = "https://" + f.DeviceAddress
@@ -263,6 +278,13 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		}
 		cfg.Tls.CertificateFile = filepath.Join(f.directory, "split-server.crt")
 		cfg.Tls.PrivateKeyFile = filepath.Join(f.directory, "split-server.key")
+	}
+	if f.publicHost != "" {
+		if err := writePublicHostCertificate(shared, f.directory, f.publicHost); err != nil {
+			return nil, err
+		}
+		cfg.Tls.CertificateFile = filepath.Join(f.directory, "public-server.crt")
+		cfg.Tls.PrivateKeyFile = filepath.Join(f.directory, "public-server.key")
 	}
 	cfg.DeviceCa.CertificateFile = filepath.Join(shared, "device-ca.crt")
 	cfg.DeviceCa.PrivateKeyFile = filepath.Join(shared, "device-ca.key")
@@ -422,7 +444,7 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	if f.scaleOut != nil {
 		adminAddress = f.scaleOut.localAdmin
 	}
-	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: ownerDialContext(adminAddress), ResponseHeaderTimeout: 3 * time.Second}
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: f.adminDial(adminAddress), ResponseHeaderTimeout: 3 * time.Second}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	ready, cancel := context.WithTimeout(ctx, 45*time.Second)

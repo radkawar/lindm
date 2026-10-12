@@ -88,6 +88,21 @@ message EnrollmentPlatform {
     (buf.validate.field).string.in = "snapshot",
     (buf.validate.field).string.in = "any"
   ];
+  // Registry-declared vendor unattended installer formats for this release,
+  // in console order. A provisioning snippet is offered only for these.
+  repeated string provisioning_formats = 10 [
+    (buf.validate.field).repeated.max_items = 8,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string = {
+      in: [
+        "cloud-init",
+        "kickstart",
+        "autoinstall",
+        "autoyast",
+        "nixos"
+      ]
+    }
+  ];
 }
 
 message EnrollmentAPTRepository {

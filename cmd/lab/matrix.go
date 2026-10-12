@@ -376,6 +376,12 @@ var laneInputs = map[string][]string{
 	"services":            {"record"},
 	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "diagnostics", "record"},
 	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "diagnostics", "record"},
+	// Provisioning needs no registration: the snippet alone installs from the
+	// lindm repository, skipping prerequisites the installed system already has.
+	"provision-cloud-init":  {"provision-browser", "record"},
+	"provision-autoinstall": {"provision-browser", "record"},
+	"provision-kickstart":   {"provision-browser", "record"},
+	"provision-autoyast":    {"provision-browser", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -387,7 +393,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.repo, "repo", ".", "checkout with the running development fixture")
 	flags.StringVar(&run.cache, "cache", ".cache/lab/images", "verified image cache")
 	flags.StringVar(&run.redhatToken, "redhat-token-file", "", "protected Red Hat offline-token file; required for entitled releases")
-	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs: PLATFORM-ARCH.json, each owned mode0600")
+	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs, each owned mode0600: PLATFORM-ARCH.json (enroll-from-console) and PLATFORM-ARCH.provision.json (provision-*, public-host origin with approver)")
 	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
@@ -432,8 +438,8 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		return err
 	}
 	for _, c := range cells {
-		if c.Spec.GetLane() == "enroll-from-console" && run.consoleBrowsers == "" {
-			return errors.New("enroll-from-console requires -console-browser-config-dir for actual clipboard capture and screenshots")
+		if inputs := laneInputs[c.Spec.GetLane()]; (slices.Contains(inputs, "console-browser") || slices.Contains(inputs, "provision-browser")) && run.consoleBrowsers == "" {
+			return fmt.Errorf("%s requires -console-browser-config-dir for actual clipboard capture and screenshots", c.Spec.GetLane())
 		}
 		if c.Release.Native().Lab.Entitlement && run.redhatToken == "" && slices.Contains(laneInputs[c.Spec.GetLane()], "redhat-token-file") {
 			return fmt.Errorf("%s %s needs -redhat-token-file", c.Release.Key, c.Spec.GetName())
@@ -797,8 +803,12 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			// "diagnostics" is its own input: a second -diagnostics flag here
 			// made the matrix create one directory and the lane write another.
 			args = append(args, "-work-dir", r.evidence)
-		case "console-browser":
-			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, c.Release.Key+"-"+c.Architecture+".json"))
+		case "console-browser", "provision-browser":
+			config := c.Release.Key + "-" + c.Architecture + ".json"
+			if input == "provision-browser" {
+				config = c.Release.Key + "-" + c.Architecture + ".provision.json"
+			}
+			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, config))
 			if r.consoleAdmin != "" {
 				args = append(args, "-admin-address", r.consoleAdmin)
 			}

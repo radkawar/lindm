@@ -56,7 +56,7 @@ func TestPersistentDirectoryCustodyAndLock(t *testing.T) {
 }
 
 func TestPersistentCredentialCounterAndPermissions(t *testing.T) {
-	account, err := newLocalAccount("test-owner", uuid.NewString())
+	account, err := newLocalAccount("localhost", "test-owner", uuid.NewString())
 	if err != nil {
 		t.Fatal(err)
 	}

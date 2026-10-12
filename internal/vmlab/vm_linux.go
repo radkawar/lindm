@@ -136,13 +136,29 @@ func hostCommand(ctx context.Context, dir, name string, files []*os.File, args .
 	return out.Bytes(), nil
 }
 
+// guestUserData renders the private NoCloud user-data of a fresh guest from
+// the lab's own access cloud-config.
+type guestUserData interface {
+	userData(lab map[string]any) ([]byte, error)
+}
+
+// labCloudConfig encodes the lab's cloud-config as JSON, a YAML subset, so
+// every value is data rather than YAML syntax.
+func labCloudConfig(config map[string]any) ([]byte, error) {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte("#cloud-config\n"), data...), nil
+}
+
 func newConfiguredGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions) (_ *guestVM, err error) {
 	return newSeededGuestVM(ctx, base, workDir, allowReboot, hardware, nil)
 }
 
-// newSeededGuestVM accepts only internally constructed, root-only enrollment
+// newSeededGuestVM accepts only internally constructed, root-only seed
 // material. The seed and overlay remain owned by the disposable VM lifecycle.
-func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions, enrollment *unattendedSeed) (_ *guestVM, err error) {
+func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions, seed guestUserData) (_ *guestVM, err error) {
 	h, err := defaultVMHardware(hardware)
 	if err != nil {
 		return nil, err
@@ -242,14 +258,18 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	if len(bootcmd) != 0 {
 		config["bootcmd"] = bootcmd
 	}
-	if enrollment != nil {
-		enrollment.apply(config)
+	var userData []byte
+	if seed != nil {
+		userData, err = seed.userData(config)
+	} else {
+		userData, err = labCloudConfig(config)
 	}
-	userData, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "user-data"), append([]byte("#cloud-config\n"), userData...), 0600); err != nil {
+	err = os.WriteFile(filepath.Join(dir, "user-data"), userData, 0600)
+	clear(userData)
+	if err != nil {
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "meta-data"), []byte("instance-id: "+filepath.Base(dir)+"\n"), 0600); err != nil {

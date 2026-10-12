@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Fedora Atomic Silverblue/Kinoite                                                  | NixOS                                                                             |
-| ----------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| inventory         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| lifecycle         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| dispatch          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| packages          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| accounts          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| sysctl            | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| definitions       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| password          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| firewall          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| encryption        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| wipe              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| report-loss       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| lock              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| recovery-sanitize | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| self-update       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| assistance        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| advisories        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| os-update         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
-| release-upgrade   | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified |
+| Capability        | Fedora Atomic Silverblue/Kinoite                                                  | NixOS                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| lifecycle         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: lindmd serves no NixOS installation artifact (no release-signed agent archive pinned through the console, no NixOS runtime for the agent's units, inventory or package backend); see the NixOS self-hosted design in atomic-nixos.md |
+| dispatch          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| packages          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| accounts          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| sysctl            | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| definitions       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| password          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| firewall          | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| encryption        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| wipe              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| report-loss       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| lock              | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| recovery-sanitize | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| self-update       | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| assistance        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| advisories        | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| os-update         | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
+| release-upgrade   | gated: design-only: the declarative/image-based management model is not specified | gated: design-only: the declarative/image-based management model is not specified                                                                                                                                                                        |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -98,6 +98,66 @@ Each installer/generation must record its actual kernel, CPU baseline and LSM mo
 no SELinux/AppArmor enforcement claim follows from the Fedora or NixOS name
 (`docs/verification.md:171-175`). Neither an LSM exception nor disabling enforcement
 is a substitute for native policy qualification.
+
+### Self-hosted NixOS installation design
+
+**Status: design-only, gated in the registry.** The `nixos` row's Lifecycle gate
+(`nixosGates` in `internal/platform/registry.go`) states that lindmd serves no NixOS
+installation artifact. The console lists the NixOS installer format only to show
+that gate; it emits no module. The previous "bring your own verified derivation"
+module was removed because it made the fleet depend on a package built and hosted
+outside the customer's lindmd.
+
+Requirement: a NixOS fleet installs lindm-agent only from its own lindmd, with the
+native repositories' trust model — release-pipeline-signed artifacts, lindmd
+verification at startup, pins delivered through the authenticated console, device
+verification before activation. No flake registry, GitHub, `cache.nixos.org` copy
+of lindm content or other host is involved.
+
+Why not a Nix binary cache first: substituters authenticate `.narinfo` files with
+Nix Ed25519 signatures (`trusted-public-keys`), a second signing system outside
+the OpenPGP package signer the release model custodies. An input-addressed store
+path also depends on the client's nixpkgs evaluation, so a cache built once by the
+release pipeline is hit only when the fleet pins the pipeline's nixpkgs revision.
+A cache therefore needs a new offline-custodied key class, lindmd verification of
+narinfo signatures, and a fleet-wide nixpkgs pin: none of these exists today.
+
+Design — fixed-output release archive pinned through the console:
+
+1. **Release pipeline.** A new `lab packages nix` emits, per architecture, a
+   deterministic `lindm-agent-VERSION-ARCH.tar` (sorted entries, mtime 0, root
+   owner) containing exactly the payload of the same build as the DEB/RPM: the
+   agent binary, its systemd units, `tmpfiles.d` and `sysusers.d` files. The existing
+   package signer adds a detached OpenPGP signature for each archive and for an
+   index listing version, architecture, file name and SHA-256.
+2. **lindmd.** `releaseRepository.directory/repo/nix` is served read-only like
+   `repo/apt`, `repo/rpm` and `repo/arch`. Startup verifies every signature against
+   a configured `nativeRepositories.nixSigningKeyFingerprint` and captures the
+   bounded allowlist; readiness gates on it. `GetEnrollmentInstructions` adds the
+   archive URL and SRI hash (`sha256-…`) per architecture.
+3. **Console artifact.** A secret-free module uses
+   `pkgs.fetchurl { url = …; hash = "sha256-…"; }`: a fixed-output derivation whose
+   content hash is the console-delivered pin, the same model as the execution-root
+   SHA-256. A private HTTPS CA is added through `security.pki.certificateFiles`
+   after its pinned fingerprint is checked. A `stdenvNoCC` derivation unpacks the
+   archive and rewrites unit paths (`/usr/libexec/lindm` → `$out/libexec/lindm`);
+   the module sets `systemd.packages`, `systemd.tmpfiles.packages`, the `lindm`
+   user and the non-secret `/etc/lindm` configuration, and fetches the execution
+   root and bootstrap bundle with their console pins. The provisioning token keeps
+   the target-local `systemd-creds encrypt` and `LoadCredentialEncrypted` path and
+   never enters the store. Offline sites need only their own nixpkgs mirror for
+   `stdenvNoCC`; no lindm closure comes from elsewhere.
+4. **Updates.** An agent update is a new owner-approved generation from a new
+   pinned module, not the agent's RPM/DEB self-update provider, which stays gated.
+
+The gate stays until all of these exist: owner approval of the NixOS management
+model (every NixOS capability is design-only); an agent runtime for NixOS (units
+hard-code `/usr/libexec/lindm/lindm-agent` and `/usr/bin/systemd-tmpfiles`, the
+package lifecycle scriptlet assumes dpkg/rpm hooks, and inventory, packages and
+OS update have no Nix generation backend — enrolling such an agent would admit a
+device whose every capability is gated); the `lab packages nix` output with lindmd
+verification and instruction fields; and a maintained `provision-nixos` lab lane on
+NixOS 26.05 that feeds this console module into a real installation.
 
 ## Agent services and sandbox
 

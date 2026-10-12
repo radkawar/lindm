@@ -19,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
-import { downloadEnrollmentFile } from "./download";
 import { enrollmentInstructionsQueryOptions } from "./queries";
 import {
   enrollmentInstallScript,
@@ -102,35 +101,17 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
     }
   }
 
-  function downloadToken() {
-    if (!active || !secret) return;
-    try {
-      downloadEnrollmentFile("provisioning-token", `${secret}\n`);
-      setCopyFailed(false);
-      setCopyStatus("Token file downloaded. Delete your copy once it's on the device.");
-    } catch {
-      setCopyFailed(true);
-      setCopyStatus("Couldn't download the token file. Copy the token instead.");
-    }
-  }
-
   if (!active) return null;
   const provisioning = credential.kind === "provisioning";
   const title = provisioning ? "Provisioning token" : "One-time enrollment code";
   const unavailable = credential.deliveryUnknown || !secret;
-  const platforms = instructions.data?.platforms ?? [];
+  const allPlatforms = instructions.data?.platforms ?? [];
+  // The registry decides which releases support an installer format.
+  const platforms = provisioning
+    ? allPlatforms.filter((item) => item.provisioningFormats.includes(format))
+    : allPlatforms;
   const platform = platforms.find((item) => item.id === platformId) ?? platforms[0];
-  const formatFamily = provisioning
-    ? format === "kickstart"
-      ? "dnf"
-      : format === "autoinstall"
-        ? "apt"
-        : format === "autoyast"
-          ? "zypper"
-          : null
-    : null;
-  const formatMismatch = !!formatFamily && platform?.packageFamily !== formatFamily;
-  const installScript = formatMismatch ? "" : enrollmentInstallScript(instructions.data, platform);
+  const installScript = enrollmentInstallScript(instructions.data, platform);
   const readiness = !instructions.data?.readiness?.ready
     ? instructions.data?.readiness
     : platform?.readiness;
@@ -140,6 +121,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
         ? provisioningSnippet(format, secret, instructions.data, installScript)
         : grantSnippet(secret, instructions.data, installScript)
       : "";
+  // Kickstart and AutoYaST install inside the installer; the others on first boot.
+  const installsInInstaller = provisioning && (format === "kickstart" || format === "autoyast");
 
   return (
     <Dialog
@@ -199,7 +182,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 />
               </div>
             ) : null}
-            {(!provisioning || format !== "nixos") && platforms.length ? (
+            {platforms.length ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="enrollment-platform">Operating system</Label>
                 <SelectField
@@ -228,16 +211,16 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 ? "Loading install command…"
                 : instructions.isError
                   ? "Couldn't load install instructions. Try again before copying."
-                  : provisioning && format === "nixos"
-                    ? "Use your verified NixOS derivation and protected, target-bound token."
-                    : installScript
-                      ? "Installs the signed agent from this server, then enrolls this device."
-                      : formatMismatch
-                        ? "Choose an operating system that matches this installer format."
-                        : readiness?.remedy ||
-                          "Ask your server administrator to configure releaseRepository and publish signed packages and deployment trust."}
+                  : snippet
+                    ? provisioning
+                      ? "Installs the signed agent from this server and enrolls this device on its first boot."
+                      : "Installs the signed agent from this server, then enrolls this device."
+                    : !platform
+                      ? "No supported operating system uses this installer format."
+                      : readiness?.remedy ||
+                        "Ask your server administrator to configure releaseRepository and publish signed packages and deployment trust."}
             </p>
-            {!installScript && !(provisioning && format === "nixos") && instructions.isSuccess ? (
+            {!snippet && instructions.isSuccess ? (
               <StatusBadge status="warning" className="w-fit">
                 Install command unavailable
               </StatusBadge>
@@ -268,11 +251,6 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
               >
                 Copy {provisioning ? `${format} snippet` : "install command"}
               </Button>
-              {provisioning && format === "nixos" ? (
-                <Button variant="outline" onClick={downloadToken}>
-                  Download token file
-                </Button>
-              ) : null}
             </div>
             {copyStatus ? (
               <p role={copyFailed ? "alert" : "status"} className="text-sm text-muted-foreground">
@@ -287,7 +265,9 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>Checks the selected operating system and available package architecture.</li>
               <li>
-                Installs package tools from the device's existing distribution sources.
+                {installsInInstaller
+                  ? "Inside the installer, before the first boot: installs package tools from the device's distribution sources."
+                  : "Installs package tools from the device's existing distribution sources."}
                 {instructions.data?.tlsCaPem
                   ? " Verifies the supplied private HTTPS CA fingerprint, then adds it to system trust."
                   : " Uses the device's system HTTPS trust."}
@@ -366,8 +346,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 </p>
                 {provisioning ? (
                   <p>
-                    These snippets only add lindm to your installer. For NixOS, follow the comments
-                    in the module.
+                    Merge the snippet into your complete installer configuration; it doesn't replace
+                    it. Delete installer and seed copies after enrollment.
                   </p>
                 ) : (
                   <p>When enrollment finishes, delete /run/lindm-enrollment/grant on the device.</p>

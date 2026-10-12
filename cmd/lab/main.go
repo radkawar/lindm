@@ -128,6 +128,11 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "enroll-from-console" {
 		return runVMEnrollFromConsole(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" {
+		if _, ok := provisionLaneFormat(args[1]); ok {
+			return runVMProvision(ctx, args[1], args[2:], stdout, stderr)
+		}
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "lifecycle" {
 		return runVMLifecycle(ctx, args[2:], stdout, stderr)
 	}

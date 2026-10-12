@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
@@ -84,7 +85,7 @@ func (f *AuthorityFixture) bootstrapLocalOwner(ctx context.Context) (string, err
 	if !ok || !idOK || len(secret) == 0 || err != nil || accountID == uuid.Nil {
 		return "", errors.New("invalid local bootstrap enrollment")
 	}
-	owner, err := newLocalAccount("owner", accountID.String())
+	owner, err := newLocalAccount(f.relyingPartyID(), "owner", accountID.String())
 	if err != nil {
 		return "", err
 	}
@@ -92,8 +93,32 @@ func (f *AuthorityFixture) bootstrapLocalOwner(ctx context.Context) (string, err
 	return string(secret), nil
 }
 
-func newLocalAccount(username, id string) (*localAccount, error) {
-	authenticator, err := webauthnlab.New("localhost")
+// relyingPartyID is the WebAuthn RP ID lindmd derives from its public_url host.
+func (f *AuthorityFixture) relyingPartyID() string {
+	if f.publicHost != "" {
+		return f.publicHost
+	}
+	return "localhost"
+}
+
+// adminDial reaches the admin listener under the console origin's name: a lab
+// public host need not resolve on the controller, and TLS still verifies it.
+func (f *AuthorityFixture) adminDial(adminAddress string) func(context.Context, string, string) (net.Conn, error) {
+	dial := ownerDialContext(adminAddress)
+	if f.publicHost == "" {
+		return dial
+	}
+	origin := strings.TrimPrefix(f.ConsoleOrigin, "https://")
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		if address == origin {
+			address = adminAddress
+		}
+		return dial(ctx, network, address)
+	}
+}
+
+func newLocalAccount(rpID, username, id string) (*localAccount, error) {
+	authenticator, err := webauthnlab.New(rpID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +144,7 @@ func (f *AuthorityFixture) newLocalSession(account *localAccount) (*OwnerSession
 	if err != nil {
 		return nil, err
 	}
-	dial := ownerDialContext(f.AdminAddress)
+	dial := f.adminDial(f.AdminAddress)
 	if f.connected != nil {
 		dial = f.connectedDialContext()
 	}
@@ -252,7 +277,7 @@ func (f *AuthorityFixture) enrollLocalApprover(ctx context.Context, session *Own
 	if err != nil || id == uuid.Nil || strings.TrimSpace(enrollment.GetSecret()) == "" {
 		return errors.New("invalid fixture approver enrollment")
 	}
-	f.local.approver, err = newLocalAccount(approverName, id.String())
+	f.local.approver, err = newLocalAccount(f.relyingPartyID(), approverName, id.String())
 	if err != nil {
 		return err
 	}

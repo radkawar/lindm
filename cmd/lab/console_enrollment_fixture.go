@@ -22,15 +22,21 @@ func runConsoleEnrollment(ctx context.Context, args []string, stdout, stderr io.
 	binary := flags.String("lindmd", "", "release-stamped current server with embedded production console")
 	architectures := flags.String("architectures", "arm64", "comma-separated package architectures: arm64,amd64")
 	publication := flags.String("publication-record", "", "optional new private JSON recording actual package digests and signed metadata publication")
+	publicHost := flags.String("public-host", "", "optional lowercase multi-label DNS name (e.g. lindm-console.test) for both origins instead of localhost; guests and browsers map it to the fixture listeners")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 || *binary == "" || *source == "" {
 		return errors.New("console-enrollment requires -lindmd and -code; no positional arguments")
 	}
+	if *publicHost != "" {
+		if err := devlab.ValidatePublicHost(*publicHost); err != nil {
+			return err
+		}
+	}
 	setup, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
-	fixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(setup, *repository, *source, *binary, strings.Split(*architectures, ","))
+	fixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(setup, *repository, *source, *binary, strings.Split(*architectures, ","), *publicHost)
 	if err != nil {
 		return err
 	}
@@ -45,8 +51,13 @@ func runConsoleEnrollment(ctx context.Context, args []string, stdout, stderr io.
 		return err
 	}
 	defer func() { enrollment.Secret = "" }()
-	_, err = fmt.Fprintf(stdout, "Protected disposable enrollment console; output contains a one-time secret.\nEnrollment URL: %s/enroll\nUsername: console-owner\nEnrollment secret: %s\nExpires: %s\nAdmin address: %s\nDevice address: %s\nNative repositories: %s/repo/apt, %s/repo/rpm and %s/repo/arch\nNo devices are pre-enrolled. Copy the production install command after the native lane reports a fresh guest ready.\nCtrl-C removes this fixture's owned server, database, packages and signing custody.\n", fixture.ConsoleOrigin, enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), fixture.AdminAddress, fixture.DeviceAddress, fixture.ConsoleOrigin, fixture.ConsoleOrigin, fixture.ConsoleOrigin)
-	enrollment.Secret = ""
+	approver, err := fixture.CreateConsoleApproverEnrollment(setup)
+	if err != nil {
+		return err
+	}
+	defer func() { approver.Secret = "" }()
+	_, err = fmt.Fprintf(stdout, "Protected disposable enrollment console; output contains one-time secrets.\nEnrollment URL: %s/enroll\nUsername: console-owner\nEnrollment secret: %s\nExpires: %s\nApprover username: console-approver\nApprover enrollment secret: %s\nApprover expires: %s\nAdmin address: %s\nDevice address: %s\nNative repositories: %s/repo/apt, %s/repo/rpm and %s/repo/arch\nNo devices are pre-enrolled. Copy the production install command after the native lane reports a fresh guest ready.\nCtrl-C removes this fixture's owned server, database, packages and signing custody.\n", fixture.ConsoleOrigin, enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), approver.GetSecret(), approver.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), fixture.AdminAddress, fixture.DeviceAddress, fixture.ConsoleOrigin, fixture.ConsoleOrigin, fixture.ConsoleOrigin)
+	enrollment.Secret, approver.Secret = "", ""
 	if err != nil {
 		return err
 	}

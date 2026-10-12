@@ -38,6 +38,11 @@ func (s *unattendedSeed) apply(config map[string]any) {
 	config["runcmd"] = append(commands, []string{"sh", "-c", unattendedBootCommand})
 }
 
+func (s *unattendedSeed) userData(config map[string]any) ([]byte, error) {
+	s.apply(config)
+	return labCloudConfig(config)
+}
+
 const unattendedBootCommand = `set -eu
 umask 077
 cd /run/lindm-enrollment-lab

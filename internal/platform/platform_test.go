@@ -397,3 +397,25 @@ func TestRHELDesktopPackagesFollowArchitectureMedia(t *testing.T) {
 		}
 	}
 }
+
+// A provision lane qualifies a release's own vendor format; the console must
+// never offer a format the release's installation media lack.
+func TestProvisionLanesMatchOfferedFormats(t *testing.T) {
+	for _, r := range Releases() {
+		for _, p := range r.Provisioning {
+			if _, ok := ProvisionLane(p); !ok && p != ProvisionNixOS {
+				t.Fatalf("%s offers unknown provisioning format %q", r.Key, p)
+			}
+		}
+		for _, p := range []Provisioning{ProvisionCloudInit, ProvisionAutoinstall, ProvisionKickstart, ProvisionAutoYaST} {
+			lane, _ := ProvisionLane(p)
+			if slices.Contains(r.Lab.Lanes, lane) && !slices.Contains(r.Provisioning, p) {
+				t.Fatalf("%s has a %s lane but does not offer %s", r.Key, lane, p)
+			}
+		}
+	}
+	nixos, ok := Lookup("nixos")
+	if !ok || nixos.Supported(Lifecycle) || !strings.Contains(nixos.GateReason(Lifecycle), "lindmd serves no NixOS installation artifact") {
+		t.Fatal("NixOS installation must stay gated with its self-hosting reason")
+	}
+}

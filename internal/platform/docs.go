@@ -166,14 +166,19 @@ func supportTable() (string, error) {
 			if feedRow != r {
 				advisory += " (verified " + feedRow.Advisory.ArchiveOrigin + "-archive packages only)"
 			}
+			formats := make([]string, 0, len(r.Provisioning))
+			for _, p := range r.Provisioning {
+				formats = append(formats, string(p))
+			}
 			rows = append(rows, []string{
 				tier.String(), gendoc.Escape(r.Name), gendoc.Escape(match(r)), dash(strings.Join(r.Architectures, ", ")),
 				dash(packages), dash(systemd), dash(n.Firewall), dash(r.FDE), dash(desktop(r.Desktop)), dash(advisory),
+				dash(strings.Join(formats, ", ")),
 				fmt.Sprintf("[%s](%s)", strings.TrimSuffix(r.Page, ".md"), r.Page),
 			})
 		}
 	}
-	return gendoc.Table([]string{"Tier", "Release", "os-release match", "Architectures", "Packages", "systemd", "Firewall (native)", "FDE", "Desktop", "Advisory feed", "Guide"}, rows)
+	return gendoc.Table([]string{"Tier", "Release", "os-release match", "Architectures", "Packages", "systemd", "Firewall (native)", "FDE", "Desktop", "Advisory feed", "Provisioning formats", "Guide"}, rows)
 }
 
 func desktop(d Desktop) string {

@@ -23,6 +23,15 @@ function locate(query) {
     root = [...document.querySelectorAll('[role="dialog"]')].find(visible);
     if (!root) return null;
   }
+  if (query.within) {
+    // Scope to the one visible card (article) whose text names an exact ID.
+    const scopes = [...root.querySelectorAll("article")].filter(
+      (node) => visible(node) && node.textContent.includes(query.within),
+    );
+    if (scopes.length > 1) throw new Error("ambiguous_ui_scope");
+    root = scopes[0];
+    if (!root) return null;
+  }
   let nodes;
   if (query.label) {
     const label = [...root.querySelectorAll("label")].find(
@@ -102,10 +111,12 @@ export class UI {
 
 export class ChromiumDriver {
   async open(config) {
+    const args = [...(config.browserArgs ?? [])];
+    if (config.hostResolverRules) args.push(`--host-resolver-rules=${config.hostResolverRules}`);
     this.browser = await chromium.launch({
       headless: true,
       timeout: 30_000,
-      args: config.browserArgs ?? [],
+      args,
     });
     this.context = await this.browser.newContext({
       ignoreHTTPSErrors: config.ignoreHTTPSErrors === true,
@@ -120,8 +131,18 @@ export class ChromiumDriver {
     };
   }
   async authenticator(credentials = []) {
-    this.cdp = await this.context.newCDPSession(this.page);
-    await this.cdp.send("WebAuthn.enable");
+    if (!this.cdp) {
+      this.cdp = await this.context.newCDPSession(this.page);
+      await this.cdp.send("WebAuthn.enable");
+    }
+    // Switching humans replaces the whole authenticator: one account's
+    // passkey state is never visible to another's sign-in ceremony.
+    if (this.authenticatorId) {
+      await this.cdp.send("WebAuthn.removeVirtualAuthenticator", {
+        authenticatorId: this.authenticatorId,
+      });
+      this.authenticatorId = undefined;
+    }
     const result = await this.cdp.send("WebAuthn.addVirtualAuthenticator", {
       options: {
         protocol: "ctap2",

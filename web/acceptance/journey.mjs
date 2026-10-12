@@ -27,10 +27,7 @@ export async function signOut(ui) {
   await ui.wait({ label: "Username" });
 }
 
-async function captureCredential(ui, kind, config, captureScreens) {
-  const provisioning = kind === "token";
-  const title = provisioning ? "Provisioning token" : "One-time enrollment code";
-  const secret = await ui.nonemptyValue({ label: title, dialog: true });
+async function credentialDetails(ui) {
   await ui.click({ css: "summary", text: "Credential details and safe delivery", dialog: true });
   const details = await ui.driver.observe(() => {
     const dialog = [...document.querySelectorAll('[role="dialog"]')].find(
@@ -50,6 +47,14 @@ async function captureCredential(ui, kind, config, captureScreens) {
   });
   if (!details.id) throw new Error("credential_id_missing");
   await ui.click({ css: "summary", text: "Credential details and safe delivery", dialog: true });
+  return details;
+}
+
+async function captureCredential(ui, kind, config, captureScreens) {
+  const provisioning = kind === "token";
+  const title = provisioning ? "Provisioning token" : "One-time enrollment code";
+  const secret = await ui.nonemptyValue({ label: title, dialog: true });
+  const details = await credentialDetails(ui);
   const commands = {};
   const commandSHA256 = {};
   const commandSources = {};
@@ -89,8 +94,9 @@ async function captureCredential(ui, kind, config, captureScreens) {
       ["autoinstall", "Ubuntu autoinstall", "apt"],
     ]) {
       if (!choices[family]) continue;
-      await ui.select("Operating system", choices[family], true);
+      // Format first: the operating systems offered are those supporting it.
       await ui.select("Installer format", label, true);
+      await ui.select("Operating system", choices[family], true);
       commands[format] = await ui.nonemptyValue({
         label: `${format} provisioning snippet`,
         dialog: true,
@@ -129,6 +135,174 @@ export async function createToken(ui, config, captureScreens) {
   const token = await captureCredential(ui, "token", config, captureScreens);
   await ui.click({ role: "button", text: "Done, forget secret", dialog: true });
   return token;
+}
+
+export const provisioningFormatLabels = {
+  "cloud-init": "cloud-init",
+  kickstart: "Kickstart",
+  autoinstall: "Ubuntu autoinstall",
+  autoyast: "AutoYaST",
+};
+
+// Creates an approval-required provisioning token and captures one installer
+// snippet through the real Copy button. Only the clipboard bytes, after an
+// exact match with the visible snippet, reach the private snippet file.
+export async function createProvisioningSnippet(ui, config, captureScreens) {
+  const format = config.provisionFormat;
+  await ui.driver.goto(`${config.origin}/enrollment`);
+  await ui.click({ role: "button", text: "Create provisioning token" });
+  await ui.fill(
+    { label: "Purpose / audit reason", dialog: true },
+    `Lab provision-${format} disposable installation`,
+  );
+  await ui.select("Expires after", "4 hours", true);
+  await ui.fill({ label: "Maximum uses", dialog: true }, "1");
+  // Another human must approve each device: keep the default, never untick it.
+  const approval = await ui.wait({ css: 'input[name="approval"]', dialog: true });
+  if ((await ui.driver.property(approval, "checked")) !== true)
+    throw new Error("provisioning_approval_not_required");
+  await ui.click({ role: "button", text: "Create provisioning token", dialog: true });
+  await ui.wait({ label: "Provisioning token", dialog: true });
+  const details = await credentialDetails(ui);
+  // Format first: the operating systems offered are those supporting it.
+  await ui.select("Installer format", provisioningFormatLabels[format], true);
+  await ui.select("Operating system", config.provisionPlatform, true);
+  const snippet = await ui.nonemptyValue({ label: `${format} provisioning snippet`, dialog: true });
+  await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
+  await ui.click({ role: "button", text: `Copy ${format} snippet`, dialog: true });
+  await ui.wait({ role: "status", contains: `${format} snippet copied.`, dialog: true });
+  const copied = await ui.driver.browserTask(() => navigator.clipboard.readText());
+  await ui.driver.browserTask(() => navigator.clipboard.writeText(""));
+  if (!copied || copied !== snippet) throw new Error("clipboard_snippet_mismatch");
+  await writePrivate(config.provisionSnippetPath, copied);
+  const snippetSHA256 = createHash("sha256").update(copied, "utf8").digest("hex");
+  if (captureScreens) await captureScreens(`provision-${format}`);
+  await ui.click({ role: "button", text: "Done, forget secret", dialog: true });
+  return {
+    tokenId: details.id,
+    format,
+    platform: config.provisionPlatform,
+    approvalRequired: true,
+    snippetSHA256,
+    snippetSource: "browser-clipboard",
+  };
+}
+
+function readCards(id) {
+  // Observation only: fields of each visible card naming this exact ID.
+  return [...document.querySelectorAll("article")]
+    .filter((node) => node.getClientRects().length > 0 && node.textContent.includes(id))
+    .map((node) => ({
+      title: node.querySelector("h2")?.textContent.trim() ?? "",
+      state: node.querySelector('[data-slot="badge"]')?.textContent.trim() ?? "",
+      done: [...node.querySelectorAll('[role="status"]')].some(
+        (status) => status.textContent.trim() === "Done.",
+      ),
+      failed: !!node.querySelector('[role="alert"]'),
+      payload: node.querySelector("pre")?.textContent ?? "",
+      fields: Object.fromEntries(
+        [...node.querySelectorAll("dt")].map((term) => [
+          term.textContent.trim().replace(/:\s*$/, ""),
+          term.nextElementSibling?.textContent.trim() ?? "",
+        ]),
+      ),
+    }));
+}
+
+// The exact device waiting under the guest's installation ID, from the
+// enrollment page's visible pending list.
+export async function findPendingEnrollment(ui, config) {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    await ui.driver.goto(`${config.origin}/enrollment`);
+    await ui.click({ css: "summary", text: "Devices waiting for approval" });
+    const settle = Math.min(deadline, Date.now() + 10_000);
+    while (Date.now() < settle) {
+      const cards = (await ui.driver.observe(readCards, config.installationId)).filter(
+        (card) => card.fields["Installation ID"] === config.installationId,
+      );
+      if (cards.length > 1) throw new Error("pending_enrollment_ambiguous");
+      if (cards.length === 1) {
+        const fields = cards[0].fields;
+        if (!fields["Device ID"] || !fields["Approval ID"] || !fields["Token ID"])
+          throw new Error("pending_enrollment_not_awaiting_approval");
+        // Show the exact identifiers in this step's screenshot.
+        await ui.click({ css: "summary", text: "Details", within: config.installationId });
+        return {
+          installationId: config.installationId,
+          deviceId: fields["Device ID"],
+          approvalId: fields["Approval ID"],
+          tokenId: fields["Token ID"],
+        };
+      }
+      await delay(250);
+    }
+  }
+  throw new Error("pending_enrollment_not_found");
+}
+
+async function waitApproval(ui, approvalId, accept) {
+  const deadline = Date.now() + 60_000;
+  let nextRefresh = Date.now() + 3_000;
+  while (Date.now() < deadline) {
+    const cards = (await ui.driver.observe(readCards, approvalId)).filter(
+      (card) => card.fields["Approval ID"] === approvalId,
+    );
+    if (cards.length > 1) throw new Error("approval_card_ambiguous");
+    if (cards.length === 1) {
+      if (cards[0].failed) throw new Error("approval_action_failed");
+      if (accept(cards[0])) return cards[0];
+    }
+    if (Date.now() >= nextRefresh) {
+      // Read-only list refetch; never a repeated decision or execution.
+      await ui.click({ role: "button", text: "Refresh approvals" });
+      nextRefresh = Date.now() + 3_000;
+    }
+    await delay(250);
+  }
+  throw new Error("approval_state_timeout");
+}
+
+// The approver, a different human from the requester, approves exactly the
+// pending device's enrollment approval in the inbox.
+export async function approvePendingEnrollment(ui, config, pending) {
+  await ui.driver.goto(`${config.origin}/approvals`);
+  await ui.wait({ role: "heading", text: "Approval inbox" });
+  const card = await waitApproval(ui, pending.approvalId, (item) => item.state === "Pending");
+  if (!card.title.startsWith("Approve device enrollment"))
+    throw new Error("approval_not_device_enrollment");
+  // The inbox shows a Device ID only when the approval row carries one; the
+  // immutable payload always names the pending device.
+  const device = card.fields["Device ID"];
+  if (
+    card.fields["Requester"] !== config.username ||
+    (device ? device !== pending.deviceId : !card.payload.includes(`"${pending.deviceId}"`))
+  )
+    throw new Error("approval_request_mismatch");
+  await ui.fill(
+    { label: "Approval decision reason", within: pending.approvalId },
+    "Lab provisioning: approve this exact pending installation",
+  );
+  await ui.click({ role: "button", text: "Approve", within: pending.approvalId });
+  const decided = await waitApproval(ui, pending.approvalId, (item) => item.state === "Approved");
+  if (decided.fields["Decided by"] !== config.approver.username)
+    throw new Error("approval_decider_mismatch");
+  return { approved: true, decidedBy: decided.fields["Decided by"] };
+}
+
+// The requester (token creator) runs the approved enrollment.
+export async function executeApprovedEnrollment(ui, config, pending) {
+  await ui.driver.goto(`${config.origin}/approvals`);
+  await ui.wait({ role: "heading", text: "Approval inbox" });
+  const card = await waitApproval(ui, pending.approvalId, (item) => item.state === "Approved");
+  if (
+    card.fields["Requester"] !== config.username ||
+    card.fields["Decided by"] !== config.approver.username
+  )
+    throw new Error("approval_request_mismatch");
+  await ui.click({ role: "button", text: "Run now", within: pending.approvalId });
+  await waitApproval(ui, pending.approvalId, (item) => item.done || item.state === "Completed");
+  return { requesterExecuted: true };
 }
 
 export async function confirmEnrolledDevice(ui, config) {

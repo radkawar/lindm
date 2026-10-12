@@ -81,6 +81,9 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 			VariantIds: slices.Clone(release.Variants),
 			Readiness:  proto.CloneOf(response.Readiness),
 		}
+		for _, format := range release.Provisioning {
+			choice.ProvisioningFormats = append(choice.ProvisioningFormats, string(format))
+		}
 		switch release.Version.Rule {
 		case platform.VersionExact:
 			choice.VersionRule, choice.VersionIds = "exact", []string{release.Version.Value}

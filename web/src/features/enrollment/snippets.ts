@@ -1,17 +1,21 @@
 import type { GetEnrollmentInstructionsResponse } from "../../../gen/lindm/admin/v1/enrollment_instructions_pb";
 
+type Platform = GetEnrollmentInstructionsResponse["platforms"][number];
+
+// Values are the registry's provisioning format names (EnrollmentPlatform
+// provisioning_formats); the server decides which releases offer each one.
 export const provisioningFormats = [
   { value: "cloud-init", label: "cloud-init" },
   { value: "kickstart", label: "Kickstart" },
   { value: "autoinstall", label: "Ubuntu autoinstall" },
   { value: "autoyast", label: "AutoYaST" },
-  { value: "nixos", label: "NixOS module" },
+  { value: "nixos", label: "NixOS" },
 ] as const;
 
 export type ProvisioningFormat = (typeof provisioningFormats)[number]["value"];
 
-const binary = "/usr/libexec/lindm/lindm-agent";
 const tokenFile = "/etc/lindm/provisioning-token";
+const unitFile = "/etc/systemd/system/lindm-provision.service";
 const executorReady = `timeout 30 sh -c 'until test -S /run/lindm/executor.sock && /usr/libexec/lindm/lindm-agent status >/dev/null 2>&1; do sleep 1; done' || {
   echo 'Executor did not become ready within 30 seconds. Check lindm-executor.service before retrying enrollment.' >&2
   exit 1
@@ -23,17 +27,12 @@ const prerequisites = `# SENSITIVE BOOT INPUT: contains a reusable, bounded prov
 # Enrollment waits at most 3600 seconds for independent approval, then fails visibly.
 `;
 
-function bootScript(bootstrapCommand: string, resumeCommand: string): string {
-  return `#!/bin/sh
-set -eu
-umask 077
-${bootstrapCommand}
-${resumeCommand}
-`;
-}
-
-const unit = `[Unit]
-Description=Lindm first-boot provisioning and bounded approval resume
+// The first-boot unit runs the installed agent's exact server templates. It
+// executes no file from /etc: package-installed binaries keep their native
+// labels, and the unit needs no separately written script.
+function provisionUnit(instructions: GetEnrollmentInstructionsResponse): string {
+  return `[Unit]
+Description=Lindm first-boot enrollment with bounded approval wait
 After=network-online.target lindm-executor.service
 Wants=network-online.target
 Requires=lindm-executor.service
@@ -42,17 +41,55 @@ ConditionPathExists=${tokenFile}
 [Service]
 Type=oneshot
 UMask=0077
-TimeoutStartSec=3660
-ExecStart=/etc/lindm/provision-at-boot
+TimeoutStartSec=3700
+ExecStartPre=/usr/bin/timeout 30 /bin/sh -c 'until test -S /run/lindm/executor.sock && /usr/libexec/lindm/lindm-agent status >/dev/null 2>&1; do sleep 1; done'
+ExecStart=${instructions.provisioningCommand}
+ExecStart=${instructions.resumeCommand}
 ExecStartPost=/usr/bin/rm -f ${tokenFile}
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target`;
+}
 
-function installerScript(secret: string, installScript: string, script: string): string {
-  // Base64 is not encryption; it only makes the quoted heredoc non-executable.
-  // The caller keeps this entire sensitive seed only in component memory.
+// cloud-config body shared by cloud-init and autoinstall user-data. It runs on
+// the installed system's first boot, where systemd and the network are up.
+// The enrollment unit starts without blocking: it waits up to an hour for
+// approval and must not hold cloud-init's final stage or login.
+function cloudConfig(
+  secret: string,
+  instructions: GetEnrollmentInstructionsResponse,
+  installScript: string,
+): string {
+  const start = `set -eu
+${installScript}
+systemctl daemon-reload
+systemctl enable --now lindm-executor.service lindm-agent.service
+systemctl enable lindm-provision.service
+systemctl start --no-block lindm-provision.service`;
+  return `write_files:
+  - path: ${tokenFile}
+    owner: root:root
+    permissions: '0600'
+    content: ${JSON.stringify(secret)}
+  - path: ${unitFile}
+    owner: root:root
+    permissions: '0644'
+    content: |
+${provisionUnit(instructions).replaceAll(/^/gm, "      ")}
+runcmd:
+  - [sh, -c, ${JSON.stringify(start)}]`;
+}
+
+// Kickstart %post and AutoYaST chroot scripts run inside the installed target
+// before its first boot: the installer's network is active, but the target's
+// systemd is not running, so units are only enabled. Enrollment happens on the
+// first boot. Base64 is not encryption; it only keeps the token out of shell syntax.
+function installerScript(
+  secret: string,
+  instructions: GetEnrollmentInstructionsResponse,
+  installScript: string,
+): string {
   return `set -eu
 umask 077
 ${installScript}
@@ -61,87 +98,63 @@ base64 -d > ${tokenFile} <<'LINDM_TOKEN'
 ${btoa(secret)}
 LINDM_TOKEN
 chmod 0600 ${tokenFile}
-cat > /etc/lindm/provision-at-boot <<'LINDM_SCRIPT'
-${script}LINDM_SCRIPT
-chmod 0700 /etc/lindm/provision-at-boot
-cat > /etc/systemd/system/lindm-provision.service <<'LINDM_UNIT'
-${unit}
+cat > ${unitFile} <<'LINDM_UNIT'
+${provisionUnit(instructions)}
 LINDM_UNIT
+chmod 0644 ${unitFile}
+if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
+  restorecon -RF /etc/lindm ${unitFile}
+fi
 systemctl enable lindm-executor.service lindm-agent.service lindm-provision.service`;
 }
 
+// Returns "" unless every pin is available; NixOS is a registry gate, not a snippet.
 export function provisioningSnippet(
   format: ProvisioningFormat,
   secret: string,
   instructions: GetEnrollmentInstructionsResponse,
   installScript: string,
 ): string {
-  if (!installScript && format !== "nixos") return "";
-  const script = bootScript(
-    `${executorReady}\n${instructions.provisioningCommand}`,
-    instructions.resumeCommand,
-  );
+  if (!installScript) return "";
   switch (format) {
     case "cloud-init":
       return `#cloud-config
-${prerequisites}write_files:
-  - path: ${tokenFile}
-    owner: root:root
-    permissions: '0600'
-    content: ${JSON.stringify(secret)}
-  - path: /etc/lindm/provision-at-boot
-    owner: root:root
-    permissions: '0700'
-    content: |
-${script
-  .split("\n")
-  .map((line) => `      ${line}`)
-  .join("\n")}
-  - path: /etc/systemd/system/lindm-provision.service
-    owner: root:root
-    permissions: '0644'
-    content: |
-${unit
-  .split("\n")
-  .map((line) => `      ${line}`)
-  .join("\n")}
-runcmd:
-  - [sh, -c, ${JSON.stringify(
-    `set -eu\n${installScript}\nsystemctl daemon-reload\nsystemctl enable --now lindm-executor.service lindm-agent.service lindm-provision.service`,
-  )}]
+${prerequisites}${cloudConfig(secret, instructions, installScript)}
 `;
     case "kickstart":
-      return `${prerequisites}# Merge this post section into the complete trusted installer profile.
-%post --erroronfail
-${installerScript(secret, installScript, script)}
+      return `${prerequisites}# Merge this %post section into the complete trusted Kickstart profile.
+# It runs in the installed target, so the installer network must be active
+# (for example network --activate) and reach this server.
+%post --erroronfail --interpreter=/bin/sh
+${installerScript(secret, instructions, installScript)}
 %end
 `;
     case "autoinstall":
       return `#cloud-config
 ${prerequisites}# Merge these fields into the complete trusted autoinstall configuration.
+# The installed system's cloud-init applies user-data on its first boot.
 autoinstall:
   version: 1
   user-data:
-${provisioningSnippet("cloud-init", secret, instructions, installScript)
-  .split("\n")
-  .slice(1)
-  .map((line) => `    ${line}`)
-  .join("\n")}
+${cloudConfig(secret, instructions, installScript).replaceAll(/^/gm, "    ")}
 `;
     case "autoyast":
       return `<?xml version="1.0"?>
 <!-- SENSITIVE installer profile: reusable, bounded provisioning token.
      Protect seed transport and retained installer copies; never embed in a
-     golden image. Merge into your complete installer profile.
-     Installs from this server's signed repository with pinned deployment trust. -->
+     golden image. Merge the chroot script into your complete AutoYaST profile.
+     It runs in the installed target with the installer network, installs from
+     this server's signed repository with pinned deployment trust, and enables
+     enrollment for the first boot. -->
 <profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
   <scripts>
     <chroot-scripts config:type="list">
       <script>
+        <filename>lindm-enroll.sh</filename>
         <chrooted config:type="boolean">true</chrooted>
         <interpreter>shell</interpreter>
         <source><![CDATA[
-${installerScript(secret, installScript, script)}
+${installerScript(secret, instructions, installScript)}
 ]]></source>
       </script>
     </chroot-scripts>
@@ -149,55 +162,7 @@ ${installerScript(secret, installScript, script)}
 </profile>
 `;
     case "nixos":
-      // Never interpolate the secret into a Nix expression: the store is public.
-      return `# Import this module and set services.lindmEnrollment.package to your verified
-# lindm-agent derivation (libexec/lindm/lindm-agent). Install the executor module
-# and authenticated deployment config/trust separately. NO SECRET belongs in Nix.
-# Download the actual token file from this page, transfer securely to this target
-# as /run/lindm/provisioning-token owned by root:root with mode 0600,
-# then run ON THE TARGET as root:
-# install -d -m 0700 /etc/credstore.encrypted
-# systemd-creds encrypt --name=lindm.provisioning-token /run/lindm/provisioning-token /etc/credstore.encrypted/lindm.provisioning-token
-# chmod 0600 /etc/credstore.encrypted/lindm.provisioning-token
-# rm /run/lindm/provisioning-token
-# systemctl start lindm-provision.service
-# The encrypted credential is target-bound; never copy it into a golden image.
-{ config, lib, pkgs, ... }:
-let cfg = config.services.lindmEnrollment; in {
-  options.services.lindmEnrollment.package = lib.mkOption {
-    type = lib.types.package;
-    description = "Verified lindm-agent package containing libexec/lindm/lindm-agent";
-  };
-  config.systemd.services.lindm-provision = {
-    description = "Lindm provisioning with bounded approval resume";
-    wantedBy = [ "multi-user.target" ];
-    wants = [ "network-online.target" ];
-    after = [ "network-online.target" "lindm-executor.service" ];
-    requires = [ "lindm-executor.service" ];
-    unitConfig.ConditionPathExists = "/etc/credstore.encrypted/lindm.provisioning-token";
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-      UMask = "0077";
-      TimeoutStartSec = 3660;
-      RemainAfterExit = true;
-      LoadCredentialEncrypted = "lindm.provisioning-token:/etc/credstore.encrypted/lindm.provisioning-token";
-      ExecStartPost = "\${pkgs.coreutils}/bin/rm -f /etc/credstore.encrypted/lindm.provisioning-token";
-    };
-    script = ''
-${bootScript(
-  instructions.provisioningCommand
-    .replace(binary, "${cfg.package}/libexec/lindm/lindm-agent")
-    .replace(tokenFile, '"$CREDENTIALS_DIRECTORY/lindm.provisioning-token"'),
-  instructions.resumeCommand.replace(binary, "${cfg.package}/libexec/lindm/lindm-agent"),
-)
-  .split("\n")
-  .map((line) => `      ${line}`)
-  .join("\n")}
-    '';
-  };
-}
-`;
+      return "";
   }
 }
 
@@ -233,7 +198,7 @@ function shellQuote(value: string): string {
 
 export function enrollmentInstallScript(
   instructions: GetEnrollmentInstructionsResponse | undefined,
-  platform: GetEnrollmentInstructionsResponse["platforms"][number] | undefined,
+  platform: Platform | undefined,
 ): string {
   if (!instructions?.readiness?.ready || !platform?.readiness?.ready) return "";
   const family = platform.packageFamily;
@@ -358,6 +323,35 @@ pacman --config "$work/pacman.conf" --sync --refresh --noconfirm
 # refreshing them or hiding them behind the server-only refresh configuration.
 pacman --sync --noconfirm ${shellQuote(`${name}/lindm-agent`)}${trust}`;
   }
+  if (family === "zypper") {
+    const config = `[lindm]
+name=Lindm
+baseurl=${repository.baseUrl}
+type=rpm-md
+enabled=1
+autorefresh=1
+gpgcheck=1
+repo_gpgcheck=1
+pkg_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/lindm`;
+    // An installer chroot may still list install media or unreachable mirrors;
+    // only this server's repository is refreshed and searched for the agent.
+    return `${header}printf '%s\\n' '[main]' 'gpgcheck = true' 'repo_gpgcheck = true' 'pkg_gpgcheck = true' > "$work/zypp.conf"
+export ZYPP_CONF="$work/zypp.conf"
+if ! rpm -q ca-certificates curl gpg2 openssl >/dev/null 2>&1; then
+  zypper --non-interactive install --no-recommends ca-certificates curl gpg2 openssl
+fi
+${privateCA}${verifyKey}
+install -d -m 0755 /etc/pki/rpm-gpg /etc/zypp/repos.d
+install -m 0644 "$work/key.asc" /etc/pki/rpm-gpg/lindm
+rpm --import /etc/pki/rpm-gpg/lindm
+printf '%s\\n' ${shellQuote(config)} > /etc/zypp/repos.d/lindm.repo
+chmod 0644 /etc/zypp/repos.d/lindm.repo
+install -d -m 0700 "$work/repos.d"
+install -m 0600 /etc/zypp/repos.d/lindm.repo "$work/repos.d/lindm.repo"
+zypper --non-interactive --reposd-dir "$work/repos.d" refresh lindm
+zypper --non-interactive --reposd-dir "$work/repos.d" install --no-recommends --from lindm lindm-agent${trust}`;
+  }
   const config = `[lindm]
 name=Lindm
 baseurl=${repository.baseUrl}
@@ -367,20 +361,11 @@ localpkg_gpgcheck=1
 repo_gpgcheck=1
 sslverify=1
 gpgkey=file:///etc/pki/rpm-gpg/lindm`;
-  if (family === "zypper") {
-    return `${header}printf '%s\\n' '[main]' 'gpgcheck = true' 'repo_gpgcheck = true' 'pkg_gpgcheck = true' > "$work/zypp.conf"
-export ZYPP_CONF="$work/zypp.conf"
-zypper --non-interactive install --no-recommends ca-certificates curl gpg2 openssl
-${privateCA}${verifyKey}
-install -d -m 0755 /etc/pki/rpm-gpg /etc/zypp/repos.d
-install -m 0644 "$work/key.asc" /etc/pki/rpm-gpg/lindm
-rpm --import /etc/pki/rpm-gpg/lindm
-printf '%s\\n' ${shellQuote(`${config}\npkg_gpgcheck=1`)} > /etc/zypp/repos.d/lindm.repo
-chmod 0644 /etc/zypp/repos.d/lindm.repo
-zypper --non-interactive refresh lindm
-zypper --non-interactive install --no-recommends --from lindm lindm-agent${trust}`;
-  }
-  return `${header}dnf -y --setopt=gpgcheck=1 --setopt=localpkg_gpgcheck=1 install ca-certificates gnupg2 openssl
+  // Prerequisites usually ship with the base system; an unregistered or
+  // offline installer target may have no distribution repository at all.
+  return `${header}if ! rpm -q ca-certificates gnupg2 openssl >/dev/null 2>&1; then
+  dnf -y --setopt=gpgcheck=1 --setopt=localpkg_gpgcheck=1 install ca-certificates gnupg2 openssl
+fi
 if ! command -v curl >/dev/null 2>&1; then dnf -y --setopt=gpgcheck=1 install curl; fi
 ${privateCA}${verifyKey}
 install -d -m 0755 /etc/pki/rpm-gpg

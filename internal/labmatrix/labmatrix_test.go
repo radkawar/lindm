@@ -205,6 +205,54 @@ func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
 	}
 }
 
+// Each provisioning cell is admitted only where the registry maintains its
+// installer format, boots its own image kind, and never inherits the console
+// enrollment or lifecycle record of the same release.
+func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
+	cloud, installer := labv1.MatrixImage_MATRIX_IMAGE_CLOUD, labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{
+		entry("ubuntu-24.04", "enroll-from-console", "aarch64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now()),
+		entry("fedora-44", "lifecycle", "aarch64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now()),
+	}}}
+	for _, key := range []string{"ubuntu-24.04", "fedora-44", "rhel-9", "opensuse-tumbleweed"} {
+		r := release(t, key)
+		in.Manifests = append(in.Manifests,
+			&Manifest{Image: &labv1.ImageManifest{Id: key + "-cloud", Edition: "cloud"}, Release: r, Architecture: "aarch64"},
+			&Manifest{Image: &labv1.ImageManifest{Id: key + "-installer", Edition: "server-encrypted-lab"}, Release: r, Architecture: "aarch64"})
+	}
+	for _, tc := range []struct {
+		lane  platform.LabLane
+		image labv1.MatrixImage
+		admit []string
+		deny  []string
+	}{
+		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44"}, []string{"rhel-9", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, []string{"fedora-44", "rhel-9", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionKickstart, installer, []string{"fedora-44", "rhel-9"}, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}},
+	} {
+		cell := &labv1.MatrixCell{Name: string(tc.lane), Title: string(tc.lane), Capabilities: []string{"lifecycle"}, Image: tc.image, Lane: string(tc.lane)}
+		for _, key := range tc.admit {
+			got := in.cell(release(t, key), cell, "aarch64")
+			if got.State != NotRun {
+				t.Fatalf("%s %s: state %s (%s), want an unrecorded runnable cell", key, tc.lane, got.State, got.Reason)
+			}
+			want := key + "-cloud"
+			if tc.image == installer {
+				want = key + "-installer"
+			}
+			if got.Manifest.Image.GetId() != want {
+				t.Fatalf("%s %s boots %s, want %s", key, tc.lane, got.Manifest.Image.GetId(), want)
+			}
+		}
+		for _, key := range tc.deny {
+			if got := in.cell(release(t, key), cell, "aarch64"); got.Runnable() {
+				t.Fatalf("%s %s became runnable without a maintained recipe", key, tc.lane)
+			}
+		}
+	}
+}
+
 // Snapshot promotion must not carry a rolling platform's old pass forward, even
 // if an operator keeps the manifest ID while changing its repository date.
 func TestRollingSnapshotEvidenceIdentity(t *testing.T) {

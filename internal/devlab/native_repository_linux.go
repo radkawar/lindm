@@ -136,6 +136,8 @@ func nativeRepositoryCustody(root, custody string, architectures []string) error
 
 // OpenEnrollmentConsoleAuthorityFixture starts a local-auth server with real
 // current-build native repositories, ready for browser-created credentials.
-func OpenEnrollmentConsoleAuthorityFixture(ctx context.Context, repository, sourceRepository, binary string, architectures []string) (*AuthorityFixture, error) {
-	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityDeviceActions, LoadAuthorityOptions{NativeEnrollmentArchitectures: architectures, NativeEnrollmentSourceRepository: sourceRepository})
+// A non-empty publicHost (see ValidatePublicHost) names both origins instead of
+// localhost; callers map it to the fixture's loopback listeners themselves.
+func OpenEnrollmentConsoleAuthorityFixture(ctx context.Context, repository, sourceRepository, binary string, architectures []string, publicHost string) (*AuthorityFixture, error) {
+	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityDeviceActions, LoadAuthorityOptions{NativeEnrollmentArchitectures: architectures, NativeEnrollmentSourceRepository: sourceRepository, publicHost: publicHost})
 }
