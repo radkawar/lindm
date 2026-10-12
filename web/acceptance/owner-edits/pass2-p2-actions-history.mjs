@@ -9,7 +9,7 @@ export const task = {
   route: "/devices/$deviceId",
   priority: "high",
   acceptance:
-    "Actions tab: 'Accounts are still locked. The undo request expired before the device received it.' with 'Undo again'; the Undo account lock row reads 'Expired before the device received it'; each action is listed once and no separate History tab repeats them.",
+    "Actions tab: 'Accounts locked since <time> by <person>. The undo request expired before the device received it, so the accounts are still locked.' with 'Undo again'; the Undo account lock row reads 'Expired before the device received it'; each action is listed once and no separate History tab repeats them.",
 };
 
 export async function check({ page, demo, visit, settle, require, capture, step }) {
@@ -29,9 +29,10 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   step("expired undo leaves the accounts locked, with Undo again");
   const restriction = panel.locator('[data-device-restriction="lock"]');
   const text = (await restriction.innerText()).replace(/\s+/g, " ");
-  require(text.includes(
-    "Accounts are still locked. The undo request expired before the device received it.",
-  ), `Lock restriction reads ${JSON.stringify(text)}`);
+  require(/Accounts locked since \S.* by \S.*\./.test(text) &&
+    text.includes(
+      "The undo request expired before the device received it, so the accounts are still locked.",
+    ), `Lock restriction reads ${JSON.stringify(text)}`);
   require((
     await restriction.getByRole("button", { name: "Undo account lock" }).innerText()
   ).trim() === "Undo again", "Lock restriction does not offer 'Undo again'");

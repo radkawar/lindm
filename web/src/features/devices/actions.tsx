@@ -145,12 +145,12 @@ const restrictionNames = {
   lock: {
     confirmed: "Accounts locked",
     sent: "Account lock sent",
-    still: "Accounts are still locked",
+    still: "the accounts are still locked",
   },
   quarantine: {
     confirmed: "Network quarantined",
     sent: "Network quarantine sent",
-    still: "The network is still quarantined",
+    still: "the network is still quarantined",
   },
 } as const;
 const releaseKinds: Record<Restriction["kind"], DeviceActionKind> = {
@@ -168,17 +168,19 @@ function RestrictionText({ restriction }: { restriction: Restriction }) {
       Ends <ObservedClock value={restriction.until} />.
     </>
   ) : null;
-  if (restriction.expiredRelease) {
-    return (
-      <p data-expired-release>
-        {names.still}. The undo request expired before the device received it.{until}
-      </p>
-    );
-  }
+  // An undo that expired unstarted left the restriction in force; say so after
+  // the statement of who set it and when.
+  const expired = restriction.expiredRelease ? (
+    <span data-expired-release>
+      {" "}
+      The undo request expired before the device received it, so {names.still}.
+    </span>
+  ) : null;
   if (!action) {
     return (
       <p>
         {names.confirmed}. The action that set it isn&apos;t in recent history.
+        {expired}
         {until}
       </p>
     );
@@ -187,12 +189,14 @@ function RestrictionText({ restriction }: { restriction: Restriction }) {
   return confirmed ? (
     <p>
       {names.confirmed} since <ObservedClock value={action.status?.completedAt} /> by {actor}.
+      {expired}
       {until}
     </p>
   ) : (
     <p>
       {names.sent} at <ObservedClock value={action.createdAt} /> by {actor}. The device hasn&apos;t
-      confirmed it.{until}
+      confirmed it.{expired}
+      {until}
     </p>
   );
 }
