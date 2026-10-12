@@ -154,6 +154,9 @@ ${cloudConfig(secret, instructions, installScript).replaceAll(/^/gm, "    ")}
         <chrooted config:type="boolean">true</chrooted>
         <interpreter>shell</interpreter>
         <source><![CDATA[
+# YaST holds the system zypp lock while AutoYaST scripts run; zypper here
+# uses the separate lock root the AutoYaST guide documents for scripts.
+export ZYPP_LOCKFILE_ROOT=/var/run/autoyast
 ${installerScript(secret, instructions, installScript)}
 ]]></source>
       </script>

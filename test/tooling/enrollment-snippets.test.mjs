@@ -212,6 +212,15 @@ test("Kickstart and AutoYaST install in the target chroot and only enable first-
   const autoyast = provisioningSnippet("autoyast", token, instructions, install);
   assert.match(autoyast, /<chroot-scripts config:type="list">\n {6}<script>\n/);
   assert.match(autoyast, /<chrooted config:type="boolean">true<\/chrooted>/);
+  // Without its own lock root zypper fails: YaST holds /run/zypp.pid. The
+  // variable is exported before the installer script and its subshells.
+  const script = autoyast.split("<![CDATA[\n")[1];
+  const exported = script.indexOf("export ZYPP_LOCKFILE_ROOT=/var/run/autoyast\n");
+  assert.ok(exported >= 0 && exported < script.indexOf("set -eu\n"));
+  assert.doesNotMatch(
+    provisioningSnippet("kickstart", token, instructions, install),
+    /ZYPP_LOCKFILE_ROOT/,
+  );
 });
 
 test("autoinstall supplies first-boot cloud-init user-data, not secret shell arguments", () => {

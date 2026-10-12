@@ -1365,10 +1365,13 @@ it never resets the journal.
   offline target may have no distribution repository. zypper refreshes and searches
   only lindmd's repository (`--reposd-dir` holding a copy of `lindm.repo`), so
   install media or unreachable mirrors listed in the target cannot fail or redirect
-  the install. Kickstart fails the installation on any error; an AutoYaST
-  chroot-script failure is only reported by YaST, so check
-  `/var/adm/autoinstall/logs/` (script `lindm-enroll.sh`) when the device does not
-  appear.
+  the install. YaST holds the system zypp lock (`/run/zypp.pid`) while AutoYaST
+  scripts run, so the AutoYaST script exports `ZYPP_LOCKFILE_ROOT=/var/run/autoyast`,
+  as the AutoYaST guide documents for scripts that call zypper; without it the
+  refresh fails with "System management is locked". Kickstart fails the
+  installation on any error; an AutoYaST chroot-script failure is only reported by
+  YaST, so check `/var/adm/autoinstall/logs/` (script `lindm-enroll.sh`) when the
+  device does not appear.
 - **NixOS** is gated in the registry. lindmd serves agents only as signed native
   APT/RPM/pacman repositories and no NixOS artifact; a module that requires an
   externally hosted derivation would violate the self-hosted model, so the console
