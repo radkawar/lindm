@@ -261,18 +261,9 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 			return err
 		}
 	case agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED:
-		if len(r.desktop.lockKeys) != 0 {
-			// The desktop's own lock shortcut on the local seat, not loginctl:
-			// the session must still end SESSION_LOCKED through that path.
-			scenario.LockPath = "keybinding:" + strings.Join(r.desktop.lockKeys, "+")
-			if err := r.vm.guest.sendKey(ctx, r.desktop.lockKeys...); err != nil {
-				return err
-			}
-		} else {
-			scenario.LockPath = "loginctl lock-session"
-			if err := lockAssistanceSession(ctx, r.vm.guest, r.result.Guest.Desktop.SessionID, true); err != nil {
-				return err
-			}
+		scenario.LockPath = "loginctl lock-session"
+		if err := lockAssistanceSession(ctx, r.vm.guest, r.result.Guest.Desktop.SessionID, true); err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("unsupported scenario end cause %s", spec.cause)

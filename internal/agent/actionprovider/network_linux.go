@@ -293,6 +293,7 @@ func (p *Provider) lockWindow() time.Duration {
 // errSessionLockUnreported; cancellation of ctx remains an unknown outcome.
 func (p *Provider) awaitSessionLock(ctx context.Context, spec *agentv1.DeviceActionSpec) (*agentv1.DeviceActionObservation, error) {
 	window := p.lockWindow()
+	deadline := p.clock().Add(window)
 	wait, cancel := context.WithTimeout(ctx, window)
 	defer cancel()
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -311,7 +312,11 @@ func (p *Provider) awaitSessionLock(ctx context.Context, spec *agentv1.DeviceAct
 		case <-ticker.C:
 			observation, err := p.observe(wait, spec)
 			if err != nil {
-				if wait.Err() != nil && ctx.Err() == nil {
+				// A native call sees the window's deadline pass before wait's
+				// timer fires: a dial past it fails with an i/o timeout that is
+				// context.DeadlineExceeded (pop2404-lock-quarantine-07). That
+				// is the window ending, not an interruption.
+				if ctx.Err() == nil && (wait.Err() != nil || !p.clock().Before(deadline)) {
 					continue
 				}
 				return nil, errors.Join(ErrOutcomeUnknown, err)

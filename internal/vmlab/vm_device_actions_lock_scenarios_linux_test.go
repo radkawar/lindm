@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/platform"
 )
 
@@ -127,26 +126,20 @@ func TestHeadlessActionGoldenRefusesLockScenarios(t *testing.T) {
 	}
 }
 
-// COSMIC locks through logind without LockedHint, locks on its own
-// Super+Escape shortcut in the lane, keeps live VIEW scenarios and refuses
-// CONTROL before consent for its missing RemoteDesktop portal.
-func TestCOSMICProfileLocksThroughLogindAndRefusesControl(t *testing.T) {
+// COSMIC locks through logind without LockedHint and refuses both assistance
+// modes before consent: VIEW for cosmic-notifications' hidden prompt actions,
+// CONTROL for its missing RemoteDesktop portal.
+func TestCOSMICProfileLocksThroughLogindAndRefusesAssistance(t *testing.T) {
 	cosmic := mustLabDesktop(t, "cosmic")
 	if want := cosmic.expectedLock(true); want.hint || !want.locker {
 		t.Fatalf("cosmic lock expectation %+v", want)
 	}
-	if strings.Join(cosmic.lockKeys, "+") != "meta_l+esc" {
-		t.Fatalf("cosmic lock path %v is not its own shortcut", cosmic.lockKeys)
-	}
-	var names []string
+	var got []string
 	for _, spec := range cosmic.assistance {
-		names = append(names, spec.name)
-		if spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL && spec.detail != "portal_remote_desktop_unavailable" {
-			t.Fatalf("cosmic runs a live control scenario: %+v", spec)
-		}
+		got = append(got, spec.name+"="+spec.detail)
 	}
-	if strings.Join(names, ",") != "view,decline,portal-cancel,lock,control-unavailable" {
-		t.Fatalf("cosmic scenarios = %v", names)
+	if strings.Join(got, ",") != "view-unavailable=notification_actions_hidden,control-unavailable=portal_remote_desktop_unavailable" || !cosmic.refusalOnly() {
+		t.Fatalf("cosmic scenarios = %v", got)
 	}
 	want := cosmic.expectedLock(true)
 	fields := desktopFields(cosmic, "wayland", "COSMIC", want)

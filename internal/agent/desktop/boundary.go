@@ -14,6 +14,8 @@ type Notifier interface {
 	// Capabilities returns the server's capabilities; an error means no
 	// notification server is reachable.
 	Capabilities(ctx context.Context) ([]string, error)
+	// ServerName returns the server's GetServerInformation name.
+	ServerName(ctx context.Context) (string, error)
 	// Notify posts a notification.
 	Notify(ctx context.Context, notification Notification) (Notice, error)
 }

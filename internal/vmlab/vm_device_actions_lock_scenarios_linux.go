@@ -117,12 +117,28 @@ func dispatchUnreportedLock(ctx context.Context, machine *actionMachine, control
 }
 
 // stopActionDesktop ends the lab desktop through its display manager and
-// waits until logind lists no graphical user session.
+// waits until logind lists no graphical user session in any state. The
+// executor counts a "closing" session whose processes linger (COSMIC after
+// greetd stops; pop2404-lock-quarantine-06), and on COSMIC such a session
+// outlived repeated TerminateSession for two minutes
+// (pop2404-lock-quarantine-09). An open session is terminated; a closing one
+// has its remaining processes killed, and they are named on failure.
 func stopActionDesktop(ctx context.Context, vm *EncryptedVM) error {
 	if _, err := vm.Run(ctx, "sudo -n systemctl stop display-manager.service", nil); err != nil {
 		return err
 	}
-	return pollGuest(ctx, vm.guest, 2*time.Minute, "graphical sessions ended", `sudo -n sh -eu -c 'for id in $(loginctl list-sessions --no-legend --no-pager | cut -d" " -f1); do case "$(loginctl show-session "$id" -p Type --value)/$(loginctl show-session "$id" -p State --value)" in x11/active|x11/online|wayland/active|wayland/online) exit 1;; esac; done'`)
+	return pollGuest(ctx, vm.guest, 2*time.Minute, "graphical sessions ended", `sudo -n sh -eu -c 'left=0
+for id in $(loginctl list-sessions --no-legend --no-pager | cut -d" " -f1); do
+  case "$(loginctl show-session "$id" -p Class --value)/$(loginctl show-session "$id" -p Type --value)" in user/x11|user/wayland) ;; *) continue;; esac
+  left=1
+  if [ "$(loginctl show-session "$id" -p State --value)" = closing ]; then
+    for p in $(grep -l "/session-$id.scope" /proc/[0-9]*/cgroup 2>/dev/null | cut -d/ -f3); do echo "session $id: $(cut -d" " -f1-3 /proc/$p/stat 2>/dev/null)"; done >&2
+    loginctl kill-session --signal=SIGKILL "$id" || true
+  else
+    loginctl terminate-session "$id" || true
+  fi
+done
+exit $left'`)
 }
 
 // Shadow records are compared in memory only. Neither password hashes nor full

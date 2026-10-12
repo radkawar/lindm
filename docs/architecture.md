@@ -1128,7 +1128,10 @@ no logind `Lock` listener at all. When a session never reports `LockedHint`, the
 action ends `OUTCOME_UNKNOWN`/`OBSERVATION`, never verified and never
 `sessions_locked`, with the verification evidence
 `session_lock_state_unreported: ...`. It is neither retried nor reported as an
-interruption. The server's lock restriction still requires an explicit release.
+interruption. A logind call that fails because the acknowledgement window's
+deadline has passed also ends the window; only cancellation of the action
+itself is an interruption. The server's lock restriction still requires an
+explicit release.
 Where a release's registry row records that its desktop locker ignores logind
 lock requests (`Desktop.SessionLockUnsupported`, natively proven on Omarchy
 4.0.4), the server refuses a lock action that would only lock sessions with
@@ -2613,6 +2616,13 @@ Each side sends its complete current state, never a stream of events:
      the session `UNAVAILABLE` (`portal_screencast_unavailable`,
      `portal_remote_desktop_unavailable`, ...) before consent; control is never
      reduced to view.
+   - It refuses a notification server that advertises actions but shows no
+     action buttons, by its `GetServerInformation` name from an explicit table
+     in `internal/platform`. cosmic-notifications 1.10 (Pop!\_OS 24.04) renders
+     only the summary, body and a close button, and activating the card invokes
+     the first action. The session ends `UNAVAILABLE`
+     (`notification_actions_hidden`) after the portal check and before any
+     prompt.
    - It then requires that every lock of the desktop is observable. The helper
      subscribes to logind `Session.Lock` for its bound session and to
      `Manager.PrepareForSleep`, and ends every session `SESSION_LOCKED`

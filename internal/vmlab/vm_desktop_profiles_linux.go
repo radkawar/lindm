@@ -69,10 +69,6 @@ type labDesktop struct {
 	lockedHint bool
 	// logindLock: logind's Session.Lock reaches the locker.
 	logindLock bool
-	// lockKeys, when set, is the desktop's own lock-screen key chord (QEMU
-	// qcodes). The assistance lock scenario then presses it on the local seat
-	// instead of calling loginctl, proving the desktop's own lock path.
-	lockKeys []string
 	// assistance are the scenarios that natively hold on this desktop.
 	assistance []assistanceScenarioSpec
 }
@@ -185,9 +181,12 @@ if as omarchy-hyprland-session-locked; then echo locked; else case $? in 1) echo
 		// Pop's greetd ignores initial_session.service (it opened the session
 		// with the cosmic-greeter PAM service; pop2404-lock-quarantine-dbg-01),
 		// so pam_env in that service supplies exactly that environment. The
-		// greeter's own sessions run COSMIC Wayland too.
+		// greeter's own sessions run COSMIC Wayland too. The locker logs its
+		// "session locked"/"session unlocked" oracle lines at info, under a
+		// default warn filter (cosmic-greeter locker.rs), so the session
+		// raises only that crate to info (pop2404-lock-quarantine-dbg-02).
 		autologin: func(platform.LabSession) string {
-			return `printf 'XDG_SESSION_TYPE=wayland\nXDG_SESSION_DESKTOP=cosmic\nXDG_CURRENT_DESKTOP=COSMIC\n' > /etc/lindm-lab-cosmic-session.env
+			return `printf 'XDG_SESSION_TYPE=wayland\nXDG_SESSION_DESKTOP=cosmic\nXDG_CURRENT_DESKTOP=COSMIC\nRUST_LOG=warn,cosmic_greeter=info\n' > /etc/lindm-lab-cosmic-session.env
 pam=/etc/pam.d/cosmic-greeter
 if ! grep -q lindm-lab-cosmic-session.env "$pam"; then
   { printf 'session required pam_env.so readenv=1 user_readenv=0 envfile=/etc/lindm-lab-cosmic-session.env\n'; cat "$pam"; } > "$pam.lindm"
@@ -222,25 +221,12 @@ case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) ech
 		locker:     "cosmic-greeter locker journal (session locked/unlocked)",
 		lockedHint: false,
 		logindLock: true,
-		lockKeys:   []string{"meta_l", "esc"},
-		// xdg-desktop-portal-cosmic implements ScreenCast but, in the shipped
-		// 0.1.0pop1, no RemoteDesktop: CONTROL is refused before consent, and
-		// only the VIEW-mode live scenarios run.
-		assistance: append(namedScenarios("view", "decline", "portal-cancel", "lock"), unavailableScenarios("", "portal_remote_desktop_unavailable")[1]),
+		// cosmic-notifications 1.10 shows the consent prompt without its
+		// Allow/Decline buttons (pop2404-assistance-04), so VIEW is refused
+		// before consent. xdg-desktop-portal-cosmic 0.1.0pop1 has no
+		// RemoteDesktop, which refuses CONTROL first.
+		assistance: unavailableScenarios("notification_actions_hidden", "portal_remote_desktop_unavailable"),
 	},
-}
-
-// namedScenarios selects live scenarios by name, so a scenario added to the
-// GNOME list never silently joins a desktop that cannot serve its mode. An
-// unknown name selects nothing; each profile's test asserts its exact list.
-func namedScenarios(names ...string) []assistanceScenarioSpec {
-	selected := make([]assistanceScenarioSpec, 0, len(names))
-	for _, spec := range assistanceScenarios {
-		if slices.Contains(names, spec.name) {
-			selected = append(selected, spec)
-		}
-	}
-	return selected
 }
 
 // labDesktopFor returns the profile of the golden's desktop variant, which

@@ -754,7 +754,11 @@ func nativeQuarantineScenarios(ctx context.Context, machine *actionMachine, cont
 		}
 		result.QuarantineEffective = true
 		if _, err := machine.vm.Run(ctx, "answer=$(dig @10.0.2.3 example.com A +short +time=3 +tries=1) && test -n \"$answer\"", nil); err != nil {
-			return fmt.Errorf("quarantine explicit DNS egress oracle: %w", err)
+			// The failure alone was exit 9 (no reply) with no output
+			// (pop2404-lock-quarantine-10): record the full query and the
+			// active ruleset so the drop point is visible.
+			state, stateErr := machine.vm.Run(ctx, "dig @10.0.2.3 example.com A +time=3 +tries=1 2>&1 || true; sudo -n nft list ruleset 2>&1 || true", nil)
+			return fmt.Errorf("quarantine explicit DNS egress oracle: %w (native state: %q)", errors.Join(err, stateErr), state)
 		}
 		result.QuarantineDNSPreserved = true
 		if err := hostOracle.Probe(ctx, machine.vm, true); err != nil {

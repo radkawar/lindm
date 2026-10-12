@@ -186,6 +186,22 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 		default:
 		}
 	})
+	// cosmic-notifications 1.10 advertises actions but shows no buttons, and
+	// activating its card invokes the first action (allow): pop2404-assistance-04.
+	t.Run("hidden actions", func(t *testing.T) {
+		h := newHarness(t)
+		h.notifier.server = "cosmic-notifications"
+		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
+		report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+		if report.GetEndDetail() != "notification_actions_hidden" {
+			t.Fatalf("detail = %q", report.GetEndDetail())
+		}
+		select {
+		case notice := <-h.notifier.posted:
+			t.Fatalf("posted %q on a server that hides its actions", notice.notification.Summary)
+		default:
+		}
+	})
 	t.Run("capture", func(t *testing.T) {
 		h := newHarness(t)
 		h.capturer.err = unavailable("gst_element_missing:vp8enc", nil)

@@ -750,8 +750,9 @@ var registry = []*Release{
 		// ("system76") use codename noble and the Pop!_OS key; its Ubuntu mirror
 		// serves Ubuntu's own signed InRelease (observed 2026-10-11).
 		Advisory: Advisory{VendorOrigins: []string{"pop-os-release", "system76"}, Partial: "vendor feed unavailable for Pop!_OS packages"},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), "original-device recovery requires Secure Boot; "+popUnsignedBoot),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock}),
+		Gates: gates(string(RecoverySanitize), "original-device recovery requires Secure Boot; "+popUnsignedBoot,
+			string(Assistance), "notification_actions_hidden: cosmic-notifications 1.10 advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1"),
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),

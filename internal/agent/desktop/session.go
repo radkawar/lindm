@@ -12,6 +12,7 @@ import (
 	"time"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/platform"
 )
 
 const (
@@ -256,6 +257,15 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	// (or, for CONTROL, RemoteDesktop) portal ends the session before the prompt.
 	if err := deps.portal.Check(consentCtx, s.invitation.GetMode()); err != nil {
 		return s.failure(consentCtx, unavailable("portal_unavailable", err))
+	}
+	// A server that advertises actions but never shows them would present a
+	// prompt without visible Allow/Decline, where activating it allows.
+	server, err := deps.notifier.ServerName(consentCtx)
+	if err != nil {
+		return s.failure(consentCtx, unavailable("notification_server_unavailable", err))
+	}
+	if platform.NotificationActionsHidden(server) {
+		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "notification_actions_hidden"
 	}
 	// A desktop whose locks lindm cannot observe would keep sharing a locked
 	// screen; such a session is refused before consent rather than started

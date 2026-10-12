@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -184,5 +186,44 @@ func TestSessionLockCancellationRemainsOutcomeUnknown(t *testing.T) {
 	_, err := p.Apply(ctx, plan, nil, func(context.Context) error { return nil })
 	if !errors.Is(err, ErrOutcomeUnknown) || errors.Is(err, errSessionLockUnreported) || *effects != 1 {
 		t.Fatalf("cancelled acknowledgement wait was misreported: effects=%d error=%v", *effects, err)
+	}
+}
+
+// A native logind call can see the acknowledgement window's deadline pass
+// before the window's timer fires: dialing the bus past it fails with an i/o
+// timeout that is context.DeadlineExceeded. That is the window ending, not an
+// interruption (pop2404-lock-quarantine-07 ended OUTCOME_UNKNOWN/INTERRUPTED).
+func TestSessionLockWindowDeadlineRaceIsUnreportedNotInterrupted(t *testing.T) {
+	p, plan, effects := unreportedLockFixture(t)
+	_, dialErr := (&net.Dialer{Deadline: time.Now().Add(-time.Second)}).Dial("unix", filepath.Join(t.TempDir(), "system_bus_socket"))
+	if !errors.Is(dialErr, context.DeadlineExceeded) {
+		t.Fatalf("a dial past its deadline must report context.DeadlineExceeded: %v", dialErr)
+	}
+	late := false
+	p.clock = func() time.Time {
+		if late {
+			return time.Now().Add(time.Hour)
+		}
+		return time.Now()
+	}
+	native := p.sessionNative
+	afterLock := 0
+	p.sessionNative = func(ctx context.Context, operation string) ([]graphicalSession, error) {
+		if operation == "observe" && *effects != 0 {
+			// Verification's own observation and the window's first tick
+			// succeed; the next tick runs past the window's deadline.
+			if afterLock++; afterLock > 2 {
+				late = true
+				return nil, dialErr
+			}
+		}
+		return native(ctx, operation)
+	}
+	result, err := p.Apply(context.Background(), plan, nil, func(context.Context) error { return nil })
+	if err != nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("the window's own deadline was reported as an interruption: %v", err)
+	}
+	if result.GetVerified() || result.GetAfter().GetSessionsLocked() || *effects != 1 || !strings.HasPrefix(result.GetEvidence(), "session_lock_state_unreported: ") {
+		t.Fatalf("unreported lock misreported: verified=%v locked=%v effects=%d evidence=%q", result.GetVerified(), result.GetAfter().GetSessionsLocked(), *effects, result.GetEvidence())
 	}
 }

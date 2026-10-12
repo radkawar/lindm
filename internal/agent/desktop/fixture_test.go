@@ -66,16 +66,21 @@ func (n *fakeNotice) isClosed() bool {
 
 type fakeNotifier struct {
 	capabilities []string
+	server       string
 	err          error
 	posted       chan *fakeNotice
 }
 
 func newFakeNotifier() *fakeNotifier {
-	return &fakeNotifier{capabilities: []string{"actions", "body"}, posted: make(chan *fakeNotice, 32)}
+	return &fakeNotifier{capabilities: []string{"actions", "body"}, server: "gnome-shell", posted: make(chan *fakeNotice, 32)}
 }
 
 func (n *fakeNotifier) Capabilities(context.Context) ([]string, error) {
 	return n.capabilities, n.err
+}
+
+func (n *fakeNotifier) ServerName(context.Context) (string, error) {
+	return n.server, n.err
 }
 
 func (n *fakeNotifier) Notify(_ context.Context, notification Notification) (Notice, error) {
