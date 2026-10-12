@@ -36,7 +36,8 @@ another landing or with a gated commit.
                when protos changed, prettier and markdownlint on touched
                docs/web files, generate-docs -check, and race tests of the
                touched packages and every module package whose build or
-               tests import them, directly or transitively. Then commit
+               tests import them, directly or transitively (each test binary
+               bounded by the 45m integration lock budget). Then commit
                exactly those files with MESSAGE and push to main's upstream
                (hooks skipped: the gate just ran). Any failure rolls back.
   gate-commit  Run the full make check in the shared tree and, only if green,
@@ -232,7 +233,13 @@ func quickGate(ctx context.Context, root string, files []string) error {
 			return err
 		}
 		fmt.Printf("land: race tests for %d touched and %d dependent packages\n", len(packages), len(affected)-len(packages))
-		if err := stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1"}, affected...)...); err != nil {
+		// A loaded host stretches race suites far past go test's default 10m
+		// per-binary deadline (internal/agent/executor has taken ~15m: every
+		// journal load re-verifies its signed trust chain, CPU-bound under
+		// -race), so a test binary gets the integration lock's budget, the
+		// bound any one suite is held to; the landing's -timeout still bounds
+		// the gate.
+		if err := stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1", "-timeout=" + integrationLockCap.String()}, affected...)...); err != nil {
 			return err
 		}
 	}

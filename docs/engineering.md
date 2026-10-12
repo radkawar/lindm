@@ -2248,7 +2248,9 @@ prettier/markdownlint on touched docs and web files, a refusal of any added
 `db/migrations` file numbered at or below `main`'s highest (it names the number
 to rename to), `generate-docs -check`
 always, race tests of the touched packages plus every module package whose
-build or tests import them, directly or transitively, and, when the landing
+build or tests import them, directly or transitively (each test binary bounded
+by `-timeout 45m`, the integration lock budget, since loaded hosts push
+`internal/agent/executor` past go test's 10m default), and, when the landing
 touches `web/src` or `web/acceptance`, `make check-web` with
 `lab acceptance -web-only -engines chromium` (evidence under ignored
 `artifacts/`); `lab acceptance` accepts fewer than all three engines only with

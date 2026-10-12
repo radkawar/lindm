@@ -62,7 +62,7 @@ make bootstrap        # pinned tools into .tools/bin, npm ci --ignore-scripts, g
 make generate         # buf generate + sqlc generate (CI fails if the output differs from what is committed)
 make fmt              # format everything
 make lint             # prettier, markdownlint, eslint, tsc, buf lint/format, golangci-lint
-make test             # builds web assets, then go test -race ./cmd/... ./db/... ./gen/... ./internal/... ./web/...
+make test             # builds web assets, then go test -race -timeout 45m ./cmd/... ./db/... ./gen/... ./internal/... ./web/...
 make check            # default target: lint + test + audit (npm audit + govulncheck)
 make test-integration # dev-up, then go run ./cmd/dev test-integration (real Postgres)
 make signoff          # local CI: clean worktree of the pushed HEAD runs check + test-integration (shared fixture), then gh signoff create --commit SHA unit integration
@@ -166,7 +166,7 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
   - prettier and markdownlint on touched Markdown/web files
   - a new `db/migrations/NNNNN_*.sql` must be numbered above every migration on `main`; otherwise the landing is refused with the number to rename it to
   - `go run ./cmd/dev generate-docs -check`, always
-  - race tests of the touched packages and of every module package whose build or tests import them, directly or transitively
+  - race tests of the touched packages and of every module package whose build or tests import them, directly or transitively; each test binary gets `-timeout 45m` (the integration lock budget) rather than go test's 10m default, which loaded hosts exceed
   - `make check-web` (`lab acceptance -web-only -engines chromium`: the real browser journey against a freshly built server and console) when the landing touches `web/src` or `web/acceptance`; release acceptance still covers Chromium, WebKit and Firefox
 - `go run ./cmd/dev gate-commit -m MSG` is the post-hoc full gate: under the same lock it runs `make check` and commits any remaining change only if green. The parent runs it periodically and reverts or routes anything that breaks `make check`. `go run ./cmd/dev worktree audit` is likewise the parent's periodic job only: landers don't run or broadcast it. It lists only stranded work; PARTIAL/UNLANDED trees that a live owner is working in are hidden unless `-all`.
 - A change that leaves `make check` red is not landed.

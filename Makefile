@@ -67,8 +67,11 @@ audit: web-assets $(GOVULNCHECK)
 	npm run audit:dependencies
 	$(GOVULNCHECK) $(GO_PACKAGES)
 
+# Each test binary gets the integration lock's 45m budget (cmd/dev
+# integrationLockCap), as in the land gate: loaded hosts push the
+# internal/agent/executor race suite past go test's 10m default.
 test: web-assets
-	go test -race $(GO_PACKAGES)
+	go test -race -timeout 45m $(GO_PACKAGES)
 	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/review-edit-sheet.test.mjs
 
 build: web-assets
