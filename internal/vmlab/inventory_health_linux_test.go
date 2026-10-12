@@ -16,6 +16,7 @@ func healthyInventoryFixture() (*inventoryv1.HostObservation, *inventoryv1.Packa
 	details := nativeDetailsFixture()
 	details.Platform = &inventoryv1.PlatformDetails{Cpe: truthString(""), ReleaseverLock: truthString(""), Releasever: truthString(""), Repositories: &inventoryv1.RepositoryObservation{Status: truthUnavailable}}
 	details.Sessions.ActiveSessions = &inventoryv1.ActiveSessions{Status: truthSuccess}
+	details.ToolCustody = &inventoryv1.NativeToolCustody{Status: truthSuccess}
 	iface := details.Network.Interfaces[0]
 	iface.DefaultRouteIpv4, iface.DefaultRouteIpv6 = truthBool(true), truthBool(false)
 	block := details.Storage.Devices[0]
@@ -28,6 +29,17 @@ func healthyInventoryFixture() (*inventoryv1.HostObservation, *inventoryv1.Packa
 	}
 	packages := &inventoryv1.PackageObservation{Status: truthSuccess, Backend: "dpkg", Packages: []*inventoryv1.Package{{Name: "example", Version: "1", Architecture: "amd64", Manager: "dpkg", Module: &inventoryv1.ModuleObservation{Status: truthUnavailable}, Origin: &inventoryv1.PackageOrigin{Status: truthSuccess}}}}
 	return host, packages
+}
+
+// A group-writable / (stock Fedora Cloud Base 43-1.6) makes the agent refuse
+// every native tool; the lab health gate names it rather than accepting the
+// resulting command failures piecemeal.
+func TestInventoryHealthRejectsUnprotectedToolPath(t *testing.T) {
+	host, packages := healthyInventoryFixture()
+	host.Details.ToolCustody = &inventoryv1.NativeToolCustody{Status: truthSuccess, UnprotectedPath: "/", Mode: 0o775}
+	if err := CheckInventoryHealth(host, packages); err == nil || !strings.Contains(err.Error(), "native tool path / is mode 0775") {
+		t.Fatalf("unprotected tool path accepted: %v", err)
+	}
 }
 
 func TestInventoryHealthAllowsReasonedNativeAbsence(t *testing.T) {

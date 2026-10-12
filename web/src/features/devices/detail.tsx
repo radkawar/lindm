@@ -22,6 +22,7 @@ import { deviceQueryOptions } from "./queries";
 import { CollectionStatusBadge, Fact, ObservedTime, ObservedValue } from "./observations";
 import { DeviceMetadataCard } from "./metadata";
 import { DeviceNativeDetails, NumberValue } from "./native-details";
+import { NativeToolCustodyAlert, ToolCustodyContext } from "./tool-custody";
 import { DevicePatchStatus } from "./patch-status";
 import { DeviceEncryptionPanel } from "./encryption";
 import { DeviceLocalAdminPanel } from "./local-admin";
@@ -214,7 +215,8 @@ export function DeviceDetailView({
         <p data-review-state="blocked">Device record unavailable. Return to the device list.</p>
       ) : null}
       {device ? (
-        <>
+        <ToolCustodyContext.Provider value={host?.details?.toolCustody}>
+          <NativeToolCustodyAlert custody={host?.details?.toolCustody} />
           <section className="flex flex-wrap items-center justify-between gap-4 border-y py-4">
             <div className="min-w-0 space-y-1">
               <h2 className="text-base font-semibold">Latest observation</h2>
@@ -723,7 +725,7 @@ export function DeviceDetailView({
           >
             {history}
           </section>
-        </>
+        </ToolCustodyContext.Provider>
       ) : null}
     </section>
   );

@@ -298,7 +298,7 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	var reasons []string
 	for _, name := range spec.GetCapabilities() {
 		capability := platform.Capability(name)
-		if reason := r.GateReason(capability); reason != "" {
+		if reason := r.GateReasonOn(capability, arch); reason != "" {
 			reasons = appendUnique(reasons, reason)
 			continue
 		}

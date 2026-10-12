@@ -386,11 +386,29 @@ var registry = []*Release{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,
 		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5,
 		Desktop: Desktop{Name: "Workstation GNOME; KDE edition", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
-		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43"},
-		Quirks:   Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB},
-		Lab:      Lab{Lanes: []LabLane{LaneServices}},
-		Supports: caps(agentCore, hostResources, []Capability{Advisories}),
-		Gates:    actionGates(string(Password), reasonNoPasswordPins),
+		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43",
+			Exports: map[Feed]AdvisoryExport{FeedRPMUpdateinfo: {
+				ArchitectureURLs: map[string]string{
+					"x86_64":  "https://dl.fedoraproject.org/pub/fedora/linux/updates/43/Everything/x86_64/repodata/repomd.xml",
+					"aarch64": "https://dl.fedoraproject.org/pub/fedora/linux/updates/43/Everything/aarch64/repodata/repomd.xml",
+				},
+				Format: "rpm-repomd", MaxAgeSeconds: 86400,
+			}}},
+		// shadow-utils 4.18.0 labels --prefix writes by the prefixed path: the
+		// account helper's /etc/passwd, shadow, group and gshadow became
+		// var_lib_t and PAM lost every local user. --root (chroot) writes them
+		// at /etc paths; Fedora 44's 4.19.0 labels --prefix writes correctly.
+		Quirks: Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB},
+		// Fedora Cloud Base 43-1.6 (x86_64 and aarch64) ships / as root:root
+		// 0775 (Fedora 44 1.7: 0755); `filesystem` packages it 0555.
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneAdvisories, LaneEnrollFromConsole},
+			RootPermissionsRepair: []string{"rpm", "--restore", "filesystem"}},
+		// Fedora 43 (release and updates) carries dnf5 5.2.18.0, below the
+		// package provider's unprivileged-transaction floor (resources record
+		// "native dnf5 5.4.6.0 or newer required"); os.update.v1 runs dnf5 itself.
+		Supports: caps(agentCore, []Capability{Accounts, Sysctl, Definitions, Firewall, Advisories, OSUpdate}),
+		Gates: without(actionGates(string(Password), reasonNoPasswordPins,
+			string(Packages), "Fedora 43 ships dnf5 5.2.18.0; the package provider requires 5.4.6.0 to store a transaction without privileges"), OSUpdate),
 	},
 	{
 		Key: "fedora-44", Name: "Fedora 44", Distribution: "Fedora", ID: "fedora", Version: Exact("44"), Variants: fedoraVar,
@@ -407,12 +425,18 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect, SSHBannerUnit: "sshd.service",
 			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}, RecoveryGRUB: blsGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initramfs-%s.img", Rebuild: "/usr/bin/dracut", RebuildArgs: []string{"--regenerate-all", "--force"}, RebuildWithFileArgs: []string{"--regenerate-all", "--force", "--include", "/etc/modprobe.d/99-lindm-blocklist.conf", "/etc/modprobe.d/99-lindm-blocklist.conf"}, WritePaths: []string{"/boot"}},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAcceptance, LaneEnrollFromConsole},
-			LaneArchitectures: updatesX86, Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole},
+			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
 		Gates:    without(gates(), OSUpdate),
+		// Recovery needs Secure Boot (measured GRUB: PCR 7 SecureBoot=1; owned
+		// UKI: signed recovery). Under AAVMF Secure Boot shim refuses Fedora's
+		// unsigned aarch64 kernel (fedora44-mgrub-nvme-arm64-01/-02), and the
+		// encrypted golden itself never reaches SSH
+		// (fedora-recovery-arm-20261011T234650Z/recovery-nvme-aarch64.json).
+		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: "the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires"}},
 	},
 	{
 		Key: "fedora-atomic", Name: "Fedora Atomic Silverblue/Kinoite", Distribution: "Fedora Atomic", ID: "fedora", Version: Any(),

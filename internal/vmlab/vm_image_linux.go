@@ -99,9 +99,10 @@ func hardwareForManifest(manifest *labv1.ImageManifest, options *VMHardwareOptio
 	if hardware.Architecture != architecture {
 		return hardware, errors.New("VM image and selected hardware architectures differ")
 	}
-	hardware.offlineRTCWaitUnit = ""
+	hardware.offlineRTCWaitUnit, hardware.rootRepair = "", nil
 	if release := manifestRelease(manifest); release != nil {
 		hardware.offlineRTCWaitUnit = release.Lab.OfflineRTCWaitUnit
+		hardware.rootRepair = release.Lab.RootPermissionsRepair
 	}
 	return hardware, nil
 }

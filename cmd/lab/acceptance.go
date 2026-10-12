@@ -67,6 +67,9 @@ type acceptanceBrowserConfig struct {
 	EnrollmentCommandPaths     map[string]string        `json:"enrollmentCommandPaths,omitempty"`
 	RequireRepositories        bool                     `json:"requireRepositories,omitempty"`
 	EnrollmentScreenshots      bool                     `json:"enrollmentScreenshots,omitempty"`
+	// ExpectToolCustodyPath requires the device page's unprotected-tool-path
+	// alert for this path with its remedy (enrollment-status mode).
+	ExpectToolCustodyPath string `json:"expectToolCustodyPath,omitempty"`
 }
 
 type acceptancePasswordProbe struct {

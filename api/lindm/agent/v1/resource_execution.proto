@@ -498,6 +498,9 @@ enum ResourceAdmissionRefusalReason {
   RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN = 1;
   RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE = 2;
   RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION = 3;
+  // A native tool's ancestry is not root-protected (inventory
+  // NativeToolCustody names the path); no native tool ran.
+  RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH = 4;
 }
 
 // Authenticated executor admission evidence, not native-state evidence. No

@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Fedora 43                                                                                               | Fedora 44                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| inventory         | implemented                                                                                             | implemented                               |
-| lifecycle         | implemented                                                                                             | implemented                               |
-| dispatch          | implemented                                                                                             | implemented                               |
-| packages          | implemented                                                                                             | implemented                               |
-| accounts          | implemented                                                                                             | implemented                               |
-| sysctl            | implemented                                                                                             | implemented                               |
-| definitions       | implemented                                                                                             | implemented                               |
-| password          | gated: libpwquality/PAM/manager versions not measured on this release                                   | implemented                               |
-| firewall          | implemented                                                                                             | implemented                               |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| self-update       | implemented                                                                                             | implemented                               |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               |
-| advisories        | implemented                                                                                             | implemented                               |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               |
-| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented |
+| Capability        | Fedora 43                                                                                                             | Fedora 44                                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                                           | implemented                                                                                                                                                             |
+| lifecycle         | implemented                                                                                                           | implemented                                                                                                                                                             |
+| dispatch          | implemented                                                                                                           | implemented                                                                                                                                                             |
+| packages          | gated: Fedora 43 ships dnf5 5.2.18.0; the package provider requires 5.4.6.0 to store a transaction without privileges | implemented                                                                                                                                                             |
+| accounts          | implemented                                                                                                           | implemented                                                                                                                                                             |
+| sysctl            | implemented                                                                                                           | implemented                                                                                                                                                             |
+| definitions       | implemented                                                                                                           | implemented                                                                                                                                                             |
+| password          | gated: libpwquality/PAM/manager versions not measured on this release                                                 | implemented                                                                                                                                                             |
+| firewall          | implemented                                                                                                           | implemented                                                                                                                                                             |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented; gated on aarch64: the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires |
+| self-update       | implemented                                                                                                           | implemented                                                                                                                                                             |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
+| advisories        | implemented                                                                                                           | implemented                                                                                                                                                             |
+| os-update         | implemented                                                                                                           | implemented                                                                                                                                                             |
+| release-upgrade   | gated: release upgrade is not implemented                                                                             | gated: release upgrade is not implemented                                                                                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -37,8 +37,10 @@ support claims. [Verification](../verification.md#1-launch-platform-qualificatio
 is authoritative: no complete matrix cell is certified. A cloud-server result
 neither qualifies Workstation/KDE nor another architecture.
 
-The pinned Fedora 43 Cloud Base Generic 43-1.6 input, exact size, digest and signer
-are in [`lab/images/fedora-43-x86_64.json:2-17`](../../lab/images/fedora-43-x86_64.json#L2-L17).
+The pinned Fedora 43 Cloud Base Generic 43-1.6 inputs, exact size, digest and signer
+are in [`lab/images/fedora-43-x86_64.json:2-17`](../../lab/images/fedora-43-x86_64.json#L2-L17)
+and [`lab/images/fedora-43-aarch64.json:2-17`](../../lab/images/fedora-43-aarch64.json#L2-L17)
+(both CHECKSUM files clearsigned by the Fedora 43 key `C6E7F081CF80E13146676E88829B606631645531`).
 Fedora 44 encrypted Server with added GNOME packages is a distinct installation,
 not proof of the stock Workstation installer.
 
@@ -114,6 +116,51 @@ one, which wakes PID 1, before it passes any descriptor. A stop after a lost
 connection uses a new connection. Readiness also ignores the `UnitRemoved`
 signals that daemon-reload sends for still-running units. No AVC accompanied
 either failure.
+
+### Fedora 43 Cloud: group-writable `/`
+
+The agent runs a native tool only when every directory from `/` to the tool is
+owned by root and writable by neither group nor other
+([`nativeexec.Executable`](../../internal/agent/nativeexec/exec_linux.go),
+[`custody.RootProtected`](../../internal/custody/open_linux.go)). The signed
+Fedora Cloud Base Generic 43-1.6 images (x86_64 `846574c8…`, aarch64
+`66031aea…`) ship `/` as `root:root 0775`; the `filesystem` package records
+`dr-xr-xr-x` (0555), and Fedora 44 1.7 ships 0755. On a stock Fedora 43 cloud
+machine the agent therefore refuses `rpm`, `dnf5`, `lsblk`, `ip`, `busctl` and
+every other tool: inventory fields report a native command failure, and resource
+and update actions fail. The custody check is not relaxed for group root.
+
+Inventory reports the condition as `NativeDetails.tool_custody` (path, owner,
+mode). The device page shows it with the remedy, labels every refused field
+"Refused: / is writable by group or other", and a resource refused before any
+tool runs carries `RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH`
+(server reason `native_tool_path_unprotected`). The remedy, as root, is
+`rpm --restore filesystem` (RPM 6's name for `--setperms`; restores the packaged 0555) or `chmod go-w /`; the
+next inventory clears the alert.
+
+Lab lanes on Fedora 43 run the registry's `Lab.RootPermissionsRepair`
+(`rpm --restore filesystem`) once, as the first cloud-init `bootcmd` of the first
+boot (`cloud-init-per once`), before the agent is installed; later boots, such as
+interrupted-update recovery, do not take the RPM transaction lock again.
+`enroll-from-console` keeps the vendor mode, as a customer's stock image would,
+and passes only when the console shows the alert with both remedies for the
+exact enrolled device.
+
+Fedora 43 carries dnf5 5.2.18.0 in both its release and updates repositories.
+The package resource provider requires 5.4.6.0 (the first release that stores a
+transaction without privileges), so `packages` is gated on Fedora 43: the native
+resources record failed preparation with `native dnf5 5.4.6.0 or newer required`.
+OS update policy (`os.update.v1`) runs dnf5 itself and is qualified.
+
+Fedora 43's shadow-utils 4.18.0 labels files written under `--prefix` by the
+prefixed path. With the account helper's private `account-root/etc` bind of
+`/etc`, a `useradd` left `/etc/passwd`, `/etc/shadow`, `/etc/group` and
+`/etc/gshadow` as `system_u:object_r:var_lib_t:s0`; sudo then failed with
+`PAM account management error: User not known to the underlying authentication
+module` for every local user, including the lab account (observed on
+`fedora-cloud-43-1.6-aarch64`, SELinux Enforcing). Fedora 43 therefore uses the
+chroot account root (`Quirks.AccountChroot`, `--root`) like EL 9/10, which writes
+the databases at their `/etc` paths. Fedora 44's 4.19.0 is unaffected.
 
 ## Inventory and per-field quirks
 

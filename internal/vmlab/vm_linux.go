@@ -226,9 +226,21 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	if h.stockAcceptance {
 		delete(config, "runcmd")
 	}
+	var bootcmd []any
+	// The documented native remedy for a vendor image whose / the agent's tool
+	// custody refuses, once at first boot: later boots (interrupted-update
+	// recovery, scheduled reboots) must not take the RPM transaction lock.
+	// Stock acceptance guests keep the vendor mode so the console's
+	// unprotected-tool-path alert is exercised instead.
+	if len(h.rootRepair) != 0 && !h.stockAcceptance {
+		bootcmd = append(bootcmd, append([]string{"cloud-init-per", "once", "lindm-lab-root-repair"}, h.rootRepair...))
+	}
 	if h.offlineRTCEnabled() {
-		config["bootcmd"] = []any{[]string{"systemctl", "disable", "--now", h.offlineRTCWaitUnit}}
+		bootcmd = append(bootcmd, []string{"systemctl", "disable", "--now", h.offlineRTCWaitUnit})
 		vm.usingOfflineRTC = true
+	}
+	if len(bootcmd) != 0 {
+		config["bootcmd"] = bootcmd
 	}
 	if enrollment != nil {
 		enrollment.apply(config)

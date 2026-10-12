@@ -69,6 +69,10 @@ func checkInventoryMessage(message protoreflect.Message, path string, context in
 		context.session = value
 	case *inventoryv1.Package:
 		context.pkg = value
+	case *inventoryv1.NativeToolCustody:
+		if value.UnprotectedPath != "" {
+			return fmt.Errorf("inventory health: agent refuses native tools: native tool path %s is mode %04o (owner %d)", value.UnprotectedPath, value.Mode, value.OwnerUid)
+		}
 	case *inventoryv1.RepositoryObservation:
 		if value.Status == truthSuccess {
 			if len(value.Ids) != len(value.Configurations) {

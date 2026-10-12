@@ -371,6 +371,9 @@ type Release struct {
 	// gated, with the reason in Gates or a default reason.
 	Supports []Capability
 	Gates    map[Capability]string
+	// ArchitectureGates gates a supported capability on one guest
+	// architecture (x86_64, aarch64) whose native stack refuses it.
+	ArchitectureGates map[string]map[Capability]string
 
 	base *Release
 }
@@ -423,6 +426,15 @@ func (r *Release) GateReason(c Capability) string {
 		return reason
 	}
 	return "not implemented for " + r.Name
+}
+
+// GateReasonOn is GateReason for one guest architecture; it accepts the
+// Debian (amd64, arm64) and kernel (x86_64, aarch64) spellings.
+func (r *Release) GateReasonOn(c Capability, architecture string) string {
+	if reason := r.GateReason(c); reason != "" {
+		return reason
+	}
+	return r.ArchitectureGates[kernelArchitecture(architecture)][c]
 }
 
 // PasswordPins returns the password-provider pins measured on the observed

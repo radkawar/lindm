@@ -209,6 +209,13 @@ func TestRegistryConsistent(t *testing.T) {
 				t.Errorf("%s: gate %q is unknown or contradicts Supports", r.Key, c)
 			}
 		}
+		for arch, gated := range r.ArchitectureGates {
+			for c, reason := range gated {
+				if !slices.Contains(r.Architectures, arch) || !r.Supported(c) || reason == "" {
+					t.Errorf("%s: %s gate %q is not a reasoned gate of a supported capability on a release architecture", r.Key, arch, c)
+				}
+			}
+		}
 		for _, other := range registry {
 			if other != r && other.ID == r.ID && overlaps(r, other) {
 				t.Errorf("%s and %s match the same os-release identity", r.Key, other.Key)
@@ -302,6 +309,9 @@ func TestUpdateLaneArchitectures(t *testing.T) {
 		{"ubuntu", "24.04", "arm64", true},
 		{"ubuntu", "26.04", "aarch64", true},
 		{"fedora", "44", "x86_64", true},
+		{"fedora", "44", "aarch64", true},
+		{"fedora", "43", "amd64", true},
+		{"fedora", "43", "arm64", true},
 		{"rhel", "9.8", "x86_64", true},
 		{"rhel", "10.2", "x86_64", true},
 		{"ubuntu", "22.04", "arm64", true},

@@ -218,7 +218,48 @@ func collectVMDetails(ctx context.Context, vm *guestVM) (*inventoryv1.NativeDeta
 	if d.Platform, err = o.platform(); err != nil {
 		return nil, fmt.Errorf("platform truth: %w", err)
 	}
+	if d.ToolCustody, err = o.toolCustody(); err != nil {
+		return nil, fmt.Errorf("native tool custody truth: %w", err)
+	}
 	return d, nil
+}
+
+// toolCustody reads the tool ancestry with coreutils stat, following the
+// merged-/usr symlinks native tools resolve through. A directory absent from
+// the image holds no tool; / and /usr must exist.
+func (o vmInventoryOracle) toolCustody() (*inventoryv1.NativeToolCustody, error) {
+	data, err := o.command(`for p in / /usr /usr/bin /usr/sbin /usr/libexec; do if [ -e "$p" ] || [ "$p" = / ] || [ "$p" = /usr ]; then stat -L -c '%n %u %a' -- "$p"; fi; done`)
+	if err != nil {
+		return nil, err
+	}
+	return parseTruthToolCustody(data)
+}
+
+func parseTruthToolCustody(data []byte) (*inventoryv1.NativeToolCustody, error) {
+	rows, err := truthRows(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) < 2 {
+		return nil, errors.New("missing native tool ancestry")
+	}
+	for _, row := range rows {
+		if len(row) != 3 {
+			return nil, errors.New("invalid native tool ancestry record")
+		}
+		uid, err := strconv.ParseUint(row[1], 10, 32)
+		if err != nil {
+			return nil, errors.New("invalid native tool ancestry owner")
+		}
+		mode, err := strconv.ParseUint(row[2], 8, 32)
+		if err != nil || mode > 0o7777 {
+			return nil, errors.New("invalid native tool ancestry mode")
+		}
+		if uid != 0 || mode&0o022 != 0 {
+			return &inventoryv1.NativeToolCustody{Status: truthSuccess, UnprotectedPath: row[0], OwnerUid: uint32(uid), Mode: uint32(mode)}, nil
+		}
+	}
+	return &inventoryv1.NativeToolCustody{Status: truthSuccess}, nil
 }
 
 func (o vmInventoryOracle) number(command string) (*inventoryv1.ObservedUint64, error) {

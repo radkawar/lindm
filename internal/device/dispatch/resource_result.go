@@ -188,8 +188,11 @@ func (k *resourceResult) persist(ctx context.Context, s *Service, st *resourceRe
 func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, string) {
 	switch {
 	case status.GetAdmissionRefusal() != nil:
-		if status.GetAdmissionRefusal().GetReason() == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION {
+		switch status.GetAdmissionRefusal().GetReason() {
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION:
 			return 5, "admission_precondition"
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
+			return 5, ResourceReasonUnsafeToolPath
 		}
 		return 6, "native_unsupported"
 	case status.GetReadOnly() && status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE:
@@ -287,7 +290,8 @@ func ResourceResultBinding(intent *agentv1.ResourceExecutionIntent, status *agen
 			if status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED {
 				return errors.New("resource_admission_refusal_binding_rejected")
 			}
-		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION:
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION,
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
 			if status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION {
 				return errors.New("resource_admission_refusal_binding_rejected")
 			}

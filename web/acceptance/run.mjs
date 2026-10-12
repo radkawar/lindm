@@ -172,6 +172,13 @@ function validate(value) {
     throw new Error("native_target_required");
   if (value.mode === "enrollment-status" && (typeof value.deviceId !== "string" || !value.deviceId))
     throw new Error("enrollment_status_device_required");
+  if (
+    value.expectToolCustodyPath !== undefined &&
+    (value.mode !== "enrollment-status" ||
+      typeof value.expectToolCustodyPath !== "string" ||
+      !value.expectToolCustodyPath.startsWith("/"))
+  )
+    throw new Error("tool_custody_expectation_requires_enrollment_status_path");
   for (const kind of value.storageActions ?? ["escrowRotate", "cryptoErase"]) {
     if (!["escrowRotate", "cryptoErase", "tpm2Bind", "sanitize"].includes(kind))
       throw new Error("invalid_storage_action");
@@ -342,6 +349,10 @@ async function journey() {
     result.enrolledDevice = await step("confirm_enrolled_device", () =>
       confirmEnrolledDevice(ui, config),
     );
+    // The unprotected-tool-path alert is console UI the lane must show; keep
+    // light/dark desktop/mobile captures of the exact device page for review.
+    if (config.expectToolCustodyPath && config.enrollmentScreenshots)
+      await enrollmentScreenshots("device-tool-custody");
     await writePrivateJSON(config.resultPath, result);
   }
   if (config.mode === "native") {

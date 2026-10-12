@@ -167,6 +167,7 @@ func TestDetectBackend(t *testing.T) {
 	}{
 		{"NAME=\"Ubuntu\"\nID=ubuntu\nVERSION_ID=\"24.04\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES},
 		{"NAME=\"Fedora Linux\"\nID=fedora\nVERSION_ID=44\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC},
+		{"NAME=\"Fedora Linux\"\nID=fedora\nVERSION_ID=43\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC},
 		{"NAME=\"Red Hat Enterprise Linux\"\nID=\"rhel\"\nVERSION_ID=\"9.6\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"NAME=\"Red Hat Enterprise Linux\"\nID=\"rhel\"\nVERSION_ID=\"10.2\"\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"ID=arch\n", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN},
@@ -181,7 +182,7 @@ func TestDetectBackend(t *testing.T) {
 		}
 	}
 	// Debian's suites need Origins-Pattern selection the runner does not render.
-	for _, release := range []string{"ID=fedora\nVERSION_ID=43\n", "ID=rhel\nVERSION_ID=\"8.10\"\n", "ID=rhel\nVERSION_ID=\"11.0\"\n", "ID=debian\nVERSION_ID=\"13\"\n", "ID=debian\nVERSION_ID=\"12\"\n", "ID=almalinux\nVERSION_ID=\"8.10\"\n"} {
+	for _, release := range []string{"ID=fedora\nVERSION_ID=42\n", "ID=rhel\nVERSION_ID=\"8.10\"\n", "ID=rhel\nVERSION_ID=\"11.0\"\n", "ID=debian\nVERSION_ID=\"13\"\n", "ID=debian\nVERSION_ID=\"12\"\n", "ID=almalinux\nVERSION_ID=\"8.10\"\n"} {
 		if _, err := detectBackend([]byte(release)); err == nil {
 			t.Errorf("detectBackend(%q) accepted an unqualified platform", release)
 		}

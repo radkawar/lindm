@@ -16,12 +16,14 @@ import (
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/sysctlprovider"
+	"lindm/internal/custody"
 )
 
 func TestAdmissionRefusalClassifiesOnlyBoundedProviderCauses(t *testing.T) {
@@ -43,6 +45,10 @@ func TestAdmissionRefusalClassifiesOnlyBoundedProviderCauses(t *testing.T) {
 				// A missing native automatic-update tool is a typed precondition
 				// naming its package, never an unsupported platform.
 				&osupdateprovider.PrerequisiteError{Package: &resourcev1.PackageIdentity{NativeName: "unattended-upgrades"}, Cause: errors.New("not installed")}}},
+		// Fedora Cloud Base 43-1.6 ships / as 0775: nativeexec refuses every
+		// tool before it runs, which is a precondition the device names.
+		{agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION,
+			[]error{errors.Join(nativeexec.ErrUntrustedExecutable, fmt.Errorf("%w: replaceable ancestry of /usr/bin/rpm", custody.ErrUnsafe))}},
 	} {
 		for _, cause := range group.causes {
 			reason, failure, ok := resourceAdmissionCause(fmt.Errorf("bounded native preflight: %w", cause))
@@ -50,6 +56,14 @@ func TestAdmissionRefusalClassifiesOnlyBoundedProviderCauses(t *testing.T) {
 				t.Fatalf("incorrect classification for %v: %v %v %v", cause, reason, failure, ok)
 			}
 		}
+	}
+}
+
+// Only an ancestry refusal is the device's unprotected tool path: an untrusted
+// leaf (a tool outside /usr or not a regular file) keeps the generic failure.
+func TestUntrustedToolLeafIsNotAnUnprotectedPath(t *testing.T) {
+	if reason, _, ok := resourceAdmissionCause(fmt.Errorf("preflight: %w", nativeexec.ErrUntrustedExecutable)); ok {
+		t.Fatalf("untrusted leaf classified as %v", reason)
 	}
 }
 

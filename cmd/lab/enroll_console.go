@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"lindm/internal/labhost"
+	"lindm/internal/platform"
 	"lindm/internal/vmlab"
 )
 
@@ -64,7 +65,13 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 		if capture == nil || capture.SHA256 != result.CommandSHA256 {
 			return errors.New("executed command differs from the browser clipboard capture")
 		}
-		enrollment, err = confirmConsoleBrowserEnrollment(ctx, *repository, private, *browserConfig, result.DeviceID)
+		// A stock image the lab otherwise repairs keeps its group-writable /
+		// here: the console must name it and the remedy before teardown.
+		expectToolPath := ""
+		if len(platform.Identify(platform.OSRelease{ID: manifest.GetDistribution(), VersionID: manifest.GetVersion()}).Lab.RootPermissionsRepair) != 0 {
+			expectToolPath = "/"
+		}
+		enrollment, err = confirmConsoleBrowserEnrollment(ctx, *repository, private, *browserConfig, result.DeviceID, expectToolPath)
 		return err
 	}
 	result, err := vmlab.EnrollFromConsoleVM(ctx, manifest, options)

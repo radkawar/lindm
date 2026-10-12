@@ -45,6 +45,24 @@ func TestResourceAdmissionRefusalCannotBecomeNativeEvidence(t *testing.T) {
 	}
 }
 
+// An unprotected native tool path is an effect-free precondition refusal: it
+// binds only with the precondition failure and releases into a named conflict.
+func TestUnprotectedToolPathRefusalIsANamedPrecondition(t *testing.T) {
+	intent := &agentv1.ResourceExecutionIntent{Desired: qualifiedServiceResource().GetDesired(), Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE}
+	status := &agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, AdmissionRefusal: &agentv1.ResourceAdmissionRefusal{Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(), Reason: agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH, NativeEvidenceUnavailable: true}}
+	if err := dispatch.ResourceResultBinding(intent, status); err != nil {
+		t.Fatal(err)
+	}
+	if state, reason := dispatch.ReleaseResultState(status); state != "release_conflict" || reason != dispatch.ResourceReasonUnsafeToolPath {
+		t.Fatalf("release state %s/%s", state, reason)
+	}
+	unsupported := proto.CloneOf(status)
+	unsupported.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
+	if err := dispatch.ResourceResultBinding(intent, unsupported); err == nil {
+		t.Fatal("accepted an unprotected tool path refusal with a non-precondition failure")
+	}
+}
+
 func TestReleaseAuthorityHeadIsNotHistoricalSourceAssignment(t *testing.T) {
 	source, head, release := uuid.New(), uuid.New(), uuid.New()
 	action := devicedb.ResourceAction{AssignmentID: source, ReleaseID: &release}

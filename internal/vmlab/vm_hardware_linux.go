@@ -44,6 +44,9 @@ type VMHardwareOptions struct {
 	// dataLink adds nic1 on a lane-owned host-local L2 link to one peer guest.
 	dataLink           *vmDataLink
 	offlineRTCWaitUnit string
+	// rootRepair is the release's registry Lab.RootPermissionsRepair; stock
+	// acceptance guests keep the vendor mode.
+	rootRepair []string
 }
 
 func (h *VMHardwareOptions) offlineRTCEnabled() bool {

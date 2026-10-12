@@ -107,6 +107,8 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 		return "release_conflict", "native_unsupported"
 	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION:
 		return "release_conflict", "precondition_failed"
+	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
+		return "release_conflict", ResourceReasonUnsafeToolPath
 	}
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
 		return "release_conflict", "outcome_unknown"

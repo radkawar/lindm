@@ -158,7 +158,7 @@ func collectDetails(ctx context.Context, s detailSources) *inventoryv1.NativeDet
 		KernelModuleCount: parseModuleCount(modules, modulesErr),
 		UptimeSeconds:     parseUptime(uptime, uptimeErr), BootTimeUnixSeconds: parseBootTime(stat, statErr),
 		Backends: collectBackends(ctx, s), Flatpak: collectFlatpak(ctx, s.run), Snap: s.snap(ctx),
-		Platform: collectPlatform(ctx, s),
+		Platform: collectPlatform(ctx, s), ToolCustody: collectToolCustody(ctx, s),
 	}
 	markDefaultRoutes(ctx, s, result.Network)
 	boundDetails(result)

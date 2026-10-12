@@ -29,6 +29,12 @@ type Lab struct {
 	// disposable offline guest uses the QEMU host's UTC hardware clock.
 	// It does not assert NTP synchronization or change production agents.
 	OfflineRTCWaitUnit string
+	// RootPermissionsRepair is the native remedy (argv) the lab runs at first
+	// boot on a pinned cloud image that ships / writable by group or other,
+	// which the agent's native tool custody refuses. Stock-image acceptance and
+	// console enrollment keep the vendor mode and require the console's
+	// unprotected-tool-path alert instead.
+	RootPermissionsRepair []string
 	// Kickstart is the Anaconda kickstart syntax version, e.g. "F44".
 	// Repository and RepositoryKey are the immutable signed release tree and
 	// its key file that the installed root adds packages from; %s is the

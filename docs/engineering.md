@@ -2261,7 +2261,7 @@ state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
 The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
-Fedora 44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
+Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
 x86_64/aarch64, including native aarch64 on a
 configured Spark. Use the declared pinned firmware arguments and normal host
 admission; never substitute an amd64 guest or pre-provision lindm's server CA, agent
@@ -2269,6 +2269,10 @@ packages or bootstrap trust into the machine under test. The copied command must
 perform those steps. Rolling guests first bind only their separate vendor
 repositories to the manifest's dated snapshot; Arch establishes that whole-system
 snapshot before enrollment instead of refreshing databases for a partial upgrade.
+A release with `Lab.RootPermissionsRepair` (Fedora 43's group-writable cloud `/`)
+is enrolled from the stock image: the lane passes only when the device page shows
+the unprotected-tool-path alert with both remedies, and keeps light/dark
+desktop/mobile captures of it. Every other lane runs that repair once at first boot.
 An entitled RHEL guest is first registered through the maintained Red Hat path
 (`-redhat-token-file`), as a customer's subscribed host is, so the copied DNF
 command reaches its vendor repositories; the registration probe is removed before

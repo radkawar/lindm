@@ -17,7 +17,7 @@ import (
 var resourceLanePlatforms = []struct{ id, version, tool string }{
 	{"ubuntu", "22.04", "apt-get"}, {"ubuntu", "24.04", "apt-get"}, {"ubuntu", "26.04", "apt-get"},
 	{"debian", "12", "apt-get"}, {"debian", "13", "apt-get"},
-	{"fedora", "44", "dnf5"},
+	{"fedora", "43", "dnf5"}, {"fedora", "44", "dnf5"},
 	{"rhel", "9.8", "dnf"}, {"almalinux", "9.8", "dnf"}, {"rocky", "9.8", "dnf"},
 	{"rhel", "10.2", "dnf"}, {"almalinux", "10.2", "dnf"}, {"rocky", "10.2", "dnf"},
 	{"almalinux", "8.10", "dnf"}, {"rocky", "8.10", "dnf"},
@@ -34,7 +34,7 @@ func TestResourceLanePlatformAdmitsOnlyBuiltFixtures(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	for _, p := range [][2]string{{"ubuntu", "25.10"}, {"ubuntu", "20.04"}, {"debian", "11"}, {"debian", "14"}, {"fedora", "43"}, {"rhel", "8.10"}, {"opensuse-leap", "16.0"}} {
+	for _, p := range [][2]string{{"ubuntu", "25.10"}, {"ubuntu", "20.04"}, {"debian", "11"}, {"debian", "14"}, {"fedora", "42"}, {"rhel", "8.10"}, {"opensuse-leap", "16.0"}} {
 		if manifestRelease(&labv1.ImageManifest{Distribution: p[0], Version: p[1]}).LabLane(platform.LaneResources) == nil {
 			t.Errorf("%s %s admitted without a native fixture", p[0], p[1])
 		}

@@ -214,6 +214,11 @@ func capabilityTable(page string) (string, error) {
 			} else if c == Advisories && r.BaseCoverage() != nil {
 				cell = "partial: " + gendoc.Escape(r.Advisory.Partial)
 			}
+			for _, arch := range r.Architectures {
+				if reason := r.ArchitectureGates[arch][c]; reason != "" {
+					cell += "; gated on " + arch + ": " + gendoc.Escape(reason)
+				}
+			}
 			row = append(row, cell)
 		}
 		rows = append(rows, row)

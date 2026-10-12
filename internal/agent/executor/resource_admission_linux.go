@@ -18,6 +18,7 @@ import (
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/packageprovider"
@@ -25,6 +26,7 @@ import (
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/sshprovider"
 	"lindm/internal/agent/sysctlprovider"
+	"lindm/internal/custody"
 )
 
 // refuseResourceAdmission records only classified, effect-free native preflight
@@ -118,6 +120,10 @@ func resourceAdmissionCause(err error) (agentv1.ResourceAdmissionRefusalReason, 
 		errors.Is(err, passwordprovider.ErrOutcomeUnknown), errors.Is(err, sysctlprovider.ErrOutcomeUnknown),
 		errors.Is(err, osupdateprovider.ErrOutcomeUnknown), errors.Is(err, sshprovider.ErrOutcomeUnknown):
 		return unspecified, none, false
+	// nativeexec refused the tool before running it: its ancestry is not
+	// root-protected (inventory NativeToolCustody reports which path).
+	case errors.Is(err, nativeexec.ErrUntrustedExecutable) && errors.Is(err, custody.ErrUnsafe):
+		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, true
 	case errors.Is(err, serviceprovider.ErrBaselineUnknown), errors.Is(err, definitionprovider.ErrBaselineUnknown):
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, true
 	// nativefile is the shared protected file boundary of the file provider:

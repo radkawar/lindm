@@ -432,6 +432,11 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 // refusal because another native package frontend held the package lock.
 const ResourceReasonNativeBusy = "native_package_manager_busy"
 
+// ResourceReasonUnsafeToolPath is the server reason for a device-attested,
+// effect-free refusal because a native tool's ancestry is not root-protected;
+// the device's inventory tool custody names the path and its mode.
+const ResourceReasonUnsafeToolPath = "native_tool_path_unprotected"
+
 func EligibleResource(rows []devicedb.ResourceAssignmentResource, now time.Time, interval time.Duration) (*policyv1.ProfileResource, error) {
 	dispositions := make(map[string]int16, len(rows))
 	desired := make(map[string]*policyv1.ProfileResource, len(rows))

@@ -119,6 +119,7 @@ func TestOnlyQualifiedMutableProductsHaveABackend(t *testing.T) {
 	}{
 		{"ubuntu", "24.04", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES},
 		{"fedora", "44", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC},
+		{"fedora", "43", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC},
 		{"rhel", "9.8", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"rhel", "10.2", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC},
 		{"arch", "", resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN},
@@ -129,7 +130,7 @@ func TestOnlyQualifiedMutableProductsHaveABackend(t *testing.T) {
 		{"opensuse-leap", "16.0", 0},
 		{"rhel", "8.10", 0},
 		{"rhel", "100.1", 0},
-		{"fedora", "43", 0},
+		{"fedora", "42", 0},
 		{"debian", "13", 0},
 		{"debian", "12", 0},
 		{"almalinux", "8.10", 0},

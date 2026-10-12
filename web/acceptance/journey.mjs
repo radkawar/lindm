@@ -133,29 +133,51 @@ export async function createToken(ui, config, captureScreens) {
 
 export async function confirmEnrolledDevice(ui, config) {
   const path = `/devices/${encodeURIComponent(config.deviceId)}`;
+  const toolPath = config.expectToolCustodyPath;
   await ui.driver.goto(`${config.origin}${path}`);
-  const deadline = Date.now() + 180_000;
+  // The custody alert needs the first host inventory after enrollment.
+  const deadline = Date.now() + (toolPath ? 420_000 : 180_000);
   let nextRefresh = 0;
   while (Date.now() < deadline) {
-    const state = await ui.driver.observe((expectedPath) => {
-      const section = document.querySelector("#main section[aria-busy]");
-      // The first badge in the device heading is its authoritative lifecycle,
-      // not an enrollment-history row or a phrase elsewhere on the page.
-      const badge = section?.querySelector('[data-slot="badge"]');
-      const visible = badge && badge.getClientRects().length > 0;
-      const refresh = [...(section?.querySelectorAll("button") ?? [])].find(
-        (button) => button.textContent.trim() === "Refresh page",
-      );
-      return {
-        exactDevicePage: location.pathname === expectedPath,
-        lifecycle: visible ? badge.textContent.trim() : "",
-        busy: section?.getAttribute("aria-busy") !== "false",
-        canRefresh: !!refresh && !refresh.disabled,
-      };
-    }, path);
+    const state = await ui.driver.observe(
+      ([expectedPath, expectedToolPath]) => {
+        const section = document.querySelector("#main section[aria-busy]");
+        // The first badge in the device heading is its authoritative lifecycle,
+        // not an enrollment-history row or a phrase elsewhere on the page.
+        const badge = section?.querySelector('[data-slot="badge"]');
+        const visible = badge && badge.getClientRects().length > 0;
+        const refresh = [...(section?.querySelectorAll("button") ?? [])].find(
+          (button) => button.textContent.trim() === "Refresh page",
+        );
+        const alert = section?.querySelector('[data-review-state="tool-custody"]');
+        const codes = [...(alert?.querySelectorAll("code") ?? [])].map((code) =>
+          code.textContent.trim(),
+        );
+        return {
+          exactDevicePage: location.pathname === expectedPath,
+          lifecycle: visible ? badge.textContent.trim() : "",
+          busy: section?.getAttribute("aria-busy") !== "false",
+          canRefresh: !!refresh && !refresh.disabled,
+          toolCustody:
+            alert && alert.getClientRects().length > 0 && codes[0] === expectedToolPath
+              ? {
+                  path: codes[0],
+                  remedy:
+                    codes.includes(`chmod go-w ${expectedToolPath}`) &&
+                    codes.includes("rpm --restore filesystem"),
+                }
+              : undefined,
+        };
+      },
+      [path, toolPath ?? ""],
+    );
     if (!state.exactDevicePage) throw new Error("enrollment_device_page_mismatch");
-    if (!state.busy && state.lifecycle === "Enrolled")
-      return { deviceId: config.deviceId, lifecycle: "Enrolled" };
+    if (!state.busy && state.lifecycle === "Enrolled" && (!toolPath || state.toolCustody?.remedy))
+      return {
+        deviceId: config.deviceId,
+        lifecycle: "Enrolled",
+        ...(toolPath ? { toolCustody: state.toolCustody } : {}),
+      };
     if (state.lifecycle === "Revoked" || state.lifecycle === "Recovery hold")
       throw new Error("enrollment_device_not_active");
     if (state.canRefresh && Date.now() >= nextRefresh) {
@@ -165,7 +187,9 @@ export async function confirmEnrolledDevice(ui, config) {
     }
     await delay(250);
   }
-  throw new Error("enrollment_device_checkin_timeout");
+  throw new Error(
+    toolPath ? "enrollment_tool_custody_alert_timeout" : "enrollment_device_checkin_timeout",
+  );
 }
 
 export async function assignProfile(ui, config) {

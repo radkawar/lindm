@@ -7,6 +7,7 @@ import {
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useUnprotectedToolPath } from "./tool-custody";
 
 export const collectionLabels: Record<CollectionStatus, string> = {
   [CollectionStatus.UNSPECIFIED]: "Not reported",
@@ -29,6 +30,15 @@ export function isOptionalCollectionAbsence(status: CollectionStatus | undefined
   );
 }
 
+/** A native command failure on a device with unprotected tool ancestry is the
+ * agent's refusal; name the path instead of a generic failure. */
+function useCollectionLabel(status: CollectionStatus | undefined) {
+  const unprotected = useUnprotectedToolPath();
+  return status === CollectionStatus.NATIVE_COMMAND_FAILURE && unprotected
+    ? `Refused: ${unprotected.unprotectedPath} is writable by group or other`
+    : (collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status");
+}
+
 export function CollectionStatusText({
   status,
   unavailableLabel,
@@ -36,8 +46,7 @@ export function CollectionStatusText({
   status: CollectionStatus | undefined;
   unavailableLabel?: string;
 }) {
-  const label =
-    collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status";
+  const label = useCollectionLabel(status);
   return (
     <span
       className={
@@ -53,6 +62,7 @@ export function CollectionStatusText({
 }
 
 export function CollectionStatusBadge({ status }: { status: CollectionStatus | undefined }) {
+  const label = useCollectionLabel(status);
   if (isOptionalCollectionAbsence(status)) return <CollectionStatusText status={status} />;
   return (
     <StatusBadge
@@ -65,7 +75,7 @@ export function CollectionStatusBadge({ status }: { status: CollectionStatus | u
             : "destructive"
       }
     >
-      {collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status"}
+      {label}
     </StatusBadge>
   );
 }

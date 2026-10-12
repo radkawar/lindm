@@ -477,6 +477,33 @@ message NativeDetails {
   // Absent on direct unprivileged inspection and historical host evidence.
   // Published inventory attaches the protected executor patch status.
   lindm.agent.v1.PatchStatusObservation patch_status = 18;
+  // Absent only on historical host evidence.
+  NativeToolCustody tool_custody = 19;
+}
+
+// NativeToolCustody is the ancestry the agent requires before it runs any
+// distribution tool: /, /usr and the tool directories must be owned by root
+// and writable by neither group nor other. When unprotected_path is set every
+// native collector and resource provider refuses its tools until an
+// administrator restores the packaged mode (e.g. `chmod go-w /`).
+message NativeToolCustody {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // The first checked directory that is not root-protected; empty when all are.
+  string unprotected_path = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^(/|(/[a-z]+)+)?$"
+  }];
+  uint32 owner_uid = 3;
+  // Permission bits (st_mode & 07777) of unprotected_path.
+  uint32 mode = 4 [(buf.validate.field).uint32.lte = 4095];
+  option (buf.validate.message).cel = {
+    id: "native_tool_custody.shape"
+    message: "only a successful observation names an unprotected path with its owner and mode"
+    expression: "(this.status == 1 && this.unprotected_path != '') || (this.unprotected_path == '' && this.owner_uid == 0u && this.mode == 0u)"
+  };
 }
 
 // Module identity is native RPM MODULARITYLABEL evidence, not a guessed stream.
