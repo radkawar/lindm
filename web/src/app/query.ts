@@ -1,6 +1,7 @@
+import { Code } from "@connectrpc/connect";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
-import { isUnauthenticated } from "@/lib/errors";
+import { isUnauthenticated, toRpcFailure } from "@/lib/errors";
 import { clearCsrfToken } from "@/lib/rpc";
 import { getAuthLifetime, synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 
@@ -29,7 +30,17 @@ export const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      retry: (failureCount, error) => !isUnauthenticated(error) && failureCount < 1,
+      // Refusals and absent targets are answers, not transient failures: retrying
+      // only delays "You don't have access" by the retry backoff.
+      retry: (failureCount, error) => {
+        const failure = toRpcFailure(error);
+        return (
+          !failure.unauthenticated &&
+          !failure.denied &&
+          failure.code !== Code.NotFound &&
+          failureCount < 1
+        );
+      },
     },
     mutations: { retry: false },
   },

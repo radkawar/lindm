@@ -71,7 +71,11 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 	if err := protojson.Unmarshal(metadata, device.Metadata); err != nil {
 		return nil, core.MapErr(core.ErrInternalState)
 	}
-	response := &adminv1.GetDeviceResponse{Device: device}
+	callerPermissions, err := core.DevicePermissions(ctx, q, actor, id)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	response := &adminv1.GetDeviceResponse{Device: device, CallerPermissions: callerPermissions}
 	if row.CurrentGenerationID != nil {
 		update, err := q.GetAgentUpdateReport(ctx, *row.CurrentGenerationID)
 		if err != nil && err != pgx.ErrNoRows {

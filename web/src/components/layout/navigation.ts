@@ -15,131 +15,134 @@ import {
   UserRoundCogIcon,
 } from "lucide-react";
 import type { SessionPrincipal } from "../../../gen/lindm/auth/v1/auth_pb";
-import { canPermission } from "@/lib/permissions";
+import { canPermission, canUseApprovals } from "@/lib/permissions";
+
+// `access` lists the server grants a page needs; any one suffices. Pages over
+// global resources (catalogs, enrollment, audit, accounts) need the grant without
+// a device scope, so a scoped role never sees a page that only refuses it.
+type Access = readonly { readonly permission: string; readonly unrestricted?: true }[];
 
 export const navigation = [
   {
     to: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboardIcon,
-    permission: "fleet.read",
+    access: [{ permission: "fleet.read" }],
     group: "Fleet",
   },
   {
     to: "/devices",
     label: "Devices",
     icon: MonitorIcon,
-    permission: "fleet.read",
+    access: [{ permission: "fleet.read" }],
     group: "Fleet",
   },
   {
     to: "/profiles",
     label: "Profiles",
     icon: LayersIcon,
-    permission: "fleet.read",
+    access: [{ permission: "fleet.read", unrestricted: true }],
     group: "Fleet",
   },
   {
     to: "/rollouts",
     label: "Rollouts",
     icon: RocketIcon,
-    permission: "resources.assign",
+    access: [{ permission: "resources.assign" }],
     group: "Fleet",
   },
   {
     to: "/enrollment",
     label: "Enrollment",
     icon: KeyRoundIcon,
-    permission: "enrollment.manage",
+    access: [{ permission: "enrollment.manage", unrestricted: true }],
     group: "Fleet",
   },
   {
     to: "/advisories",
     label: "Advisories",
     icon: ShieldAlertIcon,
-    permission: "fleet.read",
+    access: [{ permission: "fleet.read" }],
     group: "Security",
   },
   {
     to: "/secrets",
     label: "Secrets",
     icon: LockKeyholeIcon,
-    permission: "secrets.manage",
+    access: [{ permission: "secrets.manage" }],
     group: "Security",
   },
   {
     to: "/approvals",
     label: "Approvals",
     icon: ClipboardCheckIcon,
-    permission: "device.revoke",
+    access: "approvals",
     group: "Security",
   },
   {
     to: "/audit",
     label: "Audit log",
     icon: FileClockIcon,
-    permission: "audit.read",
+    access: [{ permission: "audit.read", unrestricted: true }],
     group: "Security",
   },
   {
     to: "/accounts",
     label: "Accounts",
     icon: UserRoundCogIcon,
-    permission: "accounts.manage",
+    access: [{ permission: "accounts.manage", unrestricted: true }],
     group: "Administration",
   },
   {
     to: "/authorization",
     label: "Authorization",
     icon: ShieldUserIcon,
-    permission: "accounts.manage",
+    access: [{ permission: "accounts.manage", unrestricted: true }],
     group: "Administration",
   },
   {
     to: "/groups",
     label: "Groups",
     icon: UsersIcon,
-    permission: "accounts.manage",
+    access: [
+      { permission: "accounts.manage", unrestricted: true },
+      { permission: "inventory.manage", unrestricted: true },
+    ],
     group: "Administration",
   },
   {
     to: "/integrations",
     label: "Integrations",
     icon: BlocksIcon,
-    permission: "integrations.manage",
+    access: [{ permission: "integrations.manage", unrestricted: true }],
     group: "Administration",
   },
   {
     to: "/settings",
     label: "Settings",
     icon: SettingsIcon,
-    permission: "enrollment.manage",
+    access: [
+      { permission: "enrollment.manage", unrestricted: true },
+      { permission: "inventory.manage", unrestricted: true },
+    ],
     group: "Administration",
   },
-] as const;
+] as const satisfies readonly {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboardIcon;
+  group: "Fleet" | "Security" | "Administration";
+  access: Access | "approvals";
+}[];
 
+// The shell and the command palette share this one decision.
 export function visibleNavigation(principal: SessionPrincipal) {
-  return navigation.filter(
-    (item) =>
-      canPermission(
-        principal,
-        item.permission,
-        item.to === "/groups" ||
-          item.to === "/integrations" ||
-          item.to === "/authorization" ||
-          item.to === "/accounts",
-      ) ||
-      (item.to === "/groups" && canPermission(principal, "inventory.manage", true)) ||
-      (item.to === "/approvals" &&
-        [
-          "approvals.manage",
-          "resources.assign",
-          "execution_trust.manage",
-          "destructive.execute",
-          "recovery_keys.read",
-          "remote_execution.run",
-          "scripts.run",
-          "secrets.reveal",
-        ].some((permission) => canPermission(principal, permission))),
-  );
+  return navigation.filter((item) => {
+    const access: Access | "approvals" = item.access;
+    return access === "approvals"
+      ? canUseApprovals(principal)
+      : access.some(({ permission, unrestricted }) =>
+          canPermission(principal, permission, unrestricted),
+        );
+  });
 }

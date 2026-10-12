@@ -94,6 +94,18 @@ func Permissions(p Principal) []string {
 	return permissions
 }
 
+// UnrestrictedPermissions returns the effective permissions some granting
+// binding holds without a device scope: the grants global resources require.
+func UnrestrictedPermissions(p Principal) []string {
+	permissions := make([]string, 0, len(permissionTable))
+	for _, entry := range permissionTable {
+		if unrestricted, _ := DeviceScopes(p, entry.permission); unrestricted {
+			permissions = append(permissions, string(entry.permission))
+		}
+	}
+	return permissions
+}
+
 // DeviceScopes ORs only bindings granting permission. Scope dimensions are ANDed
 // by the target consumer; an unrestricted granting binding wins over restrictions.
 func DeviceScopes(p Principal, permission Permission) (bool, []*authv1.DeviceScope) {

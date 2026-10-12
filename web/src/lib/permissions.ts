@@ -27,18 +27,34 @@ export const permissionLabels: Record<string, string> = {
   "secrets.reveal": "Reveal secrets",
 };
 
-// The server supplies effective permissions, including emergency-policy intersections.
-// Visibility is only a convenience; every operation is authorized again by the server.
+// The server supplies effective permissions, including emergency-policy intersections,
+// and the subset it grants without a device scope (which global resources such as
+// enrollment, audit, accounts and catalogs require). The console never recomputes
+// either from bindings or a role table. Visibility is only a convenience; every
+// operation is authorized again by the server.
 export function canPermission(
   principal: SessionPrincipal,
   permission: string,
   unrestricted = false,
 ): boolean {
-  if (!principal.permissions.includes(permission)) return false;
-  return (
-    !unrestricted ||
-    principal.bindings.some(
-      (binding) => binding.permissions.includes(permission) && binding.scopes.length === 0,
-    )
+  return (unrestricted ? principal.unrestrictedPermissions : principal.permissions).includes(
+    permission,
   );
+}
+
+// Permissions whose requests can reach the approval inbox, as requester or approver.
+const approvalPermissions = [
+  "approvals.manage",
+  "device.revoke",
+  "resources.assign",
+  "execution_trust.manage",
+  "destructive.execute",
+  "recovery_keys.read",
+  "remote_execution.run",
+  "scripts.run",
+  "secrets.reveal",
+];
+
+export function canUseApprovals(principal: SessionPrincipal): boolean {
+  return approvalPermissions.some((permission) => canPermission(principal, permission));
 }

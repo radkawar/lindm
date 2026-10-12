@@ -27,6 +27,7 @@ import { reviewSSHBanner } from "./review-ssh-banner.mjs";
 import { reviewOSUpdate } from "./review-os-update.mjs";
 import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
 import { reviewOwnerEdits } from "./review-owner-edits.mjs";
+import { reviewRoleWalkthroughs } from "./review-roles.mjs";
 import { popupStability } from "./review-popups.mjs";
 
 process.umask(0o077);
@@ -811,6 +812,20 @@ async function main() {
     for (const edit of report.ownerEdits)
       for (const finding of edit.findings)
         report.failures.push(`owner edit ${edit.route} ${edit.name}: ${finding}`);
+    // Per-role walkthrough before task walkthroughs add requests of their own.
+    report.roleWalkthroughs = await reviewRoleWalkthroughs({
+      ownerPage: pages[0],
+      config,
+      visit,
+      settle,
+      screenshot,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
+    });
+    for (const walkthrough of report.roleWalkthroughs)
+      for (const finding of walkthrough.findings)
+        report.failures.push(`role walkthrough ${walkthrough.role}: ${finding}`);
     const enrollmentResults = await reviewEnrollmentFixtures({
       driver,
       pages,

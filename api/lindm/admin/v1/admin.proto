@@ -278,6 +278,10 @@ message GetDeviceResponse {
   // Absent means unknown. Reports are session-fenced telemetry, not health proof.
   lindm.agent.v1.AgentUpdateStatus agent_update = 6;
   google.protobuf.Timestamp agent_update_received_at = 7;
+  // The caller's effective permissions whose device scope includes this device,
+  // evaluated in the same read snapshot. Presentation only: each action is
+  // authorized again when it is requested.
+  repeated string caller_permissions = 8;
 }
 
 message ListDevicePackagesRequest {

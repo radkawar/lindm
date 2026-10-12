@@ -5,6 +5,7 @@ import {
   advisorySummaryQueryOptions,
 } from "@/features/advisories/queries";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
+import { canPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/advisories")({
   loader: ({ context }) => {
@@ -12,7 +13,10 @@ export const Route = createFileRoute("/_authenticated/advisories")({
     if (lifetime)
       return Promise.all([
         context.queryClient.prefetchQuery(advisorySummaryQueryOptions(lifetime, "")),
-        context.queryClient.prefetchQuery(advisoryFeedsQueryOptions(lifetime)),
+        // Sources are fleet-wide; a device-scoped reader is never shown them.
+        canPermission(context.principal, "fleet.read", true)
+          ? context.queryClient.prefetchQuery(advisoryFeedsQueryOptions(lifetime))
+          : undefined,
       ]);
   },
   component: AdvisoryFleet,

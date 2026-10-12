@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
-import { canPermission } from "@/lib/permissions";
+import { canPermission, canUseApprovals } from "@/lib/permissions";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { fleetSummaryQueryOptions, staleContactUntil } from "./queries";
 import { StaleDevices } from "./stale-devices";
@@ -110,6 +110,10 @@ export function DashboardView() {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const canReadFleet = canPermission(principal, "fleet.read");
+  const canApprove = canUseApprovals(principal);
+  // Advisory sources are fleet-wide; a device-scoped reader sees the coverage fact
+  // and its causes, but reviewing and fixing sources is someone else's task.
+  const canFixCoverage = canPermission(principal, "fleet.read", true);
   const summary = useQuery({ ...fleetSummaryQueryOptions(lifetime), enabled: canReadFleet });
   const failure = summary.error ? toRpcFailure(summary.error) : null;
   // A failed refresh must not present a previous response as current evidence.
@@ -134,9 +138,9 @@ export function DashboardView() {
 
   // Workflow order, not a risk score. Never combine unlike populations.
   const next =
-    approvals && approvals.pendingApprovals > 0n
+    canApprove && approvals && approvals.pendingApprovals > 0n
       ? "approvals"
-      : uncovered > 0n
+      : canFixCoverage && uncovered > 0n
         ? "coverage"
         : contact && contact.staleDevices > 0n && staleFilter
           ? "contact"
@@ -173,7 +177,7 @@ export function DashboardView() {
         description="Review work in your authorized scopes."
         actions={
           <>
-            {canPermission(principal, "enrollment.manage") ? (
+            {canPermission(principal, "enrollment.manage", true) ? (
               <Link to="/enrollment" className={buttonVariants({ variant: "outline" })}>
                 <PlusIcon aria-hidden="true" /> Enroll a device
               </Link>
@@ -197,11 +201,17 @@ export function DashboardView() {
         <Alert data-review-state="blocked">
           <AlertTitle>You can't view the fleet overview</AlertTitle>
           <AlertDescription>
-            Ask an owner for fleet read access. You can still check{" "}
-            <Link to="/approvals" className="underline">
-              Approvals
-            </Link>
-            .
+            Ask an owner for fleet read access.
+            {canApprove ? (
+              <>
+                {" "}
+                You can still check{" "}
+                <Link to="/approvals" className="underline">
+                  Approvals
+                </Link>
+                .
+              </>
+            ) : null}
           </AlertDescription>
         </Alert>
       ) : failure ? (
@@ -233,47 +243,50 @@ export function DashboardView() {
               </p>
             </div>
             <div className="divide-y border-y" data-testid="needs-review">
-              <WorkItem
-                title="Approval requests"
-                primary={next === "approvals"}
-                action={
-                  <Link to="/approvals" className={queueLinkClass(next === "approvals")}>
-                    Review approvals <ArrowUpRightIcon aria-hidden="true" className="size-4" />
-                  </Link>
-                }
-              >
-                {approvals ? (
-                  <p>
-                    {approvals.pendingApprovals > 0n ? (
-                      <>
-                        <strong className="font-semibold tabular-nums">
-                          {plural(
-                            approvals.pendingApprovals,
-                            "pending request",
-                            "pending requests",
-                          )}
-                        </strong>{" "}
-                        in your inbox.
-                      </>
-                    ) : (
-                      "No requests are waiting in your inbox."
-                    )}
-                  </p>
-                ) : (
-                  <Unavailable section="Approval summary" />
-                )}
-                <div className="flex items-center gap-1">
-                  <p className="text-xs text-muted-foreground">
-                    Review targets and effects before approving. Opening the inbox changes nothing.
-                  </p>
-                  <Help label="About approval counts">
-                    Requests waiting in your approval inbox. Another admin must approve each one
-                    before it runs. Pending, unexpired records are counted separately from the fleet
-                    snapshot. A pending request is not a guarantee you can approve it; authority is
-                    checked again at approval.
-                  </Help>
-                </div>
-              </WorkItem>
+              {canApprove ? (
+                <WorkItem
+                  title="Approval requests"
+                  primary={next === "approvals"}
+                  action={
+                    <Link to="/approvals" className={queueLinkClass(next === "approvals")}>
+                      Review approvals <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                    </Link>
+                  }
+                >
+                  {approvals ? (
+                    <p>
+                      {approvals.pendingApprovals > 0n ? (
+                        <>
+                          <strong className="font-semibold tabular-nums">
+                            {plural(
+                              approvals.pendingApprovals,
+                              "pending request",
+                              "pending requests",
+                            )}
+                          </strong>{" "}
+                          in your inbox.
+                        </>
+                      ) : (
+                        "No requests are waiting in your inbox."
+                      )}
+                    </p>
+                  ) : (
+                    <Unavailable section="Approval summary" />
+                  )}
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground">
+                      Review targets and effects before approving. Opening the inbox changes
+                      nothing.
+                    </p>
+                    <Help label="About approval counts">
+                      Requests waiting in your approval inbox. Another admin must approve each one
+                      before it runs. Pending, unexpired records are counted separately from the
+                      fleet snapshot. A pending request is not a guarantee you can approve it;
+                      authority is checked again at approval.
+                    </Help>
+                  </div>
+                </WorkItem>
+              ) : null}
               <WorkItem
                 title={
                   !findings
@@ -284,16 +297,22 @@ export function DashboardView() {
                 }
                 primary={next === "coverage"}
                 action={
-                  <Link to="/advisories" className={queueLinkClass(next === "coverage")}>
-                    {uncovered > 0n ? "See why and fix coverage" : "Review advisory sources"}{" "}
-                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
-                  </Link>
+                  canFixCoverage || uncovered > 0n ? (
+                    <Link to="/advisories" className={queueLinkClass(next === "coverage")}>
+                      {!canFixCoverage
+                        ? "See why"
+                        : uncovered > 0n
+                          ? "See why and fix coverage"
+                          : "Review advisory sources"}{" "}
+                      <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                    </Link>
+                  ) : null
                 }
               >
                 {findings ? (
                   <p className="text-xs text-muted-foreground">
                     {uncovered > 0n
-                      ? "No advisory source has checked these devices' packages, so their exposure is unknown, not zero. Advisories explains the cause and how to add coverage."
+                      ? `No advisory source has checked these devices' packages, so their exposure is unknown, not zero. ${canFixCoverage ? "Advisories explains the cause and how to add coverage." : "Advisories explains the cause; an owner or admin with fleet-wide access fixes coverage."}`
                       : `${plural(findings.partialDevices, "device is", "devices are")} only partly checked.`}
                   </p>
                 ) : (

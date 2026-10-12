@@ -19,6 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import { CoverageBanner } from "./coverage-banner";
@@ -35,10 +37,12 @@ import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./querie
 
 export function AdvisoryFleet() {
   const lifetime = useAuthLifetime();
+  // Advisory sources are fleet-wide; a device-scoped reader sees findings only.
+  const canReviewSources = canPermission(usePrincipal(), "fleet.read", true);
   const [pageToken, setPageToken] = useState("");
   const now = useFreshnessClock();
   const summary = useQuery(advisorySummaryQueryOptions(lifetime, pageToken));
-  const feeds = useQuery(advisoryFeedsQueryOptions(lifetime));
+  const feeds = useQuery({ ...advisoryFeedsQueryOptions(lifetime), enabled: canReviewSources });
   const feedUnknown =
     !feeds.data?.feeds.length ||
     !!feeds.error ||
@@ -53,7 +57,11 @@ export function AdvisoryFleet() {
     <div className="grid min-w-0 gap-6">
       <PageHeader
         title="Advisories"
-        description="Security advisories affecting your devices, and whether advisory sources are up to date."
+        description={
+          canReviewSources
+            ? "Security advisories affecting your devices, and whether advisory sources are up to date."
+            : "Security advisories affecting your devices."
+        }
         actions={
           <Link to="/devices" className="text-sm underline underline-offset-4">
             View findings by device
@@ -64,6 +72,7 @@ export function AdvisoryFleet() {
         <CoverageBanner
           summary={summary.data}
           feeds={feeds.data?.feeds ?? []}
+          canReviewSources={canReviewSources}
           reloading={summary.isFetching}
           onReload={() => void summary.refetch()}
         />
@@ -93,7 +102,7 @@ export function AdvisoryFleet() {
             </div>
           ) : null}
           {summary.error ? <RpcError failure={toRpcFailure(summary.error)} /> : null}
-          {feedUnknown && !summary.data?.unknownDevices ? (
+          {canReviewSources && feedUnknown && !summary.data?.unknownDevices ? (
             <p className="text-sm text-muted-foreground">
               Counts may be incomplete. Check advisory sources below.
             </p>
@@ -179,131 +188,134 @@ export function AdvisoryFleet() {
           />
         </CardContent>
       </Card>
-      <Card id="advisory-sources" className="scroll-mt-4">
-        <CardHeader>
-          <CardTitle>
-            <h2>Advisory sources</h2>
-          </CardTitle>
-          <CardDescription>
-            Findings are only accurate when sources and device inventory are up to date.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <Button
-            className="w-fit"
-            variant="outline"
-            disabled={feeds.isFetching}
-            onClick={() => void feeds.refetch()}
-          >
-            Refresh sources
-          </Button>
-          {feeds.isPending ? (
-            <div role="status" className="grid gap-3">
-              <span className="text-sm text-muted-foreground">Loading advisory sources…</span>
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : null}
-          {feeds.error ? <RpcError failure={toRpcFailure(feeds.error)} /> : null}
-          {feeds.isSuccess && feeds.data.feeds.length === 0 ? (
-            <EmptyState
-              title="No advisory sources set up"
-              description="Add sources under advisories.feeds in the server configuration, then refresh."
-            />
-          ) : null}
-          {feeds.data?.feeds.map((feed) => {
-            const status = sourceStatus(feed, now, !!feeds.error);
-            return (
-              <article
-                key={feed.id}
-                id={sourceAnchor(feed.id)}
-                data-advisory-source=""
-                className="grid min-w-0 scroll-mt-4 gap-2 border bg-muted/20 p-4 text-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="break-words font-semibold">
-                    {feedOSLabel(feed)}
-                    {feed.platformStream ? ` (${feed.platformStream} stream)` : ""}
-                  </h3>
-                  <StatusBadge status={status.tone} data-advisory-source-badge="">
-                    {status.label}
-                  </StatusBadge>
-                </div>
-                <p>
-                  {feed.advisoryCount === 1n
-                    ? "1 advisory"
-                    : `${feed.advisoryCount.toString()} advisories`}
-                </p>
-                <p>
-                  Last refreshed: {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Never"}
-                </p>
-                <p>Expires: {formatTimestamp(feed.expiresAt).local}</p>
-                <p
-                  data-advisory-source-status=""
-                  className={feed.error ? "text-destructive" : "text-muted-foreground"}
+      {canReviewSources ? (
+        <Card id="advisory-sources" className="scroll-mt-4">
+          <CardHeader>
+            <CardTitle>
+              <h2>Advisory sources</h2>
+            </CardTitle>
+            <CardDescription>
+              Findings are only accurate when sources and device inventory are up to date.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <Button
+              className="w-fit"
+              variant="outline"
+              disabled={feeds.isFetching}
+              onClick={() => void feeds.refetch()}
+            >
+              Refresh sources
+            </Button>
+            {feeds.isPending ? (
+              <div role="status" className="grid gap-3">
+                <span className="text-sm text-muted-foreground">Loading advisory sources…</span>
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : null}
+            {feeds.error ? <RpcError failure={toRpcFailure(feeds.error)} /> : null}
+            {feeds.isSuccess && feeds.data.feeds.length === 0 ? (
+              <EmptyState
+                title="No advisory sources set up"
+                description="Add sources under advisories.feeds in the server configuration, then refresh."
+              />
+            ) : null}
+            {feeds.data?.feeds.map((feed) => {
+              const status = sourceStatus(feed, now, !!feeds.error);
+              return (
+                <article
+                  key={feed.id}
+                  id={sourceAnchor(feed.id)}
+                  data-advisory-source=""
+                  className="grid min-w-0 scroll-mt-4 gap-2 border bg-muted/20 p-4 text-sm"
                 >
-                  {status.sentence}
-                </p>
-                {status.remedy ? <p>{status.remedy}</p> : null}
-                {feed.rejectedRecords.length > 0 ? (
-                  <details>
-                    <summary className="cursor-pointer font-medium">
-                      Skipped entries ({feed.rejectedRecords.length})
-                    </summary>
-                    <ul className="mt-3 grid gap-3">
-                      {feed.rejectedRecords.map((record, index) => (
-                        <li
-                          key={`${record.id}:${index}`}
-                          className="grid gap-1 break-words border-l-2 border-warning pl-3"
-                        >
-                          <p className="font-medium">{record.id || "Entry without an ID"}</p>
-                          <p>{record.reason}</p>
-                          <p className="text-muted-foreground">
-                            {record.unscoped
-                              ? "Affected packages unknown."
-                              : `Packages: ${record.packageNames.join(", ")}`}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                ) : null}
-                <TechnicalDetails
-                  items={[
-                    { label: "Source ID", value: feed.id },
-                    { label: "Source URL", value: feed.sourceUrl },
-                    { label: "Last attempt", value: formatTimestamp(feed.attemptedAt).local },
-                    {
-                      label: "Snapshot time",
-                      value: feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : undefined,
-                    },
-                    { label: "Reported error", value: feed.error },
-                    { label: "Snapshot SHA-256", value: feed.sourceSha256 },
-                  ]}
-                >
-                  {feed.artifacts.length > 0 ? (
-                    <ul className="mt-2 grid gap-3">
-                      {feed.artifacts.map((artifact) => (
-                        <li key={artifact.url} className="grid gap-1 break-all">
-                          <p>{artifact.url}</p>
-                          <p className="font-mono">
-                            SHA-256:{" "}
-                            {Array.from(artifact.sha256, (byte) =>
-                              byte.toString(16).padStart(2, "0"),
-                            ).join("")}
-                          </p>
-                          <p className="font-mono">
-                            Signer: {artifact.signerFingerprint || "Not signed"}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="break-words font-semibold">
+                      {feedOSLabel(feed)}
+                      {feed.platformStream ? ` (${feed.platformStream} stream)` : ""}
+                    </h3>
+                    <StatusBadge status={status.tone} data-advisory-source-badge="">
+                      {status.label}
+                    </StatusBadge>
+                  </div>
+                  <p>
+                    {feed.advisoryCount === 1n
+                      ? "1 advisory"
+                      : `${feed.advisoryCount.toString()} advisories`}
+                  </p>
+                  <p>
+                    Last refreshed:{" "}
+                    {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Never"}
+                  </p>
+                  <p>Expires: {formatTimestamp(feed.expiresAt).local}</p>
+                  <p
+                    data-advisory-source-status=""
+                    className={feed.error ? "text-destructive" : "text-muted-foreground"}
+                  >
+                    {status.sentence}
+                  </p>
+                  {status.remedy ? <p>{status.remedy}</p> : null}
+                  {feed.rejectedRecords.length > 0 ? (
+                    <details>
+                      <summary className="cursor-pointer font-medium">
+                        Skipped entries ({feed.rejectedRecords.length})
+                      </summary>
+                      <ul className="mt-3 grid gap-3">
+                        {feed.rejectedRecords.map((record, index) => (
+                          <li
+                            key={`${record.id}:${index}`}
+                            className="grid gap-1 break-words border-l-2 border-warning pl-3"
+                          >
+                            <p className="font-medium">{record.id || "Entry without an ID"}</p>
+                            <p>{record.reason}</p>
+                            <p className="text-muted-foreground">
+                              {record.unscoped
+                                ? "Affected packages unknown."
+                                : `Packages: ${record.packageNames.join(", ")}`}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
                   ) : null}
-                </TechnicalDetails>
-              </article>
-            );
-          })}
-        </CardContent>
-      </Card>
+                  <TechnicalDetails
+                    items={[
+                      { label: "Source ID", value: feed.id },
+                      { label: "Source URL", value: feed.sourceUrl },
+                      { label: "Last attempt", value: formatTimestamp(feed.attemptedAt).local },
+                      {
+                        label: "Snapshot time",
+                        value: feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : undefined,
+                      },
+                      { label: "Reported error", value: feed.error },
+                      { label: "Snapshot SHA-256", value: feed.sourceSha256 },
+                    ]}
+                  >
+                    {feed.artifacts.length > 0 ? (
+                      <ul className="mt-2 grid gap-3">
+                        {feed.artifacts.map((artifact) => (
+                          <li key={artifact.url} className="grid gap-1 break-all">
+                            <p>{artifact.url}</p>
+                            <p className="font-mono">
+                              SHA-256:{" "}
+                              {Array.from(artifact.sha256, (byte) =>
+                                byte.toString(16).padStart(2, "0"),
+                              ).join("")}
+                            </p>
+                            <p className="font-mono">
+                              Signer: {artifact.signerFingerprint || "Not signed"}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </TechnicalDetails>
+                </article>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

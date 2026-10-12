@@ -5,21 +5,33 @@ import { auditQueryOptions } from "@/features/audit/queries";
 import { parseAuditSearch } from "@/features/audit/search";
 import { AuditActorPicker, AuditDevicePicker } from "@/features/audit/pickers";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
+import { RestrictedPage } from "@/components/layout/restricted-page";
+import { canPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/audit")({
   validateSearch: parseAuditSearch,
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => {
     const lifetime = getAuthLifetime();
-    if (lifetime) return context.queryClient.prefetchQuery(auditQueryOptions(lifetime, deps));
+    if (lifetime && canPermission(context.principal, "audit.read", true))
+      return context.queryClient.prefetchQuery(auditQueryOptions(lifetime, deps));
   },
   component: AuditRoute,
   errorComponent: AuditRouteError,
 });
 
 function AuditRoute() {
+  const { principal } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  if (!canPermission(principal, "audit.read", true))
+    return (
+      <RestrictedPage
+        title="Audit log"
+        restriction="The audit log is restricted"
+        reason="The audit log records actions across the whole fleet, so it needs audit permission without a device scope."
+      />
+    );
   return (
     <AuditView
       search={search}

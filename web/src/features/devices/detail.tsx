@@ -1,3 +1,4 @@
+import { Code } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Shield } from "lucide-react";
@@ -74,7 +75,7 @@ export function DeviceDetailView({
   deviceId: string;
   search: PackageSearch;
   onSearch: (next: PackageSearch, replace?: boolean) => void;
-  resources: (assignProfile: () => void) => ReactNode;
+  resources: (assignProfile: (() => void) | undefined) => ReactNode;
   assignDialog: (open: boolean, onOpenChange: (open: boolean) => void) => ReactNode;
   findings: ReactNode;
   // One-line findings state for the Overview posture section.
@@ -105,6 +106,11 @@ export function DeviceDetailView({
   const failure = detail.error ? toRpcFailure(detail.error) : null;
   const data = failure ? undefined : detail.data;
   const device = data?.device;
+  // The server answers NotFound alike for a missing device and one outside the
+  // caller's scope; only a fleet-wide reader knows the device does not exist.
+  const unavailable = failure?.code === Code.NotFound;
+  // Page actions follow the caller's grants on this device, not session-wide ones.
+  const canAssign = !!data?.callerPermissions.includes("resources.assign");
   const host = data?.host?.observation;
   const attempt = data?.packageAttempt;
   const snapshot = data?.currentSnapshot;
@@ -138,7 +144,7 @@ export function DeviceDetailView({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <PageHeader title={device?.hostname.trim() || "Unnamed device"} />
+          <PageHeader title={device ? device.hostname.trim() || "Unnamed device" : "Device"} />
           {device ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <DeviceLifecycleBadge state={device.lifecycleState} />
@@ -173,28 +179,37 @@ export function DeviceDetailView({
         </div>
         {/* At most two page actions: Actions and Assign profile. */}
         <div data-review-next-action className="flex flex-wrap items-center gap-2">
-          {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
-          {device &&
-          device.lifecycleState !== DeviceState.REVOKED &&
-          canPermission(principal, "resources.assign") ? (
+          {data && device ? (
+            <DeviceActionMenu
+              device={device}
+              permissions={data.callerPermissions}
+              revoke={revoke?.(device)}
+            />
+          ) : null}
+          {device && device.lifecycleState !== DeviceState.REVOKED && canAssign ? (
             <Button variant="outline" aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
               <Plus aria-hidden="true" /> Assign profile
             </Button>
           ) : null}
         </div>
       </div>
-      {device && canPermission(principal, "resources.assign")
-        ? assignDialog(assignOpen, setAssignOpen)
-        : null}
+      {device && canAssign ? assignDialog(assignOpen, setAssignOpen) : null}
       {device?.lifecycleState === DeviceState.PENDING ? (
         <Alert>
           <AlertTitle>Waiting for enrollment approval</AlertTitle>
           <AlertDescription>
-            This machine asked to enroll and has not reported inventory yet. Approve or reject it in{" "}
-            <Link to="/enrollment" className="underline underline-offset-4">
-              Enrollment
-            </Link>
-            .
+            This machine asked to enroll and has not reported inventory yet.{" "}
+            {canPermission(principal, "enrollment.manage", true) ? (
+              <>
+                Approve or reject it in{" "}
+                <Link to="/enrollment" className="underline underline-offset-4">
+                  Enrollment
+                </Link>
+                .
+              </>
+            ) : (
+              "An owner or admin approves or rejects it in Enrollment."
+            )}
           </AlertDescription>
         </Alert>
       ) : device?.lifecycleState === DeviceState.REVOKED ? (
@@ -206,7 +221,20 @@ export function DeviceDetailView({
           </AlertDescription>
         </Alert>
       ) : null}
-      {failure ? (
+      {unavailable ? (
+        <Alert data-review-state="blocked">
+          <AlertTitle>
+            {canPermission(principal, "fleet.read", true)
+              ? "This device doesn't exist"
+              : "You don't have access to this device"}
+          </AlertTitle>
+          <AlertDescription>
+            {canPermission(principal, "fleet.read", true)
+              ? "It may have been removed, or the link is wrong. Open it again from the device list."
+              : "It's outside the devices your role covers, or it no longer exists. Ask an organization owner if you need access."}
+          </AlertDescription>
+        </Alert>
+      ) : failure ? (
         <div data-review-state="blocked">
           <RpcError failure={failure} />
         </div>
@@ -532,8 +560,8 @@ export function DeviceDetailView({
             hidden={activeTab !== "resources"}
             className="space-y-4"
           >
-            {resources(() => setAssignOpen(true))}
-            {canPermission(principal, "resources.assign") ? (
+            {resources(canAssign ? () => setAssignOpen(true) : undefined)}
+            {canAssign ? (
               <Link
                 to="/rollouts"
                 search={{ device: deviceId }}

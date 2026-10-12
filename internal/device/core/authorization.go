@@ -68,6 +68,37 @@ func RequireDeviceScope(ctx context.Context, q *devicedb.Queries, principal iden
 	return nil
 }
 
+// DevicePermissions lists the principal's effective permissions whose device
+// scope includes deviceID, for presentation only. Grants sharing one scope set
+// are evaluated once; unrestricted grants need no query.
+func DevicePermissions(ctx context.Context, q *devicedb.Queries, principal identity.Principal, deviceID uuid.UUID) ([]string, error) {
+	effective := identity.Permissions(principal)
+	permissions := make([]string, 0, len(effective))
+	visible := make(map[string]bool)
+	for _, name := range effective {
+		unrestricted, scopes, err := DeviceScopeFilter(principal, identity.Permission(name))
+		if err != nil {
+			return nil, err
+		}
+		if !unrestricted {
+			key := string(scopes)
+			inScope, seen := visible[key]
+			if !seen {
+				inScope, err = q.DeviceInScope(ctx, devicedb.DeviceInScopeParams{ID: deviceID, Scopes: scopes})
+				if err != nil {
+					return nil, err
+				}
+				visible[key] = inScope
+			}
+			if !inScope {
+				continue
+			}
+		}
+		permissions = append(permissions, name)
+	}
+	return permissions, nil
+}
+
 // lockDeviceScope follows the principal-before-device lock order. Metadata and
 // membership writers must also lock the device row so scope cannot change between
 // this check and the mutation's commit.

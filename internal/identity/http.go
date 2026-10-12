@@ -285,17 +285,18 @@ func (s *Service) failCallback(w http.ResponseWriter, status int) {
 
 func writeSession(w http.ResponseWriter, principal Principal) {
 	body, err := (protojson.MarshalOptions{EmitDefaultValues: true}).Marshal(&authv1.SessionPrincipal{
-		Id:             principal.ID.String(),
-		Issuer:         principal.Issuer,
-		Subject:        principal.Subject,
-		DisplayName:    principal.DisplayName,
-		Role:           principal.Role,
-		CsrfToken:      principal.CSRFToken,
-		BreakGlass:     principal.BreakGlass,
-		IncidentReason: principal.IncidentReason,
-		Permissions:    Permissions(principal),
-		ServiceAccount: principal.ServiceAccount,
-		Bindings:       principal.Bindings,
+		Id:                      principal.ID.String(),
+		Issuer:                  principal.Issuer,
+		Subject:                 principal.Subject,
+		DisplayName:             principal.DisplayName,
+		Role:                    principal.Role,
+		CsrfToken:               principal.CSRFToken,
+		BreakGlass:              principal.BreakGlass,
+		IncidentReason:          principal.IncidentReason,
+		Permissions:             Permissions(principal),
+		ServiceAccount:          principal.ServiceAccount,
+		Bindings:                principal.Bindings,
+		UnrestrictedPermissions: UnrestrictedPermissions(principal),
 	})
 	if err != nil {
 		writeStatus(w, http.StatusServiceUnavailable)

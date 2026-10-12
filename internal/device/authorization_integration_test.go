@@ -98,6 +98,35 @@ func TestDeviceScopeReadMatrix(t *testing.T) {
 	}
 }
 
+func TestGetDeviceReportsCallerPermissionsForThatDevice(t *testing.T) {
+	f := newEnrolled(t, 0)
+	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
+	callerPermissions := func(principal identity.Principal) []string {
+		t.Helper()
+		response, err := f.svc.GetDevice(identity.WithPrincipal(f.ctx, principal), connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: f.deviceID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return response.Msg.GetCallerPermissions()
+	}
+	if got, want := callerPermissions(owner), identity.Permissions(owner); !slices.Equal(got, want) {
+		t.Fatalf("owner caller permissions = %v, want %v", got, want)
+	}
+	here := &authv1.DeviceScope{DeviceIds: []string{f.deviceID}}
+	elsewhere := &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}}
+	helpdesk := owner
+	helpdesk.Role = identity.RoleHelpdesk
+	helpdesk.Bindings = []*authv1.RoleBinding{
+		{Role: identity.RoleHelpdesk, Permissions: []string{string(identity.PermissionReadFleet), string(identity.PermissionManageEnrollment)}, Scopes: []*authv1.DeviceScope{here}},
+		{Role: "restarter", Permissions: []string{string(identity.PermissionRunRemoteExecution)}, Scopes: []*authv1.DeviceScope{elsewhere}},
+		{Role: "inventory", Permissions: []string{string(identity.PermissionManageInventory)}},
+	}
+	want := []string{string(identity.PermissionReadFleet), string(identity.PermissionManageEnrollment), string(identity.PermissionManageInventory)}
+	if got := callerPermissions(helpdesk); !slices.Equal(got, want) {
+		t.Fatalf("scoped caller permissions = %v, want %v (no grant scoped to another device)", got, want)
+	}
+}
+
 func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)

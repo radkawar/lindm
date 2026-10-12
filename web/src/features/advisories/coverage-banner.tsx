@@ -195,15 +195,18 @@ function CauseRow({
 
 // Leads /advisories whenever devices are unchecked: why, grouped by cause and OS
 // release, with one remedy per group. Counts come from the same summary as the
-// "Devices not checked" total, so the groups add up to it.
+// "Devices not checked" total, so the groups add up to it. Source remedies need
+// fleet-wide access; other readers are told who acts instead.
 export function CoverageBanner({
   summary,
   feeds,
+  canReviewSources,
   reloading,
   onReload,
 }: {
   summary: ListAdvisorySummaryResponse;
   feeds: readonly AdvisoryFeedStatus[];
+  canReviewSources: boolean;
   reloading: boolean;
   onReload: () => void;
 }) {
@@ -249,6 +252,8 @@ export function CoverageBanner({
                 <Button variant="outline" size="sm" disabled={reloading} onClick={onReload}>
                   {reloading ? "Reloading…" : "Reload status"}
                 </Button>
+              ) : cause.fix !== "devices" && !canReviewSources ? (
+                <p className="text-muted-foreground">An owner or admin manages advisory sources.</p>
               ) : cause.fix === "source" && feed ? (
                 <Link to="/advisories" hash={sourceAnchor(feed.id)} className={fixClass}>
                   Review {feedOSLabel(feed)} source

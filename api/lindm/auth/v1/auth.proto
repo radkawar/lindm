@@ -23,6 +23,10 @@ message SessionPrincipal {
   repeated string permissions = 9;
   bool service_account = 10;
   repeated RoleBinding bindings = 11;
+  // Server-computed subset of permissions granted without a device scope. The
+  // console derives navigation and global controls (enrollment, audit, accounts,
+  // catalogs) from it; every request is still authorized by the server.
+  repeated string unrestricted_permissions = 12;
 }
 
 // All authentication endpoints use protobuf JSON and no-store responses.

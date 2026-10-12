@@ -39,8 +39,12 @@ type SessionPrincipal struct {
 	Permissions    []string               `protobuf:"bytes,9,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	ServiceAccount bool                   `protobuf:"varint,10,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
 	Bindings       []*RoleBinding         `protobuf:"bytes,11,rep,name=bindings,proto3" json:"bindings,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Server-computed subset of permissions granted without a device scope. The
+	// console derives navigation and global controls (enrollment, audit, accounts,
+	// catalogs) from it; every request is still authorized by the server.
+	UnrestrictedPermissions []string `protobuf:"bytes,12,rep,name=unrestricted_permissions,json=unrestrictedPermissions,proto3" json:"unrestricted_permissions,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *SessionPrincipal) Reset() {
@@ -146,6 +150,13 @@ func (x *SessionPrincipal) GetServiceAccount() bool {
 func (x *SessionPrincipal) GetBindings() []*RoleBinding {
 	if x != nil {
 		return x.Bindings
+	}
+	return nil
+}
+
+func (x *SessionPrincipal) GetUnrestrictedPermissions() []string {
+	if x != nil {
+		return x.UnrestrictedPermissions
 	}
 	return nil
 }
@@ -1049,7 +1060,7 @@ var File_lindm_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!lindm/auth/v1/authorization.proto\"\xf7\x02\n" +
+	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!lindm/auth/v1/authorization.proto\"\xb2\x03\n" +
 	"\x10SessionPrincipal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x12\x18\n" +
@@ -1064,7 +1075,8 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\vpermissions\x18\t \x03(\tR\vpermissions\x12'\n" +
 	"\x0fservice_account\x18\n" +
 	" \x01(\bR\x0eserviceAccount\x126\n" +
-	"\bbindings\x18\v \x03(\v2\x1a.lindm.auth.v1.RoleBindingR\bbindings\"\x80\x01\n" +
+	"\bbindings\x18\v \x03(\v2\x1a.lindm.auth.v1.RoleBindingR\bbindings\x129\n" +
+	"\x18unrestricted_permissions\x18\f \x03(\tR\x17unrestrictedPermissions\"\x80\x01\n" +
 	"\x15AuthenticationOptions\x12%\n" +
 	"\x0eexternal_login\x18\x01 \x01(\bR\rexternalLogin\x12\x1f\n" +
 	"\vlocal_login\x18\x02 \x01(\bR\n" +

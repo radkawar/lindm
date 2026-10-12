@@ -1098,8 +1098,12 @@ type GetDeviceResponse struct {
 	// Absent means unknown. Reports are session-fenced telemetry, not health proof.
 	AgentUpdate           *v11.AgentUpdateStatus `protobuf:"bytes,6,opt,name=agent_update,json=agentUpdate,proto3" json:"agent_update,omitempty"`
 	AgentUpdateReceivedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=agent_update_received_at,json=agentUpdateReceivedAt,proto3" json:"agent_update_received_at,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// The caller's effective permissions whose device scope includes this device,
+	// evaluated in the same read snapshot. Presentation only: each action is
+	// authorized again when it is requested.
+	CallerPermissions []string `protobuf:"bytes,8,rep,name=caller_permissions,json=callerPermissions,proto3" json:"caller_permissions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetDeviceResponse) Reset() {
@@ -1177,6 +1181,13 @@ func (x *GetDeviceResponse) GetAgentUpdate() *v11.AgentUpdateStatus {
 func (x *GetDeviceResponse) GetAgentUpdateReceivedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AgentUpdateReceivedAt
+	}
+	return nil
+}
+
+func (x *GetDeviceResponse) GetCallerPermissions() []string {
+	if x != nil {
+		return x.CallerPermissions
 	}
 	return nil
 }
@@ -2552,7 +2563,7 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\vbatch_count\x18\f \x01(\rR\n" +
 	"batchCount\x12#\n" +
 	"\rencoded_bytes\x18\r \x01(\x04R\fencodedBytes\x12-\n" +
-	"\x12packages_available\x18\x0e \x01(\bR\x11packagesAvailable\"\x8c\x04\n" +
+	"\x12packages_available\x18\x0e \x01(\bR\x11packagesAvailable\"\xbb\x04\n" +
 	"\x11GetDeviceResponse\x12.\n" +
 	"\x06device\x18\x01 \x01(\v2\x16.lindm.admin.v1.DeviceR\x06device\x129\n" +
 	"\x04host\x18\x02 \x01(\v2%.lindm.admin.v1.HostObservationDetailR\x04host\x12M\n" +
@@ -2560,7 +2571,8 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x10current_snapshot\x18\x04 \x01(\v2%.lindm.admin.v1.PackageSnapshotDetailR\x0fcurrentSnapshot\x12P\n" +
 	"\x10staging_snapshot\x18\x05 \x01(\v2%.lindm.admin.v1.PackageSnapshotDetailR\x0fstagingSnapshot\x12D\n" +
 	"\fagent_update\x18\x06 \x01(\v2!.lindm.agent.v1.AgentUpdateStatusR\vagentUpdate\x12S\n" +
-	"\x18agent_update_received_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x15agentUpdateReceivedAt\"\xe0\x01\n" +
+	"\x18agent_update_received_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x15agentUpdateReceivedAt\x12-\n" +
+	"\x12caller_permissions\x18\b \x03(\tR\x11callerPermissions\"\xe0\x01\n" +
 	"\x19ListDevicePackagesRequest\x12%\n" +
 	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12%\n" +
 	"\tpage_size\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +

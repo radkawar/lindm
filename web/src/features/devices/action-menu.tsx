@@ -17,8 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { usePrincipal } from "@/hooks/use-permissions";
-import { canPermission } from "@/lib/permissions";
 import { DeviceActionForm } from "./action-form";
 import { actionLabels, actionPermissions, type DeviceActionKind } from "./action-display";
 import { DeviceRevocationImpact } from "./view";
@@ -36,22 +34,27 @@ const simpleKinds: DeviceActionKind[] = [
 export const complexActionKinds = ["cryptoErase", "sanitize", "escrowRotate", "tpm2Bind"] as const;
 export type ComplexActionKind = (typeof complexActionKinds)[number];
 
-export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: ReactNode }) {
-  const principal = usePrincipal();
+// Entries follow the caller's permissions on this device (GetDevice
+// caller_permissions); with none left there is no Actions button, never an empty menu.
+export function DeviceActionMenu({
+  device,
+  permissions,
+  revoke,
+}: {
+  device: Device;
+  permissions: readonly string[];
+  revoke?: ReactNode;
+}) {
   const navigate = useNavigate();
   const trigger = useRef<HTMLButtonElement>(null);
   const [kind, setKind] = useState<DeviceActionKind | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [revokeVisited, setRevokeVisited] = useState(false);
-  const simple = simpleKinds.filter(
-    (value) =>
-      canPermission(principal, actionPermissions[value]) &&
-      (value !== "refreshInventory" || canPermission(principal, "fleet.read")),
-  );
+  const simple = simpleKinds.filter((value) => permissions.includes(actionPermissions[value]));
   const complex = complexActionKinds.filter((value) =>
-    canPermission(principal, actionPermissions[value]),
+    permissions.includes(actionPermissions[value]),
   );
-  const canRevoke = !!revoke && canPermission(principal, "device.revoke");
+  const canRevoke = !!revoke && permissions.includes("device.revoke");
   if (!simple.length && !complex.length && !canRevoke) return null;
   return (
     <>
