@@ -15,7 +15,8 @@ export async function check({ page, visit, require, step }) {
 
   step("press the shortcut in a text field");
   await visit("/devices");
-  const field = main.getByRole("textbox").first();
+  // The device list's hostname filter (a search field) or, failing that, any text field.
+  const field = main.getByRole("searchbox").or(main.getByRole("textbox")).first();
   await field.waitFor({ timeout: 30_000 });
   await field.focus();
   await page.keyboard.press("Control+k");

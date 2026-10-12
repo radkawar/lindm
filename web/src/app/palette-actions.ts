@@ -83,7 +83,7 @@ export const paletteActions: PaletteAction[] = [
     keywords: ["new secret", "password", "credential"],
     icon: LockKeyholeIcon,
     allowed: (principal) => canPermission(principal, "secrets.manage", true),
-    open: (navigate) => navigate({ to: "/secrets" }),
+    open: (navigate) => navigate({ to: "/secrets", search: { create: true } }),
   },
   {
     id: "group",
