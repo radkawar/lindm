@@ -202,17 +202,14 @@ func TestStockUbuntuDesktopUsesRebootSignal(t *testing.T) {
 		prerequisite.Package.GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB || prerequisite.Package.GetArchitecture() != "all" {
 		t.Fatalf("no oracle = %v", err)
 	}
-	// A release without a reboot signal keeps its oracle tool mandatory, and
-	// never queries Ubuntu's signal package.
+	// Other releases never query Ubuntu's signal package (Fedora's stock
+	// oracle is covered by TestStockFedoraPolicyNeedsOnlyDNF5).
 	fedora := &resourcev1.PlatformProduct{OsId: "fedora", Product: "Fedora Linux", Version: "44", Architecture: "x86_64"}
 	rpm := func(_ context.Context, _ string, args ...string) ([]byte, error) {
 		if args[len(args)-1] == "dnf5-plugin-automatic" {
 			return []byte("5.4.6.0-1.fc44\n"), nil
 		}
 		return nil, errNotInstalled
-	}
-	if _, _, err := nativeTools(t.Context(), fedora, rpm); !errors.As(err, &prerequisite) || prerequisite.Package.GetNativeName() != "dnf5-plugins" {
-		t.Fatalf("fedora without dnf5-plugins = %v", err)
 	}
 	if _, err := packageVersion(t.Context(), fedora, "update-notifier-common", rpm); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("fedora queried Ubuntu's signal package: %v", err)
@@ -316,6 +313,55 @@ func TestCompetingSchedulerIsRefusedBeforeAnyEffect(t *testing.T) {
 	rpm.Observation.GetOsUpdate().ConflictingUnits = []string{"dnf-automatic-install.timer"}
 	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, rpm, nil); !errors.Is(err, ErrConflict) {
 		t.Fatalf("enabled dnf-automatic timer was not refused: %v", err)
+	}
+}
+
+// A stock Fedora 44 Workstation has dnf5 5.4.1.0 and neither
+// dnf5-plugin-automatic nor dnf5-plugins. The policy must still converge
+// there (its window runs are what upgrade dnf5 past the package provider's
+// floor), while a native dnf5-automatic timer stays refused.
+func TestStockFedoraPolicyNeedsOnlyDNF5(t *testing.T) {
+	fedora := &resourcev1.PlatformProduct{OsId: "fedora", Product: "Fedora Linux", Version: "44", Architecture: "x86_64"}
+	rpm := func(installed map[string]string) commandRunner {
+		return func(_ context.Context, path string, args ...string) ([]byte, error) {
+			if path != "/usr/bin/rpm" || len(args) != 4 || args[0] != "-q" {
+				t.Fatalf("unexpected native query %s %q", path, args)
+			}
+			if version, ok := installed[args[3]]; ok {
+				return []byte(version + "\n"), nil
+			}
+			return nil, errNotInstalled
+		}
+	}
+	for _, tc := range []struct {
+		name      string
+		installed map[string]string
+		want      string
+	}{
+		{"stock workstation", map[string]string{"dnf5": "5.4.1.0-1.fc44"}, "dnf5 5.4.1.0-1.fc44"},
+		{"automatic plugin installed", map[string]string{"dnf5": "5.4.6.0-1.fc44", "dnf5-plugin-automatic": "5.4.6.0-1.fc44", "dnf5-plugins": "5.4.6.0-1.fc44"}, "dnf5-plugin-automatic 5.4.6.0-1.fc44"},
+	} {
+		version, oracle, err := nativeTools(t.Context(), fedora, rpm(tc.installed))
+		if err != nil || version != tc.want || !oracle {
+			t.Errorf("%s: native tools = %q oracle=%v %v; want %q", tc.name, version, oracle, err, tc.want)
+		}
+	}
+	var prerequisite *PrerequisiteError
+	if _, _, err := nativeTools(t.Context(), fedora, rpm(nil)); !errors.As(err, &prerequisite) || prerequisite.Package.GetNativeName() != "dnf5" || admissiondetail.Of(err) != "native_tool_missing" {
+		t.Fatalf("missing dnf5 = %v", err)
+	}
+
+	p := fixtureProvider(t)
+	p.config.Platform, p.update = fedora, resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC
+	p.backend = &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_DNF5, NativeVersion: "dnf5 5.4.1.0-1.fc44", ProviderVersion: "1", Product: fedora}
+	desired := fixtureDesired()
+	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, fixtureSnapshot(t, p, nil, false, ""), nil); err != nil {
+		t.Fatalf("stock Fedora policy refused: %v", err)
+	}
+	timer := fixtureSnapshot(t, p, nil, false, "")
+	timer.Observation.GetOsUpdate().ConflictingUnits = []string{"dnf5-automatic.timer"}
+	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, timer, nil); !errors.Is(err, ErrConflict) {
+		t.Fatalf("enabled dnf5-automatic timer was not refused: %v", err)
 	}
 }
 

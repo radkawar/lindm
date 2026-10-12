@@ -6130,8 +6130,10 @@ group; every other capability `NOT_ENABLED`). The product reported:
 | `SSH_SERVER system`                      | BLOCKED `existing_banner_file` (base-files `/etc/issue.net`)             | not assigned                                             |
 
 The stock Fedora 44 image has `dnf5 5.4.1.0`, `dnf5-plugins 5.4.1.0` and no
-`dnf5-plugin-automatic` or `cups`; neither the OS update policy nor a package row
-can update DNF5 there (see [Fedora](platforms/fedora.md#capability-policy-facts-signed-provider-grants)).
+`dnf5-plugin-automatic` or `cups`. In this run neither the OS update policy nor a
+package row could update DNF5 there. The OS update policy now needs only `dnf5`
+and `rpm`, so it no longer requires `dnf5-plugin-automatic`. That fix has not been
+re-run on this image yet (see [Fedora](platforms/fedora.md#capability-policy-facts-signed-provider-grants)).
 The Ubuntu golden (live-server ISO plus desktop) has `needrestart 3.6-7ubuntu4.5`,
 `unattended-upgrades 2.9.1+nmu4ubuntu1` and `update-notifier-common
 3.192.68.2`; the stock desktop ISO lacks `needrestart`. After this run the OS

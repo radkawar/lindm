@@ -380,7 +380,7 @@ func (b aptBackend) rebootRequired(ctx context.Context) (bool, error) {
 	return false, failure(reasonOracleFailed, agentv1.PatchRunTool_PATCH_RUN_TOOL_NEEDRESTART, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, result)
 }
 
-// dnfBackend drives dnf5 (Fedora 44) or dnf 4 with dnf-automatic (EL 9/10).
+// dnfBackend drives dnf5 (Fedora 43/44) or dnf 4 with dnf-automatic (EL 9/10).
 type dnfBackend struct{ dnf5 bool }
 
 const (
@@ -388,6 +388,15 @@ const (
 	dnf4Binary   = "/usr/bin/dnf"
 	dnfAutomatic = "/usr/bin/dnf-automatic"
 	rpmBinary    = "/usr/bin/rpm"
+)
+
+// dnf5 command plugins. A stock Fedora 44 Workstation ships neither
+// dnf5-plugin-automatic nor dnf5-plugins, so the runner then reaches the same
+// upgrade goal through `dnf5 upgrade` and the same reboot verdict through rpm;
+// the plugin paths are used whenever the plugins are installed.
+var (
+	dnf5AutomaticPlugin       = []string{"/usr/lib64/dnf5/plugins/automatic_cmd_plugin.so", "/usr/lib/dnf5/plugins/automatic_cmd_plugin.so"}
+	dnf5NeedsRestartingPlugin = []string{"/usr/lib64/dnf5/plugins/needs_restarting_cmd_plugin.so", "/usr/lib/dnf5/plugins/needs_restarting_cmd_plugin.so"}
 )
 
 // dnf5 automatic accepts no configuration path and reads, in order,
@@ -427,11 +436,9 @@ func (b dnfBackend) missingTool(run bool) (agentv1.PatchRunTool, string) {
 		switch {
 		case !executable(dnf5Binary):
 			return agentv1.PatchRunTool_PATCH_RUN_TOOL_DNF5, "dnf5"
-		case !anyRegular("/usr/lib64/dnf5/plugins/needs_restarting_cmd_plugin.so", "/usr/lib/dnf5/plugins/needs_restarting_cmd_plugin.so"):
-			return agentv1.PatchRunTool_PATCH_RUN_TOOL_DNF5, "dnf5-plugins"
-		case run && !anyRegular("/usr/lib64/dnf5/plugins/automatic_cmd_plugin.so", "/usr/lib/dnf5/plugins/automatic_cmd_plugin.so"):
-			return agentv1.PatchRunTool_PATCH_RUN_TOOL_DNF5, "dnf5-plugin-automatic"
-		case run && !executable(rpmBinary):
+		// Runs snapshot the rpmdb; without dnf5-plugins rpm is the reboot
+		// oracle too.
+		case (run || !anyRegular(dnf5NeedsRestartingPlugin...)) && !executable(rpmBinary):
 			return agentv1.PatchRunTool_PATCH_RUN_TOOL_DNF5, "rpm"
 		}
 		return agentv1.PatchRunTool_PATCH_RUN_TOOL_UNSPECIFIED, ""
@@ -539,20 +546,12 @@ func (b dnfBackend) install(ctx context.Context, run installRequest) error {
 	return nil
 }
 
-// installDNF5 runs window updates through `dnf5 automatic`, whose provider-
-// owned configuration must select exactly this run's upgrade type and never
-// reboot on its own. Patch now carries its own selection, which no fixed
-// configuration file can express, so it uses the same solver goal through
-// `dnf5 upgrade [--security]` (automatic's run() builds add_rpm_upgrade with
-// a security advisory filter, the same goal).
+// installDNF5 runs window updates through `dnf5 automatic` when
+// dnf5-plugin-automatic is installed; its provider-owned configuration must
+// select exactly this run's upgrade type and never reboot on its own.
 func (b dnfBackend) installDNF5(ctx context.Context, run installRequest) error {
-	args := dnf5ExcludeArgs(run.deferred)
-	if run.patchNow {
-		args = append(args, "--assumeyes", "upgrade")
-		if run.selection == resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY {
-			args = append(args, "--security")
-		}
-	} else {
+	args, automatic := dnf5InstallArgs(run, anyRegular(dnf5AutomaticPlugin...))
+	if automatic {
 		files := make([][]byte, 0, len(dnf5AutomaticFiles))
 		for _, path := range dnf5AutomaticFiles {
 			data, err := readProtected(path, 64<<10)
@@ -567,13 +566,32 @@ func (b dnfBackend) installDNF5(ctx context.Context, run installRequest) error {
 		if err := checkDNF5Automatic(effectiveDNF5Automatic(files...), run.selection); err != nil {
 			return &nativeFailure{reason: errDNF5AutomaticConfig.Error(), diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_VALIDATION, errDNF5AutomaticConfig.Error())}
 		}
-		args = append(args, "automatic", "--installupdates")
 	}
 	result, err := runCommand(ctx, step{timeout: installTimeout, mutating: true}, dnf5Binary, args...)
 	if err != nil {
 		return failure("native_install_failed", agentv1.PatchRunTool_PATCH_RUN_TOOL_DNF5, agentv1.PatchRunPhase_PATCH_RUN_PHASE_INSTALL, result)
 	}
 	return nil
+}
+
+// dnf5InstallArgs selects the dnf5 transaction and reports whether it is
+// `dnf5 automatic`. Patch now carries its own selection, which no fixed
+// configuration file can express, and a window run without
+// dnf5-plugin-automatic has no automatic command; both use the same solver
+// goal through `dnf5 upgrade [--security]` (automatic's run() builds
+// add_rpm_upgrade with a security advisory filter, and upgrade --security
+// sets the same filter, in 5.4.1.0 as in later releases). Global --exclude
+// options apply to either.
+func dnf5InstallArgs(run installRequest, automaticPlugin bool) ([]string, bool) {
+	args := dnf5ExcludeArgs(run.deferred)
+	if automaticPlugin && !run.patchNow {
+		return append(args, "automatic", "--installupdates"), true
+	}
+	args = append(args, "--assumeyes", "upgrade")
+	if run.selection == resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY {
+		args = append(args, "--security")
+	}
+	return args, false
 }
 
 // oracleArgs runs needs-restarting -r against the rpmdb alone: every
@@ -593,6 +611,9 @@ func (b dnfBackend) oracleArgs() []string {
 }
 
 func (b dnfBackend) rebootRequired(ctx context.Context) (bool, error) {
+	if b.dnf5 && !anyRegular(dnf5NeedsRestartingPlugin...) {
+		return b.rpmRebootRequired(ctx)
+	}
 	result, err := runCommand(ctx, step{timeout: oracleTimeout, stdoutLimit: oracleOutputMax}, b.binary(), b.oracleArgs()...)
 	var exit *nativeexec.ExitError
 	if err == nil || (errors.As(err, &exit) && result.exitCode == 1) {
@@ -602,4 +623,36 @@ func (b dnfBackend) rebootRequired(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, failure(reasonOracleFailed, b.tool(), agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, result)
+}
+
+// rpmRebootRequired is `needs-restarting -r` without dnf5-plugins: the same
+// rpmdb-only verdict the repository-disabled plugin run gives (see
+// oracleArgs), from the install times of the reboot-suggesting core packages.
+func (b dnfBackend) rpmRebootRequired(ctx context.Context) (bool, error) {
+	boot, err := bootUnixSeconds()
+	if err != nil {
+		return false, &nativeFailure{reason: reasonOracleFailed, diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LINDM_AGENT, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, "boot time unavailable")}
+	}
+	result, err := runCommand(ctx, step{timeout: oracleTimeout, stdoutLimit: snapshotOutput}, rpmBinary, "-qa", "--qf", "%{NAME}\t%{INSTALLTIME}\n")
+	if err == nil {
+		required, parseErr := rebootSuggestedSince(result.stdout, boot)
+		if parseErr == nil {
+			return required, nil
+		}
+	}
+	return false, failure(reasonOracleFailed, b.tool(), agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_CHECK, result)
+}
+
+// bootUnixSeconds is the wall-clock second the kernel booted under the
+// current clock (the /proc/stat btime derivation), so a clock step after
+// boot moves it with the install times rpm records.
+func bootUnixSeconds() (int64, error) {
+	var realtime, boottime unix.Timespec
+	if err := unix.ClockGettime(unix.CLOCK_REALTIME, &realtime); err != nil {
+		return 0, err
+	}
+	if err := unix.ClockGettime(unix.CLOCK_BOOTTIME, &boottime); err != nil {
+		return 0, err
+	}
+	return (realtime.Nano() - boottime.Nano()) / int64(time.Second), nil
 }

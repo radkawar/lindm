@@ -610,27 +610,45 @@ moved the lock to `/var/lib/dnf`. No option bypasses the read-only check in
 5.4.1.0, so the 44 release image's DNF5 cannot be used. The floor stays at the
 natively qualified 5.4.6.0 (Fedora 44 updates); 5.4.3.0–5.4.5.0 were not
 exercised. A stock Fedora 44 image refuses package rows with
-`native_tool_outdated` until DNF5 is updated. The OS update policy cannot do
-that on a stock image either: its prerequisite `dnf5-plugin-automatic` is not
-installed (Fedora-Server-dvd-aarch64-44-1.7 with the Workstation environment
-has `dnf5 5.4.1.0` and `dnf5-plugins 5.4.1.0` but no
-`dnf5-plugin-automatic`), so the policy is refused as `native_tool_missing`,
-and a package row installing the plugin is itself refused as
-`native_tool_outdated`. Neither capability bootstraps the other; an
-administrator must run `dnf5 upgrade` (or install `dnf5-plugin-automatic`) on
-the device once
+`native_tool_outdated` until DNF5 is updated; the console's copy for that detail
+says to apply OS updates on the device first. The OS update policy is the product
+path for that. It needs only `dnf5` and `rpm` (see below), so it converges on the
+stock image: Fedora-Server-dvd-aarch64-44-1.7 with the Workstation environment
+has `dnf5 5.4.1.0` and `dnf5-plugins 5.4.1.0` but no `dnf5-plugin-automatic`.
+Before this change the policy was refused there as `native_tool_missing`
 ([verification](../verification.md#out-of-box-capability-policy-two-desktop-demo-2026-10-12)).
+A window run that installs all updates upgrades DNF5 to the current updates
+build, and package rows prepared after that pass the floor.
+
+A security-only policy does not raise DNF5. This includes the Company
+baseline's `system` row. On 2026-10-12 Bodhi listed no Fedora 44 dnf5 update
+after 5.4.1.0 (5.4.2.0 through 5.4.6.0) as a security advisory. The last
+security advisory was for 5.4.0.0-2, which 5.4.1.0 already resolves.
+`dnf5 upgrade --security` skips advisories the installed version resolves
+(libdnf5 `filter_latest_unresolved_advisories`). Such a device needs one run
+that installs all updates: either a policy with selection all, or patch now
+with selection all where `allow_patch_now` is opted in. The capability-hold
+release (`ReleaseCapabilityHolds`) covers only `capability_*` reasons, so it
+does not re-dispatch a row already recorded `native_tool_outdated`. Native
+verification of this stock-image path is pending: on 2026-10-12 the local KVM
+host was busy with other lanes and the Sparks were down.
 
 ### OS update policy (`os.update.v1`)
 
-Fedora 44 uses `dnf5 automatic` under the same lindm window timer, runner and
-release model as [Ubuntu](ubuntu.md#os-update-policy-osupdatev1). Prerequisites
-are `dnf5-plugin-automatic` and `dnf5-plugins` (for `dnf5 needs-restarting`).
+Fedora 44 uses `dnf5 automatic` when `dnf5-plugin-automatic` is installed. It
+runs under the same lindm window timer, runner and release model as
+[Ubuntu](ubuntu.md#os-update-policy-osupdatev1). The only prerequisites are
+`dnf5` and `rpm`. A stock Fedora 44 Workstation has no `dnf5-plugin-automatic`,
+and may also lack `dnf5-plugins` (for `dnf5 needs-restarting`). The runner then
+reaches the same transaction through `dnf5` itself and the same reboot verdict
+through rpm (see below). The observed native version names
+`dnf5-plugin-automatic` when it is installed, and `dnf5` otherwise.
 `dnf5 automatic` accepts no configuration path. It reads
 `/usr/share/dnf5/dnf5-plugins/automatic.conf`, then
 `/etc/dnf/dnf5-plugins/automatic.conf`, then `/etc/dnf/automatic.conf`, and later
 files win per key. The policy therefore owns the `%ghost`
-`/etc/dnf/automatic.conf` in place of the APT override. Its content is
+`/etc/dnf/automatic.conf` in place of the APT override, with or without the
+plugin, so installing the plugin later changes no owned state. Its content is
 `upgrade_type = security|default`, `random_sleep = 0`, download and apply `yes`,
 `reboot = never` and `emit_via = stdio`. An existing unowned file, or an enabled
 or active `dnf5-automatic*.timer`/`dnf-automatic*.timer`, is refused before any
@@ -638,22 +656,40 @@ effect; the provider never disables native units it does not own.
 
 A window run calls `dnf5 -q makecache --refresh`. It lists pending updates with
 `dnf5 --cacheonly repoquery --upgrades --latest-limit=1 [--security]`; security
-means the repository's updateinfo advisory type. It then folds the three
-automatic configuration files in dnf5's order and refuses a mismatch as `FAILED`
-`dnf5_automatic_config_mismatch`. Finally it runs
-`dnf5 [--exclude=name.arch …] automatic --installupdates`. Global `--exclude`
-appends to `excludepkgs` and reaches automatic's upgrade goal. Patch now cannot
-pass its own selection to `dnf5 automatic`, so it uses the same native solver
-directly: `dnf5 --assumeyes upgrade [--security]`. The reboot oracle is
+means the repository's updateinfo advisory type. With `dnf5-plugin-automatic`
+installed, it then folds the three automatic configuration files in dnf5's order
+and refuses a mismatch as `FAILED` `dnf5_automatic_config_mismatch`. Finally it
+runs `dnf5 [--exclude=name.arch …] automatic --installupdates`.
+
+Without the plugin, and for patch now, the run uses the same native solver goal
+directly: `dnf5 [--exclude=name.arch …] --assumeyes upgrade [--security]`. Patch
+now needs this path because it cannot pass its own selection to
+`dnf5 automatic`. Automatic's `run()` and `upgrade --security` both build
+`add_rpm_upgrade` with a security advisory filter (DNF5 5.4.1.0 source).
+Global `--exclude` appends to `excludepkgs` and reaches either goal.
+
+With `dnf5-plugins` installed, the reboot oracle is
 `dnf5 -q --disable-repo=* needs-restarting -r`. With repositories enabled,
 `needs-restarting` also loads filelists and updateinfo, and fails cache-only
 when filelists were never downloaded. Disabling them keeps the verdict on
-installed core packages (kernel, glibc, systemd, dbus, linux-firmware and
-configured extras). Reboot hints that only repository advisories carry are not
-consulted. Missing cached metadata in the offline status reports
+installed core packages. Reboot hints that only repository advisories carry are
+not consulted.
+
+Without `dnf5-plugins`, the runner computes that same rpmdb-only verdict itself
+from `rpm -qa --qf '%{NAME}\t%{INSTALLTIME}\n'`. A reboot is required when one of
+libdnf5's reboot-suggesting core packages was installed after boot. Those are
+5.4.1.0's `CORE_PACKAGE_NAMES`: `kernel`, `kernel-core`, `kernel-PAE`,
+`kernel-rt`, `kernel-smp`, `kernel-xen`, `linux-firmware`, `microcode_ctl`,
+`dbus`, `dbus-broker`, `dbus-daemon`, `glibc`, `hal`, `systemd`, `udev`,
+`gnutls` and `openssl-libs`. "After boot" means an install time later than the
+boot second. The runner derives the boot second as `CLOCK_REALTIME` minus
+`CLOCK_BOOTTIME`, the `/proc/stat` `btime` derivation. `needs-restarting`
+prefers systemd's `UnitsLoadStartTimestamp` instead, which is later by the
+early-boot seconds. Missing cached metadata in the offline status reports
 `native_metadata_unavailable`.
 [Verification](../verification.md#os-update-policy-patch-now-and-patch-status)
-records the native runs with SELinux enforcing.
+records the native runs with SELinux enforcing. Those runs had both plugins
+installed, so the plugin-less path has not been verified natively yet.
 
 Independent `rebootWindow` and bounded `employeeDeferral` use the same protected
 runner state, logind scheduling and authenticated desktop-helper path described

@@ -153,7 +153,9 @@ var (
 		Writers: []string{"/usr/share/update-notifier/notify-reboot-required", "/etc/kernel/postinst.d/update-notifier"}}
 	// DNF5 up to 5.4.2.1 treats --store as system-modifying and refuses a
 	// read-only /usr (fixed in 5.4.3.0); 5.4.6.0 is the natively qualified
-	// floor (docs/platforms/fedora.md, DNF5 floor).
+	// floor (docs/platforms/fedora.md, DNF5 floor). The Fedora 44 release
+	// image carries 5.4.1.0 and no dnf5 plugins; os.update.v1 needs only dnf5
+	// and rpm, so its first window run raises dnf5 above the floor.
 	dnf5 = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
 	// DNF 4.7.0 is EL 8.10's; older DNF4 lacks the plugin selection, strict
 	// remote-RPM and query APIs the DNF4 adapter relies on.

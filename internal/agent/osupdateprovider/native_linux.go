@@ -200,7 +200,7 @@ func rpmArchitecture() string {
 // errNotInstalled; any other failure or ambiguous output is an error.
 func packageVersion(ctx context.Context, platform *resourcev1.PlatformProduct, name string, run commandRunner) (string, error) {
 	switch name {
-	case "unattended-upgrades", "needrestart", "dnf5-plugin-automatic", "dnf5-plugins", "dnf-automatic", "dnf-plugins-core", "pacman", "zypper":
+	case "unattended-upgrades", "needrestart", "dnf5", "dnf5-plugin-automatic", "dnf5-plugins", "dnf-automatic", "dnf-plugins-core", "pacman", "zypper":
 	default:
 		if signal := lindmplatform.Of(platform).Native().RebootSignal; signal == nil || name != signal.Package {
 			return "", ErrUnsupported
@@ -265,8 +265,7 @@ func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run 
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_APT_UNATTENDED_UPGRADES:
 		tool, oracle = "unattended-upgrades", "needrestart"
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF5_AUTOMATIC:
-		// `dnf5 needs-restarting` is a dnf5-plugins command.
-		tool, oracle = "dnf5-plugin-automatic", "dnf5-plugins"
+		return dnf5Tools(ctx, platform, run)
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_DNF4_AUTOMATIC:
 		tool, oracle = "dnf-automatic", "dnf-plugins-core"
 	case resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN:
@@ -297,6 +296,26 @@ func nativeTools(ctx context.Context, platform *resourcev1.PlatformProduct, run 
 		return "", false, err
 	}
 	return tool + " " + version, true, nil
+}
+
+// dnf5Tools needs only dnf5 itself. A stock Fedora 44 Workstation ships
+// neither dnf5-plugin-automatic nor dnf5-plugins: window runs then use
+// `dnf5 upgrade`, and the reboot oracle reads core-package install times from
+// rpm, which dnf5 requires. The installed `dnf5 automatic` plugin names the
+// tool (window runs use it); otherwise dnf5 does, so the first window run's
+// dnf5 upgrade, or a later plugin install, changes the observed version.
+func dnf5Tools(ctx context.Context, platform *resourcev1.PlatformProduct, run commandRunner) (string, bool, error) {
+	for _, tool := range []string{"dnf5-plugin-automatic", "dnf5"} {
+		version, err := packageVersion(ctx, platform, tool, run)
+		if errors.Is(err, errNotInstalled) {
+			continue
+		}
+		if err != nil {
+			return "", false, err
+		}
+		return tool + " " + version, true, nil
+	}
+	return "", false, missingPackage(platform, "dnf5", errNotInstalled)
 }
 
 // aptPeriodicUpgrade reads APT's effective APT::Periodic::Unattended-Upgrade

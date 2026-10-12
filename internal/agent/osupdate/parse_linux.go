@@ -188,6 +188,47 @@ func needsRestartingResult(exitCode int, stdout []byte) (bool, error) {
 	}
 }
 
+// rebootSuggestingPackages are libdnf5's CORE_PACKAGE_NAMES (5.4.1.0
+// libdnf5/rpm/package_query.cpp, filter_reboot_suggested): the installed
+// packages `needs-restarting -r` weighs when no repository is loaded.
+var rebootSuggestingPackages = map[string]bool{
+	"kernel": true, "kernel-core": true, "kernel-PAE": true, "kernel-rt": true, "kernel-smp": true, "kernel-xen": true,
+	"linux-firmware": true, "microcode_ctl": true, "dbus": true, "glibc": true, "hal": true, "systemd": true, "udev": true,
+	"gnutls": true, "openssl-libs": true, "dbus-broker": true, "dbus-daemon": true,
+}
+
+// rebootSuggestedSince reads `rpm -qa --qf '%{NAME}\t%{INSTALLTIME}\n'`: a
+// reboot is required when a reboot-suggesting package was installed after
+// boot (needs-restarting compares install_time > boot_time in seconds). Any
+// malformed row, or an empty database, fails the oracle.
+func rebootSuggestedSince(data []byte, bootUnix int64) (bool, error) {
+	rows, required := 0, false
+	err := scanLines(data, func(line string) error {
+		if line == "" {
+			return nil
+		}
+		if rows++; rows > maxInstalledPackages {
+			return errNativeOutput
+		}
+		name, installed, ok := strings.Cut(line, "\t")
+		if !ok || name == "" {
+			return errNativeOutput
+		}
+		seconds, err := strconv.ParseInt(installed, 10, 64)
+		if err != nil || seconds < 0 {
+			return errNativeOutput
+		}
+		if rebootSuggestingPackages[name] && seconds > bootUnix {
+			required = true
+		}
+		return nil
+	})
+	if err != nil || rows == 0 {
+		return false, errNativeOutput
+	}
+	return required, nil
+}
+
 // parseInstalled reads `NAME\tARCH\tVERSION[\tSTATUS]` rows into a map of
 // sorted, joined versions per package key (installonly packages such as
 // kernels have several). For dpkg only the "ii " (installed) state counts.

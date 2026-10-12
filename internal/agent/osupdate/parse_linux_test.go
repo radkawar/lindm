@@ -335,6 +335,66 @@ func TestDNFRebootOracleDisablesEveryRepository(t *testing.T) {
 	}
 }
 
+// Stock Fedora 44 Workstation has dnf5 5.4.1.0 without dnf5-plugin-automatic:
+// window runs then use the same upgrade goal as patch now through dnf5
+// itself, and `dnf5 automatic` stays the window path once the plugin exists.
+func TestDNF5InstallWithoutAutomaticPluginUsesUpgrade(t *testing.T) {
+	deferred := []packageKey{{"kernel", "x86_64"}}
+	excludes := dnf5ExcludeArgs(deferred)
+	if len(excludes) == 0 {
+		t.Fatal("deferred package not excluded")
+	}
+	security := resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY
+	all := resourcev1.UpdateSelection_UPDATE_SELECTION_ALL
+	for _, tc := range []struct {
+		name          string
+		run           installRequest
+		plugin        bool
+		want          []string
+		wantAutomatic bool
+	}{
+		{"stock window security", installRequest{selection: security, deferred: deferred}, false, []string{"--assumeyes", "upgrade", "--security"}, false},
+		{"stock window all", installRequest{selection: all, deferred: deferred}, false, []string{"--assumeyes", "upgrade"}, false},
+		{"stock patch now", installRequest{selection: security, deferred: deferred, patchNow: true}, false, []string{"--assumeyes", "upgrade", "--security"}, false},
+		{"plugin window", installRequest{selection: security, deferred: deferred}, true, []string{"automatic", "--installupdates"}, true},
+		{"plugin patch now", installRequest{selection: all, deferred: deferred, patchNow: true}, true, []string{"--assumeyes", "upgrade"}, false},
+	} {
+		args, automatic := dnf5InstallArgs(tc.run, tc.plugin)
+		if want := append(slices.Clone(excludes), tc.want...); !slices.Equal(args, want) || automatic != tc.wantAutomatic {
+			t.Errorf("%s: dnf5 %q automatic=%v, want %q automatic=%v", tc.name, args, automatic, want, tc.wantAutomatic)
+		}
+	}
+}
+
+// Without dnf5-plugins the reboot oracle is the rpmdb verdict the
+// repository-disabled `needs-restarting -r` gives: a reboot-suggesting core
+// package installed after boot.
+func TestRPMRebootOracleWeighsCorePackagesInstalledAfterBoot(t *testing.T) {
+	const boot = 1791000000
+	for _, tc := range []struct {
+		name, rows string
+		want       bool
+	}{
+		{"stock image", "kernel-core\t1775000000\nglibc\t1775000000\nbash\t1775000000\n", false},
+		{"application update after boot", "kernel-core\t1775000000\nfirefox\t1791000600\n", false},
+		{"core package installed at the boot second", "systemd\t1791000000\n", false},
+		{"kernel installed after boot", "kernel-core\t1775000000\nkernel-core\t1791000600\nbash\t1775000000\n", true},
+		{"openssl-libs installed after boot", "openssl-libs\t1791000001\n", true},
+	} {
+		if got, err := rebootSuggestedSince([]byte(tc.rows), boot); err != nil || got != tc.want {
+			t.Errorf("%s: required = %v, %v; want %v", tc.name, got, err, tc.want)
+		}
+	}
+	for _, rows := range []string{"", "kernel-core\n", "kernel-core\tnot-a-time\n", "\t1791000600\n", "kernel-core\t-1\n"} {
+		if _, err := rebootSuggestedSince([]byte(rows), boot); err == nil {
+			t.Errorf("malformed rpm output %q accepted", rows)
+		}
+	}
+	if boot, err := bootUnixSeconds(); err != nil || boot <= 0 || boot > time.Now().Unix() {
+		t.Fatalf("boot time = %d, %v", boot, err)
+	}
+}
+
 func TestDNFListMissingCacheIsMetadataUnavailable(t *testing.T) {
 	for _, message := range []string{
 		"Updating and loading repositories:\nCache-only enabled but no cache for repository \"fedora\"\n",
