@@ -221,6 +221,12 @@ test("Kickstart and AutoYaST install in the target chroot and only enable first-
     provisioningSnippet("kickstart", token, instructions, install),
     /ZYPP_LOCKFILE_ROOT/,
   );
+  // An unregistered RHEL 10.2 DVD install has no repository in %post and its
+  // selection lacks openssl/gnupg2, so the profile must list them.
+  assert.match(
+    provisioningSnippet("kickstart", token, instructions, install),
+    /^# list ca-certificates curl gnupg2 openssl in the profile's %packages\.$/m,
+  );
 });
 
 test("autoinstall supplies first-boot cloud-init user-data, not secret shell arguments", () => {

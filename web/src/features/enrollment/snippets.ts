@@ -124,7 +124,9 @@ ${prerequisites}${cloudConfig(secret, instructions, installScript)}
     case "kickstart":
       return `${prerequisites}# Merge this %post section into the complete trusted Kickstart profile.
 # It runs in the installed target, so the installer network must be active
-# (for example network --activate) and reach this server.
+# (for example network --activate) and reach this server. A target with no
+# reachable distribution repository (an unregistered RHEL DVD install) must
+# list ca-certificates curl gnupg2 openssl in the profile's %packages.
 %post --erroronfail --interpreter=/bin/sh
 ${installerScript(secret, instructions, installScript)}
 %end

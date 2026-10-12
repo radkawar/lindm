@@ -9450,6 +9450,51 @@
       "recoveryRepositoryClosureSha256": "0d7092d787d82a590b2b1818db4c5516c940e05dc07d792657745269e87ff545",
       "recoveryRepositoryMetadataSha256": "990c58b81cf28ff8d14ede123cfc6bc39c0cb0484ceba9f0e3e3e772e88d49ff",
       "mainlineRevision": "16ea47e0dc6b0c061f2c7b8ee8101173c4b656b1"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "provision-cloud-init",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-prov-x86-ci-20261012T160008Z/rhel-9/provision-cloud-init-x86_64.json",
+      "sha256": "4a7e744ba948c0441883c26ae43b1abaa1fa71f1dde2cd288773eaf133c9d87b",
+      "recorded": "2026-10-12T18:26:08.548671687Z",
+      "revision": "99100c25b0c8cac11d7d0a22033af6a062b1f455-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "74158b0a02b37ec2c99e377b1ad6bf1ced0ad74d"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "provision-kickstart",
+      "architecture": "aarch64",
+      "manifest": "rhel-10.2-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-ks3-arm-20261012T184640Z/rhel-10/provision-kickstart-aarch64.log",
+      "sha256": "d0fc446112dee284ed67104f5a9773c0d36d2fc463e1b28ac30157ba5afbc2a7",
+      "recorded": "2026-10-12T18:49:01.885478137Z",
+      "revision": "d4c3c79447ebf44a9f8aab46e1ec85ed2773b62f",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "875fa1011c8dc818c2993aa04233e1b474cf1808f581d33db185841729e9cb41",
+      "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "provision-kickstart",
+      "architecture": "aarch64",
+      "manifest": "rhel-10.2-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-ks4-arm-20261012T191647Z/rhel-10/provision-kickstart-aarch64.json",
+      "sha256": "d47c852be6d4dec06e11f8b8e1839954257149d08e3a15cc8a49ebe839134d09",
+      "recorded": "2026-10-12T19:43:21.386321482Z",
+      "revision": "69e21c852d625de705a72522a639b083ba3f04d6-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "875fa1011c8dc818c2993aa04233e1b474cf1808f581d33db185841729e9cb41",
+      "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
     }
   ]
 }

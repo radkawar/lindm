@@ -288,10 +288,13 @@ func TestProvisionKickstartAppendsSnippetAfterEveryLabSection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.HasPrefix(merged, recipe) || !bytes.HasSuffix(merged, snippet) || !bytes.Equal(merged, append(append([]byte{}, lab...), snippet...)) {
-			t.Fatalf("%s: kickstart must be lab recipe, lab sections, then the verbatim snippet", distribution)
+		// The lab profile's %packages gains the snippet's prerequisites (an
+		// unregistered DVD target cannot install them in %post), nothing else.
+		profile := bytes.Replace(recipe, []byte("%packages\n"), []byte("%packages\n"+strings.Join(kickstartSnippetPrerequisites, "\n")+"\n"), 1)
+		if !bytes.HasPrefix(merged, profile) || !bytes.HasSuffix(merged, snippet) || !bytes.Equal(merged, append(append([]byte{}, lab...), snippet...)) {
+			t.Fatalf("%s: kickstart must be lab profile, lab sections, then the verbatim snippet", distribution)
 		}
-		sections := string(lab[len(recipe):])
+		sections := string(lab[len(profile):])
 		if sections != "%post --erroronfail --interpreter=/bin/sh\nset -eu\n"+provisionHostsCommand(provisionTestHost)+"\n%end\n" {
 			t.Fatalf("%s: the only lab section must write the hosts line: %q", distribution, sections)
 		}

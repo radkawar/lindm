@@ -1362,7 +1362,11 @@ it never resets the journal.
   (encoding is not encryption). Where SELinux is enabled the snippet restores the
   labels of `/etc/lindm` and the unit file. DNF and zypper install their
   prerequisites only when `rpm -q` lacks them, because an unregistered RHEL DVD or
-  offline target may have no distribution repository. zypper refreshes and searches
+  offline target may have no distribution repository. Such a Kickstart target must
+  therefore list `ca-certificates curl gnupg2 openssl` in the profile's `%packages`
+  (the snippet's header says so): an unregistered RHEL 10.2 Binary DVD install
+  lacked at least one of them, and its `%post` then had no repository to install
+  it from. zypper refreshes and searches
   only lindmd's repository (`--reposd-dir` holding a copy of `lindm.repo`), so
   install media or unreachable mirrors listed in the target cannot fail or redirect
   the install. YaST holds the system zypp lock (`/run/zypp.pid`) while AutoYaST

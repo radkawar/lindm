@@ -3,6 +3,7 @@
 package vmlab
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -242,6 +244,10 @@ func runProvisionInstaller(ctx context.Context, vm *EncryptedVM, installerPath s
 	return errors.Join(err, closeErr, vm.Kill())
 }
 
+// kickstartSnippetPrerequisites are the tools the console's RPM install
+// script checks with rpm -q before it would install them with DNF.
+var kickstartSnippetPrerequisites = []string{"ca-certificates", "curl", "gnupg2", "openssl"}
+
 // provisionInstallerRecipe merges the snippet into the lab recipe for the
 // format and returns the merged recipe and the lab-owned parts alone.
 func provisionInstallerRecipe(format string, recipe, snippet []byte, host string) (merged, lab []byte, err error) {
@@ -258,6 +264,15 @@ func provisionInstallerRecipe(format string, recipe, snippet []byte, host string
 		merged, err = mergeAutoinstall(snippet, parts)
 		return merged, lab, err
 	case platform.ProvisionKickstart:
+		// The snippet's %post verifies the server CA with openssl and the
+		// repository key with gpg. An unregistered Binary DVD install has no
+		// repository in %post, and RHEL 10.2's selection does not pull in
+		// either tool, so the trusted profile installs them from the DVD.
+		packages, rest, ok := bytes.Cut(recipe, []byte("%packages\n"))
+		if !ok {
+			return nil, nil, errors.New("kickstart recipe has no %packages section")
+		}
+		recipe = slices.Concat(packages, []byte("%packages\n"+strings.Join(kickstartSnippetPrerequisites, "\n")+"\n"), rest)
 		// A lab %post writes the hosts line in the target before the snippet.
 		sections := []byte("%post --erroronfail --interpreter=/bin/sh\nset -eu\n" + hosts + "\n%end\n")
 		lab = append(append([]byte{}, recipe...), sections...)
