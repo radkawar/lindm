@@ -30,6 +30,8 @@ const (
 	serviceConverged
 	// serviceFails starts the unit, which reports a native failure.
 	serviceFails
+	// serviceNotInstalled finds no such unit: systemd has no definition for it.
+	serviceNotInstalled
 )
 
 type encryptionState uint8
@@ -71,6 +73,9 @@ type demoDevice struct {
 	backend       string
 	packages      packageData
 	serial, luks  string
+	// agent is the host's capability-policy-aware executor; nil for an agent
+	// older than capability policies.
+	agent *demoAgent
 }
 
 func dpkg(name, version, source, sourceVersion string) *inventoryv1.Package {
@@ -109,11 +114,12 @@ func demoDevices(source string) ([]*demoDevice, error) {
 		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionUnknown, service: serviceConverged, department: "contractors", labels: []string{"kiosk", "lobby"}, state: "stale"},
 		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", assistance: assistanceOn, encryption: encryptionNone, department: "contractors", labels: []string{"workstation", "retired"}, state: "revoked"},
 		{hostname: "ubuntu-ws-08", key: "ubuntu-24.04", kernel: "6.8.0-142-generic", sessions: 1, encryption: encryptionNone, department: "it-helpdesk", labels: []string{"workstation", "support"}, historical: true},
-		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", headless: true, assistance: assistanceOff, encryption: encryptionLUKS, department: "it-helpdesk", labels: []string{"server", "ci-runner", "gpu"}, bulk: demoScalePackages},
+		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", headless: true, assistance: assistanceOff, encryption: encryptionLUKS, service: serviceNotInstalled, department: "it-helpdesk", labels: []string{"server", "ci-runner", "gpu"}, bulk: demoScalePackages},
 		// A new Engineering laptop that has not reported inventory: Engineering
 		// tools' platform-limited package rows wait for its facts.
 		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
 	}
+	agents := demoAgents()
 	baselines := make(map[string][]*inventoryv1.Package)
 	inventories := make(map[string]packageData)
 	for i, device := range devices {
@@ -162,6 +168,7 @@ func demoDevices(source string) ([]*demoDevice, error) {
 			device.state = "enrolled"
 		}
 		device.serial, device.luks = fmt.Sprintf("DEMO%04d%08X", i+1, uuid.New().ID()), uuid.NewString()
+		device.agent = agents[device.hostname]
 	}
 	return devices, nil
 }
@@ -176,6 +183,9 @@ func (s *demoDevice) observation(historical *inventoryv1.HostObservation, boot s
 	host.Details = syntheticNativeDetails()
 	host.Details.Sessions = s.sessionInventory()
 	host.Details.Platform = s.platform
+	if s.agent != nil {
+		host.Details.CapabilityPolicy = s.agent.report
+	}
 	if s.encryption == encryptionUnknown {
 		return host
 	}
@@ -237,17 +247,34 @@ func (s *demoDevice) sessionInventory() *inventoryv1.SessionCounts {
 }
 
 // immediateResult is the simulated executor's terminal answer for intents
-// it settles without start authority: read-only systemd and encryption
-// compliance findings, or an admission refusal for kinds it cannot observe.
-// Nil means the intent proceeds through the normal start protocol.
+// it settles without start authority: an admission refusal (a capability the
+// host's effective configuration lacks, a create-only collision, a missing
+// unit, or a kind it cannot observe), or read-only systemd and encryption
+// compliance findings. Nil means the intent proceeds through the normal start
+// protocol.
 func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, intentDigest []byte, service *resourcev1.ResourceObservation) (*agentv1.ResourceExecutionStatus, error) {
 	desired := intent.GetDesired()
 	accepted := service.GetMetadata().GetObservedAt()
 	status := &agentv1.ResourceExecutionStatus{ActionId: intent.GetActionId(), IntentSha256: intentDigest, State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, AcceptedAt: accepted, CompletedAt: accepted}
+	refuse := func(reason agentv1.ResourceAdmissionRefusalReason, failure agentv1.ResourceExecutionFailure, capability agentv1.ManagementCapability, detail string) (*agentv1.ResourceExecutionStatus, error) {
+		status.Failure = failure
+		status.AdmissionRefusal = &agentv1.ResourceAdmissionRefusal{Ref: desired.GetRef(), Operation: intent.GetOperation(), Reason: reason, BootId: service.GetMetadata().GetBootId(), ExecutorIncarnation: service.GetMetadata().GetExecutorIncarnation(), NativeEvidenceUnavailable: true, Capability: capability, Detail: detail}
+		return status, nil
+	}
+	unsupported := agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE
+	switch reason, capability, detail := s.agent.admission(desired); {
+	case reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
+		return refuse(reason, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, capability, "")
+	case reason != 0 && intent.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE:
+		return refuse(reason, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, 0, detail)
+	}
 	verification := new(resourcev1.ResourceVerification)
 	var observation *resourcev1.ResourceObservation
 	switch {
 	case desired.GetSystemdService() != nil:
+		if s.service == serviceNotInstalled {
+			return refuse(unsupported, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, 0, "unit_not_installed")
+		}
 		if s.service != serviceConverged {
 			return nil, nil
 		}
@@ -278,9 +305,7 @@ func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, in
 		observation.Observed = &resourcev1.ResourceObservation_EncryptionCompliance{EncryptionCompliance: compliance}
 		verification.Checks = &resourcev1.ResourceVerification_EncryptionCompliance{EncryptionCompliance: checks}
 	default:
-		status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
-		status.AdmissionRefusal = &agentv1.ResourceAdmissionRefusal{Ref: desired.GetRef(), Operation: intent.GetOperation(), Reason: agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, BootId: service.GetMetadata().GetBootId(), ExecutorIncarnation: service.GetMetadata().GetExecutorIncarnation(), NativeEvidenceUnavailable: true}
-		return status, nil
+		return refuse(unsupported, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, 0, "")
 	}
 	desiredDigest, err := resource.DesiredDigest(desired)
 	if err != nil {

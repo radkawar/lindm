@@ -159,6 +159,11 @@ func (r *runner) enrollDevice(ctx context.Context, index int, secret string) (d 
 	if err := r.syncTrust(ctx, d); err != nil {
 		return d, fmt.Errorf("device %d: sync execution trust: %w", index, err)
 	}
+	if d.demo != nil && d.demo.agent != nil {
+		if err := r.acceptCapabilityPolicy(ctx, d); err != nil {
+			return d, fmt.Errorf("device %d: accept capability policy: %w", index, err)
+		}
+	}
 	if d.demo != nil && d.demo.factsWithheld {
 		return d, nil
 	}

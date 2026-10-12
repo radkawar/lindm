@@ -1091,6 +1091,26 @@ risk-acceptance proposal awaiting independent approval, beside one whose finding
 evidence is unavailable; the seed fails when no Affected finding appears instead of
 omitting them.
 
+The organization's `capabilityPolicies` (Kernel settings for
+`fs.inotify.max_user_watches` on Engineering; the USB and kernel module blocklist on
+Finance) apply in the enrollment pass, before devices enroll through the
+department provisioning tokens that place them in those static groups. Right after
+execution trust, as the network process does, the synthetic overlay's
+capability-aware hosts fetch their signed policy, verify it under the fixture
+delegation, derive their providers with the agent's own `capabilitypolicy.Derive`
+from synthetic host evidence and publish the executor status with their first
+inventory, so no status change re-dispatches a refusal; admission then refuses
+through `capabilitypolicy.RequiredCapability`. The hosts cover Enabled, Set locally
+(`ubuntu-srv-04`'s hand-approved `/srv/build/etc` root), Not enabled and Unavailable
+(`ubuntu-ws-02`'s unrecognized vendor key); `rhel-srv-05` keeps an agent that never
+reports. A stand-in vendor key is "recognized" only through a copied registry row;
+the registry is unchanged. Blocked rows show capability refusals (Firewall without
+deployment settings; Engineering packages on `ubuntu-ws-02`, whose Software
+packages are unavailable), create-only collisions (`existing_banner_file` on
+Ubuntu; `existing_account` for `ubuntu-ws-02`'s `developers` group, which leaves
+its dependent `developer` account at `dependency_attention`) and
+`unit_not_installed` (no CUPS on the CI runner).
+
 Advisories come from registry-derived real Ubuntu OSV, Fedora updateinfo and RHEL
 CSAF exports, not single-record fixtures or a loopback feed server. First refresh
 uses the revalidating HTTP cache at `<repo>/.cache/lab/advisories`, shared across

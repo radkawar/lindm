@@ -147,6 +147,51 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			t.Fatalf("device %s lacks the %v %s row: %v", id, row.want, row.key, state.Msg.GetResources())
 		}
 	}
+	// Capability-aware hosts report the status they derived from their signed
+	// policy; rhel-srv-05 runs an agent that never reports. Blocked rows carry
+	// the executor's capability, adoption and missing-unit refusals.
+	statuses, reasons := map[agentv1.CapabilityStatus]bool{}, map[string]bool{}
+	for _, device := range demo.Devices {
+		if device.State != "enrolled" {
+			continue
+		}
+		detail, err := admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: device.ID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		capabilities := detail.Msg.GetCapabilities()
+		reported := capabilities.GetReported()
+		switch device.Hostname {
+		case "ubuntu-ws-01", "ubuntu-ws-02", "fedora-ws-03", "ubuntu-srv-04", demoScaleHostname:
+			if reported.GetState() != agentv1.CapabilityPolicyState_CAPABILITY_POLICY_STATE_ACTIVE || reported.GetAppliedVersion() == 0 || reported.GetAppliedVersion() != capabilities.GetIssuedVersion() {
+				t.Fatalf("%s capability report %v, issued %d", device.Hostname, reported, capabilities.GetIssuedVersion())
+			}
+		case "rhel-srv-05":
+			if reported != nil {
+				t.Fatalf("rhel-srv-05 reported capabilities: %v", reported)
+			}
+		}
+		for _, observed := range reported.GetCapabilities() {
+			statuses[observed.GetStatus()] = true
+		}
+		state, err := admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: device.ID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range state.Msg.GetResources() {
+			reasons[item.GetReason()] = true
+		}
+	}
+	for _, status := range []agentv1.CapabilityStatus{agentv1.CapabilityStatus_CAPABILITY_STATUS_ENABLED, agentv1.CapabilityStatus_CAPABILITY_STATUS_LOCAL, agentv1.CapabilityStatus_CAPABILITY_STATUS_NOT_ENABLED, agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE} {
+		if !statuses[status] {
+			t.Fatalf("no demo host reports %v: %v", status, statuses)
+		}
+	}
+	for _, reason := range []string{"capability_firewall_not_enabled", "capability_packages_not_enabled", "existing_banner_file", "existing_account", "dependency_attention", "unit_not_installed"} {
+		if !reasons[reason] {
+			t.Fatalf("no demo resource is blocked with %s: %v", reason, reasons)
+		}
+	}
 	encryption, err := admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: routes.DeviceID}))
 	if err != nil || encryption.Msg.GetEscrow().GetActionId() != routes.RecoveryActionID || !encryption.Msg.GetEscrow().GetRetirementConfirmed() || !encryption.Msg.GetObservation().GetEncrypted() || !slices.Contains(encryption.Msg.GetObservation().GetLindmKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) || !slices.Contains(encryption.Msg.GetObservation().GetOccupiedKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) {
 		t.Fatalf("route device lacks escrowed encrypted root: %v %v", encryption, err)
