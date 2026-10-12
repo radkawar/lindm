@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
-	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	orgv1 "lindm/gen/lindm/org/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
@@ -42,21 +41,9 @@ func TestDemoStateRejectsIdentityDrift(t *testing.T) {
 	manifest := &labv1.ImageManifest{Sha256: strings.Repeat("a", 64)}
 	spec := &demolab.Spec{Devices: []demolab.Device{{Config: device, Manifest: manifest}}}
 	state := &labv1.DemoState{Bindings: []*labv1.DemoBinding{{Key: device.Key, Device: proto.CloneOf(device), ManifestSha256: manifest.Sha256}}}
-	if changed, err := matchDemoState(state, spec); err != nil || changed {
-		t.Fatalf("unchanged spec: changed=%t err=%v", changed, err)
+	if err := matchDemoState(state, spec); err != nil {
+		t.Fatalf("unchanged spec: %v", err)
 	}
-	// The owner's executor opt-in is local configuration: a resume takes it.
-	optIn := proto.CloneOf(device)
-	optIn.FileProvider = &agentv1.NativeFileProviderConfig{AllowedRoots: []string{"/etc/motd.d"}, KernelModuleBlocklist: true}
-	if changed, err := matchDemoState(state, &demolab.Spec{Devices: []demolab.Device{{Config: optIn, Manifest: manifest}}}); err != nil || !changed || !proto.Equal(state.Bindings[0].Device.GetFileProvider(), optIn.FileProvider) {
-		t.Fatalf("executor opt-in not adopted: changed=%t err=%v", changed, err)
-	}
-	optIn = proto.CloneOf(device)
-	optIn.PackageProvider = &agentv1.NativePackageProviderConfig{Sources: []*agentv1.NativePackageSource{{SigningKeyFile: "/usr/share/keyrings/ubuntu-archive-keyring.gpg"}}}
-	if changed, err := matchDemoState(state, &demolab.Spec{Devices: []demolab.Device{{Config: optIn, Manifest: manifest}}}); err != nil || !changed || !proto.Equal(state.Bindings[0].Device.GetPackageProvider(), optIn.PackageProvider) || state.Bindings[0].Device.GetFileProvider() != nil {
-		t.Fatalf("package source opt-in not adopted: changed=%t err=%v", changed, err)
-	}
-	state.Bindings[0].Device.FileProvider, state.Bindings[0].Device.PackageProvider = nil, nil
 	for name, mutate := range map[string]func(*labv1.DemoDevice){
 		"host":     func(d *labv1.DemoDevice) { d.Host = proto.String("other") },
 		"hostname": func(d *labv1.DemoDevice) { d.Hostname = "replacement" },
@@ -67,16 +54,16 @@ func TestDemoStateRejectsIdentityDrift(t *testing.T) {
 			changed := proto.CloneOf(device)
 			mutate(changed)
 			other := &demolab.Spec{Devices: []demolab.Device{{Config: changed, Manifest: manifest}}}
-			if _, err := matchDemoState(state, other); err == nil {
+			if err := matchDemoState(state, other); err == nil {
 				t.Fatal("accepted changed persistent identity")
 			}
 		})
 	}
 	manifest.Sha256 = strings.Repeat("b", 64)
-	if _, err := matchDemoState(state, spec); err == nil {
+	if err := matchDemoState(state, spec); err == nil {
 		t.Fatal("accepted replaced image bytes")
 	}
-	if _, err := matchDemoState(state, &demolab.Spec{}); err == nil {
+	if err := matchDemoState(state, &demolab.Spec{}); err == nil {
 		t.Fatal("accepted removed device and orphaned its disk")
 	}
 }

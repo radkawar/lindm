@@ -90,6 +90,9 @@ const (
 	// DeviceServiceSyncAssistanceProcedure is the fully-qualified name of the DeviceService's
 	// SyncAssistance RPC.
 	DeviceServiceSyncAssistanceProcedure = "/lindm.device.v1.DeviceService/SyncAssistance"
+	// DeviceServiceGetCapabilityPolicyProcedure is the fully-qualified name of the DeviceService's
+	// GetCapabilityPolicy RPC.
+	DeviceServiceGetCapabilityPolicyProcedure = "/lindm.device.v1.DeviceService/GetCapabilityPolicy"
 )
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
@@ -121,6 +124,9 @@ type DeviceServiceClient interface {
 	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
 	// SyncAssistance exchanges complete assistance state; see assistance.proto.
 	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
+	// Returns this enrollment generation's current signed capability policy,
+	// signing a new version only when the effective server policy changed.
+	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
 }
 
 // NewDeviceServiceClient constructs a client for the lindm.device.v1.DeviceService service. By
@@ -248,6 +254,12 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("SyncAssistance")),
 			connect.WithClientOptions(opts...),
 		),
+		getCapabilityPolicy: connect.NewClient[v1.GetCapabilityPolicyRequest, v1.GetCapabilityPolicyResponse](
+			httpClient,
+			baseURL+DeviceServiceGetCapabilityPolicyProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("GetCapabilityPolicy")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -272,6 +284,7 @@ type deviceServiceClient struct {
 	registerDeviceActionRecovery       *connect.Client[v1.RegisterDeviceActionRecoveryRequest, v1.RegisterDeviceActionRecoveryResponse]
 	confirmRefreshInventoryPublication *connect.Client[v1.ConfirmRefreshInventoryPublicationRequest, v1.ConfirmRefreshInventoryPublicationResponse]
 	syncAssistance                     *connect.Client[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse]
+	getCapabilityPolicy                *connect.Client[v1.GetCapabilityPolicyRequest, v1.GetCapabilityPolicyResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -370,6 +383,11 @@ func (c *deviceServiceClient) SyncAssistance(ctx context.Context, req *connect.R
 	return c.syncAssistance.CallUnary(ctx, req)
 }
 
+// GetCapabilityPolicy calls lindm.device.v1.DeviceService.GetCapabilityPolicy.
+func (c *deviceServiceClient) GetCapabilityPolicy(ctx context.Context, req *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error) {
+	return c.getCapabilityPolicy.CallUnary(ctx, req)
+}
+
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
@@ -399,6 +417,9 @@ type DeviceServiceHandler interface {
 	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
 	// SyncAssistance exchanges complete assistance state; see assistance.proto.
 	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
+	// Returns this enrollment generation's current signed capability policy,
+	// signing a new version only when the effective server policy changed.
+	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
 }
 
 // NewDeviceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -522,6 +543,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("SyncAssistance")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServiceGetCapabilityPolicyHandler := connect.NewUnaryHandler(
+		DeviceServiceGetCapabilityPolicyProcedure,
+		svc.GetCapabilityPolicy,
+		connect.WithSchema(deviceServiceMethods.ByName("GetCapabilityPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DeviceServiceAcquireSessionProcedure:
@@ -562,6 +589,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceConfirmRefreshInventoryPublicationHandler.ServeHTTP(w, r)
 		case DeviceServiceSyncAssistanceProcedure:
 			deviceServiceSyncAssistanceHandler.ServeHTTP(w, r)
+		case DeviceServiceGetCapabilityPolicyProcedure:
+			deviceServiceGetCapabilityPolicyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -645,4 +674,8 @@ func (UnimplementedDeviceServiceHandler) ConfirmRefreshInventoryPublication(cont
 
 func (UnimplementedDeviceServiceHandler) SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.SyncAssistance is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetCapabilityPolicy is not implemented"))
 }

@@ -1077,8 +1077,12 @@ type AptRepository struct {
 	Components    []string               `protobuf:"bytes,3,rep,name=components,proto3" json:"components,omitempty"`
 	Architectures []string               `protobuf:"bytes,4,rep,name=architectures,proto3" json:"architectures,omitempty"`
 	SigningKey    *ArtifactRef           `protobuf:"bytes,5,opt,name=signing_key,json=signingKey,proto3" json:"signing_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Further suites of the same archive (for example noble-updates and
+	// noble-security), resolved in one transaction with the same components,
+	// architectures and signing key. One repository identity covers them all.
+	AdditionalSuites []string `protobuf:"bytes,6,rep,name=additional_suites,json=additionalSuites,proto3" json:"additional_suites,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *AptRepository) Reset() {
@@ -1146,6 +1150,105 @@ func (x *AptRepository) GetSigningKey() *ArtifactRef {
 	return nil
 }
 
+func (x *AptRepository) GetAdditionalSuites() []string {
+	if x != nil {
+		return x.AdditionalSuites
+	}
+	return nil
+}
+
+// A further native repository of the same vendor, verified with the parent
+// RpmRepository's signing keys and signature requirements.
+type RpmAdditionalRepository struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	NativeId string                 `protobuf:"bytes,1,opt,name=native_id,json=nativeId,proto3" json:"native_id,omitempty"`
+	// Types that are valid to be assigned to Location:
+	//
+	//	*RpmAdditionalRepository_BaseUrls
+	//	*RpmAdditionalRepository_Metalink
+	Location      isRpmAdditionalRepository_Location `protobuf_oneof:"location"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RpmAdditionalRepository) Reset() {
+	*x = RpmAdditionalRepository{}
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RpmAdditionalRepository) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RpmAdditionalRepository) ProtoMessage() {}
+
+func (x *RpmAdditionalRepository) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RpmAdditionalRepository.ProtoReflect.Descriptor instead.
+func (*RpmAdditionalRepository) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RpmAdditionalRepository) GetNativeId() string {
+	if x != nil {
+		return x.NativeId
+	}
+	return ""
+}
+
+func (x *RpmAdditionalRepository) GetLocation() isRpmAdditionalRepository_Location {
+	if x != nil {
+		return x.Location
+	}
+	return nil
+}
+
+func (x *RpmAdditionalRepository) GetBaseUrls() *RepositoryURLs {
+	if x != nil {
+		if x, ok := x.Location.(*RpmAdditionalRepository_BaseUrls); ok {
+			return x.BaseUrls
+		}
+	}
+	return nil
+}
+
+func (x *RpmAdditionalRepository) GetMetalink() string {
+	if x != nil {
+		if x, ok := x.Location.(*RpmAdditionalRepository_Metalink); ok {
+			return x.Metalink
+		}
+	}
+	return ""
+}
+
+type isRpmAdditionalRepository_Location interface {
+	isRpmAdditionalRepository_Location()
+}
+
+type RpmAdditionalRepository_BaseUrls struct {
+	BaseUrls *RepositoryURLs `protobuf:"bytes,2,opt,name=base_urls,json=baseUrls,proto3,oneof"`
+}
+
+type RpmAdditionalRepository_Metalink struct {
+	Metalink string `protobuf:"bytes,3,opt,name=metalink,proto3,oneof"`
+}
+
+func (*RpmAdditionalRepository_BaseUrls) isRpmAdditionalRepository_Location() {}
+
+func (*RpmAdditionalRepository_Metalink) isRpmAdditionalRepository_Location() {}
+
 type RepositoryURLs struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
@@ -1155,7 +1258,7 @@ type RepositoryURLs struct {
 
 func (x *RepositoryURLs) Reset() {
 	*x = RepositoryURLs{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[8]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1270,7 @@ func (x *RepositoryURLs) String() string {
 func (*RepositoryURLs) ProtoMessage() {}
 
 func (x *RepositoryURLs) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[8]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1283,7 @@ func (x *RepositoryURLs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryURLs.ProtoReflect.Descriptor instead.
 func (*RepositoryURLs) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{8}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RepositoryURLs) GetUrls() []string {
@@ -1197,17 +1300,24 @@ type RpmRepository struct {
 	//
 	//	*RpmRepository_BaseUrls
 	//	*RpmRepository_Metalink
-	Location                 isRpmRepository_Location `protobuf_oneof:"location"`
-	SigningKeys              []*ArtifactRef           `protobuf:"bytes,4,rep,name=signing_keys,json=signingKeys,proto3" json:"signing_keys,omitempty"`
-	RequireMetadataSignature bool                     `protobuf:"varint,5,opt,name=require_metadata_signature,json=requireMetadataSignature,proto3" json:"require_metadata_signature,omitempty"`
-	RequirePackageSignature  bool                     `protobuf:"varint,6,opt,name=require_package_signature,json=requirePackageSignature,proto3" json:"require_package_signature,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	Location    isRpmRepository_Location `protobuf_oneof:"location"`
+	SigningKeys []*ArtifactRef           `protobuf:"bytes,4,rep,name=signing_keys,json=signingKeys,proto3" json:"signing_keys,omitempty"`
+	// False is accepted only for an HTTPS metalink source: librepo then verifies
+	// repomd.xml against the hashes in the TLS-fetched metalink, and the agent
+	// additionally requires the metalink host to be pinned for the release in the
+	// platform registry. Package signatures are always required.
+	RequireMetadataSignature bool `protobuf:"varint,5,opt,name=require_metadata_signature,json=requireMetadataSignature,proto3" json:"require_metadata_signature,omitempty"`
+	RequirePackageSignature  bool `protobuf:"varint,6,opt,name=require_package_signature,json=requirePackageSignature,proto3" json:"require_package_signature,omitempty"`
+	// Further repositories (for example Fedora updates) resolved in the same
+	// transaction under this one repository identity.
+	AdditionalRepositories []*RpmAdditionalRepository `protobuf:"bytes,7,rep,name=additional_repositories,json=additionalRepositories,proto3" json:"additional_repositories,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *RpmRepository) Reset() {
 	*x = RpmRepository{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[9]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1219,7 +1329,7 @@ func (x *RpmRepository) String() string {
 func (*RpmRepository) ProtoMessage() {}
 
 func (x *RpmRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[9]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1232,7 +1342,7 @@ func (x *RpmRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RpmRepository.ProtoReflect.Descriptor instead.
 func (*RpmRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{9}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RpmRepository) GetNativeId() string {
@@ -1288,6 +1398,13 @@ func (x *RpmRepository) GetRequirePackageSignature() bool {
 	return false
 }
 
+func (x *RpmRepository) GetAdditionalRepositories() []*RpmAdditionalRepository {
+	if x != nil {
+		return x.AdditionalRepositories
+	}
+	return nil
+}
+
 type isRpmRepository_Location interface {
 	isRpmRepository_Location()
 }
@@ -1316,7 +1433,7 @@ type AlpmRepository struct {
 
 func (x *AlpmRepository) Reset() {
 	*x = AlpmRepository{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[10]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1445,7 @@ func (x *AlpmRepository) String() string {
 func (*AlpmRepository) ProtoMessage() {}
 
 func (x *AlpmRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[10]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1458,7 @@ func (x *AlpmRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AlpmRepository.ProtoReflect.Descriptor instead.
 func (*AlpmRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{10}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AlpmRepository) GetNativeName() string {
@@ -1384,7 +1501,7 @@ type FlatpakRemote struct {
 
 func (x *FlatpakRemote) Reset() {
 	*x = FlatpakRemote{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[11]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1513,7 @@ func (x *FlatpakRemote) String() string {
 func (*FlatpakRemote) ProtoMessage() {}
 
 func (x *FlatpakRemote) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[11]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1526,7 @@ func (x *FlatpakRemote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakRemote.ProtoReflect.Descriptor instead.
 func (*FlatpakRemote) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{11}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FlatpakRemote) GetName() string {
@@ -1450,7 +1567,7 @@ type NixCacheKey struct {
 
 func (x *NixCacheKey) Reset() {
 	*x = NixCacheKey{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[12]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1462,7 +1579,7 @@ func (x *NixCacheKey) String() string {
 func (*NixCacheKey) ProtoMessage() {}
 
 func (x *NixCacheKey) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[12]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1475,7 +1592,7 @@ func (x *NixCacheKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NixCacheKey.ProtoReflect.Descriptor instead.
 func (*NixCacheKey) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{12}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NixCacheKey) GetName() string {
@@ -1504,7 +1621,7 @@ type NixInput struct {
 
 func (x *NixInput) Reset() {
 	*x = NixInput{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[13]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1516,7 +1633,7 @@ func (x *NixInput) String() string {
 func (*NixInput) ProtoMessage() {}
 
 func (x *NixInput) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[13]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1529,7 +1646,7 @@ func (x *NixInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NixInput.ProtoReflect.Descriptor instead.
 func (*NixInput) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{13}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NixInput) GetApprovedInputId() string {
@@ -1572,7 +1689,7 @@ type OstreeRemote struct {
 
 func (x *OstreeRemote) Reset() {
 	*x = OstreeRemote{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[14]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1584,7 +1701,7 @@ func (x *OstreeRemote) String() string {
 func (*OstreeRemote) ProtoMessage() {}
 
 func (x *OstreeRemote) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[14]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1597,7 +1714,7 @@ func (x *OstreeRemote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OstreeRemote.ProtoReflect.Descriptor instead.
 func (*OstreeRemote) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{14}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OstreeRemote) GetName() string {
@@ -1648,7 +1765,7 @@ type RepositoryDesired struct {
 
 func (x *RepositoryDesired) Reset() {
 	*x = RepositoryDesired{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[15]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1660,7 +1777,7 @@ func (x *RepositoryDesired) String() string {
 func (*RepositoryDesired) ProtoMessage() {}
 
 func (x *RepositoryDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[15]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1673,7 +1790,7 @@ func (x *RepositoryDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryDesired.ProtoReflect.Descriptor instead.
 func (*RepositoryDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{15}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RepositoryDesired) GetRepositoryId() string {
@@ -1808,7 +1925,7 @@ type FlatpakFilesystemGrant struct {
 
 func (x *FlatpakFilesystemGrant) Reset() {
 	*x = FlatpakFilesystemGrant{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[16]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1820,7 +1937,7 @@ func (x *FlatpakFilesystemGrant) String() string {
 func (*FlatpakFilesystemGrant) ProtoMessage() {}
 
 func (x *FlatpakFilesystemGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[16]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1833,7 +1950,7 @@ func (x *FlatpakFilesystemGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakFilesystemGrant.ProtoReflect.Descriptor instead.
 func (*FlatpakFilesystemGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{16}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FlatpakFilesystemGrant) GetScope() FlatpakFilesystem {
@@ -1862,7 +1979,7 @@ type FlatpakPermissionPolicy struct {
 
 func (x *FlatpakPermissionPolicy) Reset() {
 	*x = FlatpakPermissionPolicy{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[17]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1874,7 +1991,7 @@ func (x *FlatpakPermissionPolicy) String() string {
 func (*FlatpakPermissionPolicy) ProtoMessage() {}
 
 func (x *FlatpakPermissionPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[17]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1887,7 +2004,7 @@ func (x *FlatpakPermissionPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakPermissionPolicy.ProtoReflect.Descriptor instead.
 func (*FlatpakPermissionPolicy) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{17}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *FlatpakPermissionPolicy) GetFilesystems() []*FlatpakFilesystemGrant {
@@ -1934,7 +2051,7 @@ type FlatpakAppDesired struct {
 
 func (x *FlatpakAppDesired) Reset() {
 	*x = FlatpakAppDesired{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[18]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1946,7 +2063,7 @@ func (x *FlatpakAppDesired) String() string {
 func (*FlatpakAppDesired) ProtoMessage() {}
 
 func (x *FlatpakAppDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[18]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1959,7 +2076,7 @@ func (x *FlatpakAppDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlatpakAppDesired.ProtoReflect.Descriptor instead.
 func (*FlatpakAppDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{18}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *FlatpakAppDesired) GetInstallation() *InstallationBinding {
@@ -2036,7 +2153,7 @@ type MaintenanceWindow struct {
 
 func (x *MaintenanceWindow) Reset() {
 	*x = MaintenanceWindow{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[19]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2048,7 +2165,7 @@ func (x *MaintenanceWindow) String() string {
 func (*MaintenanceWindow) ProtoMessage() {}
 
 func (x *MaintenanceWindow) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[19]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2061,7 +2178,7 @@ func (x *MaintenanceWindow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MaintenanceWindow.ProtoReflect.Descriptor instead.
 func (*MaintenanceWindow) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{19}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *MaintenanceWindow) GetTimeZone() string {
@@ -2115,7 +2232,7 @@ type OSUpdateRebootPolicy struct {
 
 func (x *OSUpdateRebootPolicy) Reset() {
 	*x = OSUpdateRebootPolicy{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[20]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2127,7 +2244,7 @@ func (x *OSUpdateRebootPolicy) String() string {
 func (*OSUpdateRebootPolicy) ProtoMessage() {}
 
 func (x *OSUpdateRebootPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[20]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2140,7 +2257,7 @@ func (x *OSUpdateRebootPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdateRebootPolicy.ProtoReflect.Descriptor instead.
 func (*OSUpdateRebootPolicy) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{20}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *OSUpdateRebootPolicy) GetMode() OSUpdateRebootMode {
@@ -2188,7 +2305,7 @@ type OSUpdateRebootDeferral struct {
 
 func (x *OSUpdateRebootDeferral) Reset() {
 	*x = OSUpdateRebootDeferral{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[21]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2200,7 +2317,7 @@ func (x *OSUpdateRebootDeferral) String() string {
 func (*OSUpdateRebootDeferral) ProtoMessage() {}
 
 func (x *OSUpdateRebootDeferral) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[21]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2213,7 +2330,7 @@ func (x *OSUpdateRebootDeferral) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdateRebootDeferral.ProtoReflect.Descriptor instead.
 func (*OSUpdateRebootDeferral) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{21}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *OSUpdateRebootDeferral) GetMaxDeferrals() uint32 {
@@ -2241,7 +2358,7 @@ type RepositorySnapshot struct {
 
 func (x *RepositorySnapshot) Reset() {
 	*x = RepositorySnapshot{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[22]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2253,7 +2370,7 @@ func (x *RepositorySnapshot) String() string {
 func (*RepositorySnapshot) ProtoMessage() {}
 
 func (x *RepositorySnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[22]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2266,7 +2383,7 @@ func (x *RepositorySnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositorySnapshot.ProtoReflect.Descriptor instead.
 func (*RepositorySnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{22}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RepositorySnapshot) GetRepository() *ResourceRef {
@@ -2299,7 +2416,7 @@ type RepositorySnapshots struct {
 
 func (x *RepositorySnapshots) Reset() {
 	*x = RepositorySnapshots{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[23]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2311,7 +2428,7 @@ func (x *RepositorySnapshots) String() string {
 func (*RepositorySnapshots) ProtoMessage() {}
 
 func (x *RepositorySnapshots) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[23]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2324,7 +2441,7 @@ func (x *RepositorySnapshots) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositorySnapshots.ProtoReflect.Descriptor instead.
 func (*RepositorySnapshots) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{23}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RepositorySnapshots) GetRepositories() []*RepositorySnapshot {
@@ -2344,7 +2461,7 @@ type OstreeSnapshot struct {
 
 func (x *OstreeSnapshot) Reset() {
 	*x = OstreeSnapshot{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[24]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2356,7 +2473,7 @@ func (x *OstreeSnapshot) String() string {
 func (*OstreeSnapshot) ProtoMessage() {}
 
 func (x *OstreeSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[24]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2369,7 +2486,7 @@ func (x *OstreeSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OstreeSnapshot.ProtoReflect.Descriptor instead.
 func (*OstreeSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{24}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *OstreeSnapshot) GetRemote() *ResourceRef {
@@ -2396,7 +2513,7 @@ type NixSnapshot struct {
 
 func (x *NixSnapshot) Reset() {
 	*x = NixSnapshot{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[25]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2408,7 +2525,7 @@ func (x *NixSnapshot) String() string {
 func (*NixSnapshot) ProtoMessage() {}
 
 func (x *NixSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[25]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2421,7 +2538,7 @@ func (x *NixSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NixSnapshot.ProtoReflect.Descriptor instead.
 func (*NixSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{25}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *NixSnapshot) GetInput() *NixInput {
@@ -2452,7 +2569,7 @@ type SourceSnapshot struct {
 
 func (x *SourceSnapshot) Reset() {
 	*x = SourceSnapshot{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[26]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2464,7 +2581,7 @@ func (x *SourceSnapshot) String() string {
 func (*SourceSnapshot) ProtoMessage() {}
 
 func (x *SourceSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[26]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2477,7 +2594,7 @@ func (x *SourceSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceSnapshot.ProtoReflect.Descriptor instead.
 func (*SourceSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{26}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SourceSnapshot) GetSource() isSourceSnapshot_Source {
@@ -2550,7 +2667,7 @@ type RollingUpdateSnapshot struct {
 
 func (x *RollingUpdateSnapshot) Reset() {
 	*x = RollingUpdateSnapshot{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[27]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2562,7 +2679,7 @@ func (x *RollingUpdateSnapshot) String() string {
 func (*RollingUpdateSnapshot) ProtoMessage() {}
 
 func (x *RollingUpdateSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[27]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2575,7 +2692,7 @@ func (x *RollingUpdateSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollingUpdateSnapshot.ProtoReflect.Descriptor instead.
 func (*RollingUpdateSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{27}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RollingUpdateSnapshot) GetDate() string {
@@ -2619,7 +2736,7 @@ type OSUpdateDesired struct {
 
 func (x *OSUpdateDesired) Reset() {
 	*x = OSUpdateDesired{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[28]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2631,7 +2748,7 @@ func (x *OSUpdateDesired) String() string {
 func (*OSUpdateDesired) ProtoMessage() {}
 
 func (x *OSUpdateDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[28]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2644,7 +2761,7 @@ func (x *OSUpdateDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdateDesired.ProtoReflect.Descriptor instead.
 func (*OSUpdateDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{28}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *OSUpdateDesired) GetSelection() UpdateSelection {
@@ -2694,7 +2811,7 @@ type SnapInterfaceGrant struct {
 
 func (x *SnapInterfaceGrant) Reset() {
 	*x = SnapInterfaceGrant{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[29]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2706,7 +2823,7 @@ func (x *SnapInterfaceGrant) String() string {
 func (*SnapInterfaceGrant) ProtoMessage() {}
 
 func (x *SnapInterfaceGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[29]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2719,7 +2836,7 @@ func (x *SnapInterfaceGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapInterfaceGrant.ProtoReflect.Descriptor instead.
 func (*SnapInterfaceGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{29}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SnapInterfaceGrant) GetInterface() SnapInterface {
@@ -2765,7 +2882,7 @@ type SnapAppDesired struct {
 
 func (x *SnapAppDesired) Reset() {
 	*x = SnapAppDesired{}
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[30]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2777,7 +2894,7 @@ func (x *SnapAppDesired) String() string {
 func (*SnapAppDesired) ProtoMessage() {}
 
 func (x *SnapAppDesired) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_resource_v1_software_proto_msgTypes[30]
+	mi := &file_lindm_resource_v1_software_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2790,7 +2907,7 @@ func (x *SnapAppDesired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapAppDesired.ProtoReflect.Descriptor instead.
 func (*SnapAppDesired) Descriptor() ([]byte, []int) {
-	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{30}
+	return file_lindm_resource_v1_software_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SnapAppDesired) GetName() string {
@@ -2887,7 +3004,7 @@ const file_lindm_resource_v1_software_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\aremoval:\xa1\x03\xbaH\x9d\x03\x1a^\n" +
 	"\x19native_package.repository\x12%source must be an approved repository\x1a\x1athis.repository.kind == 13\x1a\xba\x02\n" +
 	"\x16native_package.version\x12*exact version must match package ecosystem\x1a\xf3\x01!has(this.exact) || ((this.package.ecosystem == 1 && has(this.exact.deb)) || (this.package.ecosystem == 2 && has(this.exact.rpm)) || (this.package.ecosystem == 3 && has(this.exact.alpm)) || (this.package.ecosystem == 4 && has(this.exact.nix)))B\x10\n" +
-	"\aversion\x12\x05\xbaH\x02\b\x01\"\xe9\x02\n" +
+	"\aversion\x12\x05\xbaH\x02\b\x01\"\xd1\x04\n" +
 	"\rAptRepository\x12/\n" +
 	"\x03uri\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x18\x18\x80\x102\x10^https://[^@#]+$\x88\x01\x01R\x03uri\x12>\n" +
 	"\x05suite\x18\x02 \x01(\tB(\xbaH%r#\x10\x01\x18\x80\x012\x1c^[a-zA-Z0-9][a-zA-Z0-9_.-]*$R\x05suite\x12Q\n" +
@@ -2896,17 +3013,27 @@ const file_lindm_resource_v1_software_proto_rawDesc = "" +
 	"components\x12K\n" +
 	"\rarchitectures\x18\x04 \x03(\tB%\xbaH\"\x92\x01\x1f\b\x01\x10 \x18\x01\"\x17r\x15\x18@2\x11^[a-zA-Z0-9_.-]+$R\rarchitectures\x12G\n" +
 	"\vsigning_key\x18\x05 \x01(\v2\x1e.lindm.resource.v1.ArtifactRefB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"signingKey\"N\n" +
+	"signingKey\x12^\n" +
+	"\x11additional_suites\x18\x06 \x03(\tB1\xbaH.\x92\x01+\x10\x04\x18\x01\"%r#\x10\x01\x18\x80\x012\x1c^[a-zA-Z0-9][a-zA-Z0-9_.-]*$R\x10additionalSuites:\x85\x01\xbaH\x81\x01\x1a\x7f\n" +
+	"\x1eapt_repository.distinct_suites\x124additional suites must differ from the primary suite\x1a'!(this.suite in this.additional_suites)\"\xe7\x01\n" +
+	"\x17RpmAdditionalRepository\x12:\n" +
+	"\tnative_id\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18\x80\x012\x11^[a-zA-Z0-9_.-]+$R\bnativeId\x12@\n" +
+	"\tbase_urls\x18\x02 \x01(\v2!.lindm.resource.v1.RepositoryURLsH\x00R\bbaseUrls\x12;\n" +
+	"\bmetalink\x18\x03 \x01(\tB\x1d\xbaH\x1ar\x18\x18\x80\x102\x10^https://[^@#]+$\x88\x01\x01H\x00R\bmetalinkB\x11\n" +
+	"\blocation\x12\x05\xbaH\x02\b\x01\"N\n" +
 	"\x0eRepositoryURLs\x12<\n" +
-	"\x04urls\x18\x01 \x03(\tB(\xbaH%\x92\x01\"\b\x01\x10\x10\x18\x01\"\x1ar\x18\x18\x80\x102\x10^https://[^@#]+$\x88\x01\x01R\x04urls\"\xb8\x03\n" +
+	"\x04urls\x18\x01 \x03(\tB(\xbaH%\x92\x01\"\b\x01\x10\x10\x18\x01\"\x1ar\x18\x18\x80\x102\x10^https://[^@#]+$\x88\x01\x01R\x04urls\"\xea\a\n" +
 	"\rRpmRepository\x12:\n" +
 	"\tnative_id\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18\x80\x012\x11^[a-zA-Z0-9_.-]+$R\bnativeId\x12@\n" +
 	"\tbase_urls\x18\x02 \x01(\v2!.lindm.resource.v1.RepositoryURLsH\x00R\bbaseUrls\x12;\n" +
 	"\bmetalink\x18\x03 \x01(\tB\x1d\xbaH\x1ar\x18\x18\x80\x102\x10^https://[^@#]+$\x88\x01\x01H\x00R\bmetalink\x12M\n" +
 	"\fsigning_keys\x18\x04 \x03(\v2\x1e.lindm.resource.v1.ArtifactRefB\n" +
-	"\xbaH\a\x92\x01\x04\b\x01\x10\x10R\vsigningKeys\x12E\n" +
-	"\x1arequire_metadata_signature\x18\x05 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x18requireMetadataSignature\x12C\n" +
-	"\x19require_package_signature\x18\x06 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x17requirePackageSignatureB\x11\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10\x10R\vsigningKeys\x12<\n" +
+	"\x1arequire_metadata_signature\x18\x05 \x01(\bR\x18requireMetadataSignature\x12C\n" +
+	"\x19require_package_signature\x18\x06 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x17requirePackageSignature\x12m\n" +
+	"\x17additional_repositories\x18\a \x03(\v2*.lindm.resource.v1.RpmAdditionalRepositoryB\b\xbaH\x05\x92\x01\x02\x10\x04R\x16additionalRepositories:\xc9\x03\xbaH\xc5\x03\x1a\xe1\x01\n" +
+	"\"rpm_repository.distinct_native_ids\x12$repository native IDs must be unique\x1a\x94\x01this.additional_repositories.all(a, a.native_id != this.native_id && this.additional_repositories.filter(b, b.native_id == a.native_id).size() == 1)\x1a\xde\x01\n" +
+	"$rpm_repository.metadata_authenticity\x12Eunsigned repository metadata is accepted only through HTTPS metalinks\x1aothis.require_metadata_signature || (has(this.metalink) && this.additional_repositories.all(a, has(a.metalink)))B\x11\n" +
 	"\blocation\x12\x05\xbaH\x02\b\x01\"\xa3\x02\n" +
 	"\x0eAlpmRepository\x12>\n" +
 	"\vnative_name\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18\x80\x012\x11^[a-zA-Z0-9_.-]+$R\n" +
@@ -3115,7 +3242,7 @@ func file_lindm_resource_v1_software_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_resource_v1_software_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
-var file_lindm_resource_v1_software_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_lindm_resource_v1_software_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_lindm_resource_v1_software_proto_goTypes = []any{
 	(PackageEcosystem)(0),           // 0: lindm.resource.v1.PackageEcosystem
 	(PackageRemovalPolicy)(0),       // 1: lindm.resource.v1.PackageRemovalPolicy
@@ -3135,34 +3262,35 @@ var file_lindm_resource_v1_software_proto_goTypes = []any{
 	(*NativeVersion)(nil),           // 15: lindm.resource.v1.NativeVersion
 	(*NativePackageDesired)(nil),    // 16: lindm.resource.v1.NativePackageDesired
 	(*AptRepository)(nil),           // 17: lindm.resource.v1.AptRepository
-	(*RepositoryURLs)(nil),          // 18: lindm.resource.v1.RepositoryURLs
-	(*RpmRepository)(nil),           // 19: lindm.resource.v1.RpmRepository
-	(*AlpmRepository)(nil),          // 20: lindm.resource.v1.AlpmRepository
-	(*FlatpakRemote)(nil),           // 21: lindm.resource.v1.FlatpakRemote
-	(*NixCacheKey)(nil),             // 22: lindm.resource.v1.NixCacheKey
-	(*NixInput)(nil),                // 23: lindm.resource.v1.NixInput
-	(*OstreeRemote)(nil),            // 24: lindm.resource.v1.OstreeRemote
-	(*RepositoryDesired)(nil),       // 25: lindm.resource.v1.RepositoryDesired
-	(*FlatpakFilesystemGrant)(nil),  // 26: lindm.resource.v1.FlatpakFilesystemGrant
-	(*FlatpakPermissionPolicy)(nil), // 27: lindm.resource.v1.FlatpakPermissionPolicy
-	(*FlatpakAppDesired)(nil),       // 28: lindm.resource.v1.FlatpakAppDesired
-	(*MaintenanceWindow)(nil),       // 29: lindm.resource.v1.MaintenanceWindow
-	(*OSUpdateRebootPolicy)(nil),    // 30: lindm.resource.v1.OSUpdateRebootPolicy
-	(*OSUpdateRebootDeferral)(nil),  // 31: lindm.resource.v1.OSUpdateRebootDeferral
-	(*RepositorySnapshot)(nil),      // 32: lindm.resource.v1.RepositorySnapshot
-	(*RepositorySnapshots)(nil),     // 33: lindm.resource.v1.RepositorySnapshots
-	(*OstreeSnapshot)(nil),          // 34: lindm.resource.v1.OstreeSnapshot
-	(*NixSnapshot)(nil),             // 35: lindm.resource.v1.NixSnapshot
-	(*SourceSnapshot)(nil),          // 36: lindm.resource.v1.SourceSnapshot
-	(*RollingUpdateSnapshot)(nil),   // 37: lindm.resource.v1.RollingUpdateSnapshot
-	(*OSUpdateDesired)(nil),         // 38: lindm.resource.v1.OSUpdateDesired
-	(*SnapInterfaceGrant)(nil),      // 39: lindm.resource.v1.SnapInterfaceGrant
-	(*SnapAppDesired)(nil),          // 40: lindm.resource.v1.SnapAppDesired
-	(Presence)(0),                   // 41: lindm.resource.v1.Presence
-	(*ResourceRef)(nil),             // 42: lindm.resource.v1.ResourceRef
-	(*ArtifactRef)(nil),             // 43: lindm.resource.v1.ArtifactRef
-	(*SecretRef)(nil),               // 44: lindm.resource.v1.SecretRef
-	(*InstallationBinding)(nil),     // 45: lindm.resource.v1.InstallationBinding
+	(*RpmAdditionalRepository)(nil), // 18: lindm.resource.v1.RpmAdditionalRepository
+	(*RepositoryURLs)(nil),          // 19: lindm.resource.v1.RepositoryURLs
+	(*RpmRepository)(nil),           // 20: lindm.resource.v1.RpmRepository
+	(*AlpmRepository)(nil),          // 21: lindm.resource.v1.AlpmRepository
+	(*FlatpakRemote)(nil),           // 22: lindm.resource.v1.FlatpakRemote
+	(*NixCacheKey)(nil),             // 23: lindm.resource.v1.NixCacheKey
+	(*NixInput)(nil),                // 24: lindm.resource.v1.NixInput
+	(*OstreeRemote)(nil),            // 25: lindm.resource.v1.OstreeRemote
+	(*RepositoryDesired)(nil),       // 26: lindm.resource.v1.RepositoryDesired
+	(*FlatpakFilesystemGrant)(nil),  // 27: lindm.resource.v1.FlatpakFilesystemGrant
+	(*FlatpakPermissionPolicy)(nil), // 28: lindm.resource.v1.FlatpakPermissionPolicy
+	(*FlatpakAppDesired)(nil),       // 29: lindm.resource.v1.FlatpakAppDesired
+	(*MaintenanceWindow)(nil),       // 30: lindm.resource.v1.MaintenanceWindow
+	(*OSUpdateRebootPolicy)(nil),    // 31: lindm.resource.v1.OSUpdateRebootPolicy
+	(*OSUpdateRebootDeferral)(nil),  // 32: lindm.resource.v1.OSUpdateRebootDeferral
+	(*RepositorySnapshot)(nil),      // 33: lindm.resource.v1.RepositorySnapshot
+	(*RepositorySnapshots)(nil),     // 34: lindm.resource.v1.RepositorySnapshots
+	(*OstreeSnapshot)(nil),          // 35: lindm.resource.v1.OstreeSnapshot
+	(*NixSnapshot)(nil),             // 36: lindm.resource.v1.NixSnapshot
+	(*SourceSnapshot)(nil),          // 37: lindm.resource.v1.SourceSnapshot
+	(*RollingUpdateSnapshot)(nil),   // 38: lindm.resource.v1.RollingUpdateSnapshot
+	(*OSUpdateDesired)(nil),         // 39: lindm.resource.v1.OSUpdateDesired
+	(*SnapInterfaceGrant)(nil),      // 40: lindm.resource.v1.SnapInterfaceGrant
+	(*SnapAppDesired)(nil),          // 41: lindm.resource.v1.SnapAppDesired
+	(Presence)(0),                   // 42: lindm.resource.v1.Presence
+	(*ResourceRef)(nil),             // 43: lindm.resource.v1.ResourceRef
+	(*ArtifactRef)(nil),             // 44: lindm.resource.v1.ArtifactRef
+	(*SecretRef)(nil),               // 45: lindm.resource.v1.SecretRef
+	(*InstallationBinding)(nil),     // 46: lindm.resource.v1.InstallationBinding
 }
 var file_lindm_resource_v1_software_proto_depIdxs = []int32{
 	0,  // 0: lindm.resource.v1.PackageIdentity.ecosystem:type_name -> lindm.resource.v1.PackageEcosystem
@@ -3170,59 +3298,61 @@ var file_lindm_resource_v1_software_proto_depIdxs = []int32{
 	13, // 2: lindm.resource.v1.NativeVersion.alpm:type_name -> lindm.resource.v1.ALPMVersion
 	14, // 3: lindm.resource.v1.NativeVersion.nix:type_name -> lindm.resource.v1.NixVersion
 	10, // 4: lindm.resource.v1.NativePackageDesired.package:type_name -> lindm.resource.v1.PackageIdentity
-	41, // 5: lindm.resource.v1.NativePackageDesired.presence:type_name -> lindm.resource.v1.Presence
+	42, // 5: lindm.resource.v1.NativePackageDesired.presence:type_name -> lindm.resource.v1.Presence
 	11, // 6: lindm.resource.v1.NativePackageDesired.any:type_name -> lindm.resource.v1.AnyApprovedVersion
 	15, // 7: lindm.resource.v1.NativePackageDesired.exact:type_name -> lindm.resource.v1.NativeVersion
-	42, // 8: lindm.resource.v1.NativePackageDesired.repository:type_name -> lindm.resource.v1.ResourceRef
+	43, // 8: lindm.resource.v1.NativePackageDesired.repository:type_name -> lindm.resource.v1.ResourceRef
 	1,  // 9: lindm.resource.v1.NativePackageDesired.removal:type_name -> lindm.resource.v1.PackageRemovalPolicy
-	43, // 10: lindm.resource.v1.AptRepository.signing_key:type_name -> lindm.resource.v1.ArtifactRef
-	18, // 11: lindm.resource.v1.RpmRepository.base_urls:type_name -> lindm.resource.v1.RepositoryURLs
-	43, // 12: lindm.resource.v1.RpmRepository.signing_keys:type_name -> lindm.resource.v1.ArtifactRef
-	43, // 13: lindm.resource.v1.AlpmRepository.signing_keys:type_name -> lindm.resource.v1.ArtifactRef
-	43, // 14: lindm.resource.v1.FlatpakRemote.verification_key:type_name -> lindm.resource.v1.ArtifactRef
-	22, // 15: lindm.resource.v1.NixInput.cache_public_keys:type_name -> lindm.resource.v1.NixCacheKey
-	43, // 16: lindm.resource.v1.OstreeRemote.commit_signing_keys:type_name -> lindm.resource.v1.ArtifactRef
-	41, // 17: lindm.resource.v1.RepositoryDesired.presence:type_name -> lindm.resource.v1.Presence
-	17, // 18: lindm.resource.v1.RepositoryDesired.apt:type_name -> lindm.resource.v1.AptRepository
-	19, // 19: lindm.resource.v1.RepositoryDesired.rpm:type_name -> lindm.resource.v1.RpmRepository
-	20, // 20: lindm.resource.v1.RepositoryDesired.alpm:type_name -> lindm.resource.v1.AlpmRepository
-	21, // 21: lindm.resource.v1.RepositoryDesired.flatpak:type_name -> lindm.resource.v1.FlatpakRemote
-	23, // 22: lindm.resource.v1.RepositoryDesired.nix:type_name -> lindm.resource.v1.NixInput
-	24, // 23: lindm.resource.v1.RepositoryDesired.ostree:type_name -> lindm.resource.v1.OstreeRemote
-	44, // 24: lindm.resource.v1.RepositoryDesired.authentication:type_name -> lindm.resource.v1.SecretRef
-	2,  // 25: lindm.resource.v1.FlatpakFilesystemGrant.scope:type_name -> lindm.resource.v1.FlatpakFilesystem
-	26, // 26: lindm.resource.v1.FlatpakPermissionPolicy.filesystems:type_name -> lindm.resource.v1.FlatpakFilesystemGrant
-	3,  // 27: lindm.resource.v1.FlatpakPermissionPolicy.devices:type_name -> lindm.resource.v1.FlatpakDevice
-	4,  // 28: lindm.resource.v1.FlatpakPermissionPolicy.portals:type_name -> lindm.resource.v1.FlatpakPortal
-	45, // 29: lindm.resource.v1.FlatpakAppDesired.installation:type_name -> lindm.resource.v1.InstallationBinding
-	41, // 30: lindm.resource.v1.FlatpakAppDesired.presence:type_name -> lindm.resource.v1.Presence
-	42, // 31: lindm.resource.v1.FlatpakAppDesired.remote:type_name -> lindm.resource.v1.ResourceRef
-	27, // 32: lindm.resource.v1.FlatpakAppDesired.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
-	6,  // 33: lindm.resource.v1.MaintenanceWindow.weekdays:type_name -> lindm.resource.v1.Weekday
-	7,  // 34: lindm.resource.v1.OSUpdateRebootPolicy.mode:type_name -> lindm.resource.v1.OSUpdateRebootMode
-	29, // 35: lindm.resource.v1.OSUpdateRebootPolicy.reboot_window:type_name -> lindm.resource.v1.MaintenanceWindow
-	31, // 36: lindm.resource.v1.OSUpdateRebootPolicy.employee_deferral:type_name -> lindm.resource.v1.OSUpdateRebootDeferral
-	42, // 37: lindm.resource.v1.RepositorySnapshot.repository:type_name -> lindm.resource.v1.ResourceRef
-	32, // 38: lindm.resource.v1.RepositorySnapshots.repositories:type_name -> lindm.resource.v1.RepositorySnapshot
-	42, // 39: lindm.resource.v1.OstreeSnapshot.remote:type_name -> lindm.resource.v1.ResourceRef
-	23, // 40: lindm.resource.v1.NixSnapshot.input:type_name -> lindm.resource.v1.NixInput
-	43, // 41: lindm.resource.v1.NixSnapshot.closure_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	33, // 42: lindm.resource.v1.SourceSnapshot.repositories:type_name -> lindm.resource.v1.RepositorySnapshots
-	34, // 43: lindm.resource.v1.SourceSnapshot.ostree:type_name -> lindm.resource.v1.OstreeSnapshot
-	35, // 44: lindm.resource.v1.SourceSnapshot.nix:type_name -> lindm.resource.v1.NixSnapshot
-	5,  // 45: lindm.resource.v1.OSUpdateDesired.selection:type_name -> lindm.resource.v1.UpdateSelection
-	29, // 46: lindm.resource.v1.OSUpdateDesired.maintenance:type_name -> lindm.resource.v1.MaintenanceWindow
-	30, // 47: lindm.resource.v1.OSUpdateDesired.reboot_policy:type_name -> lindm.resource.v1.OSUpdateRebootPolicy
-	37, // 48: lindm.resource.v1.OSUpdateDesired.rolling_snapshot:type_name -> lindm.resource.v1.RollingUpdateSnapshot
-	9,  // 49: lindm.resource.v1.SnapInterfaceGrant.interface:type_name -> lindm.resource.v1.SnapInterface
-	41, // 50: lindm.resource.v1.SnapAppDesired.presence:type_name -> lindm.resource.v1.Presence
-	8,  // 51: lindm.resource.v1.SnapAppDesired.confinement:type_name -> lindm.resource.v1.SnapConfinement
-	39, // 52: lindm.resource.v1.SnapAppDesired.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
-	53, // [53:53] is the sub-list for method output_type
-	53, // [53:53] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	44, // 10: lindm.resource.v1.AptRepository.signing_key:type_name -> lindm.resource.v1.ArtifactRef
+	19, // 11: lindm.resource.v1.RpmAdditionalRepository.base_urls:type_name -> lindm.resource.v1.RepositoryURLs
+	19, // 12: lindm.resource.v1.RpmRepository.base_urls:type_name -> lindm.resource.v1.RepositoryURLs
+	44, // 13: lindm.resource.v1.RpmRepository.signing_keys:type_name -> lindm.resource.v1.ArtifactRef
+	18, // 14: lindm.resource.v1.RpmRepository.additional_repositories:type_name -> lindm.resource.v1.RpmAdditionalRepository
+	44, // 15: lindm.resource.v1.AlpmRepository.signing_keys:type_name -> lindm.resource.v1.ArtifactRef
+	44, // 16: lindm.resource.v1.FlatpakRemote.verification_key:type_name -> lindm.resource.v1.ArtifactRef
+	23, // 17: lindm.resource.v1.NixInput.cache_public_keys:type_name -> lindm.resource.v1.NixCacheKey
+	44, // 18: lindm.resource.v1.OstreeRemote.commit_signing_keys:type_name -> lindm.resource.v1.ArtifactRef
+	42, // 19: lindm.resource.v1.RepositoryDesired.presence:type_name -> lindm.resource.v1.Presence
+	17, // 20: lindm.resource.v1.RepositoryDesired.apt:type_name -> lindm.resource.v1.AptRepository
+	20, // 21: lindm.resource.v1.RepositoryDesired.rpm:type_name -> lindm.resource.v1.RpmRepository
+	21, // 22: lindm.resource.v1.RepositoryDesired.alpm:type_name -> lindm.resource.v1.AlpmRepository
+	22, // 23: lindm.resource.v1.RepositoryDesired.flatpak:type_name -> lindm.resource.v1.FlatpakRemote
+	24, // 24: lindm.resource.v1.RepositoryDesired.nix:type_name -> lindm.resource.v1.NixInput
+	25, // 25: lindm.resource.v1.RepositoryDesired.ostree:type_name -> lindm.resource.v1.OstreeRemote
+	45, // 26: lindm.resource.v1.RepositoryDesired.authentication:type_name -> lindm.resource.v1.SecretRef
+	2,  // 27: lindm.resource.v1.FlatpakFilesystemGrant.scope:type_name -> lindm.resource.v1.FlatpakFilesystem
+	27, // 28: lindm.resource.v1.FlatpakPermissionPolicy.filesystems:type_name -> lindm.resource.v1.FlatpakFilesystemGrant
+	3,  // 29: lindm.resource.v1.FlatpakPermissionPolicy.devices:type_name -> lindm.resource.v1.FlatpakDevice
+	4,  // 30: lindm.resource.v1.FlatpakPermissionPolicy.portals:type_name -> lindm.resource.v1.FlatpakPortal
+	46, // 31: lindm.resource.v1.FlatpakAppDesired.installation:type_name -> lindm.resource.v1.InstallationBinding
+	42, // 32: lindm.resource.v1.FlatpakAppDesired.presence:type_name -> lindm.resource.v1.Presence
+	43, // 33: lindm.resource.v1.FlatpakAppDesired.remote:type_name -> lindm.resource.v1.ResourceRef
+	28, // 34: lindm.resource.v1.FlatpakAppDesired.permissions:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
+	6,  // 35: lindm.resource.v1.MaintenanceWindow.weekdays:type_name -> lindm.resource.v1.Weekday
+	7,  // 36: lindm.resource.v1.OSUpdateRebootPolicy.mode:type_name -> lindm.resource.v1.OSUpdateRebootMode
+	30, // 37: lindm.resource.v1.OSUpdateRebootPolicy.reboot_window:type_name -> lindm.resource.v1.MaintenanceWindow
+	32, // 38: lindm.resource.v1.OSUpdateRebootPolicy.employee_deferral:type_name -> lindm.resource.v1.OSUpdateRebootDeferral
+	43, // 39: lindm.resource.v1.RepositorySnapshot.repository:type_name -> lindm.resource.v1.ResourceRef
+	33, // 40: lindm.resource.v1.RepositorySnapshots.repositories:type_name -> lindm.resource.v1.RepositorySnapshot
+	43, // 41: lindm.resource.v1.OstreeSnapshot.remote:type_name -> lindm.resource.v1.ResourceRef
+	24, // 42: lindm.resource.v1.NixSnapshot.input:type_name -> lindm.resource.v1.NixInput
+	44, // 43: lindm.resource.v1.NixSnapshot.closure_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	34, // 44: lindm.resource.v1.SourceSnapshot.repositories:type_name -> lindm.resource.v1.RepositorySnapshots
+	35, // 45: lindm.resource.v1.SourceSnapshot.ostree:type_name -> lindm.resource.v1.OstreeSnapshot
+	36, // 46: lindm.resource.v1.SourceSnapshot.nix:type_name -> lindm.resource.v1.NixSnapshot
+	5,  // 47: lindm.resource.v1.OSUpdateDesired.selection:type_name -> lindm.resource.v1.UpdateSelection
+	30, // 48: lindm.resource.v1.OSUpdateDesired.maintenance:type_name -> lindm.resource.v1.MaintenanceWindow
+	31, // 49: lindm.resource.v1.OSUpdateDesired.reboot_policy:type_name -> lindm.resource.v1.OSUpdateRebootPolicy
+	38, // 50: lindm.resource.v1.OSUpdateDesired.rolling_snapshot:type_name -> lindm.resource.v1.RollingUpdateSnapshot
+	9,  // 51: lindm.resource.v1.SnapInterfaceGrant.interface:type_name -> lindm.resource.v1.SnapInterface
+	42, // 52: lindm.resource.v1.SnapAppDesired.presence:type_name -> lindm.resource.v1.Presence
+	8,  // 53: lindm.resource.v1.SnapAppDesired.confinement:type_name -> lindm.resource.v1.SnapConfinement
+	40, // 54: lindm.resource.v1.SnapAppDesired.interfaces:type_name -> lindm.resource.v1.SnapInterfaceGrant
+	55, // [55:55] is the sub-list for method output_type
+	55, // [55:55] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_software_proto_init() }
@@ -3242,11 +3372,15 @@ func file_lindm_resource_v1_software_proto_init() {
 		(*NativePackageDesired_Any)(nil),
 		(*NativePackageDesired_Exact)(nil),
 	}
-	file_lindm_resource_v1_software_proto_msgTypes[9].OneofWrappers = []any{
+	file_lindm_resource_v1_software_proto_msgTypes[8].OneofWrappers = []any{
+		(*RpmAdditionalRepository_BaseUrls)(nil),
+		(*RpmAdditionalRepository_Metalink)(nil),
+	}
+	file_lindm_resource_v1_software_proto_msgTypes[10].OneofWrappers = []any{
 		(*RpmRepository_BaseUrls)(nil),
 		(*RpmRepository_Metalink)(nil),
 	}
-	file_lindm_resource_v1_software_proto_msgTypes[15].OneofWrappers = []any{
+	file_lindm_resource_v1_software_proto_msgTypes[16].OneofWrappers = []any{
 		(*RepositoryDesired_Apt)(nil),
 		(*RepositoryDesired_Rpm)(nil),
 		(*RepositoryDesired_Alpm)(nil),
@@ -3254,20 +3388,20 @@ func file_lindm_resource_v1_software_proto_init() {
 		(*RepositoryDesired_Nix)(nil),
 		(*RepositoryDesired_Ostree)(nil),
 	}
-	file_lindm_resource_v1_software_proto_msgTypes[18].OneofWrappers = []any{}
-	file_lindm_resource_v1_software_proto_msgTypes[26].OneofWrappers = []any{
+	file_lindm_resource_v1_software_proto_msgTypes[19].OneofWrappers = []any{}
+	file_lindm_resource_v1_software_proto_msgTypes[27].OneofWrappers = []any{
 		(*SourceSnapshot_Repositories)(nil),
 		(*SourceSnapshot_Ostree)(nil),
 		(*SourceSnapshot_Nix)(nil),
 	}
-	file_lindm_resource_v1_software_proto_msgTypes[30].OneofWrappers = []any{}
+	file_lindm_resource_v1_software_proto_msgTypes[31].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_software_proto_rawDesc), len(file_lindm_resource_v1_software_proto_rawDesc)),
 			NumEnums:      10,
-			NumMessages:   31,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

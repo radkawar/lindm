@@ -43,8 +43,11 @@ type Organization struct {
 	Accounts []*v12.CreateAccountRequest `protobuf:"bytes,10,rep,name=accounts,proto3" json:"accounts,omitempty"`
 	// Applied before accounts, so newly declared custom roles are available.
 	Authorization *v12.AuthorizationPolicy `protobuf:"bytes,11,opt,name=authorization,proto3" json:"authorization,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Applied after groups. Each entry replaces its scope's complete policy;
+	// omitted scopes are unchanged.
+	CapabilityPolicies []*CapabilityPolicy `protobuf:"bytes,12,rep,name=capability_policies,json=capabilityPolicies,proto3" json:"capability_policies,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Organization) Reset() {
@@ -154,6 +157,59 @@ func (x *Organization) GetAuthorization() *v12.AuthorizationPolicy {
 	return nil
 }
 
+func (x *Organization) GetCapabilityPolicies() []*CapabilityPolicy {
+	if x != nil {
+		return x.CapabilityPolicies
+	}
+	return nil
+}
+
+type CapabilityPolicy struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// request_id, expected_revision and reason are engine owned. The completed
+	// product message is validated before any mutation.
+	Request       *v1.SetCapabilityPolicyRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CapabilityPolicy) Reset() {
+	*x = CapabilityPolicy{}
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CapabilityPolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CapabilityPolicy) ProtoMessage() {}
+
+func (x *CapabilityPolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CapabilityPolicy.ProtoReflect.Descriptor instead.
+func (*CapabilityPolicy) Descriptor() ([]byte, []int) {
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CapabilityPolicy) GetRequest() *v1.SetCapabilityPolicyRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
 type StaticGroup struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -164,7 +220,7 @@ type StaticGroup struct {
 
 func (x *StaticGroup) Reset() {
 	*x = StaticGroup{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[1]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -176,7 +232,7 @@ func (x *StaticGroup) String() string {
 func (*StaticGroup) ProtoMessage() {}
 
 func (x *StaticGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[1]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -189,7 +245,7 @@ func (x *StaticGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaticGroup.ProtoReflect.Descriptor instead.
 func (*StaticGroup) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{1}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *StaticGroup) GetId() string {
@@ -217,7 +273,7 @@ type Profile struct {
 
 func (x *Profile) Reset() {
 	*x = Profile{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[2]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -229,7 +285,7 @@ func (x *Profile) String() string {
 func (*Profile) ProtoMessage() {}
 
 func (x *Profile) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[2]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -242,7 +298,7 @@ func (x *Profile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Profile.ProtoReflect.Descriptor instead.
 func (*Profile) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{2}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Profile) GetId() string {
@@ -271,7 +327,7 @@ type Assignment struct {
 
 func (x *Assignment) Reset() {
 	*x = Assignment{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[3]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +339,7 @@ func (x *Assignment) String() string {
 func (*Assignment) ProtoMessage() {}
 
 func (x *Assignment) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[3]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,7 +352,7 @@ func (x *Assignment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Assignment.ProtoReflect.Descriptor instead.
 func (*Assignment) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{3}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Assignment) GetProfileId() string {
@@ -325,7 +381,7 @@ type ProvisioningToken struct {
 
 func (x *ProvisioningToken) Reset() {
 	*x = ProvisioningToken{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[4]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -337,7 +393,7 @@ func (x *ProvisioningToken) String() string {
 func (*ProvisioningToken) ProtoMessage() {}
 
 func (x *ProvisioningToken) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[4]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -350,7 +406,7 @@ func (x *ProvisioningToken) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisioningToken.ProtoReflect.Descriptor instead.
 func (*ProvisioningToken) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{4}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ProvisioningToken) GetName() string {
@@ -377,7 +433,7 @@ type EnrollmentGrant struct {
 
 func (x *EnrollmentGrant) Reset() {
 	*x = EnrollmentGrant{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[5]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +445,7 @@ func (x *EnrollmentGrant) String() string {
 func (*EnrollmentGrant) ProtoMessage() {}
 
 func (x *EnrollmentGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[5]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +458,7 @@ func (x *EnrollmentGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentGrant.ProtoReflect.Descriptor instead.
 func (*EnrollmentGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{5}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *EnrollmentGrant) GetName() string {
@@ -436,7 +492,7 @@ type AdvisoryException struct {
 
 func (x *AdvisoryException) Reset() {
 	*x = AdvisoryException{}
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[6]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +504,7 @@ func (x *AdvisoryException) String() string {
 func (*AdvisoryException) ProtoMessage() {}
 
 func (x *AdvisoryException) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_org_v1_organization_proto_msgTypes[6]
+	mi := &file_lindm_org_v1_organization_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +517,7 @@ func (x *AdvisoryException) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdvisoryException.ProtoReflect.Descriptor instead.
 func (*AdvisoryException) Descriptor() ([]byte, []int) {
-	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{6}
+	return file_lindm_org_v1_organization_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AdvisoryException) GetHostname() string {
@@ -503,7 +559,7 @@ var File_lindm_org_v1_organization_proto protoreflect.FileDescriptor
 
 const file_lindm_org_v1_organization_proto_rawDesc = "" +
 	"\n" +
-	"\x1flindm/org/v1/organization.proto\x12\flindm.org.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1alindm/admin/v1/admin.proto\x1a\x1flindm/admin/v1/advisories.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a\x18lindm/auth/v1/auth.proto\x1a!lindm/auth/v1/authorization.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\"\x9d\x16\n" +
+	"\x1flindm/org/v1/organization.proto\x12\flindm.org.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1alindm/admin/v1/admin.proto\x1a\x1flindm/admin/v1/advisories.proto\x1a!lindm/admin/v1/capabilities.proto\x1a!lindm/admin/v1/provisioning.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a\x18lindm/auth/v1/auth.proto\x1a!lindm/auth/v1/authorization.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\"\xf8\x16\n" +
 	"\fOrganization\x12\"\n" +
 	"\x04name\x18\x01 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00R\x04name\x12;\n" +
 	"\x06groups\x18\x02 \x03(\v2\x19.lindm.org.v1.StaticGroupB\b\xbaH\x05\x92\x01\x02\x10dR\x06groups\x12S\n" +
@@ -516,13 +572,17 @@ const file_lindm_org_v1_organization_proto_rawDesc = "" +
 	"\x13advisory_exceptions\x18\t \x03(\v2\x1f.lindm.org.v1.AdvisoryExceptionB\b\xbaH\x05\x92\x01\x02\x10dR\x12advisoryExceptions\x12I\n" +
 	"\baccounts\x18\n" +
 	" \x03(\v2#.lindm.auth.v1.CreateAccountRequestB\b\xbaH\x05\x92\x01\x02\x10dR\baccounts\x12H\n" +
-	"\rauthorization\x18\v \x01(\v2\".lindm.auth.v1.AuthorizationPolicyR\rauthorization:\x81\x10\xbaH\xfd\x0f\x1a\xba\x06\n" +
+	"\rauthorization\x18\v \x01(\v2\".lindm.auth.v1.AuthorizationPolicyR\rauthorization\x12Y\n" +
+	"\x13capability_policies\x18\f \x03(\v2\x1e.lindm.org.v1.CapabilityPolicyB\b\xbaH\x05\x92\x01\x02\x10eR\x12capabilityPolicies:\x81\x10\xbaH\xfd\x0f\x1a\xba\x06\n" +
 	"\x17organization.unique_ids\x12Lobject identifiers and enrollment names must be unique within their sections\x1a\xd0\x05this.groups.all(x, this.groups.filter(y, y.id == x.id).size() == 1) && this.dynamic_groups.all(x, this.dynamic_groups.filter(y, y.group_id == x.group_id).size() == 1) && this.profiles.all(x, this.profiles.filter(y, y.id == x.id).size() == 1) && this.assignments.all(x, this.assignments.filter(y, y.assignment.assignment_id == x.assignment.assignment_id).size() == 1) && this.rollouts.all(x, this.rollouts.filter(y, y.rollout_id == x.rollout_id).size() == 1) && this.provisioning_tokens.all(x, this.provisioning_tokens.filter(y, y.name == x.name).size() == 1) && this.grants.all(x, this.grants.filter(y, y.name == x.name).size() == 1) && this.accounts.all(x, this.accounts.filter(y, y.username == x.username).size() == 1)\x1a\x92\x01\n" +
 	"\x19organization.profile_refs\x12-assignments must reference a declared profile\x1aFthis.assignments.all(x, this.profiles.exists(p, p.id == x.profile_id))\x1a\xe0\x03\n" +
 	"\x18organization.target_refs\x12Oassignments must target declared static or dynamic groups and declared rollouts\x1a\xf2\x02this.assignments.all(x, (has(x.assignment.target.static_group_id) && this.groups.exists(g, g.id == x.assignment.target.static_group_id) || has(x.assignment.target.dynamic_group_id) && this.dynamic_groups.exists(g, g.group_id == x.assignment.target.dynamic_group_id)) && (!has(x.assignment.rollout_id) || this.rollouts.exists(r, r.rollout_id == x.assignment.rollout_id)))\x1a\xc7\x01\n" +
 	"\x1eorganization.enrollment_groups\x12Dprovisioning token group references must name declared static groups\x1a_this.provisioning_tokens.all(t, t.request.group_ids.all(id, this.groups.exists(g, g.id == id)))\x1az\n" +
 	"\x1dorganization.dynamic_revision\x12+dynamic group revisions are engine observed\x1a,this.dynamic_groups.all(g, g.revision == 0u)\x1a\xff\x01\n" +
-	"\x1eorganization.unique_exceptions\x12+advisory exception selectors must be unique\x1a\xaf\x01this.advisory_exceptions.all(x, this.advisory_exceptions.filter(y, y.hostname == x.hostname && y.advisory_id == x.advisory_id && y.package_name == x.package_name).size() == 1)\"K\n" +
+	"\x1eorganization.unique_exceptions\x12+advisory exception selectors must be unique\x1a\xaf\x01this.advisory_exceptions.all(x, this.advisory_exceptions.filter(y, y.hostname == x.hostname && y.advisory_id == x.advisory_id && y.package_name == x.package_name).size() == 1)\"\xdc\x02\n" +
+	"\x10CapabilityPolicy\x12L\n" +
+	"\arequest\x18\x01 \x01(\v2*.lindm.admin.v1.SetCapabilityPolicyRequestB\x06\xbaH\x03\xd8\x01\x03R\arequest:\xf9\x01\xbaH\xf5\x01\x1a\xf2\x01\n" +
+	"'organization.capability_policy_template\x12Nrequest is required; request_id, expected_revision and reason are engine owned\x1awhas(this.request) && this.request.request_id == '' && this.request.expected_revision == 0u && this.request.reason == ''\"K\n" +
 	"\vStaticGroup\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\"\n" +
 	"\x04name\x18\x02 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00R\x04name\"a\n" +
@@ -567,46 +627,50 @@ func file_lindm_org_v1_organization_proto_rawDescGZIP() []byte {
 	return file_lindm_org_v1_organization_proto_rawDescData
 }
 
-var file_lindm_org_v1_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_lindm_org_v1_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_org_v1_organization_proto_goTypes = []any{
 	(*Organization)(nil),                      // 0: lindm.org.v1.Organization
-	(*StaticGroup)(nil),                       // 1: lindm.org.v1.StaticGroup
-	(*Profile)(nil),                           // 2: lindm.org.v1.Profile
-	(*Assignment)(nil),                        // 3: lindm.org.v1.Assignment
-	(*ProvisioningToken)(nil),                 // 4: lindm.org.v1.ProvisioningToken
-	(*EnrollmentGrant)(nil),                   // 5: lindm.org.v1.EnrollmentGrant
-	(*AdvisoryException)(nil),                 // 6: lindm.org.v1.AdvisoryException
-	(*v1.DynamicTargetGroup)(nil),             // 7: lindm.admin.v1.DynamicTargetGroup
-	(*v11.RolloutSpec)(nil),                   // 8: lindm.policy.v1.RolloutSpec
-	(*v12.CreateAccountRequest)(nil),          // 9: lindm.auth.v1.CreateAccountRequest
-	(*v12.AuthorizationPolicy)(nil),           // 10: lindm.auth.v1.AuthorizationPolicy
-	(*v11.ResourceProfile)(nil),               // 11: lindm.policy.v1.ResourceProfile
-	(*v11.TargetAssignment)(nil),              // 12: lindm.policy.v1.TargetAssignment
-	(*v1.CreateProvisioningTokenRequest)(nil), // 13: lindm.admin.v1.CreateProvisioningTokenRequest
-	(*v1.CreateEnrollmentGrantRequest)(nil),   // 14: lindm.admin.v1.CreateEnrollmentGrantRequest
-	(*v1.AcceptAdvisoryFindingRequest)(nil),   // 15: lindm.admin.v1.AcceptAdvisoryFindingRequest
+	(*CapabilityPolicy)(nil),                  // 1: lindm.org.v1.CapabilityPolicy
+	(*StaticGroup)(nil),                       // 2: lindm.org.v1.StaticGroup
+	(*Profile)(nil),                           // 3: lindm.org.v1.Profile
+	(*Assignment)(nil),                        // 4: lindm.org.v1.Assignment
+	(*ProvisioningToken)(nil),                 // 5: lindm.org.v1.ProvisioningToken
+	(*EnrollmentGrant)(nil),                   // 6: lindm.org.v1.EnrollmentGrant
+	(*AdvisoryException)(nil),                 // 7: lindm.org.v1.AdvisoryException
+	(*v1.DynamicTargetGroup)(nil),             // 8: lindm.admin.v1.DynamicTargetGroup
+	(*v11.RolloutSpec)(nil),                   // 9: lindm.policy.v1.RolloutSpec
+	(*v12.CreateAccountRequest)(nil),          // 10: lindm.auth.v1.CreateAccountRequest
+	(*v12.AuthorizationPolicy)(nil),           // 11: lindm.auth.v1.AuthorizationPolicy
+	(*v1.SetCapabilityPolicyRequest)(nil),     // 12: lindm.admin.v1.SetCapabilityPolicyRequest
+	(*v11.ResourceProfile)(nil),               // 13: lindm.policy.v1.ResourceProfile
+	(*v11.TargetAssignment)(nil),              // 14: lindm.policy.v1.TargetAssignment
+	(*v1.CreateProvisioningTokenRequest)(nil), // 15: lindm.admin.v1.CreateProvisioningTokenRequest
+	(*v1.CreateEnrollmentGrantRequest)(nil),   // 16: lindm.admin.v1.CreateEnrollmentGrantRequest
+	(*v1.AcceptAdvisoryFindingRequest)(nil),   // 17: lindm.admin.v1.AcceptAdvisoryFindingRequest
 }
 var file_lindm_org_v1_organization_proto_depIdxs = []int32{
-	1,  // 0: lindm.org.v1.Organization.groups:type_name -> lindm.org.v1.StaticGroup
-	7,  // 1: lindm.org.v1.Organization.dynamic_groups:type_name -> lindm.admin.v1.DynamicTargetGroup
-	2,  // 2: lindm.org.v1.Organization.profiles:type_name -> lindm.org.v1.Profile
-	3,  // 3: lindm.org.v1.Organization.assignments:type_name -> lindm.org.v1.Assignment
-	8,  // 4: lindm.org.v1.Organization.rollouts:type_name -> lindm.policy.v1.RolloutSpec
-	4,  // 5: lindm.org.v1.Organization.provisioning_tokens:type_name -> lindm.org.v1.ProvisioningToken
-	5,  // 6: lindm.org.v1.Organization.grants:type_name -> lindm.org.v1.EnrollmentGrant
-	6,  // 7: lindm.org.v1.Organization.advisory_exceptions:type_name -> lindm.org.v1.AdvisoryException
-	9,  // 8: lindm.org.v1.Organization.accounts:type_name -> lindm.auth.v1.CreateAccountRequest
-	10, // 9: lindm.org.v1.Organization.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
-	11, // 10: lindm.org.v1.Profile.spec:type_name -> lindm.policy.v1.ResourceProfile
-	12, // 11: lindm.org.v1.Assignment.assignment:type_name -> lindm.policy.v1.TargetAssignment
-	13, // 12: lindm.org.v1.ProvisioningToken.request:type_name -> lindm.admin.v1.CreateProvisioningTokenRequest
-	14, // 13: lindm.org.v1.EnrollmentGrant.request:type_name -> lindm.admin.v1.CreateEnrollmentGrantRequest
-	15, // 14: lindm.org.v1.AdvisoryException.request:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	2,  // 0: lindm.org.v1.Organization.groups:type_name -> lindm.org.v1.StaticGroup
+	8,  // 1: lindm.org.v1.Organization.dynamic_groups:type_name -> lindm.admin.v1.DynamicTargetGroup
+	3,  // 2: lindm.org.v1.Organization.profiles:type_name -> lindm.org.v1.Profile
+	4,  // 3: lindm.org.v1.Organization.assignments:type_name -> lindm.org.v1.Assignment
+	9,  // 4: lindm.org.v1.Organization.rollouts:type_name -> lindm.policy.v1.RolloutSpec
+	5,  // 5: lindm.org.v1.Organization.provisioning_tokens:type_name -> lindm.org.v1.ProvisioningToken
+	6,  // 6: lindm.org.v1.Organization.grants:type_name -> lindm.org.v1.EnrollmentGrant
+	7,  // 7: lindm.org.v1.Organization.advisory_exceptions:type_name -> lindm.org.v1.AdvisoryException
+	10, // 8: lindm.org.v1.Organization.accounts:type_name -> lindm.auth.v1.CreateAccountRequest
+	11, // 9: lindm.org.v1.Organization.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
+	1,  // 10: lindm.org.v1.Organization.capability_policies:type_name -> lindm.org.v1.CapabilityPolicy
+	12, // 11: lindm.org.v1.CapabilityPolicy.request:type_name -> lindm.admin.v1.SetCapabilityPolicyRequest
+	13, // 12: lindm.org.v1.Profile.spec:type_name -> lindm.policy.v1.ResourceProfile
+	14, // 13: lindm.org.v1.Assignment.assignment:type_name -> lindm.policy.v1.TargetAssignment
+	15, // 14: lindm.org.v1.ProvisioningToken.request:type_name -> lindm.admin.v1.CreateProvisioningTokenRequest
+	16, // 15: lindm.org.v1.EnrollmentGrant.request:type_name -> lindm.admin.v1.CreateEnrollmentGrantRequest
+	17, // 16: lindm.org.v1.AdvisoryException.request:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_lindm_org_v1_organization_proto_init() }
@@ -620,7 +684,7 @@ func file_lindm_org_v1_organization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_org_v1_organization_proto_rawDesc), len(file_lindm_org_v1_organization_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

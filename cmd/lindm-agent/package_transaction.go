@@ -8,7 +8,7 @@ import (
 	"flag"
 	"os"
 
-	"lindm/internal/agent/config"
+	"lindm/internal/agent/capabilitypolicy"
 	"lindm/internal/agent/nativehelper"
 )
 
@@ -25,9 +25,9 @@ func packageTransactionCommand(ctx context.Context, args []string) error {
 	if flags.NArg() != 0 || *transactionID == "" || (*phase != "prepare" && *phase != "apply") {
 		return errors.New("package transaction helper requires -transaction UUID and -phase prepare|apply")
 	}
-	document, err := config.Load(config.ExecutorConfigPath)
+	effective, err := capabilitypolicy.LoadEffectiveExecutorConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return nativehelper.Run(ctx, document, *transactionID, *phase)
+	return nativehelper.Run(ctx, effective.Document, *transactionID, *phase)
 }

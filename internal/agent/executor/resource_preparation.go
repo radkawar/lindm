@@ -15,7 +15,6 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/packageprovider"
-	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/resource"
 )
 
@@ -170,16 +169,16 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 }
 
 // preparationFailure classifies an effect-free staging failure. A native
-// frontend holding the package lock (a release upgrade) is a retried hold.
+// frontend holding the package lock (a release upgrade) is a retried hold; any
+// provider's unsupported refusal is UNSUPPORTED, exactly as at admission.
 func preparationFailure(err error) agentv1.ResourceExecutionFailure {
-	switch {
-	case errors.Is(err, serviceprovider.ErrUnsupported):
-		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
-	case errors.Is(err, packageprovider.ErrBusy):
+	if errors.Is(err, packageprovider.ErrBusy) {
 		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY
-	default:
-		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
 	}
+	if _, failure, classified := resourceAdmissionCause(err); classified && failure == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED {
+		return failure
+	}
+	return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
 }
 
 // Called under the authority lock. Current trust and signed wall deadline are

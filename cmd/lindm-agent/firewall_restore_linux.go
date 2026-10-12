@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"lindm/internal/agent/config"
+	"lindm/internal/agent/capabilitypolicy"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/statefs"
 )
@@ -18,11 +18,12 @@ func serveFirewallRestore(ctx context.Context, args []string) (resultErr error) 
 	if os.Geteuid() != 0 || len(args) != 0 {
 		return errors.New("firewall restoration requires root and no arguments")
 	}
-	document, err := config.Load(config.ExecutorConfigPath)
+	effective, err := capabilitypolicy.LoadEffectiveExecutorConfig(ctx)
 	if err != nil {
 		return err
 	}
-	if document.Proto.GetFirewallProvider() == nil {
+	firewall := effective.Config.GetFirewallProvider()
+	if firewall == nil {
 		// Packages install boot ordering before root provisioning opts into policy.
 		// Missing configuration is harmless only when no owned policy exists.
 		fd, err := statefs.OpenDirectory(firewallprovider.StateDirectory)
@@ -42,5 +43,5 @@ func serveFirewallRestore(ctx context.Context, args []string) (resultErr error) 
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	return firewallprovider.ReplayNative(ctx, document.Proto.GetFirewallProvider())
+	return firewallprovider.ReplayNative(ctx, firewall)
 }

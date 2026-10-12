@@ -7,7 +7,7 @@ import (
 	"errors"
 	"os"
 
-	"lindm/internal/agent/config"
+	"lindm/internal/agent/capabilitypolicy"
 	"lindm/internal/agent/connectivityguard"
 )
 
@@ -17,9 +17,9 @@ func serveConnectivityGuard(ctx context.Context, args []string) error {
 	if len(args) != 0 || os.Geteuid() != 0 {
 		return errors.New("connectivity-guard requires root and accepts no arguments")
 	}
-	document, err := config.Load(config.ExecutorConfigPath)
+	effective, err := capabilitypolicy.LoadEffectiveExecutorConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return connectivityguard.Supervise(ctx, connectivityguard.StateDirectory, document.Proto.GetFirewallProvider())
+	return connectivityguard.Supervise(ctx, connectivityguard.StateDirectory, effective.Config.GetFirewallProvider())
 }

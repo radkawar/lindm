@@ -62,13 +62,7 @@ func (r *demoRun) runDevice(ctx context.Context, bound *labv1.DemoBinding, crede
 	if err != nil {
 		return err
 	}
-	input := &vmlab.DemoDeviceInput{Hostname: bound.Device.GetHostname(), Desktop: bound.Device.GetRole() == labv1.DemoRole_DEMO_ROLE_DESKTOP, Assistance: bound.Device.GetAssistance(), TPMBind: bound.Device.GetTpmBind(), InstallScript: install, ProvisioningCommand: instructions.GetProvisioningCommand(), ResumeCommand: instructions.GetResumeCommand(), Token: demoToken(r.access, bound.Device.GetProvisioningToken()),
-		FileRoots: bound.Device.GetFileProvider().GetAllowedRoots(), KernelModuleBlocklist: bound.Device.GetFileProvider().GetKernelModuleBlocklist()}
-	if packages := bound.Device.GetPackageProvider(); packages != nil {
-		if input.PackageProvider, err = protojson.Marshal(packages); err != nil {
-			return err
-		}
-	}
+	input := &vmlab.DemoDeviceInput{Hostname: bound.Device.GetHostname(), Desktop: bound.Device.GetRole() == labv1.DemoRole_DEMO_ROLE_DESKTOP, Assistance: bound.Device.GetAssistance(), TPMBind: bound.Device.GetTpmBind(), InstallScript: install, ProvisioningCommand: instructions.GetProvisioningCommand(), ResumeCommand: instructions.GetResumeCommand(), Token: demoToken(r.access, bound.Device.GetProvisioningToken())}
 	inputPath := filepath.Join(private, "device.json")
 	if err := publishDemoJSON(inputPath, input, 0600); err != nil {
 		return err

@@ -136,6 +136,20 @@ func Validate(spec *orgv1.Organization) error {
 			return fmt.Errorf("validate advisory exception: %w", err)
 		}
 	}
+	scopes := make(map[string]bool, len(spec.GetCapabilityPolicies()))
+	for _, c := range spec.GetCapabilityPolicies() {
+		r := proto.CloneOf(c.GetRequest())
+		r.RequestId = placeholder
+		r.Reason = reason(spec)
+		if err := protovalidate.Validate(r); err != nil {
+			return fmt.Errorf("validate capability policy: %w", err)
+		}
+		key := capabilityScopeKey(r.GetScope())
+		if scopes[key] {
+			return fmt.Errorf("validate capability policy: scope %s is declared twice", key)
+		}
+		scopes[key] = true
+	}
 	return nil
 }
 

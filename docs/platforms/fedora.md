@@ -170,8 +170,9 @@ and passes only when the console shows the alert with both remedies for the
 exact enrolled device.
 
 Fedora 43 carries dnf5 5.2.18.0 in both its release and updates repositories.
-The package resource provider requires 5.4.6.0 (the first release that stores a
-transaction without privileges), so `packages` is gated on Fedora 43: the native
+The package resource provider requires 5.4.6.0 (see the
+[DNF5 floor](#capability-policy-facts-signed-provider-grants)), so `packages` is
+gated on Fedora 43: the native
 resources record failed preparation with `native dnf5 5.4.6.0 or newer required`.
 OS update policy (`os.update.v1`) runs dnf5 itself and is qualified.
 
@@ -460,7 +461,8 @@ installed architecture of that name. Unit coverage only: no native record exerci
 a row without an architecture yet; see
 [package identity](../engineering.md#native-package-resource-provider).
 
-The typed kernel-module blocklist is enabled explicitly in the root executor's
+The typed kernel-module blocklist needs the kernel-module blocklist device
+capability (a signed capability policy) or the root executor's local
 `fileProvider.kernelModuleBlocklist`. Fedora 44 uses native `modprobe` and
 `dracut --regenerate-all --force`; both tools must be installed. While the stanza
 exists, fixed `--include` arguments include that same path in generic as well as
@@ -533,6 +535,66 @@ MAC-matched keyfile). SELinux stayed enforcing; the packaged guard, restore and
 probe units needed no policy change. The 6.19 kernel needed the same two fixes
 as Ubuntu (ptrace-gated `/proc/1/ns/net`, explicit boolean bitwise operation on
 read-back).
+
+### Capability policy facts (signed provider grants)
+
+A signed capability policy names only catalogue capabilities; the agent derives
+every provider setting from `internal/platform/registry.go`
+([architecture](../architecture.md#capability-derivation)). Fedora 44 carries
+these facts; Fedora 43 reports `platform_not_qualified` for PACKAGES (its gate)
+and for every capability needing registry facts it lacks.
+
+Fedora 43 stays gated rather than receiving vendor archive facts: its dnf5
+cannot reach the 5.4.6.0 floor below. On 2026-10-12 the `f43` and `f43-updates`
+repositories both carry `dnf5-5.2.18.0-5.fc43` (`mdapi.fedoraproject.org`), and
+every Bodhi update of `dnf5` for F43 is a 5.2.x build (newest
+`dnf5-5.2.18.0-5.fc43`, stable 2026-08-22); no 5.3 or 5.4 build was ever
+submitted for F43.
+
+| Capability                            | Fedora 44 derivation                                                                                                                                                                                                                            |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PACKAGES                              | repository `12e3a0eb-c710-58d9-bd79-a491c614754c` (`rpm/<uuid>`): native id `fedora` (`https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=<arch>`) plus additional repository `updates` (`…?repo=updates-released-f44&arch=<arch>`) |
+| FILES                                 | `/etc/issue.d`, `/etc/motd.d`                                                                                                                                                                                                                   |
+| KERNEL_MODULE_BLOCKLIST               | the typed template with `dracut` (see above)                                                                                                                                                                                                    |
+| LOCAL_ACCOUNTS                        | home root `/home` (`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`), UID/GID 1000–59999                                                                                                                                                                  |
+| OS_UPDATES, FIREWALL, KERNEL_SETTINGS | as the local providers                                                                                                                                                                                                                          |
+
+Key: the regular file `/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary` (the
+`-x86_64`/`-aarch64` names are symlinks to it and are not used), accepted
+SHA-256 `93642aec521a1e5e96dd715f7ae0ec0850ebc9de09a94ce03cae5263f26cc18a`
+(1672 bytes), primary-key fingerprint
+`36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`. How it was obtained (2026-10-12):
+`fedora-gpg-keys-44-1.noarch.rpm` (releases/44) and `-44-2` (updates/44) were
+downloaded over HTTPS from `dl.fedoraproject.org`; both ship identical key
+bytes, both packages' RSA/SHA256 header signatures verify with that key
+(`rpmkeys -Kv`), and the fingerprint matches the one Fedora publishes at
+`fedoraproject.org/security`. Other key bytes report `vendor_key_unrecognized`.
+
+Fedora publishes no repository metadata signature: `repodata/repomd.xml.asc`
+returned HTTP 404 for `releases/44/Everything/x86_64/os` and
+`updates/44/Everything/x86_64` (2026-10-12). Approved RPM sources therefore
+set `require_metadata_signature=false`, which the agent accepts only when every
+repository of the source is an HTTPS metalink on the host the release pins
+(`mirrors.fedoraproject.org`); a plain base URL without signed metadata is
+always refused (config load, `checkSource` and the root helper). The generated
+DNF configuration has one section per native id, `gpgcheck=1` always and
+`repo_gpgcheck=0` only in this case; packages from either native id (or their
+`@stored_transaction(<id>)` form) are accepted. The trust decision is recorded in
+[security and operations](../security-and-operations.md#vendor-rpm-metadata-trust).
+
+DNF5 floor: lindm stores the transaction from a staging unit whose `/usr` and
+`/var` are read-only (`ProtectSystem=strict`). In DNF5 ≤ 5.4.2.1 `--store` counts
+as a system-modifying command (`Context::Impl::cmd_requires_privileges`), so
+DNF5 refuses with "/usr is configured to be read-only" before resolving and
+takes a write lock on the system repository lock file (under
+`/usr/lib/sysimage/libdnf5` in 5.4.1.0). 5.4.3.0 added "when storing a
+transaction, system should not be modified" and takes a read lock; 5.4.2.1
+moved the lock to `/var/lib/dnf`. No option bypasses the read-only check in
+5.4.1.0, so the 44 release image's DNF5 cannot be used. The floor stays at the
+natively qualified 5.4.6.0 (Fedora 44 updates); 5.4.3.0–5.4.5.0 were not
+exercised. A stock Fedora 44 image refuses package rows with
+`native_tool_outdated` until OS updates are applied; an OS update policy that
+installs all updates (OS_UPDATES is in the default grant) satisfies it.
 
 ### OS update policy (`os.update.v1`)
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 )
 
 // PrerequisiteError identifies the native automatic-update package that must
@@ -21,7 +22,9 @@ func (e *PrerequisiteError) Error() string {
 }
 func (e *PrerequisiteError) Unwrap() []error { return []error{ErrMissingPrerequisite, e.Cause} }
 
-func missingPackage(platform *resourcev1.PlatformProduct, name string, cause error) *PrerequisiteError {
+// missingPackage returns the typed prerequisite with the native_tool_missing
+// refusal detail; errors.As still finds the PrerequisiteError.
+func missingPackage(platform *resourcev1.PlatformProduct, name string, cause error) error {
 	ecosystem := resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
 	arch := "noarch"
 	switch {
@@ -33,5 +36,5 @@ func missingPackage(platform *resourcev1.PlatformProduct, name string, cause err
 	case name == "dnf5-plugin-automatic" || name == "dnf5-plugins" || name == "zypper":
 		arch = rpmArchitecture()
 	}
-	return &PrerequisiteError{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: name, Architecture: arch}, Cause: cause}
+	return admissiondetail.Wrap(&PrerequisiteError{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: name, Architecture: arch}, Cause: cause}, "native_tool_missing")
 }

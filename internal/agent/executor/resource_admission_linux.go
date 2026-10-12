@@ -13,6 +13,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/accountprovider"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/definitionprovider"
 	"lindm/internal/agent/encryptionprovider"
 	"lindm/internal/agent/fileprovider"
@@ -73,7 +74,8 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 		reason = agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION
 		failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
 	}
-	if intent.GetPreparation() != nil || (reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
+	// Only a capability refusal precedes preparation: nothing was staged.
+	if (intent.GetPreparation() != nil && reason != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED) || (reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
 		return nil, operationErr
 	}
 	now := protoTimestamp(s.now())
@@ -87,8 +89,11 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 		AdmissionRefusal: &agentv1.ResourceAdmissionRefusal{
 			Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(), Reason: reason,
 			BootId: loaded.state.GetSessionBootId(), ExecutorIncarnation: s.incarnation,
-			NativeEvidenceUnavailable: true,
+			NativeEvidenceUnavailable: true, Detail: admissiondetail.Of(operationErr),
 		},
+	}
+	if refusal := new(capabilityRefusal); errors.As(operationErr, &refusal) {
+		record.AdmissionRefusal.Capability = refusal.capability
 	}
 	if err := s.verifyResourceRecord(ctx, loaded, record); err != nil {
 		return nil, errInternal
@@ -120,6 +125,15 @@ func resourceAdmissionCause(err error) (agentv1.ResourceAdmissionRefusalReason, 
 		errors.Is(err, passwordprovider.ErrOutcomeUnknown), errors.Is(err, sysctlprovider.ErrOutcomeUnknown),
 		errors.Is(err, osupdateprovider.ErrOutcomeUnknown), errors.Is(err, sshprovider.ErrOutcomeUnknown):
 		return unspecified, none, false
+	// The kind's provider is not effective: no native object was opened.
+	case errors.As(err, new(*capabilityRefusal)):
+		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, true
+	// An unowned native object collides with CREATE_ONLY ownership. These
+	// sentinels also match ErrConflict, so they are classified first.
+	case errors.Is(err, accountprovider.ErrAdoptionRequired), errors.Is(err, definitionprovider.ErrAdoptionRequired),
+		errors.Is(err, fileprovider.ErrAdoptionRequired), errors.Is(err, packageprovider.ErrAdoptionRequired),
+		errors.Is(err, sshprovider.ErrAdoptionRequired), errors.Is(err, sysctlprovider.ErrAdoptionRequired):
+		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, true
 	// nativeexec refused the tool before running it: its ancestry is not
 	// root-protected (inventory NativeToolCustody reports which path).
 	case errors.Is(err, nativeexec.ErrUntrustedExecutable) && errors.Is(err, custody.ErrUnsafe):

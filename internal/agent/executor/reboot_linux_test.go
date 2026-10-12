@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/config"
 	"lindm/internal/agent/osupdate"
 )
 
@@ -23,7 +24,9 @@ func TestEmployeeSessionEnabledForEveryRebootEntryPoint(t *testing.T) {
 	}{
 		{name: "disabled"},
 		{name: "assistance", cfg: Config{RemoteAssistance: &agentv1.RemoteAssistanceConfig{Enabled: true}}, want: true},
-		{name: "scheduled updates", cfg: Config{NativeResources: NativeResourceProviders{OSUpdate: &agentv1.NativeOSUpdateProviderConfig{Enabled: true}}}, want: true},
+		{name: "scheduled updates refusing remote policy", cfg: Config{Local: &config.Document{Proto: &agentv1.AgentConfig{OsUpdateProvider: &agentv1.NativeOSUpdateProviderConfig{Enabled: true}, CapabilityPolicy: &agentv1.CapabilityPolicyConfig{RefuseRemote: true}}}}, want: true},
+		{name: "remote policy may grant updates", cfg: Config{Local: &config.Document{Proto: &agentv1.AgentConfig{}}}, want: true},
+		{name: "remote policy refused", cfg: Config{Local: &config.Document{Proto: &agentv1.AgentConfig{CapabilityPolicy: &agentv1.CapabilityPolicyConfig{RefuseRemote: true}}}}},
 		{name: "patch now only", cfg: Config{ActionProviderConfig: &agentv1.DeviceActionProviderConfig{AllowPatchNow: true}}, want: true},
 		{name: "patch now disabled", cfg: Config{ActionProviderConfig: &agentv1.DeviceActionProviderConfig{}}},
 	} {

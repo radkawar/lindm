@@ -6,12 +6,14 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"slices"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
 )
@@ -36,7 +38,7 @@ func acquisitionAllowed(owner *agentv1.ResourceOwnershipBinding, before *agentv1
 		return ErrConflict
 	}
 	if before.GetObservation().GetManagedFile().GetExists() && (owner.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION || owner.GetPolicy().GetAdoptionApprovalId() == "") {
-		return ErrConflict
+		return admissiondetail.Wrap(fmt.Errorf("%w: unowned %s exists", ErrAdoptionRequired, before.GetObservation().GetManagedFile().GetPath()), "existing_file")
 	}
 	return nil
 }

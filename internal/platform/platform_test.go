@@ -511,3 +511,131 @@ func TestSameReleaseAndArchitecture(t *testing.T) {
 		}
 	}
 }
+
+func TestVendorCapabilityFacts(t *testing.T) {
+	for _, r := range Releases() {
+		for _, vendor := range r.VendorRepositories {
+			if vendor.RepositoryID == "" || vendor.KeyFile == "" || vendor.KeyArtifactID == "" || len(vendor.KeySHA256) == 0 {
+				t.Fatalf("%s: incomplete vendor repository %+v", r.Key, vendor)
+			}
+			if vendor.DB != r.Native().Packages.Backend.PackageDB() {
+				t.Fatalf("%s: vendor repository database %s differs from the release backend", r.Key, vendor.DB)
+			}
+			for _, digest := range vendor.KeySHA256 {
+				if len(digest) != 64 || strings.ToLower(digest) != digest {
+					t.Fatalf("%s: key digest %q is not lowercase SHA-256 hex", r.Key, digest)
+				}
+			}
+			for _, architecture := range r.Architectures {
+				switch vendor.DB {
+				case PackageDBDpkg:
+					if !strings.HasPrefix(vendor.ArchiveURIs[architecture], "https://") || len(vendor.Suites) == 0 || len(vendor.Components) == 0 {
+						t.Fatalf("%s %s: incomplete APT archive", r.Key, architecture)
+					}
+				case PackageDBRPM:
+					if len(vendor.RPMFingerprint) != 40 || len(vendor.NativeRepositories) == 0 {
+						t.Fatalf("%s: incomplete RPM archive", r.Key)
+					}
+					var metalinks []string
+					for _, native := range vendor.NativeRepositories {
+						if vendor.MetadataUnsigned {
+							// Unsigned metadata is trusted only through metalinks.
+							if len(native.BaseURLs) != 0 || !strings.HasPrefix(native.Metalinks[architecture], "https://") {
+								t.Fatalf("%s %s %s: unsigned metadata needs an HTTPS metalink and no base URL", r.Key, native.ID, architecture)
+							}
+							metalinks = append(metalinks, native.Metalinks[architecture])
+							continue
+						}
+						if len(native.BaseURLs[architecture]) == 0 && native.Metalinks[architecture] == "" {
+							t.Fatalf("%s %s %s: no location", r.Key, native.ID, architecture)
+						}
+						for _, base := range native.BaseURLs[architecture] {
+							if !strings.HasPrefix(base, "https://") || !strings.HasSuffix(base, "/"+architecture+"/os/") {
+								t.Fatalf("%s %s %s: base URL %q is not the architecture's HTTPS tree", r.Key, native.ID, architecture, base)
+							}
+						}
+					}
+					if vendor.MetadataUnsigned && !r.UnsignedMetadataAllowed(metalinks) {
+						t.Fatalf("%s %s: unsigned metadata without pinned metalinks", r.Key, architecture)
+					}
+				}
+			}
+		}
+		if r.Accounts.HomeRoot != "" && (r.Accounts.MinUID < 1000 || r.Accounts.MinUID > r.Accounts.MaxUID || r.Accounts.MinGID < 1000 || r.Accounts.MinGID > r.Accounts.MaxGID || r.Accounts.HomeRootID == "") {
+			t.Fatalf("%s: invalid account defaults %+v", r.Key, r.Accounts)
+		}
+	}
+	// Which releases can derive PACKAGES: a vendor archive and an open
+	// package gate. Debian's security pocket has its own archive root, RHEL
+	// needs entitlement certificates and Fedora 43's dnf5 is below the floor.
+	derivable := map[string]bool{"ubuntu-22.04": true, "ubuntu-24.04": true, "fedora-44": true, "rocky-9": true, "rocky-10": true, "almalinux-9": true, "almalinux-10": true}
+	for _, r := range Releases() {
+		got := len(r.VendorRepositories) != 0 && r.GateReason(Packages) == ""
+		if got != derivable[r.Key] {
+			t.Errorf("%s: PACKAGES derivable = %v, want %v", r.Key, got, derivable[r.Key])
+		}
+	}
+	for key, want := range map[string]struct {
+		id, x86, arm, fingerprint string
+		ids                       []string
+	}{
+		"rocky-9":      {vendorRPMArchiveID, "https://dl.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/", "https://dl.rockylinux.org/pub/rocky/9/AppStream/aarch64/os/", "21CB256AE16FC54C6E652949702D426D350D275D", []string{"baseos", "appstream"}},
+		"rocky-10":     {vendorRPMArchiveID, "https://dl.rockylinux.org/pub/rocky/10/BaseOS/x86_64/os/", "https://dl.rockylinux.org/pub/rocky/10/AppStream/aarch64/os/", "FC226859C0860BF0DDB95B085B106C736FEDFC85", []string{"baseos", "appstream"}},
+		"almalinux-9":  {vendorRPMArchiveID, "https://repo.almalinux.org/almalinux/9/BaseOS/x86_64/os/", "https://repo.almalinux.org/almalinux/9/AppStream/aarch64/os/", "BF18AC2876178908D6E71267D36CB86CB86B3716", []string{"baseos", "appstream"}},
+		"almalinux-10": {vendorRPMArchiveID, "https://repo.almalinux.org/almalinux/10/BaseOS/x86_64/os/", "https://repo.almalinux.org/almalinux/10/AppStream/aarch64/os/", "EE6DB7B98F5BF5EDD9DA0DE5DEE5C11CC2A1E572", []string{"baseos", "appstream"}},
+	} {
+		r, _ := Lookup(key)
+		vendor := r.VendorRepositories[0]
+		var ids []string
+		for _, native := range vendor.NativeRepositories {
+			ids = append(ids, native.ID)
+		}
+		if vendor.RepositoryID != want.id || vendor.MetadataUnsigned || vendor.MetalinkHost != "" || vendor.RPMFingerprint != want.fingerprint || !slices.Equal(ids, want.ids) ||
+			!slices.Equal(vendor.NativeRepositories[0].BaseURLs["x86_64"], []string{want.x86}) || !slices.Equal(vendor.NativeRepositories[1].BaseURLs["aarch64"], []string{want.arm}) {
+			t.Errorf("%s: vendor archive %+v", key, vendor)
+		}
+		if !slices.Equal(r.StandardFileRoots, dropInRoots) || r.Accounts != regularAccounts {
+			t.Errorf("%s: files %v accounts %+v", key, r.StandardFileRoots, r.Accounts)
+		}
+	}
+	if alma, _ := Lookup("almalinux-10"); !slices.Equal(alma.VendorRepositories[0].VariantMarkers, []string{"/etc/rpm/macros.x86_64_v2"}) {
+		t.Error("almalinux-10 does not exclude its x86_64_v2 build")
+	}
+	jammy, _ := Lookup("ubuntu-22.04")
+	if vendor := jammy.VendorRepositories[0]; vendor.RepositoryID != "8053e72a-44e8-53fc-9472-825c068cf9b5" || !slices.Equal(vendor.Suites, []string{"jammy", "jammy-updates", "jammy-security"}) ||
+		!slices.Equal(vendor.KeySHA256, []string{"1a4dd63e5c76728960a2edddae22e2e0fc53df8e8b87806deb971030ac704eb0"}) || vendor.KeyArtifactID == nobleArchive.KeyArtifactID {
+		t.Errorf("ubuntu-22.04 archive %+v", vendor)
+	}
+	for _, key := range []string{"debian-12", "debian-13"} {
+		if r, _ := Lookup(key); len(r.VendorRepositories) != 0 || !slices.Equal(r.StandardFileRoots, dropInRoots) || r.Accounts != regularAccounts {
+			t.Errorf("%s: vendor facts %+v %v %+v", key, r.VendorRepositories, r.StandardFileRoots, r.Accounts)
+		}
+	}
+}
+
+func TestUnsignedMetadataAllowed(t *testing.T) {
+	fedora, ok := Lookup("fedora-44")
+	if !ok {
+		t.Fatal("fedora-44 missing")
+	}
+	ubuntu, _ := Lookup("ubuntu-24.04")
+	pinned := "https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64"
+	for name, tc := range map[string]struct {
+		release   *Release
+		metalinks []string
+		want      bool
+	}{
+		"pinned":           {fedora, []string{pinned, "https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=x86_64"}, true},
+		"none":             {fedora, nil, false},
+		"other host":       {fedora, []string{pinned, "https://mirror.example.com/metalink?repo=fedora-44"}, false},
+		"plain http":       {fedora, []string{"http://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64"}, false},
+		"explicit port":    {fedora, []string{"https://mirrors.fedoraproject.org:8443/metalink"}, false},
+		"userinfo":         {fedora, []string{"https://user@mirrors.fedoraproject.org/metalink"}, false},
+		"suffix host":      {fedora, []string{"https://mirrors.fedoraproject.org.example.com/metalink"}, false},
+		"release unpinned": {ubuntu, []string{pinned}, false},
+	} {
+		if got := tc.release.UnsignedMetadataAllowed(tc.metalinks); got != tc.want {
+			t.Errorf("%s: UnsignedMetadataAllowed = %v, want %v", name, got, tc.want)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/connectivity_guard.proto";
 import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/management_capability.proto";
 import "lindm/agent/v1/secret_delivery.proto";
 import "lindm/agent/v1/trust.proto";
 import "lindm/resource/v1/common.proto";
@@ -292,7 +293,7 @@ message ResourceExecutionRecord {
   option (buf.validate.message).cel = {
     id: "resource_record.admission_refusal"
     message: "admission refusal is an effect-free terminal rejection of exactly the signed resource"
-    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.intent.preparation) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && (!has(this.intent.preparation) || this.admission_refusal.reason == 5) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))"
   };
 }
 
@@ -410,7 +411,7 @@ message ResourceExecutionStatus {
   option (buf.validate.message).cel = {
     id: "resource_status.admission_refusal"
     message: "admission refusal cannot claim native observation, compliance, or execution"
-    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))"
   };
 }
 
@@ -501,6 +502,13 @@ enum ResourceAdmissionRefusalReason {
   // A native tool's ancestry is not root-protected (inventory
   // NativeToolCustody names the path); no native tool ran.
   RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH = 4;
+  // The kind's provider is not granted on this device; capability names the
+  // exact catalogue value the administrator (or, for local-only values, the
+  // device owner) must enable. Nothing native was observed or changed.
+  RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED = 5;
+  // A native object already exists without lindm ownership and the policy is
+  // CREATE_ONLY: only an approved adoption may take it over.
+  RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED = 6;
 }
 
 // Authenticated executor admission evidence, not native-state evidence. No
@@ -518,9 +526,22 @@ message ResourceAdmissionRefusal {
   string boot_id = 4 [(buf.validate.field).string.uuid = true];
   string executor_incarnation = 5 [(buf.validate.field).string.uuid = true];
   bool native_evidence_unavailable = 6 [(buf.validate.field).bool.const = true];
+  ManagementCapability capability = 7 [(buf.validate.field).enum.defined_only = true];
+  // Optional closed snake_case cause an administrator can act on, for example
+  // native_tool_outdated, vendor_key_unrecognized or existing_banner_file.
+  // Never free text, paths or native tool output.
+  string detail = 8 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^([a-z][a-z0-9_]*)?$"
+  }];
   option (buf.validate.message).cel = {
     id: "resource_admission_refusal.identity"
     message: "admission evidence binds nonzero executor identity and release-only unknown baseline"
     expression: "this.boot_id != '00000000-0000-0000-0000-000000000000' && this.executor_incarnation != '00000000-0000-0000-0000-000000000000' && (this.reason != 1 || this.operation == 2)"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_admission_refusal.capability"
+    message: "a capability is named exactly for capability refusals"
+    expression: "(this.reason == 5) == (this.capability != 0)"
   };
 }

@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/approved_configuration.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/capability_policy.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
@@ -98,6 +99,12 @@ service ExecutorService {
   // Signs a nonce-bound snapshot of protected action history using the current
   // device identity/session. Does not observe native state or authorize effects.
   rpc AttestResourceExecution(AttestResourceExecutionRequest) returns (AttestResourceExecutionResponse);
+  // UpdateCapabilityPolicy verifies a signed device capability policy under the
+  // current delegation and durably replaces the previous one when its version
+  // is higher. It never starts work or accepts caller-selected keys.
+  rpc UpdateCapabilityPolicy(UpdateCapabilityPolicyRequest) returns (UpdateCapabilityPolicyResponse);
+  // Reads the accepted policy and the effective per-capability status.
+  rpc GetCapabilityPolicy(GetCapabilityPolicyRequest) returns (GetCapabilityPolicyResponse);
   rpc PrepareDeviceAction(PrepareDeviceActionRequest) returns (PrepareDeviceActionResponse);
   rpc StartDeviceAction(StartDeviceActionRequest) returns (StartDeviceActionResponse);
   rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);

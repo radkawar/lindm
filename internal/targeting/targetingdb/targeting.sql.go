@@ -914,6 +914,78 @@ func (q *Queries) TargetingDevice(ctx context.Context, arg TargetingDeviceParams
 	return i, err
 }
 
+const targetingDeviceSnapshot = `-- name: TargetingDeviceSnapshot :one
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ coalesce((SELECT preview_id::text FROM target_execution_heads WHERE device_id=d.id),'')::text AS previous_preview_id,
+ coalesce((SELECT assignment_id::text FROM resource_assignment_heads WHERE generation_id=d.current_generation_id),'')::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id=$1
+`
+
+type TargetingDeviceSnapshotRow struct {
+	ID                   uuid.UUID
+	CurrentGenerationID  *uuid.UUID
+	State                string
+	Hostname             string
+	OsID                 string
+	OsVersion            string
+	HostnameStatus       int16
+	OsIDStatus           int16
+	OsVersionStatus      int16
+	HostSequence         int64
+	HostDigest           []byte
+	Architecture         string
+	LastSeenAt           pgtype.Timestamptz
+	HostReceivedAt       pgtype.Timestamptz
+	Metadata             []byte
+	Labels               []string
+	Groups               []string
+	PreviousPreviewID    string
+	ResourceAssignmentID string
+}
+
+// The unlocked, unscoped TargetingDevice row for system membership reads
+// (capability grants) inside the caller's snapshot; it fences nothing.
+func (q *Queries) TargetingDeviceSnapshot(ctx context.Context, deviceID uuid.UUID) (TargetingDeviceSnapshotRow, error) {
+	row := q.db.QueryRow(ctx, targetingDeviceSnapshot, deviceID)
+	var i TargetingDeviceSnapshotRow
+	err := row.Scan(
+		&i.ID,
+		&i.CurrentGenerationID,
+		&i.State,
+		&i.Hostname,
+		&i.OsID,
+		&i.OsVersion,
+		&i.HostnameStatus,
+		&i.OsIDStatus,
+		&i.OsVersionStatus,
+		&i.HostSequence,
+		&i.HostDigest,
+		&i.Architecture,
+		&i.LastSeenAt,
+		&i.HostReceivedAt,
+		&i.Metadata,
+		&i.Labels,
+		&i.Groups,
+		&i.PreviousPreviewID,
+		&i.ResourceAssignmentID,
+	)
+	return i, err
+}
+
 const updateDynamicGroup = `-- name: UpdateDynamicGroup :execrows
 UPDATE dynamic_target_groups SET revision=revision+1,definition=$2 WHERE id=$1 AND revision=$3
 `

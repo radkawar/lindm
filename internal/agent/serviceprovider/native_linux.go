@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 )
 
 func (p *Provider) manager(ctx context.Context, method string, args ...any) *dbus.Call {
@@ -29,11 +30,23 @@ func nativeReadError(operation string, err error) error {
 	var native dbus.Error
 	if errors.As(err, &native) {
 		switch native.Name {
-		case "org.freedesktop.systemd1.NoSuchUnit", "org.freedesktop.systemd1.LoadFailed", "org.freedesktop.systemd1.UnitMasked", "org.freedesktop.systemd1.InvalidName":
+		case "org.freedesktop.systemd1.NoSuchUnit":
+			return admissiondetail.Wrap(fmt.Errorf("%w: %s: %w", ErrUnsupported, operation, err), "unit_not_installed")
+		case "org.freedesktop.systemd1.LoadFailed", "org.freedesktop.systemd1.UnitMasked", "org.freedesktop.systemd1.InvalidName":
 			return fmt.Errorf("%w: %s: %w", ErrUnsupported, operation, err)
 		}
 	}
 	return fmt.Errorf("%s: %w", operation, err)
+}
+
+// loadStateError refuses every unit systemd has not loaded. A not-found unit
+// is named as not installed; it has no definition to bind as evidence.
+func loadStateError(state string) error {
+	err := fmt.Errorf("%w: unit load state %q", ErrUnsupported, state)
+	if state == "not-found" {
+		return admissiondetail.Wrap(err, "unit_not_installed")
+	}
+	return err
 }
 
 func (p *Provider) observe(ctx context.Context, unit string) (*resourcev1.SystemdServiceObservation, error) {
@@ -66,7 +79,7 @@ func (p *Provider) observe(ctx context.Context, unit string) (*resourcev1.System
 	// LoadUnit may return a cached not-found object without a D-Bus error.
 	// Such an object has no persistent unit file to query or manage.
 	if o.LoadState != "loaded" {
-		return nil, fmt.Errorf("%w: unit load state %q", ErrUnsupported, o.LoadState)
+		return nil, loadStateError(o.LoadState)
 	}
 	if err := object.CallWithContext(ctx, "org.freedesktop.DBus.Properties.GetAll", dbus.FlagNoAutoStart, systemdName+".Service").Store(&serviceProperties); err != nil {
 		return nil, nativeReadError("read service properties", err)

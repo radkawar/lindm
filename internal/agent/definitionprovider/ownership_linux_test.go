@@ -12,6 +12,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 )
 
@@ -97,7 +98,7 @@ func TestAcquisitionRequiresApprovedAdoption(t *testing.T) {
 	d := dropDesired()
 	before := fixtureSnapshot(t, d, true)
 	owner := fixtureOwner()
-	if err := acquisitionAllowed(owner, before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrConflict) {
+	if err := acquisitionAllowed(owner, before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrAdoptionRequired) || !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_definition" {
 		t.Fatalf("unapproved overwrite = %v", err)
 	}
 	owner.Policy.Mode = resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION

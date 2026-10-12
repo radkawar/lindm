@@ -11,6 +11,7 @@ import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/assistance.proto";
 import "lindm/admin/v1/authorization.proto";
 import "lindm/admin/v1/authz_groups.proto";
+import "lindm/admin/v1/capabilities.proto";
 import "lindm/admin/v1/device_actions.proto";
 import "lindm/admin/v1/enrollment_grants.proto";
 import "lindm/admin/v1/enrollment_instructions.proto";
@@ -67,6 +68,10 @@ service AdminService {
   rpc ListAuditDevices(ListAuditDevicesRequest) returns (ListAuditDevicesResponse);
   rpc GetExecutionAuthority(GetExecutionAuthorityRequest) returns (GetExecutionAuthorityResponse);
   rpc UpdateExecutionAuthority(UpdateExecutionAuthorityRequest) returns (UpdateExecutionAuthorityResponse);
+  // Device management capabilities granted to executors through signed
+  // per-device capability policies (deployment and group scopes).
+  rpc ListCapabilityPolicies(ListCapabilityPoliciesRequest) returns (ListCapabilityPoliciesResponse);
+  rpc SetCapabilityPolicy(SetCapabilityPolicyRequest) returns (SetCapabilityPolicyResponse);
   rpc PublishProfileRevision(PublishProfileRevisionRequest) returns (PublishProfileRevisionResponse);
   rpc GetProfileRevision(GetProfileRevisionRequest) returns (GetProfileRevisionResponse);
   rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
@@ -296,6 +301,8 @@ message GetDeviceResponse {
   // evaluated in the same read snapshot. Presentation only: each action is
   // authorized again when it is requested.
   repeated string caller_permissions = 8;
+  // Absent before the device has an enrollment generation.
+  DeviceCapabilityState capabilities = 9;
 }
 
 message ListDevicePackagesRequest {

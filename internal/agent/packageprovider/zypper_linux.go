@@ -162,6 +162,10 @@ func (p *Provider) verifyZypperRPM(ctx context.Context, directory, path string, 
 func (p *Provider) planZypper(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, db *database, source *agentv1.NativePackageSource) ([]*resourcev1.PackageTransactionEntry, error) {
 	// The existing RPM preparation binds one key by full fingerprint, creates
 	// an isolated verification database and writes the sole approved repository.
+	// The zypper adapter models exactly one signed-metadata repository.
+	if rpm := source.GetRepository().GetRpm(); len(rpm.GetAdditionalRepositories()) != 0 || !rpm.GetRequireMetadataSignature() {
+		return nil, fmt.Errorf("%w: zypper sources need one repository with signed metadata", ErrUnsupported)
+	}
 	if _, err := p.prepareDNF(ctx, directory, source); err != nil {
 		return nil, err
 	}

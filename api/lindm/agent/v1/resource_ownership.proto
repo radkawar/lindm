@@ -35,6 +35,18 @@ message ResourceOwnershipSnapshot {
   // Authenticated helper command outcome, separate from independently read
   // file/archive evidence. Absent means no rebuild was attempted.
   optional bool module_initramfs_rebuild_succeeded = 14;
+  // The approved file root directory this effect created (root:root 0755).
+  // RESTORE_OWNED release removes exactly this directory only while it is
+  // still empty and root:root 0755. Absent means no directory was created.
+  optional string created_directory = 15 [(buf.validate.field).string = {
+    max_bytes: 1024
+    pattern: "^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.created_directory"
+    message: "created directories belong only to a managed file observation"
+    expression: "!has(this.created_directory) || has(this.observation.managed_file)"
+  };
   option (buf.validate.message).cel = {
     id: "ownership_snapshot.module_rebuild"
     message: "module rebuild outcomes belong only to the typed module template"

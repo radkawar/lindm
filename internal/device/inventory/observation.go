@@ -106,6 +106,9 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 			fields.FinishedAt = core.Timestamptz(observation.GetFinishedAt().AsTime())
 			fields.ReceivedAt = core.Timestamptz(authority.Now)
 			fields.Digest = digest
+			if err := releaseCapabilityHolds(ctx, q, principal.GenerationID, observation.GetDetails().GetCapabilityPolicy()); err != nil {
+				return err
+			}
 			if err := q.UpsertHostObservation(ctx, fields); err != nil {
 				return err
 			}

@@ -7,11 +7,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
 )
@@ -53,7 +55,7 @@ func acquisitionAllowed(owner *agentv1.ResourceOwnershipBinding, before *agentv1
 		return ErrBaselineUnknown
 	}
 	if before.GetObservation().GetSystemdDefinition().GetExists() && (owner.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION || owner.GetPolicy().GetAdoptionApprovalId() == "") {
-		return ErrConflict
+		return admissiondetail.Wrap(fmt.Errorf("%w: unowned systemd definition exists", ErrAdoptionRequired), "existing_definition")
 	}
 	return nil
 }

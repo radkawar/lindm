@@ -4,9 +4,12 @@ package fileprovider
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/nativefile"
 )
 
 func allowedPath(config *agentv1.NativeFileProviderConfig, path string) error {
@@ -38,3 +41,60 @@ func allowedPath(config *agentv1.NativeFileProviderConfig, path string) error {
 	return ErrUnsafePath
 }
 func within(path, root string) bool { return path == root || strings.HasPrefix(path, root+"/") }
+
+// creatableRoot returns the approved root the provider may create for path:
+// only when path sits directly inside an entry of allowed_roots. A deeper
+// file, or a root above an absent ancestor, is never created.
+func creatableRoot(config *agentv1.NativeFileProviderConfig, desired *resourcev1.ManagedFileDesired) (string, bool) {
+	if desired.GetKernelModuleBlocklist() != nil || allowedPath(config, desired.GetPath()) != nil {
+		return "", false
+	}
+	directory := filepath.Dir(desired.GetPath())
+	return directory, slices.Contains(config.GetAllowedRoots(), directory)
+}
+
+// releasedRecordedRoot names the directory a RESTORE_OWNED release that leaves
+// the file absent may remove: the one the last-applied image recorded this
+// resource created, which must be the file's own directory.
+func releasedRecordedRoot(desired *resourcev1.ManagedFileDesired, ledger *agentv1.ResourceOwnershipLedger, target *agentv1.ResourceOwnershipSnapshot, operation resourcev1.ResourceOperation) (string, bool) {
+	recorded := ledger.GetLastApplied().GetCreatedDirectory()
+	if operation != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE || recorded == "" || ledger.GetOwner().GetPolicy().GetRelease() != resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED || target.GetObservation().GetManagedFile().GetExists() || desired.GetKernelModuleBlocklist() != nil {
+		return "", false
+	}
+	return recorded, recorded == filepath.Dir(desired.GetPath())
+}
+
+// releasedCreatedRoot additionally requires the recorded directory to still
+// be an approved root under the local configuration.
+func releasedCreatedRoot(config *agentv1.NativeFileProviderConfig, desired *resourcev1.ManagedFileDesired, ledger *agentv1.ResourceOwnershipLedger, target *agentv1.ResourceOwnershipSnapshot, operation resourcev1.ResourceOperation) (string, bool) {
+	recorded, ok := releasedRecordedRoot(desired, ledger, target, operation)
+	if !ok {
+		return "", false
+	}
+	root, ok := creatableRoot(config, desired)
+	return root, ok && root == recorded
+}
+
+// EffectWritePaths is the transient effect unit's writable set. Normally only
+// the file's directory is writable; the root's parent is granted only when
+// the effect creates the absent root or releases one lindm recorded creating.
+// The helper re-derives and checks the target before any write.
+func EffectWritePaths(request *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ManagedFileDesired) ([]string, error) {
+	directory := filepath.Dir(desired.GetPath())
+	if root := request.GetTarget().GetCreatedDirectory(); root != "" && request.GetPlan().GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE && !request.GetBefore().GetObservation().GetManagedFile().GetExists() {
+		if root != directory || desired.GetKernelModuleBlocklist() != nil {
+			return nil, ErrConflict
+		}
+		_, absent, err := nativefile.DirectoryAbsent(root)
+		if err != nil {
+			return nil, err
+		}
+		if absent {
+			return []string{filepath.Dir(root)}, nil
+		}
+	}
+	if root, ok := releasedRecordedRoot(desired, request.GetOwnership(), request.GetTarget(), request.GetPlan().GetOperation()); ok {
+		return []string{filepath.Dir(root)}, nil
+	}
+	return []string{directory}, nil
+}

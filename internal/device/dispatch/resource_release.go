@@ -100,6 +100,10 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 		return "released", ""
 	}
+	refusal := status.GetAdmissionRefusal()
+	if refusal.GetDetail() != "" && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED {
+		return "release_conflict", refusal.GetDetail()
+	}
 	switch status.GetAdmissionRefusal().GetReason() {
 	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN:
 		return "baseline_unknown", "ownership_baseline_unavailable"
@@ -109,6 +113,9 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 		return "release_conflict", "precondition_failed"
 	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
 		return "release_conflict", ResourceReasonUnsafeToolPath
+	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
+		// Retried (state pending again) when the device's capabilities change.
+		return "release_conflict", core.CapabilityNotEnabledReason(status.GetAdmissionRefusal().GetCapability())
 	}
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
 		return "release_conflict", "outcome_unknown"

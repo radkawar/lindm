@@ -4,8 +4,6 @@ package vmlab
 
 import (
 	"context"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -35,27 +33,5 @@ func TestDemoProbeDirectoryPrecedesUploadAndReadiness(t *testing.T) {
 	}
 	if got := calls.Load(); got != 2 {
 		t.Fatalf("commands after directory failure: got %d, want installer then directory setup", got)
-	}
-}
-
-// Ubuntu 24.04 has no /etc/motd.d: the owner's opt-in creates an absent
-// approved root (and its parents) but never changes an existing directory.
-func TestDemoFileRootsScriptCreatesOnlyAbsentRoots(t *testing.T) {
-	base := t.TempDir()
-	existing, absent := filepath.Join(base, "existing"), filepath.Join(base, "etc", "motd.d")
-	if err := os.Mkdir(existing, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for range 2 {
-		command := exec.CommandContext(t.Context(), "sh", "-eu", "-c", demoFileRootsScript, "sh", existing, absent)
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("roots script: %v: %s", err, output)
-		}
-	}
-	for path, want := range map[string]os.FileMode{existing: 0o700, absent: 0o755, filepath.Dir(absent): 0o755} {
-		info, err := os.Stat(path)
-		if err != nil || !info.IsDir() || info.Mode().Perm() != want {
-			t.Fatalf("%s: %v %v, want directory %v", path, info, err, want)
-		}
 	}
 }

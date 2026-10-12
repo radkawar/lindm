@@ -8,7 +8,7 @@ import (
 	"flag"
 	"os"
 
-	"lindm/internal/agent/config"
+	"lindm/internal/agent/capabilitypolicy"
 	"lindm/internal/agent/nativehelper"
 )
 
@@ -28,12 +28,12 @@ func resourceTransactionCommand(ctx context.Context, args []string, observe bool
 	if flags.NArg() != 0 || *identity == "" {
 		return errors.New("native helper requires exactly one operation UUID")
 	}
-	document, err := config.Load(config.ExecutorConfigPath)
+	effective, err := capabilitypolicy.LoadEffectiveExecutorConfig(ctx)
 	if err != nil {
 		return err
 	}
 	if observe {
-		return nativehelper.RunObservation(ctx, document, *identity)
+		return nativehelper.RunObservation(ctx, effective.Document, *identity)
 	}
-	return nativehelper.RunResource(ctx, document, *identity)
+	return nativehelper.RunResource(ctx, effective.Document, *identity)
 }

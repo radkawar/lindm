@@ -32,14 +32,16 @@ func (s *Service) GetApprovedConfiguration(ctx context.Context, req *connect.Req
 	return noStore(response), nil
 }
 
-// approvedConfiguration copies the approvals; the package source's local
-// signing key file and fingerprints stay private to the executor.
+// approvedConfiguration copies the effective approvals (root-local ones and
+// those derived from the accepted capability policy); the package source's
+// local signing key file and fingerprints stay private to the executor.
 func (s *Service) approvedConfiguration() *agentv1.ApprovedConfigurationObservation {
 	observation := &agentv1.ApprovedConfigurationObservation{ObservedAt: timestamppb.New(s.now())}
-	for _, root := range s.nativeResources.Accounts.GetApprovedHomeRoots() {
+	providers := s.currentProviders()
+	for _, root := range providers.native.Accounts.GetApprovedHomeRoots() {
 		observation.HomeRoots = append(observation.HomeRoots, proto.CloneOf(root))
 	}
-	for _, source := range s.packageProvider.GetSources() {
+	for _, source := range providers.packages.GetSources() {
 		observation.PackageSources = append(observation.PackageSources, proto.CloneOf(source.GetRepository()))
 	}
 	return observation

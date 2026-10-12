@@ -28,7 +28,7 @@ func openFirewallResource(ctx context.Context, o resourceOpen) (nativeResource, 
 	holder := new(nativeFirewallResource)
 	provider, err := firewallprovider.Open(ctx, firewallprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
-		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Firewall,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.Firewall,
 		NativeApply: s.resourceNativeApply,
 		NativeRead: func(ctx context.Context, template *resourcev1.ResourceObservation) (*agentv1.ResourceOwnershipSnapshot, error) {
 			result, err := s.observeNativeResource(ctx, intent.GetDesired(), platform, template.GetMetadata().GetBackend())

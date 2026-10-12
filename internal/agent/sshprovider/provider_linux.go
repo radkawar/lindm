@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/resourceprovider"
@@ -33,6 +35,9 @@ var (
 	ErrConflict       = errors.New("sshprovider: ownership_or_native_precondition_conflict")
 	ErrOutcomeUnknown = errors.New("sshprovider: native_outcome_unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("sshprovider: banner_not_converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of an existing
+	// unowned native object. It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("sshprovider: adoption_required: %w", ErrConflict)
 )
 
 type Config struct {
@@ -175,11 +180,16 @@ func acquisitionAllowed(owner *agentv1.ResourceOwnershipBinding, ledger *agentv1
 		}
 		return nil
 	}
-	if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE || before.GetSshServer().GetDirective().GetState().GetExists() {
+	if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		return ErrConflict
 	}
+	if before.GetSshServer().GetDirective().GetState().GetExists() {
+		// An unowned file at the reserved drop-in path is never claimed, even
+		// with approved adoption, so this is a named precondition.
+		return admissiondetail.Wrap(fmt.Errorf("%w: unowned banner drop-in exists", ErrConflict), "existing_banner_dropin")
+	}
 	if before.GetSshServer().GetBanner().GetState().GetExists() && (owner.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION || owner.GetPolicy().GetAdoptionApprovalId() == "") {
-		return ErrConflict
+		return admissiondetail.Wrap(fmt.Errorf("%w: unowned %s exists", ErrAdoptionRequired, resource.SSHBannerPath), "existing_banner_file")
 	}
 	return nil
 }

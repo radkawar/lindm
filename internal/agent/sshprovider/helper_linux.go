@@ -84,7 +84,7 @@ func (p *Provider) applyNative(ctx context.Context, request *agentv1.NativeResou
 	// Validate the sole rendered directive before any effect. The real
 	// aggregate is checked again after replacement and before reload.
 	if _, err := p.run(ctx, "/usr/sbin/sshd", "-t", "-f", sshConfigPath, "-o", "Banner="+resource.SSHBannerPath); err != nil {
-		return nil, errors.Join(ErrConflict, err)
+		return nil, configInvalid(err)
 	}
 	changes, err := p.prepareChanges(fresh, target, plan.GetOperation())
 	if err != nil {

@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/capability_policy.proto";
+import "lindm/agent/v1/management_capability.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Where a capability policy applies. A device's effective capabilities are the
+// union of the deployment policy and every static or dynamic group policy whose
+// group contains the device. Firewall settings exist only at deployment scope.
+message CapabilityPolicyScope {
+  oneof scope {
+    option (buf.validate.oneof).required = true;
+    bool deployment = 1 [(buf.validate.field).bool.const = true];
+    string static_group_id = 2 [(buf.validate.field).string.uuid = true];
+    string dynamic_group_id = 3 [(buf.validate.field).string.uuid = true];
+  }
+}
+
+message CapabilityPolicy {
+  CapabilityPolicyScope scope = 1;
+  repeated lindm.agent.v1.ManagementCapability capabilities = 2;
+  repeated string sysctl_keys = 3;
+  lindm.agent.v1.CapabilityFirewallSettings firewall = 4;
+  // Optimistic concurrency token; zero means the scope has never been set.
+  uint64 revision = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string updated_by = 7;
+  // Display name of the scope's group; empty at deployment scope.
+  string scope_name = 8;
+}
+
+message ListCapabilityPoliciesRequest {}
+
+message ListCapabilityPoliciesResponse {
+  CapabilityPolicy deployment = 1;
+  repeated CapabilityPolicy groups = 2;
+  // Empty when the current execution delegation lets the online plan signer
+  // issue capability policies; otherwise a snake_case reason such as
+  // capability_policy_not_delegated or execution_authority_unconfigured.
+  string issuance_unavailable_reason = 3;
+}
+
+// Replaces the scope's complete policy. An empty group policy is removed; an
+// empty deployment policy grants nothing. Requires execution_trust.manage and
+// a fresh sign-in; audited as capability_policy.set.
+message SetCapabilityPolicyRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  CapabilityPolicyScope scope = 2 [(buf.validate.field).required = true];
+  repeated lindm.agent.v1.ManagementCapability capabilities = 3 [(buf.validate.field).repeated = {
+    max_items: 7
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        in: [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    }
+  }];
+  repeated string sysctl_keys = 4 [(buf.validate.field).repeated = {
+    max_items: 128
+    unique: true
+    items: {
+      string: {
+        max_bytes: 256
+        pattern: "^[a-z0-9_]+([.][a-zA-Z0-9_-]+)+$"
+      }
+    }
+  }];
+  lindm.agent.v1.CapabilityFirewallSettings firewall = 5;
+  // Must equal the scope's current revision (zero when never set).
+  uint64 expected_revision = 6;
+  string reason = 7 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  option (buf.validate.message).cel = {
+    id: "set_capability_policy.firewall_scope"
+    message: "firewall settings belong to the deployment scope"
+    expression: "!has(this.firewall) || has(this.scope.deployment)"
+  };
+  option (buf.validate.message).cel = {
+    id: "set_capability_policy.sysctl"
+    message: "kernel parameters are listed exactly when kernel settings are enabled"
+    expression: "(this.sysctl_keys.size() > 0) == (7 in this.capabilities)"
+  };
+}
+
+message SetCapabilityPolicyResponse {
+  CapabilityPolicy policy = 1;
+}
+
+// One capability granted to a device and the scopes that grant it.
+message DeviceCapabilityGrant {
+  lindm.agent.v1.ManagementCapability capability = 1;
+  repeated CapabilityPolicyScope sources = 2;
+}
+
+// Device page view: what the server grants, what it last signed, and what the
+// executor last reported. Presentation only; the executor decides.
+message DeviceCapabilityState {
+  repeated DeviceCapabilityGrant granted = 1;
+  // Latest signed policy version for the current enrollment generation; zero
+  // when none has been issued.
+  uint64 issued_version = 2;
+  google.protobuf.Timestamp issued_at = 3;
+  // Why no current policy could be signed, empty otherwise.
+  string issuance_unavailable_reason = 4;
+  // Executor status from the latest accepted host observation.
+  lindm.agent.v1.CapabilityPolicyObservation reported = 5;
+  google.protobuf.Timestamp reported_at = 6;
+}

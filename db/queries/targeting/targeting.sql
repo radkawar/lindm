@@ -37,6 +37,28 @@ WHERE d.id=sqlc.arg(device_id)
 AND device_scope_matches(d.id, sqlc.arg(unrestricted)::boolean, sqlc.arg(scopes)::jsonb)
 FOR UPDATE OF d;
 
+-- name: TargetingDeviceSnapshot :one
+-- The unlocked, unscoped TargetingDevice row for system membership reads
+-- (capability grants) inside the caller's snapshot; it fences nothing.
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ coalesce((SELECT preview_id::text FROM target_execution_heads WHERE device_id=d.id),'')::text AS previous_preview_id,
+ coalesce((SELECT assignment_id::text FROM resource_assignment_heads WHERE generation_id=d.current_generation_id),'')::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id=sqlc.arg(device_id);
+
 -- name: ListTargetingDevices :many
 SELECT id FROM devices WHERE id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT 200;
 

@@ -186,15 +186,31 @@ func (k *resourceResult) persist(ctx context.Context, s *Service, st *resourceRe
 }
 
 // resourceResultDisposition classifies terminal evidence for the assignment.
+// Admission refusals are effect-free: a capability refusal names the exact
+// catalogue value to enable (and is dispatched again when the device's grant
+// or reported capability status changes); any other refusal detail is a
+// closed snake_case cause the console explains.
 func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, string) {
 	switch {
 	case status.GetAdmissionRefusal() != nil:
-		switch status.GetAdmissionRefusal().GetReason() {
+		refusal := status.GetAdmissionRefusal()
+		disposition, reason := int16(6), "native_unsupported"
+		switch refusal.GetReason() {
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
+			return 5, core.CapabilityNotEnabledReason(refusal.GetCapability())
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED:
+			disposition, reason = 5, "adoption_required"
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION:
-			return 5, "admission_precondition"
+			disposition, reason = 5, "admission_precondition"
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
-			return 5, ResourceReasonUnsafeToolPath
+			disposition, reason = 5, ResourceReasonUnsafeToolPath
 		}
+		if refusal.GetDetail() != "" {
+			reason = refusal.GetDetail()
+		}
+		return disposition, reason
+	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED && status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED && status.GetStartedAt() == nil:
+		// The provider refused before any native effect was authorized.
 		return 6, "native_unsupported"
 	case status.GetReadOnly() && status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE:
 		// A successful release acknowledgment is not proof of the active
@@ -300,7 +316,9 @@ func ResourceResultBinding(intent *agentv1.ResourceExecutionIntent, status *agen
 				return errors.New("resource_admission_refusal_binding_rejected")
 			}
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION,
-			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH:
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH,
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED,
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED:
 			if status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION {
 				return errors.New("resource_admission_refusal_binding_rejected")
 			}

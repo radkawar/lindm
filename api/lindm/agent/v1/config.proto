@@ -71,6 +71,15 @@ message AgentConfig {
   RemoteAssistanceConfig remote_assistance = 17;
   // Absent: os.update.v1 resources are refused as unsupported.
   NativeOSUpdateProviderConfig os_update_provider = 18;
+  // Absent: the executor also applies the server's signed capability policy
+  // (capability_policy.proto). Present: provider authority comes from this
+  // file only.
+  CapabilityPolicyConfig capability_policy = 19;
+}
+
+// Root-local ceiling on remotely granted provider authority.
+message CapabilityPolicyConfig {
+  bool refuse_remote = 1 [(buf.validate.field).bool.const = true];
 }
 
 message NativePackageProviderConfig {

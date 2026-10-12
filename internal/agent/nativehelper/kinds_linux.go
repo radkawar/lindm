@@ -147,7 +147,15 @@ var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativ
 	},
 	resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE: {
 		effect: func(s *effectSandbox, _ string, request *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ResourceDesiredState) error {
-			s.paths = append(s.paths, filepath.Dir(desired.GetManagedFile().GetPath()))
+			if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
+				s.paths = append(s.paths, filepath.Dir(desired.GetManagedFile().GetPath()))
+			} else {
+				paths, err := fileprovider.EffectWritePaths(request, desired.GetManagedFile())
+				if err != nil {
+					return err
+				}
+				s.paths = append(s.paths, paths...)
+			}
 			s.fileCaps()
 			if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
 				tools := platform.Of(request.GetPlan().GetBackend().GetProduct()).ModuleBlocklist

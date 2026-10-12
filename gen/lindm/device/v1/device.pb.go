@@ -412,6 +412,131 @@ func (x *GetExecutionTrustResponse) GetMinimumRecoveryEpoch() uint64 {
 	return 0
 }
 
+// Untrusted cursor hints; the executor alone decides what it accepts.
+type GetCapabilityPolicyRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SessionEpoch   uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	AppliedVersion uint64                 `protobuf:"varint,2,opt,name=applied_version,json=appliedVersion,proto3" json:"applied_version,omitempty"`
+	AppliedSha256  []byte                 `protobuf:"bytes,3,opt,name=applied_sha256,json=appliedSha256,proto3" json:"applied_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetCapabilityPolicyRequest) Reset() {
+	*x = GetCapabilityPolicyRequest{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCapabilityPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCapabilityPolicyRequest) ProtoMessage() {}
+
+func (x *GetCapabilityPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCapabilityPolicyRequest.ProtoReflect.Descriptor instead.
+func (*GetCapabilityPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetCapabilityPolicyRequest) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *GetCapabilityPolicyRequest) GetAppliedVersion() uint64 {
+	if x != nil {
+		return x.AppliedVersion
+	}
+	return 0
+}
+
+func (x *GetCapabilityPolicyRequest) GetAppliedSha256() []byte {
+	if x != nil {
+		return x.AppliedSha256
+	}
+	return nil
+}
+
+type GetCapabilityPolicyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty when the device already holds the current version or none can be
+	// issued (see unavailable_reason).
+	PolicyEnvelope []byte `protobuf:"bytes,1,opt,name=policy_envelope,json=policyEnvelope,proto3" json:"policy_envelope,omitempty"`
+	Version        uint64 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	// snake_case reason when no policy can be signed, for example
+	// capability_policy_not_delegated.
+	UnavailableReason string `protobuf:"bytes,3,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetCapabilityPolicyResponse) Reset() {
+	*x = GetCapabilityPolicyResponse{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCapabilityPolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCapabilityPolicyResponse) ProtoMessage() {}
+
+func (x *GetCapabilityPolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCapabilityPolicyResponse.ProtoReflect.Descriptor instead.
+func (*GetCapabilityPolicyResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetCapabilityPolicyResponse) GetPolicyEnvelope() []byte {
+	if x != nil {
+		return x.PolicyEnvelope
+	}
+	return nil
+}
+
+func (x *GetCapabilityPolicyResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetCapabilityPolicyResponse) GetUnavailableReason() string {
+	if x != nil {
+		return x.UnavailableReason
+	}
+	return ""
+}
+
 // PackageBatchDescriptor binds one opaque inventory.v1.PackageBatch. SHA-256 and
 // encoded_size cover those exact bytes, not a server reserialization.
 type PackageBatchDescriptor struct {
@@ -426,7 +551,7 @@ type PackageBatchDescriptor struct {
 
 func (x *PackageBatchDescriptor) Reset() {
 	*x = PackageBatchDescriptor{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -438,7 +563,7 @@ func (x *PackageBatchDescriptor) String() string {
 func (*PackageBatchDescriptor) ProtoMessage() {}
 
 func (x *PackageBatchDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -451,7 +576,7 @@ func (x *PackageBatchDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageBatchDescriptor.ProtoReflect.Descriptor instead.
 func (*PackageBatchDescriptor) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{6}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PackageBatchDescriptor) GetIndex() uint32 {
@@ -501,7 +626,7 @@ type PackageSnapshotManifest struct {
 
 func (x *PackageSnapshotManifest) Reset() {
 	*x = PackageSnapshotManifest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +638,7 @@ func (x *PackageSnapshotManifest) String() string {
 func (*PackageSnapshotManifest) ProtoMessage() {}
 
 func (x *PackageSnapshotManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +651,7 @@ func (x *PackageSnapshotManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageSnapshotManifest.ProtoReflect.Descriptor instead.
 func (*PackageSnapshotManifest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{7}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PackageSnapshotManifest) GetSnapshotId() string {
@@ -597,7 +722,7 @@ type ReportHostObservationRequest struct {
 
 func (x *ReportHostObservationRequest) Reset() {
 	*x = ReportHostObservationRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[8]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +734,7 @@ func (x *ReportHostObservationRequest) String() string {
 func (*ReportHostObservationRequest) ProtoMessage() {}
 
 func (x *ReportHostObservationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[8]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -622,7 +747,7 @@ func (x *ReportHostObservationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportHostObservationRequest.ProtoReflect.Descriptor instead.
 func (*ReportHostObservationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{8}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ReportHostObservationRequest) GetEnrollmentGeneration() string {
@@ -663,7 +788,7 @@ type ReportHostObservationResponse struct {
 
 func (x *ReportHostObservationResponse) Reset() {
 	*x = ReportHostObservationResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[9]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +800,7 @@ func (x *ReportHostObservationResponse) String() string {
 func (*ReportHostObservationResponse) ProtoMessage() {}
 
 func (x *ReportHostObservationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[9]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +813,7 @@ func (x *ReportHostObservationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportHostObservationResponse.ProtoReflect.Descriptor instead.
 func (*ReportHostObservationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{9}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReportHostObservationResponse) GetAcceptedSequence() uint64 {
@@ -721,7 +846,7 @@ type ReportPackageAttemptRequest struct {
 
 func (x *ReportPackageAttemptRequest) Reset() {
 	*x = ReportPackageAttemptRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[10]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -733,7 +858,7 @@ func (x *ReportPackageAttemptRequest) String() string {
 func (*ReportPackageAttemptRequest) ProtoMessage() {}
 
 func (x *ReportPackageAttemptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[10]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -746,7 +871,7 @@ func (x *ReportPackageAttemptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportPackageAttemptRequest.ProtoReflect.Descriptor instead.
 func (*ReportPackageAttemptRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{10}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ReportPackageAttemptRequest) GetEnrollmentGeneration() string {
@@ -808,7 +933,7 @@ type ReportPackageAttemptResponse struct {
 
 func (x *ReportPackageAttemptResponse) Reset() {
 	*x = ReportPackageAttemptResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[11]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -820,7 +945,7 @@ func (x *ReportPackageAttemptResponse) String() string {
 func (*ReportPackageAttemptResponse) ProtoMessage() {}
 
 func (x *ReportPackageAttemptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[11]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -833,7 +958,7 @@ func (x *ReportPackageAttemptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportPackageAttemptResponse.ProtoReflect.Descriptor instead.
 func (*ReportPackageAttemptResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{11}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ReportPackageAttemptResponse) GetAcceptedSequence() uint64 {
@@ -861,7 +986,7 @@ type BeginPackageSnapshotRequest struct {
 
 func (x *BeginPackageSnapshotRequest) Reset() {
 	*x = BeginPackageSnapshotRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[12]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +998,7 @@ func (x *BeginPackageSnapshotRequest) String() string {
 func (*BeginPackageSnapshotRequest) ProtoMessage() {}
 
 func (x *BeginPackageSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[12]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +1011,7 @@ func (x *BeginPackageSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginPackageSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*BeginPackageSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{12}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *BeginPackageSnapshotRequest) GetEnrollmentGeneration() string {
@@ -924,7 +1049,7 @@ type BeginPackageSnapshotResponse struct {
 
 func (x *BeginPackageSnapshotResponse) Reset() {
 	*x = BeginPackageSnapshotResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[13]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +1061,7 @@ func (x *BeginPackageSnapshotResponse) String() string {
 func (*BeginPackageSnapshotResponse) ProtoMessage() {}
 
 func (x *BeginPackageSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[13]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +1074,7 @@ func (x *BeginPackageSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginPackageSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*BeginPackageSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{13}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *BeginPackageSnapshotResponse) GetState() v11.SnapshotState {
@@ -1008,7 +1133,7 @@ type PutPackageBatchRequest struct {
 
 func (x *PutPackageBatchRequest) Reset() {
 	*x = PutPackageBatchRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[14]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1020,7 +1145,7 @@ func (x *PutPackageBatchRequest) String() string {
 func (*PutPackageBatchRequest) ProtoMessage() {}
 
 func (x *PutPackageBatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[14]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1033,7 +1158,7 @@ func (x *PutPackageBatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutPackageBatchRequest.ProtoReflect.Descriptor instead.
 func (*PutPackageBatchRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{14}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PutPackageBatchRequest) GetEnrollmentGeneration() string {
@@ -1082,7 +1207,7 @@ type PutPackageBatchResponse struct {
 
 func (x *PutPackageBatchResponse) Reset() {
 	*x = PutPackageBatchResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[15]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1094,7 +1219,7 @@ func (x *PutPackageBatchResponse) String() string {
 func (*PutPackageBatchResponse) ProtoMessage() {}
 
 func (x *PutPackageBatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[15]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1107,7 +1232,7 @@ func (x *PutPackageBatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutPackageBatchResponse.ProtoReflect.Descriptor instead.
 func (*PutPackageBatchResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{15}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PutPackageBatchResponse) GetState() v11.SnapshotState {
@@ -1142,7 +1267,7 @@ type CommitPackageSnapshotRequest struct {
 
 func (x *CommitPackageSnapshotRequest) Reset() {
 	*x = CommitPackageSnapshotRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[16]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1154,7 +1279,7 @@ func (x *CommitPackageSnapshotRequest) String() string {
 func (*CommitPackageSnapshotRequest) ProtoMessage() {}
 
 func (x *CommitPackageSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[16]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1167,7 +1292,7 @@ func (x *CommitPackageSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitPackageSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*CommitPackageSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{16}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CommitPackageSnapshotRequest) GetEnrollmentGeneration() string {
@@ -1205,7 +1330,7 @@ type CommitPackageSnapshotResponse struct {
 
 func (x *CommitPackageSnapshotResponse) Reset() {
 	*x = CommitPackageSnapshotResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[17]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +1342,7 @@ func (x *CommitPackageSnapshotResponse) String() string {
 func (*CommitPackageSnapshotResponse) ProtoMessage() {}
 
 func (x *CommitPackageSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[17]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1230,7 +1355,7 @@ func (x *CommitPackageSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitPackageSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*CommitPackageSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{17}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CommitPackageSnapshotResponse) GetState() v11.SnapshotState {
@@ -1285,7 +1410,7 @@ type RenewIdentityRequest struct {
 
 func (x *RenewIdentityRequest) Reset() {
 	*x = RenewIdentityRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[18]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1297,7 +1422,7 @@ func (x *RenewIdentityRequest) String() string {
 func (*RenewIdentityRequest) ProtoMessage() {}
 
 func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[18]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1310,7 +1435,7 @@ func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityRequest.ProtoReflect.Descriptor instead.
 func (*RenewIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{18}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RenewIdentityRequest) GetCsrPem() []byte {
@@ -1337,7 +1462,7 @@ type RenewIdentityResponse struct {
 
 func (x *RenewIdentityResponse) Reset() {
 	*x = RenewIdentityResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[19]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1349,7 +1474,7 @@ func (x *RenewIdentityResponse) String() string {
 func (*RenewIdentityResponse) ProtoMessage() {}
 
 func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[19]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1362,7 +1487,7 @@ func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityResponse.ProtoReflect.Descriptor instead.
 func (*RenewIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{19}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RenewIdentityResponse) GetCertificatePem() []byte {
@@ -1390,7 +1515,7 @@ type RegisterEncryptionKeyRequest struct {
 
 func (x *RegisterEncryptionKeyRequest) Reset() {
 	*x = RegisterEncryptionKeyRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[20]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1402,7 +1527,7 @@ func (x *RegisterEncryptionKeyRequest) String() string {
 func (*RegisterEncryptionKeyRequest) ProtoMessage() {}
 
 func (x *RegisterEncryptionKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[20]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1415,7 +1540,7 @@ func (x *RegisterEncryptionKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterEncryptionKeyRequest.ProtoReflect.Descriptor instead.
 func (*RegisterEncryptionKeyRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{20}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RegisterEncryptionKeyRequest) GetSessionEpoch() uint64 {
@@ -1442,7 +1567,7 @@ type RegisterEncryptionKeyResponse struct {
 
 func (x *RegisterEncryptionKeyResponse) Reset() {
 	*x = RegisterEncryptionKeyResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[21]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1454,7 +1579,7 @@ func (x *RegisterEncryptionKeyResponse) String() string {
 func (*RegisterEncryptionKeyResponse) ProtoMessage() {}
 
 func (x *RegisterEncryptionKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[21]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1467,7 +1592,7 @@ func (x *RegisterEncryptionKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterEncryptionKeyResponse.ProtoReflect.Descriptor instead.
 func (*RegisterEncryptionKeyResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{21}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RegisterEncryptionKeyResponse) GetPublicKeySha256() []byte {
@@ -1519,7 +1644,16 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x06update\x18\x01 \x01(\v2+.lindm.agent.v1.UpdateExecutionTrustRequestR\x06update\x12!\n" +
 	"\froot_version\x18\x02 \x01(\x04R\vrootVersion\x12-\n" +
 	"\x12delegation_version\x18\x03 \x01(\x04R\x11delegationVersion\x124\n" +
-	"\x16minimum_recovery_epoch\x18\x04 \x01(\x04R\x14minimumRecoveryEpoch\"\xab\x01\n" +
+	"\x16minimum_recovery_epoch\x18\x04 \x01(\x04R\x14minimumRecoveryEpoch\"\xbe\x01\n" +
+	"\x1aGetCapabilityPolicyRequest\x126\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x128\n" +
+	"\x0fapplied_version\x18\x02 \x01(\x04B\x0f\xbaH\f2\n" +
+	"\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7fR\x0eappliedVersion\x12.\n" +
+	"\x0eapplied_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02\x18 R\rappliedSha256\"\xb9\x01\n" +
+	"\x1bGetCapabilityPolicyResponse\x122\n" +
+	"\x0fpolicy_envelope\x18\x01 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x0epolicyEnvelope\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x04R\aversion\x12L\n" +
+	"\x12unavailable_reason\x18\x03 \x01(\tB\x1d\xbaH\x1ar\x18\x18@2\x14^([a-z][a-z0-9_]*)?$R\x11unavailableReason\"\xab\x01\n" +
 	"\x16PackageBatchDescriptor\x12\x1e\n" +
 	"\x05index\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xff\x03R\x05index\x12\x1f\n" +
 	"\x06sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x06sha256\x12 \n" +
@@ -1617,7 +1751,7 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x14attestation_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x13attestationEnvelope\"z\n" +
 	"\x1dRegisterEncryptionKeyResponse\x12*\n" +
 	"\x11public_key_sha256\x18\x01 \x01(\fR\x0fpublicKeySha256\x12-\n" +
-	"\x12certificate_sha256\x18\x02 \x01(\fR\x11certificateSha2562\xb5\x11\n" +
+	"\x12certificate_sha256\x18\x02 \x01(\fR\x11certificateSha2562\xa7\x12\n" +
 	"\rDeviceService\x12a\n" +
 	"\x0eAcquireSession\x12&.lindm.device.v1.AcquireSessionRequest\x1a'.lindm.device.v1.AcquireSessionResponse\x12[\n" +
 	"\fGetSyncState\x12$.lindm.device.v1.GetSyncStateRequest\x1a%.lindm.device.v1.GetSyncStateResponse\x12j\n" +
@@ -1637,7 +1771,8 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x18ReportDeviceActionResult\x120.lindm.device.v1.ReportDeviceActionResultRequest\x1a1.lindm.device.v1.ReportDeviceActionResultResponse\x12\x8b\x01\n" +
 	"\x1cRegisterDeviceActionRecovery\x124.lindm.device.v1.RegisterDeviceActionRecoveryRequest\x1a5.lindm.device.v1.RegisterDeviceActionRecoveryResponse\x12\x9d\x01\n" +
 	"\"ConfirmRefreshInventoryPublication\x12:.lindm.device.v1.ConfirmRefreshInventoryPublicationRequest\x1a;.lindm.device.v1.ConfirmRefreshInventoryPublicationResponse\x12a\n" +
-	"\x0eSyncAssistance\x12&.lindm.device.v1.SyncAssistanceRequest\x1a'.lindm.device.v1.SyncAssistanceResponseB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
+	"\x0eSyncAssistance\x12&.lindm.device.v1.SyncAssistanceRequest\x1a'.lindm.device.v1.SyncAssistanceResponse\x12p\n" +
+	"\x13GetCapabilityPolicy\x12+.lindm.device.v1.GetCapabilityPolicyRequest\x1a,.lindm.device.v1.GetCapabilityPolicyResponseB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
 	file_lindm_device_v1_device_proto_rawDescOnce sync.Once
@@ -1651,7 +1786,7 @@ func file_lindm_device_v1_device_proto_rawDescGZIP() []byte {
 	return file_lindm_device_v1_device_proto_rawDescData
 }
 
-var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_lindm_device_v1_device_proto_goTypes = []any{
 	(*AcquireSessionRequest)(nil),                      // 0: lindm.device.v1.AcquireSessionRequest
 	(*AcquireSessionResponse)(nil),                     // 1: lindm.device.v1.AcquireSessionResponse
@@ -1659,117 +1794,121 @@ var file_lindm_device_v1_device_proto_goTypes = []any{
 	(*GetSyncStateResponse)(nil),                       // 3: lindm.device.v1.GetSyncStateResponse
 	(*GetExecutionTrustRequest)(nil),                   // 4: lindm.device.v1.GetExecutionTrustRequest
 	(*GetExecutionTrustResponse)(nil),                  // 5: lindm.device.v1.GetExecutionTrustResponse
-	(*PackageBatchDescriptor)(nil),                     // 6: lindm.device.v1.PackageBatchDescriptor
-	(*PackageSnapshotManifest)(nil),                    // 7: lindm.device.v1.PackageSnapshotManifest
-	(*ReportHostObservationRequest)(nil),               // 8: lindm.device.v1.ReportHostObservationRequest
-	(*ReportHostObservationResponse)(nil),              // 9: lindm.device.v1.ReportHostObservationResponse
-	(*ReportPackageAttemptRequest)(nil),                // 10: lindm.device.v1.ReportPackageAttemptRequest
-	(*ReportPackageAttemptResponse)(nil),               // 11: lindm.device.v1.ReportPackageAttemptResponse
-	(*BeginPackageSnapshotRequest)(nil),                // 12: lindm.device.v1.BeginPackageSnapshotRequest
-	(*BeginPackageSnapshotResponse)(nil),               // 13: lindm.device.v1.BeginPackageSnapshotResponse
-	(*PutPackageBatchRequest)(nil),                     // 14: lindm.device.v1.PutPackageBatchRequest
-	(*PutPackageBatchResponse)(nil),                    // 15: lindm.device.v1.PutPackageBatchResponse
-	(*CommitPackageSnapshotRequest)(nil),               // 16: lindm.device.v1.CommitPackageSnapshotRequest
-	(*CommitPackageSnapshotResponse)(nil),              // 17: lindm.device.v1.CommitPackageSnapshotResponse
-	(*RenewIdentityRequest)(nil),                       // 18: lindm.device.v1.RenewIdentityRequest
-	(*RenewIdentityResponse)(nil),                      // 19: lindm.device.v1.RenewIdentityResponse
-	(*RegisterEncryptionKeyRequest)(nil),               // 20: lindm.device.v1.RegisterEncryptionKeyRequest
-	(*RegisterEncryptionKeyResponse)(nil),              // 21: lindm.device.v1.RegisterEncryptionKeyResponse
-	(*timestamppb.Timestamp)(nil),                      // 22: google.protobuf.Timestamp
-	(*v1.AgentUpdateStatus)(nil),                       // 23: lindm.agent.v1.AgentUpdateStatus
-	(*v1.UpdateExecutionTrustRequest)(nil),             // 24: lindm.agent.v1.UpdateExecutionTrustRequest
-	(*v11.HostObservation)(nil),                        // 25: lindm.inventory.v1.HostObservation
-	(v11.CollectionStatus)(0),                          // 26: lindm.inventory.v1.CollectionStatus
-	(v11.SnapshotState)(0),                             // 27: lindm.inventory.v1.SnapshotState
-	(*GetResourceWorkRequest)(nil),                     // 28: lindm.device.v1.GetResourceWorkRequest
-	(*AuthorizeResourceStartRequest)(nil),              // 29: lindm.device.v1.AuthorizeResourceStartRequest
-	(*ReportResourceResultRequest)(nil),                // 30: lindm.device.v1.ReportResourceResultRequest
-	(*GetDeviceActionWorkRequest)(nil),                 // 31: lindm.device.v1.GetDeviceActionWorkRequest
-	(*AuthorizeDeviceActionStartRequest)(nil),          // 32: lindm.device.v1.AuthorizeDeviceActionStartRequest
-	(*ReportDeviceActionResultRequest)(nil),            // 33: lindm.device.v1.ReportDeviceActionResultRequest
-	(*RegisterDeviceActionRecoveryRequest)(nil),        // 34: lindm.device.v1.RegisterDeviceActionRecoveryRequest
-	(*ConfirmRefreshInventoryPublicationRequest)(nil),  // 35: lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
-	(*SyncAssistanceRequest)(nil),                      // 36: lindm.device.v1.SyncAssistanceRequest
-	(*GetResourceWorkResponse)(nil),                    // 37: lindm.device.v1.GetResourceWorkResponse
-	(*AuthorizeResourceStartResponse)(nil),             // 38: lindm.device.v1.AuthorizeResourceStartResponse
-	(*ReportResourceResultResponse)(nil),               // 39: lindm.device.v1.ReportResourceResultResponse
-	(*GetDeviceActionWorkResponse)(nil),                // 40: lindm.device.v1.GetDeviceActionWorkResponse
-	(*AuthorizeDeviceActionStartResponse)(nil),         // 41: lindm.device.v1.AuthorizeDeviceActionStartResponse
-	(*ReportDeviceActionResultResponse)(nil),           // 42: lindm.device.v1.ReportDeviceActionResultResponse
-	(*RegisterDeviceActionRecoveryResponse)(nil),       // 43: lindm.device.v1.RegisterDeviceActionRecoveryResponse
-	(*ConfirmRefreshInventoryPublicationResponse)(nil), // 44: lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
-	(*SyncAssistanceResponse)(nil),                     // 45: lindm.device.v1.SyncAssistanceResponse
+	(*GetCapabilityPolicyRequest)(nil),                 // 6: lindm.device.v1.GetCapabilityPolicyRequest
+	(*GetCapabilityPolicyResponse)(nil),                // 7: lindm.device.v1.GetCapabilityPolicyResponse
+	(*PackageBatchDescriptor)(nil),                     // 8: lindm.device.v1.PackageBatchDescriptor
+	(*PackageSnapshotManifest)(nil),                    // 9: lindm.device.v1.PackageSnapshotManifest
+	(*ReportHostObservationRequest)(nil),               // 10: lindm.device.v1.ReportHostObservationRequest
+	(*ReportHostObservationResponse)(nil),              // 11: lindm.device.v1.ReportHostObservationResponse
+	(*ReportPackageAttemptRequest)(nil),                // 12: lindm.device.v1.ReportPackageAttemptRequest
+	(*ReportPackageAttemptResponse)(nil),               // 13: lindm.device.v1.ReportPackageAttemptResponse
+	(*BeginPackageSnapshotRequest)(nil),                // 14: lindm.device.v1.BeginPackageSnapshotRequest
+	(*BeginPackageSnapshotResponse)(nil),               // 15: lindm.device.v1.BeginPackageSnapshotResponse
+	(*PutPackageBatchRequest)(nil),                     // 16: lindm.device.v1.PutPackageBatchRequest
+	(*PutPackageBatchResponse)(nil),                    // 17: lindm.device.v1.PutPackageBatchResponse
+	(*CommitPackageSnapshotRequest)(nil),               // 18: lindm.device.v1.CommitPackageSnapshotRequest
+	(*CommitPackageSnapshotResponse)(nil),              // 19: lindm.device.v1.CommitPackageSnapshotResponse
+	(*RenewIdentityRequest)(nil),                       // 20: lindm.device.v1.RenewIdentityRequest
+	(*RenewIdentityResponse)(nil),                      // 21: lindm.device.v1.RenewIdentityResponse
+	(*RegisterEncryptionKeyRequest)(nil),               // 22: lindm.device.v1.RegisterEncryptionKeyRequest
+	(*RegisterEncryptionKeyResponse)(nil),              // 23: lindm.device.v1.RegisterEncryptionKeyResponse
+	(*timestamppb.Timestamp)(nil),                      // 24: google.protobuf.Timestamp
+	(*v1.AgentUpdateStatus)(nil),                       // 25: lindm.agent.v1.AgentUpdateStatus
+	(*v1.UpdateExecutionTrustRequest)(nil),             // 26: lindm.agent.v1.UpdateExecutionTrustRequest
+	(*v11.HostObservation)(nil),                        // 27: lindm.inventory.v1.HostObservation
+	(v11.CollectionStatus)(0),                          // 28: lindm.inventory.v1.CollectionStatus
+	(v11.SnapshotState)(0),                             // 29: lindm.inventory.v1.SnapshotState
+	(*GetResourceWorkRequest)(nil),                     // 30: lindm.device.v1.GetResourceWorkRequest
+	(*AuthorizeResourceStartRequest)(nil),              // 31: lindm.device.v1.AuthorizeResourceStartRequest
+	(*ReportResourceResultRequest)(nil),                // 32: lindm.device.v1.ReportResourceResultRequest
+	(*GetDeviceActionWorkRequest)(nil),                 // 33: lindm.device.v1.GetDeviceActionWorkRequest
+	(*AuthorizeDeviceActionStartRequest)(nil),          // 34: lindm.device.v1.AuthorizeDeviceActionStartRequest
+	(*ReportDeviceActionResultRequest)(nil),            // 35: lindm.device.v1.ReportDeviceActionResultRequest
+	(*RegisterDeviceActionRecoveryRequest)(nil),        // 36: lindm.device.v1.RegisterDeviceActionRecoveryRequest
+	(*ConfirmRefreshInventoryPublicationRequest)(nil),  // 37: lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
+	(*SyncAssistanceRequest)(nil),                      // 38: lindm.device.v1.SyncAssistanceRequest
+	(*GetResourceWorkResponse)(nil),                    // 39: lindm.device.v1.GetResourceWorkResponse
+	(*AuthorizeResourceStartResponse)(nil),             // 40: lindm.device.v1.AuthorizeResourceStartResponse
+	(*ReportResourceResultResponse)(nil),               // 41: lindm.device.v1.ReportResourceResultResponse
+	(*GetDeviceActionWorkResponse)(nil),                // 42: lindm.device.v1.GetDeviceActionWorkResponse
+	(*AuthorizeDeviceActionStartResponse)(nil),         // 43: lindm.device.v1.AuthorizeDeviceActionStartResponse
+	(*ReportDeviceActionResultResponse)(nil),           // 44: lindm.device.v1.ReportDeviceActionResultResponse
+	(*RegisterDeviceActionRecoveryResponse)(nil),       // 45: lindm.device.v1.RegisterDeviceActionRecoveryResponse
+	(*ConfirmRefreshInventoryPublicationResponse)(nil), // 46: lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
+	(*SyncAssistanceResponse)(nil),                     // 47: lindm.device.v1.SyncAssistanceResponse
 }
 var file_lindm_device_v1_device_proto_depIdxs = []int32{
-	22, // 0: lindm.device.v1.AcquireSessionResponse.server_time:type_name -> google.protobuf.Timestamp
-	23, // 1: lindm.device.v1.GetSyncStateRequest.agent_update:type_name -> lindm.agent.v1.AgentUpdateStatus
-	22, // 2: lindm.device.v1.GetSyncStateResponse.server_time:type_name -> google.protobuf.Timestamp
-	24, // 3: lindm.device.v1.GetExecutionTrustResponse.update:type_name -> lindm.agent.v1.UpdateExecutionTrustRequest
-	22, // 4: lindm.device.v1.PackageSnapshotManifest.created_at:type_name -> google.protobuf.Timestamp
-	22, // 5: lindm.device.v1.PackageSnapshotManifest.started_at:type_name -> google.protobuf.Timestamp
-	22, // 6: lindm.device.v1.PackageSnapshotManifest.finished_at:type_name -> google.protobuf.Timestamp
-	6,  // 7: lindm.device.v1.PackageSnapshotManifest.batches:type_name -> lindm.device.v1.PackageBatchDescriptor
-	25, // 8: lindm.device.v1.ReportHostObservationRequest.observation:type_name -> lindm.inventory.v1.HostObservation
-	22, // 9: lindm.device.v1.ReportHostObservationResponse.server_time:type_name -> google.protobuf.Timestamp
-	22, // 10: lindm.device.v1.ReportPackageAttemptRequest.started_at:type_name -> google.protobuf.Timestamp
-	22, // 11: lindm.device.v1.ReportPackageAttemptRequest.finished_at:type_name -> google.protobuf.Timestamp
-	26, // 12: lindm.device.v1.ReportPackageAttemptRequest.status:type_name -> lindm.inventory.v1.CollectionStatus
-	22, // 13: lindm.device.v1.ReportPackageAttemptResponse.server_time:type_name -> google.protobuf.Timestamp
-	7,  // 14: lindm.device.v1.BeginPackageSnapshotRequest.manifest:type_name -> lindm.device.v1.PackageSnapshotManifest
-	27, // 15: lindm.device.v1.BeginPackageSnapshotResponse.state:type_name -> lindm.inventory.v1.SnapshotState
-	22, // 16: lindm.device.v1.BeginPackageSnapshotResponse.accepted_at:type_name -> google.protobuf.Timestamp
-	22, // 17: lindm.device.v1.BeginPackageSnapshotResponse.open_until:type_name -> google.protobuf.Timestamp
-	22, // 18: lindm.device.v1.BeginPackageSnapshotResponse.receipt_expires_at:type_name -> google.protobuf.Timestamp
-	22, // 19: lindm.device.v1.BeginPackageSnapshotResponse.server_time:type_name -> google.protobuf.Timestamp
-	27, // 20: lindm.device.v1.PutPackageBatchResponse.state:type_name -> lindm.inventory.v1.SnapshotState
-	22, // 21: lindm.device.v1.PutPackageBatchResponse.accepted_at:type_name -> google.protobuf.Timestamp
-	22, // 22: lindm.device.v1.PutPackageBatchResponse.server_time:type_name -> google.protobuf.Timestamp
-	7,  // 23: lindm.device.v1.CommitPackageSnapshotRequest.manifest:type_name -> lindm.device.v1.PackageSnapshotManifest
-	27, // 24: lindm.device.v1.CommitPackageSnapshotResponse.state:type_name -> lindm.inventory.v1.SnapshotState
-	22, // 25: lindm.device.v1.CommitPackageSnapshotResponse.accepted_at:type_name -> google.protobuf.Timestamp
-	22, // 26: lindm.device.v1.CommitPackageSnapshotResponse.receipt_expires_at:type_name -> google.protobuf.Timestamp
-	22, // 27: lindm.device.v1.CommitPackageSnapshotResponse.server_time:type_name -> google.protobuf.Timestamp
-	22, // 28: lindm.device.v1.RenewIdentityResponse.expires_at:type_name -> google.protobuf.Timestamp
+	24, // 0: lindm.device.v1.AcquireSessionResponse.server_time:type_name -> google.protobuf.Timestamp
+	25, // 1: lindm.device.v1.GetSyncStateRequest.agent_update:type_name -> lindm.agent.v1.AgentUpdateStatus
+	24, // 2: lindm.device.v1.GetSyncStateResponse.server_time:type_name -> google.protobuf.Timestamp
+	26, // 3: lindm.device.v1.GetExecutionTrustResponse.update:type_name -> lindm.agent.v1.UpdateExecutionTrustRequest
+	24, // 4: lindm.device.v1.PackageSnapshotManifest.created_at:type_name -> google.protobuf.Timestamp
+	24, // 5: lindm.device.v1.PackageSnapshotManifest.started_at:type_name -> google.protobuf.Timestamp
+	24, // 6: lindm.device.v1.PackageSnapshotManifest.finished_at:type_name -> google.protobuf.Timestamp
+	8,  // 7: lindm.device.v1.PackageSnapshotManifest.batches:type_name -> lindm.device.v1.PackageBatchDescriptor
+	27, // 8: lindm.device.v1.ReportHostObservationRequest.observation:type_name -> lindm.inventory.v1.HostObservation
+	24, // 9: lindm.device.v1.ReportHostObservationResponse.server_time:type_name -> google.protobuf.Timestamp
+	24, // 10: lindm.device.v1.ReportPackageAttemptRequest.started_at:type_name -> google.protobuf.Timestamp
+	24, // 11: lindm.device.v1.ReportPackageAttemptRequest.finished_at:type_name -> google.protobuf.Timestamp
+	28, // 12: lindm.device.v1.ReportPackageAttemptRequest.status:type_name -> lindm.inventory.v1.CollectionStatus
+	24, // 13: lindm.device.v1.ReportPackageAttemptResponse.server_time:type_name -> google.protobuf.Timestamp
+	9,  // 14: lindm.device.v1.BeginPackageSnapshotRequest.manifest:type_name -> lindm.device.v1.PackageSnapshotManifest
+	29, // 15: lindm.device.v1.BeginPackageSnapshotResponse.state:type_name -> lindm.inventory.v1.SnapshotState
+	24, // 16: lindm.device.v1.BeginPackageSnapshotResponse.accepted_at:type_name -> google.protobuf.Timestamp
+	24, // 17: lindm.device.v1.BeginPackageSnapshotResponse.open_until:type_name -> google.protobuf.Timestamp
+	24, // 18: lindm.device.v1.BeginPackageSnapshotResponse.receipt_expires_at:type_name -> google.protobuf.Timestamp
+	24, // 19: lindm.device.v1.BeginPackageSnapshotResponse.server_time:type_name -> google.protobuf.Timestamp
+	29, // 20: lindm.device.v1.PutPackageBatchResponse.state:type_name -> lindm.inventory.v1.SnapshotState
+	24, // 21: lindm.device.v1.PutPackageBatchResponse.accepted_at:type_name -> google.protobuf.Timestamp
+	24, // 22: lindm.device.v1.PutPackageBatchResponse.server_time:type_name -> google.protobuf.Timestamp
+	9,  // 23: lindm.device.v1.CommitPackageSnapshotRequest.manifest:type_name -> lindm.device.v1.PackageSnapshotManifest
+	29, // 24: lindm.device.v1.CommitPackageSnapshotResponse.state:type_name -> lindm.inventory.v1.SnapshotState
+	24, // 25: lindm.device.v1.CommitPackageSnapshotResponse.accepted_at:type_name -> google.protobuf.Timestamp
+	24, // 26: lindm.device.v1.CommitPackageSnapshotResponse.receipt_expires_at:type_name -> google.protobuf.Timestamp
+	24, // 27: lindm.device.v1.CommitPackageSnapshotResponse.server_time:type_name -> google.protobuf.Timestamp
+	24, // 28: lindm.device.v1.RenewIdentityResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 29: lindm.device.v1.DeviceService.AcquireSession:input_type -> lindm.device.v1.AcquireSessionRequest
 	2,  // 30: lindm.device.v1.DeviceService.GetSyncState:input_type -> lindm.device.v1.GetSyncStateRequest
 	4,  // 31: lindm.device.v1.DeviceService.GetExecutionTrust:input_type -> lindm.device.v1.GetExecutionTrustRequest
-	8,  // 32: lindm.device.v1.DeviceService.ReportHostObservation:input_type -> lindm.device.v1.ReportHostObservationRequest
-	10, // 33: lindm.device.v1.DeviceService.ReportPackageAttempt:input_type -> lindm.device.v1.ReportPackageAttemptRequest
-	12, // 34: lindm.device.v1.DeviceService.BeginPackageSnapshot:input_type -> lindm.device.v1.BeginPackageSnapshotRequest
-	14, // 35: lindm.device.v1.DeviceService.PutPackageBatch:input_type -> lindm.device.v1.PutPackageBatchRequest
-	16, // 36: lindm.device.v1.DeviceService.CommitPackageSnapshot:input_type -> lindm.device.v1.CommitPackageSnapshotRequest
-	18, // 37: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
-	20, // 38: lindm.device.v1.DeviceService.RegisterEncryptionKey:input_type -> lindm.device.v1.RegisterEncryptionKeyRequest
-	28, // 39: lindm.device.v1.DeviceService.GetResourceWork:input_type -> lindm.device.v1.GetResourceWorkRequest
-	29, // 40: lindm.device.v1.DeviceService.AuthorizeResourceStart:input_type -> lindm.device.v1.AuthorizeResourceStartRequest
-	30, // 41: lindm.device.v1.DeviceService.ReportResourceResult:input_type -> lindm.device.v1.ReportResourceResultRequest
-	31, // 42: lindm.device.v1.DeviceService.GetDeviceActionWork:input_type -> lindm.device.v1.GetDeviceActionWorkRequest
-	32, // 43: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:input_type -> lindm.device.v1.AuthorizeDeviceActionStartRequest
-	33, // 44: lindm.device.v1.DeviceService.ReportDeviceActionResult:input_type -> lindm.device.v1.ReportDeviceActionResultRequest
-	34, // 45: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:input_type -> lindm.device.v1.RegisterDeviceActionRecoveryRequest
-	35, // 46: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:input_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
-	36, // 47: lindm.device.v1.DeviceService.SyncAssistance:input_type -> lindm.device.v1.SyncAssistanceRequest
-	1,  // 48: lindm.device.v1.DeviceService.AcquireSession:output_type -> lindm.device.v1.AcquireSessionResponse
-	3,  // 49: lindm.device.v1.DeviceService.GetSyncState:output_type -> lindm.device.v1.GetSyncStateResponse
-	5,  // 50: lindm.device.v1.DeviceService.GetExecutionTrust:output_type -> lindm.device.v1.GetExecutionTrustResponse
-	9,  // 51: lindm.device.v1.DeviceService.ReportHostObservation:output_type -> lindm.device.v1.ReportHostObservationResponse
-	11, // 52: lindm.device.v1.DeviceService.ReportPackageAttempt:output_type -> lindm.device.v1.ReportPackageAttemptResponse
-	13, // 53: lindm.device.v1.DeviceService.BeginPackageSnapshot:output_type -> lindm.device.v1.BeginPackageSnapshotResponse
-	15, // 54: lindm.device.v1.DeviceService.PutPackageBatch:output_type -> lindm.device.v1.PutPackageBatchResponse
-	17, // 55: lindm.device.v1.DeviceService.CommitPackageSnapshot:output_type -> lindm.device.v1.CommitPackageSnapshotResponse
-	19, // 56: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
-	21, // 57: lindm.device.v1.DeviceService.RegisterEncryptionKey:output_type -> lindm.device.v1.RegisterEncryptionKeyResponse
-	37, // 58: lindm.device.v1.DeviceService.GetResourceWork:output_type -> lindm.device.v1.GetResourceWorkResponse
-	38, // 59: lindm.device.v1.DeviceService.AuthorizeResourceStart:output_type -> lindm.device.v1.AuthorizeResourceStartResponse
-	39, // 60: lindm.device.v1.DeviceService.ReportResourceResult:output_type -> lindm.device.v1.ReportResourceResultResponse
-	40, // 61: lindm.device.v1.DeviceService.GetDeviceActionWork:output_type -> lindm.device.v1.GetDeviceActionWorkResponse
-	41, // 62: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:output_type -> lindm.device.v1.AuthorizeDeviceActionStartResponse
-	42, // 63: lindm.device.v1.DeviceService.ReportDeviceActionResult:output_type -> lindm.device.v1.ReportDeviceActionResultResponse
-	43, // 64: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:output_type -> lindm.device.v1.RegisterDeviceActionRecoveryResponse
-	44, // 65: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:output_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
-	45, // 66: lindm.device.v1.DeviceService.SyncAssistance:output_type -> lindm.device.v1.SyncAssistanceResponse
-	48, // [48:67] is the sub-list for method output_type
-	29, // [29:48] is the sub-list for method input_type
+	10, // 32: lindm.device.v1.DeviceService.ReportHostObservation:input_type -> lindm.device.v1.ReportHostObservationRequest
+	12, // 33: lindm.device.v1.DeviceService.ReportPackageAttempt:input_type -> lindm.device.v1.ReportPackageAttemptRequest
+	14, // 34: lindm.device.v1.DeviceService.BeginPackageSnapshot:input_type -> lindm.device.v1.BeginPackageSnapshotRequest
+	16, // 35: lindm.device.v1.DeviceService.PutPackageBatch:input_type -> lindm.device.v1.PutPackageBatchRequest
+	18, // 36: lindm.device.v1.DeviceService.CommitPackageSnapshot:input_type -> lindm.device.v1.CommitPackageSnapshotRequest
+	20, // 37: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
+	22, // 38: lindm.device.v1.DeviceService.RegisterEncryptionKey:input_type -> lindm.device.v1.RegisterEncryptionKeyRequest
+	30, // 39: lindm.device.v1.DeviceService.GetResourceWork:input_type -> lindm.device.v1.GetResourceWorkRequest
+	31, // 40: lindm.device.v1.DeviceService.AuthorizeResourceStart:input_type -> lindm.device.v1.AuthorizeResourceStartRequest
+	32, // 41: lindm.device.v1.DeviceService.ReportResourceResult:input_type -> lindm.device.v1.ReportResourceResultRequest
+	33, // 42: lindm.device.v1.DeviceService.GetDeviceActionWork:input_type -> lindm.device.v1.GetDeviceActionWorkRequest
+	34, // 43: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:input_type -> lindm.device.v1.AuthorizeDeviceActionStartRequest
+	35, // 44: lindm.device.v1.DeviceService.ReportDeviceActionResult:input_type -> lindm.device.v1.ReportDeviceActionResultRequest
+	36, // 45: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:input_type -> lindm.device.v1.RegisterDeviceActionRecoveryRequest
+	37, // 46: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:input_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
+	38, // 47: lindm.device.v1.DeviceService.SyncAssistance:input_type -> lindm.device.v1.SyncAssistanceRequest
+	6,  // 48: lindm.device.v1.DeviceService.GetCapabilityPolicy:input_type -> lindm.device.v1.GetCapabilityPolicyRequest
+	1,  // 49: lindm.device.v1.DeviceService.AcquireSession:output_type -> lindm.device.v1.AcquireSessionResponse
+	3,  // 50: lindm.device.v1.DeviceService.GetSyncState:output_type -> lindm.device.v1.GetSyncStateResponse
+	5,  // 51: lindm.device.v1.DeviceService.GetExecutionTrust:output_type -> lindm.device.v1.GetExecutionTrustResponse
+	11, // 52: lindm.device.v1.DeviceService.ReportHostObservation:output_type -> lindm.device.v1.ReportHostObservationResponse
+	13, // 53: lindm.device.v1.DeviceService.ReportPackageAttempt:output_type -> lindm.device.v1.ReportPackageAttemptResponse
+	15, // 54: lindm.device.v1.DeviceService.BeginPackageSnapshot:output_type -> lindm.device.v1.BeginPackageSnapshotResponse
+	17, // 55: lindm.device.v1.DeviceService.PutPackageBatch:output_type -> lindm.device.v1.PutPackageBatchResponse
+	19, // 56: lindm.device.v1.DeviceService.CommitPackageSnapshot:output_type -> lindm.device.v1.CommitPackageSnapshotResponse
+	21, // 57: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
+	23, // 58: lindm.device.v1.DeviceService.RegisterEncryptionKey:output_type -> lindm.device.v1.RegisterEncryptionKeyResponse
+	39, // 59: lindm.device.v1.DeviceService.GetResourceWork:output_type -> lindm.device.v1.GetResourceWorkResponse
+	40, // 60: lindm.device.v1.DeviceService.AuthorizeResourceStart:output_type -> lindm.device.v1.AuthorizeResourceStartResponse
+	41, // 61: lindm.device.v1.DeviceService.ReportResourceResult:output_type -> lindm.device.v1.ReportResourceResultResponse
+	42, // 62: lindm.device.v1.DeviceService.GetDeviceActionWork:output_type -> lindm.device.v1.GetDeviceActionWorkResponse
+	43, // 63: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:output_type -> lindm.device.v1.AuthorizeDeviceActionStartResponse
+	44, // 64: lindm.device.v1.DeviceService.ReportDeviceActionResult:output_type -> lindm.device.v1.ReportDeviceActionResultResponse
+	45, // 65: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:output_type -> lindm.device.v1.RegisterDeviceActionRecoveryResponse
+	46, // 66: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:output_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
+	47, // 67: lindm.device.v1.DeviceService.SyncAssistance:output_type -> lindm.device.v1.SyncAssistanceResponse
+	7,  // 68: lindm.device.v1.DeviceService.GetCapabilityPolicy:output_type -> lindm.device.v1.GetCapabilityPolicyResponse
+	49, // [49:69] is the sub-list for method output_type
+	29, // [29:49] is the sub-list for method input_type
 	29, // [29:29] is the sub-list for extension type_name
 	29, // [29:29] is the sub-list for extension extendee
 	0,  // [0:29] is the sub-list for field type_name
@@ -1790,7 +1929,7 @@ func file_lindm_device_v1_device_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_device_proto_rawDesc), len(file_lindm_device_v1_device_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

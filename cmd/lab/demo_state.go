@@ -104,7 +104,9 @@ func readDemoState(root string) (*labv1.DemoState, error) {
 		return nil, err
 	}
 	state := new(labv1.DemoState)
-	if err := protojson.Unmarshal(data, state); err != nil {
+	// States written before provider opt-ins moved to signed capability
+	// policies still carry the retired DemoDevice fields 11 and 12.
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(data, state); err != nil {
 		return nil, err
 	}
 	if err := protovalidate.Validate(state); err != nil {
@@ -113,53 +115,28 @@ func readDemoState(root string) (*labv1.DemoState, error) {
 	return state, nil
 }
 
-// matchDemoState requires each bound device's immutable configuration. The
-// owner's executor file-provider opt-in is local configuration, not identity:
-// it reports whether any binding takes the specification's new opt-in.
-func matchDemoState(state *labv1.DemoState, spec *demolab.Spec) (bool, error) {
+// matchDemoState requires each bound device's immutable configuration.
+func matchDemoState(state *labv1.DemoState, spec *demolab.Spec) error {
 	if len(state.GetBindings()) != len(spec.Devices) {
-		return false, errors.New("named demo device set changed; destroy the original before replacing devices")
+		return errors.New("named demo device set changed; destroy the original before replacing devices")
 	}
 	byKey := make(map[string]*labv1.DemoBinding, len(state.Bindings))
 	for _, bound := range state.Bindings {
 		byKey[bound.Key] = bound
 	}
-	changed := false
 	for _, device := range spec.Devices {
 		bound := byKey[device.Config.GetKey()]
-		if bound == nil || bound.GetManifestSha256() != device.Manifest.GetSha256() {
-			return false, fmt.Errorf("named device %s changed its immutable configuration; destroy before replacing it", device.Config.GetKey())
-		}
-		immutable, wanted := proto.CloneOf(bound.GetDevice()), proto.CloneOf(device.Config)
-		immutable.FileProvider, wanted.FileProvider = nil, nil
-		immutable.PackageProvider, wanted.PackageProvider = nil, nil
-		if !proto.Equal(immutable, wanted) {
-			return false, fmt.Errorf("named device %s changed its immutable configuration; destroy before replacing it", device.Config.GetKey())
-		}
-		if !proto.Equal(bound.GetDevice().GetFileProvider(), device.Config.GetFileProvider()) {
-			bound.Device.FileProvider = proto.CloneOf(device.Config.GetFileProvider())
-			changed = true
-		}
-		if !proto.Equal(bound.GetDevice().GetPackageProvider(), device.Config.GetPackageProvider()) {
-			bound.Device.PackageProvider = proto.CloneOf(device.Config.GetPackageProvider())
-			changed = true
+		if bound == nil || bound.GetManifestSha256() != device.Manifest.GetSha256() || !proto.Equal(bound.GetDevice(), device.Config) {
+			return fmt.Errorf("named device %s changed its immutable configuration; destroy before replacing it", device.Config.GetKey())
 		}
 	}
-	return changed, nil
+	return nil
 }
 
 func bindDemoState(name, root string, spec *demolab.Spec, cfg *labv1.LabConfig) (*labv1.DemoState, error) {
 	state, err := readDemoState(root)
 	if err == nil {
-		changed, err := matchDemoState(state, spec)
-		if err != nil || !changed {
-			return state, err
-		}
-		data, err := protojson.Marshal(state)
-		if err != nil {
-			return nil, err
-		}
-		return state, publishDemoFile(filepath.Join(root, "demo-state.json"), data, 0600)
+		return state, matchDemoState(state, spec)
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err

@@ -42,6 +42,9 @@ var (
 	ErrConflict       = errors.New("fileprovider: ownership_or_precondition_conflict")
 	ErrOutcomeUnknown = errors.New("fileprovider: outcome_unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("fileprovider: not_converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of an existing
+	// unowned file. It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("fileprovider: adoption_required: %w", ErrConflict)
 )
 
 // nativeConfig is trusted local context, never accepted from an action payload.
@@ -213,7 +216,18 @@ func (p *Provider) snapshot(ctx context.Context, desired *resourcev1.ResourceDes
 	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil && p.config.NativeObserve != nil {
 		return p.config.NativeObserve(ctx, desired)
 	}
-	snapshot, err = nativefile.Capture(desired.GetManagedFile().GetPath(), observationTemplate(desired.GetRef(), p.backend, p.boot, p.config.ExecutorIncarnation))
+	template := observationTemplate(desired.GetRef(), p.backend, p.boot, p.config.ExecutorIncarnation)
+	snapshot, err = nativefile.Capture(desired.GetManagedFile().GetPath(), template)
+	if errors.Is(err, nativefile.ErrConflict) && errors.Is(err, unix.ENOENT) {
+		// An absent approved root under a protected parent is an absent
+		// file the effect may create the root for; any deeper absence
+		// keeps the original precondition refusal.
+		if _, ok := creatableRoot(p.config.Native, desired.GetManagedFile()); ok {
+			if inside, insideErr := nativefile.CaptureInAbsentDirectory(desired.GetManagedFile().GetPath(), template); insideErr == nil {
+				snapshot, err = inside, nil
+			}
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -249,12 +263,42 @@ func (p *Provider) target(ctx context.Context, desired *resourcev1.ManagedFileDe
 	if err != nil {
 		return nil, err
 	}
-	if !before.GetObservation().GetManagedFile().GetExists() && target.GetObservation().GetManagedFile().GetExists() && operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
-		if err := nativefile.CreationMetadata(ctx, target); err != nil {
+	if operation != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
+		return target, nil
+	}
+	// A root this resource created stays recorded while it is owned, so
+	// RESTORE_OWNED release can remove it.
+	if ledgerActive(ledger) && ledger.GetLastApplied().GetCreatedDirectory() != "" {
+		target.CreatedDirectory = proto.String(ledger.GetLastApplied().GetCreatedDirectory())
+	}
+	if before.GetObservation().GetManagedFile().GetExists() || !target.GetObservation().GetManagedFile().GetExists() {
+		return target, nil
+	}
+	if root, ok := creatableRoot(p.config.Native, desired); ok {
+		ancestry, absent, err := nativefile.DirectoryAbsent(root)
+		if err != nil {
 			return nil, err
 		}
+		if absent {
+			if !bytes.Equal(ancestry, before.GetObservation().GetManagedFile().GetAncestrySha256()) {
+				return nil, ErrConflict
+			}
+			target.CreatedDirectory = proto.String(root)
+			target.ManagedFileXattrs, err = nativefile.CreationXattrs(ctx, desired.GetPath())
+			if err != nil {
+				return nil, err
+			}
+			target.Observation.GetManagedFile().SecurityMetadataSha256 = nativefile.XattrDigest(target.GetManagedFileXattrs())
+			return target, nil
+		}
+	}
+	if err := nativefile.CreationMetadata(ctx, target); err != nil {
+		return nil, err
 	}
 	return target, nil
+}
+func ledgerActive(ledger *agentv1.ResourceOwnershipLedger) bool {
+	return ledger != nil && ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED
 }
 func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
 	unlock, err := p.lock()
@@ -428,11 +472,8 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if !sameObserved(after.GetObservation(), reported.GetObservation()) || !imageEqual(after, target) {
 		return nil, ErrOutcomeUnknown
 	}
-	if desired.GetManagedFile().GetKernelModuleBlocklist() != nil {
-		if reported.ModuleInitramfsRebuildSucceeded == nil {
-			return nil, ErrOutcomeUnknown
-		}
-		after.ModuleInitramfsRebuildSucceeded = proto.Bool(reported.GetModuleInitramfsRebuildSucceeded())
+	if err := carryAppliedEvidence(after, target, reported, desired.GetManagedFile()); err != nil {
+		return nil, err
 	}
 	verification, err := fileVerification(plan, after, target)
 	if err != nil {
@@ -599,4 +640,21 @@ func fileVerification(plan *resourcev1.ResourcePlan, after, target *agentv1.Reso
 		return nil, fmt.Errorf("verify managed file: %w", err)
 	}
 	return verification, nil
+}
+
+// carryAppliedEvidence copies onto the fresh after-image what a native
+// observation cannot recover: the private record of a lindm-created root (who
+// created a directory is not observable) and the helper's initramfs rebuild
+// outcome for the kernel-module template.
+func carryAppliedEvidence(after, target, reported *agentv1.ResourceOwnershipSnapshot, desired *resourcev1.ManagedFileDesired) error {
+	if target.CreatedDirectory != nil {
+		after.CreatedDirectory = proto.String(target.GetCreatedDirectory())
+	}
+	if desired.GetKernelModuleBlocklist() != nil {
+		if reported.ModuleInitramfsRebuildSucceeded == nil {
+			return ErrOutcomeUnknown
+		}
+		after.ModuleInitramfsRebuildSucceeded = proto.Bool(reported.GetModuleInitramfsRebuildSucceeded())
+	}
+	return nil
 }

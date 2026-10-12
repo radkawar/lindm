@@ -17,6 +17,7 @@ import (
 	"buf.build/go/protovalidate"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/localrpc"
@@ -51,6 +52,12 @@ type Document struct {
 	// SessionRuntimeDirectory holds the session-helper socket. It is empty
 	// unless remote assistance is enabled.
 	SessionRuntimeDirectory string
+	// ConfigDirectory is the directory relative configuration paths resolve
+	// against.
+	ConfigDirectory string
+	// ownerRelaxed admits the current UID beside root (tests only); the zero
+	// value is production root custody.
+	ownerRelaxed bool
 }
 
 // Load decodes configuration, requires a root-owned file with non-replaceable
@@ -73,15 +80,8 @@ func load(path string, rootOwner bool) (*Document, error) {
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("decode configuration: %w", err)
 	}
-	if err := protodata.ValidateClosed(cfg.ProtoReflect()); err != nil {
-		return nil, errors.New("unknown configuration fields")
-	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(cfg), protovalidate.WithDisableLazy())
-	if err != nil {
-		return nil, fmt.Errorf("compile configuration validation rules: %w", err)
-	}
-	if err := validator.Validate(cfg); err != nil {
-		return nil, fmt.Errorf("validate configuration: %w", err)
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
 	}
 	base := filepath.Dir(absolute)
 	if cfg.GetActionProvider().GetAllowRecoveryHandoff() && cfg.GetRecoveryBoot() == nil {
@@ -144,7 +144,27 @@ func load(path string, rootOwner bool) (*Document, error) {
 		NetworkUser:             name,
 		NetworkUID:              uid,
 		NetworkGID:              gid,
+		ConfigDirectory:         base,
+		ownerRelaxed:            !rootOwner,
 	}, nil
+}
+
+func validateConfig(cfg *agentv1.AgentConfig) error {
+	return validateMessage(cfg)
+}
+
+func validateMessage(message proto.Message) error {
+	if err := protodata.ValidateClosed(message.ProtoReflect()); err != nil {
+		return errors.New("unknown configuration fields")
+	}
+	validator, err := protovalidate.New(protovalidate.WithMessages(message), protovalidate.WithDisableLazy())
+	if err != nil {
+		return fmt.Errorf("compile configuration validation rules: %w", err)
+	}
+	if err := validator.Validate(message); err != nil {
+		return fmt.Errorf("validate configuration: %w", err)
+	}
+	return nil
 }
 
 func resolve(base, path string) string {

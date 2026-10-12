@@ -177,6 +177,71 @@ tools (EL 10 `--prefix` still mislabels the databases), no profile step for
 password policy. Records are in
 [verification](../verification.md#host-resource-providers-on-el-10).
 
+## Capability policy facts (signed provider grants)
+
+A signed capability policy names only catalogue capabilities; the agent derives
+every provider setting from `internal/platform/registry.go` for its own release
+and architecture ([architecture](../architecture.md#capability-derivation)).
+Rocky Linux 9/10 and AlmaLinux 9/10 carry these facts; EL 8 rows and CentOS
+Stream report `platform_not_qualified`.
+
+| Capability                            | Rocky Linux / AlmaLinux 9 and 10 derivation                                                                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PACKAGES                              | repository `12e3a0eb-c710-58d9-bd79-a491c614754c` (`rpm/<uuid>`): native id `baseos` plus additional repository `appstream`, HTTPS base URLs, signed metadata required |
+| FILES                                 | `/etc/issue.d`, `/etc/motd.d` (`pam_motd` in the vendor `/etc/pam.d/sshd`; agetty reads `/etc/issue.d`)                                                                |
+| LOCAL_ACCOUNTS                        | home root `/home` (`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`), UID/GID 1000–59999 (`shadow-utils` 4.9-16.el9 / 4.15.0-11.el10 `login.defs`: 1000..60000)                  |
+| OS_UPDATES, FIREWALL, KERNEL_SETTINGS | as the local providers                                                                                                                                                 |
+| KERNEL_MODULE_BLOCKLIST               | `platform_not_qualified` (no EL module-blocklist tooling in the registry)                                                                                              |
+
+`12e3a0eb-…` is the identity profiles bind for the host's own distribution RPM
+archive (Fedora's on Fedora), so one `rpm/<uuid>` package row resolves from each
+device's own vendor. The source is BaseOS plus AppStream only: CRB is disabled
+by default on both vendors and the common packages (for example `git`,
+`podman`) need neither CRB nor extras.
+
+| Release      | Base URL pattern (`<repo>` = `BaseOS`, `AppStream`; `<arch>` = `x86_64`, `aarch64`) | Key file (regular file)                     | Accepted SHA-256 (bytes)                                                  | Primary-key fingerprint                    |
+| ------------ | ----------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| Rocky 9      | `https://dl.rockylinux.org/pub/rocky/9/<repo>/<arch>/os/`                           | `/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9`      | `3a66e521e7a4abac9768d889c7cd60a8250f59512b275cf576c8a10ff34624c1` (1750) | `21CB256AE16FC54C6E652949702D426D350D275D` |
+| Rocky 10     | `https://dl.rockylinux.org/pub/rocky/10/<repo>/<arch>/os/`                          | `/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10`     | `be8c4f070b696e64d8ce40e59a95a57e8b5c776f0015c2fd64e14b896622bdb4` (1688) | `FC226859C0860BF0DDB95B085B106C736FEDFC85` |
+| AlmaLinux 9  | `https://repo.almalinux.org/almalinux/9/<repo>/<arch>/os/`                          | `/etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-9`  | `387a8be6b70ecff4949d28778bf8abd06231654283b6e9515afc9305a1391458` (3139) | `BF18AC2876178908D6E71267D36CB86CB86B3716` |
+| AlmaLinux 10 | `https://repo.almalinux.org/almalinux/10/<repo>/<arch>/os/`                         | `/etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-10` | `de57c3c0a2dcde88ff5b894e74335f55a0ec074815f36d472270d937c16f077b` (1652) | `EE6DB7B98F5BF5EDD9DA0DE5DEE5C11CC2A1E572` |
+
+How the facts were obtained (2026-10-12): `repodata/repomd.xml.asc` exists for
+BaseOS, AppStream, CRB and extras on both architectures of all four releases, and
+every one verified (`gpgv`) with the release's key above, so these sources keep
+`repo_gpgcheck=1` and need no metalink pin or
+[metadata-trust waiver](../security-and-operations.md#vendor-rpm-metadata-trust).
+The `rocky-gpg-keys` / `almalinux-gpg-keys` packages were downloaded over HTTPS
+from the vendor BaseOS trees (current) and vaults (Rocky 9.0–9.2, 9.6, 9.7,
+10.0, 10.1; AlmaLinux 9.0–9.7, 10.0, 10.1; Rocky's vault has no 9.3–9.5
+trees); each package's SHA-256 matched the signed `primary.xml`, the current
+packages' RSA/SHA256 header signatures verify with the extracted key
+(`rpmkeys -Kv`), and the key file bytes were identical in every version. The
+fingerprints match the vendors' own publications
+(`rockylinux.org/resources/gpg-key-info`, `almalinux.org/security`).
+
+- Rocky Linux 10: `rocky-gpg-keys 10.2-1.2` (BaseOS, 2026-08-10, "Add new Rocky
+  10 PQC key") appends a second, OpenPGP v6 post-quantum key block to
+  `RPM-GPG-KEY-Rocky-10` (18586 bytes,
+  `7f517e9ca329b042228e9a35e74e1b260513ed9c786d5ebcc459e623855f2831`); its
+  first block is the unchanged RSA key and the package is still signed by
+  `FC22…FC85`. lindm's key check reads one key, and whether EL 10's DNF4/GnuPG
+  import a file carrying a v6 block is not exercised, so that file reports
+  `vendor_key_unrecognized`: a Rocky 10 host that applied this update gets
+  PACKAGES unavailable until a native run qualifies the two-key file. Rocky 9's
+  `9.8-1.2` adds its PQC key as a separate file and leaves
+  `RPM-GPG-KEY-Rocky-9` unchanged.
+- AlmaLinux 10 publishes an `x86_64_v2` build next to the default x86-64-v3
+  `x86_64` tree. It reports `uname -m` `x86_64` and identical `os-release`; only
+  its `almalinux-release` ships `/etc/rpm/macros.x86_64_v2`. When that file
+  exists (or cannot be checked) PACKAGES is `platform_not_qualified`, so v3
+  packages never replace a v2 installation. Rocky Linux 10 has no v2 build.
+- DNF4 still requires the vendor key in system RPM trust
+  ([RHEL package resources](rhel.md#package-resources-dnf4)); the derived sources
+  were not exercised natively. The DNF4 package path itself is qualified on
+  AlmaLinux 9.8 and 10.2 aarch64 (see [Updates](#updates));
+  Rocky Linux and x86_64 are not exercised.
+
 ## Encryption and recovery
 
 Do not inherit Fedora or Ubuntu LUKS2, cryptsetup, TPM, Secure Boot or recovery

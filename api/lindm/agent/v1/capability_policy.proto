@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/connectivity_guard.proto";
+import "lindm/agent/v1/management_capability.proto";
+import "lindm/agent/v1/native_firewall.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Deployment-supplied firewall prerequisites. The executor derives the allowed
+// interfaces itself (every interface with a permanent hardware address).
+message CapabilityFirewallSettings {
+  repeated NativeFirewallEndpoint management_endpoints = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  repeated string dns_servers = 2 [(buf.validate.field).repeated = {
+    max_items: 16
+    unique: true
+    items: {
+      string: {ip: true}
+    }
+  }];
+  ConnectivityGuardConfig connectivity_guard = 3 [(buf.validate.field).required = true];
+}
+
+// DSSE payload type application/vnd.lindm.agent-capability-policy.v1+protobuf,
+// signed by an online PLAN key delegated the exact capability
+// agent.capability-policy.v1. It binds one device enrollment generation. A
+// higher version replaces the previous policy entirely; an empty capability
+// list revokes every remotely granted capability.
+message AgentCapabilityPolicy {
+  option (buf.validate.message).cel = {
+    id: "agent_capability_policy.identity"
+    message: "capability policies bind nonzero deployment, device and enrollment identities"
+    expression: "[this.deployment_id, this.device_id, this.enrollment_generation].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+  option (buf.validate.message).cel = {
+    id: "agent_capability_policy.firewall"
+    message: "firewall settings are present exactly when the firewall capability is granted"
+    expression: "has(this.firewall) == (5 in this.capabilities)"
+  };
+  option (buf.validate.message).cel = {
+    id: "agent_capability_policy.sysctl"
+    message: "kernel parameters are listed exactly when kernel settings are granted"
+    expression: "(this.sysctl_keys.size() > 0) == (7 in this.capabilities)"
+  };
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string deployment_id = 2 [(buf.validate.field).string.uuid = true];
+  string device_id = 3 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 4 [(buf.validate.field).string.uuid = true];
+  // Monotonic per device enrollment generation.
+  uint64 version = 5 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  google.protobuf.Timestamp issued_at = 6 [(buf.validate.field).required = true];
+  repeated ManagementCapability capabilities = 7 [(buf.validate.field).repeated = {
+    max_items: 7
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        in: [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    }
+  }];
+  repeated string sysctl_keys = 8 [(buf.validate.field).repeated = {
+    max_items: 128
+    unique: true
+    items: {
+      string: {
+        max_bytes: 256
+        pattern: "^[a-z0-9_]+([.][a-zA-Z0-9_-]+)+$"
+      }
+    }
+  }];
+  CapabilityFirewallSettings firewall = 9;
+}
+
+// Network callers relay the signed document; they cannot select keys.
+message UpdateCapabilityPolicyRequest {
+  bytes policy_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+
+message UpdateCapabilityPolicyResponse {
+  CapabilityPolicyObservation observation = 1 [(buf.validate.field).required = true];
+}
+
+message GetCapabilityPolicyRequest {}
+
+message GetCapabilityPolicyResponse {
+  CapabilityPolicyObservation observation = 1 [(buf.validate.field).required = true];
+}
+
+enum CapabilityStatus {
+  CAPABILITY_STATUS_UNSPECIFIED = 0;
+  // Neither the signed policy nor the local configuration grants it.
+  CAPABILITY_STATUS_NOT_ENABLED = 1;
+  // Granted by the active signed policy and derived for this release.
+  CAPABILITY_STATUS_ENABLED = 2;
+  // Granted by the root-owned local configuration.
+  CAPABILITY_STATUS_LOCAL = 3;
+  // Granted, but this release does not qualify it or a host prerequisite is
+  // missing; detail names the cause.
+  CAPABILITY_STATUS_UNAVAILABLE = 4;
+}
+
+message CapabilityObservation {
+  ManagementCapability capability = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  CapabilityStatus status = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Closed snake_case cause for UNAVAILABLE, for example
+  // platform_not_qualified, vendor_key_unrecognized or native_tool_outdated.
+  string detail = 3 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^([a-z][a-z0-9_]*)?$"
+  }];
+}
+
+enum CapabilityPolicyState {
+  CAPABILITY_POLICY_STATE_UNSPECIFIED = 0;
+  // No signed policy has been accepted.
+  CAPABILITY_POLICY_STATE_NONE = 1;
+  // The accepted policy is verified under the current delegation.
+  CAPABILITY_POLICY_STATE_ACTIVE = 2;
+  // The current delegation no longer authorizes the accepted policy's signer;
+  // it grants nothing until the server issues a newly signed version.
+  CAPABILITY_POLICY_STATE_INERT = 3;
+  // The local configuration refuses remote capability policies.
+  CAPABILITY_POLICY_STATE_REFUSED_LOCALLY = 4;
+}
+
+// Executor-reported status; attached to published inventory. Not a signed
+// receipt and not native qualification evidence.
+message CapabilityPolicyObservation {
+  CapabilityPolicyState state = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  uint64 applied_version = 2;
+  // SHA-256 of the exact accepted DSSE envelope; empty when none.
+  bytes applied_sha256 = 3 [(buf.validate.field).bytes.max_len = 32];
+  google.protobuf.Timestamp accepted_at = 4;
+  // One entry per catalogue value 1-9.
+  repeated CapabilityObservation capabilities = 5 [(buf.validate.field).repeated.max_items = 16];
+}
+
+// Protected executor record at <state_directory>/capability-policy.binpb, root
+// 0600, written atomically by the executor only. Transient root helpers read it
+// to derive the same effective providers; they do not re-verify the signature.
+message CapabilityPolicyRecord {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  bytes policy_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  AgentCapabilityPolicy policy = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp accepted_at = 4 [(buf.validate.field).required = true];
+  // False when the current delegation no longer authorizes the signer.
+  bool active = 5;
+}

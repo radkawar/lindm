@@ -126,14 +126,29 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 			return nil, ErrConflict
 		}
 	}
-	tx, err := nativefile.Prepare(moduleFileImage(request.GetBefore()), moduleFileImage(target))
+	prepare, err := filePreparation(request.GetBefore(), target)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := prepare(moduleFileImage(request.GetBefore()), moduleFileImage(target))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, tx.Close()) }()
 	after, err := tx.Commit(ctx, beforeEffect)
-	if err != nil || desired.GetManagedFile().GetKernelModuleBlocklist() == nil {
-		return after, err
+	if err != nil {
+		return nil, err
+	}
+	if root, ok := releasedCreatedRoot(config.Native, desired.GetManagedFile(), ledger, target, plan.GetOperation()); ok {
+		// RESTORE_OWNED removes the root only if lindm created it and it is
+		// still an empty root:root 0755 directory; otherwise it stays.
+		if _, err := nativefile.RemoveCreatedDirectory(root); err != nil {
+			return nil, err
+		}
+		return p.snapshot(ctx, desired)
+	}
+	if desired.GetManagedFile().GetKernelModuleBlocklist() == nil {
+		return after, nil
 	}
 	tools, err := moduleTooling(config.Platform)
 	if err != nil {
@@ -155,4 +170,22 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 	}
 	after.ModuleInitramfsRebuildSucceeded = proto.Bool(rebuildErr == nil)
 	return after, nil
+}
+
+// filePreparation selects the native preparation: a target that records a
+// lindm-created approved root still absent on the host is written by creating
+// that root below its protected parent.
+func filePreparation(before, target *agentv1.ResourceOwnershipSnapshot) (func(before, target *agentv1.ResourceOwnershipSnapshot) (*nativefile.Transaction, error), error) {
+	root := target.GetCreatedDirectory()
+	if root == "" || before.GetObservation().GetManagedFile().GetExists() {
+		return nativefile.Prepare, nil
+	}
+	_, absent, err := nativefile.DirectoryAbsent(root)
+	if err != nil {
+		return nil, err
+	}
+	if absent {
+		return nativefile.PrepareInAbsentDirectory, nil
+	}
+	return nativefile.Prepare, nil
 }

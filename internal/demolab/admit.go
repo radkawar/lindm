@@ -47,9 +47,6 @@ func Admit(spec *Spec, ledger *labv1.MatrixLedger) error {
 				refusals = append(refusals, admitCapability(device, ledger, "encrypted", platform.Encryption, true))
 			}
 		}
-		if device.Config.GetFileProvider().GetKernelModuleBlocklist() && device.Release.Native().ModuleBlocklist.Rebuild == "" {
-			refusals = append(refusals, refusal(device, "kernel-module blocklist", "registry names no qualified initramfs tooling for this release"))
-		}
 	}
 	return errors.Join(refusals...)
 }

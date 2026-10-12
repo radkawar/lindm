@@ -96,6 +96,12 @@ const (
 	// ExecutorServiceAttestResourceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's AttestResourceExecution RPC.
 	ExecutorServiceAttestResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/AttestResourceExecution"
+	// ExecutorServiceUpdateCapabilityPolicyProcedure is the fully-qualified name of the
+	// ExecutorService's UpdateCapabilityPolicy RPC.
+	ExecutorServiceUpdateCapabilityPolicyProcedure = "/lindm.agent.v1.ExecutorService/UpdateCapabilityPolicy"
+	// ExecutorServiceGetCapabilityPolicyProcedure is the fully-qualified name of the ExecutorService's
+	// GetCapabilityPolicy RPC.
+	ExecutorServiceGetCapabilityPolicyProcedure = "/lindm.agent.v1.ExecutorService/GetCapabilityPolicy"
 	// ExecutorServicePrepareDeviceActionProcedure is the fully-qualified name of the ExecutorService's
 	// PrepareDeviceAction RPC.
 	ExecutorServicePrepareDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/PrepareDeviceAction"
@@ -205,6 +211,12 @@ type ExecutorServiceClient interface {
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
 	AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error)
+	// UpdateCapabilityPolicy verifies a signed device capability policy under the
+	// current delegation and durably replaces the previous one when its version
+	// is higher. It never starts work or accepts caller-selected keys.
+	UpdateCapabilityPolicy(context.Context, *connect.Request[v1.UpdateCapabilityPolicyRequest]) (*connect.Response[v1.UpdateCapabilityPolicyResponse], error)
+	// Reads the accepted policy and the effective per-capability status.
+	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
 	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
 	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
@@ -364,6 +376,18 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("AttestResourceExecution")),
 			connect.WithClientOptions(opts...),
 		),
+		updateCapabilityPolicy: connect.NewClient[v1.UpdateCapabilityPolicyRequest, v1.UpdateCapabilityPolicyResponse](
+			httpClient,
+			baseURL+ExecutorServiceUpdateCapabilityPolicyProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("UpdateCapabilityPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		getCapabilityPolicy: connect.NewClient[v1.GetCapabilityPolicyRequest, v1.GetCapabilityPolicyResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetCapabilityPolicyProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetCapabilityPolicy")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareDeviceAction: connect.NewClient[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareDeviceActionProcedure,
@@ -468,6 +492,8 @@ type executorServiceClient struct {
 	getResourceExecution         *connect.Client[v1.GetResourceExecutionRequest, v1.GetResourceExecutionResponse]
 	cancelResourcePreparation    *connect.Client[v1.CancelResourcePreparationRequest, v1.CancelResourcePreparationResponse]
 	attestResourceExecution      *connect.Client[v1.AttestResourceExecutionRequest, v1.AttestResourceExecutionResponse]
+	updateCapabilityPolicy       *connect.Client[v1.UpdateCapabilityPolicyRequest, v1.UpdateCapabilityPolicyResponse]
+	getCapabilityPolicy          *connect.Client[v1.GetCapabilityPolicyRequest, v1.GetCapabilityPolicyResponse]
 	prepareDeviceAction          *connect.Client[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse]
 	startDeviceAction            *connect.Client[v1.StartDeviceActionRequest, v1.StartDeviceActionResponse]
 	getDeviceAction              *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
@@ -586,6 +612,16 @@ func (c *executorServiceClient) CancelResourcePreparation(ctx context.Context, r
 // AttestResourceExecution calls lindm.agent.v1.ExecutorService.AttestResourceExecution.
 func (c *executorServiceClient) AttestResourceExecution(ctx context.Context, req *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error) {
 	return c.attestResourceExecution.CallUnary(ctx, req)
+}
+
+// UpdateCapabilityPolicy calls lindm.agent.v1.ExecutorService.UpdateCapabilityPolicy.
+func (c *executorServiceClient) UpdateCapabilityPolicy(ctx context.Context, req *connect.Request[v1.UpdateCapabilityPolicyRequest]) (*connect.Response[v1.UpdateCapabilityPolicyResponse], error) {
+	return c.updateCapabilityPolicy.CallUnary(ctx, req)
+}
+
+// GetCapabilityPolicy calls lindm.agent.v1.ExecutorService.GetCapabilityPolicy.
+func (c *executorServiceClient) GetCapabilityPolicy(ctx context.Context, req *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error) {
+	return c.getCapabilityPolicy.CallUnary(ctx, req)
 }
 
 // PrepareDeviceAction calls lindm.agent.v1.ExecutorService.PrepareDeviceAction.
@@ -722,6 +758,12 @@ type ExecutorServiceHandler interface {
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
 	AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error)
+	// UpdateCapabilityPolicy verifies a signed device capability policy under the
+	// current delegation and durably replaces the previous one when its version
+	// is higher. It never starts work or accepts caller-selected keys.
+	UpdateCapabilityPolicy(context.Context, *connect.Request[v1.UpdateCapabilityPolicyRequest]) (*connect.Response[v1.UpdateCapabilityPolicyResponse], error)
+	// Reads the accepted policy and the effective per-capability status.
+	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
 	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
 	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
@@ -877,6 +919,18 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("AttestResourceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceUpdateCapabilityPolicyHandler := connect.NewUnaryHandler(
+		ExecutorServiceUpdateCapabilityPolicyProcedure,
+		svc.UpdateCapabilityPolicy,
+		connect.WithSchema(executorServiceMethods.ByName("UpdateCapabilityPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetCapabilityPolicyHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetCapabilityPolicyProcedure,
+		svc.GetCapabilityPolicy,
+		connect.WithSchema(executorServiceMethods.ByName("GetCapabilityPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServicePrepareDeviceActionHandler := connect.NewUnaryHandler(
 		ExecutorServicePrepareDeviceActionProcedure,
 		svc.PrepareDeviceAction,
@@ -999,6 +1053,10 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceCancelResourcePreparationHandler.ServeHTTP(w, r)
 		case ExecutorServiceAttestResourceExecutionProcedure:
 			executorServiceAttestResourceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceUpdateCapabilityPolicyProcedure:
+			executorServiceUpdateCapabilityPolicyHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetCapabilityPolicyProcedure:
+			executorServiceGetCapabilityPolicyHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareDeviceActionProcedure:
 			executorServicePrepareDeviceActionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartDeviceActionProcedure:
@@ -1116,6 +1174,14 @@ func (UnimplementedExecutorServiceHandler) CancelResourcePreparation(context.Con
 
 func (UnimplementedExecutorServiceHandler) AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestResourceExecution is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) UpdateCapabilityPolicy(context.Context, *connect.Request[v1.UpdateCapabilityPolicyRequest]) (*connect.Response[v1.UpdateCapabilityPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.UpdateCapabilityPolicy is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetCapabilityPolicy is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error) {

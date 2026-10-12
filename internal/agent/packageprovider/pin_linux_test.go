@@ -15,6 +15,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/dnf"
 )
 
@@ -269,5 +270,23 @@ func TestAcquisitionDoesNotGuessInstalledProvenance(t *testing.T) {
 	}
 	if err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE); err == nil {
 		t.Fatal("release invented baseline")
+	}
+}
+func TestCreateOnlyInstalledPackageRequiresAdoption(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	p := &Provider{config: Config{Ownership: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}}}}
+	before := &resourcev1.ResourceObservation{Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: d.GetNativePackage().GetPackage(), Installed: true, Record: &resourcev1.NativePackageRecord{Package: d.GetNativePackage().GetPackage(), Version: d.GetNativePackage().GetExact(), ProvenanceKnown: true}}}}
+	err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
+	if !errors.Is(err, ErrAdoptionRequired) || !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_package" {
+		t.Fatalf("installed package acquired under CREATE_ONLY: %v", err)
+	}
+}
+func TestOutdatedManagerNamesDetail(t *testing.T) {
+	err := requireManager(dnf.Manager{Kind: dnf.DNF5, Version: "5.0.1"}, dnf.DNF5, "5.2.0")
+	if !errors.Is(err, ErrUnsupported) || admissiondetail.Of(err) != "native_tool_outdated" {
+		t.Fatalf("outdated manager = %v", err)
+	}
+	if err := requireManager(dnf.Manager{Kind: dnf.DNF5, Version: "5.2.0"}, dnf.DNF5, "5.2.0"); err != nil {
+		t.Fatal(err)
 	}
 }

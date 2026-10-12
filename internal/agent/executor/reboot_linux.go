@@ -11,8 +11,16 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
+// sessionEnabled also opens the session socket whenever a signed capability
+// policy may grant OS_UPDATES later: reboot deferral prompts must not depend on
+// an executor restart after the grant.
 func (cfg Config) sessionEnabled() bool {
-	return cfg.RemoteAssistance.GetEnabled() || cfg.NativeResources.OSUpdate.GetEnabled() || cfg.ActionProviderConfig.GetAllowPatchNow()
+	var local *agentv1.AgentConfig
+	if cfg.Local != nil {
+		local = cfg.Local.Proto
+	}
+	return cfg.RemoteAssistance.GetEnabled() || local.GetOsUpdateProvider().GetEnabled() || cfg.ActionProviderConfig.GetAllowPatchNow() ||
+		(cfg.Local != nil && !local.GetCapabilityPolicy().GetRefuseRemote())
 }
 
 type rebootSessionProvider interface {

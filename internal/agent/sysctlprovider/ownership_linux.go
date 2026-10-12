@@ -5,12 +5,14 @@ package sysctlprovider
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"slices"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 )
 
@@ -22,7 +24,7 @@ func acquisitionAllowed(owner *agentv1.ResourceOwnershipBinding, ledger *agentv1
 		// Every live sysctl already exists; a root allowlist does not replace the
 		// signed resource owner's explicit adoption approval.
 		if owner.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
-			return ErrConflict
+			return admissiondetail.Wrap(fmt.Errorf("%w: every live kernel setting requires approved adoption", ErrAdoptionRequired), "existing_kernel_setting")
 		}
 		return nil
 	}

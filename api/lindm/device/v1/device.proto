@@ -42,6 +42,9 @@ service DeviceService {
   rpc ConfirmRefreshInventoryPublication(ConfirmRefreshInventoryPublicationRequest) returns (ConfirmRefreshInventoryPublicationResponse);
   // SyncAssistance exchanges complete assistance state; see assistance.proto.
   rpc SyncAssistance(SyncAssistanceRequest) returns (SyncAssistanceResponse);
+  // Returns this enrollment generation's current signed capability policy,
+  // signing a new version only when the effective server policy changed.
+  rpc GetCapabilityPolicy(GetCapabilityPolicyRequest) returns (GetCapabilityPolicyResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {
@@ -94,6 +97,29 @@ message GetExecutionTrustResponse {
   uint64 root_version = 2;
   uint64 delegation_version = 3;
   uint64 minimum_recovery_epoch = 4;
+}
+
+// Untrusted cursor hints; the executor alone decides what it accepts.
+message GetCapabilityPolicyRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 applied_version = 2 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  bytes applied_sha256 = 3 [(buf.validate.field).bytes.max_len = 32];
+}
+
+message GetCapabilityPolicyResponse {
+  // Empty when the device already holds the current version or none can be
+  // issued (see unavailable_reason).
+  bytes policy_envelope = 1 [(buf.validate.field).bytes.max_len = 65536];
+  uint64 version = 2;
+  // snake_case reason when no policy can be signed, for example
+  // capability_policy_not_delegated.
+  string unavailable_reason = 3 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^([a-z][a-z0-9_]*)?$"
+  }];
 }
 
 // PackageBatchDescriptor binds one opaque inventory.v1.PackageBatch. SHA-256 and

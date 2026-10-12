@@ -411,8 +411,12 @@ type ResourceOwnershipSnapshot struct {
 	// Authenticated helper command outcome, separate from independently read
 	// file/archive evidence. Absent means no rebuild was attempted.
 	ModuleInitramfsRebuildSucceeded *bool `protobuf:"varint,14,opt,name=module_initramfs_rebuild_succeeded,json=moduleInitramfsRebuildSucceeded,proto3,oneof" json:"module_initramfs_rebuild_succeeded,omitempty"`
-	unknownFields                   protoimpl.UnknownFields
-	sizeCache                       protoimpl.SizeCache
+	// The approved file root directory this effect created (root:root 0755).
+	// RESTORE_OWNED release removes exactly this directory only while it is
+	// still empty and root:root 0755. Absent means no directory was created.
+	CreatedDirectory *string `protobuf:"bytes,15,opt,name=created_directory,json=createdDirectory,proto3,oneof" json:"created_directory,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResourceOwnershipSnapshot) Reset() {
@@ -541,6 +545,13 @@ func (x *ResourceOwnershipSnapshot) GetModuleInitramfsRebuildSucceeded() bool {
 		return *x.ModuleInitramfsRebuildSucceeded
 	}
 	return false
+}
+
+func (x *ResourceOwnershipSnapshot) GetCreatedDirectory() string {
+	if x != nil && x.CreatedDirectory != nil {
+		return *x.CreatedDirectory
+	}
+	return ""
 }
 
 // Closed SSH banner object set. Native contents and labels never leave root custody.
@@ -1669,7 +1680,7 @@ var File_lindm_agent_v1_resource_ownership_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xc8\x19\n" +
+	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xed\x1b\n" +
 	"\x19ResourceOwnershipSnapshot\x12P\n" +
 	"\vobservation\x18\x01 \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x12@\n" +
 	"\x14managed_file_content\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x12managedFileContent\x88\x01\x01\x12G\n" +
@@ -1686,7 +1697,9 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate\x12A\n" +
 	"\n" +
 	"ssh_server\x18\r \x01(\v2\".lindm.agent.v1.SSHServerOwnershipR\tsshServer\x12P\n" +
-	"\"module_initramfs_rebuild_succeeded\x18\x0e \x01(\bH\x01R\x1fmoduleInitramfsRebuildSucceeded\x88\x01\x01:\x98\x10\xbaH\x94\x10\x1a\xfb\x01\n" +
+	"\"module_initramfs_rebuild_succeeded\x18\x0e \x01(\bH\x01R\x1fmoduleInitramfsRebuildSucceeded\x88\x01\x01\x12a\n" +
+	"\x11created_directory\x18\x0f \x01(\tB/\xbaH,r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$H\x02R\x10createdDirectory\x88\x01\x01:\xc4\x11\xbaH\xc0\x11\x1a\xa9\x01\n" +
+	"$ownership_snapshot.created_directory\x12=created directories belong only to a managed file observation\x1aB!has(this.created_directory) || has(this.observation.managed_file)\x1a\xfb\x01\n" +
 	"!ownership_snapshot.module_rebuild\x12@module rebuild outcomes belong only to the typed module template\x1a\x93\x01!has(this.module_initramfs_rebuild_succeeded) || (has(this.observation.managed_file) && has(this.observation.managed_file.kernel_module_blocklist))\x1a\xa1\x01\n" +
 	"\x1aownership_snapshot.content\x12<private content is only valid for a managed file observation\x1aE!has(this.managed_file_content) || has(this.observation.managed_file)\x1a\x80\x03\n" +
 	"\x1fownership_snapshot.private_kind\x121private state must match its native resource kind\x1a\xa9\x02(this.managed_file_xattrs.size() == 0 || has(this.observation.managed_file)) && (!has(this.account_private) || has(this.observation.local_user) || has(this.observation.local_group)) && (this.account_member_edges.size() == 0 || has(this.observation.local_user) || has(this.observation.local_group))\x1a\xbe\x02\n" +
@@ -1698,7 +1711,8 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x1cownership_snapshot.os_update\x12@update policy private evidence belongs only to the update policy\x1a6has(this.os_update) == has(this.observation.os_update)\x1a\x91\x01\n" +
 	"\x16ownership_snapshot.ssh\x12=SSH private evidence belongs only to SSH server configuration\x1a8has(this.ssh_server) == has(this.observation.ssh_server)B\x17\n" +
 	"\x15_managed_file_contentB%\n" +
-	"#_module_initramfs_rebuild_succeeded\"\xa3\x03\n" +
+	"#_module_initramfs_rebuild_succeededB\x14\n" +
+	"\x12_created_directory\"\xa3\x03\n" +
 	"\x15SSHNativeFileSnapshot\x12G\n" +
 	"\x05state\x18\x01 \x01(\v2).lindm.resource.v1.ManagedFileObservationB\x06\xbaH\x03\xc8\x01\x01R\x05state\x12(\n" +
 	"\acontent\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\acontent\x88\x01\x01\x12A\n" +

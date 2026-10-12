@@ -31,6 +31,8 @@ type managementLoop struct {
 	// encryptionKeyCertificate is the certificate digest whose recipient key
 	// the root reported acknowledged; owned by the loop goroutine.
 	encryptionKeyCertificate []byte
+	// capabilityUnavailable is the last logged server issuance reason.
+	capabilityUnavailable string
 }
 
 func (m *managementLoop) start(parent context.Context) func() {
@@ -72,7 +74,13 @@ func (m *managementLoop) cycle(ctx context.Context) error {
 	if err := synchronizeExecutionTrust(ctx, m.executor, &m.cache, m.gate); err != nil {
 		return err
 	}
-	actionErr := m.dispatchDeviceActions(ctx)
+	// A capability relay failure is reported without withholding other work;
+	// the executor keeps its last verified policy.
+	policyErr := m.synchronizeCapabilityPolicy(ctx)
+	if ctx.Err() != nil {
+		return errors.Join(policyErr, ctx.Err())
+	}
+	actionErr := errors.Join(policyErr, m.dispatchDeviceActions(ctx))
 	if ctx.Err() != nil {
 		return errors.Join(actionErr, ctx.Err())
 	}

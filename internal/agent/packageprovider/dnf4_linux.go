@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/dnf"
 	"lindm/internal/platform"
 )
@@ -64,14 +65,23 @@ func (p *Provider) selectDNF(ctx context.Context, logDirectory string) (dnf.Mana
 			return dnf.Manager{}, err
 		}
 	}
-	if !manager.AtLeast(want, minimum) {
-		return dnf.Manager{}, fmt.Errorf("%w: native %s %s or newer required", ErrUnsupported, want, minimum)
+	if err := requireManager(manager, want, minimum); err != nil {
+		return dnf.Manager{}, err
 	}
 	p.managerPath, p.manager = selected, manager.Kind
 	if p.rpmdb, err = rpmDatabase(); err != nil {
 		return dnf.Manager{}, err
 	}
 	return manager, nil
+}
+
+// requireManager refuses a native manager below the registry minimum with an
+// actionable detail; the classification stays ErrUnsupported.
+func requireManager(manager dnf.Manager, want dnf.Kind, minimum string) error {
+	if manager.AtLeast(want, minimum) {
+		return nil
+	}
+	return admissiondetail.Wrap(fmt.Errorf("%w: native %s %s or newer required", ErrUnsupported, want, minimum), "native_tool_outdated")
 }
 
 // probeDNF4 reads the DNF4 entrypoint's interpreter and asks that interpreter's

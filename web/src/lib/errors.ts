@@ -2,6 +2,17 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ViolationsSchema } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import { DeviceActionSchema, type DeviceAction } from "../../gen/lindm/admin/v1/device_actions_pb";
 import { describeViolationProto, requestProblem, type FieldError } from "@/lib/validation";
+import { CapabilityStatus } from "../../gen/lindm/agent/v1/capability_policy_pb";
+import { ManagementCapability } from "../../gen/lindm/agent/v1/management_capability_pb";
+import type { DeviceCapabilityState } from "../../gen/lindm/admin/v1/capabilities_pb";
+import {
+  CAPABILITIES_PATH,
+  capabilityFromReason,
+  capabilityName,
+  localCapabilityField,
+  reportedCapability,
+  unavailableCause,
+} from "./capabilities";
 
 export type RpcFailure = {
   code: Code;
@@ -27,6 +38,10 @@ const AMBIGUOUS: Record<number, true> = {
   [Code.Unavailable]: true,
   [Code.DataLoss]: true,
 };
+
+// Reasons whose transport code is otherwise ambiguous but which the server
+// returns only after rolling back: the request definitely changed nothing.
+const DEFINITE_REASONS: Record<string, true> = { capability_policy_revision_conflict: true };
 
 const CODE_NAME: Record<number, string> = {
   [Code.Canceled]: "Canceled",
@@ -63,8 +78,10 @@ export function toRpcFailure(error: unknown): RpcFailure {
       fields: problem.fields,
     };
   const connectError = ConnectError.from(error);
-  const ambiguous = AMBIGUOUS[connectError.code] === true;
   const raw = connectError.rawMessage.trim();
+  const reason =
+    connectError.metadata.get("Lindm-Reason")?.trim() || (/^[a-z][a-z0-9_]*$/.test(raw) ? raw : "");
+  const ambiguous = AMBIGUOUS[connectError.code] === true && !DEFINITE_REASONS[reason];
   let message = raw === "" ? connectError.message.trim() : raw;
   if (message === "") {
     message = ambiguous
@@ -81,9 +98,7 @@ export function toRpcFailure(error: unknown): RpcFailure {
     code: connectError.code,
     codeName: CODE_NAME[connectError.code] ?? "Unknown",
     message,
-    reason:
-      connectError.metadata.get("Lindm-Reason")?.trim() ||
-      (/^[a-z][a-z0-9_]*$/.test(raw) ? raw : ""),
+    reason,
     unauthenticated: connectError.code === Code.Unauthenticated,
     denied: connectError.code === Code.PermissionDenied,
     ambiguous,
@@ -202,10 +217,139 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
 // Server-recorded blocked, refused or attention reasons as one plain sentence.
 // The code itself belongs in Details; unknown codes never reach primary text.
 export function blockedReasonLabel(reason: string): string {
-  return (
-    BLOCKED_REASON_LABELS[reason] ??
-    "lindm recorded a reason it can't describe in words yet. The code is in Details."
-  );
+  const copy = blockedReasonCopy(reason);
+  return copy.known && !copy.localField
+    ? copy.sentence
+    : "lindm recorded a reason it can't describe in words yet. The code is in Details.";
+}
+
+export type BlockedReasonCopy = {
+  // One plain sentence; never the raw code (that belongs in Details).
+  sentence: string;
+  // An /etc/lindm/executor.json field root sets on the device, shown as code.
+  localField?: string;
+  link?: { to: typeof CAPABILITIES_PATH | "/rollouts"; label: string };
+  known: boolean;
+};
+
+const ADOPTION_LINK = { to: "/rollouts", label: "Open Rollouts" } as const;
+const ADOPTION_REMEDY =
+  "Roll the profile out again with approved adoption, and approve it once, to let lindm take it over.";
+
+// Causes a device names when a create-only item would overwrite something lindm
+// didn't create; only an approved adoption may take it over.
+const ADOPTION_CAUSES: Record<string, string> = {
+  adoption_required: "Blocked: this item already exists on the device and lindm didn't create it.",
+  existing_banner_file:
+    "Blocked: the device already has an SSH login banner file lindm didn't create (Ubuntu ships /etc/issue.net, for example).",
+  existing_file: "Blocked: a file lindm didn't create already exists at this path.",
+  existing_account: "Blocked: a local user or group with this name already exists on the device.",
+  existing_definition: "Blocked: a systemd unit with this name already exists on the device.",
+  existing_package: "Blocked: this package is already installed and lindm didn't install it.",
+  existing_kernel_setting:
+    "Blocked: a kernel setting file lindm didn't create already sets this parameter.",
+};
+
+// Causes only a change on the device can fix; approving adoption doesn't help.
+const DEVICE_CAUSES: Record<string, string> = {
+  existing_banner_dropin:
+    "Blocked: an SSH configuration drop-in on the device already sets a login banner. Remove that setting on the device, or remove the banner from the profile.",
+  existing_update_timer:
+    "Blocked: the device already has an automatic update setup lindm didn't create. Turn it off on the device, or remove the update policy from the profile.",
+  existing_banner_symlink:
+    "Blocked: the device's SSH banner file is a symbolic link, so lindm won't take it over. Replace it with a regular file on the device, or remove the banner from the profile.",
+  // The provider refuses as unsupported, so the row's status already says
+  // Unsupported; these name why, with no second status word.
+  native_tool_outdated:
+    "The device's system tool for this item is too old (on Fedora, dnf5 older than 5.4.6.0). Apply OS updates on the device first.",
+  native_tool_missing:
+    "Blocked: a system tool this item needs isn't installed on the device. Install it on the device.",
+  ssh_service_inactive:
+    "Blocked: the SSH service isn't running on the device. Start SSH on the device, or remove the SSH setting from the profile.",
+  ssh_config_invalid:
+    "Blocked: the device's SSH configuration fails sshd's own check, so lindm left it unchanged. Fix the SSH configuration on the device.",
+  unit_not_installed:
+    "The systemd unit this item needs isn't installed on the device. Install the package that provides it.",
+  native_unsupported:
+    "The device's agent can't manage this kind of item on its OS release. Nothing changed.",
+};
+
+// Plain copy for a server-recorded reason. `capabilities` is the device's
+// granted and reported state, for a capability_*_not_enabled reason.
+export function blockedReasonCopy(
+  reason: string,
+  capabilities?: DeviceCapabilityState,
+): BlockedReasonCopy {
+  const known = BLOCKED_REASON_LABELS[reason];
+  if (known) return { sentence: known, known: true };
+  const adoption = ADOPTION_CAUSES[reason];
+  if (adoption)
+    return { sentence: `${adoption} ${ADOPTION_REMEDY}`, link: ADOPTION_LINK, known: true };
+  const device = DEVICE_CAUSES[reason];
+  if (device) return { sentence: device, known: true };
+  const settingsLink = { to: CAPABILITIES_PATH, label: "Open Device capabilities" } as const;
+  if (reason === "capability_firewall_settings_required")
+    return {
+      sentence:
+        "Blocked: Firewall needs the deployment's firewall settings (management endpoints and connectivity check). Add them in Settings → Device capabilities.",
+      link: settingsLink,
+      known: true,
+    };
+  const required = capabilityFromReason(reason);
+  if (required === undefined)
+    return {
+      sentence:
+        "The device reported a cause this console can't describe yet. The code is in Details.",
+      known: false,
+    };
+  const name = capabilityName(required);
+  const localField = localCapabilityField[required];
+  if (localField)
+    return {
+      sentence: `Blocked: ${name} is set only on the device itself. Root on the device sets it in /etc/lindm/executor.json, field`,
+      localField,
+      known: true,
+    };
+  const reported = reportedCapability(capabilities?.reported, required);
+  if (reported?.status === CapabilityStatus.UNAVAILABLE)
+    return {
+      sentence: `Blocked: a policy allows ${name} on this device, but the device can't use it. ${unavailableCause(reported.detail)}`,
+      known: true,
+    };
+  // The device has the capability, so this item asks for more than it allows.
+  if (
+    reported?.status === CapabilityStatus.ENABLED ||
+    reported?.status === CapabilityStatus.LOCAL
+  ) {
+    if (required === ManagementCapability.PACKAGES)
+      return {
+        sentence:
+          "Blocked: this device installs packages only from repositories it approves, and this item's repository isn't one of them. Policies approve only the OS vendor's archive; root on the device approves other repositories in /etc/lindm/executor.json, field",
+        localField: "package_provider.sources",
+        known: true,
+      };
+    if (required === ManagementCapability.KERNEL_SETTINGS)
+      return {
+        sentence:
+          "Blocked: this kernel parameter isn't one the device may set. Add it to the kernel parameters of this device's group in Settings → Device capabilities.",
+        link: settingsLink,
+        known: true,
+      };
+  }
+  if (capabilities?.granted.some((grant) => grant.capability === required))
+    return {
+      sentence: `Blocked: a policy allows ${name} on this device, but the device hasn't applied that policy yet. lindm tries again once the device reports it.`,
+      known: true,
+    };
+  return {
+    sentence: `Blocked: no policy allows ${name} on this device. Allow it for all devices or for one of this device's groups in Settings → Device capabilities${
+      required === ManagementCapability.FIREWALL
+        ? "; Firewall first needs the firewall settings for all devices"
+        : ""
+    }.`,
+    link: settingsLink,
+    known: true,
+  };
 }
 
 export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation {
@@ -448,7 +592,40 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "Only webhook destinations have a signing secret.",
           action: "Choose a webhook destination.",
         };
+      case "capability_firewall_settings_required":
+        return {
+          tone: "warning",
+          title: "Firewall settings needed",
+          message:
+            "Firewall can be enabled only while the deployment has firewall settings (management endpoints and a connectivity check), and those settings can't be removed while any policy enables Firewall.",
+          action: "Save the deployment's firewall settings first, or leave Firewall off.",
+        };
     }
+  }
+  if (failure.code === Code.Aborted && failure.reason === "capability_policy_revision_conflict") {
+    return {
+      tone: "warning",
+      title: "Policy changed",
+      message: "Another administrator changed this policy after you opened it. Nothing was saved.",
+      action: "Reload the policy, review it, and make your change again.",
+    };
+  }
+  if (failure.code === Code.NotFound && failure.reason === "capability_policy_group_not_found") {
+    return {
+      tone: "warning",
+      title: "Group not found",
+      message: "The group no longer exists. Nothing was saved.",
+      action: "Choose another group.",
+    };
+  }
+  if (failure.code === Code.Unavailable && failure.reason === "directory_unavailable") {
+    return {
+      tone: "warning",
+      title: "Couldn't re-check your access",
+      message:
+        "This change needs a fresh check of your account with the identity provider, which didn't answer.",
+      action: "Retry this same change. If it keeps failing, check the identity provider.",
+    };
   }
   if (failure.code === Code.ResourceExhausted && failure.reason === "device_action_capacity") {
     return {
@@ -459,6 +636,16 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     };
   }
   if (failure.code === Code.PermissionDenied) {
+    if (failure.reason === "actor_authorization_rejected") {
+      return {
+        tone: "warning",
+        title: "Sign in again",
+        message:
+          "This change needs a fresh check of your account, and the identity provider no longer confirms that you may make it. Nothing was saved.",
+        action:
+          "Sign out, sign in again, then retry. If it still fails, ask an owner to check your role.",
+      };
+    }
     if (failure.reason === "recent_step_up_required") {
       return {
         tone: "warning",
@@ -555,7 +742,11 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         };
     }
   }
-  if (failure.code === Code.AlreadyExists && failure.reason === "request_id_reused") {
+  if (
+    failure.code === Code.AlreadyExists &&
+    (failure.reason === "request_id_reused" ||
+      failure.reason === "capability_policy_request_conflict")
+  ) {
     return {
       tone: "warning",
       title: "Already submitted",

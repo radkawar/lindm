@@ -10,30 +10,6 @@
       "provisioningToken": "engineering",
       "assistance": true,
       "tpmBind": true,
-      "fileProvider": { "allowedRoots": ["/etc/motd.d"] },
-      "packageProvider": {
-        "sources": [
-          {
-            "repository": {
-              "repositoryId": "8053e72a-44e8-53fc-9472-825c068cf9b5",
-              "presence": "PRESENCE_PRESENT",
-              "apt": {
-                "uri": "https://ports.ubuntu.com/ubuntu-ports",
-                "suite": "noble",
-                "components": ["main", "universe"],
-                "architectures": ["arm64"],
-                "signingKey": {
-                  "artifactId": "e67dc7e4-b028-5748-872d-8cfed1cfb839",
-                  "sha256": "gKNrCm3i9p9J0t9170c8zeEh6eGQueoB0gpPY3eNXDE=",
-                  "sizeBytes": "3607"
-                }
-              }
-            },
-            "signingKeyFile": "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
-            "signingKeySha256": "gKNrCm3i9p9J0t9170c8zeEh6eGQueoB0gpPY3eNXDE="
-          }
-        ]
-      },
       "host": "dgx20",
       "firmware": {
         "code": "/usr/share/AAVMF/AAVMF_CODE.secboot.fd",
@@ -52,7 +28,6 @@
       "provisioningToken": "finance",
       "assistance": true,
       "tpmBind": true,
-      "fileProvider": { "allowedRoots": ["/etc/motd.d"], "kernelModuleBlocklist": true },
       "host": "dgx21",
       "firmware": {
         "code": "/usr/share/AAVMF/AAVMF_CODE.secboot.fd",
@@ -70,7 +45,6 @@
       "group": "ce806573-be05-59fa-9891-8b152b22efb3",
       "provisioningToken": "it-helpdesk",
       "tpmBind": true,
-      "fileProvider": { "allowedRoots": ["/etc/motd.d"] },
       "host": "dgx21",
       "firmware": {
         "code": "/usr/share/AAVMF/AAVMF_CODE.secboot.fd",

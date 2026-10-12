@@ -55,8 +55,7 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	if err := atomicFile(keyPath, keyring, 0600); err != nil {
 		return nil, err
 	}
-	line := "deb [arch=" + strings.Join(apt.GetArchitectures(), ",") + " signed-by=" + keyPath + "] " + apt.GetUri() + " " + apt.GetSuite() + " " + strings.Join(apt.GetComponents(), " ") + "\n"
-	if err := atomicFile(filepath.Join(directory, "sources.list"), []byte(line), 0600); err != nil {
+	if err := atomicFile(filepath.Join(directory, "sources.list"), []byte(aptSourcesList(apt, keyPath)), 0600); err != nil {
 		return nil, err
 	}
 	// APT_CONFIG is read before apt.conf.d and apt.conf, so neither host hooks
@@ -81,6 +80,7 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 		return nil, err
 	}
 	var signers [][]byte
+	verified := make(map[string]bool)
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), "_InRelease") {
 			continue
@@ -90,6 +90,10 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 			return nil, err
 		}
 		signers = append(signers, fingerprints...)
+		verified[entry.Name()] = true
+	}
+	if err := aptSuitesVerified(apt, verified); err != nil {
+		return nil, err
 	}
 	if len(signers) == 0 {
 		return nil, errors.New("packageprovider: signed APT InRelease evidence unavailable")
@@ -99,6 +103,56 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 		return nil, err
 	}
 	return &resourcev1.RepositorySnapshot{Repository: sourceRef(source), MetadataSha256: metadata, SignerSha256: signers}, nil
+}
+
+// aptSuites lists the primary suite then the additional suites.
+func aptSuites(apt *resourcev1.AptRepository) []string {
+	return append([]string{apt.GetSuite()}, apt.GetAdditionalSuites()...)
+}
+
+// aptSourcesList writes one deb line per suite of the one approved archive,
+// each bound to the approved key alone.
+func aptSourcesList(apt *resourcev1.AptRepository, keyPath string) string {
+	var list strings.Builder
+	for _, suite := range aptSuites(apt) {
+		list.WriteString("deb [arch=" + strings.Join(apt.GetArchitectures(), ",") + " signed-by=" + keyPath + "] " + apt.GetUri() + " " + suite + " " + strings.Join(apt.GetComponents(), " ") + "\n")
+	}
+	return list.String()
+}
+
+// aptSuitesVerified requires a verified InRelease for every configured suite
+// and no other: a missing pocket would silently resolve against fewer
+// updates, an extra one is not approved.
+func aptSuitesVerified(apt *resourcev1.AptRepository, verified map[string]bool) error {
+	suites := aptSuites(apt)
+	if len(verified) != len(suites) {
+		return fmt.Errorf("packageprovider: %d signed InRelease files for %d approved suites", len(verified), len(suites))
+	}
+	for _, suite := range suites {
+		if !verified[aptListName(apt.GetUri(), "dists/"+suite+"/InRelease")] {
+			return fmt.Errorf("packageprovider: approved suite %s has no signed InRelease", suite)
+		}
+	}
+	return nil
+}
+
+// aptListName is APT's URItoFileName for a credential-free URI: the scheme is
+// dropped, unsafe bytes are %xx-quoted (lowercase) and "/" becomes "_".
+func aptListName(uri, path string) string {
+	full := strings.TrimSuffix(strings.TrimPrefix(uri, "https://"), "/") + "/" + path
+	var name strings.Builder
+	for i := range len(full) {
+		c := full[i]
+		switch {
+		case c <= 0x20 || c >= 0x7f || strings.IndexByte("\\|{}[]<>\"^~_=!@#$%&*", c) >= 0:
+			fmt.Fprintf(&name, "%%%02x", c)
+		case c == '/':
+			name.WriteByte('_')
+		default:
+			name.WriteByte(c)
+		}
+	}
+	return name.String()
 }
 
 // aptVerifier is the OpenPGP verifier the device's own APT uses for InRelease.

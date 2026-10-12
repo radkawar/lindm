@@ -50,17 +50,14 @@ func serveExecutor(ctx context.Context, args []string) error {
 		ActionProviderFactory: func(store *journal.Store) (executor.DeviceActionProvider, error) {
 			return nativeActionProvider(doc.Proto.GetActionProvider(), store)
 		},
-		ActionProviderConfig:    doc.Proto.GetActionProvider(),
-		RecoveryBoot:            recoveryBootConfig(doc.Proto.GetRecoveryBoot()),
-		Updates:                 doc.Proto.GetUpdates(),
-		PackageProvider:         doc.Proto.GetPackageProvider(),
+		ActionProviderConfig: doc.Proto.GetActionProvider(),
+		RecoveryBoot:         recoveryBootConfig(doc.Proto.GetRecoveryBoot()),
+		Updates:              doc.Proto.GetUpdates(),
+		// Effective providers: this document merged with the verified signed
+		// capability policy, re-derived whenever the policy record changes.
+		Local:                   doc,
 		RemoteAssistance:        doc.Proto.GetRemoteAssistance(),
 		SessionRuntimeDirectory: doc.SessionRuntimeDirectory,
-		NativeResources: executor.NativeResourceProviders{
-			Files: doc.Proto.GetFileProvider(), Accounts: doc.Proto.GetAccountProvider(), Sysctl: doc.Proto.GetSysctlProvider(),
-			Firewall: doc.Proto.GetFirewallProvider(), Password: doc.Proto.GetPasswordProvider(), OSUpdate: doc.Proto.GetOsUpdateProvider(),
-			ProtectedPaths: doc.ProtectedPaths,
-		},
 	})
 }
 

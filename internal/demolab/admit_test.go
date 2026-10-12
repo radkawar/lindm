@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/labmatrix"
 	"lindm/internal/platform"
@@ -129,22 +128,6 @@ func TestAdmitTPMArchitectureGate(t *testing.T) {
 	spec.Devices[0].Release = &release
 	if err := Admit(spec, ledger); err == nil || !strings.Contains(err.Error(), "registry gates TPM2 binding") {
 		t.Fatalf("Admit error = %v, want TPM architecture gate", err)
-	}
-}
-
-// The kernel-module template opt-in is refused where the registry names no
-// qualified initramfs tooling (RHEL), and admitted on Fedora 44.
-func TestAdmitKernelModuleBlocklistNeedsRegistryTooling(t *testing.T) {
-	spec := demoFixture(t)
-	ledger := qualifiedFixture(spec)
-	for i := range spec.Devices {
-		device := &spec.Devices[i]
-		device.Config.FileProvider = &agentv1.NativeFileProviderConfig{KernelModuleBlocklist: true}
-		err := Admit(&Spec{Document: spec.Document, Devices: []Device{*device}}, ledger)
-		refused := err != nil && strings.Contains(err.Error(), "kernel-module blocklist")
-		if refused != (device.Release.Native().ModuleBlocklist.Rebuild == "") {
-			t.Fatalf("%s (%s): kernel-module opt-in refused=%t: %v", device.Config.GetKey(), device.Release.Key, refused, err)
-		}
 	}
 }
 

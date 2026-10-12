@@ -33,7 +33,10 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
+	"lindm/internal/agent/config"
 	"lindm/internal/agent/dnf"
+	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/statefs"
@@ -49,6 +52,9 @@ var (
 	ErrConflict       = errors.New("packageprovider: precondition conflict")
 	ErrOutcomeUnknown = errors.New("packageprovider: native outcome unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("packageprovider: not converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of an installed
+	// package or existing pin. It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("packageprovider: adoption_required: %w", ErrConflict)
 	// ErrBusy means another native frontend (for example a distribution
 	// release upgrade) held dpkg's frontend lock before any effect.
 	ErrBusy = errors.New("packageprovider: native package manager busy")
@@ -245,6 +251,15 @@ func checkSource(source *agentv1.NativePackageSource) error {
 	path := source.GetSigningKeyFile()
 	if !filepath.IsAbs(path) || strings.ContainsAny(path, " \t\r\n\"[];") || filepath.Clean(path) != path {
 		return errors.New("packageprovider: unsafe approved signing key path")
+	}
+	if rpm := source.GetRepository().GetRpm(); rpm != nil && !rpm.GetRequireMetadataSignature() {
+		release, err := inventory.HostRelease(context.Background())
+		if err != nil {
+			return err
+		}
+		if !config.RPMMetadataTrusted(platform.Identify(release), rpm) {
+			return fmt.Errorf("%w: %w", ErrUnsupported, config.ErrUnsignedMetadata)
+		}
 	}
 	parent, err := statefs.OpenTemporaryParent(filepath.Dir(path))
 	if err != nil {
@@ -583,7 +598,7 @@ func (p *Provider) acquisitionAllowed(before *resourcev1.ResourceObservation, le
 		return errors.New("packageprovider: installed provenance unknown; unsafe acquisition refused")
 	}
 	if (o.GetInstalled() || pinClaimsPackage(before.GetRef(), o)) && p.config.Ownership.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
-		return errors.New("packageprovider: existing package/pin requires approved adoption")
+		return admissiondetail.Wrap(fmt.Errorf("%w: existing package/pin requires approved adoption", ErrAdoptionRequired), "existing_package")
 	}
 	return nil
 }

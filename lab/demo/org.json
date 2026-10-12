@@ -80,6 +80,16 @@
       }
     }
   ],
+  "capabilityPolicies": [
+    {
+      "request": {
+        "scope": {
+          "staticGroupId": "9b1eb9f4-dee7-54b3-839d-4e0938f5a579"
+        },
+        "capabilities": ["MANAGEMENT_CAPABILITY_KERNEL_MODULE_BLOCKLIST"]
+      }
+    }
+  ],
   "accounts": [
     {
       "username": "owner",
@@ -711,7 +721,7 @@
       "id": "32e2cd56-942d-598e-ab1e-a08ab71a1769",
       "spec": {
         "name": "Finance hardened",
-        "description": "Higher-priority firewall policy; USB storage (usb_storage, uas) is blocked through the typed kernel-module template, which the executor must enable with fileProvider.kernelModuleBlocklist.",
+        "description": "Higher-priority firewall policy; USB storage (usb_storage, uas) is blocked through the typed kernel-module template, which the Finance group's kernel-module blocklist device capability (capabilityPolicies) enables.",
         "resources": [
           {
             "resourceId": "7a58ef8d-c669-512a-8ddd-f50363181dc1",
@@ -750,8 +760,14 @@
                 "defaultIngress": "FIREWALL_VERDICT_DROP",
                 "defaultEgress": "FIREWALL_VERDICT_ACCEPT",
                 "sourceNetworks": [
-                  { "networkAddress": "0.0.0.0", "prefixLength": 0 },
-                  { "networkAddress": "::", "prefixLength": 0 }
+                  {
+                    "networkAddress": "0.0.0.0",
+                    "prefixLength": 0
+                  },
+                  {
+                    "networkAddress": "::",
+                    "prefixLength": 0
+                  }
                 ]
               }
             },

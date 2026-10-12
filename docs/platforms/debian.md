@@ -178,6 +178,55 @@ qualification. Neither the ARM agent lifecycle nor this implementation qualifies
 Debian major upgrades, whole-system rollback, arbitrary package dependency plans or
 the new generic package resource provider. These need their own native evidence.
 
+## Capability policy facts (signed provider grants)
+
+A signed capability policy names only catalogue capabilities; the agent derives
+every provider setting from `internal/platform/registry.go`
+([architecture](../architecture.md#capability-derivation)). Debian 12 and 13
+carry FILES (`/etc/issue.d`, `/etc/motd.d`: the vendor `/etc/pam.d/sshd` runs
+`pam_motd.so noupdate`) and LOCAL_ACCOUNTS (home root `/home`,
+`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`, UID/GID 1000–59999; `login.defs`
+UID/GID 1000..60000 in bookworm's `login 1:4.13+dfsg1-1+deb12u2` and trixie's
+`login.defs 1:4.17.4-2`). OS_UPDATES stays gated (see the table above),
+FIREWALL and KERNEL_SETTINGS derive as the local providers, and
+KERNEL_MODULE_BLOCKLIST reports `platform_not_qualified` (no Debian tooling in
+the registry).
+
+PACKAGES reports `platform_not_qualified`: no Debian vendor archive is in the
+registry, because the model cannot carry Debian's security pocket. An
+`AptRepository` has exactly one `uri`; `suite` and `additional_suites` all
+resolve under it, and the package provider writes one `deb <uri> <suite>` line
+per suite and resolves a row only from its own repository identity. Debian
+publishes `bookworm`/`trixie` and `-updates` under
+`https://deb.debian.org/debian`, but `-security` only under a separate archive
+root, `https://deb.debian.org/debian-security` (also
+`https://security.debian.org/debian-security`):
+`https://deb.debian.org/debian/dists/bookworm-security/InRelease` and
+`…/trixie-security/InRelease` return HTTP 404 (2026-10-12). Approving only the
+main and `-updates` suites would silently withhold security updates, and a
+second repository identity for `debian-security` would not serve rows bound to
+the main identity. Representing Debian needs a protocol change (per-suite URIs
+under one identity, or a source-level union of identities), not a registry row.
+
+The key facts such a change would pin (2026-10-12):
+`debian-archive-keyring 2023.3+deb12u2` (bookworm) and `2025.1` (trixie), each
+downloaded over HTTPS from `deb.debian.org` with its SHA-256 matching the signed
+`main/binary-amd64/Packages`, ship byte-identical
+`/usr/share/keyrings/debian-archive-keyring.gpg` (bookworm; trixie names it
+`.pgp` and makes `.gpg` a symlink): SHA-256
+`506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017`, 55918
+bytes. It verifies (`gpgv`) the release, `-updates` and `-security` `InRelease`
+of both releases. Every signer's primary key matches
+`ftp-master.debian.org/keys.html`: archive keys 12/bookworm
+`B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8` and 13/trixie
+`04B54C3CDCA79751B16BC6B5225629DF75B188BD` (release and `-updates`), security
+archive keys 11/bullseye `AC530D520F2F3269F5E98313A48449044AAD5C5D`
+(`bookworm-security` only), 12/bookworm
+`05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0` and 13/trixie
+`5E04A1E3223A19A20706E20F9904613D4CCE68C6`, and the stable release keys 12
+`4D64FEC119C2029067D6E791F8D2585B8783D481` and 13
+`41587F7DB8C774BCCF131416762F67A0B2C39DE4`.
+
 ## Encryption and recovery
 
 The maintained **unencrypted** Debian netinst recipe uses regular partitioning

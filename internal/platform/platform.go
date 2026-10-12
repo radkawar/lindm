@@ -18,6 +18,7 @@ package platform
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 )
@@ -367,6 +368,89 @@ type ModuleBlocklistTooling struct {
 	StateDirectory      string // Native tool state; absent state needs its parent for that invocation.
 }
 
+// VendorRepository is one vendor package archive a signed capability policy
+// may approve (PACKAGES). Every fact is verified registry material compiled
+// into the agent; a policy never carries URLs, suites, keys or fingerprints.
+type VendorRepository struct {
+	// RepositoryID is the stable repository identity profiles bind
+	// (apt/<uuid>, rpm/<uuid>).
+	RepositoryID string
+	// DB selects the source form: dpkg (APT) or rpm.
+	DB PackageDB
+	// ArchiveURIs is the HTTPS APT archive per kernel architecture (x86_64,
+	// aarch64). Suites lists the primary suite first; one repository identity
+	// covers every suite with the same components and signing key.
+	ArchiveURIs map[string]string
+	Suites      []string
+	Components  []string
+	// NativeRepositories are RPM repositories, the primary first, verified
+	// with the same key: HTTPS base URLs per kernel architecture when the
+	// vendor signs repomd.xml, otherwise an HTTPS metalink per architecture.
+	NativeRepositories []VendorNativeRepository
+	// KeyFile is the vendor-packaged public key on the host: a regular file,
+	// never a distribution symlink. KeyArtifactID names it in ArtifactRef.
+	KeyFile       string
+	KeyArtifactID string
+	// KeySHA256 lists the accepted lowercase hex digests of KeyFile's exact
+	// bytes; any other content is unrecognized.
+	KeySHA256 []string
+	// RPMFingerprint is the uppercase primary-key fingerprint KeyFile holds.
+	RPMFingerprint string
+	// MetadataUnsigned: the vendor publishes no repository metadata signature
+	// (no repomd.xml.asc). Its RPM metadata is then authenticated only through
+	// HTTPS metalinks served by MetalinkHost, whose repomd.xml digests librepo
+	// checks; package signatures stay mandatory.
+	MetadataUnsigned bool
+	MetalinkHost     string
+	// VariantMarkers are host files that only an architecture variant these
+	// URLs do not serve installs (AlmaLinux 10's x86_64_v2 build ships
+	// /etc/rpm/macros.x86_64_v2 but reports uname x86_64). Any present, or
+	// unobservable, marker leaves the archive platform_not_qualified.
+	VariantMarkers []string
+}
+
+// VendorNativeRepository is one RPM repository of a vendor archive. BaseURLs
+// are used only with signed metadata (MetadataUnsigned false); Metalinks only
+// for a pinned MetalinkHost.
+type VendorNativeRepository struct {
+	ID        string
+	BaseURLs  map[string][]string
+	Metalinks map[string]string
+}
+
+// AccountDefaults are the vendor's regular local account ranges and home
+// root a signed capability policy may approve (LOCAL_ACCOUNTS).
+type AccountDefaults struct {
+	// HomeRootID is the stable approved home root identity profiles name in
+	// HomePolicy.approved_root_id.
+	HomeRootID     string
+	HomeRoot       string
+	MinUID, MaxUID uint32
+	MinGID, MaxGID uint32
+}
+
+// UnsignedMetadataAllowed reports whether repository metadata without a
+// signature may be trusted through these metalinks: at least one, each an
+// HTTPS URL on a metalink host this release pins for a vendor archive without
+// metadata signatures. Derivatives pin their own rows only.
+func (r *Release) UnsignedMetadataAllowed(metalinks []string) bool {
+	if len(metalinks) == 0 {
+		return false
+	}
+	for _, metalink := range metalinks {
+		u, err := url.Parse(metalink)
+		if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.Fragment != "" {
+			return false
+		}
+		if !slices.ContainsFunc(r.VendorRepositories, func(v VendorRepository) bool {
+			return v.MetadataUnsigned && v.MetalinkHost != "" && v.MetalinkHost == u.Host
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
 // RollingUpdateTooling describes the whole-system snapshot update model.
 // Snapshot dates are signed policy inputs, never moving registry defaults.
 type RollingUpdateTooling struct {
@@ -426,6 +510,13 @@ type Release struct {
 	Quirks          Quirks
 	Lab             Lab
 	ModuleBlocklist ModuleBlocklistTooling
+	// VendorRepositories, StandardFileRoots and Accounts are the release's
+	// facts behind remotely granted provider capabilities. Absent facts leave
+	// the capability unavailable (platform_not_qualified), never guessed.
+	VendorRepositories []VendorRepository
+	// StandardFileRoots are vendor drop-in directories (FILES).
+	StandardFileRoots []string
+	Accounts          AccountDefaults
 	// RequalificationDays scopes a rolling snapshot's evidence window. Zero
 	// means this release does not use the periodic rolling qualification lane.
 	// Native tooling derivatives inherit their base's cadence.

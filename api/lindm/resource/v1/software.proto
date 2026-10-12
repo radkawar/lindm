@@ -145,6 +145,43 @@ message AptRepository {
     }
   }];
   ArtifactRef signing_key = 5 [(buf.validate.field).required = true];
+  // Further suites of the same archive (for example noble-updates and
+  // noble-security), resolved in one transaction with the same components,
+  // architectures and signing key. One repository identity covers them all.
+  repeated string additional_suites = 6 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 128
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "apt_repository.distinct_suites"
+    message: "additional suites must differ from the primary suite"
+    expression: "!(this.suite in this.additional_suites)"
+  };
+}
+// A further native repository of the same vendor, verified with the parent
+// RpmRepository's signing keys and signature requirements.
+message RpmAdditionalRepository {
+  string native_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  oneof location {
+    option (buf.validate.oneof).required = true;
+    RepositoryURLs base_urls = 2;
+    string metalink = 3 [(buf.validate.field).string = {
+      uri: true
+      max_len: 2048
+      pattern: "^https://[^@#]+$"
+    }];
+  }
 }
 message RepositoryURLs {
   repeated string urls = 1 [(buf.validate.field).repeated = {
@@ -179,8 +216,25 @@ message RpmRepository {
     min_items: 1
     max_items: 16
   }];
-  bool require_metadata_signature = 5 [(buf.validate.field).bool.const = true];
+  // False is accepted only for an HTTPS metalink source: librepo then verifies
+  // repomd.xml against the hashes in the TLS-fetched metalink, and the agent
+  // additionally requires the metalink host to be pinned for the release in the
+  // platform registry. Package signatures are always required.
+  bool require_metadata_signature = 5;
   bool require_package_signature = 6 [(buf.validate.field).bool.const = true];
+  // Further repositories (for example Fedora updates) resolved in the same
+  // transaction under this one repository identity.
+  repeated RpmAdditionalRepository additional_repositories = 7 [(buf.validate.field).repeated.max_items = 4];
+  option (buf.validate.message).cel = {
+    id: "rpm_repository.distinct_native_ids"
+    message: "repository native IDs must be unique"
+    expression: "this.additional_repositories.all(a, a.native_id != this.native_id && this.additional_repositories.filter(b, b.native_id == a.native_id).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "rpm_repository.metadata_authenticity"
+    message: "unsigned repository metadata is accepted only through HTTPS metalinks"
+    expression: "this.require_metadata_signature || (has(this.metalink) && this.additional_repositories.all(a, has(a.metalink)))"
+  };
 }
 message AlpmRepository {
   string native_name = 1 [(buf.validate.field).string = {

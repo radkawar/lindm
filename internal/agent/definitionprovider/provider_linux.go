@@ -45,6 +45,9 @@ var (
 	ErrBaselineUnknown = errors.New("definitionprovider: ownership_baseline_unknown")
 	ErrOutcomeUnknown  = errors.New("definitionprovider: outcome_unknown")
 	ErrNotConverged    = errors.Join(resource.ErrNotConverged, errors.New("definitionprovider: not_converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of an existing
+	// unowned definition. It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("definitionprovider: adoption_required: %w", ErrConflict)
 )
 
 type ownershipStore interface {

@@ -49,6 +49,17 @@ after durable consumption; renewal and prior-credential binding remain independe
 identity checks. These extractions preserve the existing execution and custody
 contracts, without changing RPC behavior.
 
+Provider refusals keep one sentinel classification. A `CREATE_ONLY` collision
+with an existing unowned object that approved adoption can acquire returns the
+provider's `ErrAdoptionRequired` (which also `errors.Is` its `ErrConflict`); an
+object approval can never acquire stays `ErrConflict`. An actionable cause is
+attached with `admissiondetail.Wrap(err, "snake_case_detail")` and read with
+`admissiondetail.Of`; both are transparent to `errors.Is`/`errors.As`. The detail
+vocabulary is closed and listed in
+[adoption-required refusals](architecture.md#adoption-required-refusals). The
+file provider creates an absent approved root only as described in
+[managed file root creation](architecture.md#managed-file-root-creation).
+
 ### Schema and runtime validation
 
 Versioned protobuf messages define serialized configuration and RPC contracts.
@@ -946,17 +957,14 @@ Device-set, image, enrollment and host-binding changes require explicit
 destroy; changing the referenced product organization reapplies through the
 product API without replacing VMs or re-enrolling devices. Authorization
 changes apply at runtime without restart; advisory configuration changes
-restart only `lindmd`. A device's `fileProvider` and `packageProvider` are the
-owner's root executor opt-ins (`agentv1.NativeFileProviderConfig` and
-`agentv1.NativePackageProviderConfig`, written to `/etc/lindm/executor.json`
-with only the executor restarted); they are local configuration, not identity, so
-a changed value is recorded in `demo-state.json` and applied at the next start. The
-file provider's `kernelModuleBlocklist` is admitted only on releases whose registry names
-qualified initramfs tooling. The Engineering laptop approves its own Ubuntu ports
-archive (`noble`, `main`/`universe`, arm64, the installed Ubuntu archive keyring)
-under the Engineering profile's repository UUID. Other native providers are not
-opted in, so their profile resources report the product's refusal rather than
-converging.
+restart only `lindmd`. Demo devices carry no executor opt-ins: the installer's
+stock `/etc/lindm/executor.json` is left unchanged (apart from the TPM bind's
+device-action target), and provider authority comes only from the organization's
+signed device capability policies (`capabilityPolicies` in `org.json` plus the
+deployment default), exactly as for a customer device. The retired
+`DemoDevice.file_provider`/`package_provider` fields (11 and 12) are reserved;
+older `demo-state.json` files that still carry them are read with those fields
+discarded.
 
 Only `demos/NAME/owner-access` stores the human owner's original enrollment,
 role-account enrollment secrets, provisioning tokens and desktop passwords.

@@ -565,7 +565,8 @@ it to its own archive (archive.ubuntu.com or ports.ubuntu.com). Unit coverage on
 no native record exercises a row without an architecture yet; see
 [package identity](../engineering.md#native-package-resource-provider).
 
-The typed kernel-module blocklist is enabled explicitly in the root executor's
+The typed kernel-module blocklist needs the kernel-module blocklist device
+capability (a signed capability policy) or the root executor's local
 `fileProvider.kernelModuleBlocklist`. Ubuntu 24.04 uses native `modprobe` and
 `update-initramfs -u -k all`; `initramfs-tools` must be installed. Existing dracut
 installations are not guessed compatible. Other Ubuntu releases and derivatives
@@ -642,11 +643,19 @@ default ACL would be inherited. Both are signed `UNSUPPORTED_NATIVE` refusals;
 `getfacl`, content and the directory stay unchanged.
 
 Ubuntu 24.04 ships no `/etc/motd.d`, although `pam_motd` (`noupdate` in
-`/etc/pam.d/sshd` and `login`) reads it. The provider never creates an approved
-root: a managed file under an absent protected ancestor is a signed
-`PRECONDITION` refusal. Create the approved root (root:root 0755) when opting in;
-the persistent organization demo does this for its `fileProvider` roots
-([verification](../verification.md#organization-demo-resource-convergence-two-desktops-2026-10-12)).
+`/etc/pam.d/sshd` and `login`) reads it. When a managed file sits directly in an
+approved root that is absent while the root's parent is root-protected, the file
+provider creates the root (root:root 0755) inside the same owned effect, so
+`/etc/motd.d/50-company` converges on stock Ubuntu. The ownership record notes
+the created root; `RESTORE_OWNED` release removes it only while it is still an
+empty root:root 0755 directory. An absent ancestor above the root's parent stays
+a signed `PRECONDITION` refusal
+([file root creation](../architecture.md#managed-file-root-creation)).
+
+Ubuntu's `base-files` ships a regular `/etc/issue.net`. Under `CREATE_ONLY` the
+SSH banner refuses with `ADOPTION_REQUIRED` (detail `existing_banner_file`);
+roll the profile out with approved adoption to manage it, and release restores
+the distribution notice.
 
 Firewall zones are a dedicated `inet lindm_z_<zone>` nftables table written over
 netlink at priority 10 (the agent does not run the `nft` CLI). Native records for
@@ -695,6 +704,56 @@ the capability-bounded helper, guard and restore units, so the host-namespace
 check compares per-namespace `/proc/<pid>/net/dev` entries; the 6.8 kernel reads
 back boolean bitwise expressions with an explicit `NFTA_BITWISE_OP=0`, which the
 expression digest normalizes.
+
+### Capability policy facts (signed provider grants)
+
+A signed capability policy names only catalogue capabilities; the agent derives
+every provider setting from `internal/platform/registry.go` for its own release
+and architecture ([architecture](../architecture.md#capability-derivation)).
+Ubuntu 24.04 carries every fact below. Ubuntu 22.04 carries the same facts
+except KERNEL_MODULE_BLOCKLIST, which has no 22.04 tooling in the registry and
+reports `platform_not_qualified`; 26.04 reports `platform_not_qualified` for
+every remotely granted capability that needs registry facts.
+
+| Capability                            | Ubuntu 24.04 derivation                                                                                                                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PACKAGES                              | repository `8053e72a-44e8-53fc-9472-825c068cf9b5` (`apt/<uuid>`): `https://archive.ubuntu.com/ubuntu` (amd64) or `https://ports.ubuntu.com/ubuntu-ports` (arm64), suites `noble`, `noble-updates`, `noble-security`, components `main universe` |
+| FILES                                 | `/etc/issue.d`, `/etc/motd.d` (24.04 ships no `/etc/motd.d`; the file provider creates it when a file needs it)                                                                                                                                 |
+| KERNEL_MODULE_BLOCKLIST               | the typed template with `update-initramfs` (see above)                                                                                                                                                                                          |
+| LOCAL_ACCOUNTS                        | home root `/home` (`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`), UID/GID 1000–59999 (`login.defs` `UID_MIN`..`UID_MAX`−1)                                                                                                                            |
+| OS_UPDATES, FIREWALL, KERNEL_SETTINGS | as the local providers; FIREWALL selects every non-loopback interface with a permanent MAC and needs the restore unit enabled                                                                                                                   |
+
+The APT source is verified with `/usr/share/keyrings/ubuntu-archive-keyring.gpg`
+from `ubuntu-keyring 2023.11.28.1`, noble's only version. Its accepted SHA-256 is
+`80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31` (3607 bytes,
+the 2012 and 2018 archive keys). How it was obtained (2026-10-12): the
+`ubuntu-keyring_2023.11.28.1_all.deb` was downloaded over HTTPS from the noble
+archive pool; its SHA-256
+`36de43b15853ccae0028e9a767613770c704833f82586f28eb262f0311adb8a8` matches the
+noble `main/binary-amd64/Packages.gz` entry, whose own digest is listed in the
+noble `InRelease`. The extracted file verified `noble`, `noble-updates` and
+`noble-security` `InRelease` on both `archive.ubuntu.com` and `ports.ubuntu.com`
+(HTTPS, `gpgv`: Good signature, key `F6ECB3762474EDA9D21B7022871920D1991BC93C`),
+and is byte-identical to the file on an Ubuntu 24.04.4 host. Any other key bytes
+report `vendor_key_unrecognized`. The package provider writes one `deb` line per
+suite and requires exactly one verified `InRelease` per approved suite.
+
+Ubuntu 22.04 uses the same repository identity, URIs, components and key path
+with suites `jammy`, `jammy-updates`, `jammy-security`. Its key file comes from
+`ubuntu-keyring 2021.03.26`, jammy's only version (none in `-updates` or
+`-security`): accepted SHA-256
+`1a4dd63e5c76728960a2edddae22e2e0fc53df8e8b87806deb971030ac704eb0` (7399 bytes:
+the 2012 and 2018 archive keys plus the 2012 CD image key; artifact
+`d74a0281-9d25-5f2c-ac6b-9d4bfa1e8c2e`). How it was obtained (2026-10-12): the
+jammy `InRelease` on `archive.ubuntu.com` and `ports.ubuntu.com` verified with
+the noble keyring above; the `.deb` downloaded over HTTPS matched SHA-256
+`0d0e7ed6b112f5d03eabf3c7eb01ebdacf9c57714b279e90495cfc58c8c4520f` in the signed
+`main/binary-amd64` and `binary-arm64` indexes; the extracted file verified all
+six jammy pocket `InRelease` files (`gpgv`, key
+`F6ECB3762474EDA9D21B7022871920D1991BC93C`, the 2018 archive key Ubuntu publishes
+in its Security Team FAQ, `wiki.ubuntu.com/SecurityTeam/FAQ`). `login.defs` in
+jammy's `login 1:4.8.1-2ubuntu2.2` sets UID/GID 1000..60000, and its
+`/etc/pam.d/sshd` runs `pam_motd.so noupdate`. Not exercised natively on 22.04.
 
 ### OS update policy (`os.update.v1`)
 

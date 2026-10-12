@@ -82,9 +82,11 @@ export function ConsoleShell({
       ? "Device details"
       : currentPage?.to === "/secrets"
         ? "Secret details"
-        : pathname.endsWith("/new")
-          ? "Create profile"
-          : "Profile details";
+        : currentPage?.to === "/settings"
+          ? "Device capabilities"
+          : pathname.endsWith("/new")
+            ? "Create profile"
+            : "Profile details";
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">

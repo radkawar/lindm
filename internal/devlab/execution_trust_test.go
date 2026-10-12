@@ -73,9 +73,12 @@ func TestDefaultExecutionCapabilitiesCoverClosedDeviceActions(t *testing.T) {
 	if !slices.Contains(capabilities, "ssh.server.v1") {
 		t.Fatal("default delegation lost the banner-only SSH provider")
 	}
+	if !slices.Contains(capabilities, trust.CapabilityPolicyCapability) {
+		t.Fatal("default delegation cannot issue signed capability policies")
+	}
 	fields := (&agentv1.DeviceActionSpec{}).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
-	if len(capabilities) != fields.Len()+len(executableResourceKinds) {
-		t.Fatalf("default delegation has %d capabilities for %d actions plus %d resource kinds", len(capabilities), fields.Len(), len(executableResourceKinds))
+	if want := fields.Len() + len(resource.ExecutableKinds()) + 1; len(capabilities) != want {
+		t.Fatalf("default delegation has %d capabilities, want %d (actions, resource kinds, capability policy)", len(capabilities), want)
 	}
 	for i := range fields.Len() {
 		spec := new(agentv1.DeviceActionSpec)

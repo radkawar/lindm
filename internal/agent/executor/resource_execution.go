@@ -43,6 +43,8 @@ type resourceOpen struct {
 	intent   *agentv1.ResourceExecutionIntent
 	platform *resourcev1.PlatformProduct
 	secrets  secretAccessor
+	// providers is the effective configuration snapshot taken at open time.
+	providers *providerSnapshot
 }
 
 // resourceKind is the executor's per-kind entry: the provider opener and any
@@ -86,7 +88,7 @@ func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.Resour
 	if err != nil {
 		return nil, err
 	}
-	return kind.open(ctx, resourceOpen{service: s, intent: intent, platform: platform, secrets: secrets})
+	return kind.open(ctx, resourceOpen{service: s, intent: intent, platform: platform, secrets: secrets, providers: s.currentProviders()})
 }
 
 // Native package transactions keep their staged helper protocol (stage,
@@ -103,7 +105,7 @@ func openPackageResource(ctx context.Context, o resourceOpen) (nativeResource, e
 	return packageprovider.Open(ctx, packageprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), StateDirectory: s.directory, Native: s.packageProvider,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), StateDirectory: s.directory, Native: o.providers.packages,
 		Preparation: intent.GetPreparation(), IntentDigest: record.GetIntentSha256(),
 		NativeStage: s.packageNativeStage, NativeStageCancel: s.packageNativeCancel, NativeTransaction: s.packageNativeTransaction,
 	})
@@ -120,8 +122,8 @@ func openFileResource(ctx context.Context, o resourceOpen) (nativeResource, erro
 	return fileprovider.Open(ctx, fileprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Files,
-		ProtectedPaths: s.nativeResources.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.Files,
+		ProtectedPaths: o.providers.native.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
 		NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
 			result, err := s.observeNativeResource(ctx, desired, o.platform, nil)
 			if err != nil {
@@ -137,7 +139,7 @@ func openAccountResource(ctx context.Context, o resourceOpen) (nativeResource, e
 	return accountprovider.Open(ctx, accountprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Accounts,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.Accounts,
 		NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest, Secrets: o.secrets,
 		NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
 			result, err := s.observeNativeResource(ctx, desired, o.platform, nil)
@@ -154,7 +156,7 @@ func openSysctlResource(ctx context.Context, o resourceOpen) (nativeResource, er
 	return sysctlprovider.Open(ctx, sysctlprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Sysctl, NativeApply: s.resourceNativeApply,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.Sysctl, NativeApply: s.resourceNativeApply,
 	})
 }
 
@@ -187,7 +189,7 @@ func openPasswordResource(ctx context.Context, o resourceOpen) (nativeResource, 
 	return passwordprovider.Open(ctx, passwordprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Password, ExecuteNative: s.resourceNativeTransaction,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.Password, ExecuteNative: s.resourceNativeTransaction,
 	})
 }
 
@@ -196,7 +198,7 @@ func openOSUpdateResource(ctx context.Context, o resourceOpen) (nativeResource, 
 	return osupdateprovider.Open(ctx, osupdateprovider.Config{
 		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
-		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.OSUpdate, StateDirectory: s.directory,
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: o.providers.native.OSUpdate, StateDirectory: s.directory,
 		ExecuteNative: s.resourceNativeTransaction,
 	})
 }
@@ -339,6 +341,12 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	if err := s.verifyResourceSecrets(loaded, intent, req.GetSealedSecrets()); err != nil {
 		s.mu.Unlock()
 		return nil, err
+	}
+	// The capability gate precedes preparation and native preflight alike:
+	// a provider that is not effective never observes or stages anything.
+	if err := s.capabilityGate(intent.GetDesired()); err != nil {
+		s.mu.Unlock()
+		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}
 	if intent.GetPreparation() != nil {
 		return s.admitResourcePreparationLocked(ctx, loaded, intent, req.GetIntentEnvelope(), req.GetSealedSecrets())
@@ -598,12 +606,4 @@ func validateResourceVerification(plan *resourcev1.ResourcePlan, verification *r
 		return kind.verification(plan, verification)
 	}
 	return nil
-}
-
-// WithPackageProvider retains root-owned source authorization. An RPC cannot
-// enable package management or replace its approved repositories and signing keys.
-func WithPackageProvider(config *agentv1.NativePackageProviderConfig) Option {
-	return func(s *Service) {
-		s.packageProvider = proto.CloneOf(config)
-	}
 }

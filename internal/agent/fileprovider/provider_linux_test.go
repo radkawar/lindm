@@ -18,6 +18,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/resourceprovider"
@@ -227,7 +228,7 @@ func TestFileAdoptionRestoresContentModeUIDGID(t *testing.T) {
 	d.GetManagedFile().Mode = proto.Uint32(0640)
 	d.GetManagedFile().Uid = proto.Uint32(12345)
 	d.GetManagedFile().Gid = proto.Uint32(12346)
-	if _, err := p.Plan(t.Context(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrConflict) {
+	if _, err := p.Plan(t.Context(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrAdoptionRequired) || !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_file" {
 		t.Fatalf("create-only adopted existing file: %v", err)
 	}
 	p.config.Ownership.Policy.Mode = resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION

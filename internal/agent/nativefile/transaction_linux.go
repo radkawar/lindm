@@ -56,6 +56,9 @@ type Transaction struct {
 	before  *agentv1.ResourceOwnershipSnapshot
 	target  *agentv1.ResourceOwnershipSnapshot
 	used    bool
+	// createDirectory: custody is the absent parent directory, created
+	// root:root 0755 after the gate before the file is written inside it.
+	createDirectory bool
 }
 
 // Prepare retains inode and directory custody and a read lease. The path is
@@ -131,7 +134,11 @@ func (t *Transaction) Commit(ctx context.Context, beforeEffect func(context.Cont
 	if err := t.custody.unchanged(); err != nil {
 		return nil, err
 	}
-	if !sameImage(t.before, t.target) {
+	if t.createDirectory {
+		if err := t.createDirectoryAndReplace(ctx); err != nil {
+			return nil, err
+		}
+	} else if !sameImage(t.before, t.target) {
 		if t.target.GetObservation().GetManagedFile().GetExists() {
 			if err := t.replace(ctx); err != nil {
 				return nil, err
@@ -147,7 +154,7 @@ func (t *Transaction) Commit(ctx context.Context, beforeEffect func(context.Cont
 	}
 	template := proto.CloneOf(t.before.GetObservation())
 	template.Metadata.ObservedAt = timestamppb.Now()
-	after, err := Capture(t.custody.path, template)
+	after, err := Capture(t.target.GetObservation().GetManagedFile().GetPath(), template)
 	if err != nil {
 		return nil, err
 	}

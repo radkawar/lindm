@@ -74,15 +74,14 @@ func (p *Provider) prepareDNF(ctx context.Context, directory string, source *age
 			return nil, err
 		}
 	}
-	if err := atomicFile(filepath.Join(directory, "dnf.conf"), []byte("[main]\nplugins=False\ngpgcheck=True\nrepo_gpgcheck=True\nlocalpkg_gpgcheck=True\n"), 0600); err != nil {
+	main := "[main]\nplugins=False\ngpgcheck=True\nrepo_gpgcheck=True\nlocalpkg_gpgcheck=True\n"
+	if !rpm.GetRequireMetadataSignature() {
+		main = "[main]\nplugins=False\ngpgcheck=True\nrepo_gpgcheck=False\nlocalpkg_gpgcheck=True\n"
+	}
+	if err := atomicFile(filepath.Join(directory, "dnf.conf"), []byte(main), 0600); err != nil {
 		return nil, err
 	}
-	location := "metalink=" + rpm.GetMetalink()
-	if urls := rpm.GetBaseUrls(); urls != nil {
-		location = "baseurl=" + strings.Join(urls.GetUrls(), " ")
-	}
-	config := "[" + rpm.GetNativeId() + "]\nname=Lindm approved repository\n" + location + "\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\nsslverify=1\nskip_if_unavailable=0\ngpgkey=file://" + source.GetSigningKeyFile() + "\n"
-	if err := atomicFile(filepath.Join(directory, "repos", "approved.repo"), []byte(config), 0600); err != nil {
+	if err := atomicFile(filepath.Join(directory, "repos", "approved.repo"), []byte(dnfRepositoryConfig(source)), 0600); err != nil {
 		return nil, err
 	}
 	key, err := custody.ReadRoot(source.GetSigningKeyFile(), 4<<20, false)
@@ -110,6 +109,45 @@ func (p *Provider) prepareDNF(ctx context.Context, directory string, source *age
 		return nil, err
 	}
 	return digest[:], nil
+}
+
+// dnfRepositoryConfig writes one section per approved native repository, all
+// verified with the source's single key. Package signatures are always
+// required; repository metadata signatures are waived only when the source
+// says so, which checkSource admits only for metalinks the release pins.
+func dnfRepositoryConfig(source *agentv1.NativePackageSource) string {
+	rpm := source.GetRepository().GetRpm()
+	metadata := "0"
+	if rpm.GetRequireMetadataSignature() {
+		metadata = "1"
+	}
+	section := func(id string, urls *resourcev1.RepositoryURLs, metalink string) string {
+		location := "metalink=" + metalink
+		if urls != nil {
+			location = "baseurl=" + strings.Join(urls.GetUrls(), " ")
+		}
+		return "[" + id + "]\nname=Lindm approved repository\n" + location + "\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=" + metadata + "\nsslverify=1\nskip_if_unavailable=0\ngpgkey=file://" + source.GetSigningKeyFile() + "\n"
+	}
+	config := section(rpm.GetNativeId(), rpm.GetBaseUrls(), rpm.GetMetalink())
+	for _, additional := range rpm.GetAdditionalRepositories() {
+		config += "\n" + section(additional.GetNativeId(), additional.GetBaseUrls(), additional.GetMetalink())
+	}
+	return config
+}
+
+// dnfApprovedRepository reports whether a resolved or stored package came
+// from one of the source's approved native repositories.
+func dnfApprovedRepository(rpm *resourcev1.RpmRepository, repoID string) bool {
+	ids := []string{rpm.GetNativeId()}
+	for _, additional := range rpm.GetAdditionalRepositories() {
+		ids = append(ids, additional.GetNativeId())
+	}
+	for _, id := range ids {
+		if repoID == id || repoID == "@stored_transaction("+id+")" {
+			return true
+		}
+	}
+	return false
 }
 
 // dnfSpec asks DNF for the native target; for a bare name DNF selects its
@@ -306,7 +344,7 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 			entry.Operation = resourcev1.PackageTransactionOperation_PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED
 			entry.OwnedInstallation = true
 		case "Install", "Upgrade":
-			if rpm.RepoID != source.GetRepository().GetRpm().GetNativeId() && rpm.RepoID != "@stored_transaction("+source.GetRepository().GetRpm().GetNativeId()+")" {
+			if !dnfApprovedRepository(source.GetRepository().GetRpm(), rpm.RepoID) {
 				return nil, errors.New("packageprovider: unapproved DNF package source")
 			}
 			if rpm.Reason != "User" && rpm.Reason != "Dependency" && rpm.Reason != "Weak Dependency" {

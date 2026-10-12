@@ -21,6 +21,7 @@ export const routeContracts = {
   "/secrets": structural,
   "/secrets/$secretId": structural,
   "/settings": structural,
+  "/settings/capabilities": structural,
   "/devices/$deviceId": { mode: "semantic", page: "device", minimumMetrics: 0 },
   "/devices/$deviceId/assistance/$sessionId": {
     mode: "semantic",

@@ -93,16 +93,8 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 			}
 			response.AgentUpdateReceivedAt = timestamppb.New(receivedAt)
 		}
-		host, err := q.GetHostObservation(ctx, *row.CurrentGenerationID)
-		if err != nil && err != pgx.ErrNoRows {
-			return nil, core.MapErr(err)
-		}
-		if err == nil {
-			detail, err := hostDetail(host)
-			if err != nil {
-				return nil, core.MapErr(err)
-			}
-			response.Host = detail
+		if err := s.hostAndCapabilities(ctx, tx, q, id, *row.CurrentGenerationID, response); err != nil {
+			return nil, err
 		}
 		attempt, err := q.GetPackageAttempt(ctx, *row.CurrentGenerationID)
 		if err != nil && err != pgx.ErrNoRows {
@@ -144,6 +136,26 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 		return nil, core.MapErr(err)
 	}
 	return connect.NewResponse(response), nil
+}
+
+// hostAndCapabilities fills the latest accepted host observation and the
+// device capability state, whose reported status comes from that observation.
+func (s *Service) hostAndCapabilities(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, deviceID, generationID uuid.UUID, response *adminv1.GetDeviceResponse) error {
+	host, err := q.GetHostObservation(ctx, generationID)
+	if err != nil && err != pgx.ErrNoRows {
+		return core.MapErr(err)
+	}
+	var latest *devicedb.GetHostObservationRow
+	if err == nil {
+		latest = &host
+		if response.Host, err = hostDetail(host); err != nil {
+			return core.MapErr(err)
+		}
+	}
+	if response.Capabilities, err = s.DeviceCapabilityState(ctx, tx, q, deviceID, generationID, latest); err != nil {
+		return core.ExecutionError(err)
+	}
+	return nil
 }
 
 func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[adminv1.ListDevicePackagesRequest]) (*connect.Response[adminv1.ListDevicePackagesResponse], error) {

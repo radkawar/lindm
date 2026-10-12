@@ -42,6 +42,9 @@ func Plan(ctx context.Context, client adminv1connect.AdminServiceClient, spec *o
 	if err := p.groups(ctx, client); err != nil {
 		return nil, err
 	}
+	if err := p.capabilityPolicies(ctx, client); err != nil {
+		return nil, err
+	}
 	revisions, changed, err := p.profiles(ctx, client)
 	if err != nil {
 		return nil, err

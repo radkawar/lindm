@@ -16,6 +16,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 )
 
 func TestAdditiveGroupReleasePreservesUnownedEdges(t *testing.T) {
@@ -129,6 +130,18 @@ func TestAbsentDoesNotDeleteAdoptedObject(t *testing.T) {
 	ledger := appliedLedger(before, before, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_SHELL)
 	_, _, err := p.target(context.Background(), d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), ledger)
 	requireError(t, err)
+}
+func TestCreateOnlyExistingAccountRequiresAdoption(t *testing.T) {
+	p := testProvider()
+	p.config.Ownership.Policy = &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}
+	before := fixtureSnapshot(false)
+	if !exists(before.GetObservation()) {
+		t.Fatal("fixture account absent")
+	}
+	_, err := p.plan(context.Background(), userDesired(), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, fixtureDB(), nil)
+	if !errors.Is(err, ErrAdoptionRequired) || !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_account" {
+		t.Fatalf("existing account acquired under CREATE_ONLY: %v", err)
+	}
 }
 func TestChangedDimensionsDoNotAcquireSatisfiedFields(t *testing.T) {
 	before := fixtureSnapshot(false)

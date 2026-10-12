@@ -257,6 +257,27 @@ drop-ins, password policy, firewall zone) also passed together in one connected
 lane on registered RHEL 9.8 aarch64 (73/73 scenarios); see
 [verification](../verification.md#all-resource-kinds-in-one-connected-lane).
 
+### Capability policy facts (signed provider grants)
+
+RHEL rows carry no registry vendor archive, so a signed capability policy's
+PACKAGES grant reports `platform_not_qualified` on RHEL 8, 9 and 10
+([architecture](../architecture.md#capability-derivation)); package rows need an
+operator-approved source in `executor.json`, as before. The RHEL archive is not
+representable as registry facts: `cdn.redhat.com` serves BaseOS and AppStream
+only to a host presenting its subscription entitlement client certificate
+(`/etc/pki/entitlement`, issued per system by subscription-manager) and is itself
+certified by Red Hat's private CA (`/etc/rhsm/ca/redhat-uep.pem`). On
+2026-10-12 an unauthenticated HTTPS request for
+`content/dist/rhel9/9/x86_64/baseos/os/repodata/repomd.xml` failed WebPKI
+verification and, with verification skipped, returned HTTP 403. An approved
+`RpmRepository` has no client-certificate or CA fields, and per-host
+entitlement material is a secret, never registry data. FILES and
+LOCAL_ACCOUNTS facts are not recorded for RHEL either (they were measured from
+the AlmaLinux and Rocky Linux packages, not RHEL's), so they also report
+`platform_not_qualified`; see
+[AlmaLinux and Rocky Linux](alma-rocky.md#capability-policy-facts-signed-provider-grants)
+for the rebuilds' derived sources.
+
 ## Host resource providers (EL 9)
 
 Managed files, local groups and users, sysctl, systemd timers and drop-ins,

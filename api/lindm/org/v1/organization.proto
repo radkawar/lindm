@@ -5,6 +5,7 @@ package lindm.org.v1;
 import "buf/validate/validate.proto";
 import "lindm/admin/v1/admin.proto";
 import "lindm/admin/v1/advisories.proto";
+import "lindm/admin/v1/capabilities.proto";
 import "lindm/admin/v1/provisioning.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/auth/v1/auth.proto";
@@ -65,6 +66,20 @@ message Organization {
   repeated lindm.auth.v1.CreateAccountRequest accounts = 10 [(buf.validate.field).repeated.max_items = 100];
   // Applied before accounts, so newly declared custom roles are available.
   lindm.auth.v1.AuthorizationPolicy authorization = 11;
+  // Applied after groups. Each entry replaces its scope's complete policy;
+  // omitted scopes are unchanged.
+  repeated CapabilityPolicy capability_policies = 12 [(buf.validate.field).repeated.max_items = 101];
+}
+
+message CapabilityPolicy {
+  // request_id, expected_revision and reason are engine owned. The completed
+  // product message is validated before any mutation.
+  lindm.admin.v1.SetCapabilityPolicyRequest request = 1 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  option (buf.validate.message).cel = {
+    id: "organization.capability_policy_template"
+    message: "request is required; request_id, expected_revision and reason are engine owned"
+    expression: "has(this.request) && this.request.request_id == '' && this.request.expected_revision == 0u && this.request.reason == ''"
+  };
 }
 
 message StaticGroup {

@@ -17,6 +17,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/resource"
 )
@@ -142,8 +143,18 @@ func TestUnownedPresentFileIsNeverAdopted(t *testing.T) {
 		t.Fatalf("adoption mode adopted a foreign timer: %v", err)
 	}
 	loaded := fixtureSnapshot(t, p, nil, false, "Mon *-*-* 02:00:00 UTC")
-	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, loaded, nil); !errors.Is(err, ErrConflict) {
+	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, loaded, nil); !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_update_timer" {
 		t.Fatalf("already loaded timer was acquired: %v", err)
+	}
+	if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, nil); admissiondetail.Of(err) != "existing_update_timer" {
+		t.Fatalf("existing timer file detail: %v", err)
+	}
+}
+func TestMissingNativeToolNamesDetail(t *testing.T) {
+	err := missingPackage(&resourcev1.PlatformProduct{OsId: "ubuntu", Product: "Ubuntu", Version: "24.04", Architecture: "amd64"}, "unattended-upgrades", errNotInstalled)
+	var prerequisite *PrerequisiteError
+	if !errors.As(err, &prerequisite) || !errors.Is(err, ErrMissingPrerequisite) || prerequisite.Package.GetNativeName() != "unattended-upgrades" || admissiondetail.Of(err) != "native_tool_missing" {
+		t.Fatalf("missing tool = %v", err)
 	}
 }
 

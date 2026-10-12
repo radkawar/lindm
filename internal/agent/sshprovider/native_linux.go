@@ -24,6 +24,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/nativefile"
@@ -119,6 +120,21 @@ func digestMessage(m proto.Message) ([]byte, error) {
 	return digest[:], nil
 }
 
+// bannerCaptureError names the stock Fedora /etc/issue.net symlink. A link is
+// never adoptable, so it stays a precondition conflict, not adoption.
+func bannerCaptureError(err error) error {
+	if errors.Is(err, unix.ELOOP) {
+		return admissiondetail.Wrap(fmt.Errorf("%w: %s is a symbolic link: %w", ErrConflict, resource.SSHBannerPath, err), "existing_banner_symlink")
+	}
+	return err
+}
+
+// configInvalid classifies an sshd -t failure as a precondition naming the
+// invalid native configuration.
+func configInvalid(err error) error {
+	return admissiondetail.Wrap(errors.Join(ErrConflict, err), "ssh_config_invalid")
+}
+
 func fileState(capture *agentv1.ResourceOwnershipSnapshot, continuity *agentv1.NativeFileContinuity) *agentv1.SSHNativeFileSnapshot {
 	return &agentv1.SSHNativeFileSnapshot{State: capture.GetObservation().GetManagedFile(), Content: capture.ManagedFileContent, Xattrs: capture.ManagedFileXattrs, Continuity: continuity}
 }
@@ -134,7 +150,7 @@ func (p *Provider) snapshot(ctx context.Context) (*agentv1.ResourceOwnershipSnap
 	}
 	banner, bannerContinuity, err := nativefile.CaptureWithContinuity(resource.SSHBannerPath, observation)
 	if err != nil {
-		return nil, err
+		return nil, bannerCaptureError(err)
 	}
 	graph, edges, err := p.includeGraph(observation)
 	if err != nil {
@@ -142,7 +158,7 @@ func (p *Provider) snapshot(ctx context.Context) (*agentv1.ResourceOwnershipSnap
 	}
 	syntax, err := p.run(ctx, "/usr/sbin/sshd", "-t", "-f", sshConfigPath)
 	if err != nil {
-		return nil, errors.Join(ErrConflict, err)
+		return nil, configInvalid(err)
 	}
 	effective, err := p.run(ctx, "/usr/sbin/sshd", "-T", "-f", sshConfigPath, "-C", "user=lindm-banner-probe,host=localhost,addr=127.0.0.1")
 	if err != nil {
@@ -154,7 +170,7 @@ func (p *Provider) snapshot(ctx context.Context) (*agentv1.ResourceOwnershipSnap
 	}
 	active, err := p.run(ctx, "/usr/bin/systemctl", "is-active", p.unit)
 	if err != nil || strings.TrimSpace(string(active)) != "active" {
-		return nil, errors.Join(ErrConflict, err)
+		return nil, admissiondetail.Wrap(errors.Join(ErrConflict, err), "ssh_service_inactive")
 	}
 	connection, received, err := p.witness(ctx, port, observation)
 	if err != nil {

@@ -182,6 +182,8 @@ type resourceFixture struct {
 	boot              string
 	// openNative replaces the systemd boundary harness for a single test.
 	openNative func(*Service, secretAccessor) (nativeResource, error)
+	// capabilityGate keeps the production capability admission gate.
+	capabilityGate bool
 }
 
 func newResourceFixture(t *testing.T, active bool, withoutDelegation ...bool) *resourceFixture {
@@ -216,6 +218,11 @@ func newResourceFixture(t *testing.T, active bool, withoutDelegation ...bool) *r
 func (f *resourceFixture) options() []Option {
 	return []Option{WithClock(func() time.Time { return time.Unix(0, f.wall.Load()).UTC() }), WithBootID(func() (string, error) { return f.boot, nil }), func(s *Service) {
 		s.boottime = func() (uint64, error) { return f.bootClock.Load(), nil }
+		// The fixture's fake natives stand in for effective providers; the
+		// capability gate itself is exercised in capability_policy_linux_test.go.
+		if !f.capabilityGate {
+			s.capabilityGate = func(*resourcev1.ResourceDesiredState) error { return nil }
+		}
 		s.openResource = func(_ context.Context, _ *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
 			if f.openNative != nil {
 				return f.openNative(s, secrets)

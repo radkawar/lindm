@@ -35,6 +35,7 @@ const kindLabels: Record<string, string> = {
   provisioning_token: "Provisioning token",
   enrollment_grant: "Enrollment code",
   advisory_exception: "Advisory exception",
+  capability_policy: "Device capabilities",
 };
 const plannedLabels: Record<string, string> = {
   created: "Will create",
@@ -58,6 +59,13 @@ function outcomeName(outcome: OrganizationOutcome, organization: Organization | 
     );
     const profile = organization?.profiles.find((item) => item.id === assignment?.profileId);
     return profile?.spec?.name ? `${profile.spec.name} assignment` : "Resource assignment";
+  }
+  if (outcome.kind === "capability_policy") {
+    if (outcome.name === "deployment") return "Capabilities for all devices";
+    const group =
+      organization?.groups.find((item) => item.id === outcome.id)?.name ??
+      organization?.dynamicGroups.find((item) => item.groupId === outcome.id)?.name;
+    return group ? `Capabilities for ${group}` : "Capabilities for a group";
   }
   return outcome.name && outcome.name !== outcome.id
     ? outcome.name

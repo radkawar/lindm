@@ -612,6 +612,41 @@ identity-stable read; `PrivateDirectory` adds an effective-user-owned leaf
 without group/other permissions. Unprivileged tools check only their own leaf
 with `Owned`. Lab tooling captures output with the same `nativeexec.Buffer`.
 
+#### Managed file root creation
+
+A managed file directly inside an entry of `file_provider.allowed_roots` whose
+root is absent, while every directory above the root is root-protected, is
+observed as an absent file (not `PRECONDITION`). Its ancestry digest is a
+domain-separated "absent directory" value binding the protected parent chain and
+the root's name, so the plan's observation digest binds the creation. The
+target records `ResourceOwnershipSnapshot.created_directory`; after the effect
+gate the helper creates the root (`mkdirat`, then root:root 0755), proves the
+opened directory is the created inode and writes the file inside it. Only then is
+the root's parent writable in the transient effect unit; otherwise only the
+file's own directory is. The record rides on every last-applied image while the
+resource is owned. `RESTORE_OWNED` release removes exactly the recorded root, and
+only while it is still empty and root:root 0755 (`unlinkat(AT_REMOVEDIR)`); a
+root with foreign entries or changed metadata stays. A deeper file or an absent
+ancestor above the root's parent remains a `PRECONDITION` refusal. Module
+blocklist templates never create directories.
+
+#### Adoption-required refusals
+
+A provider whose `CREATE_ONLY` acquisition meets an existing unowned native
+object returns its `ErrAdoptionRequired`, which also satisfies its `ErrConflict`
+so existing classification holds: the file (`existing_file`), SSH banner
+(`existing_banner_file`), account (`existing_account`), systemd definition
+(`existing_definition`), package/pin (`existing_package`) and sysctl
+(`existing_kernel_setting`) providers. `internal/agent/admissiondetail` attaches
+the closed snake_case detail. Objects that approval can never acquire stay plain
+`ErrConflict` with a detail: the Fedora `/etc/issue.net` symlink
+(`existing_banner_symlink`), the reserved banner drop-in
+(`existing_banner_dropin`) and an existing OS-update timer or path
+(`existing_update_timer`). Other actionable details are `native_tool_outdated`
+(DNF below the registry minimum), `native_tool_missing` (OS-update tooling),
+`ssh_service_inactive`, `ssh_config_invalid` and `unit_not_installed` (a
+`SYSTEMD_SERVICE` unit systemd reports `NoSuchUnit` or `not-found`).
+
 ### Closed resources and targeting: control-plane cutover
 
 `lindm.resource.v1` is the shared closed vocabulary for twenty-four resource kinds.
@@ -1639,6 +1674,114 @@ with inventory without serializing long native collection. This implemented trus
 distribution path is separate from the still-required profile/job/online-signing
 and ownership integration.
 
+#### Signed agent capability policy
+
+Provider authority on a device is the root-owned `/etc/lindm/executor.json` merged
+with one signed `agentv1.AgentCapabilityPolicy` (DSSE payload type
+`application/vnd.lindm.agent-capability-policy.v1+protobuf`). The online PLAN key
+signs it only under the exact delegated capability `agent.capability-policy.v1`
+(`trust.ExecutionVerifier.VerifyCapabilityPolicy`); the policy binds deployment,
+device and enrollment generation and carries only catalogue values, sysctl key
+names and firewall endpoint/guard settings. Paths, repositories, keys and account
+ranges are derived inside the agent from `internal/platform/registry.go` by
+`internal/agent/capabilitypolicy`.
+
+The management loop relays the policy right after execution trust: executor
+`GetCapabilityPolicy`, then `DeviceService.GetCapabilityPolicy(session_epoch,
+applied_version, applied_sha256)` (cursors only for an ACTIVE policy, so an INERT
+or absent one is reissued), then executor `UpdateCapabilityPolicy` when an envelope
+arrives. The server's `unavailable_reason` is logged once per change. The executor
+(callers: root or the network UID only) verifies under its current delegation,
+binds the policy to its own enrolled identity, accepts only a higher version
+(equal version with identical envelope bytes is an idempotent retry; equal version
+with different bytes is a rollback), and refuses entirely when
+`capability_policy.refuse_remote` is set (state `REFUSED_LOCALLY`). It derives
+the effective providers before persisting, writes `agentv1.CapabilityPolicyRecord`
+atomically to `<state_directory>/capability-policy.binpb` (root `0600`), and swaps
+its in-memory provider snapshot (package provider and native resource providers)
+without restart. Each action opens its provider from the snapshot current at open
+time and keeps that instance. At startup and after every accepted
+`UpdateExecutionTrust` the executor re-verifies the record; when the current
+delegation (or enrollment) no longer authorizes it, the record is rewritten
+`active=false` (state `INERT`, grants nothing) until the server issues a newly
+signed version. A failed re-verification fails closed to local providers only.
+When FIREWALL is granted but `lindm-firewall-restore.service` is not enabled, the
+executor enables it over the systemd D-Bus `EnableUnitFiles` path and derives
+again; a failed enable leaves FIREWALL `UNAVAILABLE` with
+`firewall_restore_unit_disabled`.
+
+Every resource intent, including package preparation intents, passes
+`capabilitypolicy.RequiredCapability` before preparation or native preflight. A
+provider that is not effective yields a journaled admission refusal
+`CAPABILITY_NOT_ENABLED` naming the `capability`, with no native observation. A
+CREATE_ONLY collision with an unowned native object (`ErrAdoptionRequired`) is
+refused `ADOPTION_REQUIRED`; a provider's closed snake_case `admissiondetail` code
+is copied to the refusal `detail`. A provider's unsupported refusal during package
+preparation ends the action `UNSUPPORTED` (not `PRECONDITION`); a held package
+lock stays `NATIVE_BUSY`. Published inventory carries the executor's
+`CapabilityPolicyObservation` in `NativeDetails.capability_policy`.
+
+### Capability derivation
+
+Provider authority on the agent is the root-owned `/etc/lindm/executor.json`
+merged with providers derived from the executor's accepted signed capability
+policy record (`<state_directory>/capability-policy.binpb`, root 0600, written
+atomically by the executor only). `internal/agent/capabilitypolicy` does the
+merge (`Derive`, deterministic for the same configuration, record and host):
+
+- A policy carries only catalogue capabilities, sysctl key names and firewall
+  endpoint/guard settings. Repositories, signing keys and their accepted
+  digests, file roots and account ranges come from
+  `internal/platform/registry.go` for the running release and architecture
+  (`VendorRepositories`, `StandardFileRoots`, `Accounts`), and only where the
+  registry's capability gates qualify the provider. Anything else reports
+  `UNAVAILABLE` with a closed detail (`platform_not_qualified`,
+  `vendor_key_unrecognized`, `firewall_settings_missing`,
+  `firewall_restore_unit_disabled`, `no_permanent_interface`,
+  `sysctl_keys_protected`, `protected_path_overlap`, …).
+- Local settings win: a locally configured provider is reported `LOCAL` and is
+  not replaced; packages, file roots and sysctl keys are unioned. A nil or
+  inactive record, or a local `capability_policy` (`refuse_remote`), yields the
+  local configuration only. PASSWORD_POLICY and CUSTOM_FILE_ROOTS are local-only.
+- FIREWALL selects every non-loopback interface with a permanent MAC (sorted by
+  name) and requires the restore unit's custody (the same check as a firewall
+  observation's `persistent_ready`).
+- The merged configuration re-runs the configuration loader's package key
+  custody and protected-path overlap checks (`config.Document.WithProviders`);
+  if they fail, the effective document keeps local providers only and the
+  derived capabilities report `UNAVAILABLE`. Providers keep their own deny
+  lists (file prefixes, sysctl authority keys, account protections).
+
+The executor and every transient root helper or root service that applies
+provider configuration (resource transaction and observation, package
+transaction, firewall restore, connectivity guard) call
+`capabilitypolicy.LoadEffectiveExecutorConfig`, so they derive identical
+providers. Before admission, `RequiredCapability` names the capability a desired
+resource needs that is not effective (for example FILES for a path under a
+standard root, CUSTOM_FILE_ROOTS elsewhere).
+
+#### Server issuance of capability policies
+
+The server computes each device's effective grant as the deployment policy united with
+every static group containing the device and every dynamic group whose saved
+expression definitely includes it (the targeting evaluation; stale or failed inventory
+is not membership). `DeviceService.GetCapabilityPolicy` is session-fenced like
+`GetExecutionTrust`; it signs lazily with the online plan key under the exact
+delegated capability `agent.capability-policy.v1` and self-verifies with
+`trust.ExecutionVerifier.VerifyCapabilityPolicy`. A new version (monotonic per device
+generation, and above any version the device reports) is signed only when the grant's
+deterministic content changed, the stored envelope no longer verifies under the
+current delegation, or the device reports a version the server never issued. An
+empty grant is still signed and revokes remote grants. Without the delegated
+capability the response carries `capability_policy_not_delegated` (no delegation:
+`execution_authority_unconfigured`) and nothing is signed. Executor refusals
+`CAPABILITY_NOT_ENABLED` become BLOCKED `capability_<name>_not_enabled`; such rows
+and releases are dispatched again when a newly signed version is stored or when an
+accepted host observation reports a different `NativeDetails.capability_policy`.
+`ADOPTION_REQUIRED` becomes `adoption_required`; any refusal `detail` is passed
+through as the reason; an unstarted provider UNSUPPORTED failure is
+`native_unsupported`.
+
 ### Release delivery and unattended updates
 
 `internal/releasebuild` constructs two clean isolated source/tool-cache builds of
@@ -1702,6 +1845,22 @@ kind namespace, disjoint from valid canonical `.service` keys. This does not
 migrate or reinterpret an already initialized executor journal.
 Provisioning pins the same generic profile revision and inserts normal resource
 rows only after its existing approval, authorization-version and activation fences.
+
+`00044_capability_policies.sql` stores device management capability policies:
+`capability_policies` holds one row per scope (deployment singleton, static group,
+dynamic group; groups cascade on deletion) with the remotely enableable
+`ManagementCapability` numbers, sysctl key names and the deterministic
+`CapabilityFirewallSettings` encoding (deployment only). Revisions come from one
+sequence, so a removed and recreated group policy never reuses a compare-and-swap
+token; the migration seeds the deployment row (revision 1, no actor) with packages,
+files, local accounts and OS updates. `capability_policy_requests` keeps exact
+`SetCapabilityPolicy` replay receipts. `device_capability_policies` keeps the signed
+envelopes per device enrollment generation and version with a content digest of the
+effective grant; superseded versions beyond the latest 16 are pruned. Every policy
+mutation locks the deployment row first (principal → deployment policy → group),
+which serializes revisions, the 100 group-policy ceiling and the rule that FIREWALL
+anywhere requires deployment firewall settings. Capability issuance follows resource
+dispatch order (execution authority share lock → device row).
 
 Host inventory carries a bounded `inventory.v1.NativeDetails` observation alongside
 OS/boot identity. CPU, memory, storage/encryption, interfaces, firmware/Secure Boot,

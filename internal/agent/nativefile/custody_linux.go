@@ -50,6 +50,51 @@ type custody struct {
 }
 
 func openCustody(path string, readOnly bool) (_ *custody, err error) {
+	c, err := openAncestors(path, readOnly)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, c.close())
+		}
+	}()
+	fd, err := unix.Openat(c.parent(), c.name, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	if errors.Is(err, unix.ENOENT) {
+		return c, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.file = os.NewFile(uintptr(fd), path)
+	if err = unix.Fstat(fd, &c.stat); err != nil {
+		return nil, err
+	}
+	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent || c.stat.Dev != c.stats[len(c.stats)-1].Dev {
+		return nil, ErrUnsafePath
+	}
+	// A read-only dependency may be hardlinked (for example, a packaged crypto
+	// policy), but cannot be writable by an unprivileged owner or group.
+	// Every mutation-capable capture still requires exclusive link ownership.
+	if (!readOnly && c.stat.Nlink != 1) || (readOnly && !pathcustody.RootProtected(&c.stat)) {
+		return nil, ErrUnsafePath
+	}
+	// Replacing immutable, append-only, verity, encrypted or other special files
+	// would discard semantics. Extents (ext4) and compression or copy-on-write
+	// state (btrfs) are filesystem allocation details only.
+	flags, err := unix.IoctlGetInt(fd, unix.FS_IOC_GETFLAGS)
+	if err != nil {
+		return nil, fmt.Errorf("read native file flags: %w", err)
+	}
+	if flags&^storageOnlyFlags != 0 {
+		return nil, fmt.Errorf("%w: native file flags %#x", ErrUnsupported, flags)
+	}
+	return c, nil
+}
+
+// openAncestors retains custody of every root-protected directory above path
+// without opening path itself.
+func openAncestors(path string, readOnly bool) (_ *custody, err error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" {
 		return nil, ErrUnsafePath
 	}
@@ -95,36 +140,6 @@ func openCustody(path string, readOnly bool) (_ *custody, err error) {
 		_, _ = fmt.Fprintf(h, "%d:%d:%d:%d:%d;", st.Dev, st.Ino, st.Uid, st.Gid, st.Mode)
 	}
 	c.ancestry = h.Sum(nil)
-	fd, err = unix.Openat(c.parent(), c.name, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-	if errors.Is(err, unix.ENOENT) {
-		return c, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	c.file = os.NewFile(uintptr(fd), path)
-	if err = unix.Fstat(fd, &c.stat); err != nil {
-		return nil, err
-	}
-	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent || c.stat.Dev != c.stats[len(c.stats)-1].Dev {
-		return nil, ErrUnsafePath
-	}
-	// A read-only dependency may be hardlinked (for example, a packaged crypto
-	// policy), but cannot be writable by an unprivileged owner or group.
-	// Every mutation-capable capture still requires exclusive link ownership.
-	if (!readOnly && c.stat.Nlink != 1) || (readOnly && !pathcustody.RootProtected(&c.stat)) {
-		return nil, ErrUnsafePath
-	}
-	// Replacing immutable, append-only, verity, encrypted or other special files
-	// would discard semantics. Extents (ext4) and compression or copy-on-write
-	// state (btrfs) are filesystem allocation details only.
-	flags, err := unix.IoctlGetInt(fd, unix.FS_IOC_GETFLAGS)
-	if err != nil {
-		return nil, fmt.Errorf("read native file flags: %w", err)
-	}
-	if flags&^storageOnlyFlags != 0 {
-		return nil, fmt.Errorf("%w: native file flags %#x", ErrUnsupported, flags)
-	}
 	return c, nil
 }
 

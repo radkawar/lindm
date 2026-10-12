@@ -29,6 +29,7 @@ import { DeviceMetadataCard } from "./metadata";
 import { DeviceNativeDetails, NumberValue } from "./native-details";
 import { NativeToolCustodyAlert, ToolCustodyContext } from "./tool-custody";
 import { DevicePatchStatus } from "./patch-status";
+import { DeviceCapabilities, type CapabilityScopeNameSlot } from "./capabilities";
 import { DeviceEncryptionPanel } from "./encryption";
 import { DeviceLocalAdminPanel } from "./local-admin";
 import { DeviceActionsPanel, DeviceRestrictionBadges } from "./actions";
@@ -73,6 +74,7 @@ export function DeviceDetailView({
   assistance,
   notices,
   accountPicker,
+  capabilityScopeName,
 }: {
   deviceId: string;
   search: PackageSearch;
@@ -90,6 +92,8 @@ export function DeviceDetailView({
   // or approved revocation); renders nothing when there are none.
   notices?: ReactNode;
   accountPicker: PickerSlot;
+  // Names a capability policy scope (all devices or a group).
+  capabilityScopeName: CapabilityScopeNameSlot;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -598,6 +602,11 @@ export function DeviceDetailView({
                 Preview the settings this device would get
               </Link>
             ) : null}
+            <DeviceCapabilities
+              state={data?.capabilities}
+              scopeName={capabilityScopeName}
+              canReview={canPermission(principal, "fleet.read", true)}
+            />
           </section>
           <section
             role="tabpanel"

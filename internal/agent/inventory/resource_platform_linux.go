@@ -10,7 +10,19 @@ import (
 	"buf.build/go/protovalidate"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/platform"
 )
+
+// HostRelease reads the os-release identity (ID, VERSION_ID, VARIANT_ID) with
+// the strict inventory parser, for callers that must identify the registry
+// row including image-based variants.
+func HostRelease(ctx context.Context) (platform.OSRelease, error) {
+	release, err := loadOSRelease(ctx, readHostFile)
+	if err != nil {
+		return platform.OSRelease{}, fmt.Errorf("read os-release: %w", err)
+	}
+	return platform.OSRelease{ID: release["ID"], VersionID: release["VERSION_ID"], VariantID: release["VARIANT_ID"]}, nil
+}
 
 // HostPlatform reports the native product identity used in resource evidence.
 // It does not certify any backend or requested operation. A missing VERSION_ID

@@ -118,45 +118,17 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	hash := sha256.New()
 	_, _ = hash.Write([]byte("lindm.systemd-ownership-baseline-unknown.v1\x00"))
 	_, _ = hash.Write(binding)
-	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
+	conn, socket, owner, err := dialSystemd(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("connect system bus: %w", err)
-	}
-	socket, ok := raw.(*net.UnixConn)
-	if !ok {
-		_ = raw.Close()
-		return nil, fmt.Errorf("%w: non-Unix system bus", ErrUnsupported)
+		return nil, err
 	}
 	stop := closeOnCancel(ctx, socket)
 	defer stop()
-	deadline, _ := ctx.Deadline()
-	if err := socket.SetDeadline(deadline); err != nil {
-		_ = socket.Close()
-		return nil, err
-	}
-	if err := rootPeer(socket); err != nil {
-		_ = socket.Close()
-		return nil, err
-	}
-	conn, err := dbus.ConnectUnix(socket, dbus.WithAuth(dbus.AuthExternal(strconv.Itoa(os.Geteuid()))))
-	if err != nil {
-		_ = socket.Close()
-		return nil, fmt.Errorf("authenticate system bus: %w", err)
-	}
 	p := &Provider{
-		conn: conn, socket: socket, gate: make(chan struct{}, 1),
+		conn: conn, socket: socket, owner: owner, gate: make(chan struct{}, 1),
 		incarnation: config.ExecutorIncarnation, ownershipRevision: hash.Sum(nil),
 	}
 	p.gate <- struct{}{}
-	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", dbus.FlagNoAutoStart, systemdName).Store(&p.owner); err != nil {
-		_ = p.Close()
-		return nil, fmt.Errorf("resolve systemd owner: %w", err)
-	}
-	var ownerUID uint32
-	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetConnectionUnixUser", dbus.FlagNoAutoStart, p.owner).Store(&ownerUID); err != nil || ownerUID != 0 {
-		_ = p.Close()
-		return nil, fmt.Errorf("%w: systemd bus owner must be root: %v", ErrUnsupported, err)
-	}
 	var version dbus.Variant
 	if err := conn.Object(p.owner, managerPath).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, managerInterface, "Version").Store(&version); err != nil {
 		_ = p.Close()
@@ -189,6 +161,75 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+// dialSystemd authenticates to the root-owned system bus and resolves the
+// root-owned systemd manager. The socket keeps ctx's deadline; callers clear it.
+func dialSystemd(ctx context.Context) (*dbus.Conn, *net.UnixConn, string, error) {
+	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("connect system bus: %w", err)
+	}
+	socket, ok := raw.(*net.UnixConn)
+	if !ok {
+		_ = raw.Close()
+		return nil, nil, "", fmt.Errorf("%w: non-Unix system bus", ErrUnsupported)
+	}
+	stop := closeOnCancel(ctx, socket)
+	defer stop()
+	deadline, _ := ctx.Deadline()
+	if err := socket.SetDeadline(deadline); err != nil {
+		_ = socket.Close()
+		return nil, nil, "", err
+	}
+	if err := rootPeer(socket); err != nil {
+		_ = socket.Close()
+		return nil, nil, "", err
+	}
+	conn, err := dbus.ConnectUnix(socket, dbus.WithAuth(dbus.AuthExternal(strconv.Itoa(os.Geteuid()))))
+	if err != nil {
+		_ = socket.Close()
+		return nil, nil, "", fmt.Errorf("authenticate system bus: %w", err)
+	}
+	var owner string
+	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", dbus.FlagNoAutoStart, systemdName).Store(&owner); err != nil {
+		_ = conn.Close()
+		return nil, nil, "", fmt.Errorf("resolve systemd owner: %w", err)
+	}
+	var ownerUID uint32
+	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetConnectionUnixUser", dbus.FlagNoAutoStart, owner).Store(&ownerUID); err != nil || ownerUID != 0 {
+		_ = conn.Close()
+		return nil, nil, "", fmt.Errorf("%w: systemd bus owner must be root: %v", ErrUnsupported, err)
+	}
+	return conn, socket, owner, nil
+}
+
+// EnableUnitFile persistently enables one installed unit file over the same
+// authenticated systemd manager path resources use, then reloads the manager.
+// It never starts the unit and never interacts with the caller.
+func EnableUnitFile(ctx context.Context, unit string) error {
+	if ctx == nil || unit == "" {
+		return fmt.Errorf("%w: missing unit", ErrUnsupported)
+	}
+	ctx, cancel := context.WithTimeout(ctx, setupTimeout)
+	defer cancel()
+	conn, socket, owner, err := dialSystemd(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close() }()
+	stop := closeOnCancel(ctx, socket)
+	defer stop()
+	manager := conn.Object(owner, managerPath)
+	var carries bool
+	var changes []struct{ Type, Path, Source string }
+	if err := manager.CallWithContext(ctx, managerInterface+".EnableUnitFiles", dbus.FlagNoAutoStart, []string{unit}, false, false).Store(&carries, &changes); err != nil {
+		return fmt.Errorf("enable unit file: %w", err)
+	}
+	if err := manager.CallWithContext(ctx, managerInterface+".Reload", dbus.FlagNoAutoStart).Err; err != nil {
+		return fmt.Errorf("reload after enablement: %w", err)
+	}
+	return nil
 }
 
 func rootPeer(socket *net.UnixConn) error {

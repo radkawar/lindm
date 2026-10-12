@@ -54,6 +54,8 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.AcknowledgeEncryptionKeyRequest{},
 		&agentv1.UpdateExecutionTrustRequest{},
 		&agentv1.GetExecutionTrustRequest{},
+		&agentv1.UpdateCapabilityPolicyRequest{},
+		&agentv1.GetCapabilityPolicyRequest{},
 		&agentv1.GetRecoveryReadinessRequest{},
 		&agentv1.GetPatchStatusRequest{},
 		&agentv1.GetApprovedConfigurationRequest{},
@@ -173,6 +175,8 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceAcknowledgeEncryptionKeyProcedure ||
 		procedure == agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
+		procedure == agentv1connect.ExecutorServiceUpdateCapabilityPolicyProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetCapabilityPolicyProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetPatchStatusProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetApprovedConfigurationProcedure ||

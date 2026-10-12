@@ -39,6 +39,9 @@ var (
 	ErrConflict       = errors.New("sysctlprovider: precondition conflict")
 	ErrOutcomeUnknown = errors.New("sysctlprovider: native outcome unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("sysctlprovider: not converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of a live kernel
+	// setting (every key exists). It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("sysctlprovider: adoption_required: %w", ErrConflict)
 )
 
 // Config contains trusted signed execution context; Native is root-provisioned

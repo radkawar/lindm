@@ -285,11 +285,37 @@ Select only the capabilities the owner approves, independently for each role:
 | Shut down                    | `device.shutdown.v1`           |
 | Refresh inventory            | `device.refresh-inventory.v1`  |
 | Managed local-admin password | `device.local-admin-rotate.v1` |
-| Systemd services             | `systemd.service.v1`           |
+| Patch now                    | `device.patch-now.v1`          |
 | Offline enrollment           | `enrollment.offline.v1`        |
+| Device capability policies   | `agent.capability-policy.v1`   |
+| Systemd services             | `systemd.service.v1`           |
+| Systemd unit definitions     | `systemd.definition.v1`        |
+| Native packages              | `package.native.v1`            |
+| Managed files                | `managed.file.v1`              |
+| Local users                  | `local.user.v1`                |
+| Local groups                 | `local.group.v1`               |
+| Password policy              | `password.policy.v1`           |
+| Kernel parameters            | `sysctl.v1`                    |
+| Firewall zones               | `firewall.zone.v1`             |
+| OS update policy             | `os.update.v1`                 |
+| Encryption compliance        | `encryption.compliance.v1`     |
+| SSH login banner             | `ssh.server.v1`                |
+
+Resource capabilities are accepted exactly for the kinds with an agent provider
+(`resource.ExecutableKinds`); server-side native qualification still decides which
+rows are dispatched.
 
 For example, selecting only `["device.refresh-inventory.v1"]` on both plan and
 start delegates permits that protocol without granting restart or shutdown.
+`agent.capability-policy.v1` is meaningful only on a PLAN delegate: that key signs
+per-device capability policies (DSSE payload type
+`application/vnd.lindm.agent-capability-policy.v1+protobuf`) that let the executor
+enable registry-derived package, file, account, OS-update, kernel and firewall
+providers without editing `executor.json`. A START delegate holding it authorizes
+nothing. Without it the server issues no policy (`capability_policy_not_delegated`)
+and devices keep only local providers; revoking it makes every accepted policy
+INERT at the device's next trust update. A device owner can refuse remote policies
+outright with `"capabilityPolicy": {"refuseRemote": true}` in `executor.json`.
 No capability defaults, wildcards, prefixes, unknown versions, or arbitrary script
 authority are accepted. Omission never grants permission. An explicitly empty
 `delegates` array revokes all online signer authority; the review labels it as
@@ -330,6 +356,111 @@ workflow; admission and device synchronization retain their independent root,
 rollback, authorization and key-custody checks. Owner delegation permits specific
 online signers, not a bypass of RBAC, step-up, human approvals, fresh start grants,
 native preflight, or recovery safety.
+
+### Device management capabilities
+
+A stock console-installed agent's `/etc/lindm/executor.json` enables no providers.
+Provider authority additionally comes from a server-signed per-device capability
+policy drawn from the closed `lindm.agent.v1.ManagementCapability` catalogue:
+packages, files under the release's standard roots, the kernel-module blocklist,
+local accounts, firewall zones, OS updates and kernel settings. Password policy and
+custom file roots are local only: a signed policy can never grant them; set
+`password_provider` or `file_provider.allowed_roots` in `executor.json`. A policy
+carries only catalogue values, sysctl key names and the deployment's firewall
+endpoints and connectivity guard; paths, repositories, vendor keys and account
+ranges come from the platform registry inside the agent binary, and every provider
+deny list and protected-path check still applies.
+
+Policies exist per scope: the deployment (all devices), a static group or a dynamic
+group. A device's grant is the union of the deployment policy and every group whose
+membership definitely includes it; a dynamic group with stale inventory does not
+grant. New installations start with packages, files, local accounts and OS updates
+for all devices. The kernel-module blocklist and kernel settings (exactly the listed
+keys) are opt-in per scope. Firewall can be enabled, at any scope, only after the
+deployment policy carries firewall settings (management endpoints and a connectivity
+guard); those settings cannot be removed while any scope still grants the firewall
+(`capability_firewall_settings_required`).
+
+Enable or disable a capability by replacing the scope's complete policy with
+`SetCapabilityPolicy` (or `Organization.capability_policies` through
+`lindmctl apply`, applied after groups and unchanged when equal). It requires
+unrestricted `execution_trust.manage`, a fresh directory authorization and the
+scope's current revision; a stale revision is refused as
+`capability_policy_revision_conflict` and nothing changes. An empty group policy is
+removed; an empty deployment policy grants nothing. Each change is audited in the
+same transaction as `capability_policy.set` with the scope, the capabilities before
+and after, the sysctl key count, whether firewall settings are present and the
+reason. `ListCapabilityPolicies` requires unrestricted `fleet.read`.
+
+Devices pick the change up on their next management cycle. The server signs a new
+version for a device only when its effective grant changed and audits each issued
+version as `capability_policy.issue`. Signing requires the offline owner to delegate
+`agent.capability-policy.v1` to the online plan key; until then nothing is signed and
+the settings page, device page and device poll report
+`capability_policy_not_delegated` (no delegation at all:
+`execution_authority_unconfigured`). The executor verifies every policy under its
+own trust root and delegation, binds it to its enrolled device and generation, and
+treats an accepted policy as inert, granting nothing, once the current delegation no
+longer authorizes its signer. Revoking `agent.capability-policy.v1` therefore
+withdraws remote grants at the device's next trust update.
+
+A device owner can refuse remote capability policies entirely by setting
+`capability_policy.refuse_remote: true` in `/etc/lindm/executor.json`; provider
+authority then comes from that file only. This is the local ceiling: no server,
+delegation or console action can override it.
+
+A profile row the executor refuses because its capability is not effective is
+BLOCKED with reason `capability_<name>_not_enabled` (for example
+`capability_packages_not_enabled`). Such rows and releases are dispatched again
+when the device's signed grant changes or its reported capability status changes;
+a row refused because an existing unowned object needs an approved adoption is
+BLOCKED `adoption_required`.
+
+What a stock console-installed agent manages, per qualified resource kind, on the
+two natively qualified desktop releases (the delegation must include
+`agent.capability-policy.v1`; "default" means the seeded all-devices policy):
+
+| Kind                    | Ubuntu 24.04                                                                                                                                                 | Fedora 44                                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Systemd service         | Works out of the box; a unit that is not installed is BLOCKED `unit_not_installed`                                                                           | Same                                                                                                                                                             |
+| Systemd definition      | Works out of the box                                                                                                                                         | Works out of the box                                                                                                                                             |
+| Encryption compliance   | Works out of the box (read-only)                                                                                                                             | Works out of the box (read-only)                                                                                                                                 |
+| Native package          | Default (PACKAGES): Ubuntu archive `noble`, `noble-updates`, `noble-security`; a package the OS already installed is not taken over (preparation refuses it) | Default (PACKAGES): Fedora `fedora` + `updates` metalinks; dnf5 older than 5.4.6.0 (the release image) is BLOCKED `native_tool_outdated`: apply OS updates first |
+| Managed file            | Default (FILES) under `/etc/motd.d` and `/etc/issue.d`, created when absent; other paths need the local `file_provider.allowed_roots`                        | Same                                                                                                                                                             |
+| Kernel-module blocklist | Opt-in per scope (KERNEL_MODULE_BLOCKLIST)                                                                                                                   | Opt-in per scope (KERNEL_MODULE_BLOCKLIST)                                                                                                                       |
+| Local user and group    | Default (LOCAL_ACCOUNTS): IDs 1000–59999, homes under `/home`                                                                                                | Same                                                                                                                                                             |
+| OS update policy        | Default (OS_UPDATES); needs `unattended-upgrades` and `needrestart` (`native_tool_missing` otherwise)                                                        | Default (OS_UPDATES); needs `dnf5-plugin-automatic` and `dnf5-plugins` (`native_tool_missing` otherwise)                                                         |
+| Firewall zone           | Opt-in (FIREWALL) after the deployment's firewall settings exist                                                                                             | Same                                                                                                                                                             |
+| Kernel setting          | Opt-in per scope with exact keys (KERNEL_SETTINGS); approved adoption                                                                                        | Same                                                                                                                                                             |
+| Password policy         | Local only: `password_provider` in `executor.json`; approved adoption                                                                                        | Same                                                                                                                                                             |
+| SSH login banner        | No capability; base-files ships `/etc/issue.net`, so a create-only row is BLOCKED `existing_banner_file` until an approved adoption                          | No capability; the stock `/etc/issue.net` is a symlink, BLOCKED `existing_banner_symlink` until a native administrator replaces it                               |
+
+Ubuntu 22.04, Rocky Linux 9/10 and AlmaLinux 9/10 derive the same defaults where
+their registry rows qualify the provider (see the platform pages); Debian 12/13
+derive files and accounts but not packages, and RHEL packages need subscription
+credentials, so they report `platform_not_qualified`.
+
+In the console, **Settings → Device capabilities** (`/settings/capabilities`,
+readable with unrestricted `fleet.read`, editable with unrestricted
+`execution_trust.manage`) lists the catalogue in plain words, the policy for all
+devices and one row per static or dynamic group policy. Every change names its
+audited reason, carries the scope's revision (a stale revision is refused as
+`capability_policy_revision_conflict` and the editor offers a reload, never a blind
+retry) and passes the fresh directory check; a `directory_unavailable` outcome keeps
+the exact request for retry. The editor states which capabilities it turns on and
+off and for whom before saving. Firewall stays disabled until the all-devices policy
+has management endpoints and a connectivity check, entered as endpoint rows and the
+pasted `connectivity_guard` protobuf JSON, validated in the browser with the
+server's own rules and read back as a probe summary. Password policy and custom file
+roots are listed as device-only (`password_provider`, `file_provider.allowed_roots`
+in `/etc/lindm/executor.json`). When `issuance_unavailable_reason` is set the page
+and each device page say that the owner must delegate `agent.capability-policy.v1`
+with `lindmctl execution delegation sign`. The device page's **Services** tab shows
+each capability's granting scopes, the executor-reported status (Enabled, Set
+locally, Not enabled, Unavailable with its cause) and the issued versus applied
+policy version; a profile item blocked by `capability_*_not_enabled` says how to
+enable it, or that the device reports it unavailable, and adoption refusals link to
+Rollouts.
 
 ### Agent directory custody
 
@@ -375,6 +506,36 @@ facts. Track all four. Qualify each encryption owner independently, including or
 LUKS2 versus vendor-managed TPM encryption. Never modify slots behind the owning
 vendor interface. A valid recovery key retained in escrow/backups or a recoverable
 LUKS header invalidates a simplistic "delete the local keyslot = secure erase" claim.
+
+### Vendor RPM metadata trust
+
+Owner decision (2026-10-12): an approved RPM source may waive repository
+metadata signatures (`RpmRepository.require_metadata_signature=false`) only
+because Fedora signs no `repomd.xml` (no `repomd.xml.asc` for releases/44 or
+updates/44, [fedora.md](platforms/fedora.md#capability-policy-facts-signed-provider-grants)).
+The trust model is then: repository metadata is verified via Fedora's HTTPS
+metalink (MirrorManager over TLS publishes the `repomd.xml` checksums librepo
+checks against whichever mirror serves it), and every package is verified with
+Fedora's signing key (`gpgcheck=1` always). The key file is pinned in the
+agent's registry by SHA-256 of its exact bytes and by primary-key fingerprint;
+any other bytes leave PACKAGES unavailable (`vendor_key_unrecognized`).
+
+The waiver is admitted only when every repository of the source is an HTTPS
+metalink on a host the running release pins in the registry
+(`mirrors.fedoraproject.org` for Fedora 44): configuration load, the package
+provider's source check and the root package helper all refuse anything else.
+A base URL without signed metadata is never accepted, signed-metadata sources
+keep `repo_gpgcheck=1`, and the protocol requires a metalink for every
+repository whenever metadata signatures are waived
+(`rpm_repository.metadata_authenticity`). Residual risk: whoever controls
+`mirrors.fedoraproject.org`'s TLS identity can serve stale or withheld (but not
+forged) package sets; packages still need Fedora's signature.
+
+The waiver is Fedora's alone. Rocky Linux and AlmaLinux 9/10 publish
+`repomd.xml.asc` for BaseOS, AppStream, CRB and extras, so their
+registry-derived BaseOS and AppStream sources use HTTPS base URLs with
+`repo_gpgcheck=1`
+([alma-rocky.md](platforms/alma-rocky.md#capability-policy-facts-signed-provider-grants)).
 
 ### Recovery escrow provisioning and incident procedure
 
@@ -627,9 +788,16 @@ disabled/stopped `cups.service`, and daily security-update starts between 02:00 
 04:00 Europe/London. Reboots use `SCHEDULED` within an independent daily
 05:00–07:00 Europe/London reboot window, at most 360 minutes after the update, with
 up to two 30-minute employee deferrals. An already-running update is not killed at
-window end. The executor's managed-file `allowed_roots` must explicitly include
-`/etc/motd.d`; approving `/etc` is not a substitute. The host must use pam_motd to
-display that directory.
+window end. `/etc/motd.d` is a registry standard root on Ubuntu 22.04/24.04,
+Debian 12/13, Fedora 44, Rocky Linux 9/10 and AlmaLinux 9/10, so the default
+FILES capability covers it there; approving `/etc` is not a substitute.
+When `/etc/motd.d` is absent (stock Ubuntu 24.04) the file provider creates it
+root:root 0755 and removes it on release only if it created it and it is empty.
+Creating or removing the root needs its parent in the transient effect unit's
+write set, so that one effect may write `/etc` (as the SSH banner and password
+helpers do); the native code only `mkdirat`/`unlinkat`s the held name below a
+root-protected parent descriptor. The host must use pam_motd to display that
+directory.
 
 Engineering adds git, htop and podman (DEB `arm64` for the demo's Ubuntu 24.04
 aarch64 laptop), the typed SSH login banner, plus the local
@@ -796,11 +964,15 @@ install, enable, start or restart SSH, change its authentication policy, or open
 a firewall.
 
 Create-only refuses a pre-existing unowned `/etc/issue.net`, including stock
-distribution notices. Use the normal explicit adoption approval to retain a regular
-file's baseline before replacing it. Symlinks and hardlinked managed files are
-refused even with approval; a native administrator must first prepare an independent
-regular file. The reserved drop-in is never silently adopted. Any other `Banner`
-directive, including one in a different `Match`
+distribution notices, as `ADOPTION_REQUIRED` (detail `existing_banner_file`). Use
+the normal explicit adoption approval to retain a regular file's baseline before
+replacing it. Symlinks (detail `existing_banner_symlink`, the stock Fedora
+notice) and hardlinked managed files are refused as preconditions even with
+approval; a native administrator must first prepare an independent regular
+file. The reserved drop-in is never silently adopted (detail
+`existing_banner_dropin`). An inactive SSH unit (`ssh_service_inactive`) and a
+failing `sshd -t` (`ssh_config_invalid`) are named preconditions. Any other
+`Banner` directive, including one in a different `Match`
 context, is a visible collision; ambiguous includes, unsafe paths and unsupported
 file metadata also fail closed. The normal resource claim graph reserves both
 native paths against other assignments.
@@ -831,10 +1003,12 @@ blindly replayed. See [native records](verification.md#ssh-login-banner).
 #### Declarative organization controls
 
 - USB-storage blocking uses the typed `managedFile.kernelModuleBlocklist` template,
-  never arbitrary content at a forbidden path. The executor must explicitly enable
-  `fileProvider.kernelModuleBlocklist`; the demo's Finance profile blocks
-  `usb_storage` and `uas`, and the persistent organization demo opts in only the
-  Finance device, whose release names qualified initramfs tooling. The only path
+  never arbitrary content at a forbidden path. The device needs the
+  kernel-module blocklist capability (a group or deployment capability policy, or
+  the root-local `fileProvider.kernelModuleBlocklist`); the demo's Finance profile
+  blocks `usb_storage` and `uas`, and `org.json` grants the capability to the
+  Finance group only. Releases whose registry names no qualified initramfs tooling
+  report the capability unavailable. The only path
   is `/etc/modprobe.d/99-lindm-blocklist.conf`, root:root 0644.
   Applying rebuilds installed initramfs images, independently reads their embedded
   stanza and observes native modprobe settings and loaded/built-in modules.

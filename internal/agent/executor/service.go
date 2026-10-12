@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -23,7 +24,10 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/actionprovider"
+	"lindm/internal/agent/capabilitypolicy"
+	"lindm/internal/agent/config"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
 	"lindm/internal/agent/osupdate"
@@ -138,8 +142,11 @@ type Service struct {
 	recoveryPending       *recoveryPendingAction
 	recoveryTPM           func() (recoveryTPMPending, error)
 	updateConfig          *agentv1.AgentUpdateConfig
-	packageProvider       *agentv1.NativePackageProviderConfig
-	nativeResources       NativeResourceProviders
+	providers             atomic.Pointer[providerSnapshot]
+	capabilityLocal       *config.Document
+	detectHost            func(context.Context) (capabilitypolicy.Host, error)
+	enableUnit            func(context.Context, string) error
+	capabilityGate        func(*resourcev1.ResourceDesiredState) error
 	updates               *update.Engine
 	updateHold            bool
 	assistanceEnabled     bool
@@ -162,8 +169,9 @@ type Config struct {
 	ActionProviderConfig  *agentv1.DeviceActionProviderConfig
 	RecoveryBoot          *RecoveryBootConfig
 	Updates               *agentv1.AgentUpdateConfig
-	PackageProvider       *agentv1.NativePackageProviderConfig
-	NativeResources       NativeResourceProviders
+	// Local is the root-owned executor.json document. Its providers are merged
+	// with the active signed capability policy (capabilitypolicy.Effect).
+	Local *config.Document
 	// RemoteAssistance and OS-update/patch-now policies enable the session-helper
 	// socket in SessionRuntimeDirectory (default localrpc.DefaultSessionRuntimeDirectory).
 	RemoteAssistance        *agentv1.RemoteAssistanceConfig
@@ -176,7 +184,7 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.RequireRoot && os.Geteuid() != 0 {
 		return errors.New("executor requires root")
 	}
-	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates), WithPackageProvider(cfg.PackageProvider), WithNativeResourceProviders(cfg.NativeResources), WithRemoteAssistance(cfg.RemoteAssistance))
+	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates), WithCapabilityPolicy(cfg.Local), WithRemoteAssistance(cfg.RemoteAssistance))
 	if err != nil {
 		return err
 	}
@@ -232,6 +240,7 @@ var requestRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
 		&agentv1.PrepareEncryptionKeyRequest{}, &agentv1.AcknowledgeEncryptionKeyRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
+		&agentv1.UpdateCapabilityPolicyRequest{}, &agentv1.GetCapabilityPolicyRequest{}, &agentv1.CapabilityPolicyRecord{},
 		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
 		&agentv1.GetPatchStatusRequest{}, &agentv1.GetPatchStatusResponse{}, &agentv1.PatchStatusObservation{},
 		&agentv1.GetApprovedConfigurationRequest{}, &agentv1.GetApprovedConfigurationResponse{},
@@ -287,8 +296,11 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		closeDone:  make(chan struct{}),
 		workerWake: make(chan struct{}, 1),
 		boottime:   readBoottime,
+		detectHost: capabilitypolicy.DetectHost,
+		enableUnit: serviceprovider.EnableUnitFile,
 	}
 	svc.openResource = svc.openNativeResource
+	svc.capabilityGate = svc.requiredCapability
 	svc.cancelPreparation = svc.cancelPackagePreparation
 	for _, opt := range opts {
 		opt(svc)
@@ -325,6 +337,10 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		return nil, err
 	}
 	if err := svc.initializeActionProvider(); err != nil {
+		_ = svc.Close()
+		return nil, err
+	}
+	if err := svc.initializeCapabilityPolicy(ctx); err != nil {
 		_ = svc.Close()
 		return nil, err
 	}
@@ -621,6 +637,12 @@ func mapError(err error) error {
 		code, reason = connect.CodeInvalidArgument, reasonOf(err)
 	case errors.Is(err, errExecutionTrustRejected):
 		code, reason = connect.CodePermissionDenied, "execution_trust_rejected"
+	case errors.Is(err, errCapabilityPolicyRejected):
+		code, reason = connect.CodePermissionDenied, "capability_policy_rejected"
+	case errors.Is(err, errCapabilityPolicyRollback):
+		code, reason = connect.CodeFailedPrecondition, "capability_policy_rollback"
+	case errors.Is(err, errCapabilityPolicyRefused):
+		code, reason = connect.CodeFailedPrecondition, "capability_policy_refused_locally"
 	case errors.Is(err, errIdentityExpired), errors.Is(err, errRenewalNotDue), errors.Is(err, errRenewalPending), errors.Is(err, errSessionPending), errors.Is(err, errSessionRequired), errors.Is(err, errEpochRejected), errors.Is(err, errNotPending), errors.Is(err, errEncryptionKeyStale), errors.Is(err, errEncryptionKeyUnavailable):
 		code, reason = connect.CodeFailedPrecondition, reasonOf(err)
 	case errors.Is(err, errSecretDeliveryRejected):

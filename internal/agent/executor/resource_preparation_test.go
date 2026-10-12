@@ -31,6 +31,7 @@ type preparingNative struct {
 	ready    atomic.Bool
 	corrupt  atomic.Bool
 	busy     atomic.Bool
+	planErr  atomic.Pointer[error]
 	polls    atomic.Int32
 	cancels  atomic.Int32
 	applies  atomic.Int32
@@ -58,6 +59,9 @@ func (n *preparingNative) Plan(ctx context.Context, desired *resourcev1.Resource
 	}
 	if n.busy.Load() {
 		return nil, fmt.Errorf("%w: staging under another frontend", packageprovider.ErrBusy)
+	}
+	if err := n.planErr.Load(); err != nil {
+		return nil, *err
 	}
 	if !n.ready.Load() {
 		return nil, resource.ErrPreparing

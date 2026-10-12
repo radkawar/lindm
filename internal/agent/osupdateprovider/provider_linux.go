@@ -27,6 +27,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/osupdate"
@@ -258,13 +259,15 @@ func acquisitionAllowed(owner *agentv1.ResourceOwnershipBinding, ledger *agentv1
 	if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		return ErrConflict
 	}
+	// Approval cannot help: an existing timer or owned path stays a named
+	// precondition, never ADOPTION_REQUIRED.
 	observation := before.GetObservation().GetOsUpdate()
 	if observation.GetTimerActive() || observation.GetTimerCalendar() != "" {
-		return fmt.Errorf("%w: %s is already loaded", ErrConflict, resource.OSUpdateTimerUnit)
+		return admissiondetail.Wrap(fmt.Errorf("%w: %s is already loaded", ErrConflict, resource.OSUpdateTimerUnit), "existing_update_timer")
 	}
 	for _, file := range before.GetOsUpdate().GetFiles() {
 		if file.GetState().GetExists() {
-			return fmt.Errorf("%w: unowned %s exists", ErrConflict, file.GetState().GetPath())
+			return admissiondetail.Wrap(fmt.Errorf("%w: unowned %s exists", ErrConflict, file.GetState().GetPath()), "existing_update_timer")
 		}
 	}
 	return nil

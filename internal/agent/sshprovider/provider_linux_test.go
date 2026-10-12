@@ -12,11 +12,13 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
 	"lindm/internal/resource"
@@ -80,16 +82,29 @@ func TestBannerOnlyAdmission(t *testing.T) {
 func TestBannerAdoptionAndReservedCollision(t *testing.T) {
 	p := fixtureProvider()
 	before := fixtureSnapshot(t, p, false)
-	if err := acquisitionAllowed(p.config.Ownership, nil, before, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrConflict) {
-		t.Fatal("unowned issue.net overwritten")
+	if err := acquisitionAllowed(p.config.Ownership, nil, before, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrAdoptionRequired) || !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "existing_banner_file" {
+		t.Fatal("unowned issue.net overwritten", err)
 	}
 	p.config.Ownership.Policy.Mode = resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION
 	p.config.Ownership.Policy.AdoptionApprovalId = proto.String(uuid.NewString())
 	if err := acquisitionAllowed(p.config.Ownership, nil, before, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); err != nil {
 		t.Fatal(err)
 	}
-	if err := acquisitionAllowed(p.config.Ownership, nil, fixtureSnapshot(t, p, true), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrConflict) {
-		t.Fatal("reserved drop-in silently adopted")
+	if err := acquisitionAllowed(p.config.Ownership, nil, fixtureSnapshot(t, p, true), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrConflict) || errors.Is(err, ErrAdoptionRequired) || admissiondetail.Of(err) != "existing_banner_dropin" {
+		t.Fatal("reserved drop-in silently adopted", err)
+	}
+}
+func TestNativeRefusalDetails(t *testing.T) {
+	err := bannerCaptureError(&os.PathError{Op: "openat", Path: resource.SSHBannerPath, Err: unix.ELOOP})
+	if !errors.Is(err, ErrConflict) || errors.Is(err, ErrAdoptionRequired) || admissiondetail.Of(err) != "existing_banner_symlink" {
+		t.Fatal("issue.net symlink not a named precondition", err)
+	}
+	other := errors.New("io")
+	if bannerCaptureError(other) != other {
+		t.Fatal("unrelated capture failure reclassified")
+	}
+	if err := configInvalid(other); !errors.Is(err, ErrConflict) || !errors.Is(err, other) || admissiondetail.Of(err) != "ssh_config_invalid" {
+		t.Fatal("sshd -t failure detail", err)
 	}
 }
 func TestContentDriftRepairsButReplacementAndReleaseRefuse(t *testing.T) {

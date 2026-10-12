@@ -55,6 +55,7 @@ const (
 	OfflineRequestType                 = "application/vnd.lindm.offline-enrollment-request.v1+protobuf"
 	OfflineResponseType                = "application/vnd.lindm.offline-enrollment-response.v1+protobuf"
 	DeviceEncryptionKeyType            = "application/vnd.lindm.device-encryption-key.v1+protobuf"
+	AgentCapabilityPolicyType          = "application/vnd.lindm.agent-capability-policy.v1+protobuf"
 	maxEnvelopeBytes                   = 512 << 10
 	maxSignatures                      = 16
 )
@@ -83,7 +84,7 @@ var authorityRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 		&agentv1.RecoveryTimeStatement{}, &recoveryv1.GetRecoveryTimeRequest{}, &recoveryv1.GetRecoveryTimeResponse{},
 		&enrollmentv1.ProvisioningRetrieval{},
 		&agentv1.OfflineEnrollmentAuthorization{}, &agentv1.OfflineEnrollmentRequestProof{}, &agentv1.OfflineEnrollmentResponse{},
-		&agentv1.DeviceEncryptionKeyAttestation{},
+		&agentv1.DeviceEncryptionKeyAttestation{}, &agentv1.AgentCapabilityPolicy{},
 	), protovalidate.WithDisableLazy())
 })
 
@@ -171,6 +172,8 @@ func payloadType(message proto.Message) (string, error) {
 		return OfflineResponseType, nil
 	case *agentv1.DeviceEncryptionKeyAttestation:
 		return DeviceEncryptionKeyType, nil
+	case *agentv1.AgentCapabilityPolicy:
+		return AgentCapabilityPolicyType, nil
 	default:
 		return "", errors.New("unsupported signed authority payload")
 	}

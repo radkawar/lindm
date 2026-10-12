@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
 
@@ -145,9 +146,16 @@ func runOwnerDelegation(ctx context.Context, args []string, stdout io.Writer, cl
 }
 
 func ownerCapabilities(declaration *agentv1.ExecutionDelegation) error {
-	// Derive the supported device-action set from the actual typed action mapping,
-	// rather than maintaining a second list that can silently omit a new action.
-	supported := map[string]bool{"systemd.service.v1": true, trust.OfflineEnrollmentCapability: true}
+	// Derive the supported device-action and resource sets from the actual typed
+	// mappings, rather than maintaining a second list that can silently omit one.
+	supported := map[string]bool{trust.OfflineEnrollmentCapability: true, trust.CapabilityPolicyCapability: true}
+	for _, kind := range resource.ExecutableKinds() {
+		capability, err := resource.Capability(kind)
+		if err != nil {
+			return errors.New("resource kind has no supported delegation capability")
+		}
+		supported[capability] = true
+	}
 	spec := new(agentv1.DeviceActionSpec)
 	message := spec.ProtoReflect()
 	fields := message.Descriptor().Oneofs().ByName("action").Fields()

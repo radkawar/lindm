@@ -23,6 +23,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/platform"
@@ -35,6 +36,9 @@ var (
 	ErrConflict       = errors.New("accountprovider: precondition conflict")
 	ErrOutcomeUnknown = errors.New("accountprovider: outcome unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("accountprovider: not converged"))
+	// ErrAdoptionRequired refuses CREATE_ONLY acquisition of an existing
+	// unowned user or group. It is also ErrConflict.
+	ErrAdoptionRequired = fmt.Errorf("accountprovider: adoption_required: %w", ErrConflict)
 )
 
 // Config is trusted constructor context supplied by the root executor, not policy.
@@ -236,7 +240,7 @@ func (p *Provider) plan(ctx context.Context, d *resourcev1.ResourceDesiredState,
 			return nil, ErrConflict
 		}
 		if exists(before.GetObservation()) && p.config.Ownership.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
-			return nil, ErrConflict
+			return nil, admissiondetail.Wrap(fmt.Errorf("%w: unowned local account exists", ErrAdoptionRequired), "existing_account")
 		}
 	}
 	if p.isAdministrator(db, d.GetRef().GetCanonicalKey()) {

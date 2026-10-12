@@ -20,6 +20,8 @@ import {
 } from "../../../gen/lindm/agent/v1/resource_execution_pb";
 import type { SystemdServiceObservation } from "../../../gen/lindm/resource/v1/observations_pb";
 import type { ResourceRef } from "../../../gen/lindm/resource/v1/identity_pb";
+import type { DeviceCapabilityState } from "../../../gen/lindm/admin/v1/capabilities_pb";
+import { BlockedReason } from "@/components/ui/blocked-reason";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -38,7 +40,7 @@ import {
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
-import { blockedReasonLabel, toRpcFailure } from "@/lib/errors";
+import { blockedReasonCopy, blockedReasonLabel, toRpcFailure } from "@/lib/errors";
 import { settingTechnicalIds, settingTitle } from "@/lib/setting-identity";
 import {
   applicabilityFeatures,
@@ -119,11 +121,14 @@ function singleStateSentence(resource: ResourceState): string {
 export function DeviceResources({
   deviceId,
   lastContact,
+  capabilities,
   emptyAction,
 }: {
   deviceId: string;
   // The device's last check-in, to explain items it has not picked up yet.
   lastContact?: Timestamp;
+  // Granted and reported capabilities, so a blocked item names the real remedy.
+  capabilities?: DeviceCapabilityState;
   emptyAction?: ReactNode;
 }) {
   const lifetime = useAuthLifetime();
@@ -335,9 +340,10 @@ export function DeviceResources({
                               {enumLabel(ResourceDisposition[resource.disposition])}
                             </StatusBadge>
                             {resource.reason ? (
-                              <p className="mt-2 whitespace-normal break-words">
-                                {blockedReasonLabel(resource.reason)}
-                              </p>
+                              <BlockedReason
+                                className="mt-2"
+                                copy={blockedReasonCopy(resource.reason, capabilities)}
+                              />
                             ) : null}
                             {resource.disposition === ResourceDisposition.ATTENTION ? (
                               <p className="mt-2 whitespace-normal">

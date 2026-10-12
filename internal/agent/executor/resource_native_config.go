@@ -3,13 +3,12 @@
 package executor
 
 import (
-	"google.golang.org/protobuf/proto"
-
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
-// NativeResourceProviders contains only locally provisioned policy. It is never
-// decoded from a resource profile or accepted over the executor RPC boundary.
+// NativeResourceProviders is the effective provider policy: root-owned local
+// configuration merged with the verified capability policy's registry-derived
+// providers. It is never decoded from a resource profile or an RPC.
 type NativeResourceProviders struct {
 	Files          *agentv1.NativeFileProviderConfig
 	Accounts       *agentv1.NativeAccountProviderConfig
@@ -18,14 +17,4 @@ type NativeResourceProviders struct {
 	Password       *agentv1.NativePasswordProviderConfig
 	OSUpdate       *agentv1.NativeOSUpdateProviderConfig
 	ProtectedPaths []string
-}
-
-func WithNativeResourceProviders(local NativeResourceProviders) Option {
-	return func(s *Service) {
-		s.nativeResources = NativeResourceProviders{
-			Files: proto.CloneOf(local.Files), Accounts: proto.CloneOf(local.Accounts), Sysctl: proto.CloneOf(local.Sysctl),
-			Firewall: proto.CloneOf(local.Firewall), Password: proto.CloneOf(local.Password), OSUpdate: proto.CloneOf(local.OSUpdate),
-			ProtectedPaths: append([]string(nil), local.ProtectedPaths...),
-		}
-	}
 }

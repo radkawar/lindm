@@ -272,6 +272,7 @@ func TestOwnerDelegationRejectsInvalidAuthority(t *testing.T) {
 		{"prefix", func(f *ownerFixture) { f.declaration.Delegates[0].Capabilities = []string{"device.restart"} }},
 		{"unknown capability version", func(f *ownerFixture) { f.declaration.Delegates[0].Capabilities = []string{"device.restart.v2"} }},
 		{"unknown capability", func(f *ownerFixture) { f.declaration.Delegates[0].Capabilities = []string{"script.arbitrary.v1"} }},
+		{"resource kind without an agent provider", func(f *ownerFixture) { f.declaration.Delegates[0].Capabilities = []string{"flatpak.app.v1"} }},
 		{"missing capabilities", func(f *ownerFixture) { f.declaration.Delegates[0].Capabilities = nil }},
 		{"duplicate capabilities", func(f *ownerFixture) {
 			f.declaration.Delegates[0].Capabilities = []string{"device.restart.v1", "device.restart.v1"}
@@ -411,6 +412,10 @@ func TestOwnerDelegationRetainsExplicitSupportedCapabilities(t *testing.T) {
 		"device.quarantine.v1", "device.release-quarantine.v1",
 		"device.crypto-erase.v1", "device.sanitize.v1",
 		"device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1", "device.patch-now.v1",
+		trust.CapabilityPolicyCapability,
+		"package.native.v1", "managed.file.v1", "local.user.v1", "local.group.v1", "os.update.v1",
+		"firewall.zone.v1", "sysctl.v1", "password.policy.v1", "systemd.definition.v1",
+		"encryption.compliance.v1", "ssh.server.v1",
 	}
 	for _, delegate := range f.declaration.Delegates {
 		delegate.Capabilities = capabilities

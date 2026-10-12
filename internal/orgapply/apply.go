@@ -140,6 +140,9 @@ func applyRequest(ctx context.Context, client adminv1connect.AdminServiceClient,
 	case *adminv1.PutDynamicGroupRequest:
 		_, err := client.PutDynamicGroup(ctx, connect.NewRequest(r))
 		return err
+	case *adminv1.SetCapabilityPolicyRequest:
+		_, err := client.SetCapabilityPolicy(ctx, connect.NewRequest(r))
+		return err
 	case *adminv1.PublishProfileRevisionRequest:
 		response, err := client.PublishProfileRevision(ctx, connect.NewRequest(r))
 		if err != nil {

@@ -61,6 +61,7 @@ type refreshTransportFixture struct {
 	approvedErr                         error
 	approvedCalls                       int
 	publishedHost                       *inventoryv1.HostObservation
+	capability                          capabilityPolicyFake
 }
 
 type refreshTransportExecutor struct {

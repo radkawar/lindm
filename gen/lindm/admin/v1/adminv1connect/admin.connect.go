@@ -134,6 +134,12 @@ const (
 	// AdminServiceUpdateExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
 	// UpdateExecutionAuthority RPC.
 	AdminServiceUpdateExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/UpdateExecutionAuthority"
+	// AdminServiceListCapabilityPoliciesProcedure is the fully-qualified name of the AdminService's
+	// ListCapabilityPolicies RPC.
+	AdminServiceListCapabilityPoliciesProcedure = "/lindm.admin.v1.AdminService/ListCapabilityPolicies"
+	// AdminServiceSetCapabilityPolicyProcedure is the fully-qualified name of the AdminService's
+	// SetCapabilityPolicy RPC.
+	AdminServiceSetCapabilityPolicyProcedure = "/lindm.admin.v1.AdminService/SetCapabilityPolicy"
 	// AdminServicePublishProfileRevisionProcedure is the fully-qualified name of the AdminService's
 	// PublishProfileRevision RPC.
 	AdminServicePublishProfileRevisionProcedure = "/lindm.admin.v1.AdminService/PublishProfileRevision"
@@ -338,6 +344,10 @@ type AdminServiceClient interface {
 	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
+	// Device management capabilities granted to executors through signed
+	// per-device capability policies (deployment and group scopes).
+	ListCapabilityPolicies(context.Context, *connect.Request[v1.ListCapabilityPoliciesRequest]) (*connect.Response[v1.ListCapabilityPoliciesResponse], error)
+	SetCapabilityPolicy(context.Context, *connect.Request[v1.SetCapabilityPolicyRequest]) (*connect.Response[v1.SetCapabilityPolicyResponse], error)
 	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
 	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
 	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
@@ -614,6 +624,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceUpdateExecutionAuthorityProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
+			connect.WithClientOptions(opts...),
+		),
+		listCapabilityPolicies: connect.NewClient[v1.ListCapabilityPoliciesRequest, v1.ListCapabilityPoliciesResponse](
+			httpClient,
+			baseURL+AdminServiceListCapabilityPoliciesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListCapabilityPolicies")),
+			connect.WithClientOptions(opts...),
+		),
+		setCapabilityPolicy: connect.NewClient[v1.SetCapabilityPolicyRequest, v1.SetCapabilityPolicyResponse](
+			httpClient,
+			baseURL+AdminServiceSetCapabilityPolicyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetCapabilityPolicy")),
 			connect.WithClientOptions(opts...),
 		),
 		publishProfileRevision: connect.NewClient[v1.PublishProfileRevisionRequest, v1.PublishProfileRevisionResponse](
@@ -991,6 +1013,8 @@ type adminServiceClient struct {
 	listAuditDevices                     *connect.Client[v1.ListAuditDevicesRequest, v1.ListAuditDevicesResponse]
 	getExecutionAuthority                *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
 	updateExecutionAuthority             *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
+	listCapabilityPolicies               *connect.Client[v1.ListCapabilityPoliciesRequest, v1.ListCapabilityPoliciesResponse]
+	setCapabilityPolicy                  *connect.Client[v1.SetCapabilityPolicyRequest, v1.SetCapabilityPolicyResponse]
 	publishProfileRevision               *connect.Client[v1.PublishProfileRevisionRequest, v1.PublishProfileRevisionResponse]
 	getProfileRevision                   *connect.Client[v1.GetProfileRevisionRequest, v1.GetProfileRevisionResponse]
 	listProfiles                         *connect.Client[v1.ListProfilesRequest, v1.ListProfilesResponse]
@@ -1219,6 +1243,16 @@ func (c *adminServiceClient) GetExecutionAuthority(ctx context.Context, req *con
 // UpdateExecutionAuthority calls lindm.admin.v1.AdminService.UpdateExecutionAuthority.
 func (c *adminServiceClient) UpdateExecutionAuthority(ctx context.Context, req *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error) {
 	return c.updateExecutionAuthority.CallUnary(ctx, req)
+}
+
+// ListCapabilityPolicies calls lindm.admin.v1.AdminService.ListCapabilityPolicies.
+func (c *adminServiceClient) ListCapabilityPolicies(ctx context.Context, req *connect.Request[v1.ListCapabilityPoliciesRequest]) (*connect.Response[v1.ListCapabilityPoliciesResponse], error) {
+	return c.listCapabilityPolicies.CallUnary(ctx, req)
+}
+
+// SetCapabilityPolicy calls lindm.admin.v1.AdminService.SetCapabilityPolicy.
+func (c *adminServiceClient) SetCapabilityPolicy(ctx context.Context, req *connect.Request[v1.SetCapabilityPolicyRequest]) (*connect.Response[v1.SetCapabilityPolicyResponse], error) {
+	return c.setCapabilityPolicy.CallUnary(ctx, req)
 }
 
 // PublishProfileRevision calls lindm.admin.v1.AdminService.PublishProfileRevision.
@@ -1538,6 +1572,10 @@ type AdminServiceHandler interface {
 	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
+	// Device management capabilities granted to executors through signed
+	// per-device capability policies (deployment and group scopes).
+	ListCapabilityPolicies(context.Context, *connect.Request[v1.ListCapabilityPoliciesRequest]) (*connect.Response[v1.ListCapabilityPoliciesResponse], error)
+	SetCapabilityPolicy(context.Context, *connect.Request[v1.SetCapabilityPolicyRequest]) (*connect.Response[v1.SetCapabilityPolicyResponse], error)
 	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
 	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
 	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
@@ -1810,6 +1848,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceUpdateExecutionAuthorityProcedure,
 		svc.UpdateExecutionAuthority,
 		connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListCapabilityPoliciesHandler := connect.NewUnaryHandler(
+		AdminServiceListCapabilityPoliciesProcedure,
+		svc.ListCapabilityPolicies,
+		connect.WithSchema(adminServiceMethods.ByName("ListCapabilityPolicies")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetCapabilityPolicyHandler := connect.NewUnaryHandler(
+		AdminServiceSetCapabilityPolicyProcedure,
+		svc.SetCapabilityPolicy,
+		connect.WithSchema(adminServiceMethods.ByName("SetCapabilityPolicy")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServicePublishProfileRevisionHandler := connect.NewUnaryHandler(
@@ -2218,6 +2268,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetExecutionAuthorityHandler.ServeHTTP(w, r)
 		case AdminServiceUpdateExecutionAuthorityProcedure:
 			adminServiceUpdateExecutionAuthorityHandler.ServeHTTP(w, r)
+		case AdminServiceListCapabilityPoliciesProcedure:
+			adminServiceListCapabilityPoliciesHandler.ServeHTTP(w, r)
+		case AdminServiceSetCapabilityPolicyProcedure:
+			adminServiceSetCapabilityPolicyHandler.ServeHTTP(w, r)
 		case AdminServicePublishProfileRevisionProcedure:
 			adminServicePublishProfileRevisionHandler.ServeHTTP(w, r)
 		case AdminServiceGetProfileRevisionProcedure:
@@ -2473,6 +2527,14 @@ func (UnimplementedAdminServiceHandler) GetExecutionAuthority(context.Context, *
 
 func (UnimplementedAdminServiceHandler) UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateExecutionAuthority is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListCapabilityPolicies(context.Context, *connect.Request[v1.ListCapabilityPoliciesRequest]) (*connect.Response[v1.ListCapabilityPoliciesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListCapabilityPolicies is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetCapabilityPolicy(context.Context, *connect.Request[v1.SetCapabilityPolicyRequest]) (*connect.Response[v1.SetCapabilityPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetCapabilityPolicy is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error) {

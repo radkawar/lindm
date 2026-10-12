@@ -70,6 +70,8 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ListAuditDevices":                     {identity.PermissionReadAudit, []string{"owner", "admin", "auditor"}, true},
 		"GetExecutionAuthority":                {identity.PermissionReadFleet, readers, true},
 		"UpdateExecutionAuthority":             {identity.PermissionManageExecutionTrust, admins, true},
+		"ListCapabilityPolicies":               {identity.PermissionReadFleet, readers, true},
+		"SetCapabilityPolicy":                  {identity.PermissionManageExecutionTrust, admins, true},
 		"PublishProfileRevision":               {identity.PermissionManageProfiles, operators, true},
 		"GetProfileRevision":                   {identity.PermissionReadFleet, readers, true},
 		"ListProfiles":                         {identity.PermissionReadFleet, readers, true},

@@ -143,6 +143,7 @@ func (s *Service) updateExecutionTrust(ctx context.Context, req *agentv1.UpdateE
 	if err := s.commitExecutionTrust(ctx, revision, next); err != nil {
 		return nil, err
 	}
+	s.refreshCapabilityPolicy(ctx)
 	return executionReceipt(current, delegation), nil
 }
 

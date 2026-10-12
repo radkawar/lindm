@@ -1,6 +1,10 @@
 package platform
 
-import "slices"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 // New distribution facts go only into this table. A capability absent from
 // Supports is gated; Gates states why when the default reason ("not
@@ -138,8 +142,9 @@ var (
 	debianLike = []string{"debian"}
 	fedoraVar  = []string{"", "workstation", "server", "cloud", "container"}
 	apt        = PackageTooling{Backend: BackendAPT}
-	// DNF 5.4.6.0 is the first release that stores a transaction without
-	// privileges; older releases refuse the staging sandbox's read-only /usr.
+	// DNF5 up to 5.4.2.1 treats --store as system-modifying and refuses a
+	// read-only /usr (fixed in 5.4.3.0); 5.4.6.0 is the natively qualified
+	// floor (docs/platforms/fedora.md, DNF5 floor).
 	dnf5 = PackageTooling{Backend: BackendDNF5, Minimum: "5.4.6.0"}
 	// DNF 4.7.0 is EL 8.10's; older DNF4 lacks the plugin selection, strict
 	// remote-RPM and query APIs the DNF4 adapter relies on.
@@ -308,6 +313,84 @@ var (
 	cloudInitAutoinstall = []Provisioning{ProvisionCloudInit, ProvisionAutoinstall}
 	cloudInitKickstart   = []Provisioning{ProvisionCloudInit, ProvisionKickstart}
 	cloudInitAutoYaST    = []Provisioning{ProvisionCloudInit, ProvisionAutoYaST}
+	// Remotely grantable provider facts (the "Capability policy facts" section
+	// of docs/platforms/ubuntu.md, fedora.md, alma-rocky.md and debian.md
+	// records how they were obtained).
+	// Standard roots are vendor drop-in directories read by pam_motd and agetty.
+	dropInRoots = []string{"/etc/issue.d", "/etc/motd.d"}
+	// login.defs UID_MIN..UID_MAX-1 / GID_MIN..GID_MAX-1 (1000/60000) on
+	// Ubuntu, Debian, Fedora and EL 9/10 (shadow-utils, login, login.defs).
+	regularAccounts = AccountDefaults{HomeRootID: "f0047cfe-68c5-5850-a2b5-b9adc55d4f43", HomeRoot: "/home", MinUID: 1000, MaxUID: 59999, MinGID: 1000, MaxGID: 59999}
+	// ubuntuArchive is the Ubuntu archive repository identity every Ubuntu row
+	// binds (apt/<uuid>), on archive.ubuntu.com (amd64) or ports (arm64).
+	ubuntuArchive = VendorRepository{
+		RepositoryID: "8053e72a-44e8-53fc-9472-825c068cf9b5", DB: PackageDBDpkg,
+		ArchiveURIs: map[string]string{"x86_64": "https://archive.ubuntu.com/ubuntu", "aarch64": "https://ports.ubuntu.com/ubuntu-ports"},
+		Components:  []string{"main", "universe"}, KeyFile: "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
+	}
+	// ubuntu-keyring 2023.11.28.1 (noble's only version, SHA256
+	// 36de43b15853ccae0028e9a767613770c704833f82586f28eb262f0311adb8a8 in the
+	// signed noble main index), 3607 bytes; holds the 2012 and 2018 archive keys.
+	// Every noble, noble-updates and noble-security InRelease on archive and
+	// ports verifies with it (signer F6ECB3762474EDA9D21B7022871920D1991BC93C).
+	nobleArchive = ubuntuSuites(ubuntuArchive, "7c640025-e320-5951-9086-6a67ea6572f7", "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31", "noble")
+	// ubuntu-keyring 2021.03.26 (jammy's only version; none in -updates or
+	// -security; SHA256 0d0e7ed6…520f in the signed jammy main indexes),
+	// 7399 bytes: the 2012 and 2018 archive keys plus the 2012 CD image key.
+	// Every jammy, jammy-updates and jammy-security InRelease on archive and
+	// ports verifies with it (signer F6ECB3762474EDA9D21B7022871920D1991BC93C).
+	jammyArchive = ubuntuSuites(ubuntuArchive, "d74a0281-9d25-5f2c-ac6b-9d4bfa1e8c2e", "1a4dd63e5c76728960a2edddae22e2e0fc53df8e8b87806deb971030ac704eb0", "jammy")
+	// vendorRPMArchiveID is the RPM repository identity profiles bind for the
+	// host's own distribution archive (rpm/<uuid>): Fedora's on Fedora, the
+	// rebuild's own BaseOS/AppStream on Rocky Linux and AlmaLinux.
+	vendorRPMArchiveID = "12e3a0eb-c710-58d9-bd79-a491c614754c"
+	// fedora-gpg-keys 44-1 (release) and 44-2 (updates) ship identical
+	// RPM-GPG-KEY-fedora-44-primary bytes (1672), fingerprint as published on
+	// fedoraproject.org/security; both packages verify with it. The -x86_64 and
+	// -aarch64 names are symlinks to this file.
+	fedora44Archive = VendorRepository{
+		RepositoryID: vendorRPMArchiveID, DB: PackageDBRPM,
+		NativeRepositories: []VendorNativeRepository{
+			{ID: "fedora", Metalinks: map[string]string{"x86_64": "https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64", "aarch64": "https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=aarch64"}},
+			{ID: "updates", Metalinks: map[string]string{"x86_64": "https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=x86_64", "aarch64": "https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=aarch64"}},
+		},
+		KeyFile: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary", KeyArtifactID: "95fa021e-c28c-5534-b003-6ece85787e0c",
+		KeySHA256:      []string{"93642aec521a1e5e96dd715f7ae0ec0850ebc9de09a94ce03cae5263f26cc18a"},
+		RPMFingerprint: "36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6",
+		// releases/44 and updates/44 repodata have no repomd.xml.asc (HTTP 404
+		// on 2026-10-12): metadata is authenticated through Fedora's HTTPS
+		// MirrorManager metalink (owner decision, docs/security-and-operations.md).
+		MetadataUnsigned: true, MetalinkHost: "mirrors.fedoraproject.org",
+	}
+	// EL rebuild archives (alma-rocky.md, "Capability policy facts"):
+	// BaseOS and AppStream under the vendor RPM identity profiles bind for
+	// the host's own distribution archive. Both vendors sign repomd.xml, so
+	// the sources use HTTPS base URLs with signed metadata; no metalink pin.
+	// The key file bytes were identical in every minor's -gpg-keys package.
+	rocky9Archive = elArchive("https://dl.rockylinux.org/pub/rocky/9/%s/%s/os/", VendorRepository{
+		KeyFile: "/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9", KeyArtifactID: "c8feefd2-7828-523a-aeff-a7f2e4dc5efe",
+		KeySHA256: []string{"3a66e521e7a4abac9768d889c7cd60a8250f59512b275cf576c8a10ff34624c1"}, RPMFingerprint: "21CB256AE16FC54C6E652949702D426D350D275D",
+	})
+	// rocky-gpg-keys 10.2-1.2 appends a second, v6 post-quantum key block to
+	// RPM-GPG-KEY-Rocky-10 (18586 bytes,
+	// 7f517e9ca329b042228e9a35e74e1b260513ed9c786d5ebcc459e623855f2831). The
+	// RSA-only file of 10.0-1.6 through 10.2-1.1 is accepted; the two-key
+	// file is not, until a native run shows DNF and rpm accept it.
+	rocky10Archive = elArchive("https://dl.rockylinux.org/pub/rocky/10/%s/%s/os/", VendorRepository{
+		KeyFile: "/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10", KeyArtifactID: "191f7baf-7cbb-58f4-9925-9497bde260b0",
+		KeySHA256: []string{"be8c4f070b696e64d8ce40e59a95a57e8b5c776f0015c2fd64e14b896622bdb4"}, RPMFingerprint: "FC226859C0860BF0DDB95B085B106C736FEDFC85",
+	})
+	alma9Archive = elArchive("https://repo.almalinux.org/almalinux/9/%s/%s/os/", VendorRepository{
+		KeyFile: "/etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-9", KeyArtifactID: "7410d2c1-f135-57bd-a08d-a40d7aa2fd04",
+		KeySHA256: []string{"387a8be6b70ecff4949d28778bf8abd06231654283b6e9515afc9305a1391458"}, RPMFingerprint: "BF18AC2876178908D6E71267D36CB86CB86B3716",
+	})
+	// AlmaLinux 10 also publishes an x86_64_v2 build whose packages the
+	// x86_64 (x86-64-v3) tree must never replace.
+	alma10Archive = elArchive("https://repo.almalinux.org/almalinux/10/%s/%s/os/", VendorRepository{
+		KeyFile: "/etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-10", KeyArtifactID: "70b42e69-0f63-534e-8414-3a79c2ee2b2f",
+		KeySHA256: []string{"de57c3c0a2dcde88ff5b894e74335f55a0ec074815f36d472270d937c16f077b"}, RPMFingerprint: "EE6DB7B98F5BF5EDD9DA0DE5DEE5C11CC2A1E572",
+		VariantMarkers: []string{"/etc/rpm/macros.x86_64_v2"},
+	})
 )
 
 var registry = []*Release{
@@ -319,6 +402,7 @@ var registry = []*Release{
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}, RecoveryGRUB: debianGRUB},
+		VendorRepositories: []VendorRepository{jammyArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
@@ -355,7 +439,8 @@ var registry = []*Release{
 		// module load into PCR 10 during the unlock (ubuntu.md#tpm2-unseal-race).
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate, SSHBannerUnit: "ssh.service", TPM2UnsealRetry: TPM2UnsealRetryNextToken,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
-		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
+		ModuleBlocklist:    ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
+		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
 			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
@@ -405,6 +490,9 @@ var registry = []*Release{
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
+		// No vendor archive: AptRepository has one URI, but the security pocket
+		// lives only under /debian-security (debian.md, "Capability policy facts").
+		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
@@ -421,6 +509,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "trixie", Exports: debianExports},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
+		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
@@ -477,7 +566,8 @@ var registry = []*Release{
 			}}},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect, SSHBannerUnit: "sshd.service",
 			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}, RecoveryGRUB: blsGRUB},
-		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initramfs-%s.img", Rebuild: "/usr/bin/dracut", RebuildArgs: []string{"--regenerate-all", "--force"}, RebuildWithFileArgs: []string{"--regenerate-all", "--force", "--include", "/etc/modprobe.d/99-lindm-blocklist.conf", "/etc/modprobe.d/99-lindm-blocklist.conf"}, WritePaths: []string{"/boot"}},
+		ModuleBlocklist:    ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initramfs-%s.img", Rebuild: "/usr/bin/dracut", RebuildArgs: []string{"--regenerate-all", "--force"}, RebuildWithFileArgs: []string{"--regenerate-all", "--force", "--include", "/etc/modprobe.d/99-lindm-blocklist.conf", "/etc/modprobe.d/99-lindm-blocklist.conf"}, WritePaths: []string{"/boot"}},
+		VendorRepositories: []VendorRepository{fedora44Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
 			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
@@ -540,8 +630,9 @@ var registry = []*Release{
 		Key: "rocky-9", Name: "Rocky Linux 9", Distribution: "Rocky Linux", ID: "rocky", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
-		Quirks:   withPins(elQuirks9, el9Pins),
+		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
+		Quirks:             withPins(elQuirks9, el9Pins),
+		VendorRepositories: []VendorRepository{rocky9Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor and
@@ -554,8 +645,9 @@ var registry = []*Release{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
-		Quirks:   withPins(elQuirks10, el10Pins),
+		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
+		Quirks:             withPins(elQuirks10, el10Pins),
+		VendorRepositories: []VendorRepository{rocky10Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
@@ -566,8 +658,9 @@ var registry = []*Release{
 		Key: "almalinux-9", Name: "AlmaLinux 9", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
-		Quirks:   withPins(elQuirks9, el9Pins),
+		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
+		Quirks:             withPins(elQuirks9, el9Pins),
+		VendorRepositories: []VendorRepository{alma9Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
@@ -577,8 +670,9 @@ var registry = []*Release{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
-		Quirks:   withPins(elQuirks10, el10Pins),
+		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
+		Quirks:             withPins(elQuirks10, el10Pins),
+		VendorRepositories: []VendorRepository{alma10Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
@@ -808,6 +902,28 @@ func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int
 		Gates: actionGates(string(Packages), reasonEL8Packages, string(Accounts), reasonELHost, string(Sysctl), reasonELHost, string(Firewall), reasonELHost,
 			string(Definitions), reasonELHost, string(Password), reasonELHost),
 	}
+}
+
+// ubuntuSuites binds one Ubuntu release's keyring and its release, -updates
+// and -security pockets to the shared Ubuntu archive identity.
+func ubuntuSuites(archive VendorRepository, keyArtifactID, keySHA256, codename string) VendorRepository {
+	archive.KeyArtifactID, archive.KeySHA256 = keyArtifactID, []string{keySHA256}
+	archive.Suites = []string{codename, codename + "-updates", codename + "-security"}
+	return archive
+}
+
+// elArchive completes an EL rebuild's signed BaseOS + AppStream archive;
+// pattern takes the repository directory and the kernel architecture.
+func elArchive(pattern string, key VendorRepository) VendorRepository {
+	key.RepositoryID, key.DB = vendorRPMArchiveID, PackageDBRPM
+	for _, id := range []string{"BaseOS", "AppStream"} {
+		urls := map[string][]string{}
+		for _, architecture := range both {
+			urls[architecture] = []string{fmt.Sprintf(pattern, id, architecture)}
+		}
+		key.NativeRepositories = append(key.NativeRepositories, VendorNativeRepository{ID: strings.ToLower(id), BaseURLs: urls})
+	}
+	return key
 }
 
 func init() {

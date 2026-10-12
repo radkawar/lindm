@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// ManagementCapability is the closed catalogue of executor provider authority.
+// Remotely enableable values (1-7) carry no paths, repository URLs, keys or
+// account names: the executor derives every concrete provider setting from the
+// platform registry for its own qualified release and architecture, and only
+// where that release qualifies the provider. Local-only values (8-9) name the
+// root-owned /etc/lindm/executor.json settings a signed policy can never grant;
+// they appear only in refusals and status.
+enum ManagementCapability {
+  MANAGEMENT_CAPABILITY_UNSPECIFIED = 0;
+  // Native packages from the release's registry-declared vendor repositories,
+  // verified against the registry-pinned vendor key file on the host.
+  MANAGEMENT_CAPABILITY_PACKAGES = 1;
+  // Managed files under the registry's standard drop-in roots (for example
+  // /etc/motd.d). An absent standard root is created when a file needs it.
+  MANAGEMENT_CAPABILITY_FILES = 2;
+  // The closed kernel-module blocklist template.
+  MANAGEMENT_CAPABILITY_KERNEL_MODULE_BLOCKLIST = 3;
+  // Local users and groups in the registry's regular ID ranges, homes under
+  // the registry's home root.
+  MANAGEMENT_CAPABILITY_LOCAL_ACCOUNTS = 4;
+  // Firewall zones. Requires the policy's firewall settings (connectivity
+  // guard and management endpoints), which a deployment must provide.
+  MANAGEMENT_CAPABILITY_FIREWALL = 5;
+  // The os.update.v1 maintenance policy.
+  MANAGEMENT_CAPABILITY_OS_UPDATES = 6;
+  // Exactly the kernel parameters listed in the policy's sysctl_keys.
+  MANAGEMENT_CAPABILITY_KERNEL_SETTINGS = 7;
+  // Local only: password_provider in /etc/lindm/executor.json.
+  MANAGEMENT_CAPABILITY_PASSWORD_POLICY = 8;
+  // Local only: file_provider.allowed_roots in /etc/lindm/executor.json, for
+  // files outside the standard roots.
+  MANAGEMENT_CAPABILITY_CUSTOM_FILE_ROOTS = 9;
+}

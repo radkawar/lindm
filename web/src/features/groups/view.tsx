@@ -50,6 +50,32 @@ export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   });
 }
 
+// One device group by ID. The API lists groups in pages only, so this reads
+// pages until the group is found (null when it no longer exists), bounded at
+// 4,000 groups.
+export function deviceGroupQueryOptions(lifetime: AuthLifetime, groupId: string) {
+  return queryOptions({
+    queryKey: ["device-groups", lifetime.generation, "group", groupId] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }): Promise<DeviceGroup | null> => {
+      let pageToken = "";
+      for (let page = 0; page < 40; page += 1) {
+        const result = await adminClient.listDeviceGroups(
+          { pageSize: 100, pageToken },
+          { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
+        );
+        lifetime.signal.throwIfAborted();
+        const group = result.groups.find((item) => item.id === groupId);
+        if (group) return group;
+        if (!result.nextPageToken) return null;
+        pageToken = result.nextPageToken;
+      }
+      return null;
+    },
+    retry: false,
+  });
+}
+
 function deviceCount(count: number) {
   return count === 1 ? "1 device" : `${count} devices`;
 }

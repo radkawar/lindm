@@ -5,6 +5,7 @@ import { DeviceFindings } from "@/features/advisories/device-findings";
 import { DeviceFindingsSummary } from "@/features/advisories/device-findings-summary";
 import { DeviceAssistanceCard } from "@/features/assistance/panel";
 import { AccountPicker } from "@/features/auth/picker";
+import { CapabilityScopeName } from "@/features/capabilities/view";
 import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
 import { packageSearchDefaults, parsePackageSearch } from "@/features/devices/package-search";
@@ -56,6 +57,7 @@ function DeviceDetailRoute() {
         <DeviceResources
           deviceId={deviceId}
           lastContact={device.data?.device?.lastSeenAt}
+          capabilities={device.data?.capabilities}
           emptyAction={
             assignProfile ? (
               <Button aria-haspopup="dialog" onClick={assignProfile}>
@@ -79,6 +81,7 @@ function DeviceDetailRoute() {
       notices={<DeviceRevocationStatus deviceId={deviceId} />}
       assistance={<DeviceAssistanceCard deviceId={deviceId} />}
       accountPicker={(props) => <AccountPicker {...props} />}
+      capabilityScopeName={CapabilityScopeName}
     />
   );
 }

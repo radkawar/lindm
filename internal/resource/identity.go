@@ -105,6 +105,26 @@ func Capability(kind resourcev1.ResourceKind) (string, error) {
 	}
 }
 
+// ExecutableKinds returns the kinds that have an agent provider, so their exact
+// Capability strings are the resource authority an offline owner can delegate.
+// Server-side per-kind native qualification still decides what is dispatched.
+func ExecutableKinds() []resourcev1.ResourceKind {
+	return []resourcev1.ResourceKind{
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE,
+		resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE,
+		resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE,
+		resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP,
+		resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER,
+		resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY,
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL,
+		resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION,
+		resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE,
+		resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE,
+		resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY,
+		resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER,
+	}
+}
+
 // CanonicalRef derives identity from the selected desired arm. A missing ref is
 // allowed here so publishers can construct it; a supplied ref is not consulted.
 // ValidateDesired additionally requires the supplied pair to match exactly.
