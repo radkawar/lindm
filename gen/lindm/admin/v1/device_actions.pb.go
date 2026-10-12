@@ -814,8 +814,16 @@ type GetDeviceEncryptionResponse struct {
 	EscrowPublicKey []byte                      `protobuf:"bytes,4,opt,name=escrow_public_key,json=escrowPublicKey,proto3" json:"escrow_public_key,omitempty"`
 	// Absent when the caller may not reveal this device's recovery keys.
 	RecoveryKeyRevealApproval *RevealApproval `protobuf:"bytes,6,opt,name=recovery_key_reveal_approval,json=recoveryKeyRevealApproval,proto3" json:"recovery_key_reveal_approval,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// Identical systemd-tpm2 token references the device's TPM2 keyslot has in
+	// the latest observation (the most naming one keyslot); 0 without a bind.
+	Tpm2TokenReferences uint32 `protobuf:"varint,7,opt,name=tpm2_token_references,json=tpm2TokenReferences,proto3" json:"tpm2_token_references,omitempty"`
+	// References the device's release needs for a reliable unattended unlock
+	// (registry TPM2TokenReferences): 4 where systemd's unseal retry is broken
+	// (Ubuntu 24.04, EL 9), else 1. Fewer observed is repaired by a TPM2 bind,
+	// which then adds only the missing references and needs no credential.
+	Tpm2TokenReferencesRequired uint32 `protobuf:"varint,8,opt,name=tpm2_token_references_required,json=tpm2TokenReferencesRequired,proto3" json:"tpm2_token_references_required,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *GetDeviceEncryptionResponse) Reset() {
@@ -881,6 +889,20 @@ func (x *GetDeviceEncryptionResponse) GetRecoveryKeyRevealApproval() *RevealAppr
 		return x.RecoveryKeyRevealApproval
 	}
 	return nil
+}
+
+func (x *GetDeviceEncryptionResponse) GetTpm2TokenReferences() uint32 {
+	if x != nil {
+		return x.Tpm2TokenReferences
+	}
+	return 0
+}
+
+func (x *GetDeviceEncryptionResponse) GetTpm2TokenReferencesRequired() uint32 {
+	if x != nil {
+		return x.Tpm2TokenReferencesRequired
+	}
+	return 0
 }
 
 // Requires dedicated permission, recent step-up, reason and audited custody access.
@@ -1452,13 +1474,15 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"\tluks_uuid\x18\x02 \x01(\tR\bluksUuid\x12\x18\n" +
 	"\akeyslot\x18\x03 \x01(\rR\akeyslot\x127\n" +
 	"\tstored_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x121\n" +
-	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\x84\x03\n" +
+	"\x14retirement_confirmed\x18\x05 \x01(\bR\x13retirementConfirmed\"\xfd\x03\n" +
 	"\x1bGetDeviceEncryptionResponse\x12I\n" +
 	"\vobservation\x18\x01 \x01(\v2'.lindm.agent.v1.DeviceActionObservationR\vobservation\x12<\n" +
 	"\x06escrow\x18\x02 \x01(\v2$.lindm.admin.v1.DeviceRecoveryEscrowR\x06escrow\x12\"\n" +
 	"\rescrow_key_id\x18\x03 \x01(\tR\vescrowKeyId\x12*\n" +
 	"\x11escrow_public_key\x18\x04 \x01(\fR\x0fescrowPublicKey\x12_\n" +
-	"\x1crecovery_key_reveal_approval\x18\x06 \x01(\v2\x1e.lindm.admin.v1.RevealApprovalR\x19recoveryKeyRevealApprovalJ\x04\b\x05\x10\x06R%recovery_key_reveal_approval_required\"\xe2\x01\n" +
+	"\x1crecovery_key_reveal_approval\x18\x06 \x01(\v2\x1e.lindm.admin.v1.RevealApprovalR\x19recoveryKeyRevealApproval\x122\n" +
+	"\x15tpm2_token_references\x18\a \x01(\rR\x13tpm2TokenReferences\x12C\n" +
+	"\x1etpm2_token_references_required\x18\b \x01(\rR\x1btpm2TokenReferencesRequiredJ\x04\b\x05\x10\x06R%recovery_key_reveal_approval_required\"\xe2\x01\n" +
 	"\x18RevealRecoveryKeyRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +

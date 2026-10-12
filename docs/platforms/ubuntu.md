@@ -514,11 +514,34 @@ the header lacks four free tokens or the LUKS2 JSON room
 four identical references and a token unlock of that keyslot
 ([bind](../../internal/agent/actionprovider/luks_linux.go),
 [quirk](../../internal/platform/platform.go)). Pop!_OS 24.04 and Linux Mint 22
-inherit the quirk from this row. A binding made before this change keeps one
-token; bind again to add a referenced slot, after which the old token is tried
-first. Ubuntu 26.04's systemd 259 starts a new session on every retry and keeps
-one token. In its arm64 regression cell, 29 of 30 boots logged one or two
-`0x00000128` unseals, and every boot still unlocked through the first token.
+inherit the quirk from this row. Ubuntu 26.04's systemd 259 starts a new session
+on every retry and keeps one token. In its arm64 regression cell, 29 of 30 boots
+logged one or two `0x00000128` unseals, and every boot still unlocked through the
+first token.
+
+A device bound by an agent older than this fix has one token and stays flaky.
+Device encryption status reports it: `GetDeviceEncryption` returns
+`tpm2_token_references` (the most systemd-tpm2 tokens naming one keyslot in the
+latest observation) and `tpm2_token_references_required` (the registry count for
+the observed release), and the console shows "May ask for the passphrase at boot"
+with both numbers. The repair is the same signed, permission-checked and audited
+`tpm2_bind` action, so existing delegations already cover it. When the upgraded
+agent observes the target, it looks for an existing product bind to complete:
+exact requested PCRs, a keyslot that is neither the owner's nor a lindm recovery
+slot, identical references but fewer than required, and a token unlock on the
+current TPM and PCRs. If it finds one, it records that keyslot in the plan
+(`DeviceActionObservation.tpm2_reference_repair_keyslot`), which the signed plan
+then freezes. Apply adds only the missing byte-identical references and needs no
+owner credential. The same refusals apply before the effect gate (`no_free_token`,
+`luks2_metadata_space_exhausted`), and a header changed since signing is refused.
+Verification requires the keyslot set unchanged, the required number of identical
+references on the planned keyslot and a token unlock through them. A stale or
+foreign bind is not repaired; the action then makes a fresh keyslot, which needs
+the owner credential as before. `cryptsetup token import` writes only LUKS2 token
+metadata. On the amd64 golden, importing three copies with no passphrase input
+left the keyslot, digest and segment JSON, and the keyslot binary area, unchanged,
+and the token still unlocked
+([verification](../verification.md#tpm2-unseal-race-and-unattended-boot-regression)).
 
 On dgx20 (arm64, 3 concurrent guests) and on local KVM (amd64), both with Secure
 Boot enforced and the product's `systemd-cryptenroll --tpm2-pcrs=7` bind, one

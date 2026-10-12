@@ -23,13 +23,25 @@ import (
 )
 
 type actionNativePackage struct {
-	work        string
-	artifact    packaging.Artifact
-	apt         *packaging.APTRepository
-	arch        []*packaging.ArchRepository
-	publicKey   string
-	fingerprint string
+	work     string
+	artifact packaging.Artifact
+	// upgrade is the later version a reference-repair lane installs over the
+	// legacy artifact through the same native manager; zero elsewhere.
+	upgrade packaging.Artifact
+	// legacyRevision is the resolved commit artifact was compiled from when
+	// the set carries an upgrade.
+	legacyRevision string
+	apt            *packaging.APTRepository
+	arch           []*packaging.ArchRepository
+	publicKey      string
+	fingerprint    string
 }
+
+// The reference-repair lane's legacy agent and the current agent it upgrades to.
+const (
+	actionLegacyAgentVersion  = "0.1.0"
+	actionCurrentAgentVersion = "0.1.1"
+)
 
 func nativePackageArchitecture(architecture string) (string, error) {
 	switch architecture {
@@ -42,7 +54,17 @@ func nativePackageArchitecture(architecture string) (string, error) {
 	}
 }
 
-func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest, repository, workDir string) (_ *actionNativePackage, err error) {
+func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest, repository, workDir string) (*actionNativePackage, error) {
+	return buildActionPackages(ctx, manifest, repository, "", workDir)
+}
+
+// buildActionPackages builds the current agent from repository. With a legacy
+// revision it first exports that commit of repository (read-only git) into the
+// private package work directory and builds it as the installed version; the
+// current source becomes the later upgrade. Both are signed by one development
+// signer and published together: one APT archive holding both versions, or one
+// signed pacman repository per version.
+func buildActionPackages(ctx context.Context, manifest *labv1.ImageManifest, repository, legacyRevision, workDir string) (_ *actionNativePackage, err error) {
 	architecture, err := nativePackageArchitecture(manifest.GetArchitecture())
 	if err != nil {
 		return nil, err
@@ -65,51 +87,107 @@ func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest
 	if format != packaging.FormatDEB && format != packaging.FormatRPM && format != packaging.FormatArch {
 		return nil, errors.New("native action package requires a DEB, RPM or pacman guest")
 	}
-	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: repository, Revision: "encrypted-device-actions-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
-	if err != nil {
-		return nil, err
+	type source struct{ repository, revision, version string }
+	sources := []source{{repository, "encrypted-device-actions-lab", "0.1.0"}}
+	if legacyRevision != "" {
+		var legacy string
+		p.legacyRevision, legacy, err = exportLegacySource(ctx, repository, legacyRevision, work)
+		if err != nil {
+			return nil, err
+		}
+		sources = []source{{legacy, p.legacyRevision, actionLegacyAgentVersion}, {repository, "encrypted-device-actions-lab", actionCurrentAgentVersion}}
 	}
-	if len(built.Artifacts) != 1 {
-		return nil, errors.New("device action lane requires one native package artifact")
+	artifacts := make([]packaging.Artifact, 0, len(sources))
+	for _, s := range sources {
+		output := work
+		if len(sources) > 1 {
+			output = filepath.Join(work, "agent-"+s.version)
+			if err := os.Mkdir(output, 0700); err != nil {
+				return nil, err
+			}
+		}
+		built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: s.repository, Revision: s.revision, BuildRequest: packaging.BuildRequest{Version: s.version, TargetArchitecture: architecture, OutputDir: output, Formats: []packaging.Format{format}, Signer: *signer}})
+		if err != nil {
+			return nil, err
+		}
+		if len(built.Artifacts) != 1 {
+			return nil, errors.New("device action lane requires one native package artifact per version")
+		}
+		artifacts = append(artifacts, built.Artifacts[0])
+		p.publicKey = built.PublicKey
 	}
-	p.artifact, p.publicKey, p.fingerprint = built.Artifacts[0], built.PublicKey, signer.Fingerprint
+	p.artifact, p.fingerprint = artifacts[0], signer.Fingerprint
+	if len(artifacts) > 1 {
+		p.upgrade = artifacts[1]
+	}
 	if format == packaging.FormatDEB {
 		output := filepath.Join(work, "apt")
 		if err := os.Mkdir(output, 0700); err != nil {
 			return nil, err
 		}
-		p.apt, err = packaging.PublishAPT(ctx, packaging.APTRequest{OutputDir: output, DEBs: []string{p.artifact.Path}, Signer: *signer})
+		debs := make([]string, 0, len(artifacts))
+		for _, artifact := range artifacts {
+			debs = append(debs, artifact.Path)
+		}
+		p.apt, err = packaging.PublishAPT(ctx, packaging.APTRequest{OutputDir: output, DEBs: debs, Signer: *signer})
 		if err != nil {
 			return nil, err
 		}
 		p.publicKey = p.apt.PublicKeyArmor
 	}
 	if format == packaging.FormatArch {
-		output := filepath.Join(work, "arch-repo")
-		if err := os.Mkdir(output, 0700); err != nil {
-			return nil, err
+		// A pacman repository holds one version per package name.
+		for _, artifact := range artifacts {
+			output := filepath.Join(work, "arch-repo")
+			if len(artifacts) > 1 {
+				output += "-" + artifact.Version
+			}
+			if err := os.Mkdir(output, 0700); err != nil {
+				return nil, err
+			}
+			repo, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: []string{artifact.Path}, Signer: *signer})
+			if err != nil {
+				return nil, err
+			}
+			p.arch, p.publicKey = append(p.arch, repo), repo.PublicKeyArmor
 		}
-		repo, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: []string{p.artifact.Path}, Signer: *signer})
-		if err != nil {
-			return nil, err
-		}
-		p.arch, p.publicKey = []*packaging.ArchRepository{repo}, repo.PublicKeyArmor
 	}
 	return p, nil
 }
 
 func (p *actionNativePackage) Close() error { return os.RemoveAll(p.work) }
 
-func (p *actionNativePackage) Install(ctx context.Context, vm *guestVM, labBinary string) (err error) {
-	packages, err := newNativeGuestPackages(ctx, vm, p.artifact, p.artifact, p.apt, p.publicKey, p.fingerprint, p.arch...)
+func (p *actionNativePackage) Install(ctx context.Context, vm *guestVM, labBinary string) error {
+	packages, err := p.installFirst(ctx, vm, labBinary)
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, packages.Close()) }()
-	if err := packages.InstallFirst(ctx); err != nil {
-		return err
+	return packages.Close()
+}
+
+// installFirst installs the set's first version and returns its still-open
+// native manager: the pinned trust and signed source a later upgrade reuses.
+func (p *actionNativePackage) installFirst(ctx context.Context, vm *guestVM, labBinary string) (_ *nativeGuestPackages, err error) {
+	second := p.artifact
+	if p.upgrade.Path != "" {
+		second = p.upgrade
 	}
-	return uploadLifecycleProbe(ctx, vm, labBinary)
+	packages, err := newNativeGuestPackages(ctx, vm, p.artifact, second, p.apt, p.publicKey, p.fingerprint, p.arch...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, packages.Close())
+		}
+	}()
+	if err := packages.InstallFirst(ctx); err != nil {
+		return nil, err
+	}
+	if err := uploadLifecycleProbe(ctx, vm, labBinary); err != nil {
+		return nil, err
+	}
+	return packages, nil
 }
 
 // actionGuestConnection owns only guest-to-isolated-server forwarding. Reopen it

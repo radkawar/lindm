@@ -516,6 +516,9 @@ carry `TPM2UnsealRetryNextToken`, and the managed bind writes four references to
 its one sealed keyslot. With Secure Boot, EL 9's aarch64 kernel measured no
 module loads (IMA runtime count 1–2), so its initrd does not race the unlock
 there. EL 10's systemd 257 restarts the encryption session on each retry itself.
+An EL 9 device bound with one token is reported in device encryption status and
+repaired by a new TPM2 bind, which completes the existing keyslot's references
+without a credential ([Ubuntu](ubuntu.md#tpm2-unseal-race)).
 Evidence:
 [verification](../verification.md#tpm2-unseal-race-and-unattended-boot-regression).
 

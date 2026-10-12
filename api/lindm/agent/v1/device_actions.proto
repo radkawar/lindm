@@ -439,6 +439,11 @@ message DeviceActionObservation {
   ];
   // Managed local-admin account facts. Public name/UID only; no shadow field.
   LocalAdminAccountObservation local_admin = 21;
+  // TPM2 bind only: set when the target already carries a working product
+  // bind with the exact PCRs whose keyslot has fewer identical systemd-tpm2
+  // token references than the release requires. The signed plan then adds
+  // only those references to this keyslot: no new keyslot and no credential.
+  optional uint32 tpm2_reference_repair_keyslot = 22 [(buf.validate.field).uint32.lte = 31];
   option (buf.validate.message).cel = {
     id: "device_action_observation.token_ids"
     message: "native token IDs must be unique"

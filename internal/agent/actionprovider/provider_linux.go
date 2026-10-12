@@ -274,6 +274,8 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 				if !ownerPresent(metadata, qualification.GetOwnerRecoveryKeyslot()) {
 					return unsupported("independent_owner_recovery_required")
 				}
+			}
+			if spec.GetEscrowRotate() != nil {
 				if _, e := freeSlot(metadata); e != nil {
 					return unsupported("no_free_keyslot")
 				}
@@ -299,7 +301,19 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 				if e != nil {
 					return nil, e
 				}
-				if reason := tpm2CapacityReason(metadata, references); reason != "" {
+				// A working product bind with too few references is completed
+				// in place (freezing the keyslot in the signed plan); anything
+				// else is a fresh bind.
+				slot, repair, e := p.tpm2RepairCandidate(ctx, handle.file, metadata, spec.GetTpm2Bind().GetPcrs(), qualification.GetOwnerRecoveryKeyslot(), references)
+				if e != nil {
+					return nil, e
+				}
+				reason := tpm2CapacityReason(metadata, references)
+				if repair {
+					observation.Tpm2ReferenceRepairKeyslot = &slot
+					reason = tpm2RepairCapacityReason(metadata, references-len(slotTPMTokens(metadata, slot, spec.GetTpm2Bind().GetPcrs())))
+				}
+				if reason != "" {
 					return unsupported(reason)
 				}
 			}
@@ -432,7 +446,8 @@ func (p *Provider) Plan(ctx context.Context, spec *agentv1.DeviceActionSpec, bef
 }
 
 func samePrecondition(before, fresh *agentv1.DeviceActionObservation) bool {
-	return fresh.GetSupported() && proto.Equal(before.GetTarget(), fresh.GetTarget()) && before.GetEncrypted() == fresh.GetEncrypted() && before.GetRecoveryEnvironment() == fresh.GetRecoveryEnvironment() && before.GetOffTargetJournal() == fresh.GetOffTargetJournal() && bytes.Equal(before.GetMetadataSha256(), fresh.GetMetadataSha256()) && proto.Equal(before.GetNvmeSanitize(), fresh.GetNvmeSanitize())
+	return fresh.GetSupported() && proto.Equal(before.GetTarget(), fresh.GetTarget()) && before.GetEncrypted() == fresh.GetEncrypted() && before.GetRecoveryEnvironment() == fresh.GetRecoveryEnvironment() && before.GetOffTargetJournal() == fresh.GetOffTargetJournal() && bytes.Equal(before.GetMetadataSha256(), fresh.GetMetadataSha256()) && proto.Equal(before.GetNvmeSanitize(), fresh.GetNvmeSanitize()) &&
+		before.Tpm2ReferenceRepairKeyslot != nil == (fresh.Tpm2ReferenceRepairKeyslot != nil) && before.GetTpm2ReferenceRepairKeyslot() == fresh.GetTpm2ReferenceRepairKeyslot()
 }
 
 func (p *Provider) Apply(ctx context.Context, plan *agentv1.DeviceActionPlan, credential []byte, gate func(context.Context) error) (_ *agentv1.DeviceActionVerification, err error) {
@@ -481,7 +496,11 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.DeviceActionPlan, cr
 		case *agentv1.DeviceActionSpec_EscrowRotate:
 			return p.rotate(ctx, plan, target, credential, gate)
 		case *agentv1.DeviceActionSpec_Tpm2Bind:
-			err = p.bindTPM(ctx, plan, target, credential, gate)
+			if plan.GetBefore().Tpm2ReferenceRepairKeyslot != nil {
+				err = p.repairTPMReferences(ctx, plan, target, gate)
+			} else {
+				err = p.bindTPM(ctx, plan, target, credential, gate)
+			}
 		case *agentv1.DeviceActionSpec_CryptoErase:
 			return p.erase(ctx, plan, target, gate)
 		case *agentv1.DeviceActionSpec_Sanitize:
@@ -591,41 +610,10 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 		verification.Verified = false
 		return verification, nil
 	case *agentv1.DeviceActionSpec_Tpm2Bind:
-		target, e := p.resolve(ctx, plan.GetSpec(), false)
-		if e != nil {
-			return nil, e
+		verification.Evidence, err = p.verifyTPMBind(ctx, plan, after)
+		if err != nil {
+			return nil, err
 		}
-		defer func() { err = errors.Join(err, target.file.Close()) }()
-		metadata, _, e := p.metadata(ctx, target.file)
-		if e != nil {
-			return nil, e
-		}
-		references, e := p.tpm2References()
-		if e != nil {
-			return nil, e
-		}
-		slot, ids, e := newTPMTokens(metadata, plan.GetBefore().GetOccupiedKeyslots(), plan.GetSpec().GetTpm2Bind().GetPcrs())
-		if e != nil || len(ids) != references || !ownerPresent(metadata, target.qualification.GetOwnerRecoveryKeyslot()) {
-			return nil, errors.Join(ErrNotVerified, e)
-		}
-		// Every reference is the identical sealed object and PCR policy.
-		var sealed []byte
-		for _, id := range ids {
-			exported, e := p.crypt(ctx, target.file, []string{"token", "export", "--token-id", id, descriptor(0)})
-			if e != nil {
-				return nil, errors.Join(ErrNotVerified, e)
-			}
-			if sealed != nil && !bytes.Equal(sealed, exported) {
-				return nil, ErrNotVerified
-			}
-			sealed = exported
-		}
-		// The token plugin opens the slot through its references in order, as
-		// systemd-cryptsetup does at boot.
-		if _, e := p.crypt(ctx, target.file, []string{"open", "--type", "luks2", "--test-passphrase", "--token-only", "--token-type", "systemd-tpm2", "--key-slot", strconv.FormatUint(uint64(slot), 10), descriptor(0)}); e != nil {
-			return nil, errors.Join(ErrNotVerified, e)
-		}
-		verification.Evidence = fmt.Sprintf("Native systemd TPM2 token on a newly allocated slot observed with exact explicit PCR policy, as %d identical token reference(s) to that slot; independent owner recovery retained. Cold-boot/physical TPM validation is separate.", references)
 	case *agentv1.DeviceActionSpec_LockSessions:
 		if !after.GetSessionsLocked() {
 			after, err = p.awaitSessionLock(ctx, plan.GetSpec())
@@ -666,6 +654,55 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 	}
 	verification.Verified = true
 	return verification, nil
+}
+
+// verifyTPMBind requires the release's count of identical exact-PCR token
+// references on the bound keyslot (a new one, or the planned repair keyslot
+// with no keyslot change) and a token unlock through them.
+func (p *Provider) verifyTPMBind(ctx context.Context, plan *agentv1.DeviceActionPlan, after *agentv1.DeviceActionObservation) (_ string, err error) {
+	target, err := p.resolve(ctx, plan.GetSpec(), false)
+	if err != nil {
+		return "", err
+	}
+	defer func() { err = errors.Join(err, target.file.Close()) }()
+	metadata, _, err := p.metadata(ctx, target.file)
+	if err != nil {
+		return "", err
+	}
+	references, err := p.tpm2References()
+	if err != nil {
+		return "", err
+	}
+	pcrs := plan.GetSpec().GetTpm2Bind().GetPcrs()
+	repair := plan.GetBefore().Tpm2ReferenceRepairKeyslot != nil
+	var slot uint32
+	var ids []string
+	if repair {
+		// The repaired keyslot is the planned one, and no keyslot changed.
+		slot = plan.GetBefore().GetTpm2ReferenceRepairKeyslot()
+		ids = slotTPMTokens(metadata, slot, pcrs)
+		if !slices.Equal(after.GetOccupiedKeyslots(), plan.GetBefore().GetOccupiedKeyslots()) {
+			return "", fmt.Errorf("%w: keyslots_changed", ErrNotVerified)
+		}
+	} else if slot, ids, err = newTPMTokens(metadata, plan.GetBefore().GetOccupiedKeyslots(), pcrs); err != nil {
+		return "", errors.Join(ErrNotVerified, err)
+	}
+	if len(ids) != references || !ownerPresent(metadata, target.qualification.GetOwnerRecoveryKeyslot()) {
+		return "", ErrNotVerified
+	}
+	// Every reference is the identical sealed object and PCR policy.
+	if _, err := p.identicalTPMTokens(ctx, target.file, ids); err != nil {
+		return "", errors.Join(ErrNotVerified, err)
+	}
+	// The token plugin opens the slot through its references in order, as
+	// systemd-cryptsetup does at boot.
+	if _, err := p.crypt(ctx, target.file, []string{"open", "--type", "luks2", "--test-passphrase", "--token-only", "--token-type", "systemd-tpm2", "--key-slot", strconv.FormatUint(uint64(slot), 10), descriptor(0)}); err != nil {
+		return "", errors.Join(ErrNotVerified, err)
+	}
+	if repair {
+		return fmt.Sprintf("Existing product TPM2 keyslot %d completed to %d identical token references with its exact explicit PCR policy; keyslots unchanged and no credential used; independent owner recovery retained. Cold-boot/physical TPM validation is separate.", slot, references), nil
+	}
+	return fmt.Sprintf("Native systemd TPM2 token on a newly allocated slot observed with exact explicit PCR policy, as %d identical token reference(s) to that slot; independent owner recovery retained. Cold-boot/physical TPM validation is separate.", references), nil
 }
 
 // SandboxDevices resolves only locally qualified identities to real native block

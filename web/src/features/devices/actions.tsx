@@ -417,8 +417,12 @@ export function DeviceActionResult({
   const unknown =
     status?.state === DeviceActionState.OUTCOME_UNKNOWN ||
     action.closedReason === "outcome_unknown";
+  // A TPM 2.0 bind that completes an existing bind's token references
+  // (planned by the device) changes no key slot and needs no credential.
   const needsCredential =
-    action.spec?.action.case === "escrowRotate" || action.spec?.action.case === "tpm2Bind";
+    action.spec?.action.case === "escrowRotate" ||
+    (action.spec?.action.case === "tpm2Bind" &&
+      status?.before?.tpm2ReferenceRepairKeyslot === undefined);
   return (
     <article
       key={action.actionId}

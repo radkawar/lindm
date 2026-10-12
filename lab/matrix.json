@@ -100,6 +100,21 @@
       "tpm": true
     },
     {
+      "name": "tpm-reference-repair",
+      "title": "TPM reference repair",
+      "capabilities": ["encryption"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "device-actions",
+      "args": [
+        "-scenario=encryption",
+        "-encryption-phase=tpm-repair",
+        "-legacy-agent-revision=ced6d20902921a0ff66fd9a87085400fac006b08",
+        "-tpm-boots=30"
+      ],
+      "secureBoot": true,
+      "tpm": true
+    },
+    {
       "name": "device-actions",
       "title": "Wipe/loss/lock",
       "capabilities": ["wipe", "report-loss", "lock"],

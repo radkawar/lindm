@@ -247,6 +247,147 @@ func tpm2CapacityReason(metadata *luksMetadata, references int) string {
 	return ""
 }
 
+// tpm2RepairCapacityReason is tpm2CapacityReason for a reference repair, which
+// adds only missing token references to an existing keyslot.
+func tpm2RepairCapacityReason(metadata *luksMetadata, missing int) string {
+	if _, err := freeTokens(metadata, missing); err != nil {
+		return "no_free_token"
+	}
+	area, err := strconv.Atoi(metadata.Config.JSONSize)
+	if err != nil || area <= 0 || metadata.size <= 0 {
+		return "luks2_json_area_unknown"
+	}
+	if area-metadata.size < missing*tpm2TokenJSONBudget {
+		return "luks2_metadata_space_exhausted"
+	}
+	return ""
+}
+
+// slotTPMTokens returns, in token-ID order, the systemd-tpm2 tokens with
+// exactly the requested PCRs that name only keyslot slot.
+func slotTPMTokens(metadata *luksMetadata, slot uint32, pcrs []uint32) []string {
+	wanted := slices.Clone(pcrs)
+	slices.Sort(wanted)
+	name := strconv.FormatUint(uint64(slot), 10)
+	var ids []string
+	for id, token := range metadata.Tokens {
+		actual := slices.Clone(token.PCRs)
+		slices.Sort(actual)
+		if token.Type == "systemd-tpm2" && slices.Equal(wanted, actual) && slices.Equal(token.Keyslots, []string{name}) {
+			ids = append(ids, id)
+		}
+	}
+	slices.SortFunc(ids, func(left, right string) int {
+		l, _ := strconv.Atoi(left)
+		r, _ := strconv.Atoi(right)
+		return l - r
+	})
+	return ids
+}
+
+// identicalTPMTokens exports every token and returns the common sealed token
+// JSON, or ErrNotVerified when any reference differs from the first.
+func (p *Provider) identicalTPMTokens(ctx context.Context, file *os.File, ids []string) ([]byte, error) {
+	var sealed []byte
+	for _, id := range ids {
+		exported, err := p.crypt(ctx, file, []string{"token", "export", "--token-id", id, descriptor(0)})
+		if err != nil {
+			return nil, err
+		}
+		if sealed != nil && !bytes.Equal(sealed, exported) {
+			return nil, fmt.Errorf("%w: tpm2_token_references_differ", ErrNotVerified)
+		}
+		sealed = exported
+	}
+	if sealed == nil {
+		return nil, ErrNotVerified
+	}
+	return sealed, nil
+}
+
+// tpm2RepairCandidate finds the lowest existing product TPM2 keyslot (not the
+// owner's or a lindm recovery slot) whose identical exact-PCR references are
+// fewer than the release needs and which unseals on the current TPM and PCRs
+// through those tokens. A stale or foreign bind is not repaired: the TPM2
+// bind then makes a fresh keyslot, which needs the owner credential.
+func (p *Provider) tpm2RepairCandidate(ctx context.Context, file *os.File, metadata *luksMetadata, pcrs []uint32, owner uint32, references int) (uint32, bool, error) {
+	slots := make([]uint32, 0, len(metadata.Keyslots))
+	for text := range metadata.Keyslots {
+		slot, err := slotNumber(text)
+		if err != nil {
+			return 0, false, err
+		}
+		if slot != owner && !slices.Contains(managedSlots(metadata), slot) {
+			slots = append(slots, slot)
+		}
+	}
+	slices.Sort(slots)
+	for _, slot := range slots {
+		ids := slotTPMTokens(metadata, slot, pcrs)
+		if len(ids) == 0 || len(ids) >= references {
+			continue
+		}
+		if _, err := p.identicalTPMTokens(ctx, file, ids); err != nil {
+			if errors.Is(err, ErrNotVerified) {
+				continue
+			}
+			return 0, false, err
+		}
+		if _, err := p.crypt(ctx, file, []string{"open", "--type", "luks2", "--test-passphrase", "--token-only", "--token-id", ids[0], "--key-slot", strconv.FormatUint(uint64(slot), 10), descriptor(0)}); err != nil {
+			if ctx.Err() != nil {
+				return 0, false, ctx.Err()
+			}
+			continue
+		}
+		return slot, true, nil
+	}
+	return 0, false, nil
+}
+
+// repairTPMReferences adds the references a pre-existing product TPM2 bind
+// lacks: byte-identical copies of its sealed token JSON naming the same
+// keyslot. cryptsetup token import writes only LUKS2 token metadata (no
+// keyslot, digest, segment or keyslot-area change, verified natively), so no
+// owner credential is read or required.
+func (p *Provider) repairTPMReferences(ctx context.Context, plan *agentv1.DeviceActionPlan, target *targetHandle, gate func(context.Context) error) error {
+	metadata, hash, err := p.metadata(ctx, target.file)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(hash, plan.GetBefore().GetMetadataSha256()) || !ownerPresent(metadata, target.qualification.GetOwnerRecoveryKeyslot()) {
+		return ErrConflict
+	}
+	references, err := p.tpm2References()
+	if err != nil {
+		return err
+	}
+	ids := slotTPMTokens(metadata, plan.GetBefore().GetTpm2ReferenceRepairKeyslot(), plan.GetSpec().GetTpm2Bind().GetPcrs())
+	if len(ids) == 0 || len(ids) >= references {
+		return ErrConflict
+	}
+	sealed, err := p.identicalTPMTokens(ctx, target.file, ids)
+	if err != nil {
+		return errors.Join(ErrConflict, err)
+	}
+	missing := references - len(ids)
+	if reason := tpm2RepairCapacityReason(metadata, missing); reason != "" {
+		return fmt.Errorf("%w: %s", ErrUnsupported, reason)
+	}
+	free, err := freeTokens(metadata, missing)
+	if err != nil {
+		return err
+	}
+	if err := gate(ctx); err != nil {
+		return err
+	}
+	for _, id := range free {
+		if _, err := p.run(ctx, nativeRequest{command: cryptsetup, args: []string{"token", "import", "--token-id", strconv.FormatUint(uint64(id), 10), "--json-file", "-", descriptor(0)}, files: []*os.File{target.file}, input: sealed}); err != nil {
+			return errors.Join(ErrOutcomeUnknown, err)
+		}
+	}
+	return nil
+}
+
 // newTPMTokens returns, in token-ID order, the systemd-tpm2 tokens with exactly
 // the requested PCRs that reference one keyslot absent before the bind.
 func newTPMTokens(metadata *luksMetadata, occupiedBefore []uint32, pcrs []uint32) (slot uint32, ids []string, err error) {

@@ -4126,7 +4126,11 @@ unseal (registry `TPM2UnsealRetryNextToken`: Ubuntu 24.04's systemd 255.4 and EL
 there are `TPM2NextTokenReferences` of them. libcryptsetup opens the next
 reference when one fails, both at boot and in the compliance loop above, which
 tries candidate tokens in ID order
-([Ubuntu](platforms/ubuntu.md#tpm2-unseal-race)).
+([Ubuntu](platforms/ubuntu.md#tpm2-unseal-race)). A TPM2 bind on a target whose
+working product bind has too few references completes that keyslot in place
+instead (`tpm2_reference_repair_keyslot` frozen in the signed plan, token metadata
+only, no credential); device encryption status reports observed and required
+references.
 
 Qualification requires the installed Ubuntu/Fedora encrypted-root fixture,
 independent root/data-disk identity and header oracles, real signed escrow

@@ -126,6 +126,14 @@ message GetDeviceEncryptionResponse {
   reserved "recovery_key_reveal_approval_required";
   // Absent when the caller may not reveal this device's recovery keys.
   RevealApproval recovery_key_reveal_approval = 6;
+  // Identical systemd-tpm2 token references the device's TPM2 keyslot has in
+  // the latest observation (the most naming one keyslot); 0 without a bind.
+  uint32 tpm2_token_references = 7;
+  // References the device's release needs for a reliable unattended unlock
+  // (registry TPM2TokenReferences): 4 where systemd's unseal retry is broken
+  // (Ubuntu 24.04, EL 9), else 1. Fewer observed is repaired by a TPM2 bind,
+  // which then adds only the missing references and needs no credential.
+  uint32 tpm2_token_references_required = 8;
 }
 // Requires dedicated permission, recent step-up, reason and audited custody access.
 // Return bytes must remain memory-only, outside query caches, URLs and logs.

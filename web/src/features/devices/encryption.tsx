@@ -311,7 +311,21 @@ export function DeviceEncryptionPanel({
                     <StatusBadge status="warning">Not encrypted</StatusBadge>
                   </Fact>
                 )}
-                <Fact label="TPM 2.0 unlock">{observed.tpm2Bound ? "On" : "Off"}</Fact>
+                {/* Too few identical TPM token references: this release's
+                    systemd can fail one unseal at boot and fall back to the
+                    passphrase. A new TPM 2.0 bind adds only the missing ones. */}
+                <Fact label="TPM 2.0 unlock">
+                  {!observed.tpm2Bound ? (
+                    "Off"
+                  ) : data && data.tpm2TokenReferences < data.tpm2TokenReferencesRequired ? (
+                    <>
+                      <StatusBadge status="warning">May ask for the passphrase at boot</StatusBadge>{" "}
+                      {`${data.tpm2TokenReferences} of the ${data.tpm2TokenReferencesRequired} TPM unlock tokens this release needs. Bind TPM 2.0 again to add the rest; no passphrase is needed.`}
+                    </>
+                  ) : (
+                    "On"
+                  )}
+                </Fact>
                 {observed.supported ? null : (
                   <Fact label="Encryption actions">
                     Not supported{observed.reason ? `: ${observed.reason}` : ""}

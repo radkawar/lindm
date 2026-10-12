@@ -116,6 +116,9 @@ func (f *tpmFixture) native(_ context.Context, request nativeRequest) ([]byte, e
 		return f.dump()
 	case "open":
 		if slices.Contains(request.args, "--token-only") {
+			if f.fail == "stale" {
+				return nil, errors.New("PCR policy no longer matches")
+			}
 			slot := argument(request.args, "--key-slot")
 			for _, token := range f.parsedTokens() {
 				if token.Type == "systemd-tpm2" && slices.Equal(token.Keyslots, []string{slot}) {
@@ -304,6 +307,161 @@ func TestTPMBindReferencesAreCompleteOrUnverified(t *testing.T) {
 		}
 		if _, err := f.p.verify(context.Background(), plan, &agentv1.DeviceActionVerification{}); !errors.Is(err, ErrNotVerified) {
 			t.Fatalf("a reference to another sealed object verified: %v", err)
+		}
+	})
+}
+
+// legacyBind is the header an agent before the reference fix left: owner slot
+// 0 and one product systemd-tpm2 token naming keyslot 1.
+func (f *tpmFixture) legacyBind() {
+	f.slots["1"] = true
+	f.tokens["0"] = json.RawMessage(fixtureSealed)
+}
+
+// repairPlan is the plan Observe signs for a TPM2 bind of this target: it
+// freezes the repair keyslot when tpm2RepairCandidate finds one.
+func (f *tpmFixture) repairPlan(t *testing.T) (*agentv1.DeviceActionPlan, bool) {
+	t.Helper()
+	plan := f.plan(t)
+	handle, err := f.p.resolve(context.Background(), plan.GetSpec(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := handle.file.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	metadata, _, err := f.p.metadata(context.Background(), handle.file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	references, err := f.p.tpm2References()
+	if err != nil {
+		t.Fatal(err)
+	}
+	slot, ok, err := f.p.tpm2RepairCandidate(context.Background(), handle.file, metadata, []uint32{7}, 0, references)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		plan.Before.Tpm2ReferenceRepairKeyslot = &slot
+	}
+	return plan, ok
+}
+
+func (f *tpmFixture) repair(t *testing.T, plan *agentv1.DeviceActionPlan) (err error) {
+	t.Helper()
+	handle, err := f.p.resolve(context.Background(), plan.GetSpec(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { err = errors.Join(err, handle.file.Close()) }()
+	return f.p.repairTPMReferences(context.Background(), plan, handle, f.gate)
+}
+
+// A bind made by an older agent (one token) is completed in place on a
+// release that needs four: identical copies naming the same keyslot, no new
+// keyslot, no cryptenroll and no owner credential.
+func TestTPMBindRepairsLegacyReferencesWithoutCredential(t *testing.T) {
+	f := newTPMFixture(t, "ubuntu-24.04")
+	f.legacyBind()
+	plan, ok := f.repairPlan(t)
+	if !ok || plan.GetBefore().GetTpm2ReferenceRepairKeyslot() != 1 {
+		t.Fatal("legacy one-reference bind was not planned as a repair of keyslot 1")
+	}
+	f.owner = nil // any credential read would now fail
+	if err := f.repair(t, plan); err != nil {
+		t.Fatal(err)
+	}
+	if f.enrolls != 0 || f.gates != 1 || len(f.slots) != 2 {
+		t.Fatalf("repair enrolled %d keyslots, crossed %d gates, left %d keyslots", f.enrolls, f.gates, len(f.slots))
+	}
+	if len(f.tokens) != platform.TPM2NextTokenReferences {
+		t.Fatalf("%d token references after repair", len(f.tokens))
+	}
+	for id, raw := range f.tokens {
+		if !bytes.Equal(raw, []byte(fixtureSealed)) {
+			t.Fatalf("token %s is not the legacy sealed object", id)
+		}
+	}
+	verified, err := f.p.verify(context.Background(), plan, &agentv1.DeviceActionVerification{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(verified.GetEvidence(), "keyslot 1 completed to 4 identical token references") {
+		t.Fatalf("evidence does not describe the repair: %q", verified.GetEvidence())
+	}
+	// Repaired, the bind is no longer a repair candidate.
+	if _, again := f.repairPlan(t); again {
+		t.Fatal("a complete reference set was planned for repair again")
+	}
+}
+
+// Only a working product bind with the exact PCRs, identical references and
+// too few of them is repaired; anything else stays a fresh bind.
+func TestTPMBindRepairCandidates(t *testing.T) {
+	for name, setup := range map[string]func(*tpmFixture){
+		"release needs one": func(*tpmFixture) {},
+		"stale policy":      func(f *tpmFixture) { f.fail = "stale" },
+		"other PCRs": func(f *tpmFixture) {
+			f.tokens["0"] = json.RawMessage(strings.Replace(fixtureSealed, `"tpm2-pcrs":[7]`, `"tpm2-pcrs":[7,11]`, 1))
+		},
+		"differing references": func(f *tpmFixture) {
+			f.tokens["1"] = json.RawMessage(strings.Replace(fixtureSealed, "c2VhbGVkLW9iamVjdA==", "b3RoZXItb2JqZWN0", 1))
+		},
+		"owner slot": func(f *tpmFixture) {
+			f.tokens["0"] = json.RawMessage(strings.Replace(fixtureSealed, `"keyslots":["1"]`, `"keyslots":["0"]`, 1))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			release := "ubuntu-24.04"
+			if name == "release needs one" {
+				release = "ubuntu-26.04"
+			}
+			f := newTPMFixture(t, release)
+			f.legacyBind()
+			setup(f)
+			if _, ok := f.repairPlan(t); ok {
+				t.Fatal("planned as a reference repair")
+			}
+		})
+	}
+}
+
+// The repair is refused before its gate when the header lacks room, or when
+// the header changed since the signed plan.
+func TestTPMBindRepairRefusalsPrecedeEffect(t *testing.T) {
+	t.Run("space", func(t *testing.T) {
+		f := newTPMFixture(t, "ubuntu-24.04")
+		f.legacyBind()
+		f.jsonSize = 2000
+		plan, ok := f.repairPlan(t)
+		if !ok {
+			t.Fatal("not a repair")
+		}
+		err := f.repair(t, plan)
+		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "luks2_metadata_space_exhausted") || f.gates != 0 {
+			t.Fatalf("undersized LUKS2 JSON area not refused before the gate: %v", err)
+		}
+	})
+	t.Run("changed header", func(t *testing.T) {
+		f := newTPMFixture(t, "ubuntu-24.04")
+		f.legacyBind()
+		plan, ok := f.repairPlan(t)
+		if !ok {
+			t.Fatal("not a repair")
+		}
+		f.tokens["5"] = json.RawMessage(`{"type":"vendor","keyslots":[]}`)
+		if err := f.repair(t, plan); !errors.Is(err, ErrConflict) || f.gates != 0 {
+			t.Fatalf("header change after signing not refused before the gate: %v", err)
+		}
+	})
+	t.Run("precondition", func(t *testing.T) {
+		slot := uint32(1)
+		before := &agentv1.DeviceActionObservation{Supported: true, Tpm2ReferenceRepairKeyslot: &slot}
+		if samePrecondition(before, &agentv1.DeviceActionObservation{Supported: true}) || samePrecondition(&agentv1.DeviceActionObservation{Supported: true}, before) {
+			t.Fatal("a repair plan matched a fresh-bind observation")
 		}
 	})
 }

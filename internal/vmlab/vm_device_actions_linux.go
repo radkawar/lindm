@@ -17,6 +17,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/packaging"
 	"lindm/internal/platform"
 )
 
@@ -29,12 +30,17 @@ type VMDeviceActionsOptions struct {
 	WipePhase       string
 	EncryptionPhase string
 	// TPMBoots is how many consecutive unattended cold boots must unlock
-	// through the product TPM2 bind without a prompt (0 means 1; phase tpm).
-	TPMBoots         int
-	LabBinary        string
-	LindmdBinary     string
-	Encrypted        EncryptedVMOptions
-	RecoveryManifest *labv1.ImageManifest
+	// through the product TPM2 bind without a prompt (0 means 1; phases tpm
+	// and tpm-repair).
+	TPMBoots int
+	// LegacyAgentRevision is the build repository commit (or ref) whose agent
+	// performs the original TPM2 bind; required for, and only valid with,
+	// phase tpm-repair.
+	LegacyAgentRevision string
+	LabBinary           string
+	LindmdBinary        string
+	Encrypted           EncryptedVMOptions
+	RecoveryManifest    *labv1.ImageManifest
 	// RedHatTokenFile is required only by subscription-entitled original-device
 	// recovery, whose unregistered vendor cloud image needs entitled boot tooling.
 	RedHatTokenFile string
@@ -111,9 +117,24 @@ type VMDeviceActionsResult struct {
 	TPMBoots                []*tpmUnattendedBoot           `json:"tpm_unattended_boots,omitempty"`
 	// TPMTokenReferences is how many systemd-tpm2 tokens the bind left
 	// referencing its one sealed keyslot (platform TPM2TokenReferences).
-	TPMTokenReferences int                   `json:"tpm_token_references,omitempty"`
-	TPMAbsentDenial    *actionDenialEvidence `json:"tpm_absent_denial,omitempty"`
-	TPMBindingDenial   *actionDenialEvidence `json:"tpm_binding_unsupported_denial,omitempty"`
+	TPMTokenReferences int `json:"tpm_token_references,omitempty"`
+	// Reference repair (phase tpm-repair): the legacy agent's bind, the native
+	// upgrade to the current package and the credential-less repair bind.
+	LegacyAgentRevision       string                    `json:"legacy_agent_revision,omitempty"`
+	LegacyPackageSHA256       string                    `json:"legacy_package_sha256,omitempty"`
+	UpgradedAgentVersion      string                    `json:"upgraded_agent_version,omitempty"`
+	TPMLegacyInventory        *actionEncryptionEvidence `json:"tpm_legacy_inventory,omitempty"`
+	TPMLegacyTokenReferences  int                       `json:"tpm_legacy_token_references,omitempty"`
+	TPMBoundKeyslot           *uint32                   `json:"tpm_bound_keyslot,omitempty"`
+	TPMLegacyServerReferences *tpmServerReferences      `json:"tpm_legacy_server_token_references,omitempty"`
+	TPMReferenceRepair        *actionDispatchEvidence   `json:"tpm_reference_repair,omitempty"`
+	// TPMReferenceRepairKeyslot is the keyslot the agent's signed observation
+	// froze for repair (DeviceActionObservation.tpm2_reference_repair_keyslot).
+	TPMReferenceRepairKeyslot   *uint32               `json:"tpm_reference_repair_keyslot,omitempty"`
+	TPMReferenceRepairNotNeeded string                `json:"tpm_reference_repair_not_needed,omitempty"`
+	TPMServerReferences         *tpmServerReferences  `json:"tpm_server_token_references,omitempty"`
+	TPMAbsentDenial             *actionDenialEvidence `json:"tpm_absent_denial,omitempty"`
+	TPMBindingDenial            *actionDenialEvidence `json:"tpm_binding_unsupported_denial,omitempty"`
 	// TPMBootUnsupported records the observed passphrase prompt after a real
 	// TPM2 bind on a release whose boot path cannot use TPM2 tokens.
 	TPMBootUnsupported    *actionUnsupportedEvidence `json:"tpm_unattended_boot_unsupported,omitempty"`
@@ -138,6 +159,10 @@ type actionMachine struct {
 	target               actionNativeTarget
 	boot                 UnlockOutcome
 	desktop              *labDesktop
+	// packages stays open only when the package set carries an upgrade: the
+	// legacy install's pinned trust and signed source serve UpgradeAgent.
+	packages *nativeGuestPackages
+	upgrade  packaging.Artifact
 }
 
 func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, delegation *agentv1.UpdateExecutionTrustRequest) (_ *actionMachine, err error) {
@@ -196,7 +221,13 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if machine.target.Identity == nil {
 		return nil, errors.New("installed encrypted root target unavailable")
 	}
-	if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
+	if packages.upgrade.Path == "" {
+		err = packages.Install(ctx, vm.guest, options.LabBinary)
+	} else {
+		machine.packages, err = packages.installFirst(ctx, vm.guest, options.LabBinary)
+		machine.upgrade = packages.upgrade
+	}
+	if err != nil {
 		return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("install agent packages: %w", err))
 	}
 	provider := &agentv1.DeviceActionProviderConfig{AllowSessionLock: true, AllowQuarantine: true, ManagementEndpoints: []string{"127.0.0.1", "10.0.2.2"}, DnsServers: []string{"10.0.2.3"}, QuarantineSeconds: 60, Targets: []*agentv1.QualifiedActionTarget{{Target: machine.target.Identity, OwnerRecoveryKeyslot: 0, AllowRecoveryRotation: true, AllowTpm2Binding: options.Encrypted.Hardware.TPM}}}
@@ -220,11 +251,28 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 
 func (m *actionMachine) Close() error {
 	var err error
+	if m.packages != nil {
+		err = m.packages.Close()
+		m.packages = nil
+	}
 	if m.connection != nil {
-		err = m.connection.Close()
+		err = errors.Join(err, m.connection.Close())
 		m.connection = nil
 	}
 	return errors.Join(err, m.vm.Close())
+}
+
+// record copies the opened machine's public identity into a phase result.
+func (m *actionMachine) record(ctx context.Context, result *VMDeviceActionsResult) error {
+	result.Firmware, result.DeviceID, result.Target = m.vm.firmware, m.deviceID, m.target
+	result.RecipeVersion = encryptedRecipeVersion
+	runtime, err := m.vm.guest.runtimeEvidence(ctx)
+	if err != nil {
+		return err
+	}
+	runtime.SeedDisk = false
+	result.Runtime = runtime
+	return nil
 }
 
 func (m *actionMachine) PowerOff(ctx context.Context) error {
@@ -271,11 +319,8 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) {
 		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase")
 	}
-	if options.EncryptionPhase != "" && (options.Scenario != "encryption" || options.EncryptionPhase != "tpm") {
-		return nil, errors.New("encryption phase requires scenario encryption and phase tpm")
-	}
-	if options.TPMBoots < 0 || options.TPMBoots > maxTPMBoots || (options.TPMBoots > 1 && options.EncryptionPhase != "tpm") {
-		return nil, fmt.Errorf("-tpm-boots is 1 to %d and more than one requires -encryption-phase tpm", maxTPMBoots)
+	if err := validateEncryptionPhase(options); err != nil {
+		return nil, err
 	}
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
@@ -329,6 +374,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	} else {
 		result.Boundaries = append(result.Boundaries, "Headless server golden without a desktop session or display; no session lock is qualified.")
 	}
+	if options.EncryptionPhase == "tpm-repair" {
+		result.Boundaries = append(result.Boundaries, "TPM reference repair: the legacy agent binary is compiled from `git archive` of build-repository revision "+options.LegacyAgentRevision+" and packaged as "+actionLegacyAgentVersion+" in the current lab packaging layout and signer (only the agent binary is legacy); it binds with the owner credential, is upgraded in place to the current "+actionCurrentAgentVersion+" package through the guest's native manager, and the identical signed PCR 7 bind is then dispatched without any credential. Emulated swtpm only; no field-upgraded device or production package history is qualified.")
+	}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.Passed = err == nil
@@ -356,12 +404,17 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err != nil {
 		return result, err
 	}
-	packages, err := buildActionNativePackage(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.Encrypted.WorkDir)
+	packages, err := buildActionPackages(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.LegacyAgentRevision, options.Encrypted.WorkDir)
 	if err != nil {
 		return result, err
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
 	result.PackageSHA256, result.SignerFingerprint = packages.artifact.SHA256, packages.fingerprint
+	if packages.upgrade.Path != "" {
+		// PackageSHA256 stays the current agent under test; the legacy package
+		// is recorded beside its resolved source commit.
+		result.PackageSHA256, result.LegacyPackageSHA256, result.LegacyAgentRevision = packages.upgrade.SHA256, packages.artifact.SHA256, packages.legacyRevision
+	}
 	// Resolve a potentially cold installer before creating bounded online
 	// delegation and local sessions. NewEncryptedVM reuses this verified cache.
 	if !strings.HasPrefix(options.WipePhase, "recovery-") {
@@ -403,9 +456,13 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err := control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
 		return result, fmt.Errorf("admit isolated device-action authority: %w", err)
 	}
-	if options.EncryptionPhase == "tpm" {
+	switch options.EncryptionPhase {
+	case "tpm":
 		result.EncryptionPhase = options.EncryptionPhase
 		return result, nativeTPMScenario(ctx, manifest, options, packages, fixture, control, delegation, result)
+	case "tpm-repair":
+		result.EncryptionPhase = options.EncryptionPhase
+		return result, nativeTPMReferenceRepair(ctx, manifest, options, packages, fixture, control, delegation, result)
 	}
 	if options.Scenario == "wipe" && options.WipePhase != "" && options.WipePhase != "lock-quarantine" && options.WipePhase != "live-actions" {
 		result.WipePhase = options.WipePhase
@@ -416,13 +473,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		return result, fmt.Errorf("prepare native device-action machine: %w", err)
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
-	result.Firmware, result.DeviceID, result.Target = machine.vm.firmware, machine.deviceID, machine.target
-	result.RecipeVersion = encryptedRecipeVersion
-	result.Runtime, err = machine.vm.guest.runtimeEvidence(ctx)
-	if err != nil {
+	if err := machine.record(ctx, result); err != nil {
 		return result, err
 	}
-	result.Runtime.SeedDisk = false
 	if options.Scenario == "compliance" {
 		return result, nativeComplianceScenario(ctx, machine, control, result)
 	}
@@ -756,40 +809,13 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
 	if options.EncryptionPhase == "tpm" {
-		result.Firmware, result.DeviceID, result.Target = machine.vm.firmware, machine.deviceID, machine.target
-		result.RecipeVersion = encryptedRecipeVersion
-		result.Runtime, err = machine.vm.guest.runtimeEvidence(ctx)
-		if err != nil {
+		if err := machine.record(ctx, result); err != nil {
 			return err
 		}
-		result.Runtime.SeedDisk = false
 	}
-	request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Tpm2Bind{Tpm2Bind: &agentv1.TPM2BindAction{Target: machine.target.Identity, Pcrs: []uint32{7}}}})
-	if !options.Encrypted.Hardware.TPM {
-		_, rejected := control.session.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
-		denial, err := actionDenial("tpm_absent", rejected, connect.CodeFailedPrecondition)
-		if err != nil {
-			return err
-		}
-		if denial.Reason != "device_action_tpm2_unavailable" {
-			return errors.New("TPM-absent variant failed a different prerequisite")
-		}
-		result.TPMAbsentDenial = &denial
-		return nil
-	}
-	if !machine.release.TPM2BindSupported() {
-		// The shipped systemd-cryptenroll cannot take the owner secret from a
-		// descriptor; the real server must refuse before signing any intent.
-		_, rejected := control.session.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
-		denial, err := actionDenial("tpm_binding_unsupported", rejected, connect.CodeFailedPrecondition)
-		if err != nil {
-			return err
-		}
-		if denial.Reason != "device_action_tpm2_binding_unsupported" {
-			return fmt.Errorf("TPM binding on %s failed a different prerequisite: %s", machine.release.Name, denial.Reason)
-		}
-		result.TPMBindingDenial = &denial
-		return nil
+	request := tpmBindRequest(machine)
+	if refused, err := tpmBindRefused(ctx, machine, control, request, options.Encrypted.Hardware.TPM, result); refused || err != nil {
+		return err
 	}
 	credential := []byte(machine.vm.InitialUnlockSecret())
 	defer clear(credential)
@@ -812,15 +838,7 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return err
 	}
 	if !options.Encrypted.TPMBoot {
-		// No lab TPM early-boot variant exists for this vendor boot path, so the
-		// bound token is expected to be unusable: observe the prompt natively
-		// and report unattended unlock as unsupported rather than skipping it.
-		boot, err := machine.vm.ColdBoot(ctx, "")
-		if err == nil || !boot.PromptSeen || boot.Accepted {
-			return errors.Join(errors.New("vendor boot path did not request its passphrase after TPM2 bind"), err)
-		}
-		result.TPMBootUnsupported = &actionUnsupportedEvidence{Reason: noTPMBootReason(manifest), Boot: boot}
-		return nil
+		return tpmBootUnsupported(ctx, manifest, machine, result)
 	}
 	// The PCR7-mismatch phase enrolls a second clone through the isolated
 	// control plane, so it runs while the admin session is fresh: 30 GNOME

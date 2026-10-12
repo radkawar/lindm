@@ -125,6 +125,32 @@ func TPM2BindSupported(host devicedb.GetHostObservationRow) bool {
 	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2BindSupported()
 }
 
+// TPM2TokenReferencesRequired is the registry's identical systemd-tpm2 token
+// reference count for the observed release (platform TPM2TokenReferences);
+// 0 when the OS identity is unobserved.
+func TPM2TokenReferencesRequired(host devicedb.GetHostObservationRow) uint32 {
+	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
+	if host.OsIDStatus != success || host.OsVersionStatus != success {
+		return 0
+	}
+	return uint32(platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2TokenReferences())
+}
+
+// TPM2TokenReferences is the most systemd-tpm2 tokens naming one keyslot in
+// the public token inventory of an action observation.
+func TPM2TokenReferences(observation *agentv1.DeviceActionObservation) uint32 {
+	counts := make(map[uint32]uint32)
+	var most uint32
+	for _, token := range observation.GetLuksTokens() {
+		if token.GetType() != "systemd-tpm2" || len(token.GetKeyslots()) != 1 {
+			continue
+		}
+		counts[token.GetKeyslots()[0]]++
+		most = max(most, counts[token.GetKeyslots()[0]])
+	}
+	return most
+}
+
 // SessionLockOnlyUnsupported refuses a lock action that would only request a
 // logind session lock on a release whose desktop locker provably ignores it
 // (registry Desktop.SessionLockUnsupported). A spec that also locks accounts

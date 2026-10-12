@@ -156,8 +156,23 @@ func (s *Service) GetDeviceEncryption(ctx context.Context, req *connect.Request[
 			return nil, core.MapErr(core.ErrInternalState)
 		}
 		response.Observation = core.EncryptionObservation(status, req.Msg.GetLuksUuid())
+		response.Tpm2TokenReferences = core.TPM2TokenReferences(response.Observation)
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.MapErr(err)
+	}
+	if response.GetTpm2TokenReferences() > 0 {
+		device, err := q.GetDeviceDetail(ctx, id)
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		if device.CurrentGenerationID != nil {
+			host, err := q.GetHostObservation(ctx, *device.CurrentGenerationID)
+			if err == nil {
+				response.Tpm2TokenReferencesRequired = core.TPM2TokenReferencesRequired(host)
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, core.MapErr(err)
+			}
+		}
 	}
 	row, err = q.LatestDeviceActionEscrow(ctx, devicedb.LatestDeviceActionEscrowParams{DeviceID: id, LuksUuid: luksUUID})
 	if err == nil {

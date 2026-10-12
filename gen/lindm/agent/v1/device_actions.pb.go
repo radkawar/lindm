@@ -2269,9 +2269,14 @@ type DeviceActionObservation struct {
 	PreservedAccounts []string `protobuf:"bytes,19,rep,name=preserved_accounts,json=preservedAccounts,proto3" json:"preserved_accounts,omitempty"`
 	BootId            string   `protobuf:"bytes,20,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
 	// Managed local-admin account facts. Public name/UID only; no shadow field.
-	LocalAdmin    *LocalAdminAccountObservation `protobuf:"bytes,21,opt,name=local_admin,json=localAdmin,proto3" json:"local_admin,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LocalAdmin *LocalAdminAccountObservation `protobuf:"bytes,21,opt,name=local_admin,json=localAdmin,proto3" json:"local_admin,omitempty"`
+	// TPM2 bind only: set when the target already carries a working product
+	// bind with the exact PCRs whose keyslot has fewer identical systemd-tpm2
+	// token references than the release requires. The signed plan then adds
+	// only those references to this keyslot: no new keyslot and no credential.
+	Tpm2ReferenceRepairKeyslot *uint32 `protobuf:"varint,22,opt,name=tpm2_reference_repair_keyslot,json=tpm2ReferenceRepairKeyslot,proto3,oneof" json:"tpm2_reference_repair_keyslot,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *DeviceActionObservation) Reset() {
@@ -2449,6 +2454,13 @@ func (x *DeviceActionObservation) GetLocalAdmin() *LocalAdminAccountObservation 
 		return x.LocalAdmin
 	}
 	return nil
+}
+
+func (x *DeviceActionObservation) GetTpm2ReferenceRepairKeyslot() uint32 {
+	if x != nil && x.Tpm2ReferenceRepairKeyslot != nil {
+		return *x.Tpm2ReferenceRepairKeyslot
+	}
+	return 0
 }
 
 type DeviceActionPlan struct {
@@ -4807,8 +4819,7 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\btoken_id\x18\x01 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\atokenId\x121\n" +
 	"\x04type\x18\x02 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18\x80\x012\x11^[A-Za-z0-9_.-]+$R\x04type\x12,\n" +
 	"\bkeyslots\x18\x03 \x03(\rB\x10\xbaH\r\x92\x01\n" +
-	"\x10 \x18\x01\"\x04*\x02\x18\x1fR\bkeyslots\"\xb5\n" +
-	"\n" +
+	"\x10 \x18\x01\"\x04*\x02\x18\x1fR\bkeyslots\"\xa8\v\n" +
 	"\x17DeviceActionObservation\x12C\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"observedAt\x12\x1c\n" +
@@ -4838,8 +4849,10 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x12preserved_accounts\x18\x13 \x03(\tB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\x11preservedAccounts\x12$\n" +
 	"\aboot_id\x18\x14 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06bootId\x12M\n" +
 	"\vlocal_admin\x18\x15 \x01(\v2,.lindm.agent.v1.LocalAdminAccountObservationR\n" +
-	"localAdmin:\xb0\x01\xbaH\xac\x01\x1a\xa9\x01\n" +
-	"#device_action_observation.token_ids\x12\x1fnative token IDs must be unique\x1aathis.luks_tokens.all(t, this.luks_tokens.filter(other, other.token_id == t.token_id).size() == 1)\"\xcd\x03\n" +
+	"localAdmin\x12O\n" +
+	"\x1dtpm2_reference_repair_keyslot\x18\x16 \x01(\rB\a\xbaH\x04*\x02\x18\x1fH\x00R\x1atpm2ReferenceRepairKeyslot\x88\x01\x01:\xb0\x01\xbaH\xac\x01\x1a\xa9\x01\n" +
+	"#device_action_observation.token_ids\x12\x1fnative token IDs must be unique\x1aathis.luks_tokens.all(t, this.luks_tokens.filter(other, other.token_id == t.token_id).size() == 1)B \n" +
+	"\x1e_tpm2_reference_repair_keyslot\"\xcd\x03\n" +
 	"\x10DeviceActionPlan\x12<\n" +
 	"\x04spec\x18\x01 \x01(\v2 .lindm.agent.v1.DeviceActionSpecB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12G\n" +
 	"\x06before\x18\x02 \x01(\v2'.lindm.agent.v1.DeviceActionObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12%\n" +
@@ -5338,6 +5351,7 @@ func file_lindm_agent_v1_device_actions_proto_init() {
 		(*DeviceActionSpec_LocalAdminPasswordRotate)(nil),
 		(*DeviceActionSpec_PatchNow)(nil),
 	}
+	file_lindm_agent_v1_device_actions_proto_msgTypes[24].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
