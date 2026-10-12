@@ -213,7 +213,7 @@ var (
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	rhelTPMPackages = []string{"tpm2-tools", "tpm2-tss"}
-	rhelLanes       = []LabLane{LaneResources, LaneUpdates, LaneServices}
+	rhelLanes       = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAdvisories, LaneEnrollFromConsole}
 	// RHEL CSAF matching applies only to a corroborated servicing stream, which
 	// the host proves with its entitled BaseOS repository ID (internal/advisory
 	// rhelStream). The air-gap lane's guest has no route to Red Hat from boot,
@@ -265,8 +265,7 @@ var (
 	// with the guest's ukify, which systemd 253 introduced.
 	reasonNoUkify = "no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI"
 	// The native self-update lane (`lab vm updates`) is qualified per guest
-	// architecture: x86_64 on the local host, aarch64 on the arm64 KVM hosts.
-	updatesX86 = map[LabLane][]string{LaneUpdates: x86}
+	// architecture: aarch64 only on the arm64 KVM hosts.
 	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
 )
 
@@ -455,7 +454,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: rhelLanes, LaneArchitectures: updatesX86, LaneGates: rhelLaneGates, Entitlement: true,
+		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
@@ -469,9 +468,9 @@ var registry = []*Release{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
+		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: rhelLanes, LaneArchitectures: updatesX86, LaneGates: rhelLaneGates, Entitlement: true,
+		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},

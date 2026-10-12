@@ -58,7 +58,10 @@ func guestRedHat(ctx context.Context, operation string) error {
 	}
 	timeout := 100 * time.Second
 	if operation == "redhat-repositories" {
-		timeout = 5 * time.Minute
+		// RHEL 9's DNF4 refreshes full BaseOS/AppStream metadata: the aarch64
+		// BaseOS alone was 195 MB, and its AppStream had not finished when a
+		// 5-minute bound expired on a Spark (2.1 MB/s guest egress).
+		timeout = 20 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

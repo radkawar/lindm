@@ -83,9 +83,18 @@ func AirgapAdvisories(release *platform.Release, imageVersion, architecture stri
 	return cfg, nil
 }
 
+// Stream-scoped (Red Hat) sources name the image's exact minor: from RHEL 10,
+// standard-stream errata carry minor CPEs (enterprise_linux:10.1), so a major
+// source admits only the major-wide VEX claims and never a fix.
 func vmAdvisoryFeedSource(release *platform.Release, imageVersion, architecture string, feed platform.Feed, prefix string) (*advisoryv1.FeedSource, error) {
 	versionID := release.Version.Value
-	if release.Version.Rule == platform.VersionSnapshot {
+	switch {
+	case release.Version.Rule == platform.VersionSnapshot:
+		versionID = imageVersion
+	case release.Advisory.PlatformStreams:
+		if platform.Identify(platform.OSRelease{ID: release.ID, VersionID: imageVersion}).Key != release.Key {
+			return nil, fmt.Errorf("advisories: image version %q is not %s", imageVersion, release.Name)
+		}
 		versionID = imageVersion
 	}
 	switch architecture {

@@ -59,6 +59,10 @@ type BuildRequest struct {
 	// BootMode selects a signed UKI or a measured-GRUB initramfs. Measured
 	// builds take no stub, signing key or certificate and require StateUUID.
 	BootMode agentv1.RecoveryBootMode
+	// Ukify runs ukify with extra environment and arguments; nil runs the
+	// custody-checked system /usr/bin/ukify. Only a lab build host without
+	// systemd-ukify injects its privately provisioned, digest-pinned copy.
+	Ukify func(ctx context.Context, env, args []string) error
 }
 
 type Artifact struct {
@@ -182,8 +186,12 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	}
 	unsigned := filepath.Join(dir, "unsigned.efi")
 	image := filepath.Join(dir, "lindm-recovery.efi")
-	if err := native(ctx, []string{"SOURCE_DATE_EPOCH=" + strconv.FormatInt(request.SourceDateEpoch, 10)}, "ukify", "build", "--linux="+request.Kernel.Source, "--initrd="+initrd, "--stub="+request.Stub.Source, "--cmdline="+commandLine, "--os-release=@"+osRelease, "--output="+unsigned); err != nil {
-		return nil, err
+	ukify := request.Ukify
+	if ukify == nil {
+		ukify = func(ctx context.Context, env, args []string) error { return native(ctx, env, "ukify", args...) }
+	}
+	if err := ukify(ctx, []string{"SOURCE_DATE_EPOCH=" + strconv.FormatInt(request.SourceDateEpoch, 10)}, []string{"build", "--linux=" + request.Kernel.Source, "--initrd=" + initrd, "--stub=" + request.Stub.Source, "--cmdline=" + commandLine, "--os-release=@" + osRelease, "--output=" + unsigned}); err != nil {
+		return nil, fmt.Errorf("recoveryboot: build unsigned UKI: %w", err)
 	}
 	if err := native(ctx, nil, "sbsign", "--key", request.SigningKey, "--cert", request.Certificate.Source, "--output", image, unsigned); err != nil {
 		return nil, err

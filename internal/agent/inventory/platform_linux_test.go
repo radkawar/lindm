@@ -4,9 +4,12 @@ package inventory
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -180,5 +183,55 @@ func TestDNF5CapturedFedora44Configuration(t *testing.T) {
 		if config.GetId() != repos.GetIds()[i] || len(config.GetBaseUrls()) != 0 || config.GetMetalink() != "https://mirrors.fedoraproject.org/metalink" || config.GetMirrorlist() != "" || !config.GetGpgcheck() || !config.GetUrlsRedacted() || strings.Join(config.GetGpgKeys(), ",") != "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-aarch64" {
 			t.Fatalf("captured native configuration lost: %v", config)
 		}
+	}
+}
+
+// subscription-manager's redhat.repo declares every repository an entitlement
+// offers, most disabled, and exceeds the general 64 KiB configuration bound on
+// registered hosts; the repository file bound admits it while still refusing
+// an unbounded file.
+func TestDNFConfigProbeAdmitsVendorManagedRepositoryFile(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 is required to exercise the embedded DNF configuration probe")
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "probe.py")
+	if err := os.WriteFile(script, []byte(dnfConfigProbe), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	harness := `import sys
+ns = {"__name__": "probe"}
+exec(compile(open(sys.argv[1]).read(), "probe", "exec"), ns)
+try:
+    ns["checked_directories"](ns["ConfigReader"](), [], [sys.argv[2]])
+    print("ok")
+except ns["EvidenceFailure"] as failure:
+    print("failure", failure.status)
+`
+	run := func(size int) string {
+		t.Helper()
+		repos := filepath.Join(t.TempDir(), "yum.repos.d")
+		if err := os.Mkdir(repos, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		var content strings.Builder
+		for i := 0; content.Len() < size; i++ {
+			fmt.Fprintf(&content, "[rhel-9-for-x86_64-product-%d-rpms]\nname = Product %d\nbaseurl = https://cdn.redhat.com/content/dist/rhel9/$releasever/x86_64/product-%d/os\nenabled = 0\ngpgcheck = 1\nsslverify = 1\nsslclientcert = /etc/pki/entitlement/1.pem\n\n", i, i, i)
+		}
+		if err := os.WriteFile(filepath.Join(repos, "redhat.repo"), []byte(content.String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(python, "-I", "-c", harness, script, repos).CombinedOutput()
+		if err != nil {
+			t.Fatalf("probe harness: %v: %s", err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if got := run(300 << 10); got != "ok" {
+		t.Fatalf("registered-host redhat.repo refused: %s", got)
+	}
+	if got := run(2 << 20); got != "failure 6" {
+		t.Fatalf("unbounded repository file accepted: %s", got)
 	}
 }

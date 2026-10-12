@@ -529,6 +529,17 @@ and credential-bearing framework stderr stay private; EOF is not a successful
 process exit. Cleanup observes the unreaped owned leader before stopping its
 process group and preserves its actual exit status.
 
+Remote `vm device-actions -scenario wipe` runs that include an original-device
+recovery phase build the owned-boot recovery UKI with the host's ukify. The
+Sparks have no systemd-ukify, so the staging step provisions the exact Ubuntu
+`systemd-ukify` 255.4-1ubuntu8.12 package privately under `tools/` (SHA-256
+from Launchpad's published binary, extracted with `dpkg-deb`) and passes its
+path as `-ukify`. The lab injects that copy into the recovery builder
+(`recoveryboot.BuildRequest.Ukify`), running it as the lab user; the product's
+own builder keeps the custody-checked `/usr/bin/ukify`. Nothing changes system
+packages or PATH, and a missing `python3-pefile` is a prerequisite failure.
+Local runs keep `/usr/bin/ukify`.
+
 For the owner, use the printed
 `ssh -L ADMIN:localhost:ADMIN -L TURN:CONTROLLER_IP:TURN <user>@<controller-host>`
 placeholders with your workstation SSH alias, then open the loopback console.

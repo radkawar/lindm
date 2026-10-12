@@ -128,6 +128,16 @@ unregistered vendor image). See the `rhel98-inspect-readiness.json` record in
 [verification](../verification.md); this is not entitlement or EUS/E4S evidence.
 CPU model/source remain native procfs observations.
 
+On a registered host, subscription-manager's `/etc/yum.repos.d/redhat.repo`
+declares every repository the entitlement offers, most disabled: 200,272 bytes on
+registered RHEL 9.8 aarch64 and 57,600 bytes on RHEL 10.2 aarch64 (measured
+2026-10-12). The DNF configuration observer
+([`platform_dnf.py`](../../internal/agent/inventory/platform_dnf.py)) bounded every
+configuration file at 64 KiB, so registered RHEL 9 hosts reported repository
+collection as over capacity and advisory matching found no servicing stream
+(`rhel_platform_stream_unavailable`). `.repo` files are now bounded at 1 MiB each
+(the 4 MiB aggregate bound is unchanged; other configuration files keep 64 KiB).
+
 The fast Cloud image can finish SSH/cloud-init before NetworkManager finishes
 IPv6 startup. Initial strict comparisons correctly returned no verdict when a
 router advertisement added an address and default route between samples.
@@ -156,7 +166,10 @@ path below does not apply
 ([`update/native_linux.go`](../../internal/agent/update/native_linux.go)).
 Authenticity comes from the TUF-signed target digest/length plus RPM
 name/version/architecture validation; the lane neither registered the guest nor
-used repositories. Not exercised: aarch64, registered or EUS/E4S guests.
+used repositories. The same lane passed natively on RHEL 9.8 and 10.2 aarch64 KVM
+guests (matrix `self-update` cells); there DNF4's frozen unpack task is named
+after its resolved `dnf-3` script rather than the `/usr/bin/dnf` symlink, which
+the lab's unpack witness accepts. Not exercised: registered or EUS/E4S guests.
 
 ### Package resources (DNF4)
 
@@ -451,6 +464,15 @@ A Red Hat CSAF source must name a RHEL 8, 9 or 10
 [registry release](../../internal/platform/registry.go) (major or exact minor);
 the registry's per-stream fact, not the os-release ID string, makes hosts require
 corroborated stream evidence and native module identity.
+RHEL 10 standard-stream errata name minor products
+(`cpe:/o:redhat:enterprise_linux:10.1`; for example `RHSA-2026:7675`), while RHEL 9
+errata name the major (`enterprise_linux:9`). A minor CPE applies only to a source
+naming that exact minor, so a RHEL 10 source configured as major `10` retains only
+the major-wide VEX claims (all UNKNOWN on the 10.2 aarch64 lab guest: 34,324
+findings, no fix) and must name the host's exact minor, e.g. `10.2`. The
+advisories lab lane derives Red Hat sources from the image's exact minor for
+both majors, and registers the guest first, because a stream is proved only by
+the entitled BaseOS repository ID.
 RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
 they neither match records nor make architecture coverage UNKNOWN
 ([Fedora advisory feeds](fedora.md#advisory-feeds)).

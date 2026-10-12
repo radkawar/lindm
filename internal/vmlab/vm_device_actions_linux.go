@@ -38,6 +38,10 @@ type VMDeviceActionsOptions struct {
 	// RecoveryBootMode is "" (owned systemd-boot UKI) or "measured-grub"
 	// (stock shim+GRUB, vendor kernel, TPM-attested initramfs).
 	RecoveryBootMode string
+	// Ukify is the host's ukify for the owned-boot recovery UKI; empty is the
+	// system /usr/bin/ukify. Lab hosts without systemd-ukify (the Sparks)
+	// select a privately provisioned, digest-pinned copy.
+	Ukify string
 }
 
 type VMDeviceActionsResult struct {

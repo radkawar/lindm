@@ -9,6 +9,9 @@ import stat
 import sys
 from urllib.parse import urlsplit, urlunsplit
 
+# A single .repo file; every other configuration file keeps the 64 KiB bound.
+REPO_FILE_LIMIT = 1024 * 1024
+
 
 class EvidenceFailure(Exception):
     def __init__(self, status):
@@ -50,7 +53,7 @@ class ConfigReader:
             raise EvidenceFailure(6)
         return data
 
-    def directory(self, path, suffix=None):
+    def directory(self, path, suffix=None, limit=65536):
         if not os.path.isabs(path):
             raise EvidenceFailure(5)
         try:
@@ -69,7 +72,7 @@ class ConfigReader:
                 # traversal or arbitrary per-user environment is involved.
                 if entry.is_dir():
                     continue
-                self.read(entry.path)
+                self.read(entry.path, limit)
 
 
 def checked_directories(reader, varsdirs, reposdirs):
@@ -78,7 +81,10 @@ def checked_directories(reader, varsdirs, reposdirs):
     for directory in varsdirs:
         reader.directory(directory)
     for directory in reposdirs:
-        reader.directory(directory, ".repo")
+        # subscription-manager's redhat.repo declares every repository the
+        # entitlement offers (hundreds of stanzas, most disabled); the total
+        # read stays bounded below.
+        reader.directory(directory, ".repo", REPO_FILE_LIMIT)
     # Effective native variable precedence; only explicit files are locks.
     lock = observation(2)
     for directory in varsdirs:

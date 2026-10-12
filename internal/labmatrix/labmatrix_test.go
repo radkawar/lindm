@@ -3,6 +3,7 @@ package labmatrix
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -197,7 +198,9 @@ func TestConsoleEnrollmentRequiresItsOwnNativeRecord(t *testing.T) {
 			t.Fatalf("%s console enrollment inherited another lane's qualification: %s", key, got.State)
 		}
 	}
-	if got := in.cell(release(t, "rhel-9"), cell, "aarch64"); got.State != NoLane {
+	unsupported := *release(t, "rhel-9")
+	unsupported.Lab.Lanes = slices.DeleteFunc(slices.Clone(unsupported.Lab.Lanes), func(l platform.LabLane) bool { return l == platform.LaneEnrollFromConsole })
+	if got := in.cell(&unsupported, cell, "aarch64"); got.State != NoLane {
 		t.Fatalf("unsupported console enrollment recipe became runnable: %s", got.State)
 	}
 }

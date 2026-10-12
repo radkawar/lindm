@@ -332,6 +332,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" || args[1] == "assistance" {
 		args = SetFlag(args, "golden-cache", filepath.Join(work, "encrypted"))
 	}
+	if recoveryUkifyLane(args) {
+		ukify, err := stage.recoveryUkify(work)
+		if err != nil {
+			return err
+		}
+		args = SetFlag(args, "ukify", ukify)
+	}
 	if name := FlagValue(args, "name"); args[1] == "assistance" && name != "" {
 		demo, err := DemoDirectory(work, name)
 		if err != nil {

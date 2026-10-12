@@ -119,13 +119,22 @@ func runVMRedHatProbe(ctx context.Context, vm *guestVM, operation string, payloa
 	defer func() { vm.captureDiagnostics = capture }()
 	timeout := 2 * time.Minute
 	if operation == "redhat-repositories" {
-		timeout = 6 * time.Minute
+		// Beyond the guest probe's own 20-minute metadata refresh bound.
+		timeout = 21 * time.Minute
 	}
 	result, err := vm.runResult(ctx, "sudo -n "+guestLifecycleProbe+" guest "+operation, bytes.NewReader(payload), 1024, timeout)
 	defer clear(result.Stdout)
 	defer clear(result.Stderr)
 	if err != nil || result.ExitCode != 0 || len(result.Stderr) != 0 {
-		return errors.New("redhat guest " + operation + " failed (credentials and native output suppressed)")
+		reason := "credentials and native output suppressed"
+		if fixed, ok := bytes.CutPrefix(bytes.TrimSuffix(result.Stderr, []byte("\n")), []byte("lab: ")); ok {
+			for _, known := range vmRedHatGuestReasons {
+				if bytes.Equal(fixed, []byte(known)) {
+					reason = known
+				}
+			}
+		}
+		return errors.New("redhat guest " + operation + " failed (" + reason + ")")
 	}
 	if identity != nil {
 		decoded, err := decodeVMRedHatIdentity(result.Stdout, identity.GetRunName())
@@ -137,6 +146,14 @@ func runVMRedHatProbe(ctx context.Context, vm *guestVM, operation string, payloa
 		return errors.New("redhat guest " + operation + " failed (unexpected output suppressed)")
 	}
 	return nil
+}
+
+// vmRedHatGuestReasons are the guest probe's fixed, secret-free refusals that
+// distinguish repository failures; any other guest output stays suppressed.
+var vmRedHatGuestReasons = []string{
+	"redhat enabled repository observation failed (native output suppressed)",
+	"redhat guest has no enabled repositories",
+	"redhat repository metadata refresh failed (native output suppressed)",
 }
 
 var vmRedHatRunNamePattern = regexp.MustCompile(`^lindm-lab-[0-9a-f]{32}$`)

@@ -208,7 +208,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		runtime.CertificateSha256, runtime.BootMode = signer.certificateSHA256, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
 	}
 	runtime.BootstrapVerifiedAt = timestamppb.New(bootstrapVerifiedAt)
-	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem())
+	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem(), options.Ukify)
 	if err != nil {
 		return evidence, err
 	}

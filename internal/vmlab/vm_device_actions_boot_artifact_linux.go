@@ -21,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
+	"lindm/internal/labexec"
 	"lindm/internal/packaging"
 )
 
@@ -30,9 +31,19 @@ import (
 // A nil signer builds the unsigned measured-GRUB initramfs for the vendor
 // kernel; the kernel as GRUB measures it is retained at
 // actionVendorKernel(workDir) for its offline release descriptor.
-func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte) (*recoveryboot.Artifact, error) {
+// A nonempty ukify is the lab host's private pinned copy (remote hosts without
+// systemd-ukify); it runs as the lab user, outside the product's /usr custody.
+func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte, ukify string) (*recoveryboot.Artifact, error) {
 	measured := signer == nil
 	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(workDir, "recovery-build"), StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
+	if ukify != "" {
+		if !filepath.IsAbs(ukify) || filepath.Clean(ukify) != ukify || filepath.Base(ukify) != "ukify" {
+			return nil, errors.New("recovery ukify must be an absolute clean path to ukify")
+		}
+		request.Ukify = func(ctx context.Context, env, args []string) error {
+			return labexec.Run(ctx, labexec.Command{Path: ukify, Args: args, Env: append([]string{"PATH=/usr/bin:/bin", "LANG=C"}, env...), Timeout: 90 * time.Second})
+		}
+	}
 	if !measured {
 		_, serialConsole, err := encryptedInstallerArchitecture(vm.hardware.Architecture)
 		if err != nil {

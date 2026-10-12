@@ -314,6 +314,8 @@ func TestUpdateLaneArchitectures(t *testing.T) {
 		{"fedora", "43", "arm64", true},
 		{"rhel", "9.8", "x86_64", true},
 		{"rhel", "10.2", "x86_64", true},
+		{"rhel", "9.8", "aarch64", true},
+		{"rhel", "10.2", "arm64", true},
 		{"ubuntu", "22.04", "arm64", true},
 		{"debian", "12", "arm64", true},
 		{"debian", "13", "aarch64", true},
@@ -322,7 +324,6 @@ func TestUpdateLaneArchitectures(t *testing.T) {
 		{"almalinux", "9.8", "aarch64", true},
 		{"almalinux", "10.2", "arm64", true},
 		// Unqualified architectures and releases stay refused.
-		{"rhel", "9.8", "aarch64", false},
 		{"ubuntu", "22.04", "amd64", false},
 		{"debian", "12", "amd64", false},
 		{"almalinux", "9.8", "x86_64", false},

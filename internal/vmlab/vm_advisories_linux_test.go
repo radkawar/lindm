@@ -210,3 +210,24 @@ func TestVMAdvisorySourceSnapshotReleaseFromImage(t *testing.T) {
 		t.Fatalf("snapshot advisory source fails the feed contract: %v", err)
 	}
 }
+
+// RHEL 10 standard-stream errata carry minor CPEs (enterprise_linux:10.1), so
+// the Red Hat source names the image's exact minor, never another release's.
+func TestVMAdvisorySourceScopesRedHatStreamToImageMinor(t *testing.T) {
+	for key, version := range map[string]string{"rhel-9": "9.8", "rhel-10": "10.2"} {
+		release, ok := platform.Lookup(key)
+		if !ok {
+			t.Fatalf("missing %s", key)
+		}
+		source, err := vmAdvisorySource(release, version, "aarch64")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if source.GetRelease() != version || source.GetPlatformStream() != "standard" || source.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
+			t.Fatalf("%s source = %v", key, source)
+		}
+		if _, err := vmAdvisorySource(release, "8.10", "aarch64"); err == nil {
+			t.Fatalf("%s accepted another major's image version", key)
+		}
+	}
+}

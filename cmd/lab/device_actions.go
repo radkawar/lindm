@@ -20,6 +20,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
 	flags.StringVar(&options.EncryptionPhase, "encryption-phase", "", "with -scenario encryption: tpm for separately recorded bind/cold-boot/PCR recovery; empty runs all")
 	flags.StringVar(&options.RecoveryBootMode, "recovery-boot-mode", "", "original-device recovery: empty for the owned systemd-boot UKI, measured-grub for stock shim+GRUB with a TPM-attested initramfs")
+	flags.StringVar(&options.Ukify, "ukify", "", "absolute path of the host ukify that builds the owned-boot recovery UKI; empty is /usr/bin/ukify (remote lab hosts select their private pinned copy)")
 	hardware := &vmlab.VMHardwareOptions{TPM: true, AllowNetwork: true}
 	flags.StringVar(&hardware.Architecture, "architecture", "x86_64", "shared emulated architecture; manifest and installer must qualify it")
 	flags.StringVar(&hardware.Accelerator, "accelerator", "kvm", "kvm or explicit tcg; never an implicit fallback")
