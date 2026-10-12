@@ -20,7 +20,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
 	flags.StringVar(&options.EncryptionPhase, "encryption-phase", "", "with -scenario encryption: tpm for separately recorded bind/cold-boot/PCR recovery; empty runs all")
 	flags.StringVar(&options.RecoveryBootMode, "recovery-boot-mode", "", "original-device recovery: empty for the owned systemd-boot UKI, measured-grub for stock shim+GRUB with a TPM-attested initramfs")
-	hardware := &vmlab.VMHardwareOptions{TPM: true, Desktop: true, AllowNetwork: true}
+	hardware := &vmlab.VMHardwareOptions{TPM: true, AllowNetwork: true}
 	flags.StringVar(&hardware.Architecture, "architecture", "x86_64", "shared emulated architecture; manifest and installer must qualify it")
 	flags.StringVar(&hardware.Accelerator, "accelerator", "kvm", "kvm or explicit tcg; never an implicit fallback")
 	flags.StringVar(&hardware.StorageBus, "storage-bus", "virtio-scsi", "virtio-scsi, sata, nvme or virtio-blk; actual complete WWN/serial identity required")
@@ -39,7 +39,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.Encrypted.Firmware.Package, "firmware-package", "", "installed host firmware package")
 	flags.StringVar(&options.Encrypted.Firmware.Version, "firmware-version", "", "exact required firmware package version")
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
-	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland")
+	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland; empty is a headless server golden, refused for lock scenarios")
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack; false is accepted only with -wipe-phase lock-quarantine")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, exclusively created then made read-only")
 	if err := flags.Parse(args); err != nil {
@@ -56,6 +56,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	if err != nil {
 		return err
 	}
+	hardware.Desktop = options.Encrypted.Desktop != ""
 	options.Encrypted.Hardware = hardware
 	result, laneErr := vmlab.DeviceActionsVM(ctx, manifest, options)
 	if result == nil {

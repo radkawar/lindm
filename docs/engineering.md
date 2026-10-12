@@ -1310,10 +1310,13 @@ including real signed escrow/rotation and native TPM binding with independent
 cold-boot checks. The installer-only `lab vm encrypted` smoke below does not
 qualify that column. Live wipe/loss/lock uses `-wipe-phase=live-actions` and
 does not depend on the separately qualified recovery-sanitize cell.
+`vm device-actions` defaults to `-desktop gnome`; `-desktop=` boots a headless
+server golden and is refused before any VM for every scenario or wipe phase that
+includes the desktop lock.
 
 The encrypted installer lane is `lab vm encrypted -manifest
 lab/images/ubuntu-noble-encrypted-amd64.json` (or
-`lab/images/fedora-44-encrypted-x86_64.json`, `rhel-{9.8,10.2}-encrypted-x86_64.json`,
+`lab/images/fedora-44-encrypted-x86_64.json`, `rhel-{9.8,10.2}-encrypted-{x86_64,aarch64}.json`,
 `ubuntu-jammy-encrypted-amd64.json`,
 `debian-{12,13}-amd64.json` netinst, or the Rocky/AlmaLinux 9.8/10.2
 `*-encrypted-x86_64.json` DVDs). Admission is the release's platform

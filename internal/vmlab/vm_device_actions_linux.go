@@ -132,7 +132,7 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return nil, err
 	}
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
-	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
+	desktop, err := actionLaneDesktop(options, release)
 	if err != nil {
 		return nil, errors.Join(err, vm.Close())
 	}
@@ -277,7 +277,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
 		return nil, err
 	}
-	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
+	desktop, err := actionLaneDesktop(options, release)
 	if err != nil {
 		return nil, err
 	}
@@ -292,17 +292,22 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		return nil, errors.New(noTPMBoot)
 	}
 	if (!options.Encrypted.TPMBoot && !lockOnly && noTPMBoot == "") || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
-		return nil, errors.New("device actions require an installer desktop, unbound TPM-capable boot stack (except -wipe-phase lock-quarantine or a release without one), explicit topology and signed-package egress")
+		return nil, errors.New("device actions require an unbound TPM-capable boot stack (except -wipe-phase lock-quarantine or a release without one), explicit topology and signed-package egress")
 	}
-	result = &VMDeviceActionsResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), DesktopProfile: desktop.name, StartedAt: time.Now().UTC(), Boundaries: []string{
+	result = &VMDeviceActionsResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), StartedAt: time.Now().UTC(), Boundaries: []string{
 		"Shared QEMU emulated topology, software TPM2 and pinned firmware only; no physical TPM, firmware or media qualification.",
-		"Installer " + desktop.name + " session lock is verified through logind LockedHint and the desktop's own locker oracle (" + desktop.locker + "), not a physical display observation or boot lock.",
 		"Quarantine probes a guest namespace peer, allowed QEMU-gateway host endpoint, blocked routed host endpoint and explicit DNS; management traverses pinned SSH-forwarding endpoints.",
 		"Recovery keys remain memory-only and are typed as literal lowercase hexadecimal, never decoded to raw random bytes.",
 		"Approval negatives exercise real escrow reveal and real destructive mTLS start authorization after root preflight; destructive positive starts require two distinct local WebAuthn humans.",
 		"Independent off-target recovery enrollment is an external operator workflow, not production automatic recovery credential handoff.",
 		"TPM-present runs prove unattended cold boot and a deliberately mismatched emulated PCR7 policy with owner recovery; TPM-absent runs, and releases whose systemd-cryptenroll predates descriptor unlock, require an explicit server bind denial instead.",
 	}}
+	if desktop != nil {
+		result.DesktopProfile = desktop.name
+		result.Boundaries = append(result.Boundaries, "Installer "+desktop.name+" session lock is verified through logind LockedHint and the desktop's own locker oracle ("+desktop.locker+"), not a physical display observation or boot lock.")
+	} else {
+		result.Boundaries = append(result.Boundaries, "Headless server golden without a desktop session or display; no session lock is qualified.")
+	}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.Passed = err == nil
@@ -629,6 +634,19 @@ func deviceActionCapabilities(scenario, wipePhase string) []platform.Capability 
 	default:
 		return []platform.Capability{platform.Wipe, platform.ReportLoss, platform.Lock, platform.RecoverySanitize}
 	}
+}
+
+// actionLaneDesktop resolves the golden's lab desktop. A headless server
+// golden has none and is admitted only when no selected scenario locks a
+// desktop session.
+func actionLaneDesktop(options VMDeviceActionsOptions, release *platform.Release) (*labDesktop, error) {
+	if options.Encrypted.Desktop != "" {
+		return labDesktopFor(options.Encrypted.Desktop, release)
+	}
+	if slices.Contains(deviceActionCapabilities(options.Scenario, options.WipePhase), platform.Lock) {
+		return nil, errors.New("device action lock scenarios require an installer desktop golden")
+	}
+	return nil, nil
 }
 
 func nativeQuarantineScenarios(ctx context.Context, machine *actionMachine, control *vmControlPlane, result *VMDeviceActionsResult) (err error) {

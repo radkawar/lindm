@@ -103,6 +103,30 @@ func TestCinnamonLockExpectsLockerWithoutLockedHint(t *testing.T) {
 	}
 }
 
+// A headless server golden has no session to lock: it runs the encryption,
+// live-erase, report-loss and recovery phases and is refused before any VM for
+// every scenario that includes a desktop lock.
+func TestHeadlessActionGoldenRefusesLockScenarios(t *testing.T) {
+	release := &platform.Release{Name: "fixture", Lab: platform.Lab{Session: platform.LabSession{Desktops: map[string][]string{"gnome": nil}}}}
+	for _, test := range []struct {
+		scenario, phase string
+		ok              bool
+	}{
+		{"encryption", "", true}, {"compliance", "", true},
+		{"wipe", "live-erase", true}, {"wipe", "live-report-loss", true}, {"wipe", "recovery-nvme", true}, {"wipe", "recovery-sata", true},
+		{"all", "", false}, {"wipe", "", false}, {"wipe", "live-actions", false}, {"wipe", "lock-quarantine", false},
+	} {
+		desktop, err := actionLaneDesktop(VMDeviceActionsOptions{Scenario: test.scenario, WipePhase: test.phase}, release)
+		if (err == nil) != test.ok || desktop != nil {
+			t.Errorf("headless %s/%s: desktop %v, error %v; want admitted=%t", test.scenario, test.phase, desktop, err, test.ok)
+		}
+	}
+	options := VMDeviceActionsOptions{Scenario: "all", Encrypted: EncryptedVMOptions{Desktop: "gnome"}}
+	if desktop, err := actionLaneDesktop(options, release); err != nil || desktop.name != "gnome" {
+		t.Fatalf("gnome golden = %v, %v", desktop, err)
+	}
+}
+
 // COSMIC locks through logind without LockedHint, locks on its own
 // Super+Escape shortcut in the lane, keeps live VIEW scenarios and refuses
 // CONTROL before consent for its missing RemoteDesktop portal.

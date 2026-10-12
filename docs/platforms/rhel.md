@@ -376,6 +376,16 @@ bind with unattended boot and PCR7-mismatch recovery) passed natively on RHEL 9.
 and 10.2 x86_64 with Secure Boot enforced; see
 [verification](../verification.md#rhel-encrypted-device-actions-and-self-update).
 
+RHEL 9.8 aarch64 passed the same five scenarios on a DGX Spark (native KVM,
+AAVMF `2024.02-2ubuntu0.10`) with Secure Boot enforced by the package-owned
+Microsoft-enrolled variables, on a **headless server golden**
+(`vm device-actions -desktop=`) installed from
+[`rhel-9.8-encrypted-aarch64.json`](../../lab/images/rhel-9.8-encrypted-aarch64.json):
+`@core`, the TPM user space and action prerequisites from the DVD, no desktop.
+The vendor shim, GRUB and kernel boot unchanged; no aarch64-specific product fix
+was needed. A headless golden has no session to lock, so lock phases refuse it;
+see [verification](../verification.md#rhel-98-aarch64-encryption-and-tpm).
+
 The executor's action sandbox drop-in names a LUKS target by its approved
 `/dev/disk/by-uuid/<luks_uuid>` alias, verified at provisioning to be the
 identity-checked block node. On RHEL 10.2 with a second virtio-SCSI disk the root
@@ -692,8 +702,9 @@ The aarch64 Binary DVDs are pinned as
 fetch -edition dvd -arch aarch64` (vendor-authenticated checksum, edition
 `dvd-encrypted-lab`). Their
 AppStream comps define only `graphical-server-environment` and
-`server-product-environment`, so the aarch64 encrypted golden installs Server with
-GUI (registry `LabSession.ArchitectureDesktops`); x86_64 keeps Workstation.
+`server-product-environment`, so the aarch64 encrypted GNOME golden installs
+Server with GUI (registry `LabSession.ArchitectureDesktops`); x86_64 keeps
+Workstation. The headless (`-desktop=`) golden installs no environment group.
 
 The air-gap matrix lane is gated (`Lab.LaneGates`): RHEL CSAF matching requires a
 corroborated servicing stream, which the host proves only with its entitled
@@ -705,10 +716,12 @@ the guest first, as a subscribed customer host is.
 
 ## Gaps
 
-RHEL 8, native aarch64, physical TPM/media, entitled air-gap lifecycle, the
-RHEL GNOME assistance session and each gated resource/action in the table above
-remain independent work; the encrypted Workstation golden qualifies only the
-lab's GDM autologin session, not every vendor desktop configuration.
+RHEL 8, the aarch64 desktop lock, wipe and recovery-sanitize lanes, RHEL 10.2
+aarch64 encryption, physical TPM/media,
+entitled air-gap lifecycle, the RHEL GNOME assistance session and each gated
+resource/action in the table above remain independent work; the encrypted
+Workstation golden qualifies only the lab's GDM autologin session, not every
+vendor desktop configuration.
 DNF4 repository observation is not package mutation qualification. Standard,
 EUS and E4S applicability must retain exact content provenance and cannot be
 borrowed from another vendor or minor release.

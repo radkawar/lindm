@@ -3930,6 +3930,35 @@
       "verified": true,
       "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
       "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "encrypted",
+      "architecture": "aarch64",
+      "manifest": "rhel-9.8-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/rhel98-aarch64-golden-sb-server-tpm-01.json",
+      "sha256": "7fb1a1fec515d5ebfe4fb64a0cb05d3f0fddb32bc78146b06135501a10a82444",
+      "recorded": "2026-10-12T03:05:12.951168251Z",
+      "revision": "f432d368cdc3316a087649692f4fb9ee9a541718",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "golden: headless server, Secure Boot on, TPM2, prompted cold unlocks",
+      "reference": "#rhel-98-aarch64-encryption-and-tpm"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "encrypted",
+      "architecture": "aarch64",
+      "manifest": "rhel-9.8-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/rhel98-aarch64-encryption-01.json",
+      "sha256": "54a16d6450f4c4e52eb4679b0063e5a976c7a8438e5e9e21bc5de75afeadec77",
+      "recorded": "2026-10-12T03:30:05.626667883Z",
+      "revision": "f432d368cdc3316a087649692f4fb9ee9a541718-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#rhel-98-aarch64-encryption-and-tpm"
     }
   ]
 }

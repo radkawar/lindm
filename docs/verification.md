@@ -153,8 +153,8 @@ the dispatch lane's systemd service evidence.
 | Debian 13           | x86_64 —; aarch64 [pass][r1]                | no lane                                                                                                                      | no lane                      | x86_64 —; aarch64 [pass][r1]                                  | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass (seven kinds)][r2]                                | no lane                    | x86_64 [pass (scenarios)][r2]; aarch64 [pass (scenarios, TPM absent)][r2]                                                             | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]         | x86_64 [pass (measured GRUB NVMe)][r3]; aarch64 —                                                                              | x86_64 no lane; aarch64 [pass][r2]                                  | [pass (GNOME, five scenarios)][r2]                                                                                                     | no lane                                                                           | gated                                                    | gated           |
 | Fedora 43           | x86_64 [pass][r14]; aarch64 no image        | no lane                                                                                                                      | no lane                      | x86_64 —; aarch64 no image                                    | x86_64 —; aarch64 no image   | no lane                                                                   | x86_64 —; aarch64 no image | gated                                                                                                                                 | gated                                                                                                      | gated                                                                                                                          | no lane                                                             | gated                                                                                                                                  | no lane                                                                           | gated                                                    | gated           |
 | Fedora 44           | x86_64 [pass][r4]; aarch64 [pass][r1]       | x86_64 —; aarch64 [pass (Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup)][r5] | —                            | x86_64 [pass][r1]; aarch64 —                                  | x86_64 —; aarch64 [pass][r8] | x86_64 —; aarch64 [pass (subset)][r8]                                     | —                          | x86_64 [pass][r9]; aarch64 [pass (Secure Boot off)][r15]                                                                              | x86_64 [pass (selected phases)][r9]; aarch64 —                                                             | —                                                                                                                              | x86_64 [pass][r6]; aarch64 no lane                                  | x86_64 [pass (GNOME)][r11]; aarch64 [pass (GNOME, Secure Boot off)][r16]                                                               | no lane                                                                           | —                                                        | gated           |
-| RHEL 9              | x86_64 [pass][r14]; aarch64 —               | no lane                                                                                                                      | gated                        | x86_64 [pass][r1]; aarch64 —                                  | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (eight kinds)][r7]                                | —                          | x86_64 [pass (golden: Secure Boot off, TPM2, prompted cold unlocks)][r17]; aarch64 —                                                  | x86_64 [pass (lock, release, account disable and quarantine; GDM Wayland; Secure Boot on)][r17]; aarch64 — | x86_64 [pass (NVMe original-device recovery; owned systemd-boot UKI; Secure Boot on; registered)][r17]; aarch64 —              | x86_64 [pass (unregistered vendor KVM image)][r17]; aarch64 no lane | gated                                                                                                                                  | no lane                                                                           | x86_64 —; aarch64 [pass (registered; 11 scenarios)][r18] | gated           |
-| RHEL 10             | x86_64 —; aarch64 pass                      | no lane                                                                                                                      | gated                        | x86_64 [pass][r1]; aarch64 —                                  | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (registered; all eight resource kinds)][r19]      | x86_64 —; aarch64 fail     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r17]; aarch64 —                                                                         | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r17]; aarch64 —              | x86_64 [pass (NVMe original-device recovery; owned systemd-boot UKI; Secure Boot on; registered)][r17]; aarch64 —              | x86_64 [pass (unregistered vendor KVM image)][r17]; aarch64 no lane | gated                                                                                                                                  | no lane                                                                           | x86_64 —; aarch64 [pass (registered; 11 scenarios)][r18] | gated           |
+| RHEL 9              | x86_64 [pass][r14]; aarch64 —               | no lane                                                                                                                      | gated                        | x86_64 [pass][r1]; aarch64 —                                  | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (eight kinds)][r7]                                | —                          | x86_64 [pass (golden: Secure Boot off, TPM2, prompted cold unlocks)][r17]; aarch64 [pass][r18]                                        | x86_64 [pass (lock, release, account disable and quarantine; GDM Wayland; Secure Boot on)][r17]; aarch64 — | x86_64 [pass (NVMe original-device recovery; owned systemd-boot UKI; Secure Boot on; registered)][r17]; aarch64 —              | x86_64 [pass (unregistered vendor KVM image)][r17]; aarch64 no lane | gated                                                                                                                                  | no lane                                                                           | x86_64 —; aarch64 [pass (registered; 11 scenarios)][r19] | gated           |
+| RHEL 10             | x86_64 —; aarch64 pass                      | no lane                                                                                                                      | gated                        | x86_64 [pass][r1]; aarch64 —                                  | x86_64 [pass][r1]; aarch64 — | x86_64 —; aarch64 [pass (registered; all eight resource kinds)][r20]      | x86_64 —; aarch64 fail     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r17]; aarch64 —                                                                         | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r17]; aarch64 —              | x86_64 [pass (NVMe original-device recovery; owned systemd-boot UKI; Secure Boot on; registered)][r17]; aarch64 —              | x86_64 [pass (unregistered vendor KVM image)][r17]; aarch64 no lane | gated                                                                                                                                  | no lane                                                                           | x86_64 —; aarch64 [pass (registered; 11 scenarios)][r19] | gated           |
 | Rocky Linux 9       | [pass][r1]                                  | no lane                                                                                                                      | no lane                      | x86_64 —; aarch64 [pass][r1]                                  | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass (seven kinds)][r2]                                | no lane                    | x86_64 —; aarch64 [pass (TPM scenario)][r2]                                                                                           | x86_64 —; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                    | x86_64 —; aarch64 [fail (measured GRUB NVMe: vendor grubaa64.efi records no PCR 8/9 events)][r3]                               | x86_64 no lane; aarch64 [pass][r2]                                  | x86_64 —; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                   | no lane                                                                           | gated                                                    | gated           |
 | Rocky Linux 10      | [pass][r1]                                  | no lane                                                                                                                      | no lane                      | x86_64 —; aarch64 [pass][r1]                                  | x86_64 —; aarch64 [pass][r1] | x86_64 —; aarch64 [pass (seven kinds)][r2]                                | no lane                    | x86_64 —; aarch64 [pass (TPM scenario)][r2]                                                                                           | x86_64 —; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                    | x86_64 —; aarch64 [fail (measured GRUB NVMe: vendor grubaa64.efi records no PCR 8/9 events)][r3]                               | x86_64 no lane; aarch64 [pass][r2]                                  | x86_64 —; aarch64 [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                 | no lane                                                                           | gated                                                    | gated           |
 | AlmaLinux 9         | [pass][r1]                                  | no lane                                                                                                                      | no lane                      | x86_64 —; aarch64 [pass][r1]                                  | [pass][r1]                   | x86_64 —; aarch64 [pass (eight kinds)][r7]                                | no lane                    | x86_64 —; aarch64 [pass (TPM scenario)][r2]                                                                                           | x86_64 —; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                    | x86_64 —; aarch64 [fail (measured GRUB NVMe: vendor grubaa64.efi records no PCR 8/9 events)][r3]                               | x86_64 no lane; aarch64 [pass][r2]                                  | x86_64 —; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                   | no lane                                                                           | gated                                                    | gated           |
@@ -182,8 +182,9 @@ the dispatch lane's systemd service evidence.
 [r15]: #fedora-44-aarch64-encryption-and-tpm
 [r16]: #fedora-44-aarch64-gnome-assistance
 [r17]: #rhel-encrypted-device-actions-and-self-update
-[r18]: #os-update-policy-patch-now-and-patch-status
-[r19]: #host-resource-providers-on-el-10
+[r18]: #rhel-98-aarch64-encryption-and-tpm
+[r19]: #os-update-policy-patch-now-and-patch-status
+[r20]: #host-resource-providers-on-el-10
 
 <!-- END GENERATED lab-matrix -->
 
@@ -5126,6 +5127,87 @@ epoch `1 → 2`, fresh inventory (492 and 530 packages) and signed downgrade
 refusal, with SELinux asserted Enforcing. No product change was needed; the DNF4
 CLI runs in the helper's own transient unit, outside the executor's read-only
 `/var`.
+
+#### RHEL 9.8 aarch64 encryption and TPM
+
+A full `vm device-actions -scenario encryption` run **passed** on `dgx21` on
+2026-10-12 in 1,281 seconds, with **Secure Boot enforced**, on a headless server
+golden (no desktop session or display):
+`$HOME/.cache/lindm-assistqual-20261011/rhel98-aarch64-encryption-01.json`,
+SHA-256 `54a16d6450f4c4e52eb4679b0063e5a976c7a8438e5e9e21bc5de75afeadec77`.
+All five encryption scenarios ran without a phase filter; no aarch64-specific
+product or harness fix was required. This is the arm64 IT-server tuple of the
+org demo.
+
+The installer is the authenticated RHEL 9.8 aarch64 Binary DVD
+[`rhel-9.8-encrypted-aarch64.json`](../lab/images/rhel-9.8-encrypted-aarch64.json)
+(`rhel-9.8-dvd-aarch64`, SHA-256 `1da7c7f9…df275fa92`, 13,307,215,872 bytes;
+vendor-authenticated HTTPS checksum receipt, no RHSM registration). The headless
+kickstart installs `@core`, the action prerequisites and the TPM user space from
+the DVD only, with LVM on LUKS2 and SELinux Enforcing. The golden record
+`rhel98-aarch64-golden-sb-server-tpm-01.json` (same directory), SHA-256
+`7fb1a1fec515d5ebfe4fb64a0cb05d3f0fddb32bc78146b06135501a10a82444`, observed two
+accepted prompted serial cold unlocks, TPM version 2, SecureBoot=1/SetupMode=0
+and guest/stopped-disk LUKS2 header agreement.
+
+The tuple is native aarch64 KVM, QEMU 8.2.2 (`1:8.2.2+ds-0ubuntu1.18`), AAVMF
+`qemu-efi-aarch64=2024.02-2ubuntu0.10` (`AAVMF_CODE.secboot.fd`
+`d37119b2c1173ecdc88d09c00848842fdf575899403b7549a5b51f06766c20d6`,
+`AAVMF_VARS.ms.fd`
+`bdd5b6f03eecf9b18e395925012764c9100cdcf164a0e5aa4373017d3d75534b`),
+virtio-scsi and swtpm 0.7.3. The package-owned Microsoft-enrolled variables
+boot RHEL's signed aarch64 shim, GRUB and kernel enforced (SecureBoot=1,
+SetupMode=0 observed in the golden and the lane's guest/inventory checks): no
+custom key enrollment, replacement bootloader or
+disabled verification. The record binds clean source
+`f432d368cdc3316a087649692f4fb9ee9a541718` (empty diff), native lab
+`4a00f29e75dddb8e742db46d9877e1f06750c439f06b7a1b268095b880652b1a`, server
+`45a303306dd12f652b054420465d684a851b1c5e9d6a9f29b74f5ec6f0bfd19e` and agent RPM
+`863cfb603dc176bf3eb0647f94ce51d8b6a19913a8011217fcff6170bb4ff9b2`.
+
+The product-action evidence proves:
+
+- Signed escrow, actual KEK custody and audited two-human reveal, server/host
+  LUKS2 inventory agreement, and a cold boot with the revealed recovery key.
+- Committed rotation, independently absent retired slot, explicit rejection of
+  the retired key at boot, and successful replacement-key cold boot.
+- Hard-crash rotation retaining slots `[0,1,2]`, successful old/new recovery
+  cold boots, and both executor and server converging to `OUTCOME_UNKNOWN`.
+- Eight real denials: self-approval, changed digest, expired approval, revoked
+  approver, missing reveal reason, missing dedicated permission, expired
+  step-up, and offline start.
+- Successful signed TPM bind, an independently matched `systemd-tpm2` token,
+  and unattended cold boot with `accepted=true`, `prompt_seen=false`.
+- A separate signed bind against deliberately extended PCR7, refusal of
+  unattended cold boot, and successful prompted recovery with the separately
+  escrowed, two-human-revealed key.
+
+`vm device-actions -desktop=` selects the headless golden. It is admitted only
+for scenarios without a desktop lock (encryption, compliance, live erase,
+live report-loss and recovery); `all`, `-wipe-phase live-actions`,
+`lock-quarantine` and the default wipe set refuse before any VM
+(`TestHeadlessActionGoldenRefusesLockScenarios`).
+
+```sh
+artifacts/bin/lab vm device-actions -host dgx21 \
+  -scenario encryption -architecture aarch64 -desktop= \
+  -manifest lab/images/rhel-9.8-encrypted-aarch64.json \
+  -recovery-manifest lab/images/rhel-9.8-aarch64.json \
+  -repo /home/r/dev/minor/lindm -build-repo "$WORKTREE" \
+  -lab "$WORKTREE/artifacts/bin/lab" -lindmd "$WORKTREE/artifacts/bin/lindmd" \
+  -cache .cache/lab/images \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.ms.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -secure-boot -record NEW_FILE
+```
+
+The golden used `lab vm encrypted -host dgx21 -tpm-boot -storage-bus virtio-scsi`
+with the same manifest and firmware flags. The first remote run spent most of
+its wall time copying the 13 GB DVD to the Spark; the host's persistent image
+cache and golden cache on `dgx21` now hold both. This lane excludes the desktop
+lock, wipe/recovery-sanitize, physical TPM/firmware/media, RHEL 10.2 aarch64 and
+the GNOME (Server with GUI) aarch64 golden.
 
 #### Signed-action core regression lanes (2026-10-11)
 
