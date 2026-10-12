@@ -91,13 +91,19 @@ type assistanceTombstone struct {
 	until  time.Time
 }
 
+// assistanceRules compiles the assistance schemas once per process; see
+// requestRules.
+var assistanceRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
+		&agentv1.SyncAssistanceRequest{}, &agentv1.SyncSessionRequest{}, &agentv1.AssistanceLocalSession{},
+	), protovalidate.WithDisableLazy())
+})
+
 func newAssistanceBroker(enabled bool, clock func() time.Time, lookup logindLookup) (*assistanceBroker, error) {
 	if clock == nil || lookup == nil {
 		return nil, errors.New("executor: assistance broker requires a clock and logind lookup")
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(
-		&agentv1.SyncAssistanceRequest{}, &agentv1.SyncSessionRequest{}, &agentv1.AssistanceLocalSession{},
-	), protovalidate.WithDisableLazy())
+	validator, err := assistanceRules()
 	if err != nil {
 		return nil, err
 	}

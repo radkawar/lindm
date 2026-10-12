@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"buf.build/go/protovalidate"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -62,8 +63,12 @@ const (
 // It holds no signing keys and is safe for concurrent verification.
 type Authority struct{ validator protovalidate.Validator }
 
-func New() (*Authority, error) {
-	validator, err := protovalidate.New(protovalidate.WithMessages(
+// authorityRules compiles the signed payload schemas once per process. The
+// compiled rules are an immutable function of the generated descriptors, safe
+// for concurrent use; recompiling their CEL for every Authority dominated the
+// executor's race tests.
+var authorityRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.ExecutionRoot{}, &agentv1.BootstrapBundle{},
 		&agentv1.RenewalIntent{}, &agentv1.IssuanceRetrieval{}, &agentv1.SessionAcquisition{},
 		&agentv1.ExecutionRootTransition{}, &agentv1.ExecutionDelegation{},
@@ -80,6 +85,10 @@ func New() (*Authority, error) {
 		&agentv1.OfflineEnrollmentAuthorization{}, &agentv1.OfflineEnrollmentRequestProof{}, &agentv1.OfflineEnrollmentResponse{},
 		&agentv1.DeviceEncryptionKeyAttestation{},
 	), protovalidate.WithDisableLazy())
+})
+
+func New() (*Authority, error) {
+	validator, err := authorityRules()
 	if err != nil {
 		return nil, fmt.Errorf("compile agent authority schema: %w", err)
 	}

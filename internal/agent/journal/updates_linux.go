@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"buf.build/go/protovalidate"
 	"golang.org/x/mod/semver"
@@ -27,6 +28,12 @@ type UpdateStore struct {
 	current   *agentv1.AgentUpdateJournal
 	failed    bool
 }
+
+// updateRules compiles the update checkpoint schemas once per process; see
+// journalRules.
+var updateRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(&agentv1.AgentUpdateJournal{}, &agentv1.AgentUpdateTransaction{}), protovalidate.WithDisableLazy())
+})
 
 // OpenUpdates refuses missing checkpoints in an existing directory. Deleting a
 // checkpoint cannot reset the installed-version high-water mark.
@@ -54,7 +61,7 @@ func OpenUpdates(executorDirectory string) (_ *UpdateStore, resultErr error) {
 		_ = unix.Close(fd)
 		return nil, errors.Join(ErrAlreadyOpen, err)
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.AgentUpdateJournal{}, &agentv1.AgentUpdateTransaction{}), protovalidate.WithDisableLazy())
+	validator, err := updateRules()
 	if err != nil {
 		_ = unix.Close(fd)
 		return nil, err

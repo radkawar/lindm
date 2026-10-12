@@ -121,11 +121,19 @@ func InitializeLocked(ctx context.Context, directory string, locked *os.File, in
 	return open(ctx, directory, locked, initial)
 }
 
+// journalRules compiles the journal schemas once per process: the compiled
+// rules are an immutable function of the generated descriptors, safe for
+// concurrent use, and recompiling their CEL on every open dominated the
+// executor's race tests.
+var journalRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ResourceExecutionRecord{}, &agentv1.DeviceActionRecord{}, &agentv1.AccountLockLedger{}, &agentv1.ResourceOwnershipLedger{}), protovalidate.WithDisableLazy())
+})
+
 func open(ctx context.Context, directory string, locked *os.File, initial *agentv1.ExecutorJournalState) (_ *Store, resultErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ResourceExecutionRecord{}, &agentv1.DeviceActionRecord{}, &agentv1.AccountLockLedger{}, &agentv1.ResourceOwnershipLedger{}), protovalidate.WithDisableLazy())
+	validator, err := journalRules()
 	if err != nil {
 		return nil, fmt.Errorf("compile executor journal schema: %w", err)
 	}

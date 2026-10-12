@@ -219,14 +219,12 @@ func Run(ctx context.Context, cfg Config) error {
 	return err
 }
 
-// New locks the state directory and opens an existing journal, or remains
-// unprovisioned until PrepareBootstrap. Corrupt state becomes recovery hold.
-func New(ctx context.Context, directory string, opts ...Option) (*Service, error) {
-	authority, err := trust.New()
-	if err != nil {
-		return nil, err
-	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(
+// requestRules compiles the executor's request and record schemas once per
+// process: the compiled rules are an immutable function of the generated
+// descriptors, safe for concurrent use, and recompiling their CEL for every
+// Service dominated this package's race tests.
+var requestRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.PrepareBootstrapRequest{}, &agentv1.InstallEnrollmentRequest{},
 		&agentv1.ImportOfflineEnrollmentRequest{},
 		&agentv1.GetConnectionRequest{}, &agentv1.SignTLSClientMessageRequest{},
@@ -253,6 +251,16 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.ExchangeAgentUpdateRequest{}, &agentv1.GetAgentUpdateRequest{}, &agentv1.AgentUpdateConfig{},
 		&agentv1.AgentUpdateJournal{},
 	), protovalidate.WithDisableLazy())
+})
+
+// New locks the state directory and opens an existing journal, or remains
+// unprovisioned until PrepareBootstrap. Corrupt state becomes recovery hold.
+func New(ctx context.Context, directory string, opts ...Option) (*Service, error) {
+	authority, err := trust.New()
+	if err != nil {
+		return nil, err
+	}
+	validator, err := requestRules()
 	if err != nil {
 		return nil, err
 	}
