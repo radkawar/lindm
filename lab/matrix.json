@@ -90,6 +90,15 @@
       "args": ["-scenario=encryption"]
     },
     {
+      "name": "tpm-unattended-boots",
+      "title": "TPM unattended boots",
+      "capabilities": ["encryption"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "device-actions",
+      "args": ["-scenario=encryption", "-encryption-phase=tpm", "-tpm-boots=30"],
+      "secureBoot": true
+    },
+    {
       "name": "device-actions",
       "title": "Wipe/loss/lock",
       "capabilities": ["wipe", "report-loss", "lock"],

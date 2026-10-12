@@ -3669,6 +3669,14 @@ Typed findings reference only the existing escrow-rotation and TPM-binding
 action workflows; they grant no action authority. An unencrypted root requires
 separately authorized offline installation/encryption, not an invented action.
 
+On releases whose systemd-tpm2 token cannot survive a PCR extension during its
+unseal (registry `TPM2UnsealRetryNextToken`: Ubuntu 24.04's systemd 255.4 and EL
+9's 252), the TPM2 bind adds identical references to the sealed keyslot until
+there are `TPM2NextTokenReferences` of them. libcryptsetup opens the next
+reference when one fails, both at boot and in the compliance loop above, which
+tries candidate tokens in ID order
+([Ubuntu](platforms/ubuntu.md#tpm2-unseal-race)).
+
 Qualification requires the installed Ubuntu/Fedora encrypted-root fixture,
 independent root/data-disk identity and header oracles, real signed escrow
 receipt custody, the systemd cryptsetup token plugin and a real native or VM TPM.

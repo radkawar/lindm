@@ -453,6 +453,70 @@ cannot downgrade. Paths are not authority, and the fallback does not qualify NVM
 sanitize ([target construction](../../internal/device/inventory/storage_targets.go#L116),
 [native revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
 
+### TPM2 unseal race
+
+With Secure Boot enforced, Ubuntu 24.04's unattended TPM2 unlock of the root
+volume races initrd module loading. The signed `6.8.0-146-generic` kernel
+(`CONFIG_IMA_ARCH_POLICY=y`) adds IMA's Secure Boot rule
+`measure func=MODULE_CHECK`, so every module load extends PCR 10 (53–63 runtime
+measurements on the arm64 golden, 67 on amd64). Any PCR extension changes the
+TPM's global `pcrUpdateCounter`. A `TPM2_Unseal` whose policy session ran
+`TPM2_PolicyPCR` before that change fails with `TPM_RC_PCR_CHANGED` (0x128),
+whichever PCR the token is sealed to. In the arm64 dracut initrd, udev loads
+`xhci-pci`, about 15 CPU-feature crypto modules (`sha*-ce`, `sm3`/`sm4-ce`,
+`ghash-ce`, `polyval-ce`, `crct10dif-ce`) and the USB HID modules between 0.98
+and 1.45 s, which is exactly when `systemd-cryptsetup@` unseals. The other
+suspects do not extend during the unlock: systemd-pcrphase, -pcrextend,
+-pcrmachine and -tpm2-setup are skipped (`ConditionSecurity=measured-uki`),
+crypttab has no `tpm2-measure-pcr=`, and GRUB and firmware measure before the
+kernel starts.
+
+systemd `255.4-1ubuntu8.17` retries a `TPM_RC_PCR_CHANGED` unseal up to 30
+times but reuses its parameter-encryption session. tpm2-tss `4.0.1` clears that
+session's `TPMA_SESSION_DECRYPT` for `Esys_Unseal`, because the command has no
+parameter to encrypt, and restores it only after a successful response. The
+retry therefore stops at "Missing encryption session" and the token fails with
+`EINVAL` (`Failed to unseal secret using TPM2: Invalid argument`). Upstream fixed
+this in [1923e213165d](https://github.com/systemd/systemd/commit/1923e213165d1510b553473b1a14c33cb5124bcb)
+([#31881](https://github.com/systemd/systemd/issues/31881)), released in systemd
+256 and systemd-stable 255.5; Ubuntu noble's systemd does not carry it.
+`systemd-cryptsetup` opens the TPM2 tokens twice per boot, first every token
+and then the `systemd-tpm2` ones. A boot prompts for the passphrase when both
+unseals collide.
+
+The managed bind fixes this with a native mechanism and the same PCR 7 policy:
+libcryptsetup 2.7 maps the token plugin's `-EINVAL` to `-ENOENT` and opens the
+next token. The registry's `TPM2UnsealRetryNextToken` quirk makes the agent add
+three byte-identical copies of the token `systemd-cryptenroll` wrote, all
+naming its one new keyslot. The result is four tokens for the same sealed object
+and policy, and so eight independent unseals per boot, each with fresh sessions.
+No keyslot or secret is added. The bind is refused before its effect gate when
+the header lacks four free tokens or the LUKS2 JSON room
+(`no_free_token`, `luks2_metadata_space_exhausted`). Verification requires exactly
+four identical references and a token unlock of that keyslot
+([bind](../../internal/agent/actionprovider/luks_linux.go),
+[quirk](../../internal/platform/platform.go)). Pop!_OS 24.04 and Linux Mint 22
+inherit the quirk from this row. A binding made before this change keeps one
+token; bind again to add a referenced slot, after which the old token is tried
+first. Ubuntu 26.04's systemd 259 starts a new session on every retry and keeps
+one token. In its arm64 regression cell, 29 of 30 boots logged one or two
+`0x00000128` unseals, and every boot still unlocked through the first token.
+
+On dgx20 (arm64, 3 concurrent guests) and on local KVM (amd64), both with Secure
+Boot enforced and the product's `systemd-cryptenroll --tpm2-pcrs=7` bind, one
+token gave:
+
+| Guest | Cold boots | Passphrase prompt | Collisions absorbed by the second unseal |
+| ----- | ---------- | ----------------- | ---------------------------------------- |
+| arm64 | 33         | 1 (3.0%)          | 4 boots                                  |
+| amd64 | 33         | 0                 | 0                                        |
+
+The prompted arm64 boot logged two `0x00000128` unseals, at 1.150 s and 1.292 s.
+Evidence, hashes, the four-reference results and the
+`tpm-unattended-boots` regression cell (30 product-bound cold boots that must
+all unlock) are in
+[verification](../verification.md#tpm2-unseal-race-and-unattended-boot-regression).
+
 ## Resource providers
 
 The agent executes only generic signed resource intents. The server dispatches

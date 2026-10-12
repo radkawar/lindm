@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strconv"
@@ -37,6 +38,11 @@ type luksMetadata struct {
 		Offset string `json:"offset"`
 		Type   string `json:"type"`
 	} `json:"segments"`
+	Config struct {
+		JSONSize string `json:"json_size"`
+	} `json:"config"`
+	// size is the canonical compact JSON length, set by Provider.metadata.
+	size int
 }
 
 func parseMetadata(raw []byte) (*luksMetadata, error) {
@@ -144,6 +150,7 @@ func (p *Provider) metadata(ctx context.Context, file *os.File) (*luksMetadata, 
 		return nil, nil, err
 	}
 	hash := sha256.Sum256(canonical)
+	metadata.size = len(canonical)
 	return metadata, hash[:], nil
 }
 
@@ -191,12 +198,89 @@ func freeSlot(metadata *luksMetadata) (uint32, error) {
 }
 
 func freeToken(metadata *luksMetadata) (uint32, error) {
-	for id := uint32(0); id < 32; id++ {
+	ids, err := freeTokens(metadata, 1)
+	if err != nil {
+		return 0, err
+	}
+	return ids[0], nil
+}
+
+// freeTokens returns the count lowest unused token IDs.
+func freeTokens(metadata *luksMetadata, count int) ([]uint32, error) {
+	ids := make([]uint32, 0, count)
+	for id := uint32(0); id < 32 && len(ids) < count; id++ {
 		if _, occupied := metadata.Tokens[strconv.FormatUint(uint64(id), 10)]; !occupied {
-			return id, nil
+			ids = append(ids, id)
 		}
 	}
-	return 0, fmt.Errorf("%w: no_free_token", ErrUnsupported)
+	if len(ids) < count {
+		return nil, fmt.Errorf("%w: no_free_token", ErrUnsupported)
+	}
+	return ids, nil
+}
+
+// LUKS2 JSON a managed TPM2 bind adds: one keyslot (296 bytes as written by
+// systemd-cryptenroll 255) and one systemd-tpm2 token per reference (738 bytes
+// with an ECC SRK; an RSA SRK's serialized public area is larger).
+const (
+	tpm2KeyslotJSONBudget = 512
+	tpm2TokenJSONBudget   = 1024
+)
+
+// tpm2CapacityReason refuses a bind whose keyslot, token references or JSON
+// would not fit, before any effect: running out midway would leave fewer
+// references than the release needs. Empty means the bind fits.
+func tpm2CapacityReason(metadata *luksMetadata, references int) string {
+	if _, err := freeSlot(metadata); err != nil {
+		return "no_free_keyslot"
+	}
+	if _, err := freeTokens(metadata, references); err != nil {
+		return "no_free_token"
+	}
+	area, err := strconv.Atoi(metadata.Config.JSONSize)
+	if err != nil || area <= 0 || metadata.size <= 0 {
+		return "luks2_json_area_unknown"
+	}
+	if area-metadata.size < tpm2KeyslotJSONBudget+references*tpm2TokenJSONBudget {
+		return "luks2_metadata_space_exhausted"
+	}
+	return ""
+}
+
+// newTPMTokens returns, in token-ID order, the systemd-tpm2 tokens with exactly
+// the requested PCRs that reference one keyslot absent before the bind.
+func newTPMTokens(metadata *luksMetadata, occupiedBefore []uint32, pcrs []uint32) (slot uint32, ids []string, err error) {
+	wanted := slices.Clone(pcrs)
+	slices.Sort(wanted)
+	found := false
+	for id, token := range metadata.Tokens {
+		actual := slices.Clone(token.PCRs)
+		slices.Sort(actual)
+		if token.Type != "systemd-tpm2" || !slices.Equal(wanted, actual) || len(token.Keyslots) != 1 {
+			continue
+		}
+		tokenSlot, err := slotNumber(token.Keyslots[0])
+		if err != nil {
+			return 0, nil, err
+		}
+		if slices.Contains(occupiedBefore, tokenSlot) {
+			continue
+		}
+		if found && tokenSlot != slot {
+			return 0, nil, fmt.Errorf("%w: multiple_new_tpm2_keyslots", ErrConflict)
+		}
+		slot, found = tokenSlot, true
+		ids = append(ids, id)
+	}
+	if !found {
+		return 0, nil, ErrNotVerified
+	}
+	slices.SortFunc(ids, func(left, right string) int {
+		l, _ := strconv.Atoi(left)
+		r, _ := strconv.Atoi(right)
+		return l - r
+	})
+	return slot, ids, nil
 }
 
 func (p *Provider) rotate(ctx context.Context, plan *agentv1.DeviceActionPlan, target *targetHandle, credential []byte, gate func(context.Context) error) (_ *agentv1.DeviceActionVerification, err error) {
@@ -296,11 +380,12 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 	if err := p.testUnlock(ctx, target.file, target.qualification.GetOwnerRecoveryKeyslot(), credential); err != nil {
 		return err
 	}
-	if _, err := freeSlot(metadata); err != nil {
+	references, err := p.tpm2References()
+	if err != nil {
 		return err
 	}
-	if _, err := freeToken(metadata); err != nil {
-		return err
+	if reason := tpm2CapacityReason(metadata, references); reason != "" {
+		return fmt.Errorf("%w: %s", ErrUnsupported, reason)
 	}
 	pcrs := make([]string, len(plan.GetSpec().GetTpm2Bind().GetPcrs()))
 	for i, pcr := range plan.GetSpec().GetTpm2Bind().GetPcrs() {
@@ -318,7 +403,84 @@ func (p *Provider) bindTPM(ctx context.Context, plan *agentv1.DeviceActionPlan, 
 	if err != nil {
 		return errors.Join(ErrOutcomeUnknown, err)
 	}
+	if references > 1 {
+		if err := p.referenceTPMToken(ctx, target, plan, references); err != nil {
+			return errors.Join(ErrOutcomeUnknown, err)
+		}
+	}
 	return nil
+}
+
+// referenceTPMToken adds references-1 byte-identical copies of the token
+// systemd-cryptenroll just wrote, all naming its one new keyslot: the same
+// sealed object and PCR policy, opened with fresh TPM sessions per token
+// (platform.TPM2UnsealRetryNextToken). No secret is written; the export holds
+// only the TPM-sealed object, which never leaves the agent.
+func (p *Provider) referenceTPMToken(ctx context.Context, target *targetHandle, plan *agentv1.DeviceActionPlan, references int) error {
+	metadata, _, err := p.metadata(ctx, target.file)
+	if err != nil {
+		return err
+	}
+	_, ids, err := newTPMTokens(metadata, plan.GetBefore().GetOccupiedKeyslots(), plan.GetSpec().GetTpm2Bind().GetPcrs())
+	if err != nil {
+		return err
+	}
+	if len(ids) != 1 {
+		return fmt.Errorf("%w: unexpected_tpm2_token_references", ErrConflict)
+	}
+	sealed, err := p.crypt(ctx, target.file, []string{"token", "export", "--token-id", ids[0], descriptor(0)})
+	if err != nil {
+		return err
+	}
+	free, err := freeTokens(metadata, references-1)
+	if err != nil {
+		return err
+	}
+	for _, id := range free {
+		if _, err := p.run(ctx, nativeRequest{command: cryptsetup, args: []string{"token", "import", "--token-id", strconv.FormatUint(uint64(id), 10), "--json-file", "-", descriptor(0)}, files: []*os.File{target.file}, input: sealed}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// tpm2References is the registry's token-reference count for this host's own
+// os-release row (platform.Release.TPM2TokenReferences).
+func (p *Provider) tpm2References() (int, error) {
+	if p.hostRelease == nil {
+		return 0, fmt.Errorf("%w: host_release_unknown", ErrUnsupported)
+	}
+	release, err := p.hostRelease()
+	if err != nil {
+		return 0, err
+	}
+	return release.TPM2TokenReferences(), nil
+}
+
+const maximumOSRelease = 64 << 10
+
+// readHostRelease maps /etc/os-release to its registry row; an unlisted
+// release is a valid, unknown row.
+func readHostRelease() (_ *platform.Release, err error) {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	data, err := io.ReadAll(io.LimitReader(file, maximumOSRelease+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maximumOSRelease {
+		return nil, fmt.Errorf("%w: os_release_too_large", ErrUnsupported)
+	}
+	fields := make(map[string]string)
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if key, value, ok := strings.Cut(line, "="); ok {
+			fields[key] = strings.Trim(value, "\"'")
+		}
+	}
+	return platform.Identify(platform.OSRelease{ID: fields["ID"], VersionID: fields["VERSION_ID"], VariantID: fields["VARIANT_ID"]}), nil
 }
 
 // cryptenrollBindsTPM2 is the native probe behind the server's registry gate:

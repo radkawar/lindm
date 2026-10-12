@@ -305,6 +305,27 @@ func TestTPM2BindFollowsShippedSystemd(t *testing.T) {
 	}
 }
 
+// Ubuntu 24.04's systemd 255.4 and EL 9's backported systemd 252 retry a
+// TPM_RC_PCR_CHANGED unseal on a stale encryption session, so only further
+// token references retry; derivatives shipping that systemd inherit it, while
+// releases whose systemd retries the policy session itself keep one token.
+func TestTPM2TokenReferencesFollowShippedUnsealRetry(t *testing.T) {
+	for key, want := range map[string]int{"ubuntu-24.04": TPM2NextTokenReferences, "pop-24.04": TPM2NextTokenReferences, "linuxmint-22.3": TPM2NextTokenReferences,
+		"rhel-9": TPM2NextTokenReferences, "rocky-9": TPM2NextTokenReferences, "almalinux-9": TPM2NextTokenReferences,
+		"ubuntu-26.04": 1, "debian-12": 1, "debian-13": 1, "fedora-44": 1, "rhel-10": 1} {
+		release, ok := Lookup(key)
+		if !ok {
+			t.Fatalf("registry lacks %s", key)
+		}
+		if got := release.TPM2TokenReferences(); got != want {
+			t.Errorf("%s TPM2TokenReferences = %d, want %d", key, got, want)
+		}
+	}
+	if got := Identify(OSRelease{ID: "unknown-os", VersionID: "1"}).TPM2TokenReferences(); got != 1 {
+		t.Fatalf("unlisted release writes %d references", got)
+	}
+}
+
 // The native self-update lane is admitted per guest architecture exactly where
 // a native record passed; both architecture spellings resolve identically.
 func TestUpdateLaneArchitectures(t *testing.T) {

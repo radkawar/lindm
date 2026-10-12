@@ -192,7 +192,37 @@ type Quirks struct {
 	// RecoveryOwnerKey requires an owner-enrolled Secure Boot key for UKI
 	// recovery. This is a loader policy of the release itself, not its base.
 	RecoveryOwnerKey bool
+	// TPM2UnsealRetry is how the shipped systemd-tpm2 token survives a PCR
+	// extension during its unseal.
+	TPM2UnsealRetry TPM2UnsealRetry
 }
+
+// TPM2UnsealRetry is how a release's systemd-tpm2 unseal recovers when any
+// PCR is extended between its TPM2_PolicyPCR and TPM2_Unseal: the TPM's global
+// pcrUpdateCounter changes and Unseal fails with TPM_RC_PCR_CHANGED. Under
+// Secure Boot the kernel's IMA architecture policy measures every module load
+// into PCR 10, so initrd module loading races the boot-time unlock.
+type TPM2UnsealRetry uint8
+
+const (
+	// TPM2UnsealRetryInSession: systemd restarts the policy session itself
+	// (the systemd-stable 252 loop; upstream 255.5 and 256 and later).
+	TPM2UnsealRetryInSession TPM2UnsealRetry = iota
+	// TPM2UnsealRetryNextToken: systemd's retry reuses the parameter-encryption
+	// session that tpm2-tss 4 leaves without TPMA_SESSION_DECRYPT after the
+	// failed Unseal (systemd 254 to 255.4 and their backports; fixed upstream
+	// in 1923e213165d), so the token fails with -EINVAL ("Missing encryption
+	// session"). libcryptsetup maps that to -ENOENT and opens the next token,
+	// so further references to the same sealed keyslot are the only retries.
+	TPM2UnsealRetryNextToken
+)
+
+// TPM2NextTokenReferences is how many LUKS2 tokens reference the one sealed
+// keyslot of a managed TPM2 bind on a TPM2UnsealRetryNextToken release. Its
+// systemd-cryptsetup opens the tokens twice per boot (every token, then the
+// systemd-tpm2 ones), so four references give eight independent unseals of
+// the identical sealed object and PCR policy, each with fresh sessions.
+const TPM2NextTokenReferences = 4
 
 // GRUBEntries is the vendor GRUB menu source a one-shot entry is added to.
 type GRUBEntries string
@@ -449,6 +479,16 @@ const TPM2BindSystemdFloor = 252
 func (r *Release) TPM2BindSupported() bool {
 	systemd := r.Native().Systemd
 	return systemd == 0 || systemd >= TPM2BindSystemdFloor
+}
+
+// TPM2TokenReferences is how many LUKS2 tokens the managed TPM2 bind writes
+// for its one sealed keyslot: one where systemd retries a PCR change itself,
+// TPM2NextTokenReferences where only libcryptsetup's next token does.
+func (r *Release) TPM2TokenReferences() int {
+	if r.Native().Quirks.TPM2UnsealRetry == TPM2UnsealRetryNextToken {
+		return TPM2NextTokenReferences
+	}
+	return 1
 }
 
 // Gate returns nil when the capability is implemented for the release, and

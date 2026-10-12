@@ -23,11 +23,14 @@ import (
 // VMDeviceActionsOptions configures a maintained native lane, never production
 // action authority. Only signed official image manifests and disposable VMs run.
 type VMDeviceActionsOptions struct {
-	Repository       string
-	BuildRepository  string
-	Scenario         string
-	WipePhase        string
-	EncryptionPhase  string
+	Repository      string
+	BuildRepository string
+	Scenario        string
+	WipePhase       string
+	EncryptionPhase string
+	// TPMBoots is how many consecutive unattended cold boots must unlock
+	// through the product TPM2 bind without a prompt (0 means 1; phase tpm).
+	TPMBoots         int
 	LabBinary        string
 	LindmdBinary     string
 	Encrypted        EncryptedVMOptions
@@ -105,8 +108,12 @@ type VMDeviceActionsResult struct {
 	TPMBind                 *actionDispatchEvidence        `json:"tpm_bind"`
 	TPMInventory            *actionEncryptionEvidence      `json:"tpm_inventory"`
 	TPMBoot                 *UnlockOutcome                 `json:"tpm_unattended_boot"`
-	TPMAbsentDenial         *actionDenialEvidence          `json:"tpm_absent_denial,omitempty"`
-	TPMBindingDenial        *actionDenialEvidence          `json:"tpm_binding_unsupported_denial,omitempty"`
+	TPMBoots                []*tpmUnattendedBoot           `json:"tpm_unattended_boots,omitempty"`
+	// TPMTokenReferences is how many systemd-tpm2 tokens the bind left
+	// referencing its one sealed keyslot (platform TPM2TokenReferences).
+	TPMTokenReferences int                   `json:"tpm_token_references,omitempty"`
+	TPMAbsentDenial    *actionDenialEvidence `json:"tpm_absent_denial,omitempty"`
+	TPMBindingDenial   *actionDenialEvidence `json:"tpm_binding_unsupported_denial,omitempty"`
 	// TPMBootUnsupported records the observed passphrase prompt after a real
 	// TPM2 bind on a release whose boot path cannot use TPM2 tokens.
 	TPMBootUnsupported    *actionUnsupportedEvidence `json:"tpm_unattended_boot_unsupported,omitempty"`
@@ -266,6 +273,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	}
 	if options.EncryptionPhase != "" && (options.Scenario != "encryption" || options.EncryptionPhase != "tpm") {
 		return nil, errors.New("encryption phase requires scenario encryption and phase tpm")
+	}
+	if options.TPMBoots < 0 || options.TPMBoots > maxTPMBoots || (options.TPMBoots > 1 && options.EncryptionPhase != "tpm") {
+		return nil, fmt.Errorf("-tpm-boots is 1 to %d and more than one requires -encryption-phase tpm", maxTPMBoots)
 	}
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
@@ -791,6 +801,10 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if err != nil {
 		return err
 	}
+	result.TPMTokenReferences = boundTPMTokenReferences(result.TPMInventory.Tokens)
+	if want := machine.release.TPM2TokenReferences(); result.TPMTokenReferences != want {
+		return fmt.Errorf("TPM2 bind wrote %d systemd-tpm2 token references to its keyslot, want %d for %s", result.TPMTokenReferences, want, machine.release.Name)
+	}
 	if err := machine.PowerOff(ctx); err != nil {
 		return err
 	}
@@ -808,18 +822,14 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 		result.TPMBootUnsupported = &actionUnsupportedEvidence{Reason: noTPMBootReason(manifest), Boot: boot}
 		return nil
 	}
-	boot, err := machine.vm.ColdBoot(ctx, "")
-	if err != nil {
-		return fmt.Errorf("TPM unattended cold boot: %w", err)
-	}
-	if !boot.Accepted || boot.PromptSeen || boot.BootID == machine.boot.BootID {
-		return errors.New("TPM binding did not unlock an independent unattended cold boot")
-	}
-	result.TPMBoot = &boot
-	if err := machine.Close(); err != nil {
+	// The PCR7-mismatch phase enrolls a second clone through the isolated
+	// control plane, so it runs while the admin session is fresh: 30 GNOME
+	// cold boots outlasted the session (enrollment grant "unauthenticated").
+	// The boot series then needs only this powered-off guest.
+	if err := nativeTPMMismatch(ctx, manifest, options, packages, fixture, control, delegation, result); err != nil {
 		return err
 	}
-	return nativeTPMMismatch(ctx, manifest, options, packages, fixture, control, delegation, result)
+	return unattendedTPMBoots(ctx, machine, max(options.TPMBoots, 1), options.Encrypted.DiagnosticsDir, result)
 }
 
 // enableCryptsetupConsole rebuilds the running kernel's registry-named initrd

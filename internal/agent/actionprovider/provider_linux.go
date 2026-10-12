@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/custody"
+	"lindm/internal/platform"
 	"lindm/internal/resource"
 )
 
@@ -73,6 +75,8 @@ type Provider struct {
 	accounts    *accountLocker
 	resolve     func(context.Context, *agentv1.DeviceActionSpec, bool) (*targetHandle, error)
 	flushHeader func(*os.File) error
+	// hostRelease identifies this host's registry row (TPM2 token references).
+	hostRelease func() (*platform.Release, error)
 	gate        chan struct{}
 	clock       func() time.Time
 }
@@ -140,6 +144,7 @@ func New(options Options) (*Provider, error) {
 		p.localAdmin = &localAdminNative{seal: options.SealLocalAdmin, custody: options.AccountJournal, accounts: p.accounts.readAccounts, root: p.accounts.root}
 	}
 	p.flushHeader = flushBlockHeader
+	p.hostRelease = readHostRelease
 	return p, nil
 }
 
@@ -285,6 +290,13 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 				}
 				if !cryptenrollBindsTPM2(version) {
 					return unsupported("systemd_cryptenroll_tpm2_binding_unsupported")
+				}
+				references, e := p.tpm2References()
+				if e != nil {
+					return nil, e
+				}
+				if reason := tpm2CapacityReason(metadata, references); reason != "" {
+					return unsupported(reason)
 				}
 			}
 		} else {
@@ -584,29 +596,32 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 		if e != nil {
 			return nil, e
 		}
-		wanted := slices.Clone(plan.GetSpec().GetTpm2Bind().GetPcrs())
-		slices.Sort(wanted)
-		matched := false
-		for id, token := range metadata.Tokens {
-			actual := slices.Clone(token.PCRs)
-			slices.Sort(actual)
-			if token.Type == "systemd-tpm2" && slices.Equal(wanted, actual) && len(token.Keyslots) == 1 {
-				slot, e := slotNumber(token.Keyslots[0])
-				if e != nil {
-					return nil, e
-				}
-				if !slices.Contains(plan.GetBefore().GetOccupiedKeyslots(), slot) {
-					if _, e := p.crypt(ctx, target.file, []string{"open", "--type", "luks2", "--test-passphrase", "--token-only", "--token-id", id, descriptor(0)}); e != nil {
-						return nil, errors.Join(ErrNotVerified, e)
-					}
-					matched = true
-				}
+		references, e := p.tpm2References()
+		if e != nil {
+			return nil, e
+		}
+		slot, ids, e := newTPMTokens(metadata, plan.GetBefore().GetOccupiedKeyslots(), plan.GetSpec().GetTpm2Bind().GetPcrs())
+		if e != nil || len(ids) != references || !ownerPresent(metadata, target.qualification.GetOwnerRecoveryKeyslot()) {
+			return nil, errors.Join(ErrNotVerified, e)
+		}
+		// Every reference is the identical sealed object and PCR policy.
+		var sealed []byte
+		for _, id := range ids {
+			exported, e := p.crypt(ctx, target.file, []string{"token", "export", "--token-id", id, descriptor(0)})
+			if e != nil {
+				return nil, errors.Join(ErrNotVerified, e)
 			}
+			if sealed != nil && !bytes.Equal(sealed, exported) {
+				return nil, ErrNotVerified
+			}
+			sealed = exported
 		}
-		if !matched || !ownerPresent(metadata, target.qualification.GetOwnerRecoveryKeyslot()) {
-			return nil, ErrNotVerified
+		// The token plugin opens the slot through its references in order, as
+		// systemd-cryptsetup does at boot.
+		if _, e := p.crypt(ctx, target.file, []string{"open", "--type", "luks2", "--test-passphrase", "--token-only", "--token-type", "systemd-tpm2", "--key-slot", strconv.FormatUint(uint64(slot), 10), descriptor(0)}); e != nil {
+			return nil, errors.Join(ErrNotVerified, e)
 		}
-		verification.Evidence = "Native systemd TPM2 token and newly allocated slot observed with exact explicit PCR policy; independent owner recovery retained. Cold-boot/physical TPM validation is separate."
+		verification.Evidence = fmt.Sprintf("Native systemd TPM2 token on a newly allocated slot observed with exact explicit PCR policy, as %d identical token reference(s) to that slot; independent owner recovery retained. Cold-boot/physical TPM validation is separate.", references)
 	case *agentv1.DeviceActionSpec_LockSessions:
 		if !after.GetSessionsLocked() {
 			after, err = p.awaitSessionLock(ctx, plan.GetSpec())

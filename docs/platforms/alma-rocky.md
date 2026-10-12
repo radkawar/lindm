@@ -204,6 +204,12 @@ owned-boot UKI fixture boots there but needs `systemd-ukify` on the Spark hosts,
 which they do not have yet. aarch64 SATA cannot boot at all, because AAVMF has no
 AHCI driver.
 
+Rocky Linux and AlmaLinux 9 share RHEL 9's `systemd 252-67`, whose TPM2 unseal
+retry fails on a stale encryption session after a PCR change. The managed TPM2
+bind therefore writes four token references to its sealed keyslot, as on RHEL 9;
+see [RHEL](rhel.md#tpm2-unseal-retry) for the Rocky 9.8 measurements. The 10.2
+rows ship systemd 257, which retries correctly, and keep one token.
+
 ## Device actions
 
 The AlmaLinux service result below covers signed systemd service dispatch, not

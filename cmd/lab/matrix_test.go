@@ -75,6 +75,7 @@ func TestAdvisoryRecordScopeNeverInventsFullCoverage(t *testing.T) {
 func TestMatrixActionCellsRequireTheirCompleteNativeProof(t *testing.T) {
 	for _, tc := range []struct{ cell, required string }{
 		{"encrypted", "-scenario=encryption"},
+		{"tpm-unattended-boots", "-tpm-boots=30"},
 		{"device-actions", "-wipe-phase=live-actions"},
 		{"recovery-sanitize", "-wipe-phase=recovery-nvme"},
 	} {

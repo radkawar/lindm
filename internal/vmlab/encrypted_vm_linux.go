@@ -389,14 +389,27 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 // ColdBoot starts from powered-off disk/NVRAM/TPM state, supplies the chosen
 // passphrase only after an actual initramfs prompt, and proves SSH plus a boot ID.
 // Recovery keys use exactly the same path as installer passphrases.
-func (v *EncryptedVM) ColdBoot(ctx context.Context, secret string) (out UnlockOutcome, err error) {
-	return v.coldBoot(ctx, secret, true)
+func (v *EncryptedVM) ColdBoot(ctx context.Context, secret string) (UnlockOutcome, error) {
+	return v.coldBoot(ctx, secret, true, v.bootConsole)
+}
+
+// UnattendedColdBoot is a cold boot that must unlock without a prompt. If the
+// initramfs prompts anyway, fallback is typed so the failed boot still reaches
+// SSH and its journal can be collected; PromptSeen records the failure. The
+// serial console is copied to console, which may receive lab credentials only
+// as typed (unechoed) input and must stay private.
+func (v *EncryptedVM) UnattendedColdBoot(ctx context.Context, fallback string, console io.Writer) (UnlockOutcome, error) {
+	if fallback == "" {
+		return UnlockOutcome{}, errors.New("unattended cold boot requires a fallback secret")
+	}
+	return v.coldBoot(ctx, fallback, false, console)
 }
 
 // coldBoot with requireSecret false types the secret only if the boot actually
 // prompts, as a user at the console would, and also accepts an unattended
-// unlock. UnlockOutcome.PromptSeen records which happened.
-func (v *EncryptedVM) coldBoot(ctx context.Context, secret string, requireSecret bool) (out UnlockOutcome, err error) {
+// unlock. UnlockOutcome.PromptSeen records which happened. A non-nil
+// diagnostic receives a copy of the serial console.
+func (v *EncryptedVM) coldBoot(ctx context.Context, secret string, requireSecret bool, diagnostic io.Writer) (out UnlockOutcome, err error) {
 	if strings.ContainsAny(secret, "\r\n\x00") {
 		return out, errors.New("unlock secret must be a single line")
 	}
@@ -426,7 +439,7 @@ func (v *EncryptedVM) coldBoot(ctx context.Context, secret string, requireSecret
 	}
 	prompt := make(chan promptResult, 1)
 	go func() {
-		seen, err := unlockEncryptedSerial(bootctx, console, secret, v.bootConsole)
+		seen, err := unlockEncryptedSerial(bootctx, console, secret, diagnostic)
 		prompt <- promptResult{seen, err}
 		if err != nil {
 			stop()

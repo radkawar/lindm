@@ -144,14 +144,16 @@ var (
 	// Detached package signature verified against the Arch developer page's
 	// primary fingerprint 02FD1C7A934E614545849F19A6234074498E9CEE.
 	// Native runtime qualification remains a separate matrix receipt.
-	pacman     = PackageTooling{Backend: BackendPacman, ALPM: ALPMABI{Path: "/usr/lib/libalpm.so.16.0.1", SONAME: "libalpm.so.16", Version: "16.0.1"}, ResourceDependencies: []string{"python"}}
-	zypper     = PackageTooling{Backend: BackendZypper}
-	gnomeGDM3  = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
-	gnomeGDM   = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
-	ufw        = "nftables + ufw (inactive)"
-	firewalld  = "nftables + firewalld"
-	nftables   = "nftables"
-	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
+	pacman    = PackageTooling{Backend: BackendPacman, ALPM: ALPMABI{Path: "/usr/lib/libalpm.so.16.0.1", SONAME: "libalpm.so.16", Version: "16.0.1"}, ResourceDependencies: []string{"python"}}
+	zypper    = PackageTooling{Backend: BackendZypper}
+	gnomeGDM3 = Desktop{Name: "GNOME", DisplayManager: "gdm3", Lock: "GNOME Shell"}
+	gnomeGDM  = Desktop{Name: "GNOME", DisplayManager: "gdm", Lock: "GNOME Shell"}
+	ufw       = "nftables + ufw (inactive)"
+	firewalld = "nftables + firewalld"
+	nftables  = "nftables"
+	// EL 9's systemd 252-67 carries the 255-era TPM2 code with the stale
+	// encryption-session retry (rhel.md#tpm2-unseal-retry; Rocky 9.8 measured).
+	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB, TPM2UnsealRetry: TPM2UnsealRetryNextToken}
 	elQuirks10 = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
 	// Stock shim+GRUB chains for measured original-device recovery.
 	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2", BootDirectory: "/boot"}
@@ -342,7 +344,11 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:24.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "noble", CodenameRelease: true,
 			Exports:       map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}},
 			ArchiveOrigin: "Ubuntu", ArchiveSuites: []string{"noble", "noble-security", "noble-updates"}, ArchiveSigners: []string{"F6ECB3762474EDA9D21B7022871920D1991BC93C"}},
-		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate, SSHBannerUnit: "ssh.service",
+		// systemd 255.4-1ubuntu8.17 lacks upstream 1923e213165d (255.5): a
+		// PCR_CHANGED unseal retry fails "Missing encryption session" (EINVAL),
+		// and the signed kernel's Secure Boot IMA policy measures each initrd
+		// module load into PCR 10 during the unlock (ubuntu.md#tpm2-unseal-race).
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate, SSHBannerUnit: "ssh.service", TPM2UnsealRetry: TPM2UnsealRetryNextToken,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},

@@ -61,7 +61,7 @@ func demoUnattendedBoot(ctx context.Context, vm *EncryptedVM, evidenceDir, label
 	if _, werr := fmt.Fprintf(progress, "%s: TPM unattended unlock fell back to passphrase on this boot (known intermittent race, reported)\n", hostname); werr != nil {
 		return boot, false, werr
 	}
-	boot, err = vm.coldBoot(ctx, vm.InitialUnlockSecret(), false)
+	boot, err = vm.coldBoot(ctx, vm.InitialUnlockSecret(), false, nil)
 	if err != nil {
 		return boot, true, err
 	}

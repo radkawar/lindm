@@ -463,6 +463,24 @@ fixture. The host's private pinned ukify builds it. Both releases passed NVMe
 that way after the direct NVMe admin ioctl
 ([verification](../verification.md#rhel-matrix-completion-2026-10-12)).
 
+### TPM2 unseal retry
+
+EL 9's `systemd 252-67` backports the systemd 255 TPM2 code together with its
+stale-session retry ([Ubuntu](ubuntu.md#tpm2-unseal-race)). After an unseal fails
+with `TPM_RC_PCR_CHANGED`, the token fails with `EINVAL`
+(`Failed to unseal secret using TPM2: Invalid argument`; the RHEL 9 source refuses
+the reused session as "Missing encryption session"). `cryptsetup 2.8.1` logs
+`systemd-tpm2 token handler returned -22. Changing to -2.` and opens the next
+token. On Rocky Linux 9.8 aarch64 with one token, 15 of 30 and 9 of 30 token
+unlocks succeeded while PCR 10 was extended every 100 ms and every 50 ms. With
+four token references they were 26 of 30 and 23 of 30. The EL 9 rows therefore
+carry `TPM2UnsealRetryNextToken`, and the managed bind writes four references to
+its one sealed keyslot. With Secure Boot, EL 9's aarch64 kernel measured no
+module loads (IMA runtime count 1–2), so its initrd does not race the unlock
+there. EL 10's systemd 257 restarts the encryption session on each retry itself.
+Evidence:
+[verification](../verification.md#tpm2-unseal-race-and-unattended-boot-regression).
+
 ## Device actions
 
 Signed service execution is not desktop lock, quarantine, restart, shutdown,

@@ -260,6 +260,17 @@ TPM-absent, so their TPM phase records the server's `tpm2_unavailable` denial.
 Records and hashes are in
 [verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
 
+Debian 12's `systemd 252.39-1~deb12u2` keeps the systemd-stable 252 unseal loop.
+That loop reuses the parameter-encryption session but does not refuse it, so it
+restarts the policy session after a `TPM_RC_PCR_CHANGED` unseal, unlike Ubuntu
+24.04's 255.4 ([TPM2 unseal race](ubuntu.md#tpm2-unseal-race)). On the x86_64
+golden with Secure Boot enforced (109 IMA runtime measurements), one token
+unlocked 30 of 30 times while PCR 10 was extended every 100 ms and every 50 ms.
+Debian 13's systemd 257 creates a fresh session for each retry. Both releases
+therefore keep one token per TPM2 bind. On x86_64 they qualify unattended unlock
+through the `tpm-unattended-boots` cell
+([verification](../verification.md#tpm2-unseal-race-and-unattended-boot-regression)).
+
 ## Advisory feeds
 
 Debian's security-tracker export is **source-package** data. `repositories` describes
