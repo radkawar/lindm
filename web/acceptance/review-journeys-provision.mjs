@@ -55,6 +55,7 @@ function representative(config, department) {
 }
 
 async function start(ctx, id, job) {
+  trackAdminReads(ctx.page);
   await ctx.visit("/dashboard");
   await shot(
     ctx,
@@ -67,19 +68,42 @@ async function start(ctx, id, job) {
   );
 }
 
+// Console reads in flight on a page. A picker can show its cached choices while
+// it rereads them (for example after a group was just created), so "no match"
+// only counts once those reads have finished.
+const adminReads = new WeakMap();
+function trackAdminReads(page) {
+  if (adminReads.has(page)) return adminReads.get(page);
+  const state = { pending: 0 };
+  const admin = (request) => request.url().includes("/lindm.admin.v1.AdminService/");
+  const done = (request) => {
+    if (admin(request)) state.pending = Math.max(0, state.pending - 1);
+  };
+  page.on("request", (request) => {
+    if (admin(request)) state.pending += 1;
+  });
+  page.on("requestfinished", done);
+  page.on("requestfailed", done);
+  adminReads.set(page, state);
+  return state;
+}
+
 // Pickers list one server page of choices; a later page is offered by a "More …"
 // button inside the choices or beside the field. Page only when the current page
 // has finished loading and has no match.
 async function matchOnPage(page, popover, option) {
+  const reads = trackAdminReads(page);
   const deadline = Date.now() + timeout;
   let empty = 0;
   while (Date.now() < deadline) {
     if (await option.isVisible()) return true;
     const none = await popover.getByText("No matching options.", { exact: true }).isVisible();
-    const loading = await page
-      .getByRole("status")
-      .filter({ hasText: /^Loading\b/ })
-      .count();
+    const loading =
+      reads.pending > 0 ||
+      (await page
+        .getByRole("status")
+        .filter({ hasText: /^Loading\b/ })
+        .count()) > 0;
     empty = none && !loading ? empty + 1 : 0;
     if (empty >= 4) return false;
     await page.waitForTimeout(250);
@@ -87,8 +111,18 @@ async function matchOnPage(page, popover, option) {
   return false;
 }
 
+async function enabled(locator) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (!(await locator.isDisabled())) return true;
+    await locator.page().waitForTimeout(250);
+  }
+  return false;
+}
+
 async function chooseNamed(ctx, container, label, name, prefix) {
   const { page } = ctx;
+  trackAdminReads(page);
   const trigger = container.getByRole("button", { name: new RegExp(`^${label} `) });
   // The picker's choices float in a popover outside the container.
   const popover = page.locator('[data-slot="popover-content"]');
@@ -103,10 +137,10 @@ async function chooseNamed(ctx, container, label, name, prefix) {
     if (await matchOnPage(page, popover, option)) break;
     const inside = popover.getByRole("button", { name: more });
     const beside = container.getByRole("button", { name: more });
-    const next = (await inside.count()) ? inside.first() : beside.first();
-    if (turned >= 10 || !(await next.count()) || (await next.isDisabled()))
-      throw new Error("named_picker_matching_option_not_visible");
     const outside = (await inside.count()) === 0;
+    const next = outside ? beside.first() : inside.first();
+    if (turned >= 10 || !(await next.count()) || !(await enabled(next)))
+      throw new Error("named_picker_matching_option_not_visible");
     if (outside) {
       await page.keyboard.press("Escape");
       await popover.waitFor({ state: "hidden", timeout });
