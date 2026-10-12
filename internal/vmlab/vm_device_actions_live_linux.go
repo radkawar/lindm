@@ -254,7 +254,7 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 		if err != nil {
 			return evidence, err
 		}
-		output, err := machine.vm.guest.run(ctx, "sudo -n -u lindm -- "+guestLifecycleProbe+" guest live-erase-no-report", bytes.NewReader(input), 128<<10, 45*time.Second)
+		output, err := runActionProbe(ctx, machine.vm.guest, "live-erase-no-report", input, 128<<10, 45*time.Second)
 		if err != nil {
 			return evidence, err
 		}

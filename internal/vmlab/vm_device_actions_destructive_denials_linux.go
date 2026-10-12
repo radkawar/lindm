@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -87,7 +89,7 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 		if err != nil {
 			return evidence, err
 		}
-		data, err := vm.run(ctx, "sudo -n -u lindm -- "+guestLifecycleProbe+" guest action-authorize-denied", bytes.NewReader(input), 16<<10, 30*time.Second)
+		data, err := runActionProbe(ctx, vm, "action-authorize-denied", input, 16<<10, 30*time.Second)
 		if err != nil {
 			return evidence, err
 		}
@@ -119,6 +121,24 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 		}
 	}
 	return evidence, waitNativeActionPresence(ctx, owner, deviceID)
+}
+
+// runActionProbe runs an unprivileged device-action probe as the network user.
+// Its stderr is the probe's own fixed text ("lab: <operation> failed (<code>[:
+// <reason>])"), never a remote description, grant or key, so a failure keeps
+// it: a bare exit status hid which executor precondition refused a challenge.
+func runActionProbe(ctx context.Context, vm *guestVM, operation string, input []byte, limit int, timeout time.Duration) ([]byte, error) {
+	result, err := vm.runResult(ctx, "sudo -n -u lindm -- "+guestLifecycleProbe+" guest "+operation, bytes.NewReader(input), limit, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if stderr := strings.TrimSpace(string(result.Stderr)); result.ExitCode != 0 || stderr != "" {
+		if len(stderr) > 512 {
+			stderr = stderr[:512]
+		}
+		return nil, fmt.Errorf("guest %s probe: exit %d: %q", operation, result.ExitCode, stderr)
+	}
+	return result.Stdout, nil
 }
 
 // destructiveNegativeApprovalLifetime is the short approval the expired-approval

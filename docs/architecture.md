@@ -1795,6 +1795,11 @@ live-root crypto erase must cover the complete observed encrypted set. Native
 qualification, signed approval and destructive preflight remain independent
 requirements. `controller_wide` is an explicit signed human choice, not an
 inventory assertion; namespace ID and every native identity field still match.
+The live-root preflight follows the mounted root's block dependency graph to its
+single LUKS2 mapping. A Btrfs root reports an anonymous per-subvolume device
+rather than a block device, so it starts from every member that
+`BTRFS_IOC_FS_INFO` and `/sys/fs/btrfs/<fsid>/devices` list; an incomplete member
+list, and any other root without a block device, is refused.
 
 The latest accepted host sequence stores the validated canonical native-details
 protobuf in `host_observations.details`, with a 768 KiB storage ceiling. Admission

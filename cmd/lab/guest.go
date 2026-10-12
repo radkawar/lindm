@@ -443,7 +443,23 @@ func guestRejection(err error, code connect.Code, reason string) bool {
 func guestRPCFailure(operation string, err error) error {
 	// Never propagate remote descriptions or validation text: bootstrap
 	// requests and responses may contain grants or other protected material.
+	// A Lindm-Reason is a fixed snake_case code; anything else is withheld.
+	if reason := rpcreason.Get(err); guestReasonCode(reason) {
+		return fmt.Errorf("%s failed (%s: %s)", operation, connect.CodeOf(err), reason)
+	}
 	return fmt.Errorf("%s failed (%s)", operation, connect.CodeOf(err))
+}
+
+func guestReasonCode(reason string) bool {
+	if reason == "" || len(reason) > 64 {
+		return false
+	}
+	for _, r := range reason {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func writeGuestEvidence(output io.Writer, evidence proto.Message) error {

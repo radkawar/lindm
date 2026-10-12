@@ -6,10 +6,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
+	"unsafe"
 
 	"lindm/internal/agent/nativeexec"
 
@@ -72,6 +75,42 @@ func TestRootBackingRequiresActualSingleLUKS2Dependency(t *testing.T) {
 	}
 	if _, err := matchRootBacking(targets, map[string]bool{"8:1": true}, []string{id}); err == nil {
 		t.Fatal("same physical disk mistaken for actual root backing")
+	}
+}
+
+// Btrfs reports an anonymous st_dev (major 0) for "/", which has no
+// /sys/dev/block entry: Omarchy's LUKS2+Btrfs root mapped to no crypt device and
+// every live-root erase was refused before a challenge. The root resolves through
+// the filesystem ID to every kernel-listed member, and only a complete list counts.
+func TestBtrfsRootResolvesEveryMemberDevice(t *testing.T) {
+	if size, encoded := unsafe.Sizeof(btrfsFSInfo{}), btrfsIocFSInfo>>16&0x3fff; size != 1024 || encoded != 1024 {
+		t.Fatalf("BTRFS_IOC_FS_INFO argument is %d bytes, ioctl encodes %d, kernel expects 1024", size, encoded)
+	}
+	fsid := [16]byte{0x0f, 0x72, 0x64, 0x67, 0xc3, 0xd9, 0x41, 0xaa, 0xbf, 0xd8, 0x56, 0x78, 0xb4, 0x41, 0x6a, 0x29}
+	base := "sys/fs/btrfs/0f726467-c3d9-41aa-bfd8-5678b4416a29/devices/"
+	read := func(fsys fstest.MapFS) (func(string) ([]os.DirEntry, error), func(string) ([]byte, error)) {
+		return func(path string) ([]os.DirEntry, error) { return fs.ReadDir(fsys, strings.TrimPrefix(path, "/")) },
+			func(path string) ([]byte, error) { return fs.ReadFile(fsys, strings.TrimPrefix(path, "/")) }
+	}
+	readDir, readFile := read(fstest.MapFS{base + "dm-1/dev": {Data: []byte("253:1\n")}, base + "dm-0/dev": {Data: []byte("253:0\n")}})
+	devices, err := btrfsMemberDevices(fsid, 2, readDir, readFile)
+	if err != nil || strings.Join(devices, ",") != "253:0,253:1" {
+		t.Fatalf("btrfs members = %v, %v", devices, err)
+	}
+	for name, variant := range map[string]struct {
+		fsys  fstest.MapFS
+		count uint64
+	}{
+		"missing member":    {fstest.MapFS{base + "dm-0/dev": {Data: []byte("253:0\n")}}, 2},
+		"anonymous member":  {fstest.MapFS{base + "dm-0/dev": {Data: []byte("0:31\n")}}, 1},
+		"malformed member":  {fstest.MapFS{base + "dm-0/dev": {Data: []byte("dm-0\n")}}, 1},
+		"other filesystem":  {fstest.MapFS{"sys/fs/btrfs/00000000-0000-0000-0000-000000000000/devices/dm-0/dev": {Data: []byte("253:0\n")}}, 1},
+		"no reported count": {fstest.MapFS{base + "dm-0/dev": {Data: []byte("253:0\n")}}, 0},
+	} {
+		readDir, readFile := read(variant.fsys)
+		if devices, err := btrfsMemberDevices(fsid, variant.count, readDir, readFile); err == nil {
+			t.Fatalf("%s: incomplete btrfs root accepted as %v", name, devices)
+		}
 	}
 }
 
