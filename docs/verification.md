@@ -6165,8 +6165,18 @@ The runs found and fixed these defects (each with a regression test):
   the executor two seconds after boot, interrupting the Fedora blocklist effect
   (`OUTCOME_UNKNOWN`, then an internal failure every 20 seconds); an executor
   already opted in is no longer restarted.
+- Every later action for a resource whose ownership ledger is `UNKNOWN` failed
+  `Plan` unclassified (the internal failure above), so the relay retried it
+  each cycle and the row stayed in progress. It is now the attested admission
+  refusal `OWNERSHIP_UNKNOWN`, reported once as ATTENTION `outcome_unknown` and
+  never redispatched; the ledger stays `UNKNOWN` (see
+  [architecture](architecture.md#ownership-ledger-unknown)). Deterministic tests
+  only: `TestUnknownOwnershipLedgerRefusesLaterActionsDurably`,
+  `TestUnknownOwnershipLedgerRefusesPackageStaging`,
+  `TestOwnershipUnknownRefusalIsOutcomeUnknownAttention`,
+  `TestResourceOwnershipUnknownRefusalReportsOnce`.
 
-Not yet re-run with the last two fixes: both Sparks became unreachable at about
+Not yet re-run with the last three fixes: both Sparks became unreachable at about
 21:40 during run `pe-proof3-01` (infrastructure, not a product result), so native
 guest checks of the fully fixed build are pending. Evidence:
 `~/.cache/lindm-pe-proof/pe-proof-interim-manifest.sha256`, SHA-256

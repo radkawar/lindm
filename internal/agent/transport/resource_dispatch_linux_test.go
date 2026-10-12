@@ -75,6 +75,25 @@ func TestResourceReadOnlyOutcomesNeverRequestEffectAuthority(t *testing.T) {
 	}
 }
 
+// An executor refusal over an UNKNOWN ownership ledger is terminal signed
+// history: one prepare, no start authority, one report that closes the action.
+// Before it was classified, the same prepare failed internally every cycle.
+func TestResourceOwnershipUnknownRefusalReportsOnce(t *testing.T) {
+	f := newDispatchFixture(t)
+	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED
+	f.admissionRefusal = &agentv1.ResourceAdmissionRefusal{
+		Ref:       &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "fixture.service"},
+		Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, Reason: agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN,
+		BootId: "22222222-2222-4222-8222-222222222222", ExecutorIncarnation: "a2bca405-36e9-4a43-b5b5-d0b82a05e551", NativeEvidenceUnavailable: true,
+	}
+	if err := f.loop.dispatchServices(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if f.prepares != 1 || f.starts != 0 || f.authorizations != 0 || f.polls != 0 || f.reports != 1 || !f.closed || f.attestedState != f.state {
+		t.Fatalf("ownership-unknown refusal was not reported once as terminal history: %v", f.events)
+	}
+}
+
 func TestServicePreparationSpansManagementCyclesWithoutGrant(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
@@ -439,6 +458,7 @@ type dispatchFixture struct {
 	cancelState              agentv1.ResourceExecutionState
 	neverPrepared            bool
 	readOnlyDisposition      resourcev1.VerificationDisposition
+	admissionRefusal         *agentv1.ResourceAdmissionRefusal
 	authorizations, reports  int
 	attestations, workCalls  int
 	establishments           int
@@ -553,6 +573,10 @@ func (f *dispatchFixture) status() *agentv1.ResourceExecutionStatus {
 			Preparation: &agentv1.ResourceExecutionPreparation{Deadline: timestamppb.New(time.Now().Add(time.Minute)), MaxCacheBytes: 512 << 20},
 			Failure:     status.GetFailure(),
 		}
+	}
+	if f.admissionRefusal != nil {
+		status.Before, status.Failure = nil, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
+		status.AdmissionRefusal = proto.CloneOf(f.admissionRefusal)
 	}
 	switch f.badStatus {
 	case "action":

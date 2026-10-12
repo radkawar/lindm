@@ -349,6 +349,12 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}
 	if intent.GetPreparation() != nil {
+		// Staging never starts over an earlier effect whose outcome is
+		// unknown: the durable ledger refuses it before any download.
+		if refusal := s.ownershipUnknown(ctx, intent, nil); refusal != nil {
+			s.mu.Unlock()
+			return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), refusal)
+		}
 		return s.admitResourcePreparationLocked(ctx, loaded, intent, req.GetIntentEnvelope(), req.GetSealedSecrets())
 	}
 	// Admission and Add are serialized with Close. Native preflight never holds
@@ -367,7 +373,7 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	defer func() { _ = provider.Close() }()
 	plan, err := provider.Plan(ctx, intent.GetDesired(), intent.GetOperation())
 	if err != nil {
-		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
+		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), s.ownershipFence(ctx, intent, err))
 	}
 	if validateResourcePlan(plan) != nil || !proto.Equal(resource.PlanDesired(plan), intent.GetDesired()) || plan.GetOperation() != intent.GetOperation() {
 		return nil, errInternal

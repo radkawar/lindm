@@ -3,11 +3,16 @@ package dispatch
 import (
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/device/devicedb"
 	"lindm/internal/resource"
 )
 
@@ -93,6 +98,40 @@ func TestReleaseResultStateNamesCapability(t *testing.T) {
 	}
 	if state, reason := ReleaseResultState(preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated")); state != "release_conflict" || reason != "native_tool_outdated" {
 		t.Fatalf("release dropped the preparation detail: %s %s", state, reason)
+	}
+}
+
+// A refusal over an UNKNOWN ownership ledger is the earlier effect's unknown
+// outcome: the existing ATTENTION outcome_unknown (check the device), even with
+// a detail, never another automatic dispatch, and a release names it too.
+func TestOwnershipUnknownRefusalIsOutcomeUnknownAttention(t *testing.T) {
+	ref := &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, CanonicalKey: "/etc/modprobe.d/99-lindm-blocklist.conf"}
+	intent := &agentv1.ResourceExecutionIntent{Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, Desired: &resourcev1.ResourceDesiredState{Ref: ref}}
+	for _, detail := range []string{"", "existing_banner_file"} {
+		status := refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN, 0, detail)
+		status.AdmissionRefusal.Ref, status.AdmissionRefusal.Operation = ref, intent.GetOperation()
+		if err := ResourceResultBinding(intent, status); err != nil {
+			t.Fatalf("refusal rejected: %v", err)
+		}
+		if disposition, reason := resourceResultDisposition(status); disposition != 4 || reason != "outcome_unknown" {
+			t.Fatalf("disposition=%d reason=%q", disposition, reason)
+		}
+		if state, reason := ReleaseResultState(status); state != "release_conflict" || reason != "outcome_unknown" {
+			t.Fatalf("release state=%s reason=%s", state, reason)
+		}
+		status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
+		if err := ResourceResultBinding(intent, status); err == nil {
+			t.Fatal("refusal admitted with a non-precondition failure")
+		}
+	}
+	document, err := proto.Marshal(&policyv1.ProfileResource{ResourceId: "5b0c6f3e-2d8a-4f0b-9b1e-7a3c1d2e4f01", Desired: intent.GetDesired()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	row := devicedb.ResourceAssignmentResource{ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Document: document, Disposition: 4, Reason: "outcome_unknown", ObservedAt: pgtype.Timestamptz{Time: now.Add(-24 * time.Hour), Valid: true}}
+	if candidate, err := EligibleResource([]devicedb.ResourceAssignmentResource{row}, now, 5*time.Minute); err != nil || candidate != nil {
+		t.Fatalf("outcome_unknown was dispatched again: %v %v", candidate, err)
 	}
 }
 

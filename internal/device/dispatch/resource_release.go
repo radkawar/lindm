@@ -101,6 +101,11 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 		return "released", ""
 	}
 	refusal := status.GetAdmissionRefusal()
+	// An earlier effect's unknown outcome refuses the release too; nothing
+	// is restored until that exact effect is explicitly resolved.
+	if refusal.GetReason() == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN {
+		return "release_conflict", "outcome_unknown"
+	}
 	if refusal.GetDetail() != "" && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED {
 		return "release_conflict", refusal.GetDetail()
 	}

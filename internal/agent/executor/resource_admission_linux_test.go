@@ -5,6 +5,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,9 +14,12 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/sshprovider"
+	"lindm/internal/custody"
 )
 
 type admissionRefusingNative struct {
@@ -45,6 +49,9 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 		{"precondition", serviceprovider.ErrConflict, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
 		{"ssh-unsupported", sshprovider.ErrUnsupported, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED},
 		{"ssh-collision", sshprovider.ErrConflict, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
+		// The record and status schemas once omitted this reason, so its
+		// refusal failed validation and was retried as an internal error.
+		{"unsafe-tool-path", errors.Join(nativeexec.ErrUntrustedExecutable, fmt.Errorf("%w: replaceable ancestry of /usr/bin/rpm", custody.ErrUnsafe)), agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newResourceFixture(t, false)
@@ -102,7 +109,7 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 }
 
 func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *testing.T) {
-	for _, scenario := range []string{"expired-during-plan", "unclassified-error", "canceled", "baseline-on-reconcile"} {
+	for _, scenario := range []string{"expired-during-plan", "unclassified-error", "canceled", "baseline-on-reconcile", "outcome-unknown-without-unknown-ledger"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newResourceFixture(t, false)
 			native := &admissionRefusingNative{nativeResource: f.native, refusal: serviceprovider.ErrUnsupported}
@@ -115,6 +122,9 @@ func TestResourceAdmissionRefusalRequiresFreshAuthorityAndClassifiedCause(t *tes
 				native.refusal = context.Canceled
 			case "baseline-on-reconcile":
 				native.refusal = serviceprovider.ErrBaselineUnknown
+			case "outcome-unknown-without-unknown-ledger":
+				// Only a durably UNKNOWN ledger proves the earlier effect.
+				native.refusal = fileprovider.ErrOutcomeUnknown
 			}
 			f.svc.openResource = func(context.Context, *agentv1.ResourceExecutionIntent, secretAccessor) (nativeResource, error) {
 				return native, nil

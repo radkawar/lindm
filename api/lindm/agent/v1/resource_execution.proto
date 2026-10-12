@@ -300,7 +300,7 @@ message ResourceExecutionRecord {
   option (buf.validate.message).cel = {
     id: "resource_record.admission_refusal"
     message: "admission refusal is an effect-free terminal rejection of exactly the signed resource"
-    expression: "!has(this.admission_refusal) || (this.state == 5 && (!has(this.intent.preparation) || this.admission_refusal.reason == 5) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && (!has(this.intent.preparation) || this.admission_refusal.reason in [5, 7]) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 4, 5, 6, 7] && this.failure == 2)))"
   };
 }
 
@@ -418,7 +418,7 @@ message ResourceExecutionStatus {
   option (buf.validate.message).cel = {
     id: "resource_status.admission_refusal"
     message: "admission refusal cannot claim native observation, compliance, or execution"
-    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 4, 5, 6, 7] && this.failure == 2)))"
   };
 }
 
@@ -516,6 +516,11 @@ enum ResourceAdmissionRefusalReason {
   // A native object already exists without lindm ownership and the policy is
   // CREATE_ONLY: only an approved adoption may take it over.
   RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED = 6;
+  // The resource's ownership ledger durably records an earlier native effect
+  // whose outcome is unknown (state UNKNOWN). Refused before staging or any
+  // effect; nothing ran or will be retried. Only an explicit resolution of that
+  // exact effect can clear the fence; the administrator checks the device.
+  RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN = 7;
 }
 
 // Authenticated executor admission evidence, not native-state evidence. No

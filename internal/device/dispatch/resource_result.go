@@ -189,7 +189,9 @@ func (k *resourceResult) persist(ctx context.Context, s *Service, st *resourceRe
 // Admission refusals are effect-free: a capability refusal names the exact
 // catalogue value to enable (and is dispatched again when the device's grant
 // or reported capability status changes); any other refusal detail is a
-// closed snake_case cause the console explains.
+// closed snake_case cause the console explains. A refusal because an earlier
+// effect's outcome is unknown is that earlier outcome: ATTENTION
+// outcome_unknown, never dispatched again automatically.
 func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, string) {
 	switch {
 	case status.GetAdmissionRefusal() != nil:
@@ -198,6 +200,8 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 		switch refusal.GetReason() {
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
 			return 5, core.CapabilityNotEnabledReason(refusal.GetCapability())
+		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN:
+			return 4, "outcome_unknown"
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED:
 			disposition, reason = 5, "adoption_required"
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION:
@@ -327,7 +331,8 @@ func ResourceResultBinding(intent *agentv1.ResourceExecutionIntent, status *agen
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION,
 			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH,
 			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED,
-			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED:
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED,
+			agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN:
 			if status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION {
 				return errors.New("resource_admission_refusal_binding_rejected")
 			}

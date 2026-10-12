@@ -191,6 +191,11 @@ const (
 	// A native object already exists without lindm ownership and the policy is
 	// CREATE_ONLY: only an approved adoption may take it over.
 	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED ResourceAdmissionRefusalReason = 6
+	// The resource's ownership ledger durably records an earlier native effect
+	// whose outcome is unknown (state UNKNOWN). Refused before staging or any
+	// effect; nothing ran or will be retried. Only an explicit resolution of that
+	// exact effect can clear the fence; the administrator checks the device.
+	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN ResourceAdmissionRefusalReason = 7
 )
 
 // Enum value maps for ResourceAdmissionRefusalReason.
@@ -203,6 +208,7 @@ var (
 		4: "RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH",
 		5: "RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED",
 		6: "RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED",
+		7: "RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN",
 	}
 	ResourceAdmissionRefusalReason_value = map[string]int32{
 		"RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED":             0,
@@ -212,6 +218,7 @@ var (
 		"RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH": 4,
 		"RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED":  5,
 		"RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED":       6,
+		"RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN":       7,
 	}
 )
 
@@ -2215,7 +2222,7 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:\xe3\x02\xbaH\xdf\x02\x1a\xe7\x01\n" +
 	"\x17resource_start.validity\x12@start validity must fit the challenge and at most thirty seconds\x1a\x89\x01this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at\x1as\n" +
-	"\x14resource_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\xa6-\n" +
+	"\x14resource_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\xb1-\n" +
 	"\x17ResourceExecutionRecord\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x124\n" +
@@ -2248,7 +2255,7 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"\x13preparation_outcome\x18\x16 \x01(\v2*.lindm.agent.v1.ResourcePreparationOutcomeR\x12preparationOutcome\x12U\n" +
 	"\x11admission_refusal\x18\x17 \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal\x12]\n" +
 	"\x11firewall_evidence\x18\x18 \x01(\v20.lindm.agent.v1.ConnectivityVerificationEvidenceR\x10firewallEvidence\x128\n" +
-	"\x0esealed_secrets\x18\x19 \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets:\xe4\x1f\xbaH\xe0\x1f\x1a\xd6\x01\n" +
+	"\x0esealed_secrets\x18\x19 \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets:\xef\x1f\xbaH\xeb\x1f\x1a\xd6\x01\n" +
 	"\x1eresource_record.sealed_secrets\x12Wjournaled sealed secrets must match the signed delivery manifest until terminal cleanup\x1a[this.sealed_secrets.size() == 0 || this.sealed_secrets.size() == this.intent.secrets.size()\x1a\x81\x02\n" +
 	"!resource_record.firewall_evidence\x12Gretained packet proof requires the exact terminal firewall verification\x1a\x92\x01!has(this.firewall_evidence) || (has(this.verification) && this.verification.ref.kind == 8 && this.firewall_evidence.ref == this.verification.ref)\x1a\xb9\x05\n" +
 	"$resource_record.preparation_evidence\x12cmissing native evidence is restricted to effect-free preparation or authenticated admission refusal\x1a\xab\x04(has(this.native_plan) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal))) && (this.state != 9 || has(this.intent.preparation)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.preparation == this.intent.preparation && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at) && !has(this.verification)))\x1a\xe5\x01\n" +
@@ -2257,8 +2264,8 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"\x1bresource_record.grant_shape\x124a retained grant requires a digest and its challenge\x1a\xf6\x01(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && has(this.challenge) && has(this.grant_accepted_at))\x1a\xf9\x04\n" +
 	"\x19resource_record.lifecycle\x121execution state must retain its required evidence\x1a\xa8\x04((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && (this.verification.disposition == 1 || (this.verification.disposition == 5 && this.intent.operation == 2 && !has(this.challenge) && !has(this.started_at)))))\x1a\x8a\x01\n" +
 	"\x1dresource_record.failure_shape\x121successful or pending work cannot carry a failure\x1a6(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)\x1a\xa5\x05\n" +
-	"\"resource_record.read_only_evidence\x12Ceffect-free native evidence must retain a terminal verified finding\x1a\xb9\x04(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && (this.verification.disposition in [2, 4] || (has(this.intent.desired.managed_file.kernel_module_blocklist) && this.verification.disposition in [5, 7])))))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))\x1a\x98\x04\n" +
-	"!resource_record.admission_refusal\x12Uadmission refusal is an effect-free terminal rejection of exactly the signed resource\x1a\x9b\x03!has(this.admission_refusal) || (this.state == 5 && (!has(this.intent.preparation) || this.admission_refusal.reason == 5) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))\"\x91\x01\n" +
+	"\"resource_record.read_only_evidence\x12Ceffect-free native evidence must retain a terminal verified finding\x1a\xb9\x04(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && (this.verification.disposition in [2, 4] || (has(this.intent.desired.managed_file.kernel_module_blocklist) && this.verification.disposition in [5, 7])))))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))\x1a\xa3\x04\n" +
+	"!resource_record.admission_refusal\x12Uadmission refusal is an effect-free terminal rejection of exactly the signed resource\x1a\xa6\x03!has(this.admission_refusal) || (this.state == 5 && (!has(this.intent.preparation) || this.admission_refusal.reason in [5, 7]) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 4, 5, 6, 7] && this.failure == 2)))\"\x91\x01\n" +
 	"\x1fPrepareResourceExecutionRequest\x124\n" +
 	"\x0fintent_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x128\n" +
 	"\x0esealed_secrets\x18\x02 \x03(\fB\x11\xbaH\x0e\x92\x01\v\x10\b\"\az\x05\x10\x01\x18\x80@R\rsealedSecrets\"\x86\x05\n" +
@@ -2283,7 +2290,7 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"!CancelResourcePreparationResponse\x12?\n" +
 	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusR\x06status\x12%\n" +
 	"\x0enever_prepared\x18\x02 \x01(\bR\rneverPrepared:\x91\x01\xbaH\x8d\x01\x1a\x8a\x01\n" +
-	"\x16resource_cancel.result\x12Gcancellation returns either protected history or a never-prepared fence\x1a'has(this.status) != this.never_prepared\"\x8a\x18\n" +
+	"\x16resource_cancel.result\x12Gcancellation returns either protected history or a never-prepared fence\x1a'has(this.status) != this.never_prepared\"\x90\x18\n" +
 	"\x17ResourceExecutionStatus\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12,\n" +
 	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12H\n" +
@@ -2302,13 +2309,13 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	" \x01(\v2*.lindm.agent.v1.ResourcePreparationOutcomeR\x12preparationOutcome\x12W\n" +
 	"\fremediations\x18\v \x03(\v2).lindm.agent.v1.ResourceActionRemediationB\b\xbaH\x05\x92\x01\x02\x10\x02R\fremediations\x12\x1b\n" +
 	"\tread_only\x18\f \x01(\bR\breadOnly\x12U\n" +
-	"\x11admission_refusal\x18\r \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal:\x89\x11\xbaH\x85\x11\x1a\xe3\x03\n" +
+	"\x11admission_refusal\x18\r \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal:\x8f\x11\xbaH\x8b\x11\x1a\xe3\x03\n" +
 	"$resource_status.preparation_evidence\x12Monly effect-free preparation or admission refusal may omit native observation\x1a\xeb\x02has(this.before) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.started_at) && !has(this.verification)))\x1a\xbf\x03\n" +
 	"\x19resource_status.lifecycle\x12Apending work, effect start, completion and convergence must agree\x1a\xde\x02((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (!(this.state in [1, 2, 9]) || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && (has(this.started_at) || this.read_only) && (this.verification.disposition == 1 || (this.read_only && this.verification.disposition == 5))))\x1a\x8a\x01\n" +
 	"\x1dresource_status.failure_shape\x121successful or pending work cannot carry a failure\x1a6(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)\x1a\xfa\x03\n" +
 	"\"resource_status.read_only_evidence\x12Aread-only terminal status distinguishes compliance from execution\x1a\x90\x03(!this.read_only || (has(this.before) && has(this.verification) && !has(this.started_at) && ((this.state == 4 && this.verification.disposition in [1, 5]) || (this.state == 5 && this.failure == 10 && (this.verification.disposition in [2, 4] || (has(this.verification.after.managed_file.kernel_module_blocklist) && this.verification.disposition in [5, 7])))))) && (this.failure != 10 || this.read_only)\x1a\xeb\x01\n" +
-	"$resource_status.remediation_evidence\x12=action recommendations require encryption compliance findings\x1a\x83\x01this.remediations.size() == 0 || (has(this.verification) && this.verification.ref.kind == 24 && this.verification.disposition != 1)\x1a\xe2\x02\n" +
-	"!resource_status.admission_refusal\x12Kadmission refusal cannot claim native observation, compliance, or execution\x1a\xef\x01!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 5, 6] && this.failure == 2)))\"\xe1\x01\n" +
+	"$resource_status.remediation_evidence\x12=action recommendations require encryption compliance findings\x1a\x83\x01this.remediations.size() == 0 || (has(this.verification) && this.verification.ref.kind == 24 && this.verification.disposition != 1)\x1a\xe8\x02\n" +
+	"!resource_status.admission_refusal\x12Kadmission refusal cannot claim native observation, compliance, or execution\x1a\xf5\x01!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason in [3, 4, 5, 6, 7] && this.failure == 2)))\"\xe1\x01\n" +
 	"\x19ResourceActionRemediation\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
 	"\rescrow_rotate\x18\x02 \x01(\v2\x16.google.protobuf.EmptyH\x00R\fescrowRotate\x125\n" +
@@ -2386,7 +2393,7 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"%RESOURCE_EXECUTION_FAILURE_SUPERSEDED\x10\t\x12,\n" +
 	"(RESOURCE_EXECUTION_FAILURE_POSTCONDITION\x10\n" +
 	"\x12*\n" +
-	"&RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY\x10\v*\xaf\x03\n" +
+	"&RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY\x10\v*\xe8\x03\n" +
 	"\x1eResourceAdmissionRefusalReason\x121\n" +
 	"-RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED\x10\x00\x126\n" +
 	"2RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN\x10\x01\x128\n" +
@@ -2394,7 +2401,8 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	".RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION\x10\x03\x12=\n" +
 	"9RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH\x10\x04\x12<\n" +
 	"8RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED\x10\x05\x127\n" +
-	"3RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED\x10\x06B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"3RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED\x10\x06\x127\n" +
+	"3RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN\x10\aB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_resource_execution_proto_rawDescOnce sync.Once

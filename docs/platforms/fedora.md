@@ -157,7 +157,11 @@ Inventory reports the condition as `NativeDetails.tool_custody` (path, owner,
 mode). The device page shows it with the remedy, labels every refused field
 "Refused: / is writable by group or other", and a resource refused before any
 tool runs carries `RESOURCE_ADMISSION_REFUSAL_REASON_UNSAFE_NATIVE_TOOL_PATH`
-(server reason `native_tool_path_unprotected`). The remedy, as root, is
+(server reason `native_tool_path_unprotected`). Until 2026-10-12 the signed
+record and status schemas omitted that reason, so the refusal failed validation
+and was retried as an internal error; it is now admitted (deterministic test
+`TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect/unsafe-tool-path`,
+not yet re-run on a stock Fedora 43 cloud image). The remedy, as root, is
 `rpm --restore filesystem` (RPM 6's name for `--setperms`; restores the packaged 0555) or `chmod go-w /`; the
 next inventory clears the alert.
 

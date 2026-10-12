@@ -569,6 +569,35 @@ executor contract but keep their staged helper protocol (stage, cancel,
 transaction), which a single apply call cannot express; device actions keep
 their own `DeviceActionProvider` contract.
 
+### Ownership ledger UNKNOWN
+
+Before its start gate, every ledger-owning provider records the exact native
+before-state in the protected ownership ledger and moves it to `UNKNOWN`
+(`BeginResourceOwnershipEffect`); only an observed after-state
+(`CompleteResourceOwnershipEffect`) ends that state. An interrupted or
+unverifiable effect therefore leaves the ledger `UNKNOWN` and its action
+`OUTCOME_UNKNOWN`. Each of those providers' `Plan` refuses over an `UNKNOWN`
+ledger, so no later action, reconcile or release, replays or builds on that
+effect. The executor records that refusal (a provider's outcome-unknown error
+while the durable ledger is `UNKNOWN`) as the journaled, attested admission refusal
+`OWNERSHIP_UNKNOWN` with failure `PRECONDITION` and no observation, plan or start
+authority; a package intent with staging is refused the same way from the ledger
+before any staging. The relay reports that terminal history once instead of
+retrying an internal error every management cycle, and the server maps it to
+ATTENTION `outcome_unknown` (a release: `release_conflict`/`outcome_unknown`),
+which is never dispatched again automatically; the console asks the
+administrator to check the device. The refusal never changes the ledger.
+
+Only `ResolveResourceOwnershipEffect` ends `UNKNOWN`. It requires the interrupted
+effect's own action to be terminal `OUTCOME_UNKNOWN` and records observed native
+truth without any effect. Today only the firewall provider calls it, at its next
+plan, from the connectivity guard's terminal record of that exact transaction
+([dedicated typed firewall zones](engineering.md#dedicated-typed-firewall-zones)).
+No other kind has a resolution path: a new assignment, a release, an executor
+restart or re-enrollment does not clear it (a new enrollment's claim of the same
+kind and key is refused as an ownership conflict while the older ledger is
+unreleased).
+
 ### Native process and file custody policy
 
 Every native process the agent starts goes through `internal/agent/nativeexec`;
@@ -1795,9 +1824,9 @@ capability the response carries `capability_policy_not_delegated` (no delegation
 `CAPABILITY_NOT_ENABLED` become BLOCKED `capability_<name>_not_enabled`; such rows
 and releases are dispatched again when a newly signed version is stored or when an
 accepted host observation reports a different `NativeDetails.capability_policy`.
-`ADOPTION_REQUIRED` becomes `adoption_required`; any refusal `detail` is passed
-through as the reason; an unstarted provider UNSUPPORTED failure is
-`native_unsupported`.
+`ADOPTION_REQUIRED` becomes `adoption_required`; `OWNERSHIP_UNKNOWN` becomes
+ATTENTION `outcome_unknown`; any other refusal `detail` is passed through as the
+reason; an unstarted provider UNSUPPORTED failure is `native_unsupported`.
 
 ### Release delivery and unattended updates
 

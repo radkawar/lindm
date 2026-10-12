@@ -74,8 +74,9 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 		reason = agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION
 		failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
 	}
-	// Only a capability refusal precedes preparation: nothing was staged.
-	if (intent.GetPreparation() != nil && reason != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED) || (reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
+	// Only a capability refusal or an earlier effect's unknown outcome
+	// precedes preparation: nothing was staged.
+	if (intent.GetPreparation() != nil && reason != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED && reason != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN) || (reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
 		return nil, operationErr
 	}
 	now := protoTimestamp(s.now())
@@ -106,25 +107,82 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 	return resourcePreparation(record), nil
 }
 
+// ownershipUnknownRefusal refuses an action because the resource's durable
+// ownership ledger is UNKNOWN: an earlier effect on the same resource
+// (effectActionID) ended with an unknown outcome. It deliberately does not
+// unwrap to a provider's outcome-unknown sentinel, which stays unclassified
+// when the ledger does not record that fence.
+type ownershipUnknownRefusal struct {
+	effectActionID string
+	cause          error
+}
+
+func (r *ownershipUnknownRefusal) Error() string {
+	message := "resource_ownership_unknown: effect action " + r.effectActionID
+	if r.cause != nil {
+		message += ": " + r.cause.Error()
+	}
+	return message
+}
+
+// ownershipUnknown returns the refusal for a resource whose durable ownership
+// ledger is UNKNOWN, or nil. It reads the ledger only; the fence is never
+// changed here, so the earlier effect is never replayed or resolved.
+func (s *Service) ownershipUnknown(ctx context.Context, intent *agentv1.ResourceExecutionIntent, cause error) *ownershipUnknownRefusal {
+	ledger, err := s.store.LoadResourceOwnership(ctx, intent.GetDeploymentId(), intent.GetDeviceId(), intent.GetEnrollmentGeneration(), intent.GetDesired().GetRef())
+	if err != nil || ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {
+		return nil
+	}
+	return &ownershipUnknownRefusal{effectActionID: ledger.GetEffectActionId(), cause: cause}
+}
+
+// ownershipFence turns a provider's outcome-unknown Plan refusal into a
+// classified admission refusal only when the resource's ownership ledger is
+// durably UNKNOWN. Plan observes but never changes native state, so this
+// action had no effect. Any hazard that keeps an error unclassified
+// (cancellation, custody, authority) also keeps this refusal unclassified.
+func (s *Service) ownershipFence(ctx context.Context, intent *agentv1.ResourceExecutionIntent, err error) error {
+	if !nativeOutcomeUnknown(err) || admissionHazard(err) {
+		return err
+	}
+	if refusal := s.ownershipUnknown(ctx, intent, err); refusal != nil {
+		return refusal
+	}
+	return err
+}
+
+// nativeOutcomeUnknown reports a provider's possibly performed native effect.
+func nativeOutcomeUnknown(err error) bool {
+	return errors.Is(err, serviceprovider.ErrOutcomeUnknown) || errors.Is(err, accountprovider.ErrOutcomeUnknown) ||
+		errors.Is(err, definitionprovider.ErrOutcomeUnknown) || errors.Is(err, fileprovider.ErrOutcomeUnknown) ||
+		errors.Is(err, firewallprovider.ErrOutcomeUnknown) || errors.Is(err, packageprovider.ErrOutcomeUnknown) ||
+		errors.Is(err, passwordprovider.ErrOutcomeUnknown) || errors.Is(err, sysctlprovider.ErrOutcomeUnknown) ||
+		errors.Is(err, osupdateprovider.ErrOutcomeUnknown) || errors.Is(err, sshprovider.ErrOutcomeUnknown)
+}
+
+// admissionHazard reports cancellation, damaged protected custody or lost
+// authority, which a joined diagnostic must never hide.
+func admissionHazard(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, errResourceRejected) || errors.Is(err, errRecoveryHold) || errors.Is(err, errInternal) ||
+		errors.Is(err, errResourceExpired) || errors.Is(err, errIdentityExpired) || errors.Is(err, errSessionPending) ||
+		errors.Is(err, errSessionRequired) || errors.Is(err, errRenewalPending) || errors.Is(err, errExecutionTrustRejected) ||
+		errors.Is(err, errClosed) || errors.Is(err, errInvalid) ||
+		errors.Is(err, journal.ErrRecoveryHold) || errors.Is(err, journal.ErrResourceOwnershipUnknown) ||
+		errors.Is(err, journal.ErrResourceOwnershipCapacity) || errors.Is(err, journal.ErrClosed)
+}
+
 func resourceAdmissionCause(err error) (agentv1.ResourceAdmissionRefusalReason, agentv1.ResourceExecutionFailure, bool) {
 	unspecified := agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED
 	none := agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED
-	// A joined diagnostic must never hide cancellation, damaged protected
-	// custody, lost authority, or a possibly already performed native effect.
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded),
-		errors.Is(err, errResourceRejected), errors.Is(err, errRecoveryHold), errors.Is(err, errInternal),
-		errors.Is(err, errResourceExpired), errors.Is(err, errIdentityExpired), errors.Is(err, errSessionPending),
-		errors.Is(err, errSessionRequired), errors.Is(err, errRenewalPending), errors.Is(err, errExecutionTrustRejected),
-		errors.Is(err, errClosed), errors.Is(err, errInvalid),
-		errors.Is(err, journal.ErrRecoveryHold), errors.Is(err, journal.ErrResourceOwnershipUnknown),
-		errors.Is(err, journal.ErrResourceOwnershipCapacity), errors.Is(err, journal.ErrClosed),
-		errors.Is(err, serviceprovider.ErrOutcomeUnknown), errors.Is(err, accountprovider.ErrOutcomeUnknown),
-		errors.Is(err, definitionprovider.ErrOutcomeUnknown), errors.Is(err, fileprovider.ErrOutcomeUnknown),
-		errors.Is(err, firewallprovider.ErrOutcomeUnknown), errors.Is(err, packageprovider.ErrOutcomeUnknown),
-		errors.Is(err, passwordprovider.ErrOutcomeUnknown), errors.Is(err, sysctlprovider.ErrOutcomeUnknown),
-		errors.Is(err, osupdateprovider.ErrOutcomeUnknown), errors.Is(err, sshprovider.ErrOutcomeUnknown):
+	// A possibly performed native effect is never an effect-free refusal.
+	case admissionHazard(err), nativeOutcomeUnknown(err):
 		return unspecified, none, false
+	// The durable ledger, not the provider's error, proves the earlier
+	// effect's unknown outcome; this action refused before any effect.
+	case errors.As(err, new(*ownershipUnknownRefusal)):
+		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, true
 	// The kind's provider is not effective: no native object was opened.
 	case errors.As(err, new(*capabilityRefusal)):
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, true
