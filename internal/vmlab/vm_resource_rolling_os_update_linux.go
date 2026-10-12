@@ -37,7 +37,8 @@ func exerciseRollingOSUpdate(ctx context.Context, r *resourceDispatch, packages 
 	if err != nil {
 		return err
 	}
-	names := []string{"partial-rolling-selection-refused", "policy-installs-window-timer", "start-outside-window-skipped", "window-installs-whole-system-snapshot", "scheduled-reboot-executes", "interrupted-transaction-recovery-hold", "repeat-after-recovery", "release-removes-policy"}
+	// In execution order: qualifyResourceEvidence matches each by position.
+	names := []string{"partial-rolling-selection-refused", "policy-installs-window-timer", "start-outside-window-skipped", "window-installs-whole-system-snapshot", "scheduled-reboot-executes", "policy-reconciles-recovery-window", "interrupted-transaction-recovery-hold", "repeat-after-recovery", "release-removes-policy"}
 	// A schema-valid security-only policy is refused by the selected native
 	// model before it can own files or replace an administrator's scheduler.
 	partial := osUpdateDesired(zone, resourcev1.UpdateSelection_UPDATE_SELECTION_SECURITY, osUpdateWindowStart(time.Now()), 0)
@@ -62,17 +63,16 @@ func exerciseRollingOSUpdate(ctx context.Context, r *resourceDispatch, packages 
 	start = time.Now().Add(-time.Minute).Truncate(time.Minute)
 	desired = osUpdateDesired(zone, resourcev1.UpdateSelection_UPDATE_SELECTION_ALL, start, 0)
 	desired.GetOsUpdate().RollingSnapshot = proto.CloneOf(r.osUpdateTarget)
-	if err := resourceStep(ctx, r, evidence, "policy-reconciles-recovery-window", desired, resourceCreatePolicy(), false, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
+	if err := resourceStep(ctx, r, evidence, names[5], desired, resourceCreatePolicy(), false, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
 		return err
 	}
-	names = append(names, "policy-reconciles-recovery-window")
 	if err := rollingRecoveryHoldScenario(ctx, r, packages, evidence); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, names[6], desired, resourceCreatePolicy(), true, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
+	if err := resourceStep(ctx, r, evidence, names[7], desired, resourceCreatePolicy(), true, withVM(r.vm, osUpdateInstalledOracle(packages, zone, start))); err != nil {
 		return err
 	}
-	if err := resourceReleaseStep(ctx, r, evidence, names[7], desired.GetRef(), withVM(r.vm, func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
+	if err := resourceReleaseStep(ctx, r, evidence, names[8], desired.GetRef(), withVM(r.vm, func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
 		record, err := osUpdateConfigOracle(packages)(ctx, vm)
 		if err == nil && !bytes.Equal(record.Bytes, baseline.Bytes) {
 			err = errors.New("rolling policy release changed the unowned native baseline")
@@ -142,8 +142,7 @@ func rollingWindowAndReboot(ctx context.Context, r *resourceDispatch, packages r
 	if err := r.awaitReboot(ctx, previous, time.Until(when)+8*time.Minute); err != nil {
 		return failReboot(err)
 	}
-	booted := time.Now()
-	if booted.Before(when.Add(-30 * time.Second)) {
+	if time.Now().Before(when.Add(-30 * time.Second)) {
 		return failReboot(errors.New("guest rebooted before rolling policy schedule"))
 	}
 	if _, err := waitGuestExecutorReady(ctx, r.vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
@@ -153,9 +152,13 @@ func rollingWindowAndReboot(ctx context.Context, r *resourceDispatch, packages r
 	if err != nil {
 		return failReboot(err)
 	}
+	// The executor recomputes patch status only when it is an hour old or the
+	// native database changed, so the lab's own reboot detection time says
+	// nothing about it; its boot ID must be the new boot, read independently.
+	current := strings.TrimSpace(string(boot.Bytes))
 	_, fresh, err := serverPatchStatus(ctx, r, rebooted, "after-reboot", func(p *agentv1.PatchStatusObservation) error {
-		if p.GetRebootRequired() || p.GetBootId() == previous || p.GetObservedAt().AsTime().Before(booted.Add(-time.Minute)) {
-			return fmt.Errorf("patch status %v is not a fresh post-reboot observation", p)
+		if p.GetRebootRequired() || p.GetBootId() != current {
+			return fmt.Errorf("patch status %v is not an observation of the new boot %s", p, current)
 		}
 		return nil
 	})

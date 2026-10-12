@@ -759,7 +759,8 @@ each record in the [ledger](../verification.md#1-launch-platform-qualification):
 | Cell           | Result                          | Record / SHA-256                                                                                                                             |
 | -------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Inventory      | pass                            | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
-| Lifecycle      | pass                            | `~/.cache/lindm-arch-qualify/r8/arch/lifecycle-x86_64.json` / `58dc60279b56f5ae6fd0a1f0a6b9783394cbaf17e2e28d9e88c968021a8bd3d5`             |
+| Lifecycle      | pass                            | `~/.cache/lindm-arch-qualify/r14/arch/lifecycle-x86_64.json` / `5e71f6963ee5894bea093784a68d3b390bb7265f3d158db00a1fd23acfe623be`            |
+| Air-gap bundle | pass                            | `~/.cache/lindm-arch-qualify/r14-airgap/arch/airgap-x86_64.json` / `1f5915592c596e87d66f3af7727b21d0f242f37c2058e6826adbc5525afe5cb3`        |
 | Dispatch       | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
 | Assistance     | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
 | Services       | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
