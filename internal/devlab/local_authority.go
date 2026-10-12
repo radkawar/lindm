@@ -38,6 +38,15 @@ type localAccount struct {
 	authenticator *webauthnlab.Authenticator
 	counter       uint32
 	statePath     string
+	// role is the account's role in memory only; empty means owner.
+	role string
+}
+
+func (a *localAccount) accountRole() string {
+	if a.role == "" {
+		return "owner"
+	}
+	return a.role
 }
 
 // OpenLocalAuthorityFixture uses the existing isolated process/database lifecycle
@@ -197,7 +206,7 @@ func (s *OwnerSession) localRequest(ctx context.Context, path string, request, r
 
 // localCeremony serializes this credential's counter through server acceptance.
 func (s *OwnerSession) localCeremony(ctx context.Context, secret string) error {
-	return s.localCeremonyRole(ctx, secret, "owner")
+	return s.localCeremonyRole(ctx, secret, s.local.accountRole())
 }
 
 func (s *OwnerSession) localCeremonyRole(ctx context.Context, secret, role string) error {
@@ -329,8 +338,11 @@ func (f *AuthorityFixture) RevokeAccount(ctx context.Context, accountID string) 
 	if f.local == nil || f.local.approver == nil {
 		return errors.New("account revocation requires local fixture owners")
 	}
-	actor := f.local.owner
+	actor, role := f.local.owner, f.local.approver.accountRole()
 	if accountID == f.local.owner.id {
+		if role != "owner" {
+			return errors.New("an admin approver cannot revoke the fixture owner")
+		}
 		actor = f.local.approver
 	} else if accountID != f.local.approver.id {
 		return errors.New("account is not owned by this fixture")
@@ -340,7 +352,7 @@ func (f *AuthorityFixture) RevokeAccount(ctx context.Context, accountID string) 
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, session.Close(ctx)) }()
-	return session.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: accountID, Enabled: false, Role: "owner"}, nil, http.StatusNoContent)
+	return session.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: accountID, Enabled: false, Role: role}, nil, http.StatusNoContent)
 }
 
 // RestoreAccount re-enables only the owned approver through the normal account
@@ -354,7 +366,28 @@ func (f *AuthorityFixture) RestoreAccount(ctx context.Context, accountID string)
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, session.Close(ctx)) }()
-	return session.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: accountID, Enabled: true, Role: "owner"}, nil, http.StatusNoContent)
+	return session.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: accountID, Enabled: true, Role: f.local.approver.accountRole()}, nil, http.StatusNoContent)
+}
+
+// UseAdminApprover gives the fixture approver the built-in admin role, the least
+// role holding every permission an approval can bind, through the real account
+// API. Afterwards the approver decides every approval kind but cannot manage
+// accounts, so RevokeAccount of the owner is refused. The role is not persisted:
+// call it only on fixtures that never resume their accounts.
+func (f *AuthorityFixture) UseAdminApprover(ctx context.Context) (resultErr error) {
+	if f.local == nil || f.local.approver == nil {
+		return errors.New("admin approver requires local fixture owners")
+	}
+	session, err := f.openLocalSession(ctx, f.local.owner)
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, session.Close(ctx)) }()
+	if err := session.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: f.local.approver.id, Enabled: true, Role: "admin"}, nil, http.StatusNoContent); err != nil {
+		return err
+	}
+	f.local.approver.role = "admin"
+	return nil
 }
 
 func (f *localAuthority) close() {

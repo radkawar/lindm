@@ -161,3 +161,27 @@ func TestReleaseLockPermissionDoesNotInheritLockScope(t *testing.T) {
 		t.Fatal("release inherited another grant's lock scope")
 	}
 }
+
+// The console shows these as locked "Always required" approvals; the report must
+// be exactly what the server enforces without any policy, and policy cannot list
+// them as optional.
+func TestBuiltInApprovalPermissionsMatchEnforcement(t *testing.T) {
+	state := runtimeAuthorizationState(&authv1.AuthorizationPolicy{}, 1, true)
+	reported := state.GetBuiltInApprovalPermissions()
+	if len(reported) == 0 {
+		t.Fatal("no built-in approval permissions reported")
+	}
+	rules, err := protovalidate.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range permissionTable {
+		required := Principal{}.ApprovalRequired(entry.permission)
+		if required != slices.Contains(reported, string(entry.permission)) {
+			t.Errorf("%s: enforced=%v but reported=%v", entry.permission, required, !required)
+		}
+		if required && rules.Validate(&authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(entry.permission)}}) == nil {
+			t.Errorf("%s: built-in approval accepted as an optional policy requirement", entry.permission)
+		}
+	}
+}

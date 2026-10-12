@@ -146,6 +146,11 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	if err != nil {
 		return Demo{}, nil, fmt.Errorf("enroll demo devices: %w", err)
 	}
+	// The demo approver reads as what it is: an admin, the least built-in role
+	// that can decide every approval kind, not a second owner.
+	if err := fixture.UseAdminApprover(seedCtx); err != nil {
+		return Demo{}, nil, fmt.Errorf("make demo approver an admin: %w", err)
+	}
 	approver, err := devlab.OpenApprovalSession(seedCtx, "", fixture)
 	if err != nil {
 		return Demo{}, nil, err

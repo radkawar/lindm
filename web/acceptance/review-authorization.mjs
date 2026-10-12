@@ -58,7 +58,7 @@ export async function reviewAuthorization({
       const name = `review-reader-${index}-${crypto.randomUUID().slice(0, 8)}`;
       const roleName = page.getByLabel("Role name", { exact: true }).last();
       await roleName.fill(name);
-      const role = roleName.locator("../..");
+      const role = page.getByRole("group", { name: "Allowed operations", exact: true }).last();
       await role.getByLabel("View devices", { exact: true }).check();
       await page
         .getByLabel("Reason", { exact: true })

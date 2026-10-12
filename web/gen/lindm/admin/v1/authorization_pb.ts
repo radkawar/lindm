@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/authorization.proto.
  */
 export const file_lindm_admin_v1_authorization: GenFile = /*@__PURE__*/
-  fileDesc("CiJsaW5kbS9hZG1pbi92MS9hdXRob3JpemF0aW9uLnByb3RvEg5saW5kbS5hZG1pbi52MSKbAQoSQXV0aG9yaXphdGlvblN0YXRlEjIKBnBvbGljeRgBIAEoCzIiLmxpbmRtLmF1dGgudjEuQXV0aG9yaXphdGlvblBvbGljeRIQCghyZXZpc2lvbhgCIAEoBBIPCgdydW50aW1lGAMgASgIEi4KCnVwZGF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhkKF0dldEF1dGhvcml6YXRpb25SZXF1ZXN0IlUKGEdldEF1dGhvcml6YXRpb25SZXNwb25zZRI5Cg1hdXRob3JpemF0aW9uGAEgASgLMiIubGluZG0uYWRtaW4udjEuQXV0aG9yaXphdGlvblN0YXRlIr0BChpVcGRhdGVBdXRob3JpemF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIqChFleHBlY3RlZF9yZXZpc2lvbhgCIAEoBEIPukgMMgoY/v////////9/EjoKBnBvbGljeRgDIAEoCzIiLmxpbmRtLmF1dGgudjEuQXV0aG9yaXphdGlvblBvbGljeUIGukgDyAEBEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBIlgKG1VwZGF0ZUF1dGhvcml6YXRpb25SZXNwb25zZRI5Cg1hdXRob3JpemF0aW9uGAEgASgLMiIubGluZG0uYWRtaW4udjEuQXV0aG9yaXphdGlvblN0YXRlQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_auth_v1_authorization, file_lindm_validation_v1_string_rules]);
+  fileDesc("CiJsaW5kbS9hZG1pbi92MS9hdXRob3JpemF0aW9uLnByb3RvEg5saW5kbS5hZG1pbi52MSLrAQoSQXV0aG9yaXphdGlvblN0YXRlEjIKBnBvbGljeRgBIAEoCzIiLmxpbmRtLmF1dGgudjEuQXV0aG9yaXphdGlvblBvbGljeRIQCghyZXZpc2lvbhgCIAEoBBIPCgdydW50aW1lGAMgASgIEi4KCnVwZGF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiUKHWJ1aWx0X2luX2FwcHJvdmFsX3Blcm1pc3Npb25zGAUgAygJEicKH2NvbmZpZ3VyZWRfYXBwcm92YWxfcGVybWlzc2lvbnMYBiADKAkiGQoXR2V0QXV0aG9yaXphdGlvblJlcXVlc3QiVQoYR2V0QXV0aG9yaXphdGlvblJlc3BvbnNlEjkKDWF1dGhvcml6YXRpb24YASABKAsyIi5saW5kbS5hZG1pbi52MS5BdXRob3JpemF0aW9uU3RhdGUivQEKGlVwZGF0ZUF1dGhvcml6YXRpb25SZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEioKEWV4cGVjdGVkX3JldmlzaW9uGAIgASgEQg+6SAwyChj+/////////38SOgoGcG9saWN5GAMgASgLMiIubGluZG0uYXV0aC52MS5BdXRob3JpemF0aW9uUG9saWN5Qga6SAPIAQESGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiWAobVXBkYXRlQXV0aG9yaXphdGlvblJlc3BvbnNlEjkKDWF1dGhvcml6YXRpb24YASABKAsyIi5saW5kbS5hZG1pbi52MS5BdXRob3JpemF0aW9uU3RhdGVCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_auth_v1_authorization, file_lindm_validation_v1_string_rules]);
 
 /**
  * Runtime authority replaces the complete bootstrap policy, never merges with it.
@@ -43,6 +43,22 @@ export type AuthorizationState = Message<"lindm.admin.v1.AuthorizationState"> & 
    * @generated from field: google.protobuf.Timestamp updated_at = 4;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * Permissions whose operations always need an independent approver whatever
+   * the policy says; built into the server and not part of the policy.
+   *
+   * @generated from field: repeated string built_in_approval_permissions = 5;
+   */
+  builtInApprovalPermissions: string[];
+
+  /**
+   * Permissions whose operations need an independent approver because the
+   * server configuration requires it (escrow.reveal_approval_required).
+   *
+   * @generated from field: repeated string configured_approval_permissions = 6;
+   */
+  configuredApprovalPermissions: string[];
 };
 
 /**

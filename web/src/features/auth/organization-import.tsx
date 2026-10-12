@@ -1,4 +1,5 @@
 import { create, fromJsonString } from "@bufbuild/protobuf";
+import { timestampNow, type Timestamp as ProtoTimestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { Timestamp } from "@/components/ui/timestamp";
 import type { PickerSlot } from "@/components/ui/search-picker";
 import { permissionLabels } from "@/lib/permissions";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -79,7 +81,7 @@ export function OrganizationImport({
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState("");
   const [failure, setFailure] = useState<RpcFailure | null>(null);
-  const [reviewedAt, setReviewedAt] = useState("");
+  const [reviewedAt, setReviewedAt] = useState<ProtoTimestamp | undefined>(undefined);
   const controller = useRef<AbortController | null>(null);
   const active = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -109,7 +111,7 @@ export function OrganizationImport({
     setMessage("");
     setConfirmed(false);
     setApplied(false);
-    setReviewedAt("");
+    setReviewedAt(undefined);
     try {
       // The HTTP boundary also bounds input. This avoids reading an unbounded local file.
       if (file.size > 16 * 1024 * 1024) throw new Error("oversized upload");
@@ -164,7 +166,7 @@ export function OrganizationImport({
       );
       if (current.signal.aborted || lifetime.signal.aborted) return;
       setResult(response);
-      if (!apply) setReviewedAt(new Date().toLocaleString());
+      if (!apply) setReviewedAt(timestampNow());
       if (apply) {
         await client.invalidateQueries({ queryKey: ["local-accounts", lifetime.generation] });
         await client.invalidateQueries({ queryKey: ["authorization", lifetime.generation] });
@@ -272,7 +274,7 @@ export function OrganizationImport({
           <h3 className="font-semibold">{applied ? "Recorded outcomes" : "Review current plan"}</h3>
           {!applied ? (
             <p className="text-sm text-muted-foreground">
-              Reviewed at {reviewedAt}. No changes have been applied.
+              Reviewed <Timestamp value={reviewedAt} />. No changes have been applied.
             </p>
           ) : (
             <p className="text-sm">
@@ -419,7 +421,7 @@ export function OrganizationImport({
               <h4 className="min-w-0 font-medium break-words">{secret.name}</h4>
               <p className="min-w-0 text-sm break-words">
                 {kindLabels[secret.kind] ?? "Credential"}. Expires:{" "}
-                {formatTimestamp(secret.expiresAt).local}
+                <Timestamp value={secret.expiresAt} missing="Unknown" />
               </p>
               <code className="block min-w-0 max-w-full border bg-background p-3 break-all select-all">
                 {secret.secret}

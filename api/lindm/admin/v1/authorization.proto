@@ -15,6 +15,12 @@ message AuthorizationState {
   uint64 revision = 2;
   bool runtime = 3;
   google.protobuf.Timestamp updated_at = 4;
+  // Permissions whose operations always need an independent approver whatever
+  // the policy says; built into the server and not part of the policy.
+  repeated string built_in_approval_permissions = 5;
+  // Permissions whose operations need an independent approver because the
+  // server configuration requires it (escrow.reveal_approval_required).
+  repeated string configured_approval_permissions = 6;
 }
 message GetAuthorizationRequest {}
 message GetAuthorizationResponse {

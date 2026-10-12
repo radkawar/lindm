@@ -925,7 +925,9 @@ replays a captured host on one demo device. The route device (`ubuntu-ws-01`) ke
 checking in while the fixture runs, so remote assistance can be requested from it;
 no user answers, so requested sessions stay waiting. It also fetches action work on
 each 30-second check-in and completes a requested inventory refresh (other work
-expires unstarted), so console flows waiting for fresh storage can finish.
+expires unstarted), so console flows waiting for fresh storage can finish. Its
+independent `approver` account is an admin (`AuthorityFixture.UseAdminApprover`),
+the least built-in role that can decide every approval kind, not a second owner.
 
 The Ubuntu, Debian and RHEL advisory fixtures are single vendor notices, so their
 feeds are partial: those devices evaluate `UNKNOWN`/`feed_partial_coverage` and

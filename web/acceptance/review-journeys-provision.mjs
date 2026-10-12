@@ -556,7 +556,7 @@ async function helpdesk(ctx) {
   await ctx.visit("/accounts");
   const row = page.getByRole("row").filter({ hasText: username });
   await visible(row);
-  await visible(row.getByText("Waiting for setup", { exact: true }));
+  await visible(row.getByText("Waiting for enrollment", { exact: true }));
   await visible(row.getByText("Limited to 1 group", { exact: true }));
   await row.getByRole("button", { name: `Edit ${username}`, exact: true }).click();
   const editDialog = page.getByRole("dialog", { name: `Edit ${username}`, exact: true });
@@ -592,12 +592,12 @@ async function helpdesk(ctx) {
     "partly",
     "The persisted group is named rather than a UUID, but the account still lacks a compact effective-access summary.",
     "Show the hire, helpdesk capabilities, Engineering member devices and pending setup as one compact account record.",
-    "After reload, the account row shows Helpdesk, Limited to 1 group and Waiting for setup, and its editor confirms the single Engineering group rule. This proves saved configuration, not a signed-in hire's authorization behavior.",
+    "After reload, the account row shows Helpdesk, Limited to 1 group and Waiting for enrollment, and its editor confirms the single Engineering group rule. This proves saved configuration, not a signed-in hire's authorization behavior.",
   );
   return {
     outcome: "completed",
     reason:
-      "Created a local helpdesk account limited to an isolated Engineering group and verified its persisted role/scope and Waiting for setup state through UI. The one-time secret was masked and dismissed without retention. The real hire must receive a fresh privately delivered enrollment secret and complete their own password/authenticator setup; no real browser identity or signed-in authorization claim is made.",
+      "Created a local helpdesk account limited to an isolated Engineering group and verified its persisted role/scope and Waiting for enrollment state through UI. The one-time secret was masked and dismissed without retention. The real hire must receive a fresh privately delivered enrollment secret and complete their own password/authenticator setup; no real browser identity or signed-in authorization claim is made.",
   };
 }
 

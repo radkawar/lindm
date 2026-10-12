@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -126,26 +126,22 @@ export function Accounts({
       <PageHeader
         title="Accounts"
         description="Who can sign in to this console, with which role and device access."
+        onRefresh={() => {
+          void accounts.refetch();
+          void client.invalidateQueries({ queryKey: ["identity-settings", lifetime.generation] });
+        }}
+        refreshing={accounts.isFetching}
         actions={
-          <>
-            <Button
-              variant="outline"
-              disabled={accounts.isFetching}
-              onClick={() => void accounts.refetch()}
-            >
-              Refresh
-            </Button>
-            <Button
-              aria-haspopup="dialog"
-              disabled={!accounts.data}
-              onClick={() => {
-                setError(null);
-                setDialog("create");
-              }}
-            >
-              Create account
-            </Button>
-          </>
+          <Button
+            aria-haspopup="dialog"
+            disabled={!accounts.data}
+            onClick={() => {
+              setError(null);
+              setDialog("create");
+            }}
+          >
+            Create account
+          </Button>
         }
       />
       {dialog === null ? failure : null}
@@ -210,7 +206,7 @@ export function Accounts({
               .sort((a, b) => a.username.localeCompare(b.username))
               .map((account) => (
                 <TableRow key={account.id}>
-                  <TableCell className="font-medium whitespace-normal break-all">
+                  <TableCell className="font-medium whitespace-normal break-words">
                     {account.username}
                     {account.id === principal.id ? (
                       <span className="font-normal text-muted-foreground"> (you)</span>
@@ -225,7 +221,7 @@ export function Accounts({
                   <TableCell className="whitespace-normal">
                     {scopeSummary(account.scopes)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-48 whitespace-normal">
                     <AccountState account={account} />
                   </TableCell>
                   <TableCell className="text-right">
@@ -310,16 +306,11 @@ export function Accounts({
                     ),
                   )
                 }
-                onReset={() => {
-                  if (
-                    window.confirm(
-                      `Reset ${editing.username}? They'll be signed out and must set up their password and authenticator again.`,
-                    )
+                onReset={() =>
+                  void perform("Credentials reset", () =>
+                    resetAccount(editing.id, csrf, lifetime.signal),
                   )
-                    void perform("Credentials reset", () =>
-                      resetAccount(editing.id, csrf, lifetime.signal),
-                    );
-                }}
+                }
               />
             </>
           ) : null}
@@ -331,10 +322,19 @@ export function Accounts({
   );
 }
 
+// Enrollment sets the password and the passkey in one step, and a reset clears both.
 function AccountState({ account }: { account: LocalAccount }) {
-  if (!account.enabled) return <StatusBadge status="neutral">Disabled</StatusBadge>;
-  if (!account.enrolled) return <StatusBadge status="warning">Waiting for setup</StatusBadge>;
-  return <StatusBadge status="success">Set up</StatusBadge>;
+  const [status, label, description] = !account.enabled
+    ? (["neutral", "Disabled", "Can't sign in until the account is enabled."] as const)
+    : !account.enrolled
+      ? (["warning", "Waiting for enrollment", "No password or passkey set yet."] as const)
+      : (["success", "Password and passkey set", "Can sign in."] as const);
+  return (
+    <div className="grid justify-items-start gap-1">
+      <StatusBadge status={status}>{label}</StatusBadge>
+      <span className="text-xs whitespace-normal text-muted-foreground">{description}</span>
+    </div>
+  );
 }
 
 function scopeSummary(scopes: DeviceScope[]): string {
@@ -461,6 +461,8 @@ function AccountEditor({
   const [role, setRole] = useState(account.role);
   const [emergency, setEmergency] = useState(account.breakGlass);
   const [scopes, setScopes] = useState(account.scopes);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const resetButton = useRef<HTMLButtonElement>(null);
   return (
     <form
       className="grid min-w-0 gap-4"
@@ -509,14 +511,54 @@ function AccountEditor({
         Emergency (break-glass) owner
       </label>
       {failure}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || !roles.includes(role)}>
-          {busy ? "Saving…" : "Save account"}
-        </Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={onReset}>
-          Reset credentials
-        </Button>
-      </div>
+      {confirmingReset ? (
+        <section
+          aria-labelledby="reset-credentials-heading"
+          tabIndex={-1}
+          ref={(node) => node?.focus()}
+          className="grid gap-3 border border-destructive p-4 text-sm outline-none"
+        >
+          <h3 id="reset-credentials-heading" className="font-semibold break-words">
+            Reset {account.username}'s credentials?
+          </h3>
+          <p>
+            {account.username} is signed out now and their password and passkey are removed. They
+            can't sign in until they enroll again with the new one-time secret shown on this page.
+            This can't be undone.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="destructive" disabled={busy} onClick={onReset}>
+              {busy ? "Resetting…" : "Reset credentials"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setConfirmingReset(false);
+                requestAnimationFrame(() => resetButton.current?.focus());
+              }}
+            >
+              Keep credentials
+            </Button>
+          </div>
+        </section>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={busy || !roles.includes(role)}>
+            {busy ? "Saving…" : "Save account"}
+          </Button>
+          <Button
+            ref={resetButton}
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setConfirmingReset(true)}
+          >
+            Reset credentials…
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

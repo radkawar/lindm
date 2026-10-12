@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { SearchPicker, type PickerSlot } from "@/components/ui/search-picker";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { Timestamp } from "@/components/ui/timestamp";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useExactRequest } from "@/hooks/use-exact-request";
@@ -14,6 +15,7 @@ import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { permissionLabels } from "@/lib/permissions";
+import { roleLabel } from "@/lib/roles";
 import { reasonError, REASON_MAX_UNITS } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
@@ -47,6 +49,25 @@ const approvalPermissions = [
   "secrets.reveal",
 ];
 const builtInRoles = ["owner", "admin", "operator", "helpdesk", "auditor"];
+const ROLE_NAME_RULE =
+  "Lowercase letters, digits, dots, dashes or underscores, starting with a letter (for example patch-operator).";
+const NO_PERMISSIONS = "Choose at least one allowed operation.";
+
+// The same rules the server applies to RoleDefinition.name, stated in words before submit.
+function roleNameProblem(
+  name: string,
+  index: number,
+  roles: readonly { name: string }[],
+): string | null {
+  if (!name) return "Enter a role name.";
+  if (builtInRoles.includes(name))
+    return `"${name}" is a built-in role name. Choose a different name.`;
+  if (!/^[a-z][a-z0-9_.-]*$/.test(name))
+    return `"${name}" can't be used. Use lowercase letters, digits, dots, dashes or underscores, starting with a letter (for example patch-operator).`;
+  if (roles.some((role, i) => i !== index && role.name === name))
+    return `Another custom role is already named "${name}".`;
+  return null;
+}
 
 type Pickers = {
   devicePicker: PickerSlot;
@@ -65,6 +86,15 @@ export function Authorization(pickers: Pickers) {
       <PageHeader
         title="Authorization"
         description="Choose what administrators can do and which devices they can reach."
+        onRefresh={
+          editing
+            ? undefined
+            : () => {
+                void policy.refetch();
+                void identity.refetch();
+              }
+        }
+        refreshing={policy.isFetching || identity.isFetching}
       />
       {policy.isPending || identity.isPending ? <p role="status">Loading access policy…</p> : null}
       {policy.isError ? <RpcError failure={toRpcFailure(policy.error)} /> : null}
@@ -74,18 +104,6 @@ export function Authorization(pickers: Pickers) {
           The access policy was not returned. Refresh before editing; no replacement policy has been
           assumed.
         </p>
-      ) : null}
-      {!editing ? (
-        <Button
-          className="w-fit"
-          variant="outline"
-          onClick={() => {
-            void policy.refetch();
-            void identity.refetch();
-          }}
-        >
-          Refresh access policy
-        </Button>
       ) : null}
       {saved ? (
         <div role="status" className="grid gap-2 border p-4">
@@ -117,7 +135,7 @@ export function Authorization(pickers: Pickers) {
           <div className="grid gap-4">
             <p className="text-sm text-muted-foreground">
               {policy.data.authorization.runtime ? "Runtime policy" : "Server bootstrap policy"}.
-              Last changed: {formatTimestamp(policy.data.authorization.updatedAt).local}.
+              Last changed: <Timestamp value={policy.data.authorization.updatedAt} />.
               {policy.isError ? " Current access could not be refreshed." : ""}
             </p>
             <Button
@@ -275,7 +293,9 @@ function PolicySummary({
     <div className="grid min-w-0 gap-6">
       <section className="grid min-w-0 gap-3" aria-label="Custom roles">
         <h2 className="text-base font-semibold">Custom roles</h2>
-        {!policy?.roles.length ? <p>No custom roles. Built-in roles remain available.</p> : null}
+        {!policy?.roles.length ? (
+          <p className="text-sm">No custom roles. Built-in roles remain available.</p>
+        ) : null}
         {policy?.roles.map((role) => (
           <div key={role.name} className="min-w-0 border-b pb-3">
             <h3 className="font-medium break-words">{role.name}</h3>
@@ -290,7 +310,7 @@ function PolicySummary({
       <section className="grid min-w-0 gap-3" aria-label="Directory access">
         <h2 className="text-base font-semibold">Directory access</h2>
         {!policy?.groupBindings.length ? (
-          <p>No directory groups grant access through this policy.</p>
+          <p className="text-sm">No directory groups grant access through this policy.</p>
         ) : null}
         {groupNames.isError ? (
           <RpcError failure={toRpcFailure(groupNames.error)}>
@@ -304,7 +324,7 @@ function PolicySummary({
             <h3 className="min-w-0 font-medium break-words">
               {primarySource === "keycloak" ? binding.group : `Directory group ${index + 1}`}
             </h3>
-            <p className="text-sm">Role: {binding.role}</p>
+            <p className="text-sm">Role: {roleLabel(binding.role)}</p>
             {primarySource !== "keycloak" ? (
               <p className="text-sm text-muted-foreground">
                 Display name unavailable from the identity provider.
@@ -323,50 +343,84 @@ function PolicySummary({
       </section>
       <section className="grid min-w-0 gap-3" aria-label="Independent approval">
         <h2 className="text-base font-semibold">Independent approval</h2>
-        <p>
-          {policy?.approvalRequiredPermissions.length
-            ? policy.approvalRequiredPermissions
-                .map((permission) => permissionLabels[permission] ?? "Unrecognized permission")
-                .join(", ")
-            : "No additional operations require independent approval under this policy."}
+        <p className="text-sm text-muted-foreground">
+          A second administrator must approve these operations before they run.
         </p>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[16rem_minmax(0,1fr)] [&_dt]:text-muted-foreground">
+          <dt>Always required</dt>
+          <dd>
+            {permissionList(state.builtInApprovalPermissions) || "Not reported by the server"}
+          </dd>
+          {state.configuredApprovalPermissions.length ? (
+            <>
+              <dt>Required by server configuration</dt>
+              <dd>{permissionList(state.configuredApprovalPermissions)}</dd>
+            </>
+          ) : null}
+          <dt>Added by this policy</dt>
+          <dd>{permissionList(policy?.approvalRequiredPermissions ?? []) || "None"}</dd>
+        </dl>
       </section>
       <TechnicalDetails items={[{ label: "Revision", value: state.revision.toString() }]} />
     </div>
   );
 }
 
+function permissionList(permissions: string[]): string {
+  return permissions
+    .map((permission) => permissionLabels[permission] ?? "Unrecognized permission")
+    .join(", ");
+}
+
 function PermissionPicker({
   label,
+  description,
   values,
   choices,
+  locked = {},
   onChange,
 }: {
   label: string;
+  description?: string;
   values: string[];
   choices: string[];
+  // Permissions the server enforces whatever the policy says, with the reason
+  // shown beside them; they render checked and cannot be changed here.
+  locked?: Record<string, string>;
   onChange: (values: string[]) => void;
 }) {
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-2 text-sm font-medium">{label}</legend>
+      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       <div className="grid gap-2 sm:grid-cols-2">
-        {choices.map((permission) => (
+        {Object.entries(locked).map(([permission, note]) => (
           <label key={permission} className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={values.includes(permission)}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...values, permission]
-                    : values.filter((value) => value !== permission),
-                )
-              }
-            />
-            {permissionLabels[permission]}
+            <input type="checkbox" checked readOnly disabled />
+            <span>
+              {permissionLabels[permission] ?? "Unrecognized permission"}{" "}
+              <span className="text-muted-foreground">· {note}</span>
+            </span>
           </label>
         ))}
+        {choices
+          .filter((permission) => !(permission in locked))
+          .map((permission) => (
+            <label key={permission} className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={values.includes(permission)}
+                onChange={(event) =>
+                  onChange(
+                    event.target.checked
+                      ? [...values, permission]
+                      : values.filter((value) => value !== permission),
+                  )
+                }
+              />
+              {permissionLabels[permission]}
+            </label>
+          ))}
       </div>
     </fieldset>
   );
@@ -391,16 +445,27 @@ function AuthorizationEditor({
   const [policy, setDraft] = useState(() => clone(AuthorizationPolicySchema, initial.policy!));
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  // Set when an edit cleared an earlier review, so the reset is never silent.
+  const [reviewCleared, setReviewCleared] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const request = useExactRequest<UpdateAuthorizationRequest>();
   const disabled = request.busy || request.ambiguous;
   function setPolicy(value: typeof policy) {
     setDraft(value);
+    if (confirmed) setReviewCleared(true);
     setConfirmed(false);
   }
   function submit(event: FormEvent) {
     event.preventDefault();
+    setAttempted(true);
     void request.submit({
       capture: () => {
+        for (const [index, role] of policy.roles.entries()) {
+          const problem =
+            roleNameProblem(role.name, index, policy.roles) ??
+            (role.permissions.length ? null : NO_PERMISSIONS);
+          if (problem) throw new Error(`Custom role ${role.name || index + 1}: ${problem}`);
+        }
         const problem = reasonError(reason);
         if (problem) throw new Error(problem);
         if (!confirmed) throw new Error("Confirm the access consequences before saving.");
@@ -434,51 +499,76 @@ function AuthorizationEditor({
         <legend className="mb-4 text-base font-semibold">Edit access policy</legend>
         <section className="grid gap-4" aria-label="Edit custom roles">
           <h2 className="text-base font-semibold">Custom roles</h2>
-          {policy.roles.map((role, index) => (
-            <div className="grid min-w-0 gap-4 border p-4" key={index}>
-              <label className="grid gap-2 text-sm font-medium">
-                Role name
-                <Input
-                  data-freeform="new custom role name"
-                  required
-                  maxLength={64}
-                  pattern="[a-z][a-z0-9_.-]*"
-                  value={role.name}
-                  onChange={(event) =>
+          {policy.roles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No custom roles. Built-in roles (Owner, Admin, Operator, Helpdesk, Auditor) remain
+              available; add a custom role to grant a narrower set of operations.
+            </p>
+          ) : null}
+          {policy.roles.map((role, index) => {
+            const nameProblem =
+              attempted || role.name ? roleNameProblem(role.name, index, policy.roles) : null;
+            const permissionsProblem =
+              attempted && !role.permissions.length ? NO_PERMISSIONS : null;
+            return (
+              <div className="grid min-w-0 gap-4 border p-4" key={index}>
+                <div className="grid gap-2">
+                  <label className="grid gap-2 text-sm font-medium">
+                    Role name
+                    <Input
+                      data-freeform="new custom role name"
+                      maxLength={64}
+                      aria-invalid={nameProblem ? true : undefined}
+                      aria-describedby={`role-name-hint-${index}`}
+                      value={role.name}
+                      onChange={(event) =>
+                        setPolicy({
+                          ...policy,
+                          roles: policy.roles.map((item, i) =>
+                            i === index ? { ...item, name: event.target.value } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </label>
+                  <p
+                    id={`role-name-hint-${index}`}
+                    className={
+                      nameProblem ? "text-sm text-destructive" : "text-sm text-muted-foreground"
+                    }
+                  >
+                    {nameProblem ?? ROLE_NAME_RULE}
+                  </p>
+                </div>
+                <PermissionPicker
+                  label="Allowed operations"
+                  choices={Object.keys(permissionLabels)}
+                  values={role.permissions}
+                  onChange={(permissions) =>
                     setPolicy({
                       ...policy,
                       roles: policy.roles.map((item, i) =>
-                        i === index ? { ...item, name: event.target.value } : item,
+                        i === index ? { ...item, permissions } : item,
                       ),
                     })
                   }
                 />
-              </label>
-              <PermissionPicker
-                label="Allowed operations"
-                choices={Object.keys(permissionLabels)}
-                values={role.permissions}
-                onChange={(permissions) =>
-                  setPolicy({
-                    ...policy,
-                    roles: policy.roles.map((item, i) =>
-                      i === index ? { ...item, permissions } : item,
-                    ),
-                  })
-                }
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="w-fit"
-                onClick={() =>
-                  setPolicy({ ...policy, roles: policy.roles.filter((_, i) => i !== index) })
-                }
-              >
-                Remove role {role.name || index + 1}
-              </Button>
-            </div>
-          ))}
+                {permissionsProblem ? (
+                  <p className="text-sm text-destructive">{permissionsProblem}</p>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-fit"
+                  onClick={() =>
+                    setPolicy({ ...policy, roles: policy.roles.filter((_, i) => i !== index) })
+                  }
+                >
+                  Remove role {role.name || index + 1}
+                </Button>
+              </div>
+            );
+          })}
           <Button
             type="button"
             className="w-fit"
@@ -521,7 +611,7 @@ function AuthorizationEditor({
                     disabled={disabled}
                     options={[...builtInRoles, ...policy.roles.map((role) => role.name)]
                       .filter(Boolean)
-                      .map((role) => ({ value: role, label: role }))}
+                      .map((role) => ({ value: role, label: roleLabel(role) }))}
                     onChange={(role) =>
                       setPolicy({
                         ...policy,
@@ -579,8 +669,23 @@ function AuthorizationEditor({
         </section>
         <PermissionPicker
           label="Require independent approval"
+          description="A second administrator must approve these operations before they run."
           choices={approvalPermissions}
           values={policy.approvalRequiredPermissions}
+          locked={{
+            ...Object.fromEntries(
+              initial.builtInApprovalPermissions.map((permission) => [
+                permission,
+                "Always required",
+              ]),
+            ),
+            ...Object.fromEntries(
+              initial.configuredApprovalPermissions.map((permission) => [
+                permission,
+                "Required by server configuration",
+              ]),
+            ),
+          }}
           onChange={(approvalRequiredPermissions) =>
             setPolicy({ ...policy, approvalRequiredPermissions })
           }
@@ -600,8 +705,8 @@ function AuthorizationEditor({
           <p>
             This replaces the complete policy: {policy.roles.length} custom roles,{" "}
             {policy.groupBindings.length} directory group bindings and{" "}
-            {policy.approvalRequiredPermissions.length} approval requirements. Removed grants stop
-            authorizing work; unscoped bindings allow every device.
+            {policy.approvalRequiredPermissions.length} added approval requirements. Removed grants
+            stop authorizing work; unscoped bindings allow every device.
           </p>
           <p>
             Non-owner sessions are signed out and pending authority is invalidated. Local
@@ -612,10 +717,19 @@ function AuthorizationEditor({
             <input
               type="checkbox"
               checked={confirmed}
-              onChange={(event) => setConfirmed(event.target.checked)}
+              onChange={(event) => {
+                setConfirmed(event.target.checked);
+                if (event.target.checked) setReviewCleared(false);
+              }}
             />
             I reviewed the complete access policy and sign-out consequences.
           </label>
+          {reviewCleared && !confirmed ? (
+            <p role="status" className="text-warning">
+              You changed the policy after reviewing it, so the review was cleared. Review the
+              change again before saving.
+            </p>
+          ) : null}
         </div>
       </fieldset>
       {request.invalid ? <p role="alert">{request.invalid}</p> : null}
@@ -628,17 +742,28 @@ function AuthorizationEditor({
           </p>
         </RpcError>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={request.busy || (!request.ambiguous && !confirmed)}>
-          {request.busy
-            ? "Saving…"
-            : request.ambiguous
-              ? "Retry exact access change"
-              : "Save access policy"}
-        </Button>
-        <Button type="button" variant="outline" disabled={disabled} onClick={onClose}>
-          Cancel editing
-        </Button>
+      <div className="grid gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="submit"
+            disabled={request.busy || (!request.ambiguous && !confirmed)}
+            aria-describedby={!request.ambiguous && !confirmed ? "save-policy-hint" : undefined}
+          >
+            {request.busy
+              ? "Saving…"
+              : request.ambiguous
+                ? "Retry exact access change"
+                : "Save access policy"}
+          </Button>
+          <Button type="button" variant="outline" disabled={disabled} onClick={onClose}>
+            Cancel editing
+          </Button>
+        </div>
+        {!request.ambiguous && !confirmed ? (
+          <p id="save-policy-hint" className="text-sm text-muted-foreground">
+            Confirm the review above to save.
+          </p>
+        ) : null}
       </div>
     </form>
   );

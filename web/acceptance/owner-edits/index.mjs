@@ -22,6 +22,8 @@ import * as pass2Bug6 from "./pass2-bug6-install-command.mjs";
 import * as pass2SafetyUndo from "./pass2-safety-undo.mjs";
 import * as pass2SafetyAssistance from "./pass2-safety-assistance.mjs";
 import * as pass2SafetyReveal from "./pass2-safety-reveal.mjs";
+import * as accounts from "./accounts.mjs";
+import * as authorization from "./authorization.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -35,6 +37,8 @@ export const ownerEdits = [
   enrollment,
   pass2Bug5,
   rollouts,
+  accounts,
+  authorization,
   approvals,
   audit,
   wipeForm,

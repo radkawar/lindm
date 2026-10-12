@@ -245,12 +245,20 @@ func (s *Service) policyConfiguration(definition *authv1.AuthorizationPolicy) Co
 		Okta: s.okta, Google: s.google, Broker: broker, BreakGlass: s.breakGlass, Policy: definition}
 }
 
+// builtInApprovalPermissions always need an independent approver; policy can
+// add permissions to this set but never remove these.
+var builtInApprovalPermissions = []Permission{PermissionRevokeDevice, PermissionExecuteDestructive}
+
 // ApprovalRequired describes the immutable authority snapshot. Mutation callers
 // must fence its Authorization before relying on an optional approval decision.
 func (p Principal) ApprovalRequired(permission Permission) bool {
-	return permission == PermissionRevokeDevice || permission == PermissionExecuteDestructive || p.policy != nil && slices.Contains(p.policy.approvalPermissions, string(permission))
+	return slices.Contains(builtInApprovalPermissions, permission) || p.policy != nil && slices.Contains(p.policy.approvalPermissions, string(permission))
 }
 
 func runtimeAuthorizationState(definition *authv1.AuthorizationPolicy, revision int64, runtime bool) *adminv1.AuthorizationState {
-	return &adminv1.AuthorizationState{Policy: proto.CloneOf(definition), Revision: uint64(revision), Runtime: runtime}
+	builtIn := make([]string, 0, len(builtInApprovalPermissions))
+	for _, permission := range builtInApprovalPermissions {
+		builtIn = append(builtIn, string(permission))
+	}
+	return &adminv1.AuthorizationState{Policy: proto.CloneOf(definition), Revision: uint64(revision), Runtime: runtime, BuiltInApprovalPermissions: builtIn}
 }

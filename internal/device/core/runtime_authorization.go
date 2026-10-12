@@ -28,7 +28,18 @@ func (s *Service) GetAuthorization(ctx context.Context, _ *connect.Request[admin
 	if err != nil {
 		return nil, ExecutionError(err)
 	}
+	state.ConfiguredApprovalPermissions = configuredApprovalPermissions(s.RevealApproval)
 	return NoStore(&adminv1.GetAuthorizationResponse{Authorization: state}), nil
+}
+
+// configuredApprovalPermissions names the reveals escrow.reveal_approval_required
+// gates (recovery keys, stored secrets and local admin passwords), so the policy
+// editor never presents them as optional while the server enforces them.
+func configuredApprovalPermissions(revealApproval bool) []string {
+	if !revealApproval {
+		return nil
+	}
+	return []string{string(identity.PermissionReadRecoveryKeys), string(identity.PermissionRevealSecrets)}
 }
 
 func (s *Service) UpdateAuthorization(ctx context.Context, req *connect.Request[adminv1.UpdateAuthorizationRequest]) (*connect.Response[adminv1.UpdateAuthorizationResponse], error) {
@@ -58,5 +69,6 @@ func (s *Service) UpdateAuthorization(ctx context.Context, req *connect.Request[
 	case err != nil:
 		return nil, ExecutionError(err)
 	}
+	state.ConfiguredApprovalPermissions = configuredApprovalPermissions(s.RevealApproval)
 	return NoStore(&adminv1.UpdateAuthorizationResponse{Authorization: state}), nil
 }

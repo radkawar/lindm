@@ -5,7 +5,7 @@ export const permissionLabels: Record<string, string> = {
   "enrollment.manage": "Manage enrollment",
   "device.revoke": "Revoke devices",
   "audit.read": "View audit log",
-  "execution_trust.manage": "Manage execution trust",
+  "execution_trust.manage": "Change which signing keys devices trust for commands",
   "profiles.manage": "Manage profiles",
   "resources.assign": "Assign resources",
   "accounts.manage": "Manage accounts",

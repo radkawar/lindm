@@ -27,13 +27,19 @@ const (
 
 // Runtime authority replaces the complete bootstrap policy, never merges with it.
 type AuthorizationState struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Policy        *v1.AuthorizationPolicy `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
-	Revision      uint64                  `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
-	Runtime       bool                    `protobuf:"varint,3,opt,name=runtime,proto3" json:"runtime,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp  `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState  `protogen:"open.v1"`
+	Policy    *v1.AuthorizationPolicy `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	Revision  uint64                  `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	Runtime   bool                    `protobuf:"varint,3,opt,name=runtime,proto3" json:"runtime,omitempty"`
+	UpdatedAt *timestamppb.Timestamp  `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Permissions whose operations always need an independent approver whatever
+	// the policy says; built into the server and not part of the policy.
+	BuiltInApprovalPermissions []string `protobuf:"bytes,5,rep,name=built_in_approval_permissions,json=builtInApprovalPermissions,proto3" json:"built_in_approval_permissions,omitempty"`
+	// Permissions whose operations need an independent approver because the
+	// server configuration requires it (escrow.reveal_approval_required).
+	ConfiguredApprovalPermissions []string `protobuf:"bytes,6,rep,name=configured_approval_permissions,json=configuredApprovalPermissions,proto3" json:"configured_approval_permissions,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *AuthorizationState) Reset() {
@@ -90,6 +96,20 @@ func (x *AuthorizationState) GetRuntime() bool {
 func (x *AuthorizationState) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *AuthorizationState) GetBuiltInApprovalPermissions() []string {
+	if x != nil {
+		return x.BuiltInApprovalPermissions
+	}
+	return nil
+}
+
+func (x *AuthorizationState) GetConfiguredApprovalPermissions() []string {
+	if x != nil {
+		return x.ConfiguredApprovalPermissions
 	}
 	return nil
 }
@@ -291,13 +311,15 @@ var File_lindm_admin_v1_authorization_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_authorization_proto_rawDesc = "" +
 	"\n" +
-	"\"lindm/admin/v1/authorization.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc1\x01\n" +
+	"\"lindm/admin/v1/authorization.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcc\x02\n" +
 	"\x12AuthorizationState\x12:\n" +
 	"\x06policy\x18\x01 \x01(\v2\".lindm.auth.v1.AuthorizationPolicyR\x06policy\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\x04R\brevision\x12\x18\n" +
 	"\aruntime\x18\x03 \x01(\bR\aruntime\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x19\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12A\n" +
+	"\x1dbuilt_in_approval_permissions\x18\x05 \x03(\tR\x1abuiltInApprovalPermissions\x12F\n" +
+	"\x1fconfigured_approval_permissions\x18\x06 \x03(\tR\x1dconfiguredApprovalPermissions\"\x19\n" +
 	"\x17GetAuthorizationRequest\"d\n" +
 	"\x18GetAuthorizationResponse\x12H\n" +
 	"\rauthorization\x18\x01 \x01(\v2\".lindm.admin.v1.AuthorizationStateR\rauthorization\"\xea\x01\n" +
