@@ -43,6 +43,7 @@ import { newRequestId } from "@/lib/ids";
 import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
+import { SecretRowActions } from "./actions";
 import { MaterialField, purposeLabels, purposeOptions, takeMaterial } from "./material";
 import { secretsQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
@@ -53,43 +54,43 @@ export function SecretsView({
   pageToken,
   onSearch,
   onCreated,
+  creating,
+  onCreatingChange,
 }: {
   pageSize: PageSize;
   pageToken: string;
   onSearch: (next: { pageSize: PageSize; pageToken: string }) => void;
   onCreated: (secretId: string) => void;
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
+  const queryClient = useQueryClient();
   const list = useQuery(secretsQueryOptions(lifetime, pageSize, pageToken));
   const pagination = useListPagination({ pageSize, pageToken }, onSearch);
   const failure = list.error ? toRpcFailure(list.error) : null;
   const canCreate = canPermission(principal, "secrets.manage", true);
-  const [creating, setCreating] = useState(false);
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Secrets"
         description="Passwords and keys that profiles can use. Values are never shown in this list."
+        onRefresh={() => {
+          void list.refetch();
+          void queryClient.invalidateQueries({ queryKey: ["secret-uses", lifetime.generation] });
+        }}
+        refreshing={list.isFetching}
         actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => void list.refetch()}
-              disabled={list.isFetching}
-            >
-              Refresh
+          canCreate ? (
+            <Button aria-haspopup="dialog" onClick={() => onCreatingChange(true)}>
+              Create secret
             </Button>
-            {canCreate ? (
-              <Button aria-haspopup="dialog" onClick={() => setCreating(true)}>
-                Create secret
-              </Button>
-            ) : null}
-          </>
+          ) : null
         }
       />
       {canCreate ? (
-        <Dialog open={creating} onOpenChange={setCreating}>
+        <Dialog open={creating} onOpenChange={onCreatingChange}>
           <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Create secret</DialogTitle>
@@ -97,7 +98,7 @@ export function SecretsView({
             </DialogHeader>
             <CreateSecretForm
               onCreated={(secretId) => {
-                setCreating(false);
+                onCreatingChange(false);
                 onCreated(secretId);
               }}
             />
@@ -119,7 +120,7 @@ export function SecretsView({
             description="Store a Wi-Fi key, password hash or other credential once, then select it in a profile."
             action={
               canCreate ? (
-                <Button aria-haspopup="dialog" onClick={() => setCreating(true)}>
+                <Button aria-haspopup="dialog" onClick={() => onCreatingChange(true)}>
                   Create secret
                 </Button>
               ) : null
@@ -142,9 +143,14 @@ export function SecretsView({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Purpose</TableHead>
-              <TableHead>Current version</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead>Created by</TableHead>
+              {/* Version history and authorship are on the secret page; on narrow
+                  screens the row keeps its name, purpose and actions in view. */}
+              <TableHead className="hidden md:table-cell">Current version</TableHead>
+              <TableHead className="hidden md:table-cell">Updated</TableHead>
+              <TableHead className="hidden md:table-cell">Created by</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -159,12 +165,21 @@ export function SecretsView({
                     {secret.displayName.trim() || "Unnamed secret"}
                   </Link>
                 </TableCell>
-                <TableCell>{purposeLabels[secret.purpose] ?? "Unrecognized purpose"}</TableCell>
-                <TableCell>{secret.currentVersion.toString()}</TableCell>
-                <TableCell>
+                <TableCell className="whitespace-normal">
+                  {purposeLabels[secret.purpose] ?? "Unrecognized purpose"}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {secret.currentVersion.toString()}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
                   <Timestamp value={secret.updatedAt} />
                 </TableCell>
-                <TableCell>{secret.createdByDisplayName.trim() || "Unknown"}</TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {secret.createdByDisplayName.trim() || "Unknown"}
+                </TableCell>
+                <TableCell className="w-10 text-right">
+                  <SecretRowActions secret={secret} canManage={canCreate} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -197,7 +212,8 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
   const id = useId();
   const exact = useExactRequest<CreateSecretRequest>();
   const [displayName, setDisplayName] = useState("");
-  const [purpose, setPurpose] = useState(SecretPurpose.PASSWORD_HASH);
+  const [purpose, setPurpose] = useState(SecretPurpose.UNSPECIFIED);
+  const chosen = purpose !== SecretPurpose.UNSPECIFIED;
   const [reason, setReason] = useState("");
   const locked = exact.busy || exact.ambiguous;
 
@@ -227,6 +243,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
       failureTitle: "Secret creation",
       onSuccess: async (response) => {
         setDisplayName("");
+        setPurpose(SecretPurpose.UNSPECIFIED);
         setReason("");
         toast.success("Secret created", {
           description: "Select it in a profile to send it to devices.",
@@ -257,10 +274,15 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
           value={purpose}
           disabled={locked}
           onValueChange={(value) => setPurpose(Number(value) as SecretPurpose)}
-          options={purposeOptions}
+          options={[
+            { value: SecretPurpose.UNSPECIFIED, label: "Choose a purpose", disabled: true },
+            ...purposeOptions,
+          ]}
         />
       </div>
-      <MaterialField key={purpose} id={`${id}-material`} purpose={purpose} disabled={locked} />
+      {chosen ? (
+        <MaterialField key={purpose} id={`${id}-material`} purpose={purpose} disabled={locked} />
+      ) : null}
       <div className="grid gap-2">
         <Label htmlFor={`${id}-reason`}>Reason</Label>
         <Textarea
@@ -286,7 +308,11 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
         </RpcError>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={exact.busy}>
+        <Button
+          type="submit"
+          disabled={exact.busy || !chosen}
+          aria-describedby={chosen ? undefined : `${id}-prerequisite`}
+        >
           {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Create secret"}
         </Button>
         {exact.ambiguous ? (
@@ -295,6 +321,11 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
           </Button>
         ) : null}
       </div>
+      {chosen ? null : (
+        <p id={`${id}-prerequisite`} className="text-sm text-muted-foreground">
+          Choose a purpose to enter the value.
+        </p>
+      )}
     </form>
   );
 }

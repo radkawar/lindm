@@ -1368,6 +1368,19 @@ decryption, every attempt is audited and the response is `no-store`.
 Profiles pin explicit versions: rotation never silently re-delivers; a new
 profile revision referencing the new version is the delivery decision.
 
+Uses and deletion: `ListSecretUses` (`secrets.manage`) reports current
+references only, each profile's head revision and the assignment head of every
+device that is not revoked, with the setting and pinned version; devices outside
+a scoped caller's grant are counted, not named. Stored settings are matched by the
+canonical secret ID that resource validation requires, then decoded for the
+version. `DeleteSecret` (unrestricted `secrets.manage`, reason, exact request ID)
+refuses with `secret_in_use` while any such reference exists. Otherwise it
+erases every version's wrapped data key and ciphertext and marks the secret
+deleted; metadata, version history, sealed delivery records and audit remain.
+A deleted secret is never listed, revealed, rotated or delivered (delivery fails
+closed with `secret_unavailable`). Publication and assignment do not consult the
+store, so a reference added after the check also fails closed at delivery.
+
 Delivery: when `GetResourceWork` mints an intent whose desired state contains a
 `SecretRef`, the server resolves the version in the same transaction, requires
 matching purpose and subject binding, the referencing field's allowed purpose,
@@ -1425,7 +1438,7 @@ device encryption keys rotate with identity renewal; LAPS passwords rotate on
 schedule, after reveal and on request. The KEK and transport key do not rotate
 online: replacing them strands existing records, as for recovery escrow.
 
-Audit actions: `secret.created`, `secret.rotated`, `secret.reveal`,
+Audit actions: `secret.created`, `secret.rotated`, `secret.reveal`, `secret.deleted`,
 `secret.delivered`, `device_encryption_key.registered`,
 `local_admin.policy_set`, `local_admin.rotation_requested`,
 `local_admin.escrow_store`, `local_admin.reveal`. Audit rows contain identifiers

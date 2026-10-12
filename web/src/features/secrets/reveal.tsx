@@ -22,6 +22,7 @@ import { newRequestId } from "@/lib/ids";
 import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
 import { validateRequest } from "@/lib/validation";
+import { CONFIRMATION_HINT, confirmsSecretName } from "./actions";
 
 const approvalStateLabels: Partial<Record<ApprovalState, string>> = {
   [ApprovalState.PENDING]: "waiting for another admin",
@@ -98,8 +99,8 @@ export function SecretReveal({
 
   function capture() {
     if (!request.current) {
-      if (confirmation !== confirmationName)
-        throw new Error("Type the secret name exactly as shown to confirm.");
+      if (!confirmsSecretName(confirmation, confirmationName))
+        throw new Error("Type the secret name as shown to confirm.");
       const payload = create(RevealSecretRequestSchema, {
         requestId: newRequestId(),
         secretId,
@@ -230,7 +231,12 @@ export function SecretReveal({
   }
 
   const shown = secret ? revealedText(secret) : null;
-  const awaitingApproval = approvalRequired === true && approvalState !== ApprovalState.APPROVED;
+  // A refusal naming approval_required means the server wants a second admin
+  // even if the policy summary didn't say so: lead with Request approval.
+  const approvalRefused =
+    failure?.reason === "approval_required" || failure?.reason === "human_approval_required";
+  const awaitingApproval =
+    (approvalRequired === true || approvalRefused) && approvalState !== ApprovalState.APPROVED;
   return (
     <div className="grid gap-3 rounded-md border p-3">
       {shown ? (
@@ -264,7 +270,8 @@ export function SecretReveal({
           { label: "Approval ID", value: approvalId },
         ]}
       />
-      <Label htmlFor={`${idPrefix}-confirmation`}>
+      {/* Block, not the flex default: flex gaps doubled the spaces around the name. */}
+      <Label htmlFor={`${idPrefix}-confirmation`} className="block leading-normal">
         Type <span className="break-all">{confirmationName}</span> to confirm
       </Label>
       <Input
@@ -274,8 +281,14 @@ export function SecretReveal({
         onChange={(event) => setConfirmation(event.target.value)}
         readOnly={busy || request.current !== null}
         autoComplete="off"
+        aria-describedby={`${idPrefix}-confirmation-hint`}
+        aria-invalid={
+          confirmation.trim() !== "" && !confirmsSecretName(confirmation, confirmationName)
+        }
       />
-      <p className="text-sm text-muted-foreground">Reveals version {version.toString()}.</p>
+      <p id={`${idPrefix}-confirmation-hint`} className="text-sm text-muted-foreground">
+        {CONFIRMATION_HINT} Reveals version {version.toString()}.
+      </p>
       <RevealApprovalNote approval={approval} />
       {approvalState !== null ? (
         <p>
@@ -299,7 +312,7 @@ export function SecretReveal({
         >
           {busy ? "Requesting…" : ambiguous === "reveal" ? "Try again" : "Reveal secret"}
         </Button>
-        {approvalRequired === false ? null : (
+        {approvalRequired === false && !approvalRefused ? null : (
           <Button
             variant={awaitingApproval ? "default" : "outline"}
             disabled={busy || secret !== null || ambiguous === "reveal"}

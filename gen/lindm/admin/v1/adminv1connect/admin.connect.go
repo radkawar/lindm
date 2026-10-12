@@ -240,6 +240,12 @@ const (
 	// AdminServiceRevealSecretProcedure is the fully-qualified name of the AdminService's RevealSecret
 	// RPC.
 	AdminServiceRevealSecretProcedure = "/lindm.admin.v1.AdminService/RevealSecret"
+	// AdminServiceListSecretUsesProcedure is the fully-qualified name of the AdminService's
+	// ListSecretUses RPC.
+	AdminServiceListSecretUsesProcedure = "/lindm.admin.v1.AdminService/ListSecretUses"
+	// AdminServiceDeleteSecretProcedure is the fully-qualified name of the AdminService's DeleteSecret
+	// RPC.
+	AdminServiceDeleteSecretProcedure = "/lindm.admin.v1.AdminService/DeleteSecret"
 	// AdminServiceSetLocalAdminPasswordPolicyProcedure is the fully-qualified name of the
 	// AdminService's SetLocalAdminPasswordPolicy RPC.
 	AdminServiceSetLocalAdminPasswordPolicyProcedure = "/lindm.admin.v1.AdminService/SetLocalAdminPasswordPolicy"
@@ -357,6 +363,8 @@ type AdminServiceClient interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
 	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
 	RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error)
+	ListSecretUses(context.Context, *connect.Request[v1.ListSecretUsesRequest]) (*connect.Response[v1.ListSecretUsesResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 	// Managed local-admin passwords escrowed by the device.
 	SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error)
 	RemoveLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error)
@@ -806,6 +814,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("RevealSecret")),
 			connect.WithClientOptions(opts...),
 		),
+		listSecretUses: connect.NewClient[v1.ListSecretUsesRequest, v1.ListSecretUsesResponse](
+			httpClient,
+			baseURL+AdminServiceListSecretUsesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListSecretUses")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSecret: connect.NewClient[v1.DeleteSecretRequest, v1.DeleteSecretResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+			connect.WithClientOptions(opts...),
+		),
 		setLocalAdminPasswordPolicy: connect.NewClient[v1.SetLocalAdminPasswordPolicyRequest, v1.SetLocalAdminPasswordPolicyResponse](
 			httpClient,
 			baseURL+AdminServiceSetLocalAdminPasswordPolicyProcedure,
@@ -965,6 +985,8 @@ type adminServiceClient struct {
 	listSecrets                          *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
 	getSecret                            *connect.Client[v1.GetSecretRequest, v1.GetSecretResponse]
 	revealSecret                         *connect.Client[v1.RevealSecretRequest, v1.RevealSecretResponse]
+	listSecretUses                       *connect.Client[v1.ListSecretUsesRequest, v1.ListSecretUsesResponse]
+	deleteSecret                         *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
 	setLocalAdminPasswordPolicy          *connect.Client[v1.SetLocalAdminPasswordPolicyRequest, v1.SetLocalAdminPasswordPolicyResponse]
 	removeLocalAdminPasswordPolicy       *connect.Client[v1.RemoveLocalAdminPasswordPolicyRequest, v1.RemoveLocalAdminPasswordPolicyResponse]
 	requestLocalAdminPasswordRotation    *connect.Client[v1.RequestLocalAdminPasswordRotationRequest, v1.RequestLocalAdminPasswordRotationResponse]
@@ -1333,6 +1355,16 @@ func (c *adminServiceClient) RevealSecret(ctx context.Context, req *connect.Requ
 	return c.revealSecret.CallUnary(ctx, req)
 }
 
+// ListSecretUses calls lindm.admin.v1.AdminService.ListSecretUses.
+func (c *adminServiceClient) ListSecretUses(ctx context.Context, req *connect.Request[v1.ListSecretUsesRequest]) (*connect.Response[v1.ListSecretUsesResponse], error) {
+	return c.listSecretUses.CallUnary(ctx, req)
+}
+
+// DeleteSecret calls lindm.admin.v1.AdminService.DeleteSecret.
+func (c *adminServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return c.deleteSecret.CallUnary(ctx, req)
+}
+
 // SetLocalAdminPasswordPolicy calls lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy.
 func (c *adminServiceClient) SetLocalAdminPasswordPolicy(ctx context.Context, req *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error) {
 	return c.setLocalAdminPasswordPolicy.CallUnary(ctx, req)
@@ -1477,6 +1509,8 @@ type AdminServiceHandler interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
 	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
 	RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error)
+	ListSecretUses(context.Context, *connect.Request[v1.ListSecretUsesRequest]) (*connect.Response[v1.ListSecretUsesResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 	// Managed local-admin passwords escrowed by the device.
 	SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error)
 	RemoveLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.RemoveLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.RemoveLocalAdminPasswordPolicyResponse], error)
@@ -1922,6 +1956,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("RevealSecret")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListSecretUsesHandler := connect.NewUnaryHandler(
+		AdminServiceListSecretUsesProcedure,
+		svc.ListSecretUses,
+		connect.WithSchema(adminServiceMethods.ByName("ListSecretUses")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteSecretHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteSecretProcedure,
+		svc.DeleteSecret,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceSetLocalAdminPasswordPolicyHandler := connect.NewUnaryHandler(
 		AdminServiceSetLocalAdminPasswordPolicyProcedure,
 		svc.SetLocalAdminPasswordPolicy,
@@ -2148,6 +2194,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetSecretHandler.ServeHTTP(w, r)
 		case AdminServiceRevealSecretProcedure:
 			adminServiceRevealSecretHandler.ServeHTTP(w, r)
+		case AdminServiceListSecretUsesProcedure:
+			adminServiceListSecretUsesHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteSecretProcedure:
+			adminServiceDeleteSecretHandler.ServeHTTP(w, r)
 		case AdminServiceSetLocalAdminPasswordPolicyProcedure:
 			adminServiceSetLocalAdminPasswordPolicyHandler.ServeHTTP(w, r)
 		case AdminServiceRemoveLocalAdminPasswordPolicyProcedure:
@@ -2463,6 +2513,14 @@ func (UnimplementedAdminServiceHandler) GetSecret(context.Context, *connect.Requ
 
 func (UnimplementedAdminServiceHandler) RevealSecret(context.Context, *connect.Request[v1.RevealSecretRequest]) (*connect.Response[v1.RevealSecretResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevealSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListSecretUses(context.Context, *connect.Request[v1.ListSecretUsesRequest]) (*connect.Response[v1.ListSecretUsesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListSecretUses is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.DeleteSecret is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) SetLocalAdminPasswordPolicy(context.Context, *connect.Request[v1.SetLocalAdminPasswordPolicyRequest]) (*connect.Response[v1.SetLocalAdminPasswordPolicyResponse], error) {

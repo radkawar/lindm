@@ -103,6 +103,8 @@ service AdminService {
   rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
   rpc GetSecret(GetSecretRequest) returns (GetSecretResponse);
   rpc RevealSecret(RevealSecretRequest) returns (RevealSecretResponse);
+  rpc ListSecretUses(ListSecretUsesRequest) returns (ListSecretUsesResponse);
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
   // Managed local-admin passwords escrowed by the device.
   rpc SetLocalAdminPasswordPolicy(SetLocalAdminPasswordPolicyRequest) returns (SetLocalAdminPasswordPolicyResponse);
   rpc RemoveLocalAdminPasswordPolicy(RemoveLocalAdminPasswordPolicyRequest) returns (RemoveLocalAdminPasswordPolicyResponse);

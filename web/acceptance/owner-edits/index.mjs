@@ -22,6 +22,8 @@ import * as pass2Bug8PickerSidebar from "./pass2-bug8-picker-sidebar.mjs";
 import * as pass2P27StackedDialogs from "./pass2-p2-7-stacked-dialogs.mjs";
 import * as pass2EmptySetting from "./pass2-bug1-empty-setting.mjs";
 import * as pass2SafetyApprovals from "./pass2-safety-approvals.mjs";
+import * as secrets from "./secrets.mjs";
+import * as secretReveal from "./secret-reveal.mjs";
 import * as approvals from "./approvals.mjs";
 import * as audit from "./audit.mjs";
 import * as pass2RestartDelay from "./pass2-bug2-restart-delay.mjs";
@@ -65,6 +67,8 @@ export const ownerEdits = [
   pass2Bug8PickerSidebar,
   pass2P27StackedDialogs,
   pass2EmptySetting,
+  secrets,
+  secretReveal,
   approvals,
   audit,
   pass2RestartDelay,

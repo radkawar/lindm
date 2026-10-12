@@ -458,6 +458,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.RevealRecoveryKeyRequest{},
 		&adminv1.CreateSecretRequest{}, &adminv1.RotateSecretRequest{},
 		&adminv1.ListSecretsRequest{}, &adminv1.GetSecretRequest{}, &adminv1.RevealSecretRequest{},
+		&adminv1.ListSecretUsesRequest{}, &adminv1.DeleteSecretRequest{},
 		&adminv1.SetLocalAdminPasswordPolicyRequest{}, &adminv1.RemoveLocalAdminPasswordPolicyRequest{},
 		&adminv1.RequestLocalAdminPasswordRotationRequest{}, &adminv1.GetLocalAdminPasswordStatusRequest{},
 		&adminv1.RevealLocalAdminPasswordRequest{},

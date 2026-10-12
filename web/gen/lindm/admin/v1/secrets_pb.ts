@@ -11,6 +11,8 @@ import type { SecretMaterial } from "../../agent/v1/secret_delivery_pb.js";
 import { file_lindm_agent_v1_secret_delivery } from "../../agent/v1/secret_delivery_pb.js";
 import type { SecretPurpose } from "../../resource/v1/common_pb.js";
 import { file_lindm_resource_v1_common } from "../../resource/v1/common_pb.js";
+import type { ResourceRef } from "../../resource/v1/identity_pb.js";
+import { file_lindm_resource_v1_identity } from "../../resource/v1/identity_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -18,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/secrets.proto.
  */
 export const file_lindm_admin_v1_secrets: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9hZG1pbi92MS9zZWNyZXRzLnByb3RvEg5saW5kbS5hZG1pbi52MSJUCg5SZXZlYWxBcHByb3ZhbBIQCghyZXF1aXJlZBgBIAEoCBIwCgRydWxlGAIgASgOMiIubGluZG0uYWRtaW4udjEuUmV2ZWFsQXBwcm92YWxSdWxlIrUCCg1TZWNyZXRTdW1tYXJ5EhEKCXNlY3JldF9pZBgBIAEoCRIxCgdwdXJwb3NlGAIgASgOMiAubGluZG0ucmVzb3VyY2UudjEuU2VjcmV0UHVycG9zZRIUCgxkaXNwbGF5X25hbWUYAyABKAkSGgoSc3ViamVjdF9iaW5kaW5nX2lkGAQgASgJEhcKD2N1cnJlbnRfdmVyc2lvbhgFIAEoBBIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjcmVhdGVkX2J5GAggASgJEh8KF2NyZWF0ZWRfYnlfZGlzcGxheV9uYW1lGAkgASgJIpwBChRTZWNyZXRWZXJzaW9uU3VtbWFyeRIPCgd2ZXJzaW9uGAEgASgEEi4KCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmNyZWF0ZWRfYnkYAyABKAkSHwoXY3JlYXRlZF9ieV9kaXNwbGF5X25hbWUYBCABKAkSDgoGcmVhc29uGAUgASgJItcDChNDcmVhdGVTZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEj0KB3B1cnBvc2UYAiABKA4yIC5saW5kbS5yZXNvdXJjZS52MS5TZWNyZXRQdXJwb3NlQgq6SAeCAQQQASAAEjUKDGRpc3BsYXlfbmFtZRgDIAEoCUIfukgcchoQARiAATITXlteXHgwMC1ceDFmXHg3Zl0rJBI4CghtYXRlcmlhbBgEIAEoCzIeLmxpbmRtLmFnZW50LnYxLlNlY3JldE1hdGVyaWFsQga6SAPIAQESGQoGcmVhc29uGAUgASgJQgm6SAZyBJi1GAE61gG6SNIBGs8BCh5jcmVhdGVfc2VjcmV0LnB1cnBvc2VfbWF0ZXJpYWwSJnNlY3JldCBtYXRlcmlhbCBtdXN0IG1hdGNoIGl0cyBwdXJwb3NlGoQBdGhpcy5wdXJwb3NlID09IDEgPyBoYXModGhpcy5tYXRlcmlhbC5wYXNzd29yZF9oYXNoKSA6ICh0aGlzLnB1cnBvc2UgPT0gMiA/IGhhcyh0aGlzLm1hdGVyaWFsLndpZmlfcHNrKSA6IGhhcyh0aGlzLm1hdGVyaWFsLm9wYXF1ZSkpIkUKFENyZWF0ZVNlY3JldFJlc3BvbnNlEi0KBnNlY3JldBgBIAEoCzIdLmxpbmRtLmFkbWluLnYxLlNlY3JldFN1bW1hcnkiyAEKE1JvdGF0ZVNlY3JldFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJc2VjcmV0X2lkGAIgASgJQgi6SAVyA7ABARIhChBleHBlY3RlZF92ZXJzaW9uGAMgASgEQge6SAQyAiAAEjgKCG1hdGVyaWFsGAQgASgLMh4ubGluZG0uYWdlbnQudjEuU2VjcmV0TWF0ZXJpYWxCBrpIA8gBARIZCgZyZWFzb24YBSABKAlCCbpIBnIEmLUYASJFChRSb3RhdGVTZWNyZXRSZXNwb25zZRItCgZzZWNyZXQYASABKAsyHS5saW5kbS5hZG1pbi52MS5TZWNyZXRTdW1tYXJ5Ik8KEkxpc3RTZWNyZXRzUmVxdWVzdBIbCglwYWdlX3NpemUYASABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEIl4KE0xpc3RTZWNyZXRzUmVzcG9uc2USLgoHc2VjcmV0cxgBIAMoCzIdLmxpbmRtLmFkbWluLnYxLlNlY3JldFN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIi8KEEdldFNlY3JldFJlcXVlc3QSGwoJc2VjcmV0X2lkGAEgASgJQgi6SAVyA7ABASKzAQoRR2V0U2VjcmV0UmVzcG9uc2USLQoGc2VjcmV0GAEgASgLMh0ubGluZG0uYWRtaW4udjEuU2VjcmV0U3VtbWFyeRI2Cgh2ZXJzaW9ucxgCIAMoCzIkLmxpbmRtLmFkbWluLnYxLlNlY3JldFZlcnNpb25TdW1tYXJ5EjcKD3JldmVhbF9hcHByb3ZhbBgDIAEoCzIeLmxpbmRtLmFkbWluLnYxLlJldmVhbEFwcHJvdmFsIqcBChNSZXZlYWxTZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCXNlY3JldF9pZBgCIAEoCUIIukgFcgOwAQESGAoHdmVyc2lvbhgDIAEoBEIHukgEMgIgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIgCgthcHByb3ZhbF9pZBgFIAEoCUILukgI2AEBcgOwAQEiewoUUmV2ZWFsU2VjcmV0UmVzcG9uc2USMAoIbWF0ZXJpYWwYASABKAsyHi5saW5kbS5hZ2VudC52MS5TZWNyZXRNYXRlcmlhbBIxCgdwdXJwb3NlGAIgASgOMiAubGluZG0ucmVzb3VyY2UudjEuU2VjcmV0UHVycG9zZSL+AQoYTG9jYWxBZG1pblBhc3N3b3JkUG9saWN5EkIKDGFjY291bnRfbmFtZRgBIAEoCUIsukgpcicyH15bYS16QS1aX11bYS16QS1aMC05Xy4tXXswLDMxfSRaBHJvb3QSTAoRcm90YXRpb25faW50ZXJ2YWwYAiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CFrpIE8gBAaoBDSIFCIDnhA8yBAiAowUSUAoacG9zdF9yZXZlYWxfcm90YXRpb25fZGVsYXkYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDsgBAaoBCCIECICjBTIAIrwBCiJTZXRMb2NhbEFkbWluUGFzc3dvcmRQb2xpY3lSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRldmljZV9pZBgCIAEoCUIIukgFcgOwAQESQAoGcG9saWN5GAMgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkUG9saWN5Qga6SAPIAQESGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiXwojU2V0TG9jYWxBZG1pblBhc3N3b3JkUG9saWN5UmVzcG9uc2USOAoGc3RhdHVzGAEgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzIn0KJVJlbW92ZUxvY2FsQWRtaW5QYXNzd29yZFBvbGljeVJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASIoCiZSZW1vdmVMb2NhbEFkbWluUGFzc3dvcmRQb2xpY3lSZXNwb25zZSKAAQooUmVxdWVzdExvY2FsQWRtaW5QYXNzd29yZFJvdGF0aW9uUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBImUKKVJlcXVlc3RMb2NhbEFkbWluUGFzc3dvcmRSb3RhdGlvblJlc3BvbnNlEjgKBnN0YXR1cxgBIAEoCzIoLmxpbmRtLmFkbWluLnYxLkxvY2FsQWRtaW5QYXNzd29yZFN0YXR1cyKnAgoYTG9jYWxBZG1pblBhc3N3b3JkRXNjcm93EhEKCWFjdGlvbl9pZBgBIAEoCRIUCgxhY2NvdW50X25hbWUYAiABKAkSEwoLYWNjb3VudF91aWQYAyABKA0SNgoFc3RhdGUYBCABKA4yJy5saW5kbS5hZG1pbi52MS5Mb2NhbEFkbWluUGFzc3dvcmRTdGF0ZRIvCgtlc2Nyb3dlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc2V0dGxlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNAoQbGFzdF9yZXZlYWxlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiwgIKGExvY2FsQWRtaW5QYXNzd29yZFN0YXR1cxIRCglkZXZpY2VfaWQYASABKAkSOAoGcG9saWN5GAIgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkUG9saWN5EjMKD3JvdGF0aW9uX2R1ZV9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFgoOYmxvY2tlZF9yZWFzb24YBCABKAkSFwoPcG9saWN5X2FjdG9yX2lkGAUgASgJEiEKGXBvbGljeV9hY3Rvcl9kaXNwbGF5X25hbWUYBiABKAkSOQoHZXNjcm93cxgHIAMoCzIoLmxpbmRtLmFkbWluLnYxLkxvY2FsQWRtaW5QYXNzd29yZEVzY3JvdxIVCg1lc2Nyb3dfa2V5X2lkGAggASgJIkEKIkdldExvY2FsQWRtaW5QYXNzd29yZFN0YXR1c1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABASKYAQojR2V0TG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzUmVzcG9uc2USOAoGc3RhdHVzGAEgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzEjcKD3JldmVhbF9hcHByb3ZhbBgCIAEoCzIeLmxpbmRtLmFkbWluLnYxLlJldmVhbEFwcHJvdmFsIrYBCh9SZXZlYWxMb2NhbEFkbWluUGFzc3dvcmRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRldmljZV9pZBgCIAEoCUIIukgFcgOwAQESGwoJYWN0aW9uX2lkGAMgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIgCgthcHByb3ZhbF9pZBgFIAEoCUILukgI2AEBcgOwAQEiowEKIFJldmVhbExvY2FsQWRtaW5QYXNzd29yZFJlc3BvbnNlEhAKCHBhc3N3b3JkGAEgASgMEjgKBmVzY3JvdxgCIAEoCzIoLmxpbmRtLmFkbWluLnYxLkxvY2FsQWRtaW5QYXNzd29yZEVzY3JvdxIzCg9yb3RhdGlvbl9kdWVfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wKuUBChJSZXZlYWxBcHByb3ZhbFJ1bGUSJAogUkVWRUFMX0FQUFJPVkFMX1JVTEVfVU5TUEVDSUZJRUQQABIpCiVSRVZFQUxfQVBQUk9WQUxfUlVMRV9BTk9USEVSX0FQUFJPVkVSEAESJgoiUkVWRUFMX0FQUFJPVkFMX1JVTEVfT05MWV9BUFBST1ZFUhACEicKI1JFVkVBTF9BUFBST1ZBTF9SVUxFX1NFUlZFUl9TRVRUSU5HEAMSLQopUkVWRUFMX0FQUFJPVkFMX1JVTEVfQVVUSE9SSVpBVElPTl9QT0xJQ1kQBCqQAgoXTG9jYWxBZG1pblBhc3N3b3JkU3RhdGUSKgomTE9DQUxfQURNSU5fUEFTU1dPUkRfU1RBVEVfVU5TUEVDSUZJRUQQABInCiNMT0NBTF9BRE1JTl9QQVNTV09SRF9TVEFURV9FU0NST1dFRBABEiYKIkxPQ0FMX0FETUlOX1BBU1NXT1JEX1NUQVRFX0NVUlJFTlQQAhIpCiVMT0NBTF9BRE1JTl9QQVNTV09SRF9TVEFURV9TVVBFUlNFREVEEAMSJgoiTE9DQUxfQURNSU5fUEFTU1dPUkRfU1RBVEVfVU5LTk9XThAEEiUKIUxPQ0FMX0FETUlOX1BBU1NXT1JEX1NUQVRFX0ZBSUxFRBAFQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_lindm_agent_v1_secret_delivery, file_lindm_resource_v1_common, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChxsaW5kbS9hZG1pbi92MS9zZWNyZXRzLnByb3RvEg5saW5kbS5hZG1pbi52MSJUCg5SZXZlYWxBcHByb3ZhbBIQCghyZXF1aXJlZBgBIAEoCBIwCgRydWxlGAIgASgOMiIubGluZG0uYWRtaW4udjEuUmV2ZWFsQXBwcm92YWxSdWxlIrUCCg1TZWNyZXRTdW1tYXJ5EhEKCXNlY3JldF9pZBgBIAEoCRIxCgdwdXJwb3NlGAIgASgOMiAubGluZG0ucmVzb3VyY2UudjEuU2VjcmV0UHVycG9zZRIUCgxkaXNwbGF5X25hbWUYAyABKAkSGgoSc3ViamVjdF9iaW5kaW5nX2lkGAQgASgJEhcKD2N1cnJlbnRfdmVyc2lvbhgFIAEoBBIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjcmVhdGVkX2J5GAggASgJEh8KF2NyZWF0ZWRfYnlfZGlzcGxheV9uYW1lGAkgASgJIpwBChRTZWNyZXRWZXJzaW9uU3VtbWFyeRIPCgd2ZXJzaW9uGAEgASgEEi4KCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmNyZWF0ZWRfYnkYAyABKAkSHwoXY3JlYXRlZF9ieV9kaXNwbGF5X25hbWUYBCABKAkSDgoGcmVhc29uGAUgASgJItcDChNDcmVhdGVTZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEj0KB3B1cnBvc2UYAiABKA4yIC5saW5kbS5yZXNvdXJjZS52MS5TZWNyZXRQdXJwb3NlQgq6SAeCAQQQASAAEjUKDGRpc3BsYXlfbmFtZRgDIAEoCUIfukgcchoQARiAATITXlteXHgwMC1ceDFmXHg3Zl0rJBI4CghtYXRlcmlhbBgEIAEoCzIeLmxpbmRtLmFnZW50LnYxLlNlY3JldE1hdGVyaWFsQga6SAPIAQESGQoGcmVhc29uGAUgASgJQgm6SAZyBJi1GAE61gG6SNIBGs8BCh5jcmVhdGVfc2VjcmV0LnB1cnBvc2VfbWF0ZXJpYWwSJnNlY3JldCBtYXRlcmlhbCBtdXN0IG1hdGNoIGl0cyBwdXJwb3NlGoQBdGhpcy5wdXJwb3NlID09IDEgPyBoYXModGhpcy5tYXRlcmlhbC5wYXNzd29yZF9oYXNoKSA6ICh0aGlzLnB1cnBvc2UgPT0gMiA/IGhhcyh0aGlzLm1hdGVyaWFsLndpZmlfcHNrKSA6IGhhcyh0aGlzLm1hdGVyaWFsLm9wYXF1ZSkpIkUKFENyZWF0ZVNlY3JldFJlc3BvbnNlEi0KBnNlY3JldBgBIAEoCzIdLmxpbmRtLmFkbWluLnYxLlNlY3JldFN1bW1hcnkiyAEKE1JvdGF0ZVNlY3JldFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJc2VjcmV0X2lkGAIgASgJQgi6SAVyA7ABARIhChBleHBlY3RlZF92ZXJzaW9uGAMgASgEQge6SAQyAiAAEjgKCG1hdGVyaWFsGAQgASgLMh4ubGluZG0uYWdlbnQudjEuU2VjcmV0TWF0ZXJpYWxCBrpIA8gBARIZCgZyZWFzb24YBSABKAlCCbpIBnIEmLUYASJFChRSb3RhdGVTZWNyZXRSZXNwb25zZRItCgZzZWNyZXQYASABKAsyHS5saW5kbS5hZG1pbi52MS5TZWNyZXRTdW1tYXJ5Ik8KEkxpc3RTZWNyZXRzUmVxdWVzdBIbCglwYWdlX3NpemUYASABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEIl4KE0xpc3RTZWNyZXRzUmVzcG9uc2USLgoHc2VjcmV0cxgBIAMoCzIdLmxpbmRtLmFkbWluLnYxLlNlY3JldFN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIi8KEEdldFNlY3JldFJlcXVlc3QSGwoJc2VjcmV0X2lkGAEgASgJQgi6SAVyA7ABASKzAQoRR2V0U2VjcmV0UmVzcG9uc2USLQoGc2VjcmV0GAEgASgLMh0ubGluZG0uYWRtaW4udjEuU2VjcmV0U3VtbWFyeRI2Cgh2ZXJzaW9ucxgCIAMoCzIkLmxpbmRtLmFkbWluLnYxLlNlY3JldFZlcnNpb25TdW1tYXJ5EjcKD3JldmVhbF9hcHByb3ZhbBgDIAEoCzIeLmxpbmRtLmFkbWluLnYxLlJldmVhbEFwcHJvdmFsIqcBChNSZXZlYWxTZWNyZXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCXNlY3JldF9pZBgCIAEoCUIIukgFcgOwAQESGAoHdmVyc2lvbhgDIAEoBEIHukgEMgIgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIgCgthcHByb3ZhbF9pZBgFIAEoCUILukgI2AEBcgOwAQEiewoUUmV2ZWFsU2VjcmV0UmVzcG9uc2USMAoIbWF0ZXJpYWwYASABKAsyHi5saW5kbS5hZ2VudC52MS5TZWNyZXRNYXRlcmlhbBIxCgdwdXJwb3NlGAIgASgOMiAubGluZG0ucmVzb3VyY2UudjEuU2VjcmV0UHVycG9zZSJjChBTZWNyZXRTZXR0aW5nVXNlEjAKCHJlc291cmNlGAEgASgLMh4ubGluZG0ucmVzb3VyY2UudjEuUmVzb3VyY2VSZWYSDwoHdmVyc2lvbhgCIAEoBBIMCgRuYW1lGAMgASgJIokBChBTZWNyZXRQcm9maWxlVXNlEhIKCnByb2ZpbGVfaWQYASABKAkSFAoMcHJvZmlsZV9uYW1lGAIgASgJEhcKD3JldmlzaW9uX251bWJlchgDIAEoBBIyCghzZXR0aW5ncxgEIAMoCzIgLmxpbmRtLmFkbWluLnYxLlNlY3JldFNldHRpbmdVc2UiagoPU2VjcmV0RGV2aWNlVXNlEhEKCWRldmljZV9pZBgBIAEoCRIQCghob3N0bmFtZRgCIAEoCRIyCghzZXR0aW5ncxgDIAMoCzIgLmxpbmRtLmFkbWluLnYxLlNlY3JldFNldHRpbmdVc2UiNAoVTGlzdFNlY3JldFVzZXNSZXF1ZXN0EhsKCXNlY3JldF9pZBgBIAEoCUIIukgFcgOwAQEiyQEKFkxpc3RTZWNyZXRVc2VzUmVzcG9uc2USMgoIcHJvZmlsZXMYASADKAsyIC5saW5kbS5hZG1pbi52MS5TZWNyZXRQcm9maWxlVXNlEjAKB2RldmljZXMYAiADKAsyHy5saW5kbS5hZG1pbi52MS5TZWNyZXREZXZpY2VVc2USFQoNcHJvZmlsZV9jb3VudBgDIAEoDRIUCgxkZXZpY2VfY291bnQYBCABKA0SHAoUdmlzaWJsZV9kZXZpY2VfY291bnQYBSABKA0iawoTRGVsZXRlU2VjcmV0UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglzZWNyZXRfaWQYAiABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBIhYKFERlbGV0ZVNlY3JldFJlc3BvbnNlIv4BChhMb2NhbEFkbWluUGFzc3dvcmRQb2xpY3kSQgoMYWNjb3VudF9uYW1lGAEgASgJQiy6SClyJzIfXlthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9JFoEcm9vdBJMChFyb3RhdGlvbl9pbnRlcnZhbBgCIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIWukgTyAEBqgENIgUIgOeEDzIECICjBRJQChpwb3N0X3JldmVhbF9yb3RhdGlvbl9kZWxheRgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOyAEBqgEIIgQIgKMFMgAivAEKIlNldExvY2FsQWRtaW5QYXNzd29yZFBvbGljeVJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARJACgZwb2xpY3kYAyABKAsyKC5saW5kbS5hZG1pbi52MS5Mb2NhbEFkbWluUGFzc3dvcmRQb2xpY3lCBrpIA8gBARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYASJfCiNTZXRMb2NhbEFkbWluUGFzc3dvcmRQb2xpY3lSZXNwb25zZRI4CgZzdGF0dXMYASABKAsyKC5saW5kbS5hZG1pbi52MS5Mb2NhbEFkbWluUGFzc3dvcmRTdGF0dXMifQolUmVtb3ZlTG9jYWxBZG1pblBhc3N3b3JkUG9saWN5UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBIigKJlJlbW92ZUxvY2FsQWRtaW5QYXNzd29yZFBvbGljeVJlc3BvbnNlIoABCihSZXF1ZXN0TG9jYWxBZG1pblBhc3N3b3JkUm90YXRpb25SZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRldmljZV9pZBgCIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEiZQopUmVxdWVzdExvY2FsQWRtaW5QYXNzd29yZFJvdGF0aW9uUmVzcG9uc2USOAoGc3RhdHVzGAEgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzIqcCChhMb2NhbEFkbWluUGFzc3dvcmRFc2Nyb3cSEQoJYWN0aW9uX2lkGAEgASgJEhQKDGFjY291bnRfbmFtZRgCIAEoCRITCgthY2NvdW50X3VpZBgDIAEoDRI2CgVzdGF0ZRgEIAEoDjInLmxpbmRtLmFkbWluLnYxLkxvY2FsQWRtaW5QYXNzd29yZFN0YXRlEi8KC2VzY3Jvd2VkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzZXR0bGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBsYXN0X3JldmVhbGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLCAgoYTG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzEhEKCWRldmljZV9pZBgBIAEoCRI4CgZwb2xpY3kYAiABKAsyKC5saW5kbS5hZG1pbi52MS5Mb2NhbEFkbWluUGFzc3dvcmRQb2xpY3kSMwoPcm90YXRpb25fZHVlX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIWCg5ibG9ja2VkX3JlYXNvbhgEIAEoCRIXCg9wb2xpY3lfYWN0b3JfaWQYBSABKAkSIQoZcG9saWN5X2FjdG9yX2Rpc3BsYXlfbmFtZRgGIAEoCRI5Cgdlc2Nyb3dzGAcgAygLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkRXNjcm93EhUKDWVzY3Jvd19rZXlfaWQYCCABKAkiQQoiR2V0TG9jYWxBZG1pblBhc3N3b3JkU3RhdHVzUmVxdWVzdBIbCglkZXZpY2VfaWQYASABKAlCCLpIBXIDsAEBIpgBCiNHZXRMb2NhbEFkbWluUGFzc3dvcmRTdGF0dXNSZXNwb25zZRI4CgZzdGF0dXMYASABKAsyKC5saW5kbS5hZG1pbi52MS5Mb2NhbEFkbWluUGFzc3dvcmRTdGF0dXMSNwoPcmV2ZWFsX2FwcHJvdmFsGAIgASgLMh4ubGluZG0uYWRtaW4udjEuUmV2ZWFsQXBwcm92YWwitgEKH1JldmVhbExvY2FsQWRtaW5QYXNzd29yZFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIbCglhY3Rpb25faWQYAyABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEiAKC2FwcHJvdmFsX2lkGAUgASgJQgu6SAjYAQFyA7ABASKjAQogUmV2ZWFsTG9jYWxBZG1pblBhc3N3b3JkUmVzcG9uc2USEAoIcGFzc3dvcmQYASABKAwSOAoGZXNjcm93GAIgASgLMigubGluZG0uYWRtaW4udjEuTG9jYWxBZG1pblBhc3N3b3JkRXNjcm93EjMKD3JvdGF0aW9uX2R1ZV9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAq5QEKElJldmVhbEFwcHJvdmFsUnVsZRIkCiBSRVZFQUxfQVBQUk9WQUxfUlVMRV9VTlNQRUNJRklFRBAAEikKJVJFVkVBTF9BUFBST1ZBTF9SVUxFX0FOT1RIRVJfQVBQUk9WRVIQARImCiJSRVZFQUxfQVBQUk9WQUxfUlVMRV9PTkxZX0FQUFJPVkVSEAISJwojUkVWRUFMX0FQUFJPVkFMX1JVTEVfU0VSVkVSX1NFVFRJTkcQAxItCilSRVZFQUxfQVBQUk9WQUxfUlVMRV9BVVRIT1JJWkFUSU9OX1BPTElDWRAEKpACChdMb2NhbEFkbWluUGFzc3dvcmRTdGF0ZRIqCiZMT0NBTF9BRE1JTl9QQVNTV09SRF9TVEFURV9VTlNQRUNJRklFRBAAEicKI0xPQ0FMX0FETUlOX1BBU1NXT1JEX1NUQVRFX0VTQ1JPV0VEEAESJgoiTE9DQUxfQURNSU5fUEFTU1dPUkRfU1RBVEVfQ1VSUkVOVBACEikKJUxPQ0FMX0FETUlOX1BBU1NXT1JEX1NUQVRFX1NVUEVSU0VERUQQAxImCiJMT0NBTF9BRE1JTl9QQVNTV09SRF9TVEFURV9VTktOT1dOEAQSJQohTE9DQUxfQURNSU5fUEFTU1dPUkRfU1RBVEVfRkFJTEVEEAVCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_lindm_agent_v1_secret_delivery, file_lindm_resource_v1_common, file_lindm_resource_v1_identity, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.RevealApproval
@@ -408,6 +410,208 @@ export const RevealSecretResponseSchema: GenMessage<RevealSecretResponse> = /*@_
   messageDesc(file_lindm_admin_v1_secrets, 12);
 
 /**
+ * One setting that references a secret, and the secret version it pins.
+ *
+ * @generated from message lindm.admin.v1.SecretSettingUse
+ */
+export type SecretSettingUse = Message<"lindm.admin.v1.SecretSettingUse"> & {
+  /**
+   * @generated from field: lindm.resource.v1.ResourceRef resource = 1;
+   */
+  resource?: ResourceRef | undefined;
+
+  /**
+   * Zero when the stored setting names the secret outside a typed reference.
+   *
+   * @generated from field: uint64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * The setting's own name when it has one: the network connection name, the
+   * local account or the directory realm. Empty otherwise.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.SecretSettingUse.
+ * Use `create(SecretSettingUseSchema)` to create a new message.
+ */
+export const SecretSettingUseSchema: GenMessage<SecretSettingUse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 13);
+
+/**
+ * @generated from message lindm.admin.v1.SecretProfileUse
+ */
+export type SecretProfileUse = Message<"lindm.admin.v1.SecretProfileUse"> & {
+  /**
+   * @generated from field: string profile_id = 1;
+   */
+  profileId: string;
+
+  /**
+   * @generated from field: string profile_name = 2;
+   */
+  profileName: string;
+
+  /**
+   * The profile's current version.
+   *
+   * @generated from field: uint64 revision_number = 3;
+   */
+  revisionNumber: bigint;
+
+  /**
+   * @generated from field: repeated lindm.admin.v1.SecretSettingUse settings = 4;
+   */
+  settings: SecretSettingUse[];
+};
+
+/**
+ * Describes the message lindm.admin.v1.SecretProfileUse.
+ * Use `create(SecretProfileUseSchema)` to create a new message.
+ */
+export const SecretProfileUseSchema: GenMessage<SecretProfileUse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 14);
+
+/**
+ * @generated from message lindm.admin.v1.SecretDeviceUse
+ */
+export type SecretDeviceUse = Message<"lindm.admin.v1.SecretDeviceUse"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string hostname = 2;
+   */
+  hostname: string;
+
+  /**
+   * @generated from field: repeated lindm.admin.v1.SecretSettingUse settings = 3;
+   */
+  settings: SecretSettingUse[];
+};
+
+/**
+ * Describes the message lindm.admin.v1.SecretDeviceUse.
+ * Use `create(SecretDeviceUseSchema)` to create a new message.
+ */
+export const SecretDeviceUseSchema: GenMessage<SecretDeviceUse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 15);
+
+/**
+ * Current references only: each profile's current version and the current
+ * desired state of every device that is not revoked. Older profile versions
+ * and past deliveries are history, not uses.
+ *
+ * @generated from message lindm.admin.v1.ListSecretUsesRequest
+ */
+export type ListSecretUsesRequest = Message<"lindm.admin.v1.ListSecretUsesRequest"> & {
+  /**
+   * @generated from field: string secret_id = 1;
+   */
+  secretId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListSecretUsesRequest.
+ * Use `create(ListSecretUsesRequestSchema)` to create a new message.
+ */
+export const ListSecretUsesRequestSchema: GenMessage<ListSecretUsesRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 16);
+
+/**
+ * @generated from message lindm.admin.v1.ListSecretUsesResponse
+ */
+export type ListSecretUsesResponse = Message<"lindm.admin.v1.ListSecretUsesResponse"> & {
+  /**
+   * By profile name, at most 200 settings in total.
+   *
+   * @generated from field: repeated lindm.admin.v1.SecretProfileUse profiles = 1;
+   */
+  profiles: SecretProfileUse[];
+
+  /**
+   * Devices the caller may see, by hostname, at most 200 settings in total.
+   *
+   * @generated from field: repeated lindm.admin.v1.SecretDeviceUse devices = 2;
+   */
+  devices: SecretDeviceUse[];
+
+  /**
+   * @generated from field: uint32 profile_count = 3;
+   */
+  profileCount: number;
+
+  /**
+   * Every referencing device, including devices outside the caller's scope.
+   *
+   * @generated from field: uint32 device_count = 4;
+   */
+  deviceCount: number;
+
+  /**
+   * @generated from field: uint32 visible_device_count = 5;
+   */
+  visibleDeviceCount: number;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListSecretUsesResponse.
+ * Use `create(ListSecretUsesResponseSchema)` to create a new message.
+ */
+export const ListSecretUsesResponseSchema: GenMessage<ListSecretUsesResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 17);
+
+/**
+ * Erases every version's material; metadata and history remain for audit.
+ * Refused with secret_in_use while ListSecretUses reports any profile or device.
+ *
+ * @generated from message lindm.admin.v1.DeleteSecretRequest
+ */
+export type DeleteSecretRequest = Message<"lindm.admin.v1.DeleteSecretRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string secret_id = 2;
+   */
+  secretId: string;
+
+  /**
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DeleteSecretRequest.
+ * Use `create(DeleteSecretRequestSchema)` to create a new message.
+ */
+export const DeleteSecretRequestSchema: GenMessage<DeleteSecretRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 18);
+
+/**
+ * @generated from message lindm.admin.v1.DeleteSecretResponse
+ */
+export type DeleteSecretResponse = Message<"lindm.admin.v1.DeleteSecretResponse"> & {
+};
+
+/**
+ * Describes the message lindm.admin.v1.DeleteSecretResponse.
+ * Use `create(DeleteSecretResponseSchema)` to create a new message.
+ */
+export const DeleteSecretResponseSchema: GenMessage<DeleteSecretResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_secrets, 19);
+
+/**
  * @generated from message lindm.admin.v1.LocalAdminPasswordPolicy
  */
 export type LocalAdminPasswordPolicy = Message<"lindm.admin.v1.LocalAdminPasswordPolicy"> & {
@@ -432,7 +636,7 @@ export type LocalAdminPasswordPolicy = Message<"lindm.admin.v1.LocalAdminPasswor
  * Use `create(LocalAdminPasswordPolicySchema)` to create a new message.
  */
 export const LocalAdminPasswordPolicySchema: GenMessage<LocalAdminPasswordPolicy> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 13);
+  messageDesc(file_lindm_admin_v1_secrets, 20);
 
 /**
  * @generated from message lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
@@ -464,7 +668,7 @@ export type SetLocalAdminPasswordPolicyRequest = Message<"lindm.admin.v1.SetLoca
  * Use `create(SetLocalAdminPasswordPolicyRequestSchema)` to create a new message.
  */
 export const SetLocalAdminPasswordPolicyRequestSchema: GenMessage<SetLocalAdminPasswordPolicyRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 14);
+  messageDesc(file_lindm_admin_v1_secrets, 21);
 
 /**
  * @generated from message lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
@@ -481,7 +685,7 @@ export type SetLocalAdminPasswordPolicyResponse = Message<"lindm.admin.v1.SetLoc
  * Use `create(SetLocalAdminPasswordPolicyResponseSchema)` to create a new message.
  */
 export const SetLocalAdminPasswordPolicyResponseSchema: GenMessage<SetLocalAdminPasswordPolicyResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 15);
+  messageDesc(file_lindm_admin_v1_secrets, 22);
 
 /**
  * Stops future rotations. Escrowed passwords remain revealable.
@@ -510,7 +714,7 @@ export type RemoveLocalAdminPasswordPolicyRequest = Message<"lindm.admin.v1.Remo
  * Use `create(RemoveLocalAdminPasswordPolicyRequestSchema)` to create a new message.
  */
 export const RemoveLocalAdminPasswordPolicyRequestSchema: GenMessage<RemoveLocalAdminPasswordPolicyRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 16);
+  messageDesc(file_lindm_admin_v1_secrets, 23);
 
 /**
  * @generated from message lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
@@ -523,7 +727,7 @@ export type RemoveLocalAdminPasswordPolicyResponse = Message<"lindm.admin.v1.Rem
  * Use `create(RemoveLocalAdminPasswordPolicyResponseSchema)` to create a new message.
  */
 export const RemoveLocalAdminPasswordPolicyResponseSchema: GenMessage<RemoveLocalAdminPasswordPolicyResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 17);
+  messageDesc(file_lindm_admin_v1_secrets, 24);
 
 /**
  * @generated from message lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
@@ -550,7 +754,7 @@ export type RequestLocalAdminPasswordRotationRequest = Message<"lindm.admin.v1.R
  * Use `create(RequestLocalAdminPasswordRotationRequestSchema)` to create a new message.
  */
 export const RequestLocalAdminPasswordRotationRequestSchema: GenMessage<RequestLocalAdminPasswordRotationRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 18);
+  messageDesc(file_lindm_admin_v1_secrets, 25);
 
 /**
  * @generated from message lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
@@ -567,7 +771,7 @@ export type RequestLocalAdminPasswordRotationResponse = Message<"lindm.admin.v1.
  * Use `create(RequestLocalAdminPasswordRotationResponseSchema)` to create a new message.
  */
 export const RequestLocalAdminPasswordRotationResponseSchema: GenMessage<RequestLocalAdminPasswordRotationResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 19);
+  messageDesc(file_lindm_admin_v1_secrets, 26);
 
 /**
  * @generated from message lindm.admin.v1.LocalAdminPasswordEscrow
@@ -614,7 +818,7 @@ export type LocalAdminPasswordEscrow = Message<"lindm.admin.v1.LocalAdminPasswor
  * Use `create(LocalAdminPasswordEscrowSchema)` to create a new message.
  */
 export const LocalAdminPasswordEscrowSchema: GenMessage<LocalAdminPasswordEscrow> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 20);
+  messageDesc(file_lindm_admin_v1_secrets, 27);
 
 /**
  * @generated from message lindm.admin.v1.LocalAdminPasswordStatus
@@ -674,7 +878,7 @@ export type LocalAdminPasswordStatus = Message<"lindm.admin.v1.LocalAdminPasswor
  * Use `create(LocalAdminPasswordStatusSchema)` to create a new message.
  */
 export const LocalAdminPasswordStatusSchema: GenMessage<LocalAdminPasswordStatus> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 21);
+  messageDesc(file_lindm_admin_v1_secrets, 28);
 
 /**
  * @generated from message lindm.admin.v1.GetLocalAdminPasswordStatusRequest
@@ -691,7 +895,7 @@ export type GetLocalAdminPasswordStatusRequest = Message<"lindm.admin.v1.GetLoca
  * Use `create(GetLocalAdminPasswordStatusRequestSchema)` to create a new message.
  */
 export const GetLocalAdminPasswordStatusRequestSchema: GenMessage<GetLocalAdminPasswordStatusRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 22);
+  messageDesc(file_lindm_admin_v1_secrets, 29);
 
 /**
  * @generated from message lindm.admin.v1.GetLocalAdminPasswordStatusResponse
@@ -715,7 +919,7 @@ export type GetLocalAdminPasswordStatusResponse = Message<"lindm.admin.v1.GetLoc
  * Use `create(GetLocalAdminPasswordStatusResponseSchema)` to create a new message.
  */
 export const GetLocalAdminPasswordStatusResponseSchema: GenMessage<GetLocalAdminPasswordStatusResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 23);
+  messageDesc(file_lindm_admin_v1_secrets, 30);
 
 /**
  * Return bytes must remain memory-only, outside query caches, URLs and logs.
@@ -754,7 +958,7 @@ export type RevealLocalAdminPasswordRequest = Message<"lindm.admin.v1.RevealLoca
  * Use `create(RevealLocalAdminPasswordRequestSchema)` to create a new message.
  */
 export const RevealLocalAdminPasswordRequestSchema: GenMessage<RevealLocalAdminPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 24);
+  messageDesc(file_lindm_admin_v1_secrets, 31);
 
 /**
  * @generated from message lindm.admin.v1.RevealLocalAdminPasswordResponse
@@ -785,7 +989,7 @@ export type RevealLocalAdminPasswordResponse = Message<"lindm.admin.v1.RevealLoc
  * Use `create(RevealLocalAdminPasswordResponseSchema)` to create a new message.
  */
 export const RevealLocalAdminPasswordResponseSchema: GenMessage<RevealLocalAdminPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_secrets, 25);
+  messageDesc(file_lindm_admin_v1_secrets, 32);
 
 /**
  * Why revealing custody material does or does not need a second human's

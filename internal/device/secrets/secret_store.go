@@ -114,6 +114,9 @@ func (s *Service) replayedSecretVersion(ctx context.Context, q *devicedb.Queries
 	if row.CreatedBy != actor || !match(row) {
 		return uuid.Nil, errSecretRequestReused
 	}
+	if row.Deleted {
+		return uuid.Nil, errSecretDeleted
+	}
 	equal, err := s.storedMaterialEqual(row.BindingDocument, &escrow.SecretRecord{KeyID: row.KeyID, WrappedKey: row.WrappedKey, Ciphertext: row.Ciphertext}, plaintext)
 	if err != nil {
 		return uuid.Nil, err

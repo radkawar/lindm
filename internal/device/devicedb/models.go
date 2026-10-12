@@ -221,18 +221,6 @@ type LocalAdminPasswordPolicy struct {
 	UpdatedAt               pgtype.Timestamptz
 }
 
-type ManagedSecret struct {
-	ID               uuid.UUID
-	Purpose          int16
-	SubjectBindingID uuid.UUID
-	DisplayName      string
-	CurrentVersion   int64
-	RequestID        uuid.UUID
-	CreatedBy        uuid.UUID
-	CreatedAt        pgtype.Timestamptz
-	UpdatedAt        pgtype.Timestamptz
-}
-
 type OfflineEnrollmentAuthorization struct {
 	ID                    uuid.UUID
 	TokenID               uuid.UUID

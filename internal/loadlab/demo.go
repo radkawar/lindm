@@ -750,6 +750,9 @@ func (s *demoSeed) catalog(ctx context.Context) error {
 		return fmt.Errorf("create demo secret: %w", err)
 	}
 	s.demo.Routes.SecretID = secret.Msg.GetSecret().GetSecretId()
+	if err := s.officeNetwork(ctx, secret.Msg.GetSecret()); err != nil {
+		return err
+	}
 	signing := make([]byte, 32)
 	if _, err := rand.Read(signing); err != nil {
 		return err

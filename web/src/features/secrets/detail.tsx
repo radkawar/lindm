@@ -1,15 +1,8 @@
-import { create, toJsonString } from "@bufbuild/protobuf";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { useId, useState, type FormEvent } from "react";
-import { toast } from "sonner";
-import {
-  RotateSecretRequestSchema,
-  type RotateSecretRequest,
-  type SecretSummary,
-} from "../../../gen/lindm/admin/v1/secrets_pb";
-import { SecretRefSchema } from "../../../gen/lindm/resource/v1/common_pb";
+import { useState } from "react";
+import { SecretPurpose } from "../../../gen/lindm/resource/v1/common_pb";
 import { useBreadcrumbTitle } from "@/components/layout/breadcrumb-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,14 +11,6 @@ import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
   Table,
   TableBody,
   TableCell,
@@ -33,34 +18,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { useExactRequest } from "@/hooks/use-exact-request";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
-import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
-import { adminClient } from "@/lib/rpc";
 import { Timestamp } from "@/components/ui/timestamp";
-import { MaterialField, purposeLabels, takeMaterial } from "./material";
-import { secretQueryOptions } from "./queries";
+import { DeleteSecretDialog, RotateSecretDialog, SecretUsesList, secretName } from "./actions";
+import { purposeLabels } from "./material";
+import { secretQueryOptions, secretUsesQueryOptions } from "./queries";
 import { SecretReveal } from "./reveal";
-import { validateRequest } from "@/lib/validation";
-import { secretMaterialHints } from "./validation";
 
 export function SecretDetailView({ secretId }: { secretId: string }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
+  const navigate = useNavigate();
   const detail = useQuery(secretQueryOptions(lifetime, secretId));
+  const uses = useQuery(secretUsesQueryOptions(lifetime, secretId));
   const failure = detail.error ? toRpcFailure(detail.error) : null;
   const secret = failure ? undefined : detail.data?.secret;
   const versions = failure ? [] : (detail.data?.versions ?? []);
   const [selected, setSelected] = useState<bigint | null>(null);
   const [rotating, setRotating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const version = selected ?? secret?.currentVersion ?? 0n;
   const canManage = canPermission(principal, "secrets.manage", true);
   const canReveal = canPermission(principal, "secrets.reveal", true);
-  useBreadcrumbTitle(secret ? secret.displayName.trim() || "Unnamed secret" : undefined);
+  useBreadcrumbTitle(secret ? secretName(secret) : undefined);
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={detail.isFetching}>
       <Link
@@ -73,21 +56,26 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
       <PageHeader
         title={secret?.displayName.trim() || "Secret"}
         description="Values stay hidden unless you reveal them."
+        onRefresh={() => {
+          void detail.refetch();
+          void uses.refetch();
+        }}
+        refreshing={detail.isFetching || uses.isFetching}
         actions={
-          <>
-            <Button
-              variant="outline"
-              disabled={detail.isFetching}
-              onClick={() => void detail.refetch()}
-            >
-              Refresh
-            </Button>
-            {secret && canManage ? (
+          secret && canManage ? (
+            <>
               <Button variant="outline" aria-haspopup="dialog" onClick={() => setRotating(true)}>
                 Rotate secret
               </Button>
-            ) : null}
-          </>
+              <Button
+                variant="destructive"
+                aria-haspopup="dialog"
+                onClick={() => setDeleting(true)}
+              >
+                Delete secret
+              </Button>
+            </>
+          ) : null
         }
       />
       {failure ? <RpcError failure={failure} /> : null}
@@ -128,40 +116,61 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                     { label: "Secret ID", value: secret.secretId },
                     { label: "Subject binding ID", value: secret.subjectBindingId },
                     { label: "Created by ID", value: secret.createdBy },
-                    {
-                      label: `Profile reference, version ${secret.currentVersion.toString()}`,
-                      value: secretReferenceJson(secret, secret.currentVersion),
-                    },
                   ]}
                 />
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">
-                To send it to devices, select this secret in a{" "}
-                <Link to="/profiles" className="underline underline-offset-4">
-                  profile
-                </Link>{" "}
-                setting of the same type. Devices get a new version only after you update the
-                profile.
-              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Where it&apos;s used</CardTitle>
+              <CardDescription>
+                Profiles in their current version, and devices that receive it now.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {uses.error ? (
+                <RpcError failure={toRpcFailure(uses.error)} title="Uses not loaded" />
+              ) : uses.data ? (
+                <SecretUsesList uses={uses.data} currentVersion={secret.currentVersion} />
+              ) : (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Finding where it&apos;s used…
+                </p>
+              )}
+              {editorSettings[secret.purpose] ? (
+                <p className="text-sm text-muted-foreground">
+                  To use it,{" "}
+                  <Link to="/profiles" className="underline underline-offset-4">
+                    edit a profile
+                  </Link>
+                  , add {editorSettings[secret.purpose]} and choose {secretName(secret)} in its
+                  secret picker. Devices get a new version only after you update the profile.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  The{" "}
+                  <Link to="/profiles" className="underline underline-offset-4">
+                    profile editor
+                  </Link>{" "}
+                  can&apos;t add {otherSettings[secret.purpose] ?? "settings of this type"} yet, so
+                  it can&apos;t choose this secret there.
+                </p>
+              )}
             </CardContent>
           </Card>
           {canManage ? (
-            <Dialog open={rotating} onOpenChange={setRotating}>
-              <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Rotate {secret.displayName.trim() || "secret"}</DialogTitle>
-                  <DialogDescription>
-                    Saves version {(secret.currentVersion + 1n).toString()}. Devices keep the
-                    current version until you update the profile.
-                  </DialogDescription>
-                </DialogHeader>
-                <RotateSecretForm
-                  key={secret.currentVersion.toString()}
-                  secret={secret}
-                  onRotated={() => setRotating(false)}
-                />
-              </DialogContent>
-            </Dialog>
+            <>
+              <RotateSecretDialog secret={secret} open={rotating} onOpenChange={setRotating} />
+              <DeleteSecretDialog
+                secret={secret}
+                open={deleting}
+                onOpenChange={setDeleting}
+                onDeleted={() =>
+                  void navigate({ to: "/secrets", search: { pageSize: 50, pageToken: "" } })
+                }
+              />
+            </>
           ) : null}
           <Card>
             <CardHeader>
@@ -243,103 +252,19 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
   );
 }
 
-function secretReferenceJson(secret: SecretSummary, version: bigint): string {
-  return toJsonString(
-    SecretRefSchema,
-    create(SecretRefSchema, {
-      secretId: secret.secretId,
-      version,
-      purpose: secret.purpose,
-      subjectBindingId: secret.subjectBindingId,
-    }),
-  );
-}
-
-function RotateSecretForm({ secret, onRotated }: { secret: SecretSummary; onRotated: () => void }) {
-  const lifetime = useAuthLifetime();
-  const queryClient = useQueryClient();
-  const id = useId();
-  const exact = useExactRequest<RotateSecretRequest>();
-  const [reason, setReason] = useState("");
-  const locked = exact.busy || exact.ambiguous;
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    void exact.submit({
-      capture: () => {
-        const material = takeMaterial(form, secret.purpose);
-        const request = create(RotateSecretRequestSchema, {
-          requestId: newRequestId(),
-          secretId: secret.secretId,
-          expectedVersion: secret.currentVersion,
-          material,
-          reason: reason.trim(),
-        });
-        try {
-          validateRequest(RotateSecretRequestSchema, request, secretMaterialHints);
-        } catch (error) {
-          material.material.value?.fill(0);
-          throw error;
-        }
-        return request;
-      },
-      send: (request, options) => adminClient.rotateSecret(request, options),
-      discard: (request) => request.material?.material.value?.fill(0),
-      failureTitle: "Secret rotation",
-      onSuccess: async (response) => {
-        setReason("");
-        onRotated();
-        toast.success(`Version ${response.secret?.currentVersion.toString() ?? "unknown"} saved`, {
-          description: "Update the profile to send it to devices.",
-        });
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: ["secret", lifetime.generation, secret.secretId],
-          }),
-          queryClient.invalidateQueries({ queryKey: ["secrets", lifetime.generation] }),
-        ]);
-      },
-    });
-  }
-
-  return (
-    <form className="grid gap-4" onSubmit={submit} autoComplete="off">
-      <MaterialField id={`${id}-material`} purpose={secret.purpose} disabled={locked} />
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-reason`}>Reason</Label>
-        <Textarea
-          id={`${id}-reason`}
-          data-freeform="audit reason"
-          value={reason}
-          readOnly={locked}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </div>
-      {exact.invalid ? (
-        <p role="alert" className="text-sm text-destructive">
-          {exact.invalid}
-        </p>
-      ) : null}
-      {exact.failure ? (
-        <RpcError failure={exact.failure} title="Secret not rotated">
-          {exact.ambiguous ? (
-            <p>
-              Refresh to see whether a new version was saved. Try again, or discard to start over.
-            </p>
-          ) : null}
-        </RpcError>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={exact.busy}>
-          {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Rotate secret"}
-        </Button>
-        {exact.ambiguous ? (
-          <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
-            Discard
-          </Button>
-        ) : null}
-      </div>
-    </form>
-  );
-}
+// Settings that accept each purpose (resource secret fields): the profile
+// editor offers local accounts and package repositories; the others exist only
+// in profiles it keeps as they are.
+const editorSettings: Partial<Record<SecretPurpose, string>> = {
+  [SecretPurpose.PASSWORD_HASH]: "a local user with a hashed password",
+  [SecretPurpose.REPOSITORY_AUTHENTICATION]: "a package repository that signs in",
+};
+const otherSettings: Partial<Record<SecretPurpose, string>> = {
+  [SecretPurpose.WIFI_PSK]: "Wi-Fi network connections",
+  [SecretPurpose.EAP_PASSWORD]: "network connections that sign in with EAP",
+  [SecretPurpose.VPN_AUTHENTICATION]: "VPN connections",
+  [SecretPurpose.WIREGUARD_PRIVATE_KEY]: "WireGuard VPN connections",
+  [SecretPurpose.WIREGUARD_PRESHARED_KEY]: "WireGuard VPN connections",
+  [SecretPurpose.PROXY_AUTHENTICATION]: "proxies",
+  [SecretPurpose.DIRECTORY_JOIN]: "directory connections",
+};

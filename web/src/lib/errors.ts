@@ -225,6 +225,20 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "The server cannot open this secret version.",
           action: "Check the secret version and the server escrow configuration.",
         };
+      case "secret_in_use":
+        return {
+          tone: "warning",
+          title: "Secret in use",
+          message: "A profile or device still uses this secret, so it wasn't deleted.",
+          action: "Choose another secret in those profiles and publish them, then delete.",
+        };
+      case "secret_deleted":
+        return {
+          tone: "neutral",
+          title: "Secret deleted",
+          message: "This secret was deleted, so the request can't be repeated.",
+          action: "Create a new secret if you still need it.",
+        };
       case "local_admin_policy_required":
         return {
           tone: "neutral",

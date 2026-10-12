@@ -113,6 +113,9 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ListSecrets":  {identity.PermissionManageSecrets, admins, false},
 		"GetSecret":    {identity.PermissionManageSecrets, admins, false},
 		"RevealSecret": {identity.PermissionRevealSecrets, admins, false},
+		// Uses name only devices within the caller's scope; deletion is global.
+		"ListSecretUses": {identity.PermissionManageSecrets, admins, false},
+		"DeleteSecret":   {identity.PermissionManageSecrets, admins, true},
 		// Local-admin passwords are device-scoped; status is fleet-visible metadata.
 		"SetLocalAdminPasswordPolicy":       {identity.PermissionManageSecrets, admins, false},
 		"RemoveLocalAdminPasswordPolicy":    {identity.PermissionManageSecrets, admins, false},

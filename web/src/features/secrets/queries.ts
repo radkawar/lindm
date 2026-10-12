@@ -37,3 +37,21 @@ export function secretQueryOptions(lifetime: AuthLifetime, secretId: string) {
     },
   });
 }
+
+// Profiles and devices whose current settings reference the secret.
+export function secretUsesQueryOptions(lifetime: AuthLifetime, secretId: string) {
+  return queryOptions({
+    queryKey: ["secret-uses", lifetime.generation, secretId] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    staleTime: 0,
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listSecretUses(
+        { secretId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}

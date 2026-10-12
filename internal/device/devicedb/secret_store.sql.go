@@ -31,13 +31,81 @@ func (q *Queries) AdvanceManagedSecretVersion(ctx context.Context, arg AdvanceMa
 	return result.RowsAffected(), nil
 }
 
+const countSecretUses = `-- name: CountSecretUses :one
+
+WITH profile_uses AS (
+    SELECT DISTINCT p.id
+    FROM profiles p
+    JOIN profile_resources r ON r.revision_id = p.head_revision_id
+    WHERE position($3::bytea IN r.resource_proto) > 0
+), device_uses AS (
+    SELECT DISTINCT d.id
+    FROM devices d
+    JOIN resource_assignment_heads h ON h.generation_id = d.current_generation_id
+    JOIN resource_assignment_resources r ON r.assignment_id = h.assignment_id
+    WHERE d.state <> 'revoked' AND position($3::bytea IN r.document) > 0
+)
+SELECT (SELECT count(*) FROM profile_uses)::bigint AS profiles,
+    (SELECT count(*) FROM device_uses)::bigint AS devices,
+    (SELECT count(*) FROM device_uses u
+     WHERE device_scope_matches(u.id, $1::boolean, $2::jsonb))::bigint AS visible_devices
+`
+
+type CountSecretUsesParams struct {
+	ScopeUnrestricted bool
+	Scopes            []byte
+	Needle            []byte
+}
+
+type CountSecretUsesRow struct {
+	Profiles       int64
+	Devices        int64
+	VisibleDevices int64
+}
+
+// Secret uses are current references: each profile's head revision and the
+// assignment head of every device that is not revoked. Stored settings are
+// matched by the canonical secret ID text, which resource validation requires
+// of every SecretRef; callers decode each match for the pinned version.
+func (q *Queries) CountSecretUses(ctx context.Context, arg CountSecretUsesParams) (CountSecretUsesRow, error) {
+	row := q.db.QueryRow(ctx, countSecretUses, arg.ScopeUnrestricted, arg.Scopes, arg.Needle)
+	var i CountSecretUsesRow
+	err := row.Scan(&i.Profiles, &i.Devices, &i.VisibleDevices)
+	return i, err
+}
+
+const deleteManagedSecret = `-- name: DeleteManagedSecret :exec
+UPDATE managed_secrets SET deleted_at = clock_timestamp(), deleted_by = $1,
+    updated_at = greatest(clock_timestamp(), updated_at)
+WHERE id = $2 AND deleted_at IS NULL
+`
+
+type DeleteManagedSecretParams struct {
+	DeletedBy *uuid.UUID
+	ID        uuid.UUID
+}
+
+func (q *Queries) DeleteManagedSecret(ctx context.Context, arg DeleteManagedSecretParams) error {
+	_, err := q.db.Exec(ctx, deleteManagedSecret, arg.DeletedBy, arg.ID)
+	return err
+}
+
+const eraseManagedSecretVersions = `-- name: EraseManagedSecretVersions :exec
+UPDATE managed_secret_versions SET wrapped_key = '', ciphertext = '' WHERE secret_id = $1
+`
+
+func (q *Queries) EraseManagedSecretVersions(ctx context.Context, secretID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, eraseManagedSecretVersions, secretID)
+	return err
+}
+
 const getManagedSecretSummary = `-- name: GetManagedSecretSummary :one
 SELECT s.id, s.purpose, s.subject_binding_id, s.display_name, s.current_version, s.created_by, s.created_at, s.updated_at,
     coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name
 FROM managed_secrets s
 LEFT JOIN principals creator ON creator.id = s.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
-WHERE s.id = $1
+WHERE s.id = $1 AND s.deleted_at IS NULL
 `
 
 type GetManagedSecretSummaryRow struct {
@@ -74,7 +142,7 @@ SELECT v.secret_id, v.version, v.request_id, v.binding_document, v.key_id, v.wra
     s.purpose, s.subject_binding_id
 FROM managed_secret_versions v
 JOIN managed_secrets s ON s.id = v.secret_id
-WHERE v.secret_id = $1 AND v.version = $2
+WHERE v.secret_id = $1 AND v.version = $2 AND s.deleted_at IS NULL
 `
 
 type GetManagedSecretVersionParams struct {
@@ -113,7 +181,7 @@ func (q *Queries) GetManagedSecretVersion(ctx context.Context, arg GetManagedSec
 
 const getManagedSecretVersionByRequest = `-- name: GetManagedSecretVersionByRequest :one
 SELECT v.secret_id, v.version, v.request_id, v.binding_document, v.key_id, v.wrapped_key, v.ciphertext, v.created_by,
-    s.purpose, s.display_name
+    s.purpose, s.display_name, (s.deleted_at IS NOT NULL)::boolean AS deleted
 FROM managed_secret_versions v
 JOIN managed_secrets s ON s.id = v.secret_id
 WHERE v.request_id = $1
@@ -130,6 +198,7 @@ type GetManagedSecretVersionByRequestRow struct {
 	CreatedBy       uuid.UUID
 	Purpose         int16
 	DisplayName     string
+	Deleted         bool
 }
 
 func (q *Queries) GetManagedSecretVersionByRequest(ctx context.Context, requestID uuid.UUID) (GetManagedSecretVersionByRequestRow, error) {
@@ -146,6 +215,7 @@ func (q *Queries) GetManagedSecretVersionByRequest(ctx context.Context, requestI
 		&i.CreatedBy,
 		&i.Purpose,
 		&i.DisplayName,
+		&i.Deleted,
 	)
 	return i, err
 }
@@ -259,7 +329,8 @@ SELECT s.id, s.purpose, s.subject_binding_id, s.display_name, s.current_version,
 FROM managed_secrets s
 LEFT JOIN principals creator ON creator.id = s.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
-WHERE NOT $1::boolean OR (s.created_at, s.id) > ($2::timestamptz, $3::uuid)
+WHERE s.deleted_at IS NULL
+  AND (NOT $1::boolean OR (s.created_at, s.id) > ($2::timestamptz, $3::uuid))
 ORDER BY s.created_at, s.id
 LIMIT $4
 `
@@ -318,14 +389,123 @@ func (q *Queries) ListManagedSecrets(ctx context.Context, arg ListManagedSecrets
 	return items, nil
 }
 
-const lockManagedSecret = `-- name: LockManagedSecret :one
-SELECT id, purpose, subject_binding_id, display_name, current_version, request_id, created_by, created_at, updated_at
-FROM managed_secrets WHERE id = $1 FOR UPDATE
+const listSecretDeviceUses = `-- name: ListSecretDeviceUses :many
+SELECT d.id AS device_id, d.hostname, r.resource_kind, r.canonical_key, r.document
+FROM devices d
+JOIN resource_assignment_heads h ON h.generation_id = d.current_generation_id
+JOIN resource_assignment_resources r ON r.assignment_id = h.assignment_id
+WHERE d.state <> 'revoked' AND position($1::bytea IN r.document) > 0
+  AND device_scope_matches(d.id, $2::boolean, $3::jsonb)
+ORDER BY lower(d.hostname), d.id, r.position
+LIMIT 200
 `
 
-func (q *Queries) LockManagedSecret(ctx context.Context, id uuid.UUID) (ManagedSecret, error) {
+type ListSecretDeviceUsesParams struct {
+	Needle            []byte
+	ScopeUnrestricted bool
+	Scopes            []byte
+}
+
+type ListSecretDeviceUsesRow struct {
+	DeviceID     uuid.UUID
+	Hostname     string
+	ResourceKind int16
+	CanonicalKey string
+	Document     []byte
+}
+
+func (q *Queries) ListSecretDeviceUses(ctx context.Context, arg ListSecretDeviceUsesParams) ([]ListSecretDeviceUsesRow, error) {
+	rows, err := q.db.Query(ctx, listSecretDeviceUses, arg.Needle, arg.ScopeUnrestricted, arg.Scopes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSecretDeviceUsesRow{}
+	for rows.Next() {
+		var i ListSecretDeviceUsesRow
+		if err := rows.Scan(
+			&i.DeviceID,
+			&i.Hostname,
+			&i.ResourceKind,
+			&i.CanonicalKey,
+			&i.Document,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSecretProfileUses = `-- name: ListSecretProfileUses :many
+SELECT p.id AS profile_id, rev.name, rev.revision_number, r.resource_kind, r.canonical_key, r.resource_proto
+FROM profiles p
+JOIN profile_revisions rev ON rev.id = p.head_revision_id
+JOIN profile_resources r ON r.revision_id = rev.id
+WHERE position($1::bytea IN r.resource_proto) > 0
+ORDER BY lower(rev.name), p.id, r.resource_kind, r.canonical_key
+LIMIT 200
+`
+
+type ListSecretProfileUsesRow struct {
+	ProfileID      uuid.UUID
+	Name           string
+	RevisionNumber int64
+	ResourceKind   int16
+	CanonicalKey   string
+	ResourceProto  []byte
+}
+
+func (q *Queries) ListSecretProfileUses(ctx context.Context, needle []byte) ([]ListSecretProfileUsesRow, error) {
+	rows, err := q.db.Query(ctx, listSecretProfileUses, needle)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSecretProfileUsesRow{}
+	for rows.Next() {
+		var i ListSecretProfileUsesRow
+		if err := rows.Scan(
+			&i.ProfileID,
+			&i.Name,
+			&i.RevisionNumber,
+			&i.ResourceKind,
+			&i.CanonicalKey,
+			&i.ResourceProto,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockManagedSecret = `-- name: LockManagedSecret :one
+SELECT id, purpose, subject_binding_id, display_name, current_version, request_id, created_by, created_at, updated_at
+FROM managed_secrets WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+`
+
+type LockManagedSecretRow struct {
+	ID               uuid.UUID
+	Purpose          int16
+	SubjectBindingID uuid.UUID
+	DisplayName      string
+	CurrentVersion   int64
+	RequestID        uuid.UUID
+	CreatedBy        uuid.UUID
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+func (q *Queries) LockManagedSecret(ctx context.Context, id uuid.UUID) (LockManagedSecretRow, error) {
 	row := q.db.QueryRow(ctx, lockManagedSecret, id)
-	var i ManagedSecret
+	var i LockManagedSecretRow
 	err := row.Scan(
 		&i.ID,
 		&i.Purpose,
