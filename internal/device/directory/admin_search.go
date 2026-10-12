@@ -150,18 +150,13 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		if query.sort.GetField() == adminv1.DeviceSortField_DEVICE_SORT_FIELD_UNSPECIFIED {
 			params.Descending = true // newest enrollment first
 		}
-		if filter.GetLastSeenFrom() != nil {
-			params.SeenFrom = core.Timestamptz(filter.GetLastSeenFrom().AsTime())
-		}
-		if filter.GetLastSeenUntil() != nil {
-			params.SeenUntil = core.Timestamptz(filter.GetLastSeenUntil().AsTime())
-		}
 		if token != "" {
 			if err := resumeDeviceSearchCursor(ctx, q, &cursor, &params, actor.ID, digest, token, now); err != nil {
 				return err
 			}
 		}
 		params.UpperEnrolledAt = cursor.UpperEnrolledAt
+		applySeenWindow(&params, filter, cursor.UpperEnrolledAt.Time)
 		rows, err := q.SearchDevices(ctx, params)
 		if err != nil {
 			return err
@@ -223,6 +218,24 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		return nil
 	})
 	return page, err
+}
+
+// applySeenWindow sets the last-seen bounds. A relative window is anchored at
+// the first page's clock, so every page of one search applies the same bound,
+// and the later of it and an absolute lower bound wins.
+func applySeenWindow(params *devicedb.SearchDevicesParams, filter *adminv1.DeviceFilter, anchor time.Time) {
+	if filter.GetLastSeenFrom() != nil {
+		params.SeenFrom = core.Timestamptz(filter.GetLastSeenFrom().AsTime())
+	}
+	if filter.GetLastSeenUntil() != nil {
+		params.SeenUntil = core.Timestamptz(filter.GetLastSeenUntil().AsTime())
+	}
+	if within := filter.GetLastSeenWithinSeconds(); within > 0 {
+		from := anchor.Add(-time.Duration(within) * time.Second)
+		if !params.SeenFrom.Valid || from.After(params.SeenFrom.Time) {
+			params.SeenFrom = core.Timestamptz(from)
+		}
+	}
 }
 
 func resumeDeviceSearchCursor(ctx context.Context, q *devicedb.Queries, cursor *devicedb.DeviceSearchCursor, params *devicedb.SearchDevicesParams, actorID uuid.UUID, digest []byte, token string, now time.Time) error {

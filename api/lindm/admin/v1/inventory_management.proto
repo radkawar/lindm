@@ -164,6 +164,10 @@ message DeviceFilter {
     max_len: 128
     not_contains: "\000"
   }];
+  // Relative window: the device's last contact is at most this many seconds
+  // before evaluation time; zero disables it. It combines with the absolute
+  // last_seen_from/last_seen_until bounds (all that are set must hold).
+  uint32 last_seen_within_seconds = 9 [(buf.validate.field).uint32.lte = 31622400];
 }
 
 message SetDeviceMetadataRequest {

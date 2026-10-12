@@ -1,5 +1,4 @@
-import { create, createRegistry } from "@bufbuild/protobuf";
-import { createValidator } from "@bufbuild/protovalidate";
+import { create } from "@bufbuild/protobuf";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,22 +9,30 @@ import {
   type SetDeviceGroupRequest,
   type DeleteDeviceGroupRequest,
 } from "../../../gen/lindm/admin/v1/authz_groups_pb";
-import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TechnicalDetails } from "@/components/ui/technical-details";
-import { MultiPicker, type PickerSlot } from "@/components/ui/search-picker";
+import type { PickerSlot } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
-import { describeViolations } from "@/lib/validation";
+import { checkRequest } from "@/lib/validation";
+import { DeviceMembersField, type DeviceLabelSlot } from "./device-members";
 
-const validator = createValidator({ registry: createRegistry(audit_reason) });
+const MAX_MEMBERS = 1000; // SetDeviceGroupRequest.device_ids max_items
+const LISTED_MEMBERS = 5;
 
 export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
   return queryOptions({
@@ -47,16 +54,26 @@ function deviceCount(count: number) {
   return count === 1 ? "1 device" : `${count} devices`;
 }
 
-export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
+export function GroupsView({
+  devicePicker,
+  deviceLabel,
+  creating,
+  onCreatingChange,
+}: {
+  devicePicker: PickerSlot;
+  deviceLabel: DeviceLabelSlot;
+  // Owned by the route so a link (for example the command palette) can open it.
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
+}) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
-  const [creating, setCreating] = useState(false);
   const [createGeneration, setCreateGeneration] = useState(0);
   const list = useQuery(groupsQueryOptions(lifetime, pageToken));
   const groups = [...(list.data?.groups ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const startCreate = () => {
     setCreateGeneration((value) => value + 1);
-    setCreating(true);
+    onCreatingChange(true);
   };
   return (
     <section
@@ -70,24 +87,28 @@ export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
             Device groups
           </h2>
           <p className="text-sm text-muted-foreground">
-            Named sets of devices. Accounts limited to a group can manage only its devices. Only
-            admins with access to all devices can edit groups.
+            Named sets of devices. Accounts limited to a group can manage only its devices.
           </p>
         </div>
-        {creating ? null : <Button onClick={startCreate}>New group</Button>}
+        <Button onClick={startCreate}>New group</Button>
       </div>
-      {creating ? (
-        <div className="grid min-w-0 gap-2">
+      <Dialog open={creating} onOpenChange={onCreatingChange}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>New device group</DialogTitle>
+            <DialogDescription>
+              Saving creates the group. Accounts you later limit to it can manage only these
+              devices.
+            </DialogDescription>
+          </DialogHeader>
           <GroupEditor
             key={createGeneration}
             devicePicker={devicePicker}
-            onDone={() => setCreating(false)}
+            deviceLabel={deviceLabel}
+            onDone={() => onCreatingChange(false)}
           />
-          <Button variant="outline" className="w-fit" onClick={() => setCreating(false)}>
-            Close
-          </Button>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading groups…</span>
@@ -106,6 +127,7 @@ export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
               key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`}
               group={group}
               devicePicker={devicePicker}
+              deviceLabel={deviceLabel}
             />
           ))}
         </ul>
@@ -117,68 +139,119 @@ export function GroupsView({ devicePicker }: { devicePicker: PickerSlot }) {
           <EmptyState
             title="No device groups yet"
             description="Create a group to limit an account to a set of devices."
-            action={creating ? null : <Button onClick={startCreate}>New group</Button>}
+            action={<Button onClick={startCreate}>New group</Button>}
           />
         )
       ) : null}
-      {pageToken || list.data?.nextPageToken ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            disabled={!pageToken || list.isFetching}
-            onClick={() => setPageToken("")}
-          >
-            First page
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!list.data?.nextPageToken || list.isFetching}
-            onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
-          >
-            Next page
-          </Button>
-        </div>
-      ) : null}
+      <ListPagination
+        label="Device group pages"
+        busy={list.isFetching}
+        onPrevious={pageToken ? () => setPageToken("") : undefined}
+        onNext={
+          list.data?.nextPageToken ? () => setPageToken(list.data?.nextPageToken ?? "") : undefined
+        }
+      />
     </section>
   );
 }
 
-function GroupRow({ group, devicePicker }: { group: DeviceGroup; devicePicker: PickerSlot }) {
+function GroupRow({
+  group,
+  devicePicker,
+  deviceLabel: DeviceLabel,
+}: {
+  group: DeviceGroup;
+  devicePicker: PickerSlot;
+  deviceLabel: DeviceLabelSlot;
+}) {
   const [editing, setEditing] = useState(false);
   const name = group.name || "Unnamed group";
+  const listed = group.deviceIds.slice(0, LISTED_MEMBERS);
+  const more = group.deviceIds.length - listed.length;
   return (
     <li className="grid min-w-0 gap-2 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="grid min-w-0 gap-0.5">
+        <div className="grid min-w-0 gap-1">
           <h3 className="break-words font-medium">{name}</h3>
           <p className="text-sm text-muted-foreground">{deviceCount(group.deviceIds.length)}</p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          aria-expanded={editing}
-          aria-label={`${editing ? "Close editor for" : "Edit"} ${name}`}
-          onClick={() => setEditing(!editing)}
+          aria-label={`Edit ${name}`}
+          onClick={() => setEditing(true)}
         >
-          {editing ? "Close" : "Edit"}
+          Edit
         </Button>
       </div>
-      <TechnicalDetails items={[{ label: "Group ID", value: group.id }]} />
-      {editing ? (
-        <GroupEditor group={group} devicePicker={devicePicker} onDone={() => setEditing(false)} />
+      {listed.length > 0 ? (
+        <ul
+          aria-label={`Devices in ${name}`}
+          className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm"
+        >
+          {listed.map((id) => (
+            <li key={id} className="min-w-0">
+              <DeviceLabel value={id} />
+            </li>
+          ))}
+          {more > 0 ? (
+            <li className="text-muted-foreground">and {deviceCount(more)} more</li>
+          ) : null}
+        </ul>
       ) : null}
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit {name}</DialogTitle>
+            <DialogDescription>
+              Saving replaces this group&apos;s name and devices. Accounts limited to it gain or
+              lose access to the devices you add or remove.
+            </DialogDescription>
+          </DialogHeader>
+          {editing ? (
+            <GroupEditor
+              group={group}
+              devicePicker={devicePicker}
+              deviceLabel={DeviceLabel}
+              onDone={() => setEditing(false)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </li>
   );
+}
+
+// The administrator's checks, in words, before protobuf validation; a request
+// that still fails the schema is described, never shown as a violation path.
+function problem(request: SetDeviceGroupRequest | DeleteDeviceGroupRequest) {
+  if (request.$typeName === "lindm.admin.v1.SetDeviceGroupRequest") {
+    if (!request.name.trim()) return "Enter a group name.";
+    if (request.deviceIds.length > MAX_MEMBERS)
+      return `A group can have up to ${MAX_MEMBERS.toLocaleString()} devices. Remove ${(request.deviceIds.length - MAX_MEMBERS).toLocaleString()}.`;
+  }
+  if (!request.reason.trim()) return "Enter a reason for this change.";
+  const hints = {
+    name: "Use a group name of up to 128 characters.",
+    reason: "Use a reason of up to 1,024 characters.",
+  };
+  const invalid =
+    request.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
+      ? checkRequest(SetDeviceGroupRequestSchema, request, hints)
+      : checkRequest(DeleteDeviceGroupRequestSchema, request, hints);
+  return invalid?.message ?? "";
 }
 
 function GroupEditor({
   group,
   onDone,
   devicePicker,
+  deviceLabel,
 }: {
   group?: DeviceGroup;
   onDone: () => void;
   devicePicker: PickerSlot;
+  deviceLabel: DeviceLabelSlot;
 }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
@@ -189,7 +262,6 @@ function GroupEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [failure, setFailure] = useState<RpcFailure | null>(null);
-  const [completed, setCompleted] = useState(false);
   const [attempt, setAttempt] = useState<SetDeviceGroupRequest | DeleteDeviceGroupRequest | null>(
     null,
   );
@@ -209,18 +281,11 @@ function GroupEditor({
             groupId,
             name,
             reason,
-            deviceIds: members.filter(Boolean),
+            deviceIds: members,
           }));
-    const validation =
-      exact.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
-        ? validator.validate(SetDeviceGroupRequestSchema, exact)
-        : validator.validate(DeleteDeviceGroupRequestSchema, exact);
-    if (validation.kind !== "valid") {
-      setError(
-        validation.kind === "invalid"
-          ? describeViolations(validation.violations)
-          : validation.error.message,
-      );
+    const message = problem(exact);
+    if (message) {
+      setError(message);
       return;
     }
     setAttempt(exact);
@@ -233,7 +298,6 @@ function GroupEditor({
         await adminClient.setDeviceGroup(exact, options);
       else await adminClient.deleteDeviceGroup(exact, options);
       lifetime.signal.throwIfAborted();
-      setCompleted(true);
       toast.success(
         exact.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
           ? "Group deleted"
@@ -255,18 +319,16 @@ function GroupEditor({
     }
   }
 
+  const frozen = busy || attempt !== null;
   return (
     <form
-      aria-label={group ? `Edit ${group.name || "unnamed group"}` : undefined}
-      className={
-        group ? "grid min-w-0 gap-4 border-t pt-4" : "grid min-w-0 gap-4 border bg-card p-4 sm:p-6"
-      }
+      aria-label={group ? `Edit ${group.name || "unnamed group"}` : "New device group"}
+      className="grid min-w-0 gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         void save(false);
       }}
     >
-      {group ? null : <h3 className="font-semibold">Create group</h3>}
       <label className="grid gap-2 text-sm font-medium">
         Group name
         <Input
@@ -275,16 +337,17 @@ function GroupEditor({
           required
           maxLength={128}
           value={name}
-          disabled={busy || attempt !== null}
+          disabled={frozen}
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <MultiPicker
-        label="Member devices"
+      <DeviceMembersField
+        label="Devices"
         values={members}
         onChange={setMembers}
         picker={devicePicker}
-        disabled={busy || attempt !== null}
+        deviceLabel={deviceLabel}
+        disabled={frozen}
       />
       <label className="grid gap-2 text-sm font-medium">
         Reason for this change
@@ -293,7 +356,7 @@ function GroupEditor({
           data-freeform="audit reason"
           required
           value={reason}
-          disabled={busy || attempt !== null}
+          disabled={frozen}
           onChange={(event) => setReason(event.target.value)}
         />
       </label>
@@ -303,56 +366,60 @@ function GroupEditor({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      {failure ? <RpcError failure={failure} /> : null}
+      {failure ? (
+        <RpcError failure={failure}>
+          {failure.ambiguous ? (
+            <p>We couldn&apos;t confirm the change. Try again: it won&apos;t apply twice.</p>
+          ) : null}
+        </RpcError>
+      ) : null}
       {busy ? (
         <p role="status" className="text-sm text-muted-foreground">
           Saving group…
         </p>
       ) : null}
-      {completed ? (
-        <p role="status" className="border bg-muted/30 p-3 text-sm">
-          {attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
-            ? "Group deleted."
-            : "Group saved."}
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="submit"
+          disabled={busy || attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"}
+        >
+          {attempt?.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
+            ? "Try again"
+            : group
+              ? "Save group"
+              : "Create group"}
+        </Button>
+        {group ? (
           <Button
-            type="submit"
-            disabled={busy || attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"}
-          >
-            {attempt ? "Try again" : "Save group"}
-          </Button>
-          {group ? (
-            <Button
-              type="button"
-              variant="destructive"
-              aria-describedby={reason.trim() === "" ? `${groupId}-delete-help` : undefined}
-              disabled={
-                busy ||
-                reason.trim() === "" ||
-                attempt?.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
-              }
-              onClick={() => {
-                if (
-                  attempt ||
-                  window.confirm(
-                    `Delete the group “${group.name}” (${deviceCount(group.deviceIds.length)})? Accounts limited to this group lose access to these devices. The devices stay enrolled. This can't be undone.`,
-                  )
+            type="button"
+            variant="destructive"
+            aria-describedby={reason.trim() === "" ? `${groupId}-delete-help` : undefined}
+            disabled={
+              busy ||
+              reason.trim() === "" ||
+              attempt?.$typeName === "lindm.admin.v1.SetDeviceGroupRequest"
+            }
+            onClick={() => {
+              if (
+                attempt ||
+                window.confirm(
+                  `Delete the group “${group.name}” (${deviceCount(group.deviceIds.length)})? Accounts limited to this group lose access to these devices. The devices stay enrolled. This can't be undone.`,
                 )
-                  void save(true);
-              }}
-            >
-              {attempt ? "Try deleting again" : "Delete group"}
-            </Button>
-          ) : null}
-          {group && reason.trim() === "" ? (
-            <p id={`${groupId}-delete-help`} className="self-center text-xs text-muted-foreground">
-              Enter a reason to delete this group.
-            </p>
-          ) : null}
-        </div>
-      )}
+              )
+                void save(true);
+            }}
+          >
+            {attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
+              ? "Try deleting again"
+              : "Delete group"}
+          </Button>
+        ) : null}
+        {group && reason.trim() === "" ? (
+          <p id={`${groupId}-delete-help`} className="text-xs text-muted-foreground">
+            Enter a reason to delete this group.
+          </p>
+        ) : null}
+      </div>
     </form>
   );
 }

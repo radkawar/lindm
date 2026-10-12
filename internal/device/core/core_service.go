@@ -421,6 +421,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.PutDynamicGroupRequest{},
 		&adminv1.GetDynamicGroupRequest{},
 		&adminv1.ListDynamicGroupsRequest{},
+		&adminv1.PreviewDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{},
 		&adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{},

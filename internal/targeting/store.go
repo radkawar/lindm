@@ -57,7 +57,7 @@ func New() (*Store, error) {
 
 func newStore(clock func() time.Time) (*Store, error) {
 	rules, err := protovalidate.New(protovalidate.WithMessages(
-		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{},
+		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{}, &adminv1.PreviewDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{}, &adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{}, &adminv1.ActivateTargetPreviewRequest{},
 		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.SaveTargetAssignmentImpactRequest{},

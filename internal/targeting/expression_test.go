@@ -11,8 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
 	"lindm/internal/targeting/targetingdb"
 )
 
@@ -28,6 +30,47 @@ func TestExpressionUnknownDoesNotBecomeNegatedMembership(t *testing.T) {
 	d.HostReceivedAt = pgtype.Timestamptz{Time: time.Unix(990, 0), Valid: true}
 	if got := evaluate(e, d, &adminv1.DeviceMetadata{}, time.Unix(1000, 0)); got != excluded {
 		t.Fatalf("NOT true = %v", got)
+	}
+}
+func TestExpressionLastSeenWithinIsRelativeToEvaluation(t *testing.T) {
+	week := uint32(7 * 24 * 60 * 60)
+	e := &adminv1.TargetExpression{InventoryMaxAgeSeconds: 60, Nodes: []*adminv1.TargetNode{
+		{Depth: 1, Node: &adminv1.TargetNode_Predicate{Predicate: &adminv1.DeviceFilter{LastSeenWithinSeconds: week}}},
+	}}
+	now := time.Date(2026, 10, 12, 10, 0, 0, 0, time.UTC)
+	seen := func(ago time.Duration) targetingdb.TargetingDeviceRow {
+		return targetingdb.TargetingDeviceRow{LastSeenAt: pgtype.Timestamptz{Time: now.Add(-ago), Valid: true}}
+	}
+	for _, test := range []struct {
+		name   string
+		device targetingdb.TargetingDeviceRow
+		at     time.Time
+		want   policyv1.TargetMatch
+	}{
+		{"seen an hour ago", seen(time.Hour), now, included},
+		{"seen exactly at the window edge", seen(7 * 24 * time.Hour), now, included},
+		{"seen just outside the window", seen(7*24*time.Hour + time.Second), now, excluded},
+		{"the same contact ages out later", seen(time.Hour), now.Add(7 * 24 * time.Hour), excluded},
+		{"never seen is undecided", targetingdb.TargetingDeviceRow{}, now, unknown},
+	} {
+		if got := evaluate(e, test.device, &adminv1.DeviceMetadata{}, test.at); got != test.want {
+			t.Errorf("%s: got %v, want %v", test.name, got, test.want)
+		}
+	}
+	// The relative window narrows, never widens, an absolute lower bound.
+	e.Nodes[0].GetPredicate().LastSeenFrom = timestamppb.New(now.Add(-time.Minute))
+	if got := evaluate(e, seen(time.Hour), &adminv1.DeviceMetadata{}, now); got != excluded {
+		t.Fatalf("absolute bound ignored with a relative window: %v", got)
+	}
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &adminv1.PreviewDynamicGroupRequest{Expression: &adminv1.TargetExpression{InventoryMaxAgeSeconds: 60, Nodes: []*adminv1.TargetNode{
+		{Depth: 1, Node: &adminv1.TargetNode_Predicate{Predicate: &adminv1.DeviceFilter{LastSeenWithinSeconds: 366*24*60*60 + 1}}},
+	}}}
+	if err := s.validate(r); err == nil {
+		t.Fatal("window beyond 366 days accepted")
 	}
 }
 func TestExpressionGraphRejectsForwardEdgesAndFalseRanks(t *testing.T) {

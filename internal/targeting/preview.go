@@ -151,8 +151,12 @@ func (e *evaluation) target(ctx context.Context, t *policyv1.TargetRef) (policyv
 		if id := node.GetStaticGroupId(); id != "" {
 			e.staticGroup(id)
 		}
-		if f := node.GetPredicate(); f != nil && (f.LastSeenFrom != nil || f.LastSeenUntil != nil) {
+		if f := node.GetPredicate(); f != nil && lastSeenDependent(f) {
 			usesLastSeen = true
+			// A relative window ends this membership without any device change.
+			if f.LastSeenWithinSeconds > 0 && e.input.Device.LastSeenAt.Valid {
+				e.limit(e.input.Device.LastSeenAt.Time.Add(lastSeenWindow(f)))
+			}
 		}
 	}
 	definitions, valid, err := e.groupDefinitions(ctx, id, g.Expression)

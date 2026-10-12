@@ -2767,7 +2767,7 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\"DEVICE_ROOT_ENCRYPTION_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eDEVICE_ROOT_ENCRYPTION_UNKNOWN\x10\x01\x12$\n" +
 	" DEVICE_ROOT_ENCRYPTION_ENCRYPTED\x10\x02\x12(\n" +
-	"$DEVICE_ROOT_ENCRYPTION_NOT_ENCRYPTED\x10\x032\xe3M\n" +
+	"$DEVICE_ROOT_ENCRYPTION_NOT_ENCRYPTED\x10\x032\xd3N\n" +
 	"\fAdminService\x12e\n" +
 	"\x10GetAuthorization\x12'.lindm.admin.v1.GetAuthorizationRequest\x1a(.lindm.admin.v1.GetAuthorizationResponse\x12n\n" +
 	"\x13UpdateAuthorization\x12*.lindm.admin.v1.UpdateAuthorizationRequest\x1a+.lindm.admin.v1.UpdateAuthorizationResponse\x12V\n" +
@@ -2813,6 +2813,7 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x0fPutDynamicGroup\x12&.lindm.admin.v1.PutDynamicGroupRequest\x1a'.lindm.admin.v1.PutDynamicGroupResponse\x12b\n" +
 	"\x0fGetDynamicGroup\x12&.lindm.admin.v1.GetDynamicGroupRequest\x1a'.lindm.admin.v1.GetDynamicGroupResponse\x12h\n" +
 	"\x11ListDynamicGroups\x12(.lindm.admin.v1.ListDynamicGroupsRequest\x1a).lindm.admin.v1.ListDynamicGroupsResponse\x12n\n" +
+	"\x13PreviewDynamicGroup\x12*.lindm.admin.v1.PreviewDynamicGroupRequest\x1a+.lindm.admin.v1.PreviewDynamicGroupResponse\x12n\n" +
 	"\x13PutTargetAssignment\x12*.lindm.admin.v1.PutTargetAssignmentRequest\x1a+.lindm.admin.v1.PutTargetAssignmentResponse\x12t\n" +
 	"\x15ListTargetAssignments\x12,.lindm.admin.v1.ListTargetAssignmentsRequest\x1a-.lindm.admin.v1.ListTargetAssignmentsResponse\x12}\n" +
 	"\x18PreviewTargetAssignments\x12/.lindm.admin.v1.PreviewTargetAssignmentsRequest\x1a0.lindm.admin.v1.PreviewTargetAssignmentsResponse\x12\x8c\x01\n" +
@@ -2957,127 +2958,129 @@ var file_lindm_admin_v1_admin_proto_goTypes = []any{
 	(*PutDynamicGroupRequest)(nil),                       // 80: lindm.admin.v1.PutDynamicGroupRequest
 	(*GetDynamicGroupRequest)(nil),                       // 81: lindm.admin.v1.GetDynamicGroupRequest
 	(*ListDynamicGroupsRequest)(nil),                     // 82: lindm.admin.v1.ListDynamicGroupsRequest
-	(*PutTargetAssignmentRequest)(nil),                   // 83: lindm.admin.v1.PutTargetAssignmentRequest
-	(*ListTargetAssignmentsRequest)(nil),                 // 84: lindm.admin.v1.ListTargetAssignmentsRequest
-	(*PreviewTargetAssignmentsRequest)(nil),              // 85: lindm.admin.v1.PreviewTargetAssignmentsRequest
-	(*PreviewTargetAssignmentImpactRequest)(nil),         // 86: lindm.admin.v1.PreviewTargetAssignmentImpactRequest
-	(*SaveTargetAssignmentImpactRequest)(nil),            // 87: lindm.admin.v1.SaveTargetAssignmentImpactRequest
-	(*ActivateTargetPreviewRequest)(nil),                 // 88: lindm.admin.v1.ActivateTargetPreviewRequest
-	(*PutRolloutRequest)(nil),                            // 89: lindm.admin.v1.PutRolloutRequest
-	(*ControlRolloutRequest)(nil),                        // 90: lindm.admin.v1.ControlRolloutRequest
-	(*ListRolloutsRequest)(nil),                          // 91: lindm.admin.v1.ListRolloutsRequest
-	(*CreateDeviceActionRequest)(nil),                    // 92: lindm.admin.v1.CreateDeviceActionRequest
-	(*PreflightDeviceActionRequest)(nil),                 // 93: lindm.admin.v1.PreflightDeviceActionRequest
-	(*GetDeviceActionsRequest)(nil),                      // 94: lindm.admin.v1.GetDeviceActionsRequest
-	(*GetDeviceActionRequest)(nil),                       // 95: lindm.admin.v1.GetDeviceActionRequest
-	(*CreateAssistanceSessionRequest)(nil),               // 96: lindm.admin.v1.CreateAssistanceSessionRequest
-	(*ListAssistanceSessionsRequest)(nil),                // 97: lindm.admin.v1.ListAssistanceSessionsRequest
-	(*GetAssistanceSessionRequest)(nil),                  // 98: lindm.admin.v1.GetAssistanceSessionRequest
-	(*JoinAssistanceSessionRequest)(nil),                 // 99: lindm.admin.v1.JoinAssistanceSessionRequest
-	(*AnswerAssistanceSessionRequest)(nil),               // 100: lindm.admin.v1.AnswerAssistanceSessionRequest
-	(*StopAssistanceSessionRequest)(nil),                 // 101: lindm.admin.v1.StopAssistanceSessionRequest
-	(*GetDeviceEncryptionRequest)(nil),                   // 102: lindm.admin.v1.GetDeviceEncryptionRequest
-	(*ListDeviceStorageTargetsRequest)(nil),              // 103: lindm.admin.v1.ListDeviceStorageTargetsRequest
-	(*RevealRecoveryKeyRequest)(nil),                     // 104: lindm.admin.v1.RevealRecoveryKeyRequest
-	(*CreateSecretRequest)(nil),                          // 105: lindm.admin.v1.CreateSecretRequest
-	(*RotateSecretRequest)(nil),                          // 106: lindm.admin.v1.RotateSecretRequest
-	(*ListSecretsRequest)(nil),                           // 107: lindm.admin.v1.ListSecretsRequest
-	(*GetSecretRequest)(nil),                             // 108: lindm.admin.v1.GetSecretRequest
-	(*RevealSecretRequest)(nil),                          // 109: lindm.admin.v1.RevealSecretRequest
-	(*ListSecretUsesRequest)(nil),                        // 110: lindm.admin.v1.ListSecretUsesRequest
-	(*DeleteSecretRequest)(nil),                          // 111: lindm.admin.v1.DeleteSecretRequest
-	(*SetLocalAdminPasswordPolicyRequest)(nil),           // 112: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
-	(*RemoveLocalAdminPasswordPolicyRequest)(nil),        // 113: lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
-	(*RequestLocalAdminPasswordRotationRequest)(nil),     // 114: lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
-	(*GetLocalAdminPasswordStatusRequest)(nil),           // 115: lindm.admin.v1.GetLocalAdminPasswordStatusRequest
-	(*RevealLocalAdminPasswordRequest)(nil),              // 116: lindm.admin.v1.RevealLocalAdminPasswordRequest
-	(*ListDeviceGroupsRequest)(nil),                      // 117: lindm.admin.v1.ListDeviceGroupsRequest
-	(*SetDeviceGroupRequest)(nil),                        // 118: lindm.admin.v1.SetDeviceGroupRequest
-	(*DeleteDeviceGroupRequest)(nil),                     // 119: lindm.admin.v1.DeleteDeviceGroupRequest
-	(*ListDeviceFindingsRequest)(nil),                    // 120: lindm.admin.v1.ListDeviceFindingsRequest
-	(*ListDeviceUncoveredPackagesRequest)(nil),           // 121: lindm.admin.v1.ListDeviceUncoveredPackagesRequest
-	(*ListAdvisorySummaryRequest)(nil),                   // 122: lindm.admin.v1.ListAdvisorySummaryRequest
-	(*ListAdvisoryFeedsRequest)(nil),                     // 123: lindm.admin.v1.ListAdvisoryFeedsRequest
-	(*AcceptAdvisoryFindingRequest)(nil),                 // 124: lindm.admin.v1.AcceptAdvisoryFindingRequest
-	(*SuggestValuesRequest)(nil),                         // 125: lindm.admin.v1.SuggestValuesRequest
-	(*ListApprovedReferencesRequest)(nil),                // 126: lindm.admin.v1.ListApprovedReferencesRequest
-	(*GetAuthorizationResponse)(nil),                     // 127: lindm.admin.v1.GetAuthorizationResponse
-	(*UpdateAuthorizationResponse)(nil),                  // 128: lindm.admin.v1.UpdateAuthorizationResponse
-	(*GetFleetSummaryResponse)(nil),                      // 129: lindm.admin.v1.GetFleetSummaryResponse
-	(*SetDeviceMetadataResponse)(nil),                    // 130: lindm.admin.v1.SetDeviceMetadataResponse
-	(*SetAttributeDefinitionResponse)(nil),               // 131: lindm.admin.v1.SetAttributeDefinitionResponse
-	(*ListAttributeDefinitionsResponse)(nil),             // 132: lindm.admin.v1.ListAttributeDefinitionsResponse
-	(*ExportDevicesResponse)(nil),                        // 133: lindm.admin.v1.ExportDevicesResponse
-	(*ListEnrollmentGrantsResponse)(nil),                 // 134: lindm.admin.v1.ListEnrollmentGrantsResponse
-	(*GetEnrollmentInstructionsResponse)(nil),            // 135: lindm.admin.v1.GetEnrollmentInstructionsResponse
-	(*CreateProvisioningTokenResponse)(nil),              // 136: lindm.admin.v1.CreateProvisioningTokenResponse
-	(*ListProvisioningTokensResponse)(nil),               // 137: lindm.admin.v1.ListProvisioningTokensResponse
-	(*RevokeProvisioningTokenResponse)(nil),              // 138: lindm.admin.v1.RevokeProvisioningTokenResponse
-	(*GetPendingEnrollmentsResponse)(nil),                // 139: lindm.admin.v1.GetPendingEnrollmentsResponse
-	(*ApprovePendingEnrollmentResponse)(nil),             // 140: lindm.admin.v1.ApprovePendingEnrollmentResponse
-	(*CreateRecoveryEnrollmentGrantResponse)(nil),        // 141: lindm.admin.v1.CreateRecoveryEnrollmentGrantResponse
-	(*CreateOfflineEnrollmentAuthorizationResponse)(nil), // 142: lindm.admin.v1.CreateOfflineEnrollmentAuthorizationResponse
-	(*ImportOfflineEnrollmentRequestResponse)(nil),       // 143: lindm.admin.v1.ImportOfflineEnrollmentRequestResponse
-	(*ExportOfflineEnrollmentResponseResponse)(nil),      // 144: lindm.admin.v1.ExportOfflineEnrollmentResponseResponse
-	(*CreateApprovalResponse)(nil),                       // 145: lindm.admin.v1.CreateApprovalResponse
-	(*ListApprovalsResponse)(nil),                        // 146: lindm.admin.v1.ListApprovalsResponse
-	(*ApproveApprovalResponse)(nil),                      // 147: lindm.admin.v1.ApproveApprovalResponse
-	(*RejectApprovalResponse)(nil),                       // 148: lindm.admin.v1.RejectApprovalResponse
-	(*WithdrawApprovalResponse)(nil),                     // 149: lindm.admin.v1.WithdrawApprovalResponse
-	(*PublishProfileRevisionResponse)(nil),               // 150: lindm.admin.v1.PublishProfileRevisionResponse
-	(*GetProfileRevisionResponse)(nil),                   // 151: lindm.admin.v1.GetProfileRevisionResponse
-	(*ListProfilesResponse)(nil),                         // 152: lindm.admin.v1.ListProfilesResponse
-	(*ListProfileRevisionsResponse)(nil),                 // 153: lindm.admin.v1.ListProfileRevisionsResponse
-	(*ListQualifiedResourceKindsResponse)(nil),           // 154: lindm.admin.v1.ListQualifiedResourceKindsResponse
-	(*SetResourceAssignmentResponse)(nil),                // 155: lindm.admin.v1.SetResourceAssignmentResponse
-	(*GetDeviceResourceStateResponse)(nil),               // 156: lindm.admin.v1.GetDeviceResourceStateResponse
-	(*PutDynamicGroupResponse)(nil),                      // 157: lindm.admin.v1.PutDynamicGroupResponse
-	(*GetDynamicGroupResponse)(nil),                      // 158: lindm.admin.v1.GetDynamicGroupResponse
-	(*ListDynamicGroupsResponse)(nil),                    // 159: lindm.admin.v1.ListDynamicGroupsResponse
-	(*PutTargetAssignmentResponse)(nil),                  // 160: lindm.admin.v1.PutTargetAssignmentResponse
-	(*ListTargetAssignmentsResponse)(nil),                // 161: lindm.admin.v1.ListTargetAssignmentsResponse
-	(*PreviewTargetAssignmentsResponse)(nil),             // 162: lindm.admin.v1.PreviewTargetAssignmentsResponse
-	(*PreviewTargetAssignmentImpactResponse)(nil),        // 163: lindm.admin.v1.PreviewTargetAssignmentImpactResponse
-	(*SaveTargetAssignmentImpactResponse)(nil),           // 164: lindm.admin.v1.SaveTargetAssignmentImpactResponse
-	(*ActivateTargetPreviewResponse)(nil),                // 165: lindm.admin.v1.ActivateTargetPreviewResponse
-	(*PutRolloutResponse)(nil),                           // 166: lindm.admin.v1.PutRolloutResponse
-	(*ControlRolloutResponse)(nil),                       // 167: lindm.admin.v1.ControlRolloutResponse
-	(*ListRolloutsResponse)(nil),                         // 168: lindm.admin.v1.ListRolloutsResponse
-	(*CreateDeviceActionResponse)(nil),                   // 169: lindm.admin.v1.CreateDeviceActionResponse
-	(*PreflightDeviceActionResponse)(nil),                // 170: lindm.admin.v1.PreflightDeviceActionResponse
-	(*GetDeviceActionsResponse)(nil),                     // 171: lindm.admin.v1.GetDeviceActionsResponse
-	(*GetDeviceActionResponse)(nil),                      // 172: lindm.admin.v1.GetDeviceActionResponse
-	(*CreateAssistanceSessionResponse)(nil),              // 173: lindm.admin.v1.CreateAssistanceSessionResponse
-	(*ListAssistanceSessionsResponse)(nil),               // 174: lindm.admin.v1.ListAssistanceSessionsResponse
-	(*GetAssistanceSessionResponse)(nil),                 // 175: lindm.admin.v1.GetAssistanceSessionResponse
-	(*JoinAssistanceSessionResponse)(nil),                // 176: lindm.admin.v1.JoinAssistanceSessionResponse
-	(*AnswerAssistanceSessionResponse)(nil),              // 177: lindm.admin.v1.AnswerAssistanceSessionResponse
-	(*StopAssistanceSessionResponse)(nil),                // 178: lindm.admin.v1.StopAssistanceSessionResponse
-	(*GetDeviceEncryptionResponse)(nil),                  // 179: lindm.admin.v1.GetDeviceEncryptionResponse
-	(*ListDeviceStorageTargetsResponse)(nil),             // 180: lindm.admin.v1.ListDeviceStorageTargetsResponse
-	(*RevealRecoveryKeyResponse)(nil),                    // 181: lindm.admin.v1.RevealRecoveryKeyResponse
-	(*CreateSecretResponse)(nil),                         // 182: lindm.admin.v1.CreateSecretResponse
-	(*RotateSecretResponse)(nil),                         // 183: lindm.admin.v1.RotateSecretResponse
-	(*ListSecretsResponse)(nil),                          // 184: lindm.admin.v1.ListSecretsResponse
-	(*GetSecretResponse)(nil),                            // 185: lindm.admin.v1.GetSecretResponse
-	(*RevealSecretResponse)(nil),                         // 186: lindm.admin.v1.RevealSecretResponse
-	(*ListSecretUsesResponse)(nil),                       // 187: lindm.admin.v1.ListSecretUsesResponse
-	(*DeleteSecretResponse)(nil),                         // 188: lindm.admin.v1.DeleteSecretResponse
-	(*SetLocalAdminPasswordPolicyResponse)(nil),          // 189: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
-	(*RemoveLocalAdminPasswordPolicyResponse)(nil),       // 190: lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
-	(*RequestLocalAdminPasswordRotationResponse)(nil),    // 191: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
-	(*GetLocalAdminPasswordStatusResponse)(nil),          // 192: lindm.admin.v1.GetLocalAdminPasswordStatusResponse
-	(*RevealLocalAdminPasswordResponse)(nil),             // 193: lindm.admin.v1.RevealLocalAdminPasswordResponse
-	(*ListDeviceGroupsResponse)(nil),                     // 194: lindm.admin.v1.ListDeviceGroupsResponse
-	(*SetDeviceGroupResponse)(nil),                       // 195: lindm.admin.v1.SetDeviceGroupResponse
-	(*DeleteDeviceGroupResponse)(nil),                    // 196: lindm.admin.v1.DeleteDeviceGroupResponse
-	(*ListDeviceFindingsResponse)(nil),                   // 197: lindm.admin.v1.ListDeviceFindingsResponse
-	(*ListDeviceUncoveredPackagesResponse)(nil),          // 198: lindm.admin.v1.ListDeviceUncoveredPackagesResponse
-	(*ListAdvisorySummaryResponse)(nil),                  // 199: lindm.admin.v1.ListAdvisorySummaryResponse
-	(*ListAdvisoryFeedsResponse)(nil),                    // 200: lindm.admin.v1.ListAdvisoryFeedsResponse
-	(*AcceptAdvisoryFindingResponse)(nil),                // 201: lindm.admin.v1.AcceptAdvisoryFindingResponse
-	(*SuggestValuesResponse)(nil),                        // 202: lindm.admin.v1.SuggestValuesResponse
-	(*ListApprovedReferencesResponse)(nil),               // 203: lindm.admin.v1.ListApprovedReferencesResponse
+	(*PreviewDynamicGroupRequest)(nil),                   // 83: lindm.admin.v1.PreviewDynamicGroupRequest
+	(*PutTargetAssignmentRequest)(nil),                   // 84: lindm.admin.v1.PutTargetAssignmentRequest
+	(*ListTargetAssignmentsRequest)(nil),                 // 85: lindm.admin.v1.ListTargetAssignmentsRequest
+	(*PreviewTargetAssignmentsRequest)(nil),              // 86: lindm.admin.v1.PreviewTargetAssignmentsRequest
+	(*PreviewTargetAssignmentImpactRequest)(nil),         // 87: lindm.admin.v1.PreviewTargetAssignmentImpactRequest
+	(*SaveTargetAssignmentImpactRequest)(nil),            // 88: lindm.admin.v1.SaveTargetAssignmentImpactRequest
+	(*ActivateTargetPreviewRequest)(nil),                 // 89: lindm.admin.v1.ActivateTargetPreviewRequest
+	(*PutRolloutRequest)(nil),                            // 90: lindm.admin.v1.PutRolloutRequest
+	(*ControlRolloutRequest)(nil),                        // 91: lindm.admin.v1.ControlRolloutRequest
+	(*ListRolloutsRequest)(nil),                          // 92: lindm.admin.v1.ListRolloutsRequest
+	(*CreateDeviceActionRequest)(nil),                    // 93: lindm.admin.v1.CreateDeviceActionRequest
+	(*PreflightDeviceActionRequest)(nil),                 // 94: lindm.admin.v1.PreflightDeviceActionRequest
+	(*GetDeviceActionsRequest)(nil),                      // 95: lindm.admin.v1.GetDeviceActionsRequest
+	(*GetDeviceActionRequest)(nil),                       // 96: lindm.admin.v1.GetDeviceActionRequest
+	(*CreateAssistanceSessionRequest)(nil),               // 97: lindm.admin.v1.CreateAssistanceSessionRequest
+	(*ListAssistanceSessionsRequest)(nil),                // 98: lindm.admin.v1.ListAssistanceSessionsRequest
+	(*GetAssistanceSessionRequest)(nil),                  // 99: lindm.admin.v1.GetAssistanceSessionRequest
+	(*JoinAssistanceSessionRequest)(nil),                 // 100: lindm.admin.v1.JoinAssistanceSessionRequest
+	(*AnswerAssistanceSessionRequest)(nil),               // 101: lindm.admin.v1.AnswerAssistanceSessionRequest
+	(*StopAssistanceSessionRequest)(nil),                 // 102: lindm.admin.v1.StopAssistanceSessionRequest
+	(*GetDeviceEncryptionRequest)(nil),                   // 103: lindm.admin.v1.GetDeviceEncryptionRequest
+	(*ListDeviceStorageTargetsRequest)(nil),              // 104: lindm.admin.v1.ListDeviceStorageTargetsRequest
+	(*RevealRecoveryKeyRequest)(nil),                     // 105: lindm.admin.v1.RevealRecoveryKeyRequest
+	(*CreateSecretRequest)(nil),                          // 106: lindm.admin.v1.CreateSecretRequest
+	(*RotateSecretRequest)(nil),                          // 107: lindm.admin.v1.RotateSecretRequest
+	(*ListSecretsRequest)(nil),                           // 108: lindm.admin.v1.ListSecretsRequest
+	(*GetSecretRequest)(nil),                             // 109: lindm.admin.v1.GetSecretRequest
+	(*RevealSecretRequest)(nil),                          // 110: lindm.admin.v1.RevealSecretRequest
+	(*ListSecretUsesRequest)(nil),                        // 111: lindm.admin.v1.ListSecretUsesRequest
+	(*DeleteSecretRequest)(nil),                          // 112: lindm.admin.v1.DeleteSecretRequest
+	(*SetLocalAdminPasswordPolicyRequest)(nil),           // 113: lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
+	(*RemoveLocalAdminPasswordPolicyRequest)(nil),        // 114: lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
+	(*RequestLocalAdminPasswordRotationRequest)(nil),     // 115: lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
+	(*GetLocalAdminPasswordStatusRequest)(nil),           // 116: lindm.admin.v1.GetLocalAdminPasswordStatusRequest
+	(*RevealLocalAdminPasswordRequest)(nil),              // 117: lindm.admin.v1.RevealLocalAdminPasswordRequest
+	(*ListDeviceGroupsRequest)(nil),                      // 118: lindm.admin.v1.ListDeviceGroupsRequest
+	(*SetDeviceGroupRequest)(nil),                        // 119: lindm.admin.v1.SetDeviceGroupRequest
+	(*DeleteDeviceGroupRequest)(nil),                     // 120: lindm.admin.v1.DeleteDeviceGroupRequest
+	(*ListDeviceFindingsRequest)(nil),                    // 121: lindm.admin.v1.ListDeviceFindingsRequest
+	(*ListDeviceUncoveredPackagesRequest)(nil),           // 122: lindm.admin.v1.ListDeviceUncoveredPackagesRequest
+	(*ListAdvisorySummaryRequest)(nil),                   // 123: lindm.admin.v1.ListAdvisorySummaryRequest
+	(*ListAdvisoryFeedsRequest)(nil),                     // 124: lindm.admin.v1.ListAdvisoryFeedsRequest
+	(*AcceptAdvisoryFindingRequest)(nil),                 // 125: lindm.admin.v1.AcceptAdvisoryFindingRequest
+	(*SuggestValuesRequest)(nil),                         // 126: lindm.admin.v1.SuggestValuesRequest
+	(*ListApprovedReferencesRequest)(nil),                // 127: lindm.admin.v1.ListApprovedReferencesRequest
+	(*GetAuthorizationResponse)(nil),                     // 128: lindm.admin.v1.GetAuthorizationResponse
+	(*UpdateAuthorizationResponse)(nil),                  // 129: lindm.admin.v1.UpdateAuthorizationResponse
+	(*GetFleetSummaryResponse)(nil),                      // 130: lindm.admin.v1.GetFleetSummaryResponse
+	(*SetDeviceMetadataResponse)(nil),                    // 131: lindm.admin.v1.SetDeviceMetadataResponse
+	(*SetAttributeDefinitionResponse)(nil),               // 132: lindm.admin.v1.SetAttributeDefinitionResponse
+	(*ListAttributeDefinitionsResponse)(nil),             // 133: lindm.admin.v1.ListAttributeDefinitionsResponse
+	(*ExportDevicesResponse)(nil),                        // 134: lindm.admin.v1.ExportDevicesResponse
+	(*ListEnrollmentGrantsResponse)(nil),                 // 135: lindm.admin.v1.ListEnrollmentGrantsResponse
+	(*GetEnrollmentInstructionsResponse)(nil),            // 136: lindm.admin.v1.GetEnrollmentInstructionsResponse
+	(*CreateProvisioningTokenResponse)(nil),              // 137: lindm.admin.v1.CreateProvisioningTokenResponse
+	(*ListProvisioningTokensResponse)(nil),               // 138: lindm.admin.v1.ListProvisioningTokensResponse
+	(*RevokeProvisioningTokenResponse)(nil),              // 139: lindm.admin.v1.RevokeProvisioningTokenResponse
+	(*GetPendingEnrollmentsResponse)(nil),                // 140: lindm.admin.v1.GetPendingEnrollmentsResponse
+	(*ApprovePendingEnrollmentResponse)(nil),             // 141: lindm.admin.v1.ApprovePendingEnrollmentResponse
+	(*CreateRecoveryEnrollmentGrantResponse)(nil),        // 142: lindm.admin.v1.CreateRecoveryEnrollmentGrantResponse
+	(*CreateOfflineEnrollmentAuthorizationResponse)(nil), // 143: lindm.admin.v1.CreateOfflineEnrollmentAuthorizationResponse
+	(*ImportOfflineEnrollmentRequestResponse)(nil),       // 144: lindm.admin.v1.ImportOfflineEnrollmentRequestResponse
+	(*ExportOfflineEnrollmentResponseResponse)(nil),      // 145: lindm.admin.v1.ExportOfflineEnrollmentResponseResponse
+	(*CreateApprovalResponse)(nil),                       // 146: lindm.admin.v1.CreateApprovalResponse
+	(*ListApprovalsResponse)(nil),                        // 147: lindm.admin.v1.ListApprovalsResponse
+	(*ApproveApprovalResponse)(nil),                      // 148: lindm.admin.v1.ApproveApprovalResponse
+	(*RejectApprovalResponse)(nil),                       // 149: lindm.admin.v1.RejectApprovalResponse
+	(*WithdrawApprovalResponse)(nil),                     // 150: lindm.admin.v1.WithdrawApprovalResponse
+	(*PublishProfileRevisionResponse)(nil),               // 151: lindm.admin.v1.PublishProfileRevisionResponse
+	(*GetProfileRevisionResponse)(nil),                   // 152: lindm.admin.v1.GetProfileRevisionResponse
+	(*ListProfilesResponse)(nil),                         // 153: lindm.admin.v1.ListProfilesResponse
+	(*ListProfileRevisionsResponse)(nil),                 // 154: lindm.admin.v1.ListProfileRevisionsResponse
+	(*ListQualifiedResourceKindsResponse)(nil),           // 155: lindm.admin.v1.ListQualifiedResourceKindsResponse
+	(*SetResourceAssignmentResponse)(nil),                // 156: lindm.admin.v1.SetResourceAssignmentResponse
+	(*GetDeviceResourceStateResponse)(nil),               // 157: lindm.admin.v1.GetDeviceResourceStateResponse
+	(*PutDynamicGroupResponse)(nil),                      // 158: lindm.admin.v1.PutDynamicGroupResponse
+	(*GetDynamicGroupResponse)(nil),                      // 159: lindm.admin.v1.GetDynamicGroupResponse
+	(*ListDynamicGroupsResponse)(nil),                    // 160: lindm.admin.v1.ListDynamicGroupsResponse
+	(*PreviewDynamicGroupResponse)(nil),                  // 161: lindm.admin.v1.PreviewDynamicGroupResponse
+	(*PutTargetAssignmentResponse)(nil),                  // 162: lindm.admin.v1.PutTargetAssignmentResponse
+	(*ListTargetAssignmentsResponse)(nil),                // 163: lindm.admin.v1.ListTargetAssignmentsResponse
+	(*PreviewTargetAssignmentsResponse)(nil),             // 164: lindm.admin.v1.PreviewTargetAssignmentsResponse
+	(*PreviewTargetAssignmentImpactResponse)(nil),        // 165: lindm.admin.v1.PreviewTargetAssignmentImpactResponse
+	(*SaveTargetAssignmentImpactResponse)(nil),           // 166: lindm.admin.v1.SaveTargetAssignmentImpactResponse
+	(*ActivateTargetPreviewResponse)(nil),                // 167: lindm.admin.v1.ActivateTargetPreviewResponse
+	(*PutRolloutResponse)(nil),                           // 168: lindm.admin.v1.PutRolloutResponse
+	(*ControlRolloutResponse)(nil),                       // 169: lindm.admin.v1.ControlRolloutResponse
+	(*ListRolloutsResponse)(nil),                         // 170: lindm.admin.v1.ListRolloutsResponse
+	(*CreateDeviceActionResponse)(nil),                   // 171: lindm.admin.v1.CreateDeviceActionResponse
+	(*PreflightDeviceActionResponse)(nil),                // 172: lindm.admin.v1.PreflightDeviceActionResponse
+	(*GetDeviceActionsResponse)(nil),                     // 173: lindm.admin.v1.GetDeviceActionsResponse
+	(*GetDeviceActionResponse)(nil),                      // 174: lindm.admin.v1.GetDeviceActionResponse
+	(*CreateAssistanceSessionResponse)(nil),              // 175: lindm.admin.v1.CreateAssistanceSessionResponse
+	(*ListAssistanceSessionsResponse)(nil),               // 176: lindm.admin.v1.ListAssistanceSessionsResponse
+	(*GetAssistanceSessionResponse)(nil),                 // 177: lindm.admin.v1.GetAssistanceSessionResponse
+	(*JoinAssistanceSessionResponse)(nil),                // 178: lindm.admin.v1.JoinAssistanceSessionResponse
+	(*AnswerAssistanceSessionResponse)(nil),              // 179: lindm.admin.v1.AnswerAssistanceSessionResponse
+	(*StopAssistanceSessionResponse)(nil),                // 180: lindm.admin.v1.StopAssistanceSessionResponse
+	(*GetDeviceEncryptionResponse)(nil),                  // 181: lindm.admin.v1.GetDeviceEncryptionResponse
+	(*ListDeviceStorageTargetsResponse)(nil),             // 182: lindm.admin.v1.ListDeviceStorageTargetsResponse
+	(*RevealRecoveryKeyResponse)(nil),                    // 183: lindm.admin.v1.RevealRecoveryKeyResponse
+	(*CreateSecretResponse)(nil),                         // 184: lindm.admin.v1.CreateSecretResponse
+	(*RotateSecretResponse)(nil),                         // 185: lindm.admin.v1.RotateSecretResponse
+	(*ListSecretsResponse)(nil),                          // 186: lindm.admin.v1.ListSecretsResponse
+	(*GetSecretResponse)(nil),                            // 187: lindm.admin.v1.GetSecretResponse
+	(*RevealSecretResponse)(nil),                         // 188: lindm.admin.v1.RevealSecretResponse
+	(*ListSecretUsesResponse)(nil),                       // 189: lindm.admin.v1.ListSecretUsesResponse
+	(*DeleteSecretResponse)(nil),                         // 190: lindm.admin.v1.DeleteSecretResponse
+	(*SetLocalAdminPasswordPolicyResponse)(nil),          // 191: lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
+	(*RemoveLocalAdminPasswordPolicyResponse)(nil),       // 192: lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
+	(*RequestLocalAdminPasswordRotationResponse)(nil),    // 193: lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
+	(*GetLocalAdminPasswordStatusResponse)(nil),          // 194: lindm.admin.v1.GetLocalAdminPasswordStatusResponse
+	(*RevealLocalAdminPasswordResponse)(nil),             // 195: lindm.admin.v1.RevealLocalAdminPasswordResponse
+	(*ListDeviceGroupsResponse)(nil),                     // 196: lindm.admin.v1.ListDeviceGroupsResponse
+	(*SetDeviceGroupResponse)(nil),                       // 197: lindm.admin.v1.SetDeviceGroupResponse
+	(*DeleteDeviceGroupResponse)(nil),                    // 198: lindm.admin.v1.DeleteDeviceGroupResponse
+	(*ListDeviceFindingsResponse)(nil),                   // 199: lindm.admin.v1.ListDeviceFindingsResponse
+	(*ListDeviceUncoveredPackagesResponse)(nil),          // 200: lindm.admin.v1.ListDeviceUncoveredPackagesResponse
+	(*ListAdvisorySummaryResponse)(nil),                  // 201: lindm.admin.v1.ListAdvisorySummaryResponse
+	(*ListAdvisoryFeedsResponse)(nil),                    // 202: lindm.admin.v1.ListAdvisoryFeedsResponse
+	(*AcceptAdvisoryFindingResponse)(nil),                // 203: lindm.admin.v1.AcceptAdvisoryFindingResponse
+	(*SuggestValuesResponse)(nil),                        // 204: lindm.admin.v1.SuggestValuesResponse
+	(*ListApprovedReferencesResponse)(nil),               // 205: lindm.admin.v1.ListApprovedReferencesResponse
 }
 var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
 	0,   // 0: lindm.admin.v1.Device.lifecycle_state:type_name -> lindm.admin.v1.DeviceState
@@ -3178,140 +3181,142 @@ var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
 	80,  // 95: lindm.admin.v1.AdminService.PutDynamicGroup:input_type -> lindm.admin.v1.PutDynamicGroupRequest
 	81,  // 96: lindm.admin.v1.AdminService.GetDynamicGroup:input_type -> lindm.admin.v1.GetDynamicGroupRequest
 	82,  // 97: lindm.admin.v1.AdminService.ListDynamicGroups:input_type -> lindm.admin.v1.ListDynamicGroupsRequest
-	83,  // 98: lindm.admin.v1.AdminService.PutTargetAssignment:input_type -> lindm.admin.v1.PutTargetAssignmentRequest
-	84,  // 99: lindm.admin.v1.AdminService.ListTargetAssignments:input_type -> lindm.admin.v1.ListTargetAssignmentsRequest
-	85,  // 100: lindm.admin.v1.AdminService.PreviewTargetAssignments:input_type -> lindm.admin.v1.PreviewTargetAssignmentsRequest
-	86,  // 101: lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact:input_type -> lindm.admin.v1.PreviewTargetAssignmentImpactRequest
-	87,  // 102: lindm.admin.v1.AdminService.SaveTargetAssignmentImpact:input_type -> lindm.admin.v1.SaveTargetAssignmentImpactRequest
-	88,  // 103: lindm.admin.v1.AdminService.ActivateTargetPreview:input_type -> lindm.admin.v1.ActivateTargetPreviewRequest
-	89,  // 104: lindm.admin.v1.AdminService.PutRollout:input_type -> lindm.admin.v1.PutRolloutRequest
-	90,  // 105: lindm.admin.v1.AdminService.ControlRollout:input_type -> lindm.admin.v1.ControlRolloutRequest
-	91,  // 106: lindm.admin.v1.AdminService.ListRollouts:input_type -> lindm.admin.v1.ListRolloutsRequest
-	92,  // 107: lindm.admin.v1.AdminService.CreateDeviceAction:input_type -> lindm.admin.v1.CreateDeviceActionRequest
-	93,  // 108: lindm.admin.v1.AdminService.PreflightDeviceAction:input_type -> lindm.admin.v1.PreflightDeviceActionRequest
-	94,  // 109: lindm.admin.v1.AdminService.GetDeviceActions:input_type -> lindm.admin.v1.GetDeviceActionsRequest
-	95,  // 110: lindm.admin.v1.AdminService.GetDeviceAction:input_type -> lindm.admin.v1.GetDeviceActionRequest
-	96,  // 111: lindm.admin.v1.AdminService.CreateAssistanceSession:input_type -> lindm.admin.v1.CreateAssistanceSessionRequest
-	97,  // 112: lindm.admin.v1.AdminService.ListAssistanceSessions:input_type -> lindm.admin.v1.ListAssistanceSessionsRequest
-	98,  // 113: lindm.admin.v1.AdminService.GetAssistanceSession:input_type -> lindm.admin.v1.GetAssistanceSessionRequest
-	99,  // 114: lindm.admin.v1.AdminService.JoinAssistanceSession:input_type -> lindm.admin.v1.JoinAssistanceSessionRequest
-	100, // 115: lindm.admin.v1.AdminService.AnswerAssistanceSession:input_type -> lindm.admin.v1.AnswerAssistanceSessionRequest
-	101, // 116: lindm.admin.v1.AdminService.StopAssistanceSession:input_type -> lindm.admin.v1.StopAssistanceSessionRequest
-	102, // 117: lindm.admin.v1.AdminService.GetDeviceEncryption:input_type -> lindm.admin.v1.GetDeviceEncryptionRequest
-	103, // 118: lindm.admin.v1.AdminService.ListDeviceStorageTargets:input_type -> lindm.admin.v1.ListDeviceStorageTargetsRequest
-	104, // 119: lindm.admin.v1.AdminService.RevealRecoveryKey:input_type -> lindm.admin.v1.RevealRecoveryKeyRequest
-	105, // 120: lindm.admin.v1.AdminService.CreateSecret:input_type -> lindm.admin.v1.CreateSecretRequest
-	106, // 121: lindm.admin.v1.AdminService.RotateSecret:input_type -> lindm.admin.v1.RotateSecretRequest
-	107, // 122: lindm.admin.v1.AdminService.ListSecrets:input_type -> lindm.admin.v1.ListSecretsRequest
-	108, // 123: lindm.admin.v1.AdminService.GetSecret:input_type -> lindm.admin.v1.GetSecretRequest
-	109, // 124: lindm.admin.v1.AdminService.RevealSecret:input_type -> lindm.admin.v1.RevealSecretRequest
-	110, // 125: lindm.admin.v1.AdminService.ListSecretUses:input_type -> lindm.admin.v1.ListSecretUsesRequest
-	111, // 126: lindm.admin.v1.AdminService.DeleteSecret:input_type -> lindm.admin.v1.DeleteSecretRequest
-	112, // 127: lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy:input_type -> lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
-	113, // 128: lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy:input_type -> lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
-	114, // 129: lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation:input_type -> lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
-	115, // 130: lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus:input_type -> lindm.admin.v1.GetLocalAdminPasswordStatusRequest
-	116, // 131: lindm.admin.v1.AdminService.RevealLocalAdminPassword:input_type -> lindm.admin.v1.RevealLocalAdminPasswordRequest
-	117, // 132: lindm.admin.v1.AdminService.ListDeviceGroups:input_type -> lindm.admin.v1.ListDeviceGroupsRequest
-	118, // 133: lindm.admin.v1.AdminService.SetDeviceGroup:input_type -> lindm.admin.v1.SetDeviceGroupRequest
-	119, // 134: lindm.admin.v1.AdminService.DeleteDeviceGroup:input_type -> lindm.admin.v1.DeleteDeviceGroupRequest
-	120, // 135: lindm.admin.v1.AdminService.ListDeviceFindings:input_type -> lindm.admin.v1.ListDeviceFindingsRequest
-	121, // 136: lindm.admin.v1.AdminService.ListDeviceUncoveredPackages:input_type -> lindm.admin.v1.ListDeviceUncoveredPackagesRequest
-	122, // 137: lindm.admin.v1.AdminService.ListAdvisorySummary:input_type -> lindm.admin.v1.ListAdvisorySummaryRequest
-	123, // 138: lindm.admin.v1.AdminService.ListAdvisoryFeeds:input_type -> lindm.admin.v1.ListAdvisoryFeedsRequest
-	124, // 139: lindm.admin.v1.AdminService.AcceptAdvisoryFinding:input_type -> lindm.admin.v1.AcceptAdvisoryFindingRequest
-	125, // 140: lindm.admin.v1.AdminService.SuggestValues:input_type -> lindm.admin.v1.SuggestValuesRequest
-	126, // 141: lindm.admin.v1.AdminService.ListApprovedReferences:input_type -> lindm.admin.v1.ListApprovedReferencesRequest
-	127, // 142: lindm.admin.v1.AdminService.GetAuthorization:output_type -> lindm.admin.v1.GetAuthorizationResponse
-	128, // 143: lindm.admin.v1.AdminService.UpdateAuthorization:output_type -> lindm.admin.v1.UpdateAuthorizationResponse
-	7,   // 144: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
-	129, // 145: lindm.admin.v1.AdminService.GetFleetSummary:output_type -> lindm.admin.v1.GetFleetSummaryResponse
-	12,  // 146: lindm.admin.v1.AdminService.GetDevice:output_type -> lindm.admin.v1.GetDeviceResponse
-	15,  // 147: lindm.admin.v1.AdminService.ListDevicePackages:output_type -> lindm.admin.v1.ListDevicePackagesResponse
-	130, // 148: lindm.admin.v1.AdminService.SetDeviceMetadata:output_type -> lindm.admin.v1.SetDeviceMetadataResponse
-	131, // 149: lindm.admin.v1.AdminService.SetAttributeDefinition:output_type -> lindm.admin.v1.SetAttributeDefinitionResponse
-	132, // 150: lindm.admin.v1.AdminService.ListAttributeDefinitions:output_type -> lindm.admin.v1.ListAttributeDefinitionsResponse
-	133, // 151: lindm.admin.v1.AdminService.ExportDevices:output_type -> lindm.admin.v1.ExportDevicesResponse
-	17,  // 152: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
-	134, // 153: lindm.admin.v1.AdminService.ListEnrollmentGrants:output_type -> lindm.admin.v1.ListEnrollmentGrantsResponse
-	135, // 154: lindm.admin.v1.AdminService.GetEnrollmentInstructions:output_type -> lindm.admin.v1.GetEnrollmentInstructionsResponse
-	19,  // 155: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
-	136, // 156: lindm.admin.v1.AdminService.CreateProvisioningToken:output_type -> lindm.admin.v1.CreateProvisioningTokenResponse
-	137, // 157: lindm.admin.v1.AdminService.ListProvisioningTokens:output_type -> lindm.admin.v1.ListProvisioningTokensResponse
-	138, // 158: lindm.admin.v1.AdminService.RevokeProvisioningToken:output_type -> lindm.admin.v1.RevokeProvisioningTokenResponse
-	139, // 159: lindm.admin.v1.AdminService.GetPendingEnrollments:output_type -> lindm.admin.v1.GetPendingEnrollmentsResponse
-	140, // 160: lindm.admin.v1.AdminService.ApprovePendingEnrollment:output_type -> lindm.admin.v1.ApprovePendingEnrollmentResponse
-	141, // 161: lindm.admin.v1.AdminService.CreateRecoveryEnrollmentGrant:output_type -> lindm.admin.v1.CreateRecoveryEnrollmentGrantResponse
-	142, // 162: lindm.admin.v1.AdminService.CreateOfflineEnrollmentAuthorization:output_type -> lindm.admin.v1.CreateOfflineEnrollmentAuthorizationResponse
-	143, // 163: lindm.admin.v1.AdminService.ImportOfflineEnrollmentRequest:output_type -> lindm.admin.v1.ImportOfflineEnrollmentRequestResponse
-	144, // 164: lindm.admin.v1.AdminService.ExportOfflineEnrollmentResponse:output_type -> lindm.admin.v1.ExportOfflineEnrollmentResponseResponse
-	20,  // 165: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
-	145, // 166: lindm.admin.v1.AdminService.CreateApproval:output_type -> lindm.admin.v1.CreateApprovalResponse
-	146, // 167: lindm.admin.v1.AdminService.ListApprovals:output_type -> lindm.admin.v1.ListApprovalsResponse
-	147, // 168: lindm.admin.v1.AdminService.ApproveApproval:output_type -> lindm.admin.v1.ApproveApprovalResponse
-	148, // 169: lindm.admin.v1.AdminService.RejectApproval:output_type -> lindm.admin.v1.RejectApprovalResponse
-	149, // 170: lindm.admin.v1.AdminService.WithdrawApproval:output_type -> lindm.admin.v1.WithdrawApprovalResponse
-	23,  // 171: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
-	26,  // 172: lindm.admin.v1.AdminService.ListAuditActors:output_type -> lindm.admin.v1.ListAuditActorsResponse
-	29,  // 173: lindm.admin.v1.AdminService.ListAuditDevices:output_type -> lindm.admin.v1.ListAuditDevicesResponse
-	31,  // 174: lindm.admin.v1.AdminService.GetExecutionAuthority:output_type -> lindm.admin.v1.GetExecutionAuthorityResponse
-	32,  // 175: lindm.admin.v1.AdminService.UpdateExecutionAuthority:output_type -> lindm.admin.v1.UpdateExecutionAuthorityResponse
-	150, // 176: lindm.admin.v1.AdminService.PublishProfileRevision:output_type -> lindm.admin.v1.PublishProfileRevisionResponse
-	151, // 177: lindm.admin.v1.AdminService.GetProfileRevision:output_type -> lindm.admin.v1.GetProfileRevisionResponse
-	152, // 178: lindm.admin.v1.AdminService.ListProfiles:output_type -> lindm.admin.v1.ListProfilesResponse
-	153, // 179: lindm.admin.v1.AdminService.ListProfileRevisions:output_type -> lindm.admin.v1.ListProfileRevisionsResponse
-	154, // 180: lindm.admin.v1.AdminService.ListQualifiedResourceKinds:output_type -> lindm.admin.v1.ListQualifiedResourceKindsResponse
-	155, // 181: lindm.admin.v1.AdminService.SetResourceAssignment:output_type -> lindm.admin.v1.SetResourceAssignmentResponse
-	156, // 182: lindm.admin.v1.AdminService.GetDeviceResourceState:output_type -> lindm.admin.v1.GetDeviceResourceStateResponse
-	157, // 183: lindm.admin.v1.AdminService.PutDynamicGroup:output_type -> lindm.admin.v1.PutDynamicGroupResponse
-	158, // 184: lindm.admin.v1.AdminService.GetDynamicGroup:output_type -> lindm.admin.v1.GetDynamicGroupResponse
-	159, // 185: lindm.admin.v1.AdminService.ListDynamicGroups:output_type -> lindm.admin.v1.ListDynamicGroupsResponse
-	160, // 186: lindm.admin.v1.AdminService.PutTargetAssignment:output_type -> lindm.admin.v1.PutTargetAssignmentResponse
-	161, // 187: lindm.admin.v1.AdminService.ListTargetAssignments:output_type -> lindm.admin.v1.ListTargetAssignmentsResponse
-	162, // 188: lindm.admin.v1.AdminService.PreviewTargetAssignments:output_type -> lindm.admin.v1.PreviewTargetAssignmentsResponse
-	163, // 189: lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact:output_type -> lindm.admin.v1.PreviewTargetAssignmentImpactResponse
-	164, // 190: lindm.admin.v1.AdminService.SaveTargetAssignmentImpact:output_type -> lindm.admin.v1.SaveTargetAssignmentImpactResponse
-	165, // 191: lindm.admin.v1.AdminService.ActivateTargetPreview:output_type -> lindm.admin.v1.ActivateTargetPreviewResponse
-	166, // 192: lindm.admin.v1.AdminService.PutRollout:output_type -> lindm.admin.v1.PutRolloutResponse
-	167, // 193: lindm.admin.v1.AdminService.ControlRollout:output_type -> lindm.admin.v1.ControlRolloutResponse
-	168, // 194: lindm.admin.v1.AdminService.ListRollouts:output_type -> lindm.admin.v1.ListRolloutsResponse
-	169, // 195: lindm.admin.v1.AdminService.CreateDeviceAction:output_type -> lindm.admin.v1.CreateDeviceActionResponse
-	170, // 196: lindm.admin.v1.AdminService.PreflightDeviceAction:output_type -> lindm.admin.v1.PreflightDeviceActionResponse
-	171, // 197: lindm.admin.v1.AdminService.GetDeviceActions:output_type -> lindm.admin.v1.GetDeviceActionsResponse
-	172, // 198: lindm.admin.v1.AdminService.GetDeviceAction:output_type -> lindm.admin.v1.GetDeviceActionResponse
-	173, // 199: lindm.admin.v1.AdminService.CreateAssistanceSession:output_type -> lindm.admin.v1.CreateAssistanceSessionResponse
-	174, // 200: lindm.admin.v1.AdminService.ListAssistanceSessions:output_type -> lindm.admin.v1.ListAssistanceSessionsResponse
-	175, // 201: lindm.admin.v1.AdminService.GetAssistanceSession:output_type -> lindm.admin.v1.GetAssistanceSessionResponse
-	176, // 202: lindm.admin.v1.AdminService.JoinAssistanceSession:output_type -> lindm.admin.v1.JoinAssistanceSessionResponse
-	177, // 203: lindm.admin.v1.AdminService.AnswerAssistanceSession:output_type -> lindm.admin.v1.AnswerAssistanceSessionResponse
-	178, // 204: lindm.admin.v1.AdminService.StopAssistanceSession:output_type -> lindm.admin.v1.StopAssistanceSessionResponse
-	179, // 205: lindm.admin.v1.AdminService.GetDeviceEncryption:output_type -> lindm.admin.v1.GetDeviceEncryptionResponse
-	180, // 206: lindm.admin.v1.AdminService.ListDeviceStorageTargets:output_type -> lindm.admin.v1.ListDeviceStorageTargetsResponse
-	181, // 207: lindm.admin.v1.AdminService.RevealRecoveryKey:output_type -> lindm.admin.v1.RevealRecoveryKeyResponse
-	182, // 208: lindm.admin.v1.AdminService.CreateSecret:output_type -> lindm.admin.v1.CreateSecretResponse
-	183, // 209: lindm.admin.v1.AdminService.RotateSecret:output_type -> lindm.admin.v1.RotateSecretResponse
-	184, // 210: lindm.admin.v1.AdminService.ListSecrets:output_type -> lindm.admin.v1.ListSecretsResponse
-	185, // 211: lindm.admin.v1.AdminService.GetSecret:output_type -> lindm.admin.v1.GetSecretResponse
-	186, // 212: lindm.admin.v1.AdminService.RevealSecret:output_type -> lindm.admin.v1.RevealSecretResponse
-	187, // 213: lindm.admin.v1.AdminService.ListSecretUses:output_type -> lindm.admin.v1.ListSecretUsesResponse
-	188, // 214: lindm.admin.v1.AdminService.DeleteSecret:output_type -> lindm.admin.v1.DeleteSecretResponse
-	189, // 215: lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy:output_type -> lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
-	190, // 216: lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy:output_type -> lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
-	191, // 217: lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation:output_type -> lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
-	192, // 218: lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus:output_type -> lindm.admin.v1.GetLocalAdminPasswordStatusResponse
-	193, // 219: lindm.admin.v1.AdminService.RevealLocalAdminPassword:output_type -> lindm.admin.v1.RevealLocalAdminPasswordResponse
-	194, // 220: lindm.admin.v1.AdminService.ListDeviceGroups:output_type -> lindm.admin.v1.ListDeviceGroupsResponse
-	195, // 221: lindm.admin.v1.AdminService.SetDeviceGroup:output_type -> lindm.admin.v1.SetDeviceGroupResponse
-	196, // 222: lindm.admin.v1.AdminService.DeleteDeviceGroup:output_type -> lindm.admin.v1.DeleteDeviceGroupResponse
-	197, // 223: lindm.admin.v1.AdminService.ListDeviceFindings:output_type -> lindm.admin.v1.ListDeviceFindingsResponse
-	198, // 224: lindm.admin.v1.AdminService.ListDeviceUncoveredPackages:output_type -> lindm.admin.v1.ListDeviceUncoveredPackagesResponse
-	199, // 225: lindm.admin.v1.AdminService.ListAdvisorySummary:output_type -> lindm.admin.v1.ListAdvisorySummaryResponse
-	200, // 226: lindm.admin.v1.AdminService.ListAdvisoryFeeds:output_type -> lindm.admin.v1.ListAdvisoryFeedsResponse
-	201, // 227: lindm.admin.v1.AdminService.AcceptAdvisoryFinding:output_type -> lindm.admin.v1.AcceptAdvisoryFindingResponse
-	202, // 228: lindm.admin.v1.AdminService.SuggestValues:output_type -> lindm.admin.v1.SuggestValuesResponse
-	203, // 229: lindm.admin.v1.AdminService.ListApprovedReferences:output_type -> lindm.admin.v1.ListApprovedReferencesResponse
-	142, // [142:230] is the sub-list for method output_type
-	54,  // [54:142] is the sub-list for method input_type
+	83,  // 98: lindm.admin.v1.AdminService.PreviewDynamicGroup:input_type -> lindm.admin.v1.PreviewDynamicGroupRequest
+	84,  // 99: lindm.admin.v1.AdminService.PutTargetAssignment:input_type -> lindm.admin.v1.PutTargetAssignmentRequest
+	85,  // 100: lindm.admin.v1.AdminService.ListTargetAssignments:input_type -> lindm.admin.v1.ListTargetAssignmentsRequest
+	86,  // 101: lindm.admin.v1.AdminService.PreviewTargetAssignments:input_type -> lindm.admin.v1.PreviewTargetAssignmentsRequest
+	87,  // 102: lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact:input_type -> lindm.admin.v1.PreviewTargetAssignmentImpactRequest
+	88,  // 103: lindm.admin.v1.AdminService.SaveTargetAssignmentImpact:input_type -> lindm.admin.v1.SaveTargetAssignmentImpactRequest
+	89,  // 104: lindm.admin.v1.AdminService.ActivateTargetPreview:input_type -> lindm.admin.v1.ActivateTargetPreviewRequest
+	90,  // 105: lindm.admin.v1.AdminService.PutRollout:input_type -> lindm.admin.v1.PutRolloutRequest
+	91,  // 106: lindm.admin.v1.AdminService.ControlRollout:input_type -> lindm.admin.v1.ControlRolloutRequest
+	92,  // 107: lindm.admin.v1.AdminService.ListRollouts:input_type -> lindm.admin.v1.ListRolloutsRequest
+	93,  // 108: lindm.admin.v1.AdminService.CreateDeviceAction:input_type -> lindm.admin.v1.CreateDeviceActionRequest
+	94,  // 109: lindm.admin.v1.AdminService.PreflightDeviceAction:input_type -> lindm.admin.v1.PreflightDeviceActionRequest
+	95,  // 110: lindm.admin.v1.AdminService.GetDeviceActions:input_type -> lindm.admin.v1.GetDeviceActionsRequest
+	96,  // 111: lindm.admin.v1.AdminService.GetDeviceAction:input_type -> lindm.admin.v1.GetDeviceActionRequest
+	97,  // 112: lindm.admin.v1.AdminService.CreateAssistanceSession:input_type -> lindm.admin.v1.CreateAssistanceSessionRequest
+	98,  // 113: lindm.admin.v1.AdminService.ListAssistanceSessions:input_type -> lindm.admin.v1.ListAssistanceSessionsRequest
+	99,  // 114: lindm.admin.v1.AdminService.GetAssistanceSession:input_type -> lindm.admin.v1.GetAssistanceSessionRequest
+	100, // 115: lindm.admin.v1.AdminService.JoinAssistanceSession:input_type -> lindm.admin.v1.JoinAssistanceSessionRequest
+	101, // 116: lindm.admin.v1.AdminService.AnswerAssistanceSession:input_type -> lindm.admin.v1.AnswerAssistanceSessionRequest
+	102, // 117: lindm.admin.v1.AdminService.StopAssistanceSession:input_type -> lindm.admin.v1.StopAssistanceSessionRequest
+	103, // 118: lindm.admin.v1.AdminService.GetDeviceEncryption:input_type -> lindm.admin.v1.GetDeviceEncryptionRequest
+	104, // 119: lindm.admin.v1.AdminService.ListDeviceStorageTargets:input_type -> lindm.admin.v1.ListDeviceStorageTargetsRequest
+	105, // 120: lindm.admin.v1.AdminService.RevealRecoveryKey:input_type -> lindm.admin.v1.RevealRecoveryKeyRequest
+	106, // 121: lindm.admin.v1.AdminService.CreateSecret:input_type -> lindm.admin.v1.CreateSecretRequest
+	107, // 122: lindm.admin.v1.AdminService.RotateSecret:input_type -> lindm.admin.v1.RotateSecretRequest
+	108, // 123: lindm.admin.v1.AdminService.ListSecrets:input_type -> lindm.admin.v1.ListSecretsRequest
+	109, // 124: lindm.admin.v1.AdminService.GetSecret:input_type -> lindm.admin.v1.GetSecretRequest
+	110, // 125: lindm.admin.v1.AdminService.RevealSecret:input_type -> lindm.admin.v1.RevealSecretRequest
+	111, // 126: lindm.admin.v1.AdminService.ListSecretUses:input_type -> lindm.admin.v1.ListSecretUsesRequest
+	112, // 127: lindm.admin.v1.AdminService.DeleteSecret:input_type -> lindm.admin.v1.DeleteSecretRequest
+	113, // 128: lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy:input_type -> lindm.admin.v1.SetLocalAdminPasswordPolicyRequest
+	114, // 129: lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy:input_type -> lindm.admin.v1.RemoveLocalAdminPasswordPolicyRequest
+	115, // 130: lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation:input_type -> lindm.admin.v1.RequestLocalAdminPasswordRotationRequest
+	116, // 131: lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus:input_type -> lindm.admin.v1.GetLocalAdminPasswordStatusRequest
+	117, // 132: lindm.admin.v1.AdminService.RevealLocalAdminPassword:input_type -> lindm.admin.v1.RevealLocalAdminPasswordRequest
+	118, // 133: lindm.admin.v1.AdminService.ListDeviceGroups:input_type -> lindm.admin.v1.ListDeviceGroupsRequest
+	119, // 134: lindm.admin.v1.AdminService.SetDeviceGroup:input_type -> lindm.admin.v1.SetDeviceGroupRequest
+	120, // 135: lindm.admin.v1.AdminService.DeleteDeviceGroup:input_type -> lindm.admin.v1.DeleteDeviceGroupRequest
+	121, // 136: lindm.admin.v1.AdminService.ListDeviceFindings:input_type -> lindm.admin.v1.ListDeviceFindingsRequest
+	122, // 137: lindm.admin.v1.AdminService.ListDeviceUncoveredPackages:input_type -> lindm.admin.v1.ListDeviceUncoveredPackagesRequest
+	123, // 138: lindm.admin.v1.AdminService.ListAdvisorySummary:input_type -> lindm.admin.v1.ListAdvisorySummaryRequest
+	124, // 139: lindm.admin.v1.AdminService.ListAdvisoryFeeds:input_type -> lindm.admin.v1.ListAdvisoryFeedsRequest
+	125, // 140: lindm.admin.v1.AdminService.AcceptAdvisoryFinding:input_type -> lindm.admin.v1.AcceptAdvisoryFindingRequest
+	126, // 141: lindm.admin.v1.AdminService.SuggestValues:input_type -> lindm.admin.v1.SuggestValuesRequest
+	127, // 142: lindm.admin.v1.AdminService.ListApprovedReferences:input_type -> lindm.admin.v1.ListApprovedReferencesRequest
+	128, // 143: lindm.admin.v1.AdminService.GetAuthorization:output_type -> lindm.admin.v1.GetAuthorizationResponse
+	129, // 144: lindm.admin.v1.AdminService.UpdateAuthorization:output_type -> lindm.admin.v1.UpdateAuthorizationResponse
+	7,   // 145: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
+	130, // 146: lindm.admin.v1.AdminService.GetFleetSummary:output_type -> lindm.admin.v1.GetFleetSummaryResponse
+	12,  // 147: lindm.admin.v1.AdminService.GetDevice:output_type -> lindm.admin.v1.GetDeviceResponse
+	15,  // 148: lindm.admin.v1.AdminService.ListDevicePackages:output_type -> lindm.admin.v1.ListDevicePackagesResponse
+	131, // 149: lindm.admin.v1.AdminService.SetDeviceMetadata:output_type -> lindm.admin.v1.SetDeviceMetadataResponse
+	132, // 150: lindm.admin.v1.AdminService.SetAttributeDefinition:output_type -> lindm.admin.v1.SetAttributeDefinitionResponse
+	133, // 151: lindm.admin.v1.AdminService.ListAttributeDefinitions:output_type -> lindm.admin.v1.ListAttributeDefinitionsResponse
+	134, // 152: lindm.admin.v1.AdminService.ExportDevices:output_type -> lindm.admin.v1.ExportDevicesResponse
+	17,  // 153: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
+	135, // 154: lindm.admin.v1.AdminService.ListEnrollmentGrants:output_type -> lindm.admin.v1.ListEnrollmentGrantsResponse
+	136, // 155: lindm.admin.v1.AdminService.GetEnrollmentInstructions:output_type -> lindm.admin.v1.GetEnrollmentInstructionsResponse
+	19,  // 156: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
+	137, // 157: lindm.admin.v1.AdminService.CreateProvisioningToken:output_type -> lindm.admin.v1.CreateProvisioningTokenResponse
+	138, // 158: lindm.admin.v1.AdminService.ListProvisioningTokens:output_type -> lindm.admin.v1.ListProvisioningTokensResponse
+	139, // 159: lindm.admin.v1.AdminService.RevokeProvisioningToken:output_type -> lindm.admin.v1.RevokeProvisioningTokenResponse
+	140, // 160: lindm.admin.v1.AdminService.GetPendingEnrollments:output_type -> lindm.admin.v1.GetPendingEnrollmentsResponse
+	141, // 161: lindm.admin.v1.AdminService.ApprovePendingEnrollment:output_type -> lindm.admin.v1.ApprovePendingEnrollmentResponse
+	142, // 162: lindm.admin.v1.AdminService.CreateRecoveryEnrollmentGrant:output_type -> lindm.admin.v1.CreateRecoveryEnrollmentGrantResponse
+	143, // 163: lindm.admin.v1.AdminService.CreateOfflineEnrollmentAuthorization:output_type -> lindm.admin.v1.CreateOfflineEnrollmentAuthorizationResponse
+	144, // 164: lindm.admin.v1.AdminService.ImportOfflineEnrollmentRequest:output_type -> lindm.admin.v1.ImportOfflineEnrollmentRequestResponse
+	145, // 165: lindm.admin.v1.AdminService.ExportOfflineEnrollmentResponse:output_type -> lindm.admin.v1.ExportOfflineEnrollmentResponseResponse
+	20,  // 166: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
+	146, // 167: lindm.admin.v1.AdminService.CreateApproval:output_type -> lindm.admin.v1.CreateApprovalResponse
+	147, // 168: lindm.admin.v1.AdminService.ListApprovals:output_type -> lindm.admin.v1.ListApprovalsResponse
+	148, // 169: lindm.admin.v1.AdminService.ApproveApproval:output_type -> lindm.admin.v1.ApproveApprovalResponse
+	149, // 170: lindm.admin.v1.AdminService.RejectApproval:output_type -> lindm.admin.v1.RejectApprovalResponse
+	150, // 171: lindm.admin.v1.AdminService.WithdrawApproval:output_type -> lindm.admin.v1.WithdrawApprovalResponse
+	23,  // 172: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
+	26,  // 173: lindm.admin.v1.AdminService.ListAuditActors:output_type -> lindm.admin.v1.ListAuditActorsResponse
+	29,  // 174: lindm.admin.v1.AdminService.ListAuditDevices:output_type -> lindm.admin.v1.ListAuditDevicesResponse
+	31,  // 175: lindm.admin.v1.AdminService.GetExecutionAuthority:output_type -> lindm.admin.v1.GetExecutionAuthorityResponse
+	32,  // 176: lindm.admin.v1.AdminService.UpdateExecutionAuthority:output_type -> lindm.admin.v1.UpdateExecutionAuthorityResponse
+	151, // 177: lindm.admin.v1.AdminService.PublishProfileRevision:output_type -> lindm.admin.v1.PublishProfileRevisionResponse
+	152, // 178: lindm.admin.v1.AdminService.GetProfileRevision:output_type -> lindm.admin.v1.GetProfileRevisionResponse
+	153, // 179: lindm.admin.v1.AdminService.ListProfiles:output_type -> lindm.admin.v1.ListProfilesResponse
+	154, // 180: lindm.admin.v1.AdminService.ListProfileRevisions:output_type -> lindm.admin.v1.ListProfileRevisionsResponse
+	155, // 181: lindm.admin.v1.AdminService.ListQualifiedResourceKinds:output_type -> lindm.admin.v1.ListQualifiedResourceKindsResponse
+	156, // 182: lindm.admin.v1.AdminService.SetResourceAssignment:output_type -> lindm.admin.v1.SetResourceAssignmentResponse
+	157, // 183: lindm.admin.v1.AdminService.GetDeviceResourceState:output_type -> lindm.admin.v1.GetDeviceResourceStateResponse
+	158, // 184: lindm.admin.v1.AdminService.PutDynamicGroup:output_type -> lindm.admin.v1.PutDynamicGroupResponse
+	159, // 185: lindm.admin.v1.AdminService.GetDynamicGroup:output_type -> lindm.admin.v1.GetDynamicGroupResponse
+	160, // 186: lindm.admin.v1.AdminService.ListDynamicGroups:output_type -> lindm.admin.v1.ListDynamicGroupsResponse
+	161, // 187: lindm.admin.v1.AdminService.PreviewDynamicGroup:output_type -> lindm.admin.v1.PreviewDynamicGroupResponse
+	162, // 188: lindm.admin.v1.AdminService.PutTargetAssignment:output_type -> lindm.admin.v1.PutTargetAssignmentResponse
+	163, // 189: lindm.admin.v1.AdminService.ListTargetAssignments:output_type -> lindm.admin.v1.ListTargetAssignmentsResponse
+	164, // 190: lindm.admin.v1.AdminService.PreviewTargetAssignments:output_type -> lindm.admin.v1.PreviewTargetAssignmentsResponse
+	165, // 191: lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact:output_type -> lindm.admin.v1.PreviewTargetAssignmentImpactResponse
+	166, // 192: lindm.admin.v1.AdminService.SaveTargetAssignmentImpact:output_type -> lindm.admin.v1.SaveTargetAssignmentImpactResponse
+	167, // 193: lindm.admin.v1.AdminService.ActivateTargetPreview:output_type -> lindm.admin.v1.ActivateTargetPreviewResponse
+	168, // 194: lindm.admin.v1.AdminService.PutRollout:output_type -> lindm.admin.v1.PutRolloutResponse
+	169, // 195: lindm.admin.v1.AdminService.ControlRollout:output_type -> lindm.admin.v1.ControlRolloutResponse
+	170, // 196: lindm.admin.v1.AdminService.ListRollouts:output_type -> lindm.admin.v1.ListRolloutsResponse
+	171, // 197: lindm.admin.v1.AdminService.CreateDeviceAction:output_type -> lindm.admin.v1.CreateDeviceActionResponse
+	172, // 198: lindm.admin.v1.AdminService.PreflightDeviceAction:output_type -> lindm.admin.v1.PreflightDeviceActionResponse
+	173, // 199: lindm.admin.v1.AdminService.GetDeviceActions:output_type -> lindm.admin.v1.GetDeviceActionsResponse
+	174, // 200: lindm.admin.v1.AdminService.GetDeviceAction:output_type -> lindm.admin.v1.GetDeviceActionResponse
+	175, // 201: lindm.admin.v1.AdminService.CreateAssistanceSession:output_type -> lindm.admin.v1.CreateAssistanceSessionResponse
+	176, // 202: lindm.admin.v1.AdminService.ListAssistanceSessions:output_type -> lindm.admin.v1.ListAssistanceSessionsResponse
+	177, // 203: lindm.admin.v1.AdminService.GetAssistanceSession:output_type -> lindm.admin.v1.GetAssistanceSessionResponse
+	178, // 204: lindm.admin.v1.AdminService.JoinAssistanceSession:output_type -> lindm.admin.v1.JoinAssistanceSessionResponse
+	179, // 205: lindm.admin.v1.AdminService.AnswerAssistanceSession:output_type -> lindm.admin.v1.AnswerAssistanceSessionResponse
+	180, // 206: lindm.admin.v1.AdminService.StopAssistanceSession:output_type -> lindm.admin.v1.StopAssistanceSessionResponse
+	181, // 207: lindm.admin.v1.AdminService.GetDeviceEncryption:output_type -> lindm.admin.v1.GetDeviceEncryptionResponse
+	182, // 208: lindm.admin.v1.AdminService.ListDeviceStorageTargets:output_type -> lindm.admin.v1.ListDeviceStorageTargetsResponse
+	183, // 209: lindm.admin.v1.AdminService.RevealRecoveryKey:output_type -> lindm.admin.v1.RevealRecoveryKeyResponse
+	184, // 210: lindm.admin.v1.AdminService.CreateSecret:output_type -> lindm.admin.v1.CreateSecretResponse
+	185, // 211: lindm.admin.v1.AdminService.RotateSecret:output_type -> lindm.admin.v1.RotateSecretResponse
+	186, // 212: lindm.admin.v1.AdminService.ListSecrets:output_type -> lindm.admin.v1.ListSecretsResponse
+	187, // 213: lindm.admin.v1.AdminService.GetSecret:output_type -> lindm.admin.v1.GetSecretResponse
+	188, // 214: lindm.admin.v1.AdminService.RevealSecret:output_type -> lindm.admin.v1.RevealSecretResponse
+	189, // 215: lindm.admin.v1.AdminService.ListSecretUses:output_type -> lindm.admin.v1.ListSecretUsesResponse
+	190, // 216: lindm.admin.v1.AdminService.DeleteSecret:output_type -> lindm.admin.v1.DeleteSecretResponse
+	191, // 217: lindm.admin.v1.AdminService.SetLocalAdminPasswordPolicy:output_type -> lindm.admin.v1.SetLocalAdminPasswordPolicyResponse
+	192, // 218: lindm.admin.v1.AdminService.RemoveLocalAdminPasswordPolicy:output_type -> lindm.admin.v1.RemoveLocalAdminPasswordPolicyResponse
+	193, // 219: lindm.admin.v1.AdminService.RequestLocalAdminPasswordRotation:output_type -> lindm.admin.v1.RequestLocalAdminPasswordRotationResponse
+	194, // 220: lindm.admin.v1.AdminService.GetLocalAdminPasswordStatus:output_type -> lindm.admin.v1.GetLocalAdminPasswordStatusResponse
+	195, // 221: lindm.admin.v1.AdminService.RevealLocalAdminPassword:output_type -> lindm.admin.v1.RevealLocalAdminPasswordResponse
+	196, // 222: lindm.admin.v1.AdminService.ListDeviceGroups:output_type -> lindm.admin.v1.ListDeviceGroupsResponse
+	197, // 223: lindm.admin.v1.AdminService.SetDeviceGroup:output_type -> lindm.admin.v1.SetDeviceGroupResponse
+	198, // 224: lindm.admin.v1.AdminService.DeleteDeviceGroup:output_type -> lindm.admin.v1.DeleteDeviceGroupResponse
+	199, // 225: lindm.admin.v1.AdminService.ListDeviceFindings:output_type -> lindm.admin.v1.ListDeviceFindingsResponse
+	200, // 226: lindm.admin.v1.AdminService.ListDeviceUncoveredPackages:output_type -> lindm.admin.v1.ListDeviceUncoveredPackagesResponse
+	201, // 227: lindm.admin.v1.AdminService.ListAdvisorySummary:output_type -> lindm.admin.v1.ListAdvisorySummaryResponse
+	202, // 228: lindm.admin.v1.AdminService.ListAdvisoryFeeds:output_type -> lindm.admin.v1.ListAdvisoryFeedsResponse
+	203, // 229: lindm.admin.v1.AdminService.AcceptAdvisoryFinding:output_type -> lindm.admin.v1.AcceptAdvisoryFindingResponse
+	204, // 230: lindm.admin.v1.AdminService.SuggestValues:output_type -> lindm.admin.v1.SuggestValuesResponse
+	205, // 231: lindm.admin.v1.AdminService.ListApprovedReferences:output_type -> lindm.admin.v1.ListApprovedReferencesResponse
+	143, // [143:232] is the sub-list for method output_type
+	54,  // [54:143] is the sub-list for method input_type
 	54,  // [54:54] is the sub-list for extension type_name
 	54,  // [54:54] is the sub-list for extension extendee
 	0,   // [0:54] is the sub-list for field type_name

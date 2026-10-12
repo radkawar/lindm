@@ -164,6 +164,9 @@ const (
 	// AdminServiceListDynamicGroupsProcedure is the fully-qualified name of the AdminService's
 	// ListDynamicGroups RPC.
 	AdminServiceListDynamicGroupsProcedure = "/lindm.admin.v1.AdminService/ListDynamicGroups"
+	// AdminServicePreviewDynamicGroupProcedure is the fully-qualified name of the AdminService's
+	// PreviewDynamicGroup RPC.
+	AdminServicePreviewDynamicGroupProcedure = "/lindm.admin.v1.AdminService/PreviewDynamicGroup"
 	// AdminServicePutTargetAssignmentProcedure is the fully-qualified name of the AdminService's
 	// PutTargetAssignment RPC.
 	AdminServicePutTargetAssignmentProcedure = "/lindm.admin.v1.AdminService/PutTargetAssignment"
@@ -342,6 +345,7 @@ type AdminServiceClient interface {
 	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
 	GetDynamicGroup(context.Context, *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error)
 	ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error)
+	PreviewDynamicGroup(context.Context, *connect.Request[v1.PreviewDynamicGroupRequest]) (*connect.Response[v1.PreviewDynamicGroupResponse], error)
 	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
@@ -667,6 +671,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListDynamicGroups")),
 			connect.WithClientOptions(opts...),
 		),
+		previewDynamicGroup: connect.NewClient[v1.PreviewDynamicGroupRequest, v1.PreviewDynamicGroupResponse](
+			httpClient,
+			baseURL+AdminServicePreviewDynamicGroupProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PreviewDynamicGroup")),
+			connect.WithClientOptions(opts...),
+		),
 		putTargetAssignment: connect.NewClient[v1.PutTargetAssignmentRequest, v1.PutTargetAssignmentResponse](
 			httpClient,
 			baseURL+AdminServicePutTargetAssignmentProcedure,
@@ -980,6 +990,7 @@ type adminServiceClient struct {
 	putDynamicGroup                      *connect.Client[v1.PutDynamicGroupRequest, v1.PutDynamicGroupResponse]
 	getDynamicGroup                      *connect.Client[v1.GetDynamicGroupRequest, v1.GetDynamicGroupResponse]
 	listDynamicGroups                    *connect.Client[v1.ListDynamicGroupsRequest, v1.ListDynamicGroupsResponse]
+	previewDynamicGroup                  *connect.Client[v1.PreviewDynamicGroupRequest, v1.PreviewDynamicGroupResponse]
 	putTargetAssignment                  *connect.Client[v1.PutTargetAssignmentRequest, v1.PutTargetAssignmentResponse]
 	listTargetAssignments                *connect.Client[v1.ListTargetAssignmentsRequest, v1.ListTargetAssignmentsResponse]
 	previewTargetAssignments             *connect.Client[v1.PreviewTargetAssignmentsRequest, v1.PreviewTargetAssignmentsResponse]
@@ -1246,6 +1257,11 @@ func (c *adminServiceClient) GetDynamicGroup(ctx context.Context, req *connect.R
 // ListDynamicGroups calls lindm.admin.v1.AdminService.ListDynamicGroups.
 func (c *adminServiceClient) ListDynamicGroups(ctx context.Context, req *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error) {
 	return c.listDynamicGroups.CallUnary(ctx, req)
+}
+
+// PreviewDynamicGroup calls lindm.admin.v1.AdminService.PreviewDynamicGroup.
+func (c *adminServiceClient) PreviewDynamicGroup(ctx context.Context, req *connect.Request[v1.PreviewDynamicGroupRequest]) (*connect.Response[v1.PreviewDynamicGroupResponse], error) {
+	return c.previewDynamicGroup.CallUnary(ctx, req)
 }
 
 // PutTargetAssignment calls lindm.admin.v1.AdminService.PutTargetAssignment.
@@ -1515,6 +1531,7 @@ type AdminServiceHandler interface {
 	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
 	GetDynamicGroup(context.Context, *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error)
 	ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error)
+	PreviewDynamicGroup(context.Context, *connect.Request[v1.PreviewDynamicGroupRequest]) (*connect.Response[v1.PreviewDynamicGroupResponse], error)
 	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
@@ -1834,6 +1851,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceListDynamicGroupsProcedure,
 		svc.ListDynamicGroups,
 		connect.WithSchema(adminServiceMethods.ByName("ListDynamicGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePreviewDynamicGroupHandler := connect.NewUnaryHandler(
+		AdminServicePreviewDynamicGroupProcedure,
+		svc.PreviewDynamicGroup,
+		connect.WithSchema(adminServiceMethods.ByName("PreviewDynamicGroup")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServicePutTargetAssignmentHandler := connect.NewUnaryHandler(
@@ -2190,6 +2213,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetDynamicGroupHandler.ServeHTTP(w, r)
 		case AdminServiceListDynamicGroupsProcedure:
 			adminServiceListDynamicGroupsHandler.ServeHTTP(w, r)
+		case AdminServicePreviewDynamicGroupProcedure:
+			adminServicePreviewDynamicGroupHandler.ServeHTTP(w, r)
 		case AdminServicePutTargetAssignmentProcedure:
 			adminServicePutTargetAssignmentHandler.ServeHTTP(w, r)
 		case AdminServiceListTargetAssignmentsProcedure:
@@ -2461,6 +2486,10 @@ func (UnimplementedAdminServiceHandler) GetDynamicGroup(context.Context, *connec
 
 func (UnimplementedAdminServiceHandler) ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDynamicGroups is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PreviewDynamicGroup(context.Context, *connect.Request[v1.PreviewDynamicGroupRequest]) (*connect.Response[v1.PreviewDynamicGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreviewDynamicGroup is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error) {

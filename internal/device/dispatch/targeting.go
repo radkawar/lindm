@@ -144,6 +144,11 @@ func (s *Service) ListDynamicGroups(ctx context.Context, r *connect.Request[admi
 		return s.Targeting.ListDynamicGroups(ctx, tx, a.Principal(), identity.PermissionManageInventory, r)
 	})
 }
+func (s *Service) PreviewDynamicGroup(ctx context.Context, r *connect.Request[adminv1.PreviewDynamicGroupRequest]) (*connect.Response[adminv1.PreviewDynamicGroupResponse], error) {
+	return targetingRPC(ctx, s, r, identity.PermissionManageInventory, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.PreviewDynamicGroupRequest) (*adminv1.PreviewDynamicGroupResponse, error) {
+		return s.Targeting.PreviewDynamicGroup(ctx, tx, a.Principal(), identity.PermissionManageInventory, r)
+	})
+}
 func (s *Service) PutTargetAssignment(ctx context.Context, r *connect.Request[adminv1.PutTargetAssignmentRequest]) (*connect.Response[adminv1.PutTargetAssignmentResponse], error) {
 	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.PutTargetAssignmentRequest) (*adminv1.PutTargetAssignmentResponse, error) {
 		return s.Targeting.PutAssignment(ctx, tx, a.Principal(), identity.PermissionAssignResources, r)
@@ -214,7 +219,7 @@ func (s *Service) GetDynamicGroup(ctx context.Context, r *connect.Request[adminv
 
 func targetingReadOnly(request any) bool {
 	switch request.(type) {
-	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.ListTargetAssignmentsRequest, *adminv1.ListRolloutsRequest:
+	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.PreviewDynamicGroupRequest, *adminv1.ListTargetAssignmentsRequest, *adminv1.ListRolloutsRequest:
 		return true
 	default:
 		return false

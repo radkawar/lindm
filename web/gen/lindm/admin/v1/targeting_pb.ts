@@ -18,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/targeting.proto.
  */
 export const file_lindm_admin_v1_targeting: GenFile = /*@__PURE__*/
-  fileDesc("Ch5saW5kbS9hZG1pbi92MS90YXJnZXRpbmcucHJvdG8SDmxpbmRtLmFkbWluLnYxInkKEFRhcmdldEV4cHJlc3Npb24SNQoFbm9kZXMYASADKAsyGi5saW5kbS5hZG1pbi52MS5UYXJnZXROb2RlQgq6SAeSAQQIARBAEi4KGWludmVudG9yeV9tYXhfYWdlX3NlY29uZHMYAiABKA1CC7pICCoGGICjBSg8IjUKDlRhcmdldENoaWxkcmVuEiMKB2luZGljZXMYASADKA1CErpID5IBDAgBEBAYASIEKgIYPyKJAgoKVGFyZ2V0Tm9kZRIYCgVkZXB0aBgBIAEoDUIJukgGKgQYCCgBEjEKCXByZWRpY2F0ZRgCIAEoCzIcLmxpbmRtLmFkbWluLnYxLkRldmljZUZpbHRlckgAEi0KA2FsbBgDIAEoCzIeLmxpbmRtLmFkbWluLnYxLlRhcmdldENoaWxkcmVuSAASLQoDYW55GAQgASgLMh4ubGluZG0uYWRtaW4udjEuVGFyZ2V0Q2hpbGRyZW5IABIcCglub3RfaW5kZXgYBSABKA1CB7pIBCoCGD9IABIjCg9zdGF0aWNfZ3JvdXBfaWQYBiABKAlCCLpIBXIDsAEBSABCDQoEbm9kZRIFukgCCAEingEKEkR5bmFtaWNUYXJnZXRHcm91cBIaCghncm91cF9pZBgBIAEoCUIIukgFcgOwAQESHAoEbmFtZRgCIAEoCUIOukgLcgkQARiAAboBAQASPAoKZXhwcmVzc2lvbhgDIAEoCzIgLmxpbmRtLmFkbWluLnYxLlRhcmdldEV4cHJlc3Npb25CBrpIA8gBARIQCghyZXZpc2lvbhgEIAEoBCK4AQoWUHV0RHluYW1pY0dyb3VwUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARI5CgVncm91cBgCIAEoCzIiLmxpbmRtLmFkbWluLnYxLkR5bmFtaWNUYXJnZXRHcm91cEIGukgDyAEBEioKEWV4cGVjdGVkX3JldmlzaW9uGAMgASgEQg+6SAwyChj+/////////38SGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiTAoXUHV0RHluYW1pY0dyb3VwUmVzcG9uc2USMQoFZ3JvdXAYASABKAsyIi5saW5kbS5hZG1pbi52MS5EeW5hbWljVGFyZ2V0R3JvdXAiNAoWR2V0RHluYW1pY0dyb3VwUmVxdWVzdBIaCghncm91cF9pZBgBIAEoCUIIukgFcgOwAQEiTAoXR2V0RHluYW1pY0dyb3VwUmVzcG9uc2USMQoFZ3JvdXAYASABKAsyIi5saW5kbS5hZG1pbi52MS5EeW5hbWljVGFyZ2V0R3JvdXAiZgoYTGlzdER5bmFtaWNHcm91cHNSZXF1ZXN0EhwKCXBhZ2Vfc2l6ZRgBIAEoDUIJukgGKgQYZCgBEh8KCGFmdGVyX2lkGAIgASgJQgi6SAVyA7ABAUgAiAEBQgsKCV9hZnRlcl9pZCJPChlMaXN0RHluYW1pY0dyb3Vwc1Jlc3BvbnNlEjIKBmdyb3VwcxgBIAMoCzIiLmxpbmRtLmFkbWluLnYxLkR5bmFtaWNUYXJnZXRHcm91cCLAAQoaUHV0VGFyZ2V0QXNzaWdubWVudFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESPQoKYXNzaWdubWVudBgCIAEoCzIhLmxpbmRtLnBvbGljeS52MS5UYXJnZXRBc3NpZ25tZW50Qga6SAPIAQESKgoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKARCD7pIDDIKGP7/////////fxIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYASJTChtQdXRUYXJnZXRBc3NpZ25tZW50UmVzcG9uc2USNAoKYXNzaWdubWVudBgBIAEoCzIgLmxpbmRtLnBvbGljeS52MS5UYXJnZXRDYW5kaWRhdGUiagocTGlzdFRhcmdldEFzc2lnbm1lbnRzUmVxdWVzdBIcCglwYWdlX3NpemUYASABKA1CCbpIBioEGGQoARIfCghhZnRlcl9pZBgCIAEoCUIIukgFcgOwAQFIAIgBAUILCglfYWZ0ZXJfaWQiVgodTGlzdFRhcmdldEFzc2lnbm1lbnRzUmVzcG9uc2USNQoLYXNzaWdubWVudHMYASADKAsyIC5saW5kbS5wb2xpY3kudjEuVGFyZ2V0Q2FuZGlkYXRlIj4KH1ByZXZpZXdUYXJnZXRBc3NpZ25tZW50c1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABASJTCiBQcmV2aWV3VGFyZ2V0QXNzaWdubWVudHNSZXNwb25zZRIvCgdwcmV2aWV3GAEgASgLMh4ubGluZG0ucG9saWN5LnYxLlRhcmdldFByZXZpZXcijAMKJFByZXZpZXdUYXJnZXRBc3NpZ25tZW50SW1wYWN0UmVxdWVzdBI9Cgphc3NpZ25tZW50GAEgASgLMiEubGluZG0ucG9saWN5LnYxLlRhcmdldEFzc2lnbm1lbnRCBrpIA8gBARIqChFleHBlY3RlZF9yZXZpc2lvbhgCIAEoBEIPukgMMgoY/v////////9/EhwKCXBhZ2Vfc2l6ZRgDIAEoDUIJukgGKgQYFCgBEiEKCnByZXZpZXdfaWQYBCABKAlCCLpIBXIDsAEBSACIAQESJgoPYWZ0ZXJfZGV2aWNlX2lkGAUgASgJQgi6SAVyA7ABAUgBiAEBOm26SGoaaAoNaW1wYWN0LmN1cnNvchIjYSBjdXJzb3IgcmVxdWlyZXMgYSByZXRhaW5lZCByZXBvcnQaMiFoYXModGhpcy5hZnRlcl9kZXZpY2VfaWQpIHx8IGhhcyh0aGlzLnByZXZpZXdfaWQpQg0KC19wcmV2aWV3X2lkQhIKEF9hZnRlcl9kZXZpY2VfaWQijwMKHFRhcmdldEFzc2lnbm1lbnREZXZpY2VJbXBhY3QSEQoJZGV2aWNlX2lkGAEgASgJEhAKCGhvc3RuYW1lGAIgASgJEg0KBW9zX2lkGAMgASgJEhIKCm9zX3ZlcnNpb24YBCABKAkSFAoMYXJjaGl0ZWN0dXJlGAUgASgJEg0KBXN0YXRlGAYgASgJEjQKEGhvc3RfcmVjZWl2ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEisKBW1hdGNoGAggASgOMhwubGluZG0ucG9saWN5LnYxLlRhcmdldE1hdGNoEj0KEmN1cnJlbnRfcmVzb2x1dGlvbhgJIAEoCzIhLmxpbmRtLnBvbGljeS52MS5UYXJnZXRSZXNvbHV0aW9uEj4KE3Byb3Bvc2VkX3Jlc29sdXRpb24YCiABKAsyIS5saW5kbS5wb2xpY3kudjEuVGFyZ2V0UmVzb2x1dGlvbhIPCgdjaGFuZ2VkGAsgASgIEg8KB3JlYXNvbnMYDCADKAkiuwQKJVByZXZpZXdUYXJnZXRBc3NpZ25tZW50SW1wYWN0UmVzcG9uc2USEgoKcHJldmlld19pZBgBIAEoCRI1Cgphc3NpZ25tZW50GAIgASgLMiEubGluZG0ucG9saWN5LnYxLlRhcmdldEFzc2lnbm1lbnQSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKAQSMAoMZXZhbHVhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgt2YWxpZF91bnRpbBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASPQoHZGV2aWNlcxgGIAMoCzIsLmxpbmRtLmFkbWluLnYxLlRhcmdldEFzc2lnbm1lbnREZXZpY2VJbXBhY3QSHgoWZXZhbHVhdGVkX2RldmljZV9jb3VudBgHIAEoDRIUCgx0YXJnZXRfY291bnQYCCABKA0SFgoOaW5jbHVkZWRfY291bnQYCSABKA0SFgoOZXhjbHVkZWRfY291bnQYCiABKA0SFQoNdW5rbm93bl9jb3VudBgLIAEoDRIQCghjb21wbGV0ZRgMIAEoCBIhChRuZXh0X2FmdGVyX2RldmljZV9pZBgNIAEoCUgAiAEBEhUKDXJldmlld19zaGEyNTYYDiABKAwSFwoPY2FuZGlkYXRlX2NvdW50GA8gASgNEg8KB3JlYXNvbnMYECADKAlCFwoVX25leHRfYWZ0ZXJfZGV2aWNlX2lkIoUCCiFTYXZlVGFyZ2V0QXNzaWdubWVudEltcGFjdFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESHAoKcHJldmlld19pZBgCIAEoCUIIukgFcgOwAQESHgoNcmV2aWV3X3NoYTI1NhgDIAEoDEIHukgEegJoIBI9Cgphc3NpZ25tZW50GAQgASgLMiEubGluZG0ucG9saWN5LnYxLlRhcmdldEFzc2lnbm1lbnRCBrpIA8gBARIqChFleHBlY3RlZF9yZXZpc2lvbhgFIAEoBEIPukgMMgoY/v////////9/EhkKBnJlYXNvbhgGIAEoCUIJukgGcgSYtRgBIloKIlNhdmVUYXJnZXRBc3NpZ25tZW50SW1wYWN0UmVzcG9uc2USNAoKYXNzaWdubWVudBgBIAEoCzIgLmxpbmRtLnBvbGljeS52MS5UYXJnZXRDYW5kaWRhdGUi5wEKHEFjdGl2YXRlVGFyZ2V0UHJldmlld1JlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESHAoKcHJldmlld19pZBgCIAEoCUIIukgFcgOwAQESHwoOcHJldmlld19zaGEyNTYYAyABKAxCB7pIBHoCaCASGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAESGwoJZGV2aWNlX2lkGAUgASgJQgi6SAVyA7ABARIiCgthcHByb3ZhbF9pZBgGIAEoCUIIukgFcgOwAQFIAIgBAUIOCgxfYXBwcm92YWxfaWQiUAodQWN0aXZhdGVUYXJnZXRQcmV2aWV3UmVzcG9uc2USLwoHcHJldmlldxgBIAEoCzIeLmxpbmRtLnBvbGljeS52MS5UYXJnZXRQcmV2aWV3IoMBChFQdXRSb2xsb3V0UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARI1Cgdyb2xsb3V0GAIgASgLMhwubGluZG0ucG9saWN5LnYxLlJvbGxvdXRTcGVjQga6SAPIAQESGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEiygMKDFJvbGxvdXRTdGF0ZRItCgdyb2xsb3V0GAEgASgLMhwubGluZG0ucG9saWN5LnYxLlJvbGxvdXRTcGVjEhAKCHJldmlzaW9uGAIgASgEEhIKCnJpbmdfaW5kZXgYAyABKA0SDgoGcGF1c2VkGAQgASgIEhQKDHBhdXNlX3JlYXNvbhgFIAEoCRIWCg5zZWxlY3RlZF9jb3VudBgGIAEoDRIVCg1wZW5kaW5nX2NvdW50GAcgASgNEhYKDmV4Y2x1ZGVkX2NvdW50GAggASgNEjQKEHN0YWdlX3N0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjUKEW5leHRfcHJvbW90aW9uX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9wcm9tb3Rpb25fcmVhZHkYCyABKAgSFQoNaGVhbHRoeV9jb3VudBgMIAEoDRIUCgxmYWlsZWRfY291bnQYDSABKA0SFQoNdW5rbm93bl9jb3VudBgOIAEoDRIZChF1bmF2YWlsYWJsZV9jb3VudBgPIAEoDRITCgtnYXRlX3JlYXNvbhgQIAEoCSJDChJQdXRSb2xsb3V0UmVzcG9uc2USLQoHcm9sbG91dBgBIAEoCzIcLmxpbmRtLmFkbWluLnYxLlJvbGxvdXRTdGF0ZSLWAgoVQ29udHJvbFJvbGxvdXRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhwKCnJvbGxvdXRfaWQYAiABKAlCCLpIBXIDsAEBEiwKEWV4cGVjdGVkX3JldmlzaW9uGAMgASgEQhG6SA4yDBj+/////////38oARJOCglvcGVyYXRpb24YBCABKA4yLy5saW5kbS5hZG1pbi52MS5Db250cm9sUm9sbG91dFJlcXVlc3QuT3BlcmF0aW9uQgq6SAeCAQQQASAAEhkKBnJlYXNvbhgFIAEoCUIJukgGcgSYtRgBImgKCU9wZXJhdGlvbhIZChVPUEVSQVRJT05fVU5TUEVDSUZJRUQQABITCg9PUEVSQVRJT05fUEFVU0UQARIUChBPUEVSQVRJT05fUkVTVU1FEAISFQoRT1BFUkFUSU9OX1BST01PVEUQAyJHChZDb250cm9sUm9sbG91dFJlc3BvbnNlEi0KB3JvbGxvdXQYASABKAsyHC5saW5kbS5hZG1pbi52MS5Sb2xsb3V0U3RhdGUicgoTTGlzdFJvbGxvdXRzUmVxdWVzdBIcCglwYWdlX3NpemUYASABKA1CCbpIBioEGGQoARIfCghhZnRlcl9pZBgCIAEoCUIIukgFcgOwAQFIAIgBAUILCglfYWZ0ZXJfaWRKBAgDEARSCXJlYWRfb25seSJGChRMaXN0Um9sbG91dHNSZXNwb25zZRIuCghyb2xsb3V0cxgBIAMoCzIcLmxpbmRtLmFkbWluLnYxLlJvbGxvdXRTdGF0ZUIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_admin_v1_inventory_management, file_lindm_policy_v1_targeting, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch5saW5kbS9hZG1pbi92MS90YXJnZXRpbmcucHJvdG8SDmxpbmRtLmFkbWluLnYxInkKEFRhcmdldEV4cHJlc3Npb24SNQoFbm9kZXMYASADKAsyGi5saW5kbS5hZG1pbi52MS5UYXJnZXROb2RlQgq6SAeSAQQIARBAEi4KGWludmVudG9yeV9tYXhfYWdlX3NlY29uZHMYAiABKA1CC7pICCoGGICjBSg8IjUKDlRhcmdldENoaWxkcmVuEiMKB2luZGljZXMYASADKA1CErpID5IBDAgBEBAYASIEKgIYPyKJAgoKVGFyZ2V0Tm9kZRIYCgVkZXB0aBgBIAEoDUIJukgGKgQYCCgBEjEKCXByZWRpY2F0ZRgCIAEoCzIcLmxpbmRtLmFkbWluLnYxLkRldmljZUZpbHRlckgAEi0KA2FsbBgDIAEoCzIeLmxpbmRtLmFkbWluLnYxLlRhcmdldENoaWxkcmVuSAASLQoDYW55GAQgASgLMh4ubGluZG0uYWRtaW4udjEuVGFyZ2V0Q2hpbGRyZW5IABIcCglub3RfaW5kZXgYBSABKA1CB7pIBCoCGD9IABIjCg9zdGF0aWNfZ3JvdXBfaWQYBiABKAlCCLpIBXIDsAEBSABCDQoEbm9kZRIFukgCCAEingEKEkR5bmFtaWNUYXJnZXRHcm91cBIaCghncm91cF9pZBgBIAEoCUIIukgFcgOwAQESHAoEbmFtZRgCIAEoCUIOukgLcgkQARiAAboBAQASPAoKZXhwcmVzc2lvbhgDIAEoCzIgLmxpbmRtLmFkbWluLnYxLlRhcmdldEV4cHJlc3Npb25CBrpIA8gBARIQCghyZXZpc2lvbhgEIAEoBCK4AQoWUHV0RHluYW1pY0dyb3VwUmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARI5CgVncm91cBgCIAEoCzIiLmxpbmRtLmFkbWluLnYxLkR5bmFtaWNUYXJnZXRHcm91cEIGukgDyAEBEioKEWV4cGVjdGVkX3JldmlzaW9uGAMgASgEQg+6SAwyChj+/////////38SGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiTAoXUHV0RHluYW1pY0dyb3VwUmVzcG9uc2USMQoFZ3JvdXAYASABKAsyIi5saW5kbS5hZG1pbi52MS5EeW5hbWljVGFyZ2V0R3JvdXAiNAoWR2V0RHluYW1pY0dyb3VwUmVxdWVzdBIaCghncm91cF9pZBgBIAEoCUIIukgFcgOwAQEiTAoXR2V0RHluYW1pY0dyb3VwUmVzcG9uc2USMQoFZ3JvdXAYASABKAsyIi5saW5kbS5hZG1pbi52MS5EeW5hbWljVGFyZ2V0R3JvdXAiZgoYTGlzdER5bmFtaWNHcm91cHNSZXF1ZXN0EhwKCXBhZ2Vfc2l6ZRgBIAEoDUIJukgGKgQYZCgBEh8KCGFmdGVyX2lkGAIgASgJQgi6SAVyA7ABAUgAiAEBQgsKCV9hZnRlcl9pZCJPChlMaXN0RHluYW1pY0dyb3Vwc1Jlc3BvbnNlEjIKBmdyb3VwcxgBIAMoCzIiLmxpbmRtLmFkbWluLnYxLkR5bmFtaWNUYXJnZXRHcm91cCJ4ChpQcmV2aWV3RHluYW1pY0dyb3VwUmVxdWVzdBI8CgpleHByZXNzaW9uGAEgASgLMiAubGluZG0uYWRtaW4udjEuVGFyZ2V0RXhwcmVzc2lvbkIGukgDyAEBEhwKC3NhbXBsZV9zaXplGAIgASgNQge6SAQqAhhkImMKGUR5bmFtaWNHcm91cFByZXZpZXdEZXZpY2USEQoJZGV2aWNlX2lkGAEgASgJEhAKCGhvc3RuYW1lGAIgASgJEg0KBW9zX2lkGAMgASgJEhIKCm9zX3ZlcnNpb24YBCABKAki8wEKG1ByZXZpZXdEeW5hbWljR3JvdXBSZXNwb25zZRIwCgxldmFsdWF0ZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEh4KFmV2YWx1YXRlZF9kZXZpY2VfY291bnQYAiABKA0SFQoNbWF0Y2hlZF9jb3VudBgDIAEoDRIVCg11bmtub3duX2NvdW50GAQgASgNEkIKD21hdGNoZWRfZGV2aWNlcxgFIAMoCzIpLmxpbmRtLmFkbWluLnYxLkR5bmFtaWNHcm91cFByZXZpZXdEZXZpY2USEAoIY29tcGxldGUYBiABKAgiwAEKGlB1dFRhcmdldEFzc2lnbm1lbnRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEj0KCmFzc2lnbm1lbnQYAiABKAsyIS5saW5kbS5wb2xpY3kudjEuVGFyZ2V0QXNzaWdubWVudEIGukgDyAEBEioKEWV4cGVjdGVkX3JldmlzaW9uGAMgASgEQg+6SAwyChj+/////////38SGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAEiUwobUHV0VGFyZ2V0QXNzaWdubWVudFJlc3BvbnNlEjQKCmFzc2lnbm1lbnQYASABKAsyIC5saW5kbS5wb2xpY3kudjEuVGFyZ2V0Q2FuZGlkYXRlImoKHExpc3RUYXJnZXRBc3NpZ25tZW50c1JlcXVlc3QSHAoJcGFnZV9zaXplGAEgASgNQgm6SAYqBBhkKAESHwoIYWZ0ZXJfaWQYAiABKAlCCLpIBXIDsAEBSACIAQFCCwoJX2FmdGVyX2lkIlYKHUxpc3RUYXJnZXRBc3NpZ25tZW50c1Jlc3BvbnNlEjUKC2Fzc2lnbm1lbnRzGAEgAygLMiAubGluZG0ucG9saWN5LnYxLlRhcmdldENhbmRpZGF0ZSI+Ch9QcmV2aWV3VGFyZ2V0QXNzaWdubWVudHNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQEiUwogUHJldmlld1RhcmdldEFzc2lnbm1lbnRzUmVzcG9uc2USLwoHcHJldmlldxgBIAEoCzIeLmxpbmRtLnBvbGljeS52MS5UYXJnZXRQcmV2aWV3IowDCiRQcmV2aWV3VGFyZ2V0QXNzaWdubWVudEltcGFjdFJlcXVlc3QSPQoKYXNzaWdubWVudBgBIAEoCzIhLmxpbmRtLnBvbGljeS52MS5UYXJnZXRBc3NpZ25tZW50Qga6SAPIAQESKgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKARCD7pIDDIKGP7/////////fxIcCglwYWdlX3NpemUYAyABKA1CCbpIBioEGBQoARIhCgpwcmV2aWV3X2lkGAQgASgJQgi6SAVyA7ABAUgAiAEBEiYKD2FmdGVyX2RldmljZV9pZBgFIAEoCUIIukgFcgOwAQFIAYgBATptukhqGmgKDWltcGFjdC5jdXJzb3ISI2EgY3Vyc29yIHJlcXVpcmVzIGEgcmV0YWluZWQgcmVwb3J0GjIhaGFzKHRoaXMuYWZ0ZXJfZGV2aWNlX2lkKSB8fCBoYXModGhpcy5wcmV2aWV3X2lkKUINCgtfcHJldmlld19pZEISChBfYWZ0ZXJfZGV2aWNlX2lkIo8DChxUYXJnZXRBc3NpZ25tZW50RGV2aWNlSW1wYWN0EhEKCWRldmljZV9pZBgBIAEoCRIQCghob3N0bmFtZRgCIAEoCRINCgVvc19pZBgDIAEoCRISCgpvc192ZXJzaW9uGAQgASgJEhQKDGFyY2hpdGVjdHVyZRgFIAEoCRINCgVzdGF0ZRgGIAEoCRI0ChBob3N0X3JlY2VpdmVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgVtYXRjaBgIIAEoDjIcLmxpbmRtLnBvbGljeS52MS5UYXJnZXRNYXRjaBI9ChJjdXJyZW50X3Jlc29sdXRpb24YCSABKAsyIS5saW5kbS5wb2xpY3kudjEuVGFyZ2V0UmVzb2x1dGlvbhI+ChNwcm9wb3NlZF9yZXNvbHV0aW9uGAogASgLMiEubGluZG0ucG9saWN5LnYxLlRhcmdldFJlc29sdXRpb24SDwoHY2hhbmdlZBgLIAEoCBIPCgdyZWFzb25zGAwgAygJIrsECiVQcmV2aWV3VGFyZ2V0QXNzaWdubWVudEltcGFjdFJlc3BvbnNlEhIKCnByZXZpZXdfaWQYASABKAkSNQoKYXNzaWdubWVudBgCIAEoCzIhLmxpbmRtLnBvbGljeS52MS5UYXJnZXRBc3NpZ25tZW50EhkKEWV4cGVjdGVkX3JldmlzaW9uGAMgASgEEjAKDGV2YWx1YXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdmFsaWRfdW50aWwYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj0KB2RldmljZXMYBiADKAsyLC5saW5kbS5hZG1pbi52MS5UYXJnZXRBc3NpZ25tZW50RGV2aWNlSW1wYWN0Eh4KFmV2YWx1YXRlZF9kZXZpY2VfY291bnQYByABKA0SFAoMdGFyZ2V0X2NvdW50GAggASgNEhYKDmluY2x1ZGVkX2NvdW50GAkgASgNEhYKDmV4Y2x1ZGVkX2NvdW50GAogASgNEhUKDXVua25vd25fY291bnQYCyABKA0SEAoIY29tcGxldGUYDCABKAgSIQoUbmV4dF9hZnRlcl9kZXZpY2VfaWQYDSABKAlIAIgBARIVCg1yZXZpZXdfc2hhMjU2GA4gASgMEhcKD2NhbmRpZGF0ZV9jb3VudBgPIAEoDRIPCgdyZWFzb25zGBAgAygJQhcKFV9uZXh0X2FmdGVyX2RldmljZV9pZCKFAgohU2F2ZVRhcmdldEFzc2lnbm1lbnRJbXBhY3RSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhwKCnByZXZpZXdfaWQYAiABKAlCCLpIBXIDsAEBEh4KDXJldmlld19zaGEyNTYYAyABKAxCB7pIBHoCaCASPQoKYXNzaWdubWVudBgEIAEoCzIhLmxpbmRtLnBvbGljeS52MS5UYXJnZXRBc3NpZ25tZW50Qga6SAPIAQESKgoRZXhwZWN0ZWRfcmV2aXNpb24YBSABKARCD7pIDDIKGP7/////////fxIZCgZyZWFzb24YBiABKAlCCbpIBnIEmLUYASJaCiJTYXZlVGFyZ2V0QXNzaWdubWVudEltcGFjdFJlc3BvbnNlEjQKCmFzc2lnbm1lbnQYASABKAsyIC5saW5kbS5wb2xpY3kudjEuVGFyZ2V0Q2FuZGlkYXRlIucBChxBY3RpdmF0ZVRhcmdldFByZXZpZXdSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhwKCnByZXZpZXdfaWQYAiABKAlCCLpIBXIDsAEBEh8KDnByZXZpZXdfc2hhMjU2GAMgASgMQge6SAR6AmggEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEhsKCWRldmljZV9pZBgFIAEoCUIIukgFcgOwAQESIgoLYXBwcm92YWxfaWQYBiABKAlCCLpIBXIDsAEBSACIAQFCDgoMX2FwcHJvdmFsX2lkIlAKHUFjdGl2YXRlVGFyZ2V0UHJldmlld1Jlc3BvbnNlEi8KB3ByZXZpZXcYASABKAsyHi5saW5kbS5wb2xpY3kudjEuVGFyZ2V0UHJldmlldyKDAQoRUHV0Um9sbG91dFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESNQoHcm9sbG91dBgCIAEoCzIcLmxpbmRtLnBvbGljeS52MS5Sb2xsb3V0U3BlY0IGukgDyAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBIsoDCgxSb2xsb3V0U3RhdGUSLQoHcm9sbG91dBgBIAEoCzIcLmxpbmRtLnBvbGljeS52MS5Sb2xsb3V0U3BlYxIQCghyZXZpc2lvbhgCIAEoBBISCgpyaW5nX2luZGV4GAMgASgNEg4KBnBhdXNlZBgEIAEoCBIUCgxwYXVzZV9yZWFzb24YBSABKAkSFgoOc2VsZWN0ZWRfY291bnQYBiABKA0SFQoNcGVuZGluZ19jb3VudBgHIAEoDRIWCg5leGNsdWRlZF9jb3VudBgIIAEoDRI0ChBzdGFnZV9zdGFydGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1ChFuZXh0X3Byb21vdGlvbl9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPcHJvbW90aW9uX3JlYWR5GAsgASgIEhUKDWhlYWx0aHlfY291bnQYDCABKA0SFAoMZmFpbGVkX2NvdW50GA0gASgNEhUKDXVua25vd25fY291bnQYDiABKA0SGQoRdW5hdmFpbGFibGVfY291bnQYDyABKA0SEwoLZ2F0ZV9yZWFzb24YECABKAkiQwoSUHV0Um9sbG91dFJlc3BvbnNlEi0KB3JvbGxvdXQYASABKAsyHC5saW5kbS5hZG1pbi52MS5Sb2xsb3V0U3RhdGUi1gIKFUNvbnRyb2xSb2xsb3V0UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIcCgpyb2xsb3V0X2lkGAIgASgJQgi6SAVyA7ABARIsChFleHBlY3RlZF9yZXZpc2lvbhgDIAEoBEIRukgOMgwY/v////////9/KAESTgoJb3BlcmF0aW9uGAQgASgOMi8ubGluZG0uYWRtaW4udjEuQ29udHJvbFJvbGxvdXRSZXF1ZXN0Lk9wZXJhdGlvbkIKukgHggEEEAEgABIZCgZyZWFzb24YBSABKAlCCbpIBnIEmLUYASJoCglPcGVyYXRpb24SGQoVT1BFUkFUSU9OX1VOU1BFQ0lGSUVEEAASEwoPT1BFUkFUSU9OX1BBVVNFEAESFAoQT1BFUkFUSU9OX1JFU1VNRRACEhUKEU9QRVJBVElPTl9QUk9NT1RFEAMiRwoWQ29udHJvbFJvbGxvdXRSZXNwb25zZRItCgdyb2xsb3V0GAEgASgLMhwubGluZG0uYWRtaW4udjEuUm9sbG91dFN0YXRlInIKE0xpc3RSb2xsb3V0c1JlcXVlc3QSHAoJcGFnZV9zaXplGAEgASgNQgm6SAYqBBhkKAESHwoIYWZ0ZXJfaWQYAiABKAlCCLpIBXIDsAEBSACIAQFCCwoJX2FmdGVyX2lkSgQIAxAEUglyZWFkX29ubHkiRgoUTGlzdFJvbGxvdXRzUmVzcG9uc2USLgoIcm9sbG91dHMYASADKAsyHC5saW5kbS5hZG1pbi52MS5Sb2xsb3V0U3RhdGVCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_admin_v1_inventory_management, file_lindm_policy_v1_targeting, file_lindm_validation_v1_string_rules]);
 
 /**
  * A topologically ordered bounded AST. The last node is the root. Child indices
@@ -273,6 +273,113 @@ export const ListDynamicGroupsResponseSchema: GenMessage<ListDynamicGroupsRespon
   messageDesc(file_lindm_admin_v1_targeting, 9);
 
 /**
+ * Evaluates a proposed, unsaved dynamic group expression against the fleet with
+ * the same matching as saved groups. Nothing is stored. At most 10,000 devices are
+ * evaluated; counts are lower bounds when complete is false.
+ *
+ * @generated from message lindm.admin.v1.PreviewDynamicGroupRequest
+ */
+export type PreviewDynamicGroupRequest = Message<"lindm.admin.v1.PreviewDynamicGroupRequest"> & {
+  /**
+   * @generated from field: lindm.admin.v1.TargetExpression expression = 1;
+   */
+  expression?: TargetExpression | undefined;
+
+  /**
+   * Matching devices to name, first by hostname; zero means five.
+   *
+   * @generated from field: uint32 sample_size = 2;
+   */
+  sampleSize: number;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PreviewDynamicGroupRequest.
+ * Use `create(PreviewDynamicGroupRequestSchema)` to create a new message.
+ */
+export const PreviewDynamicGroupRequestSchema: GenMessage<PreviewDynamicGroupRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_targeting, 10);
+
+/**
+ * @generated from message lindm.admin.v1.DynamicGroupPreviewDevice
+ */
+export type DynamicGroupPreviewDevice = Message<"lindm.admin.v1.DynamicGroupPreviewDevice"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string hostname = 2;
+   */
+  hostname: string;
+
+  /**
+   * @generated from field: string os_id = 3;
+   */
+  osId: string;
+
+  /**
+   * @generated from field: string os_version = 4;
+   */
+  osVersion: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DynamicGroupPreviewDevice.
+ * Use `create(DynamicGroupPreviewDeviceSchema)` to create a new message.
+ */
+export const DynamicGroupPreviewDeviceSchema: GenMessage<DynamicGroupPreviewDevice> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_targeting, 11);
+
+/**
+ * @generated from message lindm.admin.v1.PreviewDynamicGroupResponse
+ */
+export type PreviewDynamicGroupResponse = Message<"lindm.admin.v1.PreviewDynamicGroupResponse"> & {
+  /**
+   * @generated from field: google.protobuf.Timestamp evaluated_at = 1;
+   */
+  evaluatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: uint32 evaluated_device_count = 2;
+   */
+  evaluatedDeviceCount: number;
+
+  /**
+   * @generated from field: uint32 matched_count = 3;
+   */
+  matchedCount: number;
+
+  /**
+   * Devices whose membership cannot be decided (stale or failed inventory,
+   * never seen); they are neither members nor non-members.
+   *
+   * @generated from field: uint32 unknown_count = 4;
+   */
+  unknownCount: number;
+
+  /**
+   * The first matching devices by hostname, at most sample_size.
+   *
+   * @generated from field: repeated lindm.admin.v1.DynamicGroupPreviewDevice matched_devices = 5;
+   */
+  matchedDevices: DynamicGroupPreviewDevice[];
+
+  /**
+   * @generated from field: bool complete = 6;
+   */
+  complete: boolean;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PreviewDynamicGroupResponse.
+ * Use `create(PreviewDynamicGroupResponseSchema)` to create a new message.
+ */
+export const PreviewDynamicGroupResponseSchema: GenMessage<PreviewDynamicGroupResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_targeting, 12);
+
+/**
  * @generated from message lindm.admin.v1.PutTargetAssignmentRequest
  */
 export type PutTargetAssignmentRequest = Message<"lindm.admin.v1.PutTargetAssignmentRequest"> & {
@@ -302,7 +409,7 @@ export type PutTargetAssignmentRequest = Message<"lindm.admin.v1.PutTargetAssign
  * Use `create(PutTargetAssignmentRequestSchema)` to create a new message.
  */
 export const PutTargetAssignmentRequestSchema: GenMessage<PutTargetAssignmentRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 10);
+  messageDesc(file_lindm_admin_v1_targeting, 13);
 
 /**
  * @generated from message lindm.admin.v1.PutTargetAssignmentResponse
@@ -319,7 +426,7 @@ export type PutTargetAssignmentResponse = Message<"lindm.admin.v1.PutTargetAssig
  * Use `create(PutTargetAssignmentResponseSchema)` to create a new message.
  */
 export const PutTargetAssignmentResponseSchema: GenMessage<PutTargetAssignmentResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 11);
+  messageDesc(file_lindm_admin_v1_targeting, 14);
 
 /**
  * @generated from message lindm.admin.v1.ListTargetAssignmentsRequest
@@ -341,7 +448,7 @@ export type ListTargetAssignmentsRequest = Message<"lindm.admin.v1.ListTargetAss
  * Use `create(ListTargetAssignmentsRequestSchema)` to create a new message.
  */
 export const ListTargetAssignmentsRequestSchema: GenMessage<ListTargetAssignmentsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 12);
+  messageDesc(file_lindm_admin_v1_targeting, 15);
 
 /**
  * @generated from message lindm.admin.v1.ListTargetAssignmentsResponse
@@ -358,7 +465,7 @@ export type ListTargetAssignmentsResponse = Message<"lindm.admin.v1.ListTargetAs
  * Use `create(ListTargetAssignmentsResponseSchema)` to create a new message.
  */
 export const ListTargetAssignmentsResponseSchema: GenMessage<ListTargetAssignmentsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 13);
+  messageDesc(file_lindm_admin_v1_targeting, 16);
 
 /**
  * @generated from message lindm.admin.v1.PreviewTargetAssignmentsRequest
@@ -375,7 +482,7 @@ export type PreviewTargetAssignmentsRequest = Message<"lindm.admin.v1.PreviewTar
  * Use `create(PreviewTargetAssignmentsRequestSchema)` to create a new message.
  */
 export const PreviewTargetAssignmentsRequestSchema: GenMessage<PreviewTargetAssignmentsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 14);
+  messageDesc(file_lindm_admin_v1_targeting, 17);
 
 /**
  * @generated from message lindm.admin.v1.PreviewTargetAssignmentsResponse
@@ -392,7 +499,7 @@ export type PreviewTargetAssignmentsResponse = Message<"lindm.admin.v1.PreviewTa
  * Use `create(PreviewTargetAssignmentsResponseSchema)` to create a new message.
  */
 export const PreviewTargetAssignmentsResponseSchema: GenMessage<PreviewTargetAssignmentsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 15);
+  messageDesc(file_lindm_admin_v1_targeting, 18);
 
 /**
  * A proposed assignment is evaluated without saving or activating it. The first
@@ -434,7 +541,7 @@ export type PreviewTargetAssignmentImpactRequest = Message<"lindm.admin.v1.Previ
  * Use `create(PreviewTargetAssignmentImpactRequestSchema)` to create a new message.
  */
 export const PreviewTargetAssignmentImpactRequestSchema: GenMessage<PreviewTargetAssignmentImpactRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 16);
+  messageDesc(file_lindm_admin_v1_targeting, 19);
 
 /**
  * @generated from message lindm.admin.v1.TargetAssignmentDeviceImpact
@@ -510,7 +617,7 @@ export type TargetAssignmentDeviceImpact = Message<"lindm.admin.v1.TargetAssignm
  * Use `create(TargetAssignmentDeviceImpactSchema)` to create a new message.
  */
 export const TargetAssignmentDeviceImpactSchema: GenMessage<TargetAssignmentDeviceImpact> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 17);
+  messageDesc(file_lindm_admin_v1_targeting, 20);
 
 /**
  * @generated from message lindm.admin.v1.PreviewTargetAssignmentImpactResponse
@@ -602,7 +709,7 @@ export type PreviewTargetAssignmentImpactResponse = Message<"lindm.admin.v1.Prev
  * Use `create(PreviewTargetAssignmentImpactResponseSchema)` to create a new message.
  */
 export const PreviewTargetAssignmentImpactResponseSchema: GenMessage<PreviewTargetAssignmentImpactResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 18);
+  messageDesc(file_lindm_admin_v1_targeting, 21);
 
 /**
  * This operation saves only the exact reviewed assignment. Activation remains
@@ -647,7 +754,7 @@ export type SaveTargetAssignmentImpactRequest = Message<"lindm.admin.v1.SaveTarg
  * Use `create(SaveTargetAssignmentImpactRequestSchema)` to create a new message.
  */
 export const SaveTargetAssignmentImpactRequestSchema: GenMessage<SaveTargetAssignmentImpactRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 19);
+  messageDesc(file_lindm_admin_v1_targeting, 22);
 
 /**
  * @generated from message lindm.admin.v1.SaveTargetAssignmentImpactResponse
@@ -664,7 +771,7 @@ export type SaveTargetAssignmentImpactResponse = Message<"lindm.admin.v1.SaveTar
  * Use `create(SaveTargetAssignmentImpactResponseSchema)` to create a new message.
  */
 export const SaveTargetAssignmentImpactResponseSchema: GenMessage<SaveTargetAssignmentImpactResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 20);
+  messageDesc(file_lindm_admin_v1_targeting, 23);
 
 /**
  * @generated from message lindm.admin.v1.ActivateTargetPreviewRequest
@@ -706,7 +813,7 @@ export type ActivateTargetPreviewRequest = Message<"lindm.admin.v1.ActivateTarge
  * Use `create(ActivateTargetPreviewRequestSchema)` to create a new message.
  */
 export const ActivateTargetPreviewRequestSchema: GenMessage<ActivateTargetPreviewRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 21);
+  messageDesc(file_lindm_admin_v1_targeting, 24);
 
 /**
  * @generated from message lindm.admin.v1.ActivateTargetPreviewResponse
@@ -723,7 +830,7 @@ export type ActivateTargetPreviewResponse = Message<"lindm.admin.v1.ActivateTarg
  * Use `create(ActivateTargetPreviewResponseSchema)` to create a new message.
  */
 export const ActivateTargetPreviewResponseSchema: GenMessage<ActivateTargetPreviewResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 22);
+  messageDesc(file_lindm_admin_v1_targeting, 25);
 
 /**
  * @generated from message lindm.admin.v1.PutRolloutRequest
@@ -750,7 +857,7 @@ export type PutRolloutRequest = Message<"lindm.admin.v1.PutRolloutRequest"> & {
  * Use `create(PutRolloutRequestSchema)` to create a new message.
  */
 export const PutRolloutRequestSchema: GenMessage<PutRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 23);
+  messageDesc(file_lindm_admin_v1_targeting, 26);
 
 /**
  * @generated from message lindm.admin.v1.RolloutState
@@ -848,7 +955,7 @@ export type RolloutState = Message<"lindm.admin.v1.RolloutState"> & {
  * Use `create(RolloutStateSchema)` to create a new message.
  */
 export const RolloutStateSchema: GenMessage<RolloutState> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 24);
+  messageDesc(file_lindm_admin_v1_targeting, 27);
 
 /**
  * @generated from message lindm.admin.v1.PutRolloutResponse
@@ -865,7 +972,7 @@ export type PutRolloutResponse = Message<"lindm.admin.v1.PutRolloutResponse"> & 
  * Use `create(PutRolloutResponseSchema)` to create a new message.
  */
 export const PutRolloutResponseSchema: GenMessage<PutRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 25);
+  messageDesc(file_lindm_admin_v1_targeting, 28);
 
 /**
  * @generated from message lindm.admin.v1.ControlRolloutRequest
@@ -902,7 +1009,7 @@ export type ControlRolloutRequest = Message<"lindm.admin.v1.ControlRolloutReques
  * Use `create(ControlRolloutRequestSchema)` to create a new message.
  */
 export const ControlRolloutRequestSchema: GenMessage<ControlRolloutRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 26);
+  messageDesc(file_lindm_admin_v1_targeting, 29);
 
 /**
  * @generated from enum lindm.admin.v1.ControlRolloutRequest.Operation
@@ -933,7 +1040,7 @@ export enum ControlRolloutRequest_Operation {
  * Describes the enum lindm.admin.v1.ControlRolloutRequest.Operation.
  */
 export const ControlRolloutRequest_OperationSchema: GenEnum<ControlRolloutRequest_Operation> = /*@__PURE__*/
-  enumDesc(file_lindm_admin_v1_targeting, 26, 0);
+  enumDesc(file_lindm_admin_v1_targeting, 29, 0);
 
 /**
  * @generated from message lindm.admin.v1.ControlRolloutResponse
@@ -950,7 +1057,7 @@ export type ControlRolloutResponse = Message<"lindm.admin.v1.ControlRolloutRespo
  * Use `create(ControlRolloutResponseSchema)` to create a new message.
  */
 export const ControlRolloutResponseSchema: GenMessage<ControlRolloutResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 27);
+  messageDesc(file_lindm_admin_v1_targeting, 30);
 
 /**
  * @generated from message lindm.admin.v1.ListRolloutsRequest
@@ -972,7 +1079,7 @@ export type ListRolloutsRequest = Message<"lindm.admin.v1.ListRolloutsRequest"> 
  * Use `create(ListRolloutsRequestSchema)` to create a new message.
  */
 export const ListRolloutsRequestSchema: GenMessage<ListRolloutsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 28);
+  messageDesc(file_lindm_admin_v1_targeting, 31);
 
 /**
  * @generated from message lindm.admin.v1.ListRolloutsResponse
@@ -989,5 +1096,5 @@ export type ListRolloutsResponse = Message<"lindm.admin.v1.ListRolloutsResponse"
  * Use `create(ListRolloutsResponseSchema)` to create a new message.
  */
 export const ListRolloutsResponseSchema: GenMessage<ListRolloutsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_targeting, 29);
+  messageDesc(file_lindm_admin_v1_targeting, 32);
 

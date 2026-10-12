@@ -124,7 +124,7 @@ func predicate(f *adminv1.DeviceFilter, d targetingdb.TargetingDeviceRow, m *adm
 	if !strings.HasPrefix(d.Hostname, f.NamePrefix) {
 		return excluded
 	}
-	if f.LastSeenFrom != nil || f.LastSeenUntil != nil {
+	if lastSeenDependent(f) {
 		if !d.LastSeenAt.Valid {
 			return unknown
 		}
@@ -134,6 +134,18 @@ func predicate(f *adminv1.DeviceFilter, d targetingdb.TargetingDeviceRow, m *adm
 		if f.LastSeenUntil != nil && d.LastSeenAt.Time.After(f.LastSeenUntil.AsTime()) {
 			return excluded
 		}
+		if f.LastSeenWithinSeconds > 0 && d.LastSeenAt.Time.Before(now.Add(-lastSeenWindow(f))) {
+			return excluded
+		}
 	}
 	return included
+}
+
+// lastSeenDependent reports whether membership depends on the device's last
+// contact, which heartbeats move without any inventory or membership change.
+func lastSeenDependent(f *adminv1.DeviceFilter) bool {
+	return f.LastSeenFrom != nil || f.LastSeenUntil != nil || f.LastSeenWithinSeconds > 0
+}
+func lastSeenWindow(f *adminv1.DeviceFilter) time.Duration {
+	return time.Duration(f.LastSeenWithinSeconds) * time.Second
 }

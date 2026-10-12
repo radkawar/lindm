@@ -80,6 +80,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"PutDynamicGroup":                      {identity.PermissionManageInventory, admins, false},
 		"ListDynamicGroups":                    {identity.PermissionManageInventory, admins, false},
 		"GetDynamicGroup":                      {identity.PermissionManageInventory, admins, false},
+		"PreviewDynamicGroup":                  {identity.PermissionManageInventory, admins, false},
 		"PutTargetAssignment":                  {identity.PermissionAssignResources, operators, false},
 		"ListTargetAssignments":                {identity.PermissionAssignResources, operators, false},
 		"PreviewTargetAssignments":             {identity.PermissionAssignResources, operators, false},

@@ -627,7 +627,17 @@ fences and the configured exact-request approval policy.
 Preview digests bind an explicit membership input vector. Routine authenticated
 contact does not invalidate a reviewed snapshot unless an evaluated last-contact
 predicate used that timestamp; generation, native status, metadata, catalog,
-group definitions and execution/rollout heads remain fenced.
+group definitions and execution/rollout heads remain fenced. A relative
+last-contact window (`last_seen_within_seconds`, at most 366 days) is evaluated at
+the preview's clock and also ends that preview's validity when a member's last
+contact leaves the window; device search anchors it at the first page's clock.
+
+`PreviewDynamicGroup` evaluates an unsaved expression with the same matcher while
+an administrator edits or reviews a group: matched and undecided counts plus up to
+100 matching hostnames (five by default), over at most 10,000 devices at one clock.
+It reads without row locks, writes nothing and requires the same unrestricted
+`inventory.manage` as saving a dynamic group; it is an editing aid, not the
+reviewed membership snapshot.
 
 `PreviewTargetAssignmentImpact` is a separate pre-save operation: it replaces the
 proposed assignment only in a transaction-local catalog and reuses canonical

@@ -1,21 +1,27 @@
-import { create, toJsonString } from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  DynamicTargetGroupSchema,
   PutDynamicGroupRequestSchema,
   type DynamicTargetGroup,
 } from "../../../gen/lindm/admin/v1/targeting_pb";
 import { Button } from "@/components/ui/button";
-import { TechnicalDetails } from "@/components/ui/technical-details";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import {
-  ConditionText,
+  ConditionsText,
   DynamicGroupFields,
   freshnessChoices,
   freshnessLabel,
+  MembershipPreview,
   parseExpression,
   validateDynamicGroup,
 } from "./dynamic-group";
@@ -23,6 +29,13 @@ import { discardSettledAttempt, TargetMutation } from "./mutation";
 import type { NameSlot } from "./pickers";
 import { dynamicGroupsQueryOptions } from "./queries";
 import { ListStatus, TargetPagination } from "./list";
+
+// What saving a dynamic group does, verified against the targeting service:
+// assignments evaluate the conditions at their next preview and rollouts keep
+// the cohort they froze when they started. Nothing is locked after saving.
+const SAVE_EFFECT =
+  "Saving changes no device by itself. Assignments use these conditions at their next preview; running rollouts keep the devices they started with. You can edit the group later.";
+const MEMBERS_LISTED = 10;
 
 export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {
   const lifetime = useAuthLifetime();
@@ -51,13 +64,18 @@ export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {
             Include devices automatically from their latest inventory. Use them as rollout targets.
           </p>
         </div>
-        {creating ? null : <Button onClick={startCreate}>New dynamic group</Button>}
+        <Button onClick={startCreate}>New dynamic group</Button>
       </div>
-      {creating ? (
-        <div className="grid min-w-0 gap-2">
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>New dynamic group</DialogTitle>
+            <DialogDescription>{SAVE_EFFECT}</DialogDescription>
+          </DialogHeader>
           <TargetMutation
             key={createGeneration}
-            title="Create dynamic group"
+            title="Create group"
+            framed={false}
             formKey="dynamic-group:new"
             schema={PutDynamicGroupRequestSchema}
             initial={() =>
@@ -82,19 +100,16 @@ export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {
               />
             )}
           />
-          <Button variant="outline" className="w-fit" onClick={() => setCreating(false)}>
-            Close
-          </Button>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
       <ListStatus
         pending={list.isPending}
         error={list.error}
         empty={list.data?.length === 0}
         firstPage={!afterId}
         noun="dynamic groups"
-        emptyDescription="Create one to target devices by operating system, label, hostname, custom attribute or group membership."
-        emptyAction={creating ? null : <Button onClick={startCreate}>New dynamic group</Button>}
+        emptyDescription="Create one to target devices by operating system, label, hostname, last contact, custom attribute or group membership."
+        emptyAction={<Button onClick={startCreate}>New dynamic group</Button>}
       />
       {!list.error && groups.length > 0 ? (
         <ul className="grid min-w-0 divide-y border" aria-label="Dynamic groups">
@@ -115,86 +130,75 @@ export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {
 
 function DynamicGroupRow({ group, groupName }: { group: DynamicTargetGroup; groupName: NameSlot }) {
   const [editing, setEditing] = useState(false);
+  const name = group.name || "Unnamed group";
   const parsed = parseExpression(group.expression);
   const seconds = group.expression?.inventoryMaxAgeSeconds ?? 0;
   return (
     <li className="grid min-w-0 gap-2 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="min-w-0 break-words font-medium">{group.name || "Unnamed group"}</h3>
+        <h3 className="min-w-0 break-words font-medium">{name}</h3>
         <Button
           variant="outline"
           size="sm"
-          aria-expanded={editing}
-          aria-label={`${editing ? "Close editor for" : "Edit"} ${group.name || "unnamed group"}`}
+          aria-label={`Edit ${name}`}
           onClick={() => {
-            if (!editing) discardSettledAttempt(`dynamic-group:${group.groupId}`);
-            setEditing(!editing);
+            discardSettledAttempt(`dynamic-group:${group.groupId}`);
+            setEditing(true);
           }}
         >
-          {editing ? "Close" : "Edit"}
+          Edit
         </Button>
       </div>
-      {parsed ? (
-        <div className="grid gap-1 text-sm">
-          <p className="text-muted-foreground">
-            {parsed.conditions.length === 1
-              ? "Includes devices where:"
-              : parsed.match === "all"
-                ? "Includes devices that match all of:"
-                : "Includes devices that match any of:"}
-          </p>
-          <ul className="grid list-disc gap-0.5 pl-5">
-            {parsed.conditions.map((condition) => (
-              <li key={condition.key} className="break-words">
-                <ConditionText condition={condition} groupName={groupName} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Nested conditions. Open Details to inspect them.
-        </p>
-      )}
+      <div className="text-sm">
+        {parsed ? (
+          <ConditionsText value={parsed} groupName={groupName} />
+        ) : (
+          <span className="text-muted-foreground">
+            Conditions nested more deeply than this page shows. Edit to replace them.
+          </span>
+        )}
+      </div>
+      {group.expression ? (
+        <MembershipPreview expression={group.expression} ready sampleSize={MEMBERS_LISTED} />
+      ) : null}
       <p className="text-xs text-muted-foreground">
         Inventory must be newer than {freshnessLabel(seconds)}.
       </p>
-      <TechnicalDetails
-        items={[
-          { label: "Group ID", value: group.groupId },
-          { label: "Revision", value: group.revision.toString() },
-        ]}
-      >
-        <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
-          {toJsonString(DynamicTargetGroupSchema, group, { prettySpaces: 2 })}
-        </pre>
-      </TechnicalDetails>
-      {editing ? (
-        <TargetMutation
-          key={`${group.groupId}:${group.revision}`}
-          title="Save dynamic group"
-          formKey={`dynamic-group:${group.groupId}`}
-          schema={PutDynamicGroupRequestSchema}
-          initial={() =>
-            create(PutDynamicGroupRequestSchema, {
-              requestId: newRequestId(),
-              group,
-              expectedRevision: group.revision,
-            })
-          }
-          send={(request, signal) => adminClient.putDynamicGroup(request, { signal })}
-          onAccepted={() => setEditing(false)}
-          validate={validateDynamicGroup}
-          fields={(request, change, disabled) => (
-            <DynamicGroupFields
-              request={request}
-              change={change}
-              disabled={disabled}
-              groupName={groupName}
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit {name}</DialogTitle>
+            <DialogDescription>{SAVE_EFFECT}</DialogDescription>
+          </DialogHeader>
+          {editing ? (
+            <TargetMutation
+              key={`${group.groupId}:${group.revision}`}
+              title="Save group"
+              framed={false}
+              formKey={`dynamic-group:${group.groupId}`}
+              schema={PutDynamicGroupRequestSchema}
+              initial={() =>
+                create(PutDynamicGroupRequestSchema, {
+                  requestId: newRequestId(),
+                  group,
+                  expectedRevision: group.revision,
+                })
+              }
+              send={(request, signal) => adminClient.putDynamicGroup(request, { signal })}
+              onAccepted={() => setEditing(false)}
+              validate={validateDynamicGroup}
+              fields={(request, change, disabled) => (
+                <DynamicGroupFields
+                  request={request}
+                  change={change}
+                  disabled={disabled}
+                  groupName={groupName}
+                />
+              )}
             />
-          )}
-        />
-      ) : null}
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

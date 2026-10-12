@@ -74,7 +74,7 @@ func (x ControlRolloutRequest_Operation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ControlRolloutRequest_Operation.Descriptor instead.
 func (ControlRolloutRequest_Operation) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{26, 0}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{29, 0}
 }
 
 // A topologically ordered bounded AST. The last node is the root. Child indices
@@ -681,6 +681,217 @@ func (x *ListDynamicGroupsResponse) GetGroups() []*DynamicTargetGroup {
 	return nil
 }
 
+// Evaluates a proposed, unsaved dynamic group expression against the fleet with
+// the same matching as saved groups. Nothing is stored. At most 10,000 devices are
+// evaluated; counts are lower bounds when complete is false.
+type PreviewDynamicGroupRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Expression *TargetExpression      `protobuf:"bytes,1,opt,name=expression,proto3" json:"expression,omitempty"`
+	// Matching devices to name, first by hostname; zero means five.
+	SampleSize    uint32 `protobuf:"varint,2,opt,name=sample_size,json=sampleSize,proto3" json:"sample_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewDynamicGroupRequest) Reset() {
+	*x = PreviewDynamicGroupRequest{}
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewDynamicGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewDynamicGroupRequest) ProtoMessage() {}
+
+func (x *PreviewDynamicGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewDynamicGroupRequest.ProtoReflect.Descriptor instead.
+func (*PreviewDynamicGroupRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PreviewDynamicGroupRequest) GetExpression() *TargetExpression {
+	if x != nil {
+		return x.Expression
+	}
+	return nil
+}
+
+func (x *PreviewDynamicGroupRequest) GetSampleSize() uint32 {
+	if x != nil {
+		return x.SampleSize
+	}
+	return 0
+}
+
+type DynamicGroupPreviewDevice struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Hostname      string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	OsId          string                 `protobuf:"bytes,3,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
+	OsVersion     string                 `protobuf:"bytes,4,opt,name=os_version,json=osVersion,proto3" json:"os_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DynamicGroupPreviewDevice) Reset() {
+	*x = DynamicGroupPreviewDevice{}
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DynamicGroupPreviewDevice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DynamicGroupPreviewDevice) ProtoMessage() {}
+
+func (x *DynamicGroupPreviewDevice) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DynamicGroupPreviewDevice.ProtoReflect.Descriptor instead.
+func (*DynamicGroupPreviewDevice) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DynamicGroupPreviewDevice) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *DynamicGroupPreviewDevice) GetHostname() string {
+	if x != nil {
+		return x.Hostname
+	}
+	return ""
+}
+
+func (x *DynamicGroupPreviewDevice) GetOsId() string {
+	if x != nil {
+		return x.OsId
+	}
+	return ""
+}
+
+func (x *DynamicGroupPreviewDevice) GetOsVersion() string {
+	if x != nil {
+		return x.OsVersion
+	}
+	return ""
+}
+
+type PreviewDynamicGroupResponse struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	EvaluatedAt          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=evaluated_at,json=evaluatedAt,proto3" json:"evaluated_at,omitempty"`
+	EvaluatedDeviceCount uint32                 `protobuf:"varint,2,opt,name=evaluated_device_count,json=evaluatedDeviceCount,proto3" json:"evaluated_device_count,omitempty"`
+	MatchedCount         uint32                 `protobuf:"varint,3,opt,name=matched_count,json=matchedCount,proto3" json:"matched_count,omitempty"`
+	// Devices whose membership cannot be decided (stale or failed inventory,
+	// never seen); they are neither members nor non-members.
+	UnknownCount uint32 `protobuf:"varint,4,opt,name=unknown_count,json=unknownCount,proto3" json:"unknown_count,omitempty"`
+	// The first matching devices by hostname, at most sample_size.
+	MatchedDevices []*DynamicGroupPreviewDevice `protobuf:"bytes,5,rep,name=matched_devices,json=matchedDevices,proto3" json:"matched_devices,omitempty"`
+	Complete       bool                         `protobuf:"varint,6,opt,name=complete,proto3" json:"complete,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PreviewDynamicGroupResponse) Reset() {
+	*x = PreviewDynamicGroupResponse{}
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewDynamicGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewDynamicGroupResponse) ProtoMessage() {}
+
+func (x *PreviewDynamicGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewDynamicGroupResponse.ProtoReflect.Descriptor instead.
+func (*PreviewDynamicGroupResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PreviewDynamicGroupResponse) GetEvaluatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EvaluatedAt
+	}
+	return nil
+}
+
+func (x *PreviewDynamicGroupResponse) GetEvaluatedDeviceCount() uint32 {
+	if x != nil {
+		return x.EvaluatedDeviceCount
+	}
+	return 0
+}
+
+func (x *PreviewDynamicGroupResponse) GetMatchedCount() uint32 {
+	if x != nil {
+		return x.MatchedCount
+	}
+	return 0
+}
+
+func (x *PreviewDynamicGroupResponse) GetUnknownCount() uint32 {
+	if x != nil {
+		return x.UnknownCount
+	}
+	return 0
+}
+
+func (x *PreviewDynamicGroupResponse) GetMatchedDevices() []*DynamicGroupPreviewDevice {
+	if x != nil {
+		return x.MatchedDevices
+	}
+	return nil
+}
+
+func (x *PreviewDynamicGroupResponse) GetComplete() bool {
+	if x != nil {
+		return x.Complete
+	}
+	return false
+}
+
 type PutTargetAssignmentRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -693,7 +904,7 @@ type PutTargetAssignmentRequest struct {
 
 func (x *PutTargetAssignmentRequest) Reset() {
 	*x = PutTargetAssignmentRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -705,7 +916,7 @@ func (x *PutTargetAssignmentRequest) String() string {
 func (*PutTargetAssignmentRequest) ProtoMessage() {}
 
 func (x *PutTargetAssignmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -718,7 +929,7 @@ func (x *PutTargetAssignmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutTargetAssignmentRequest.ProtoReflect.Descriptor instead.
 func (*PutTargetAssignmentRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{10}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PutTargetAssignmentRequest) GetRequestId() string {
@@ -758,7 +969,7 @@ type PutTargetAssignmentResponse struct {
 
 func (x *PutTargetAssignmentResponse) Reset() {
 	*x = PutTargetAssignmentResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +981,7 @@ func (x *PutTargetAssignmentResponse) String() string {
 func (*PutTargetAssignmentResponse) ProtoMessage() {}
 
 func (x *PutTargetAssignmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +994,7 @@ func (x *PutTargetAssignmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutTargetAssignmentResponse.ProtoReflect.Descriptor instead.
 func (*PutTargetAssignmentResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{11}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PutTargetAssignmentResponse) GetAssignment() *v1.TargetCandidate {
@@ -803,7 +1014,7 @@ type ListTargetAssignmentsRequest struct {
 
 func (x *ListTargetAssignmentsRequest) Reset() {
 	*x = ListTargetAssignmentsRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -815,7 +1026,7 @@ func (x *ListTargetAssignmentsRequest) String() string {
 func (*ListTargetAssignmentsRequest) ProtoMessage() {}
 
 func (x *ListTargetAssignmentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -828,7 +1039,7 @@ func (x *ListTargetAssignmentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTargetAssignmentsRequest.ProtoReflect.Descriptor instead.
 func (*ListTargetAssignmentsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{12}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListTargetAssignmentsRequest) GetPageSize() uint32 {
@@ -854,7 +1065,7 @@ type ListTargetAssignmentsResponse struct {
 
 func (x *ListTargetAssignmentsResponse) Reset() {
 	*x = ListTargetAssignmentsResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -866,7 +1077,7 @@ func (x *ListTargetAssignmentsResponse) String() string {
 func (*ListTargetAssignmentsResponse) ProtoMessage() {}
 
 func (x *ListTargetAssignmentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +1090,7 @@ func (x *ListTargetAssignmentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTargetAssignmentsResponse.ProtoReflect.Descriptor instead.
 func (*ListTargetAssignmentsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{13}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListTargetAssignmentsResponse) GetAssignments() []*v1.TargetCandidate {
@@ -898,7 +1109,7 @@ type PreviewTargetAssignmentsRequest struct {
 
 func (x *PreviewTargetAssignmentsRequest) Reset() {
 	*x = PreviewTargetAssignmentsRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -910,7 +1121,7 @@ func (x *PreviewTargetAssignmentsRequest) String() string {
 func (*PreviewTargetAssignmentsRequest) ProtoMessage() {}
 
 func (x *PreviewTargetAssignmentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -923,7 +1134,7 @@ func (x *PreviewTargetAssignmentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewTargetAssignmentsRequest.ProtoReflect.Descriptor instead.
 func (*PreviewTargetAssignmentsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{14}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PreviewTargetAssignmentsRequest) GetDeviceId() string {
@@ -942,7 +1153,7 @@ type PreviewTargetAssignmentsResponse struct {
 
 func (x *PreviewTargetAssignmentsResponse) Reset() {
 	*x = PreviewTargetAssignmentsResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -954,7 +1165,7 @@ func (x *PreviewTargetAssignmentsResponse) String() string {
 func (*PreviewTargetAssignmentsResponse) ProtoMessage() {}
 
 func (x *PreviewTargetAssignmentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -967,7 +1178,7 @@ func (x *PreviewTargetAssignmentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewTargetAssignmentsResponse.ProtoReflect.Descriptor instead.
 func (*PreviewTargetAssignmentsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{15}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PreviewTargetAssignmentsResponse) GetPreview() *v1.TargetPreview {
@@ -994,7 +1205,7 @@ type PreviewTargetAssignmentImpactRequest struct {
 
 func (x *PreviewTargetAssignmentImpactRequest) Reset() {
 	*x = PreviewTargetAssignmentImpactRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[16]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1006,7 +1217,7 @@ func (x *PreviewTargetAssignmentImpactRequest) String() string {
 func (*PreviewTargetAssignmentImpactRequest) ProtoMessage() {}
 
 func (x *PreviewTargetAssignmentImpactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[16]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1019,7 +1230,7 @@ func (x *PreviewTargetAssignmentImpactRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use PreviewTargetAssignmentImpactRequest.ProtoReflect.Descriptor instead.
 func (*PreviewTargetAssignmentImpactRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{16}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PreviewTargetAssignmentImpactRequest) GetAssignment() *v1.TargetAssignment {
@@ -1079,7 +1290,7 @@ type TargetAssignmentDeviceImpact struct {
 
 func (x *TargetAssignmentDeviceImpact) Reset() {
 	*x = TargetAssignmentDeviceImpact{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[17]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1091,7 +1302,7 @@ func (x *TargetAssignmentDeviceImpact) String() string {
 func (*TargetAssignmentDeviceImpact) ProtoMessage() {}
 
 func (x *TargetAssignmentDeviceImpact) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[17]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1104,7 +1315,7 @@ func (x *TargetAssignmentDeviceImpact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetAssignmentDeviceImpact.ProtoReflect.Descriptor instead.
 func (*TargetAssignmentDeviceImpact) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{17}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TargetAssignmentDeviceImpact) GetDeviceId() string {
@@ -1215,7 +1426,7 @@ type PreviewTargetAssignmentImpactResponse struct {
 
 func (x *PreviewTargetAssignmentImpactResponse) Reset() {
 	*x = PreviewTargetAssignmentImpactResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[18]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1227,7 +1438,7 @@ func (x *PreviewTargetAssignmentImpactResponse) String() string {
 func (*PreviewTargetAssignmentImpactResponse) ProtoMessage() {}
 
 func (x *PreviewTargetAssignmentImpactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[18]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1240,7 +1451,7 @@ func (x *PreviewTargetAssignmentImpactResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use PreviewTargetAssignmentImpactResponse.ProtoReflect.Descriptor instead.
 func (*PreviewTargetAssignmentImpactResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{18}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PreviewTargetAssignmentImpactResponse) GetPreviewId() string {
@@ -1371,7 +1582,7 @@ type SaveTargetAssignmentImpactRequest struct {
 
 func (x *SaveTargetAssignmentImpactRequest) Reset() {
 	*x = SaveTargetAssignmentImpactRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[19]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1383,7 +1594,7 @@ func (x *SaveTargetAssignmentImpactRequest) String() string {
 func (*SaveTargetAssignmentImpactRequest) ProtoMessage() {}
 
 func (x *SaveTargetAssignmentImpactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[19]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1396,7 +1607,7 @@ func (x *SaveTargetAssignmentImpactRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use SaveTargetAssignmentImpactRequest.ProtoReflect.Descriptor instead.
 func (*SaveTargetAssignmentImpactRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{19}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SaveTargetAssignmentImpactRequest) GetRequestId() string {
@@ -1450,7 +1661,7 @@ type SaveTargetAssignmentImpactResponse struct {
 
 func (x *SaveTargetAssignmentImpactResponse) Reset() {
 	*x = SaveTargetAssignmentImpactResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[20]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1462,7 +1673,7 @@ func (x *SaveTargetAssignmentImpactResponse) String() string {
 func (*SaveTargetAssignmentImpactResponse) ProtoMessage() {}
 
 func (x *SaveTargetAssignmentImpactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[20]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1475,7 +1686,7 @@ func (x *SaveTargetAssignmentImpactResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use SaveTargetAssignmentImpactResponse.ProtoReflect.Descriptor instead.
 func (*SaveTargetAssignmentImpactResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{20}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SaveTargetAssignmentImpactResponse) GetAssignment() *v1.TargetCandidate {
@@ -1499,7 +1710,7 @@ type ActivateTargetPreviewRequest struct {
 
 func (x *ActivateTargetPreviewRequest) Reset() {
 	*x = ActivateTargetPreviewRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1511,7 +1722,7 @@ func (x *ActivateTargetPreviewRequest) String() string {
 func (*ActivateTargetPreviewRequest) ProtoMessage() {}
 
 func (x *ActivateTargetPreviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1524,7 +1735,7 @@ func (x *ActivateTargetPreviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivateTargetPreviewRequest.ProtoReflect.Descriptor instead.
 func (*ActivateTargetPreviewRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{21}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ActivateTargetPreviewRequest) GetRequestId() string {
@@ -1578,7 +1789,7 @@ type ActivateTargetPreviewResponse struct {
 
 func (x *ActivateTargetPreviewResponse) Reset() {
 	*x = ActivateTargetPreviewResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1590,7 +1801,7 @@ func (x *ActivateTargetPreviewResponse) String() string {
 func (*ActivateTargetPreviewResponse) ProtoMessage() {}
 
 func (x *ActivateTargetPreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1603,7 +1814,7 @@ func (x *ActivateTargetPreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivateTargetPreviewResponse.ProtoReflect.Descriptor instead.
 func (*ActivateTargetPreviewResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{22}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ActivateTargetPreviewResponse) GetPreview() *v1.TargetPreview {
@@ -1624,7 +1835,7 @@ type PutRolloutRequest struct {
 
 func (x *PutRolloutRequest) Reset() {
 	*x = PutRolloutRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1636,7 +1847,7 @@ func (x *PutRolloutRequest) String() string {
 func (*PutRolloutRequest) ProtoMessage() {}
 
 func (x *PutRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1649,7 +1860,7 @@ func (x *PutRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutRolloutRequest.ProtoReflect.Descriptor instead.
 func (*PutRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{23}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PutRolloutRequest) GetRequestId() string {
@@ -1700,7 +1911,7 @@ type RolloutState struct {
 
 func (x *RolloutState) Reset() {
 	*x = RolloutState{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[24]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1712,7 +1923,7 @@ func (x *RolloutState) String() string {
 func (*RolloutState) ProtoMessage() {}
 
 func (x *RolloutState) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[24]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1725,7 +1936,7 @@ func (x *RolloutState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RolloutState.ProtoReflect.Descriptor instead.
 func (*RolloutState) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{24}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RolloutState) GetRollout() *v1.RolloutSpec {
@@ -1849,7 +2060,7 @@ type PutRolloutResponse struct {
 
 func (x *PutRolloutResponse) Reset() {
 	*x = PutRolloutResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[25]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +2072,7 @@ func (x *PutRolloutResponse) String() string {
 func (*PutRolloutResponse) ProtoMessage() {}
 
 func (x *PutRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[25]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +2085,7 @@ func (x *PutRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutRolloutResponse.ProtoReflect.Descriptor instead.
 func (*PutRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{25}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PutRolloutResponse) GetRollout() *RolloutState {
@@ -1897,7 +2108,7 @@ type ControlRolloutRequest struct {
 
 func (x *ControlRolloutRequest) Reset() {
 	*x = ControlRolloutRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[26]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1909,7 +2120,7 @@ func (x *ControlRolloutRequest) String() string {
 func (*ControlRolloutRequest) ProtoMessage() {}
 
 func (x *ControlRolloutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[26]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1922,7 +2133,7 @@ func (x *ControlRolloutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlRolloutRequest.ProtoReflect.Descriptor instead.
 func (*ControlRolloutRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{26}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ControlRolloutRequest) GetRequestId() string {
@@ -1969,7 +2180,7 @@ type ControlRolloutResponse struct {
 
 func (x *ControlRolloutResponse) Reset() {
 	*x = ControlRolloutResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[27]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1981,7 +2192,7 @@ func (x *ControlRolloutResponse) String() string {
 func (*ControlRolloutResponse) ProtoMessage() {}
 
 func (x *ControlRolloutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[27]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1994,7 +2205,7 @@ func (x *ControlRolloutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlRolloutResponse.ProtoReflect.Descriptor instead.
 func (*ControlRolloutResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{27}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ControlRolloutResponse) GetRollout() *RolloutState {
@@ -2014,7 +2225,7 @@ type ListRolloutsRequest struct {
 
 func (x *ListRolloutsRequest) Reset() {
 	*x = ListRolloutsRequest{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[28]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2026,7 +2237,7 @@ func (x *ListRolloutsRequest) String() string {
 func (*ListRolloutsRequest) ProtoMessage() {}
 
 func (x *ListRolloutsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[28]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2039,7 +2250,7 @@ func (x *ListRolloutsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolloutsRequest.ProtoReflect.Descriptor instead.
 func (*ListRolloutsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{28}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListRolloutsRequest) GetPageSize() uint32 {
@@ -2065,7 +2276,7 @@ type ListRolloutsResponse struct {
 
 func (x *ListRolloutsResponse) Reset() {
 	*x = ListRolloutsResponse{}
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[29]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2077,7 +2288,7 @@ func (x *ListRolloutsResponse) String() string {
 func (*ListRolloutsResponse) ProtoMessage() {}
 
 func (x *ListRolloutsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[29]
+	mi := &file_lindm_admin_v1_targeting_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2090,7 +2301,7 @@ func (x *ListRolloutsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolloutsResponse.ProtoReflect.Descriptor instead.
 func (*ListRolloutsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{29}
+	return file_lindm_admin_v1_targeting_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListRolloutsResponse) GetRollouts() []*RolloutState {
@@ -2145,7 +2356,26 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01B\v\n" +
 	"\t_after_id\"W\n" +
 	"\x19ListDynamicGroupsResponse\x12:\n" +
-	"\x06groups\x18\x01 \x03(\v2\".lindm.admin.v1.DynamicTargetGroupR\x06groups\"\xf1\x01\n" +
+	"\x06groups\x18\x01 \x03(\v2\".lindm.admin.v1.DynamicTargetGroupR\x06groups\"\x90\x01\n" +
+	"\x1aPreviewDynamicGroupRequest\x12H\n" +
+	"\n" +
+	"expression\x18\x01 \x01(\v2 .lindm.admin.v1.TargetExpressionB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"expression\x12(\n" +
+	"\vsample_size\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18dR\n" +
+	"sampleSize\"\x88\x01\n" +
+	"\x19DynamicGroupPreviewDevice\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1a\n" +
+	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x13\n" +
+	"\x05os_id\x18\x03 \x01(\tR\x04osId\x12\x1d\n" +
+	"\n" +
+	"os_version\x18\x04 \x01(\tR\tosVersion\"\xcc\x02\n" +
+	"\x1bPreviewDynamicGroupResponse\x12=\n" +
+	"\fevaluated_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\vevaluatedAt\x124\n" +
+	"\x16evaluated_device_count\x18\x02 \x01(\rR\x14evaluatedDeviceCount\x12#\n" +
+	"\rmatched_count\x18\x03 \x01(\rR\fmatchedCount\x12#\n" +
+	"\runknown_count\x18\x04 \x01(\rR\funknownCount\x12R\n" +
+	"\x0fmatched_devices\x18\x05 \x03(\v2).lindm.admin.v1.DynamicGroupPreviewDeviceR\x0ematchedDevices\x12\x1a\n" +
+	"\bcomplete\x18\x06 \x01(\bR\bcomplete\"\xf1\x01\n" +
 	"\x1aPutTargetAssignmentRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12I\n" +
@@ -2312,7 +2542,7 @@ func file_lindm_admin_v1_targeting_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_admin_v1_targeting_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_targeting_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_lindm_admin_v1_targeting_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_lindm_admin_v1_targeting_proto_goTypes = []any{
 	(ControlRolloutRequest_Operation)(0),          // 0: lindm.admin.v1.ControlRolloutRequest.Operation
 	(*TargetExpression)(nil),                      // 1: lindm.admin.v1.TargetExpression
@@ -2325,38 +2555,41 @@ var file_lindm_admin_v1_targeting_proto_goTypes = []any{
 	(*GetDynamicGroupResponse)(nil),               // 8: lindm.admin.v1.GetDynamicGroupResponse
 	(*ListDynamicGroupsRequest)(nil),              // 9: lindm.admin.v1.ListDynamicGroupsRequest
 	(*ListDynamicGroupsResponse)(nil),             // 10: lindm.admin.v1.ListDynamicGroupsResponse
-	(*PutTargetAssignmentRequest)(nil),            // 11: lindm.admin.v1.PutTargetAssignmentRequest
-	(*PutTargetAssignmentResponse)(nil),           // 12: lindm.admin.v1.PutTargetAssignmentResponse
-	(*ListTargetAssignmentsRequest)(nil),          // 13: lindm.admin.v1.ListTargetAssignmentsRequest
-	(*ListTargetAssignmentsResponse)(nil),         // 14: lindm.admin.v1.ListTargetAssignmentsResponse
-	(*PreviewTargetAssignmentsRequest)(nil),       // 15: lindm.admin.v1.PreviewTargetAssignmentsRequest
-	(*PreviewTargetAssignmentsResponse)(nil),      // 16: lindm.admin.v1.PreviewTargetAssignmentsResponse
-	(*PreviewTargetAssignmentImpactRequest)(nil),  // 17: lindm.admin.v1.PreviewTargetAssignmentImpactRequest
-	(*TargetAssignmentDeviceImpact)(nil),          // 18: lindm.admin.v1.TargetAssignmentDeviceImpact
-	(*PreviewTargetAssignmentImpactResponse)(nil), // 19: lindm.admin.v1.PreviewTargetAssignmentImpactResponse
-	(*SaveTargetAssignmentImpactRequest)(nil),     // 20: lindm.admin.v1.SaveTargetAssignmentImpactRequest
-	(*SaveTargetAssignmentImpactResponse)(nil),    // 21: lindm.admin.v1.SaveTargetAssignmentImpactResponse
-	(*ActivateTargetPreviewRequest)(nil),          // 22: lindm.admin.v1.ActivateTargetPreviewRequest
-	(*ActivateTargetPreviewResponse)(nil),         // 23: lindm.admin.v1.ActivateTargetPreviewResponse
-	(*PutRolloutRequest)(nil),                     // 24: lindm.admin.v1.PutRolloutRequest
-	(*RolloutState)(nil),                          // 25: lindm.admin.v1.RolloutState
-	(*PutRolloutResponse)(nil),                    // 26: lindm.admin.v1.PutRolloutResponse
-	(*ControlRolloutRequest)(nil),                 // 27: lindm.admin.v1.ControlRolloutRequest
-	(*ControlRolloutResponse)(nil),                // 28: lindm.admin.v1.ControlRolloutResponse
-	(*ListRolloutsRequest)(nil),                   // 29: lindm.admin.v1.ListRolloutsRequest
-	(*ListRolloutsResponse)(nil),                  // 30: lindm.admin.v1.ListRolloutsResponse
-	(*DeviceFilter)(nil),                          // 31: lindm.admin.v1.DeviceFilter
-	(*v1.TargetAssignment)(nil),                   // 32: lindm.policy.v1.TargetAssignment
-	(*v1.TargetCandidate)(nil),                    // 33: lindm.policy.v1.TargetCandidate
-	(*v1.TargetPreview)(nil),                      // 34: lindm.policy.v1.TargetPreview
+	(*PreviewDynamicGroupRequest)(nil),            // 11: lindm.admin.v1.PreviewDynamicGroupRequest
+	(*DynamicGroupPreviewDevice)(nil),             // 12: lindm.admin.v1.DynamicGroupPreviewDevice
+	(*PreviewDynamicGroupResponse)(nil),           // 13: lindm.admin.v1.PreviewDynamicGroupResponse
+	(*PutTargetAssignmentRequest)(nil),            // 14: lindm.admin.v1.PutTargetAssignmentRequest
+	(*PutTargetAssignmentResponse)(nil),           // 15: lindm.admin.v1.PutTargetAssignmentResponse
+	(*ListTargetAssignmentsRequest)(nil),          // 16: lindm.admin.v1.ListTargetAssignmentsRequest
+	(*ListTargetAssignmentsResponse)(nil),         // 17: lindm.admin.v1.ListTargetAssignmentsResponse
+	(*PreviewTargetAssignmentsRequest)(nil),       // 18: lindm.admin.v1.PreviewTargetAssignmentsRequest
+	(*PreviewTargetAssignmentsResponse)(nil),      // 19: lindm.admin.v1.PreviewTargetAssignmentsResponse
+	(*PreviewTargetAssignmentImpactRequest)(nil),  // 20: lindm.admin.v1.PreviewTargetAssignmentImpactRequest
+	(*TargetAssignmentDeviceImpact)(nil),          // 21: lindm.admin.v1.TargetAssignmentDeviceImpact
+	(*PreviewTargetAssignmentImpactResponse)(nil), // 22: lindm.admin.v1.PreviewTargetAssignmentImpactResponse
+	(*SaveTargetAssignmentImpactRequest)(nil),     // 23: lindm.admin.v1.SaveTargetAssignmentImpactRequest
+	(*SaveTargetAssignmentImpactResponse)(nil),    // 24: lindm.admin.v1.SaveTargetAssignmentImpactResponse
+	(*ActivateTargetPreviewRequest)(nil),          // 25: lindm.admin.v1.ActivateTargetPreviewRequest
+	(*ActivateTargetPreviewResponse)(nil),         // 26: lindm.admin.v1.ActivateTargetPreviewResponse
+	(*PutRolloutRequest)(nil),                     // 27: lindm.admin.v1.PutRolloutRequest
+	(*RolloutState)(nil),                          // 28: lindm.admin.v1.RolloutState
+	(*PutRolloutResponse)(nil),                    // 29: lindm.admin.v1.PutRolloutResponse
+	(*ControlRolloutRequest)(nil),                 // 30: lindm.admin.v1.ControlRolloutRequest
+	(*ControlRolloutResponse)(nil),                // 31: lindm.admin.v1.ControlRolloutResponse
+	(*ListRolloutsRequest)(nil),                   // 32: lindm.admin.v1.ListRolloutsRequest
+	(*ListRolloutsResponse)(nil),                  // 33: lindm.admin.v1.ListRolloutsResponse
+	(*DeviceFilter)(nil),                          // 34: lindm.admin.v1.DeviceFilter
 	(*timestamppb.Timestamp)(nil),                 // 35: google.protobuf.Timestamp
-	(v1.TargetMatch)(0),                           // 36: lindm.policy.v1.TargetMatch
-	(*v1.TargetResolution)(nil),                   // 37: lindm.policy.v1.TargetResolution
-	(*v1.RolloutSpec)(nil),                        // 38: lindm.policy.v1.RolloutSpec
+	(*v1.TargetAssignment)(nil),                   // 36: lindm.policy.v1.TargetAssignment
+	(*v1.TargetCandidate)(nil),                    // 37: lindm.policy.v1.TargetCandidate
+	(*v1.TargetPreview)(nil),                      // 38: lindm.policy.v1.TargetPreview
+	(v1.TargetMatch)(0),                           // 39: lindm.policy.v1.TargetMatch
+	(*v1.TargetResolution)(nil),                   // 40: lindm.policy.v1.TargetResolution
+	(*v1.RolloutSpec)(nil),                        // 41: lindm.policy.v1.RolloutSpec
 }
 var file_lindm_admin_v1_targeting_proto_depIdxs = []int32{
 	3,  // 0: lindm.admin.v1.TargetExpression.nodes:type_name -> lindm.admin.v1.TargetNode
-	31, // 1: lindm.admin.v1.TargetNode.predicate:type_name -> lindm.admin.v1.DeviceFilter
+	34, // 1: lindm.admin.v1.TargetNode.predicate:type_name -> lindm.admin.v1.DeviceFilter
 	2,  // 2: lindm.admin.v1.TargetNode.all:type_name -> lindm.admin.v1.TargetChildren
 	2,  // 3: lindm.admin.v1.TargetNode.any:type_name -> lindm.admin.v1.TargetChildren
 	1,  // 4: lindm.admin.v1.DynamicTargetGroup.expression:type_name -> lindm.admin.v1.TargetExpression
@@ -2364,35 +2597,38 @@ var file_lindm_admin_v1_targeting_proto_depIdxs = []int32{
 	4,  // 6: lindm.admin.v1.PutDynamicGroupResponse.group:type_name -> lindm.admin.v1.DynamicTargetGroup
 	4,  // 7: lindm.admin.v1.GetDynamicGroupResponse.group:type_name -> lindm.admin.v1.DynamicTargetGroup
 	4,  // 8: lindm.admin.v1.ListDynamicGroupsResponse.groups:type_name -> lindm.admin.v1.DynamicTargetGroup
-	32, // 9: lindm.admin.v1.PutTargetAssignmentRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
-	33, // 10: lindm.admin.v1.PutTargetAssignmentResponse.assignment:type_name -> lindm.policy.v1.TargetCandidate
-	33, // 11: lindm.admin.v1.ListTargetAssignmentsResponse.assignments:type_name -> lindm.policy.v1.TargetCandidate
-	34, // 12: lindm.admin.v1.PreviewTargetAssignmentsResponse.preview:type_name -> lindm.policy.v1.TargetPreview
-	32, // 13: lindm.admin.v1.PreviewTargetAssignmentImpactRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
-	35, // 14: lindm.admin.v1.TargetAssignmentDeviceImpact.host_received_at:type_name -> google.protobuf.Timestamp
-	36, // 15: lindm.admin.v1.TargetAssignmentDeviceImpact.match:type_name -> lindm.policy.v1.TargetMatch
-	37, // 16: lindm.admin.v1.TargetAssignmentDeviceImpact.current_resolution:type_name -> lindm.policy.v1.TargetResolution
-	37, // 17: lindm.admin.v1.TargetAssignmentDeviceImpact.proposed_resolution:type_name -> lindm.policy.v1.TargetResolution
-	32, // 18: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.assignment:type_name -> lindm.policy.v1.TargetAssignment
-	35, // 19: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.evaluated_at:type_name -> google.protobuf.Timestamp
-	35, // 20: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.valid_until:type_name -> google.protobuf.Timestamp
-	18, // 21: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.devices:type_name -> lindm.admin.v1.TargetAssignmentDeviceImpact
-	32, // 22: lindm.admin.v1.SaveTargetAssignmentImpactRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
-	33, // 23: lindm.admin.v1.SaveTargetAssignmentImpactResponse.assignment:type_name -> lindm.policy.v1.TargetCandidate
-	34, // 24: lindm.admin.v1.ActivateTargetPreviewResponse.preview:type_name -> lindm.policy.v1.TargetPreview
-	38, // 25: lindm.admin.v1.PutRolloutRequest.rollout:type_name -> lindm.policy.v1.RolloutSpec
-	38, // 26: lindm.admin.v1.RolloutState.rollout:type_name -> lindm.policy.v1.RolloutSpec
-	35, // 27: lindm.admin.v1.RolloutState.stage_started_at:type_name -> google.protobuf.Timestamp
-	35, // 28: lindm.admin.v1.RolloutState.next_promotion_at:type_name -> google.protobuf.Timestamp
-	25, // 29: lindm.admin.v1.PutRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
-	0,  // 30: lindm.admin.v1.ControlRolloutRequest.operation:type_name -> lindm.admin.v1.ControlRolloutRequest.Operation
-	25, // 31: lindm.admin.v1.ControlRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
-	25, // 32: lindm.admin.v1.ListRolloutsResponse.rollouts:type_name -> lindm.admin.v1.RolloutState
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	1,  // 9: lindm.admin.v1.PreviewDynamicGroupRequest.expression:type_name -> lindm.admin.v1.TargetExpression
+	35, // 10: lindm.admin.v1.PreviewDynamicGroupResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	12, // 11: lindm.admin.v1.PreviewDynamicGroupResponse.matched_devices:type_name -> lindm.admin.v1.DynamicGroupPreviewDevice
+	36, // 12: lindm.admin.v1.PutTargetAssignmentRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
+	37, // 13: lindm.admin.v1.PutTargetAssignmentResponse.assignment:type_name -> lindm.policy.v1.TargetCandidate
+	37, // 14: lindm.admin.v1.ListTargetAssignmentsResponse.assignments:type_name -> lindm.policy.v1.TargetCandidate
+	38, // 15: lindm.admin.v1.PreviewTargetAssignmentsResponse.preview:type_name -> lindm.policy.v1.TargetPreview
+	36, // 16: lindm.admin.v1.PreviewTargetAssignmentImpactRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
+	35, // 17: lindm.admin.v1.TargetAssignmentDeviceImpact.host_received_at:type_name -> google.protobuf.Timestamp
+	39, // 18: lindm.admin.v1.TargetAssignmentDeviceImpact.match:type_name -> lindm.policy.v1.TargetMatch
+	40, // 19: lindm.admin.v1.TargetAssignmentDeviceImpact.current_resolution:type_name -> lindm.policy.v1.TargetResolution
+	40, // 20: lindm.admin.v1.TargetAssignmentDeviceImpact.proposed_resolution:type_name -> lindm.policy.v1.TargetResolution
+	36, // 21: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.assignment:type_name -> lindm.policy.v1.TargetAssignment
+	35, // 22: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	35, // 23: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.valid_until:type_name -> google.protobuf.Timestamp
+	21, // 24: lindm.admin.v1.PreviewTargetAssignmentImpactResponse.devices:type_name -> lindm.admin.v1.TargetAssignmentDeviceImpact
+	36, // 25: lindm.admin.v1.SaveTargetAssignmentImpactRequest.assignment:type_name -> lindm.policy.v1.TargetAssignment
+	37, // 26: lindm.admin.v1.SaveTargetAssignmentImpactResponse.assignment:type_name -> lindm.policy.v1.TargetCandidate
+	38, // 27: lindm.admin.v1.ActivateTargetPreviewResponse.preview:type_name -> lindm.policy.v1.TargetPreview
+	41, // 28: lindm.admin.v1.PutRolloutRequest.rollout:type_name -> lindm.policy.v1.RolloutSpec
+	41, // 29: lindm.admin.v1.RolloutState.rollout:type_name -> lindm.policy.v1.RolloutSpec
+	35, // 30: lindm.admin.v1.RolloutState.stage_started_at:type_name -> google.protobuf.Timestamp
+	35, // 31: lindm.admin.v1.RolloutState.next_promotion_at:type_name -> google.protobuf.Timestamp
+	28, // 32: lindm.admin.v1.PutRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
+	0,  // 33: lindm.admin.v1.ControlRolloutRequest.operation:type_name -> lindm.admin.v1.ControlRolloutRequest.Operation
+	28, // 34: lindm.admin.v1.ControlRolloutResponse.rollout:type_name -> lindm.admin.v1.RolloutState
+	28, // 35: lindm.admin.v1.ListRolloutsResponse.rollouts:type_name -> lindm.admin.v1.RolloutState
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_targeting_proto_init() }
@@ -2409,18 +2645,18 @@ func file_lindm_admin_v1_targeting_proto_init() {
 		(*TargetNode_StaticGroupId)(nil),
 	}
 	file_lindm_admin_v1_targeting_proto_msgTypes[8].OneofWrappers = []any{}
-	file_lindm_admin_v1_targeting_proto_msgTypes[12].OneofWrappers = []any{}
-	file_lindm_admin_v1_targeting_proto_msgTypes[16].OneofWrappers = []any{}
-	file_lindm_admin_v1_targeting_proto_msgTypes[18].OneofWrappers = []any{}
+	file_lindm_admin_v1_targeting_proto_msgTypes[15].OneofWrappers = []any{}
+	file_lindm_admin_v1_targeting_proto_msgTypes[19].OneofWrappers = []any{}
 	file_lindm_admin_v1_targeting_proto_msgTypes[21].OneofWrappers = []any{}
-	file_lindm_admin_v1_targeting_proto_msgTypes[28].OneofWrappers = []any{}
+	file_lindm_admin_v1_targeting_proto_msgTypes[24].OneofWrappers = []any{}
+	file_lindm_admin_v1_targeting_proto_msgTypes[31].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_targeting_proto_rawDesc), len(file_lindm_admin_v1_targeting_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   30,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

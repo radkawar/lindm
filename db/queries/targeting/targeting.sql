@@ -40,6 +40,29 @@ FOR UPDATE OF d;
 -- name: ListTargetingDevices :many
 SELECT id FROM devices WHERE id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT 200;
 
+-- name: ListTargetingDevicePage :many
+-- Read-only evaluation input for unsaved group previews: the TargetingDevice
+-- columns without row locks, one bounded page at a time.
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ ''::text AS previous_preview_id,
+ ''::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id > sqlc.arg(after_id)::uuid
+ORDER BY d.id LIMIT 200;
+
 -- name: GetTargetingRequest :one
 SELECT method, digest, response FROM targeting_requests WHERE actor_id=$1 AND request_id=$2;
 

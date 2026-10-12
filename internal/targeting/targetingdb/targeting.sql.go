@@ -519,6 +519,92 @@ func (q *Queries) ListTargetAssignments(ctx context.Context, arg ListTargetAssig
 	return items, nil
 }
 
+const listTargetingDevicePage = `-- name: ListTargetingDevicePage :many
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ ''::text AS previous_preview_id,
+ ''::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id > $1::uuid
+ORDER BY d.id LIMIT 200
+`
+
+type ListTargetingDevicePageRow struct {
+	ID                   uuid.UUID
+	CurrentGenerationID  *uuid.UUID
+	State                string
+	Hostname             string
+	OsID                 string
+	OsVersion            string
+	HostnameStatus       int16
+	OsIDStatus           int16
+	OsVersionStatus      int16
+	HostSequence         int64
+	HostDigest           []byte
+	Architecture         string
+	LastSeenAt           pgtype.Timestamptz
+	HostReceivedAt       pgtype.Timestamptz
+	Metadata             []byte
+	Labels               []string
+	Groups               []string
+	PreviousPreviewID    string
+	ResourceAssignmentID string
+}
+
+// Read-only evaluation input for unsaved group previews: the TargetingDevice
+// columns without row locks, one bounded page at a time.
+func (q *Queries) ListTargetingDevicePage(ctx context.Context, afterID uuid.UUID) ([]ListTargetingDevicePageRow, error) {
+	rows, err := q.db.Query(ctx, listTargetingDevicePage, afterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTargetingDevicePageRow{}
+	for rows.Next() {
+		var i ListTargetingDevicePageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CurrentGenerationID,
+			&i.State,
+			&i.Hostname,
+			&i.OsID,
+			&i.OsVersion,
+			&i.HostnameStatus,
+			&i.OsIDStatus,
+			&i.OsVersionStatus,
+			&i.HostSequence,
+			&i.HostDigest,
+			&i.Architecture,
+			&i.LastSeenAt,
+			&i.HostReceivedAt,
+			&i.Metadata,
+			&i.Labels,
+			&i.Groups,
+			&i.PreviousPreviewID,
+			&i.ResourceAssignmentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTargetingDevices = `-- name: ListTargetingDevices :many
 SELECT id FROM devices WHERE id > $1::uuid ORDER BY id LIMIT 200
 `

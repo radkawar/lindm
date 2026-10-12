@@ -53,6 +53,8 @@ import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
 import * as pass2RevokedDevice from "./pass2-bug9-revoked-device.mjs";
 import * as fleetPass2 from "./fleet-pass-2.mjs";
 import * as pass2P2Approvals from "./pass2-p2-approvals.mjs";
+import * as groups from "./groups.mjs";
+import * as groupsDynamicCreate from "./groups-dynamic-create.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -90,6 +92,7 @@ export const ownerEdits = [
   pass2P2Approvals,
   audit,
   auditLogPass2,
+  groups,
   pass2RestartDelay,
   // Need the route device's inventory stale, so they precede the wipe check's refresh.
   pass2ReviewPreflight,
@@ -109,6 +112,8 @@ export const ownerEdits = [
   pass2SecretReveal,
   // Publishes one new, never-assigned profile.
   profilePublish,
+  // Creates a dynamic group.
+  groupsDynamicCreate,
   // Changes and restores the route device profile; keep last.
   pass2AssignmentProgress,
 ];

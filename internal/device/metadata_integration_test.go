@@ -152,6 +152,49 @@ CREATE TRIGGER reject_inventory_audit BEFORE INSERT ON audit_events FOR EACH ROW
 	}
 }
 
+func TestInventorySearchLastSeenWithinIsAnchoredToTheSearch(t *testing.T) {
+	f := newEnrolled(t, 0)
+	ages := []time.Duration{time.Hour, 2 * time.Hour, 7*24*time.Hour - 5*time.Minute, 10 * 24 * time.Hour}
+	ids := make([]string, len(ages))
+	for i, age := range ages {
+		ids[i] = uuid.NewString()
+		if _, err := f.conn.Exec(f.ctx, `INSERT INTO devices(id,state,enrolled_at,last_seen_at,hostname,os_id,os_version) VALUES($1,'pending',$2,$3,'relative-host','relative-os','1')`, ids[i], f.now.Add(-time.Duration(i)*time.Second), f.now.Add(-age)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	request := &adminv1.ListDevicesRequest{PageSize: 2, Filter: &adminv1.DeviceFilter{OsId: "relative-os", LastSeenWithinSeconds: 7 * 24 * 60 * 60}}
+	first, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(request))
+	if err != nil || len(first.Msg.GetDevices()) != 2 || first.Msg.GetNextPageToken() == "" {
+		t.Fatalf("first page within 7 days: %v %v", err, first)
+	}
+	// The continuation keeps the first page's window even though the clock has
+	// moved far enough (within the cursor's lifetime) to push the device seen
+	// 5 minutes inside the window out of a fresh search.
+	f.now = f.now.Add(10 * time.Minute)
+	request.PageToken = first.Msg.GetNextPageToken()
+	second, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(request))
+	if err != nil || len(second.Msg.GetDevices()) != 1 || second.Msg.GetNextPageToken() != "" || second.Msg.GetDevices()[0].GetId() != ids[2] {
+		t.Fatalf("continuation moved the relative window: %v %v", err, second)
+	}
+	request.PageToken = ""
+	request.PageSize = 10
+	fresh, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(request))
+	if err != nil || len(fresh.Msg.GetDevices()) != 2 {
+		t.Fatalf("fresh search within 7 days: %v %v", err, fresh)
+	}
+	for _, device := range fresh.Msg.GetDevices() {
+		if device.GetId() != ids[0] && device.GetId() != ids[1] {
+			t.Fatalf("device outside the window listed: %s", device.GetId())
+		}
+	}
+	// An absolute bound still applies alongside the relative window.
+	request.Filter.LastSeenFrom = timestamppb.New(f.now.Add(-90 * time.Minute))
+	narrowed, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(request))
+	if err != nil || len(narrowed.Msg.GetDevices()) != 1 || narrowed.Msg.GetDevices()[0].GetId() != ids[0] {
+		t.Fatalf("absolute bound with relative window: %v %v", err, narrowed)
+	}
+}
+
 func TestInventorySearchCursorBindingAndScopedExports(t *testing.T) {
 	f := newEnrolled(t, 0)
 	defineInventoryAttribute(t, f, "floor", adminv1.AttributeType_ATTRIBUTE_TYPE_INT)

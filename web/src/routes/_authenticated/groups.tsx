@@ -5,6 +5,7 @@ import { DynamicGroupsView } from "@/features/targeting/groups";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
+import { DeviceLabel } from "@/features/devices/device-label";
 import { DevicePicker } from "@/features/devices/picker";
 import { GroupName, GroupPicker } from "@/features/groups/picker";
 import { ProfileRevisionPicker } from "@/features/profiles/picker";
@@ -12,6 +13,9 @@ import { TargetPickerProvider } from "@/features/targeting/pickers";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/_authenticated/groups")({
+  // ?create=true opens the new device group dialog (for example from the command palette).
+  validateSearch: (search: Record<string, unknown>): { create?: true } =>
+    search.create === true || search.create === "true" ? { create: true } : {},
   beforeLoad: ({ context }) => {
     if (
       !canPermission(context.principal, "accounts.manage", true) &&
@@ -30,6 +34,8 @@ function GroupsPage() {
   const dynamicGroups = ["targeting", lifetime.generation, "groups"];
   const fetching =
     useIsFetching({ queryKey: deviceGroups }) + useIsFetching({ queryKey: dynamicGroups });
+  const { create } = Route.useSearch();
+  const navigate = Route.useNavigate();
   return (
     <div className="grid min-w-0 gap-8">
       <PageHeader
@@ -43,7 +49,14 @@ function GroupsPage() {
         }
       />
       {canPermission(principal, "accounts.manage", true) ? (
-        <GroupsView devicePicker={DevicePicker} />
+        <GroupsView
+          devicePicker={DevicePicker}
+          deviceLabel={DeviceLabel}
+          creating={create === true}
+          onCreatingChange={(next) =>
+            void navigate({ search: next ? { create: true } : {}, replace: true })
+          }
+        />
       ) : null}
       {canPermission(principal, "inventory.manage", true) ? (
         <TargetPickerProvider

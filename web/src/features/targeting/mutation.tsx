@@ -1,23 +1,19 @@
 import {
-  createRegistry,
   fromJsonString,
   toJsonString,
   type DescMessage,
   type MessageShape,
 } from "@bufbuild/protobuf";
-import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
-import { describeViolations } from "@/lib/validation";
+import { checkRequest } from "@/lib/validation";
 
-const validator = createValidator({ registry: createRegistry(audit_reason) });
 type Attempt = {
   document: string;
   status: "pending" | "accepted" | "ambiguous" | "rejected";
@@ -56,6 +52,7 @@ export function TargetMutation<S extends DescMessage>({
   onAccepted,
   fields,
   validate,
+  framed = true,
 }: {
   title: string;
   formKey: string;
@@ -70,6 +67,8 @@ export function TargetMutation<S extends DescMessage>({
   ) => ReactNode;
   // The administrator's own checks, in task language, before protobuf validation.
   validate?: (request: MessageShape<S>) => string | undefined;
+  // False inside a dialog, which already supplies the frame and the title.
+  framed?: boolean;
 }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
@@ -114,7 +113,7 @@ export function TargetMutation<S extends DescMessage>({
   });
   return (
     <Container
-      className="grid min-w-0 gap-3 border p-4"
+      className={framed ? "grid min-w-0 gap-3 border p-4" : "grid min-w-0 gap-3"}
       onSubmit={(event) => {
         event.preventDefault();
         const current = attempts.get(formKey);
@@ -126,13 +125,9 @@ export function TargetMutation<S extends DescMessage>({
             setError(problem);
             return;
           }
-          const validation = validator.validate(schema, request);
-          if (validation.kind !== "valid") {
-            setError(
-              validation.kind === "invalid"
-                ? describeViolations(validation.violations)
-                : validation.error.message,
-            );
+          const invalid = checkRequest(schema, request);
+          if (invalid) {
+            setError(invalid.message);
             return;
           }
           attempts.set(formKey, {
@@ -147,8 +142,7 @@ export function TargetMutation<S extends DescMessage>({
         }
       }}
     >
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">Once sent, edits are locked.</p>
+      {framed ? <h3 className="text-sm font-semibold">{title}</h3> : null}
       <Fragment key={formGeneration}>
         {fields(
           fromJsonString(schema, attempt?.document ?? document),
@@ -165,8 +159,8 @@ export function TargetMutation<S extends DescMessage>({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.status === "ambiguous"
-              ? "We couldn't confirm this was saved. Retry: it won't apply twice."
-              : "Refresh, then try again."}
+              ? "We couldn't confirm this was saved. Retry sends the same request, so it can't apply twice; the fields stay as sent until it's confirmed."
+              : "Nothing was saved. Start over to change the entries and send again."}
           </p>
         </RpcError>
       ) : null}

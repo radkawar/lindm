@@ -85,6 +85,31 @@ message ListDynamicGroupsRequest {
 message ListDynamicGroupsResponse {
   repeated DynamicTargetGroup groups = 1;
 }
+// Evaluates a proposed, unsaved dynamic group expression against the fleet with
+// the same matching as saved groups. Nothing is stored. At most 10,000 devices are
+// evaluated; counts are lower bounds when complete is false.
+message PreviewDynamicGroupRequest {
+  TargetExpression expression = 1 [(buf.validate.field).required = true];
+  // Matching devices to name, first by hostname; zero means five.
+  uint32 sample_size = 2 [(buf.validate.field).uint32.lte = 100];
+}
+message DynamicGroupPreviewDevice {
+  string device_id = 1;
+  string hostname = 2;
+  string os_id = 3;
+  string os_version = 4;
+}
+message PreviewDynamicGroupResponse {
+  google.protobuf.Timestamp evaluated_at = 1;
+  uint32 evaluated_device_count = 2;
+  uint32 matched_count = 3;
+  // Devices whose membership cannot be decided (stale or failed inventory,
+  // never seen); they are neither members nor non-members.
+  uint32 unknown_count = 4;
+  // The first matching devices by hostname, at most sample_size.
+  repeated DynamicGroupPreviewDevice matched_devices = 5;
+  bool complete = 6;
+}
 message PutTargetAssignmentRequest {
   string request_id = 1 [(buf.validate.field).string.uuid = true];
   lindm.policy.v1.TargetAssignment assignment = 2 [(buf.validate.field).required = true];
