@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -489,6 +490,33 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 		return err
 	}
 	return f.start(ctx)
+}
+
+// serverLogTailLimit bounds a failure diagnostic copy of the fixture's log.
+const serverLogTailLimit = 1 << 20
+
+// ServerLogTail returns at most the last serverLogTailLimit bytes of the
+// isolated lindmd's JSON log for private failure diagnostics; Close removes
+// the log with the fixture directory.
+func (f *AuthorityFixture) ServerLogTail() (_ []byte, resultErr error) {
+	if f.connected != nil || f.directory == "" {
+		return nil, errors.New("server log belongs to an isolated authority fixture")
+	}
+	file, err := os.Open(filepath.Join(f.directory, "server.log"))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resultErr = errors.Join(resultErr, file.Close()) }()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if offset := info.Size() - serverLogTailLimit; offset > 0 {
+		if _, err := file.Seek(offset, io.SeekStart); err != nil {
+			return nil, err
+		}
+	}
+	return io.ReadAll(io.LimitReader(file, serverLogTailLimit))
 }
 
 // Close stops owned processes and releases credential custody. Persistent state

@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/platform"
@@ -170,22 +172,41 @@ func TestVMAdvisorySourceUsesRegistryExportAndArchitectureBoundary(t *testing.T)
 	// An isolated export tests derivation, not live vendor coverage. Its partial
 	// declaration must not prevent recording the server's actual UNKNOWN result.
 	release.Advisory.Exports = map[platform.Feed]platform.AdvisoryExport{release.Advisory.Feeds[0]: {URL: "https://vendor.example/arch.json", Format: "arch-json", MaxAgeSeconds: 86400}}
-	source, err := vmAdvisorySource(&release, "amd64")
+	source, err := vmAdvisorySource(&release, "rolling", "amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if source.GetArchitecture() != "x86_64" || source.GetDistro() != release.ID || source.GetRelease() != "rolling" || source.GetUrl() != "https://vendor.example/arch.json" || source.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON {
 		t.Fatalf("incorrect primary export: %v", source)
 	}
-	alias, err := vmAdvisorySource(&release, "x86_64")
+	alias, err := vmAdvisorySource(&release, "rolling", "x86_64")
 	if err != nil || !proto.Equal(source, alias) {
 		t.Fatalf("architecture alias changed feed: %v", err)
 	}
-	if _, err := vmAdvisorySource(&release, "aarch64"); err == nil {
+	if _, err := vmAdvisorySource(&release, "rolling", "aarch64"); err == nil {
 		t.Fatal("Arch Linux ARM silently inherited official Arch coverage")
 	}
 	release.Advisory.Exports = nil
-	if _, err := vmAdvisorySource(&release, "x86_64"); err == nil {
+	if _, err := vmAdvisorySource(&release, "rolling", "x86_64"); err == nil {
 		t.Fatal("invented missing primary export")
+	}
+}
+
+// A snapshot row has no registry version: its feed release is the image's
+// dated VERSION_ID mapped to "rolling", which the feed contract accepts.
+func TestVMAdvisorySourceSnapshotReleaseFromImage(t *testing.T) {
+	release, ok := platform.Lookup("opensuse-tumbleweed")
+	if !ok {
+		t.Fatal("missing Tumbleweed registry row")
+	}
+	source, err := vmAdvisorySource(release, "20261007", "aarch64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source.GetRelease() != "rolling" {
+		t.Fatalf("snapshot feed release = %q", source.GetRelease())
+	}
+	if err := protovalidate.Validate(&configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}); err != nil {
+		t.Fatalf("snapshot advisory source fails the feed contract: %v", err)
 	}
 }

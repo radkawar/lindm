@@ -22,6 +22,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 )
 
@@ -316,4 +317,25 @@ func saveLifecycleFailure(ctx context.Context, vm *guestVM, directory string) er
 		return err
 	}
 	return fmt.Errorf("private lifecycle diagnostics saved to %q", path)
+}
+
+// saveFixtureServerLog keeps the isolated lindmd's bounded log tail beside a
+// failed lane's other private diagnostics.
+func saveFixtureServerLog(fixture *devlab.AuthorityFixture, directory string) error {
+	tail, err := fixture.ServerLogTail()
+	if err != nil {
+		return fmt.Errorf("collect private fixture server log: %w", err)
+	}
+	data, err := json.Marshal(struct {
+		Source  string
+		LogTail string
+	}{"isolated-lindmd-log-tail", string(tail)})
+	if err != nil {
+		return err
+	}
+	path, err := saveGuestDiagnostics(directory, data)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("private fixture server log saved to %q", path)
 }

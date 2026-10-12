@@ -26,7 +26,7 @@ import (
 const tumbleweedInstallerEdition = "dvd"
 
 // Bump when the AutoYaST profile or machine layout changes.
-const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v8"
+const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v9"
 
 // tumbleweedSSHDOrdering closes a vendor boot race. Tumbleweed starts sshd and
 // systemd-user-sessions in parallel once cloud-init's network stage finishes;
@@ -192,6 +192,11 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 	}
 	if passphrase != "" {
 		loader = "<loader_type>grub2-bls</loader_type>"
+		// The profile's timeout did not survive into the golden: booted with
+		// fresh firmware variables, the first boot waited indefinitely at the
+		// GRUB menu (observed on aarch64). sdbootutil without EFI variables
+		// persists it in the vendor ESP grubenv, which GRUB2-BLS reads.
+		provision += "sdbootutil --no-variables set-timeout 1\n"
 		var escaped bytes.Buffer
 		if err := xml.EscapeText(&escaped, []byte(passphrase)); err != nil {
 			return nil, err

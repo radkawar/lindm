@@ -313,7 +313,7 @@ package name from those registry pins, rather than relying on an implicit
 chroot must report exactly the pinned RPM epoch, version and release; the
 ordinary first-boot probes repeat that check. A mismatch fails closed instead of
 accepting a different DVD kernel. Final recipe identity is
-`opensuse-tumbleweed-dvd-autoyast-v8`. It resets `/etc/machine-id` explicitly
+`opensuse-tumbleweed-dvd-autoyast-v9`. It resets `/etc/machine-id` explicitly
 to an empty mode-0644 file, rather than inheriting the credential writer's
 umask 077; unprivileged D-Bus must be able to read the first-boot identity.
 SSH private keys and source markers retain their separate private modes.
@@ -329,6 +329,11 @@ subject hash the installation system's own `openssl` computes. The installed
 system still receives the anchor and runs `update-ca-certificates`. A failed
 ordinary golden install now retains a bounded, credential-redacted serial tail
 (`snapshot-dvd-installer-failure`) in the private lab work directory.
+v9 adds `sdbootutil --no-variables set-timeout 1` to the encrypted (grub2-bls)
+provisioning: YaST's profile timeout did not survive into a golden booted with
+fresh firmware variables, whose first boot then waited at the GRUB menu
+indefinitely (observed on aarch64 by the recovery lane); the timeout now lives
+in the vendor ESP `grubenv` that GRUB2-BLS reads.
 The encrypted golden identity also includes this AutoYaST recipe revision,
 so a corrected installer cannot reuse an earlier encrypted disk merely because
 its ISO and repository closure are unchanged.

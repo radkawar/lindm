@@ -16,7 +16,7 @@ import (
 
 func TestTumbleweedSnapshotRequiresCapturedClosure(t *testing.T) {
 	manifest := &labv1.ImageManifest{Distribution: "opensuse-tumbleweed", Version: "20261007", Architecture: "arm64", RepositorySnapshotDate: proto.String("2026-10-07")}
-	server, err := startImageRepositorySnapshot(context.Background(), manifest, t.TempDir())
+	server, err := startImageRepositorySnapshot(context.Background(), manifest, t.TempDir(), "127.0.0.1")
 	if err == nil || server != nil {
 		t.Fatal("uncaptured Tumbleweed repository was accepted")
 	}
@@ -25,8 +25,8 @@ func TestTumbleweedSnapshotRequiresCapturedClosure(t *testing.T) {
 func TestRollingSnapshotDesiredBindsVerifiedMetadata(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	manifest := &labv1.ImageManifest{Distribution: "opensuse-tumbleweed", Version: "20261007", Architecture: "arm64", RepositorySnapshotDate: proto.String("2026-10-07")}
-	server := &reposnapshot.Server{URL: "https://10.0.2.2:12345/snapshots/closure/", Manifest: &labv1.RepositorySnapshotManifest{SnapshotDate: "2026-10-07", RepomdSha256: digest}}
-	desired := rollingSnapshotDesired(manifest, server)
+	server := &reposnapshot.Server{URL: "https://127.0.0.1:12345/snapshots/closure/", Manifest: &labv1.RepositorySnapshotManifest{SnapshotDate: "2026-10-07", RepomdSha256: digest}}
+	desired := rollingSnapshotDesired(manifest, &guestRollingSnapshot{Server: server})
 	if desired.GetDate() != "2026-10-07" || desired.GetRepositoryUrl() != server.URL || hex.EncodeToString(desired.GetMetadataSha256()) != digest {
 		t.Fatalf("desired snapshot lost exact verified identity: %v", desired)
 	}

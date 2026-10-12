@@ -307,8 +307,10 @@ func absentIdentity() []byte {
 // protected ledger only; server-provided inverse content is never accepted.
 func (p *Provider) target(ctx context.Context, desired *resourcev1.OSUpdateDesired, before *agentv1.ResourceOwnershipSnapshot, ledger *agentv1.ResourceOwnershipLedger, operation resourcev1.ResourceOperation) (*agentv1.ResourceOwnershipSnapshot, error) {
 	if operation != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+		// The native rolling model cannot express this policy: a typed,
+		// terminal refusal (an untyped error was retried forever as internal).
 		if err := osupdate.ValidateRollingPolicy(p.update, desired); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", ErrUnsupported, err)
 		}
 	}
 	target := proto.CloneOf(before)

@@ -38,11 +38,14 @@ func exerciseUpdateRepository(ctx context.Context, p *nativeGuestPackages, repos
 			return err
 		}
 	} else {
+		// libzypp accepts no per-repository CA file (only ssl_capath; an
+		// unknown ssl_cacert parameter leaves the lab CA untrusted). As the
+		// console's zypper command, add the transport CA to the system store.
 		repos := nativeGuestDir + "/https-repos"
-		if err := p.command(ctx, "prepare isolated HTTPS zypper repository", "install -d -m 0755 "+repos, nil); err != nil {
+		if err := p.command(ctx, "trust lindmd transport CA and prepare isolated HTTPS zypper repository", "install -m 0644 "+caPath+" /etc/pki/trust/anchors/lindm-update-fixture.crt; update-ca-certificates; install -d -m 0755 "+repos, nil); err != nil {
 			return err
 		}
-		config := "[lindm]\nname=lindm signed update fixture\nenabled=1\nautorefresh=0\nbaseurl=https://localhost:18444/repo/rpm?ssl_verify=yes&ssl_cacert=" + caPath + "\ngpgcheck=1\nrepo_gpgcheck=1\npkg_gpgcheck=1\n"
+		config := "[lindm]\nname=lindm signed update fixture\nenabled=1\nautorefresh=0\nbaseurl=https://localhost:18444/repo/rpm\ngpgcheck=1\nrepo_gpgcheck=1\npkg_gpgcheck=1\n"
 		if err := p.uploadBytes(ctx, repos+"/lindm.repo", []byte(config)); err != nil {
 			return err
 		}

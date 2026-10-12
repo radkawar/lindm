@@ -56,8 +56,17 @@ func stagingUsage(directory string) (uint64, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		// Name the native-tool path relative to the private staging root: a
+		// bare reason gave no way to tell which tool left which object.
+		relative, _ := filepath.Rel(directory, path)
 		if entry.Type()&os.ModeSymlink != 0 {
-			return errors.New("packageprovider: symlink in staging")
+			// libzypp records its repository-signature mode in the raw cache
+			// as a fixed relative symlink; it is never followed and the zypper
+			// planner verifies and removes it before hashing the cache.
+			if zyppGPGCheckMarker(path) {
+				return nil
+			}
+			return fmt.Errorf("packageprovider: symlink in staging: %s", relative)
 		}
 		info, err := entry.Info()
 		if errors.Is(err, os.ErrNotExist) {
@@ -67,7 +76,7 @@ func stagingUsage(directory string) (uint64, error) {
 			return err
 		}
 		if !info.Mode().IsRegular() || info.Size() < 0 {
-			return errors.New("packageprovider: nonregular staging object")
+			return fmt.Errorf("packageprovider: nonregular staging object %s (%v)", relative, info.Mode().Type())
 		}
 		count++
 		if count > 10000 {

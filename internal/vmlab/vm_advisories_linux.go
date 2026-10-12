@@ -47,10 +47,16 @@ type VMAdvisoryEvidence struct {
 
 // vmAdvisorySource deliberately permits registry-declared partial sources so
 // the lane can record their actual UNKNOWN result rather than invent coverage.
-// No URL, distribution identity or architecture support is guessed here.
-func vmAdvisorySource(release *platform.Release, architecture string) (*advisoryv1.FeedSource, error) {
+// No URL, distribution identity or architecture support is guessed here. A
+// snapshot row has no fixed registry version, so its feed release derives from
+// the image's dated VERSION_ID (an empty Tumbleweed release failed validation).
+func vmAdvisorySource(release *platform.Release, imageVersion, architecture string) (*advisoryv1.FeedSource, error) {
 	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
 		return nil, errors.New("advisories: no maintained vendor source")
+	}
+	versionID := release.Version.Value
+	if release.Version.Rule == platform.VersionSnapshot {
+		versionID = imageVersion
 	}
 	switch architecture {
 	case "amd64":
@@ -81,7 +87,7 @@ func vmAdvisorySource(release *platform.Release, architecture string) (*advisory
 	}
 	source := &advisoryv1.FeedSource{
 		Id:     "matrix-" + release.Key + "-" + architecture,
-		Distro: release.ID, Release: release.FeedRelease(release.Version.Value), Architecture: architecture,
+		Distro: release.ID, Release: release.FeedRelease(versionID), Architecture: architecture,
 		Url: url, Format: advisoryv1.FeedFormat(format), MaxAgeSeconds: export.MaxAgeSeconds,
 		PlatformStream: export.PlatformStream,
 	}
@@ -107,7 +113,7 @@ func vmAdvisoryRefreshBounds(source *advisoryv1.FeedSource) (int64, time.Duratio
 
 func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPlane, fixture *devlab.AuthorityFixture, manifest *labv1.ImageManifest, cacheDir, deviceID string) (evidence *VMAdvisoryEvidence, err error) {
 	release := manifestRelease(manifest)
-	source, err := vmAdvisorySource(release, manifest.GetArchitecture())
+	source, err := vmAdvisorySource(release, manifest.GetVersion(), manifest.GetArchitecture())
 	if err != nil {
 		return nil, err
 	}

@@ -180,7 +180,7 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if _, err = hostCommand(ctx, staging, "qemu-img", nil, "create", "-f", "qcow2", "disk.qcow2", "24G"); err != nil {
 		return nil, err
 	}
-	snapshot, err := startImageRepositorySnapshot(ctx, m, opts.CacheDir)
+	snapshot, err := startImageRepositorySnapshot(ctx, m, opts.CacheDir, "10.0.2.2")
 	if err != nil {
 		return nil, err
 	}

@@ -214,18 +214,25 @@ func (f *AuthorityFixture) configureReleaseRepository(ctx context.Context, cfg *
 		if err := os.Mkdir(output, 0o700); err != nil {
 			return err
 		}
+		// lindmd serves a native repository only under its configured signer
+		// pin; without it every /repo/<family> path was 404 (zypper: "Repository
+		// type can't be determined").
+		pins := &configv1.NativeRepositoriesConfig{}
 		switch native.Format {
 		case packaging.FormatArch:
 			if _, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: native.Paths, Signer: native.Signer}); err != nil {
 				return err
 			}
+			pins.ArchSigningKeyFingerprint = proto.String(native.Signer.Fingerprint)
 		case packaging.FormatRPM:
 			if _, err := packaging.PublishRPM(ctx, packaging.RPMRequest{OutputDir: output, RPMs: native.Paths, Signer: native.Signer}); err != nil {
 				return err
 			}
+			pins.RpmSigningKeyFingerprint = proto.String(native.Signer.Fingerprint)
 		default:
 			return errors.New("native release fixture requires signed pacman or RPM packages")
 		}
+		cfg.ReleaseRepository.NativeRepositories = pins
 	}
 	f.releasePublisher = publisher
 	return nil

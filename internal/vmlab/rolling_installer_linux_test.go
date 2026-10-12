@@ -48,6 +48,26 @@ func TestTumbleweedEncryptedProfileKeepsLUKS2AndVendorBLS(t *testing.T) {
 				t.Fatal("GRUB boot assets unexpectedly encrypted")
 			}
 		}
+		// Regression: with fresh firmware variables YaST's grub2-bls timeout
+		// was lost and the first boot waited at the GRUB menu indefinitely.
+		var scripts autoyastProfile
+		if err := xml.Unmarshal(recipe, &scripts); err != nil {
+			t.Fatal(err)
+		}
+		if len(scripts.Scripts) != 1 {
+			t.Fatal("missing installed-system provisioning")
+		}
+		fields := strings.Split(scripts.Scripts[0].Source, "'")
+		if len(fields) < 4 {
+			t.Fatal("missing provisioning payload")
+		}
+		payload, err := base64.StdEncoding.DecodeString(fields[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(payload), "sdbootutil --no-variables set-timeout 1\n") {
+			t.Fatal("grub2-bls menu timeout is not persisted on the ESP")
+		}
 	}
 }
 

@@ -8,8 +8,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +80,63 @@ func TestStagingAccountingCountsMetadataAndRejectsSymlinks(t *testing.T) {
 	}
 	if _, err := stagingUsage(directory); err == nil {
 		t.Fatal("staging followed foreign link")
+	}
+}
+
+// zypper refresh records repo_gpgcheck as raw/<alias>/.repo_gpgcheck -> ./true
+// (observed). The guard tolerates exactly that marker; the planner requires
+// ./true and removes it. Any other symlink, or a gpg-agent socket left in the
+// staging keyring (observed on Tumbleweed), still fails the guard.
+func TestStagingAllowsOnlyZyppSignatureMarker(t *testing.T) {
+	directory := t.TempDir()
+	raw := filepath.Join(directory, "cache", "raw", "approved")
+	if err := os.MkdirAll(raw, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("./true", filepath.Join(raw, ".repo_gpgcheck")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stagingUsage(directory); err != nil {
+		t.Fatalf("zypper's signature-mode marker failed the guard: %v", err)
+	}
+	if err := consumeZyppGPGCheckMarker(raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(raw, ".repo_gpgcheck")); !os.IsNotExist(err) {
+		t.Fatal("consumed marker remained in the committed cache")
+	}
+	if err := consumeZyppGPGCheckMarker(raw); err == nil {
+		t.Fatal("refresh without a recorded signature check was accepted")
+	}
+	if err := os.Symlink("./false", filepath.Join(raw, ".repo_gpgcheck")); err != nil {
+		t.Fatal(err)
+	}
+	if err := consumeZyppGPGCheckMarker(raw); err == nil {
+		t.Fatal("unenforced repository signature mode was accepted")
+	}
+	if err := os.Remove(filepath.Join(raw, ".repo_gpgcheck")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../../escape", filepath.Join(raw, ".repo_gpgcheck")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stagingUsage(directory); err == nil {
+		t.Fatal("marker name with a foreign target passed the guard")
+	}
+}
+
+func TestStagingRejectsSocketAndNamesIt(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.Mkdir(filepath.Join(directory, "keyring"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(directory, "keyring", "S.gpg-agent"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	if _, err := stagingUsage(directory); err == nil || !strings.Contains(err.Error(), "keyring/S.gpg-agent") {
+		t.Fatalf("socket in staging = %v", err)
 	}
 }
 func TestAPTPredependencyConfigurationOrderIsRetained(t *testing.T) {

@@ -406,9 +406,10 @@ func vmCanonicalEvidence(detail *adminv1.GetDeviceResponse) (*vmInventoryEvidenc
 }
 
 func vmCompareHost(truth *vmTruth, host *inventoryv1.HostObservation) error {
+	names := [6]string{"os_id", "os_version", "architecture", "kernel_release", "hostname", "boot_id"}
 	for i, field := range vmHostFields(host) {
 		if !vmHostFieldMatches(truth, i, field) {
-			return errors.New("published successful host fields or boot ID differ from native truth")
+			return fmt.Errorf("published successful host fields or boot ID differ from native truth (%s)", names[i])
 		}
 	}
 	return nil

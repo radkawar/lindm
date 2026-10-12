@@ -27,6 +27,9 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	publicKey := flags.String("public-key", "", "separately pinned ASCII-armored package signing key")
 	fingerprint := flags.String("fingerprint", "", "expected package signer fingerprint")
 	repository := flags.String("repo", ".", "checkout with the existing real development control-plane fixture")
+	// Read by remote host routing only: SSH hosts stage and build this source
+	// (the lane driver under test) instead of the fixture checkout.
+	flags.String("build-repo", "", "source checkout staged to remote lab hosts (default: -repo)")
 	cache := flags.String("cache", ".cache/lab/images", "verified image cache")
 	workDir := flags.String("work-dir", "", "parent for owned disposable VM state")
 	diagnostics := flags.String("diagnostics", "", "existing directory for opt-in private failure diagnostics")

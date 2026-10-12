@@ -200,6 +200,13 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 			return nil, err
 		}
 		defer func() { err = errors.Join(err, isolated.Close()) }()
+		// Runs before Close removes the log: a rejected device sync is only
+		// a reason code on the guest ("invalid_argument: constraint").
+		defer func() {
+			if err != nil && options.DiagnosticsDir != "" {
+				err = errors.Join(err, saveFixtureServerLog(isolated, options.DiagnosticsDir))
+			}
+		}()
 		destinations = [2]string{isolated.AdminAddress, isolated.DeviceAddress}
 	}
 	forwards, err := openLifecycleForwards(ctx, vm, destinations)

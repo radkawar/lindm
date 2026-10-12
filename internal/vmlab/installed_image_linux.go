@@ -147,7 +147,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			return nil, err
 		}
 	}
-	snapshot, err := startImageRepositorySnapshot(ctx, m, cacheDir)
+	snapshot, err := startImageRepositorySnapshot(ctx, m, cacheDir, "10.0.2.2")
 	if err != nil {
 		return nil, err
 	}

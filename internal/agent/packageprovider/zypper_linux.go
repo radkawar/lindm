@@ -111,6 +111,29 @@ func zypperTarget(d *resourcev1.NativePackageDesired) string {
 	return target
 }
 
+// zyppGPGCheckMarker reports libzypp's raw-cache record of the repository
+// signature mode: a symlink named .repo_gpgcheck targeting ./true or ./false.
+func zyppGPGCheckMarker(path string) bool {
+	if filepath.Base(path) != ".repo_gpgcheck" {
+		return false
+	}
+	target, err := os.Readlink(path)
+	return err == nil && (target == "./true" || target == "./false")
+}
+
+// consumeZyppGPGCheckMarker requires native zypper's own record that it
+// enforced the repository signature, then removes that symlink so the cache
+// commit hashes and syncs regular files only. Later --no-refresh solves read
+// the retained metadata without it (observed with zypper 1.14.101).
+func consumeZyppGPGCheckMarker(raw string) error {
+	marker := filepath.Join(raw, ".repo_gpgcheck")
+	target, err := os.Readlink(marker)
+	if err != nil || target != "./true" {
+		return errors.Join(errors.New("packageprovider: zypper did not record enforced repository signature checking"), err)
+	}
+	return os.Remove(marker)
+}
+
 func (p *Provider) verifyZypperRPM(ctx context.Context, directory, path string, source *agentv1.NativePackageSource) error {
 	for _, keydb := range []string{filepath.Join(directory, "rpmkeys"), ""} {
 		args := []string{"--checksig", "--verbose", path}
@@ -160,7 +183,11 @@ func (p *Provider) planZypper(ctx context.Context, directory string, d *resource
 	if _, err := p.run(ctx, p.managerPath, zypperArgs(directory, "refresh", "--force"), "/", zypperEnv(directory, true)); err != nil {
 		return nil, err
 	}
-	repomd := filepath.Join(directory, "cache", "raw", repo.GetNativeId(), "repodata", "repomd.xml")
+	raw := filepath.Join(directory, "cache", "raw", repo.GetNativeId())
+	if err := consumeZyppGPGCheckMarker(raw); err != nil {
+		return nil, err
+	}
+	repomd := filepath.Join(raw, "repodata", "repomd.xml")
 	if err := os.Rename(repomd+".asc", repomd+".sig"); err != nil {
 		return nil, err
 	}
@@ -188,7 +215,18 @@ func (p *Provider) planZypper(ctx context.Context, directory string, d *resource
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
 		return entries, nil
 	}
-	if _, err := p.run(ctx, p.managerPath, zypperArgs(directory, "install", "--no-recommends", "--no-allow-vendor-change", "--download-only", "--", zypperTarget(d)), "/", zypperEnv(directory, true)); err != nil {
+	// The staging unit's root filesystem is read-only (ProtectSystem=strict),
+	// and zypper refuses even "install --download-only" there with exit 5
+	// ("target filesystem is mounted as read-only"; observed on Tumbleweed).
+	// "zypper download" fetches exactly the solved NEVRAs into the private
+	// cache without touching the target.
+	download := []string{"download", "--"}
+	for _, entry := range entries {
+		if entry.GetAfter() != nil {
+			download = append(download, entry.GetPackage().GetNativeName()+"."+entry.GetPackage().GetArchitecture()+"="+nativeVersion(entry.GetAfter()))
+		}
+	}
+	if _, err := p.run(ctx, p.managerPath, zypperArgs(directory, download...), "/", zypperEnv(directory, true)); err != nil {
 		return nil, err
 	}
 	var total uint64

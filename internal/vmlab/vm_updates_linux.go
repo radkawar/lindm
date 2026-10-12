@@ -418,6 +418,9 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
+	if err := snapshot.reconnect(ctx); err != nil {
+		return result, err
+	}
 	status, err = waitUpdateObservation(ctx, vm, nil, "installed")
 	if err != nil {
 		return result, err

@@ -360,20 +360,22 @@ type matrixRun struct {
 }
 
 // laneInputs lists the shared inputs each lane takes; everything else comes
-// from the matrix cell's fixed arguments.
+// from the matrix cell's fixed arguments. "diagnostics" gives each failed lane
+// a private directory beside its record; SSH hosts return it, whereas a path
+// inside the remote run directory was deleted with the run.
 var laneInputs = map[string][]string{
-	"inspect":             {"agent", "record"},
-	"lifecycle":           {"repo", "packages", "redhat-token-file", "record"},
-	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
-	"resources":           {"repo", "build-repo", "lindmd", "redhat-token-file", "record"},
+	"inspect":             {"agent", "diagnostics", "record"},
+	"lifecycle":           {"repo", "build-repo", "packages", "redhat-token-file", "diagnostics", "record"},
+	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
+	"resources":           {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
 	"encrypted":           {"record"},
-	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "record"},
-	"updates":             {"repo", "build-repo", "lab", "record"},
+	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "diagnostics", "record"},
+	"updates":             {"repo", "build-repo", "lab", "diagnostics", "record"},
 	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
 	"enroll-from-console": {"console-browser", "redhat-token-file", "record"},
 	"services":            {"record"},
-	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "record"},
-	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "record"},
+	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "diagnostics", "record"},
+	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "diagnostics", "record"},
 }
 
 func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -803,6 +805,8 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			}
 		case "record":
 			args = append(args, "-record", base+".json")
+		case "diagnostics":
+			args = append(args, "-diagnostics", base+".diagnostics")
 		case "evidence":
 			args = append(args, "-evidence", base)
 		case "redhat-token-file":

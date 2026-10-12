@@ -147,7 +147,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		if options.Resources || options.PowerActions || options.Hold != 0 {
 			return nil, errors.New("advisories run without resource, power or hold scenarios")
 		}
-		source, err := vmAdvisorySource(release, manifest.GetArchitecture())
+		source, err := vmAdvisorySource(release, manifest.GetVersion(), manifest.GetArchitecture())
 		if err != nil {
 			return nil, err
 		}
@@ -519,8 +519,10 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			if err := rebootLifecycleGuest(ctx, vm, boot); err != nil {
 				return err
 			}
-			forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
-			return err
+			if forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress}); err != nil {
+				return err
+			}
+			return snapshot.reconnect(ctx)
 		}
 		// The update policy's own logind reboot is awaited, never triggered.
 		awaitReboot := func(ctx context.Context, previousBoot string, timeout time.Duration) error {
@@ -536,8 +538,10 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			if err := awaitLifecycleGuestBoot(ctx, vm, previous, timeout); err != nil {
 				return err
 			}
-			forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
-			return err
+			if forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress}); err != nil {
+				return err
+			}
+			return snapshot.reconnect(ctx)
 		}
 		if firewall != nil {
 			firewall.rebootDevice = reboot

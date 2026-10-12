@@ -247,6 +247,22 @@ func TestCompetingSchedulerIsRefusedBeforeAnyEffect(t *testing.T) {
 	}
 }
 
+// A security-only or unpinned policy on a rolling backend is a typed terminal
+// refusal. The bare validation error was classified as an internal executor
+// failure and retried every 20 s until the lane deadline (Tumbleweed aarch64).
+func TestRollingModelRefusalIsTypedUnsupported(t *testing.T) {
+	p := fixtureProvider(t)
+	p.update = resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER
+	p.backend.Backend = resourcev1.Backend_BACKEND_ZYPPER
+	p.backend.NativeVersion = "zypper 1.14.94"
+	before := fixtureSnapshot(t, p, nil, false, "")
+	for _, desired := range []*resourcev1.OSUpdateDesired{fixtureDesired(), {Selection: resourcev1.UpdateSelection_UPDATE_SELECTION_ALL, Maintenance: fixtureDesired().GetMaintenance(), RebootPolicy: fixtureDesired().GetRebootPolicy()}} {
+		if _, _, err := p.plan(t.Context(), fixtureState(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, before, nil); !errors.Is(err, ErrUnsupported) {
+			t.Fatalf("rolling backend did not refuse %v as unsupported: %v", desired, err)
+		}
+	}
+}
+
 func TestReleaseRemovesOnlyOwnedObjectsWithBoundInverse(t *testing.T) {
 	p := fixtureProvider(t)
 	desired := fixtureDesired()

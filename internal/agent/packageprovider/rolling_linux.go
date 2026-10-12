@@ -44,7 +44,10 @@ func (p *Provider) prepareRollingKey(ctx context.Context, directory string, sour
 	if err := os.Mkdir(keyring, 0700); err != nil {
 		return nil, err
 	}
-	args := []string{"--batch", "--no-options", "--homedir", keyring, "--no-default-keyring", "--keyring", filepath.Join(keyring, "pubring.gpg"), "--no-auto-key-retrieve"}
+	// --no-autostart: public-key import and verification need no gpg-agent,
+	// whose socket in the private staging keyring tripped the staging guard
+	// (observed: keyring/S.gpg-agent on Tumbleweed).
+	args := []string{"--batch", "--no-options", "--no-autostart", "--homedir", keyring, "--no-default-keyring", "--keyring", filepath.Join(keyring, "pubring.gpg"), "--no-auto-key-retrieve"}
 	result, err := p.run(ctx, "/usr/bin/gpg", append(args, "--with-colons", "--import-options", "show-only", "--import", source.GetSigningKeyFile()), "/", nil)
 	if err != nil {
 		return nil, err
@@ -92,7 +95,7 @@ func (p *Provider) prepareRollingKey(ctx context.Context, directory string, sour
 
 func (p *Provider) verifyRollingSignature(ctx context.Context, directory, path, fingerprint string) error {
 	keyring := filepath.Join(directory, "keyring")
-	result, err := p.run(ctx, "/usr/bin/gpg", []string{"--batch", "--no-options", "--homedir", keyring, "--no-default-keyring", "--keyring", filepath.Join(keyring, "pubring.gpg"), "--no-auto-key-retrieve", "--status-fd=1", "--verify", path + ".sig", path}, "/", nil)
+	result, err := p.run(ctx, "/usr/bin/gpg", []string{"--batch", "--no-options", "--no-autostart", "--homedir", keyring, "--no-default-keyring", "--keyring", filepath.Join(keyring, "pubring.gpg"), "--no-auto-key-retrieve", "--status-fd=1", "--verify", path + ".sig", path}, "/", nil)
 	if err != nil {
 		return err
 	}
