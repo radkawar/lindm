@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -264,15 +265,12 @@ func (p *Provider) snapshot(ctx context.Context, desired *resourcev1.ResourceDes
 		return nil, err
 	}
 	d := desired.GetSystemdDefinition()
-	target, err := p.manager.Unit(ctx, targetUnit(d), "Service")
+	target, err := settledTarget(ctx, p.manager, targetUnit(d), targetJobSettle)
 	if err != nil {
 		return nil, err
 	}
 	if target == nil {
 		return nil, fmt.Errorf("%w: target service is absent", ErrUnsupported)
-	}
-	if target.pending {
-		return nil, fmt.Errorf("%w: target has a pending job", ErrConflict)
 	}
 	graph, err := targetFingerprint(ctx, target, path)
 	if err != nil {
@@ -377,4 +375,31 @@ func (p *Provider) snapshot(ctx context.Context, desired *resourcev1.ResourceDes
 		return nil, err
 	}
 	return s, nil
+}
+
+// targetJobSettle bounds the wait for a queued target job, such as the start
+// the definition's own timer enqueued when it elapsed during an apply.
+const targetJobSettle = 20 * time.Second
+
+// settledTarget observes the target service once no job is queued for it. A
+// timer-started run settles within seconds; a job still pending after settle
+// is a conflict, since the definition must not change mid-transition.
+func settledTarget(ctx context.Context, manager nativeManager, name string, settle time.Duration) (*unitView, error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(settle)
+	defer deadline.Stop()
+	for {
+		target, err := manager.Unit(ctx, name, "Service")
+		if err != nil || target == nil || !target.pending {
+			return target, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-deadline.C:
+			return nil, fmt.Errorf("%w: target has a pending job", ErrConflict)
+		case <-ticker.C:
+		}
+	}
 }
