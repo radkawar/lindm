@@ -492,7 +492,14 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string, di
 			}
 			pending += string(buf[:n])
 			if len(pending) > 8192 {
-				pending = pending[len(pending)-8192:]
+				// Start the bounded tail at a line or redraw boundary: a cut
+				// inside a redraw's erase sequence would leave its prompt
+				// text looking like a fresh prompt (a false rejection).
+				tail := pending[len(pending)-8192:]
+				if at := strings.IndexAny(tail, "\n\x1b"); at >= 0 {
+					tail = tail[at:]
+				}
+				pending = tail
 			}
 			// Some initramfs password agents report cryptsetup's rejection without
 			// repeating the original prompt on the serial console.

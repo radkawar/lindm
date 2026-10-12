@@ -4,6 +4,7 @@ package vmlab
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -139,6 +140,54 @@ func TestEncryptedUnlockSerialPromptRedrawIsNotRejection(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// A serial console delivers the agent's per-keystroke redraws and the boot
+// output that follows in small reads. Bounding the retained console tail must
+// never cut a redraw's erase sequence and so turn its prompt text into what
+// looks like a fresh prompt (observed as a false rejection on Tumbleweed).
+func TestEncryptedUnlockSerialBoundedTailKeepsRedrawsIntact(t *testing.T) {
+	const prompt = "\r\nPlease enter passphrase for disk cr_root::"
+	var after strings.Builder
+	for i := range 64 {
+		after.WriteString("\x1b[2K\rPlease enter passphrase for disk cr_root::" + strings.Repeat("*", i+1))
+	}
+	after.WriteString("\r\n")
+	for i := range 400 {
+		fmt.Fprintf(&after, "[  OK  ] Started boot unit %03d of the initrd.\r\n", i)
+	}
+	host, guest := net.Pipe()
+	defer func() { _ = host.Close(); _ = guest.Close() }()
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		if _, err := io.WriteString(guest, prompt); err != nil {
+			done <- err
+			return
+		}
+		if _, err := io.ReadFull(guest, make([]byte, len("secret\r"))); err != nil {
+			done <- err
+			return
+		}
+		data := after.String()
+		for i := range len(data) {
+			if _, err := io.WriteString(guest, data[i:i+1]); err != nil {
+				done <- err
+				return
+			}
+		}
+		// Every byte was consumed without a rejection: end the wait.
+		cancel()
+		done <- nil
+	}()
+	seen, err := unlockEncryptedSerial(ctx, host, "secret", nil)
+	if !seen || err != nil {
+		t.Fatalf("seen=%v err=%v, want the redrawn prompt accepted", seen, err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 
