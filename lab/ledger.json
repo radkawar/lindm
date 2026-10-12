@@ -6365,6 +6365,65 @@
       "verified": true,
       "manifestSha256": "57f17e1bf6b7926bd56fb50c10deed97f48305bbe32bfa9051dd84ae7d41a9af",
       "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "provision-kickstart",
+      "architecture": "aarch64",
+      "manifest": "fedora-server-encrypted-44-1.7-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/lab-evidence/provision-20261012-inst1/fedora-44/provision-kickstart-aarch64.json",
+      "sha256": "5f84901a8a419e9d07f3868adb1b35d7089d15bec9fbc0bc58792b1b6a6f48ef",
+      "recorded": "2026-10-12T06:47:19.853297334Z",
+      "revision": "5e541df1dd03cb27766fd8daa90b5fe717079e37",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "2b5104abf91adfe0c97afebdfbcb25c0520df15f4989928f33911030edf60251"
+    },
+    {
+      "platform": "opensuse-tumbleweed",
+      "cell": "provision-autoyast",
+      "architecture": "aarch64",
+      "manifest": "opensuse-tumbleweed-20261007-encrypted-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/lab-evidence/provision-20261012-inst1/opensuse-tumbleweed/provision-autoyast-aarch64.log",
+      "sha256": "854846f1dba974b72a6d612ae7634a8cb48b2471f0dd8c3f2ed60229d84ab1ba",
+      "recorded": "2026-10-12T06:53:23.571981768Z",
+      "revision": "5e541df1dd03cb27766fd8daa90b5fe717079e37",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "374fbef4a9413c394be5fcec2e80e65d0b5430a4388d28a4b5a759da5d00d356",
+      "repositorySnapshotDate": "2026-10-07",
+      "repositoryClosureSha256": "0d7092d787d82a590b2b1818db4c5516c940e05dc07d792657745269e87ff545",
+      "repositoryMetadataSha256": "990c58b81cf28ff8d14ede123cfc6bc39c0cb0484ceba9f0e3e3e772e88d49ff"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "provision-autoinstall",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/lab-evidence/provision-20261012-inst1/ubuntu-24.04/provision-autoinstall-aarch64.json",
+      "sha256": "bfccb86f82dd9a2cb01caa596f38d7bc9427d7a12af23951ccab0111d1e205c0",
+      "recorded": "2026-10-12T07:01:07.403865408Z",
+      "revision": "5e541df1dd03cb27766fd8daa90b5fe717079e37",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5442dc4f7b5eb4ecf4ed6a51bafe4d43cd243c40786916920b738dc4427419f6"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "provision-kickstart",
+      "architecture": "aarch64",
+      "manifest": "rhel-9.8-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/lab-evidence/provision-20261012-inst1/rhel-9/provision-kickstart-aarch64.log",
+      "sha256": "b86e727eef3be77d22636f5640b037244533a0ee5bc5cf67803546e8ed7805b4",
+      "recorded": "2026-10-12T07:03:10.599131136Z",
+      "revision": "5e541df1dd03cb27766fd8daa90b5fe717079e37",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "3499b90f1e57dfaf4a1cd92a8dc7e022e7c7496e09be258516f402ccc1700dd7"
     }
   ]
 }
