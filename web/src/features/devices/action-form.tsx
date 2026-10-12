@@ -142,6 +142,7 @@ function powerDelayMax(field: DescField): number {
 }
 const restartDelayMax = powerDelayMax(RestartActionSchema.field.delaySeconds);
 const shutdownDelayMax = powerDelayMax(ShutdownActionSchema.field.delaySeconds);
+const ENDPOINT_HINT = "Enter one IP address per line, such as 192.0.2.10 or 2001:db8::10.";
 // Server refusals that fresh inventory repairs.
 const inventoryBlockers: Record<string, true> = {
   device_action_inventory_stale: true,
@@ -464,6 +465,18 @@ export function DeviceActionForm({
     : delayText !== "" && !(/^\d+$/.test(delayText) && Number(delayText) <= delayMax)
       ? `Enter a whole number of seconds from 0 to ${delayMax}.`
       : (fieldErrors.find((entry) => entry.field === "delay_seconds")?.message ?? "");
+  // The schema names the refused entry by position; show the value the admin typed.
+  const endpointList = endpoints.split(/[\s,]+/).filter(Boolean);
+  const badEndpoints = fieldErrors.flatMap((entry) => {
+    const index = /^spec\.quarantine\.management_endpoints\[(\d+)\]$/.exec(entry.path)?.[1];
+    return index === undefined ? [] : [endpointList[Number(index)] ?? ""];
+  });
+  const endpointError =
+    kind !== "quarantine"
+      ? ""
+      : badEndpoints.length > 0
+        ? `Not an IP address: ${badEndpoints.join(", ")}. ${ENDPOINT_HINT}`
+        : (fieldErrors.find((entry) => entry.field === "management_endpoints")?.message ?? "");
 
   // What still blocks review, named inline instead of a disabled button. Empty
   // required text fields are reported by native form validation instead.
@@ -710,7 +723,9 @@ export function DeviceActionForm({
         expiresAt: timestampFromDate(new Date(Date.now() + 10 * 60_000)),
         reason: reason.trim(),
       });
-      validateRequest(CreateDeviceActionRequestSchema, payload);
+      validateRequest(CreateDeviceActionRequestSchema, payload, {
+        "spec.quarantine.management_endpoints": ENDPOINT_HINT,
+      });
       const digest = await crypto.subtle.digest("SHA-256", toBinary(DeviceActionSpecSchema, spec));
       lifetime.signal.throwIfAborted();
       const specSha256 = Array.from(new Uint8Array(digest), (byte) =>
@@ -1579,9 +1594,18 @@ export function DeviceActionForm({
                     id={`${prefix}-endpoints`}
                     required
                     value={endpoints}
+                    aria-invalid={endpointError !== "" || undefined}
+                    aria-describedby={
+                      endpointError !== "" ? `${prefix}-endpoints-error` : undefined
+                    }
                     onChange={(event) => setEndpoints(event.target.value)}
                     data-freeform="management IP addresses that stay reachable"
                   />
+                  {endpointError !== "" ? (
+                    <p id={`${prefix}-endpoints-error`} className="text-sm text-destructive">
+                      {endpointError}
+                    </p>
+                  ) : null}
                 </>
               ) : null}
               {kind === "releaseQuarantine" ? (

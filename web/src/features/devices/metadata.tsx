@@ -27,7 +27,10 @@ import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { AttributeFields, readAttributeInputs } from "./attributes";
-import { validateRequest } from "@/lib/validation";
+import { checkRequest, validateRequest } from "@/lib/validation";
+
+const LABEL_HINT =
+  "Labels use letters, digits and . _ : / -, start with a letter or digit, and have at most 64 characters.";
 
 export function DeviceMetadataCard({
   deviceId,
@@ -119,6 +122,7 @@ function MetadataForm({
   const queryClient = useQueryClient();
   const [attributes, setAttributes] = useState(metadata.attributes);
   const [labels, setLabels] = useState(metadata.labels);
+  const [labelError, setLabelError] = useState("");
   const [ownerKind, setOwnerKind] = useState(metadata.owner.case ?? "");
   const [ownerPrincipalId, setOwnerPrincipalId] = useState(
     metadata.owner.case === "ownerPrincipalId" ? metadata.owner.value : "",
@@ -183,7 +187,9 @@ function MetadataForm({
               metadata: value,
               reason: String(data.get("reason") ?? "").trim(),
             });
-            validateRequest(SetDeviceMetadataRequestSchema, request);
+            validateRequest(SetDeviceMetadataRequestSchema, request, {
+              "metadata.labels": LABEL_HINT,
+            });
             if (metadataChanges(metadata, value).length === 0) {
               setInputError("Nothing changed. Edit a field, or cancel.");
               return;
@@ -249,12 +255,24 @@ function MetadataForm({
               value=""
               disabled={captured !== null}
               onChange={(label) => {
-                if (label && !labels.includes(label)) setLabels([...labels, label]);
+                if (!label) return;
+                // Checked when added, against the same schema rule as Save.
+                const problem = checkRequest(
+                  DeviceMetadataSchema,
+                  create(DeviceMetadataSchema, { labels: [label] }),
+                );
+                setLabelError(problem ? `“${label}” can't be a label. ${LABEL_HINT}` : "");
+                if (!problem && !labels.includes(label)) setLabels([...labels, label]);
               }}
             />
           ) : (
             <span className="text-sm font-medium">Labels</span>
           )}
+          {labelError ? (
+            <p id="metadata-label-error" role="alert" className="text-sm text-destructive">
+              {labelError}
+            </p>
+          ) : null}
           {labels.length ? (
             <ul className="flex flex-wrap gap-2" aria-label="Labels">
               {labels.map((label) => (

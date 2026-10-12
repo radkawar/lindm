@@ -1,6 +1,7 @@
-import { fromJson, type JsonObject } from "@bufbuild/protobuf";
+import { create, fromJson, type JsonObject } from "@bufbuild/protobuf";
 import { Trash2Icon } from "lucide-react";
 import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
+import { KernelModuleBlocklistSchema } from "../../../gen/lindm/resource/v1/host_pb";
 import { FirewallZoneDesiredSchema } from "../../../gen/lindm/resource/v1/network_pb";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,8 +9,9 @@ import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { firewallZoneLabel } from "@/lib/setting-identity";
 import { cn } from "cn";
+import { checkRequest } from "@/lib/validation";
 import { EncryptionComplianceFields } from "./encryption-fields";
-import { type DraftResource } from "./model";
+import { MODULE_NAME_RULE, type DraftResource } from "./model";
 import { OwnershipFields } from "./ownership-fields";
 import { kindQualification, qualifiedOwnership, type Qualification } from "./qualification";
 import {
@@ -73,6 +75,19 @@ export function ResourceFields({
   const desired = object(document.desired);
   const moduleBlocklist = object(desired.managedFile).kernelModuleBlocklist !== undefined;
   const selectedTask = moduleBlocklist ? "blockKernelModules" : arm;
+  // Checked as typed against the schema's module-name rule, not only at Publish.
+  const modules = moduleBlocklist
+    ? ((object(object(desired.managedFile).kernelModuleBlocklist).modules as string[]) ?? [])
+    : [];
+  const named = modules.filter((name) => name !== "");
+  const invalidModules =
+    checkRequest(
+      KernelModuleBlocklistSchema,
+      create(KernelModuleBlocklistSchema, { modules: named }),
+    )?.fields.flatMap((problem) => {
+      const entry = /^modules\[(\d+)\]$/.exec(problem.path)?.[1];
+      return entry === undefined ? [] : [named[Number(entry)] ?? ""];
+    }) ?? [];
   const id = `resource-${resource.resourceId}`;
   const references: ReferenceChoice[] = resources.flatMap((entry, position) => {
     if (entry.resourceId === resource.resourceId) return [];
@@ -236,10 +251,7 @@ export function ResourceFields({
             <Textarea
               id={`${id}-modules`}
               data-freeform="kernel module names to block; may not be loaded on any device yet"
-              value={(
-                (object(object(desired.managedFile).kernelModuleBlocklist).modules as string[]) ??
-                []
-              ).join("\n")}
+              value={modules.join("\n")}
               onChange={(event) =>
                 update({
                   ...document,
@@ -252,11 +264,17 @@ export function ResourceFields({
                   },
                 })
               }
-              aria-describedby={`${id}-module-help`}
+              aria-invalid={invalidModules.length > 0 || undefined}
+              aria-describedby={`${id}-module-help${invalidModules.length > 0 ? ` ${id}-module-error` : ""}`}
             />
             <p id={`${id}-module-help`} className="text-sm text-muted-foreground">
               Enter one module name per line, using underscores rather than hyphens.
             </p>
+            {invalidModules.length > 0 ? (
+              <p id={`${id}-module-error`} className="text-sm text-destructive">
+                Not a module name: {invalidModules.join(", ")}. Module names {MODULE_NAME_RULE}
+              </p>
+            ) : null}
           </div>
           <p className="text-sm">
             Assigned devices block future loads and rebuild their boot files. Active drivers stay

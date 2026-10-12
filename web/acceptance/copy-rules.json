@@ -52,6 +52,11 @@
       "name": "numeric date instead of console date format (use Timestamp)",
       "pattern": "\\b\\d{1,2}/\\d{1,2}/\\d{4}\\b",
       "flags": ""
+    },
+    {
+      "name": "raw validation or encoder text (use lib/validation describeViolation)",
+      "pattern": "\\[(?:required|(?:string|bytes|bool|enum|repeated|map|u?int(?:32|64)|s?fixed(?:32|64)|sint(?:32|64)|double|float|duration|timestamp)\\.[a-z_]+)\\]|regex pattern|cannot encode|validation error",
+      "flags": "i"
     }
   ],
   "rawByteValue": {

@@ -1,6 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { ViolationsSchema } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import { DeviceActionSchema, type DeviceAction } from "../../gen/lindm/admin/v1/device_actions_pb";
-import { requestProblem, type FieldError } from "@/lib/validation";
+import { describeViolationProto, requestProblem, type FieldError } from "@/lib/validation";
 
 export type RpcFailure = {
   code: Code;
@@ -10,7 +11,8 @@ export type RpcFailure = {
   unauthenticated: boolean;
   denied: boolean;
   ambiguous: boolean;
-  // Set only for a request the browser refused to send; nothing reached the server.
+  // Field problems in plain words: a request the browser refused to send
+  // (reason request_invalid), or the fields a server refusal names.
   fields?: readonly FieldError[];
   // The open action behind a device_action_pending refusal, when the server named it.
   blockingAction?: DeviceAction;
@@ -69,6 +71,12 @@ export function toRpcFailure(error: unknown): RpcFailure {
       ? "The request ended without a result. Retry the same request ID before starting a new one."
       : "The request was rejected.";
   }
+  const fields =
+    connectError.code === Code.InvalidArgument
+      ? connectError
+          .findDetails(ViolationsSchema)
+          .flatMap((detail) => detail.violations.map((item) => describeViolationProto(item)))
+      : [];
   return {
     code: connectError.code,
     codeName: CODE_NAME[connectError.code] ?? "Unknown",
@@ -80,6 +88,7 @@ export function toRpcFailure(error: unknown): RpcFailure {
     denied: connectError.code === Code.PermissionDenied,
     ambiguous,
     blockingAction: connectError.findDetails(DeviceActionSchema)[0],
+    ...(fields.length > 0 ? { fields } : {}),
   };
 }
 
@@ -473,6 +482,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Check the form",
       message: failure.message,
       action: "Nothing was sent. Correct the values, then try again.",
+    };
+  }
+  if (failure.code === Code.InvalidArgument && failure.fields && failure.fields.length > 0) {
+    return {
+      tone: "warning",
+      title: "Check the form",
+      message: failure.fields.map((field) => field.message).join(" "),
+      action: "Nothing was saved. Correct the values, then try again.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.reason === "secret_purpose_mismatch") {

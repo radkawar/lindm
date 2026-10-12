@@ -28,6 +28,7 @@ import * as pass2Bug7DialogScrolled from "./pass2-bug7-dialog-scrolled.mjs";
 import * as pass2Bug8PickerSidebar from "./pass2-bug8-picker-sidebar.mjs";
 import * as pass2P27StackedDialogs from "./pass2-p2-7-stacked-dialogs.mjs";
 import * as pass2EmptySetting from "./pass2-bug1-empty-setting.mjs";
+import * as pass2ValidationWords from "./pass2-p2-10-validation-words.mjs";
 import * as pass2SafetyApprovals from "./pass2-safety-approvals.mjs";
 import * as secrets from "./secrets.mjs";
 import * as secretReveal from "./secret-reveal.mjs";
@@ -94,6 +95,7 @@ export const ownerEdits = [
   pass2EmptySetting,
   secrets,
   secretReveal,
+  pass2ValidationWords,
   approvals,
   // Proposes a risk acceptance and a revocation, then withdraws both.
   pass2P2Approvals,

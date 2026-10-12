@@ -22,11 +22,12 @@ import {
   type ResourceProfile,
 } from "../../../gen/lindm/policy/v1/profile_pb";
 import { SSHServerDesiredSchema } from "../../../gen/lindm/resource/v1/accounts_pb";
+import { KernelModuleBlocklistSchema } from "../../../gen/lindm/resource/v1/host_pb";
 import { Presence } from "../../../gen/lindm/resource/v1/identity_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
-import { describeViolation } from "@/lib/validation";
+import { describeViolation, violationText } from "@/lib/validation";
 import { object, replaceReference, withDerivedRef } from "./resource-draft";
 import { fieldLabel } from "./typed-fields";
 
@@ -219,7 +220,7 @@ function settingMessage(violation: Violation, all: Violation[]): string | null {
         ? null
         : "Use plain text in the SSH login notice, without terminal control characters.";
     }
-    return `SSH login notice: ${violation.message}`;
+    return violationText("SSH login notice", violation.ruleId, violation.message);
   }
   if (violation.ruleId === EMPTY_SETTING_RULE) {
     return last?.kind === "field" && last.localName === "firewallZone"
@@ -229,24 +230,27 @@ function settingMessage(violation: Violation, all: Violation[]): string | null {
   if (/\.(managed_)?dimensions?$/.test(violation.ruleId)) {
     return "This setting doesn't manage anything yet. Choose at least one option to manage.";
   }
-  const label =
-    last?.kind === "field"
-      ? fieldLabel(last.jsonName)
-      : last?.kind === "oneof"
-        ? fieldLabel(last.localName)
-        : "";
-  if (label === "") return violation.message;
-  switch (violation.ruleId) {
-    case "required":
-    case "string.min_len":
-    case "bytes.min_len":
-      return `${label} is required.`;
-    case "repeated.min_items":
-      return `${label}: add at least one.`;
-    default:
-      return `${label}: ${violation.message}`;
+  const named = [...violation.field]
+    .reverse()
+    .find((part) => part.kind === "field" || part.kind === "oneof");
+  const entry = last?.kind === "list_sub" ? ` (line ${last.index + 1})` : "";
+  if (
+    named === KernelModuleBlocklistSchema.field.modules &&
+    violation.ruleId !== "repeated.min_items"
+  ) {
+    return `Modules to block${entry}: ${MODULE_NAME_RULE}`;
   }
+  const label =
+    named?.kind === "field"
+      ? fieldLabel(named.jsonName)
+      : named?.kind === "oneof"
+        ? fieldLabel(named.localName)
+        : "This setting";
+  return violationText(`${label}${entry}`, violation.ruleId, violation.message);
 }
+
+export const MODULE_NAME_RULE =
+  "use letters, digits and underscores, starting with a letter (usb_storage, not usb-storage).";
 
 export function capturePayload(input: {
   requestId: string;

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { classifyRpcFailure, type RpcFailure } from "@/lib/errors";
+import { RAW_VALIDATION_TEXT } from "@/lib/validation";
 
 export function RpcError({
   failure,
@@ -21,7 +22,11 @@ export function RpcError({
         {presentation.tone === "destructive" && title ? title : presentation.title}
       </AlertTitle>
       <AlertDescription>
-        <p>{presentation.message}</p>
+        <p>
+          {RAW_VALIDATION_TEXT.test(presentation.message)
+            ? "Some values aren't valid. Check the form."
+            : presentation.message}
+        </p>
         <p>{presentation.action}</p>
         <details data-slot="support-details" className="mt-2">
           <summary className="cursor-pointer">Details for support</summary>
