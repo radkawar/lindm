@@ -454,6 +454,15 @@ RHEL 9.8 SATA, and RHEL 10.2 SATA and NVMe
 RHEL 9.8 NVMe needs the sysfs-derived NVMe approval scope (kernel 5.14). The
 method covers unencrypted roots only; LUKS roots use live crypto-erase.
 
+On aarch64 the signed `grubaa64.efi` of RHEL 9.8 and 10.2 records no GRUB event
+at all: the ordinary event logs captured by the measured run have no PCR 8 event,
+so readiness refuses with `recovery_readiness_measured_grub_required`. The
+registry records this as `Lab.MeasuredGRUBUnavailableOn["aarch64"]`, and
+`lab matrix run` runs aarch64 recovery sanitize through the owned-boot UKI
+fixture. The host's private pinned ukify builds it. Both releases passed NVMe
+that way after the direct NVMe admin ioctl
+([verification](../verification.md#rhel-matrix-completion-2026-10-12)).
+
 ## Device actions
 
 Signed service execution is not desktop lock, quarantine, restart, shutdown,

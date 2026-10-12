@@ -253,7 +253,7 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 		noRecipe   []string
 		notOffered []string
 	}{
-		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44"}, []string{"rhel-9", "opensuse-tumbleweed"}, nil},
+		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}, []string{"opensuse-tumbleweed"}, nil},
 		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, nil, []string{"fedora-44", "rhel-9", "opensuse-tumbleweed"}},
 		{platform.LaneProvisionKickstart, installer, []string{"fedora-44", "rhel-9"}, nil, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
 		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, nil, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}},

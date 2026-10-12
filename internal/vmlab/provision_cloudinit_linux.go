@@ -34,8 +34,10 @@ func ProvisionCloudInitVM(ctx context.Context, manifest *labv1.ImageManifest, op
 		return nil, err
 	}
 	// The snippet runs at first boot, before the lab could bind a rolling
-	// release to its retained snapshot or register an entitled guest.
-	if manifest.GetRepositorySnapshotManifestSha256() != "" || release.Lab.Entitlement {
+	// release to its retained snapshot. An entitled (RHEL) guest stays
+	// unregistered: the snippet needs no vendor repository when the image
+	// already carries its prerequisites, and installs only from lindmd's.
+	if manifest.GetRepositorySnapshotManifestSha256() != "" {
 		return nil, errors.New("cloud-init provisioning needs vendor repositories reachable at first boot without lab preparation")
 	}
 	if err := options.validate(); err != nil {

@@ -803,7 +803,10 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		args = append(args, secureBoot.GetArgs()...)
 	}
 	if slices.Contains(c.Spec.GetCapabilities(), string(platform.RecoverySanitize)) {
-		if c.Release.Quirks.RecoveryGRUB.Entries != "" {
+		// A declared stock GRUB chain selects measured GRUB unless that
+		// architecture's signed GRUB records no measurements; then the
+		// owned-boot UKI fixture is the only recovery path.
+		if c.Release.Quirks.RecoveryGRUB.Entries != "" && c.Release.Lab.MeasuredGRUBUnavailableFor(c.Architecture) == "" {
 			args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
 		}
 		if c.Release.Quirks.RecoveryOwnerKey {

@@ -68,6 +68,12 @@ type Lab struct {
 	// OwnedBootUnavailableOn holds such reasons for single guest architectures
 	// (x86_64, aarch64) where the fixture works on the others.
 	OwnedBootUnavailableOn map[string]string
+	// MeasuredGRUBUnavailableOn holds, per guest architecture, why the
+	// release's stock shim+GRUB chain cannot carry measured recovery (its
+	// signed GRUB records no PCR 8/9 event, so readiness refuses with
+	// recovery_readiness_measured_grub_required). Matrix recovery there uses
+	// the owned-boot UKI fixture even though Quirks.RecoveryGRUB is declared.
+	MeasuredGRUBUnavailableOn map[string]string
 	// Updater is the vendor's own background package updater. The lab stops it
 	// for stable package truth, and the resources lane drives it on purpose
 	// to hold the native package lock while a package change arrives.
@@ -185,6 +191,12 @@ func (l Lab) OwnedBootUnavailableFor(architecture string) string {
 		return l.OwnedBootUnavailable
 	}
 	return l.OwnedBootUnavailableOn[kernelArchitecture(architecture)]
+}
+
+// MeasuredGRUBUnavailableFor is why the release's stock GRUB cannot carry
+// measured recovery on the guest architecture (either spelling), or "".
+func (l Lab) MeasuredGRUBUnavailableFor(architecture string) string {
+	return l.MeasuredGRUBUnavailableOn[kernelArchitecture(architecture)]
 }
 
 // LabLaneOn is LabLane for one guest architecture; it accepts the Debian

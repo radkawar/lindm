@@ -232,7 +232,16 @@ var (
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	rhelTPMPackages = []string{"tpm2-tools", "tpm2-tss"}
-	rhelLanes       = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAdvisories, LaneEnrollFromConsole}
+	// The signed EL 9.8/10.2 grubaa64.efi records no GRUB PCR 8/9 event (the
+	// RHEL 9.8/10.2 aarch64 ordinary logs captured by recovery-sanitize have
+	// no PCR 8 event at all), so measured recovery is refused at readiness;
+	// aarch64 recovery runs the owned-boot UKI fixture with the host's ukify.
+	elARMUnmeasuredGRUB = map[string]string{"aarch64": "the signed EL grubaa64.efi records no PCR 8/9 event, so measured-GRUB readiness refuses (recovery_readiness_measured_grub_required)"}
+	// Provisioning installs only from lindmd's repository: the console
+	// snippet skips its DNF prerequisites when rpm -q has them, so both the
+	// unregistered KVM image (cloud-init) and the unregistered Binary DVD
+	// install (Kickstart %post) enroll without Red Hat entitlement.
+	rhelLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart}
 	// RHEL CSAF matching applies only to a corroborated servicing stream, which
 	// the host proves with its entitled BaseOS repository ID (internal/advisory
 	// rhelStream). The air-gap lane's guest has no route to Red Hat from boot,
@@ -481,7 +490,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: slices.Concat(rhelLanes, []LabLane{LaneProvisionKickstart}), LaneGates: rhelLaneGates, Entitlement: true,
+		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			RPMMedia: &LabRPMMedia{Repositories: []string{"BaseOS", "AppStream"}, Key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"},
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
@@ -498,7 +507,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true,
+		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
@@ -513,7 +522,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor and
 		// architecture in verification.md; implemented capabilities stay
@@ -527,7 +536,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),
@@ -539,7 +548,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonELMajorUpgrade), OSUpdate),
@@ -550,7 +559,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),

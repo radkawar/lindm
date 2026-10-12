@@ -1905,7 +1905,11 @@ and the `grub-editenv` path, which the executor runs in a short-lived transient
 unit. In the lab, `lab vm device-actions -recovery-boot-mode measured-grub` with
 `-wipe-phase recovery-sata`, `recovery-nvme` or `recovery-attestation-refusal`
 runs the stock shim+GRUB fixture; the registry's `Lab.Guest.MeasuredBoot` holds
-the guest package recipe.
+the guest package recipe. `lab matrix run` selects measured GRUB for the
+`recovery-sanitize` cell of a release that declares `Quirks.RecoveryGRUB` or has
+no owned-boot fixture on that architecture. The exception is an architecture
+listed in `Lab.MeasuredGRUBUnavailableOn`, where the signed GRUB records no
+measurements (EL aarch64); that cell runs the owned-boot UKI.
 
 Shared `VMHardwareOptions` selects x86_64/aarch64, KVM/TCG, UEFI or x86 legacy
 BIOS, TPM2 or TPM absence, virtio-blk/scsi, NVMe or SATA/AHCI, up to four extra

@@ -43,3 +43,32 @@ func TestMatrixRecoveryCellUsesMeasuredGRUBWithoutOwnedBoot(t *testing.T) {
 		}
 	}
 }
+
+// The recovery-sanitize cell selects measured GRUB from a declared stock GRUB
+// chain, except on an architecture whose signed GRUB records no measurements
+// (EL aarch64): there the owned-boot UKI fixture runs.
+func TestMatrixRecoverySanitizeSkipsUnmeasuredGRUB(t *testing.T) {
+	cell := &labv1.MatrixCell{Name: "recovery-sanitize", Lane: "device-actions", Capabilities: []string{string(platform.RecoverySanitize)}, Args: []string{"-scenario=wipe", "-wipe-phase=recovery-nvme"}}
+	run := &matrixRun{root: t.TempDir(), cache: t.TempDir()}
+	for _, tc := range []struct{ key, architecture, want string }{
+		{"rhel-9", "x86_64", "measured-grub"},
+		{"rhel-9", "aarch64", ""},
+		{"rhel-10", "aarch64", ""},
+		{"almalinux-10", "aarch64", ""},
+		{"ubuntu-24.04", "aarch64", "measured-grub"},
+		{"opensuse-tumbleweed", "aarch64", "measured-grub"},
+	} {
+		release, ok := platform.Lookup(tc.key)
+		if !ok {
+			t.Fatalf("%s missing from the registry", tc.key)
+		}
+		image := &labmatrix.Manifest{Path: "lab/images/x.json"}
+		args, err := run.laneArgs(&labmatrix.Cell{Release: release, Spec: cell, Architecture: tc.architecture, Manifest: image, Recovery: image}, "base")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := labhost.FlagValue(args, "recovery-boot-mode"); got != tc.want {
+			t.Fatalf("%s %s: recovery boot mode %q, want %q", tc.key, tc.architecture, got, tc.want)
+		}
+	}
+}
