@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
-import { Button } from "@/components/ui/button";
+import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
+import { SearchPicker, pickerFooter, type PickerProps } from "@/components/ui/search-picker";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { SEARCH_DELAY_MS, useDelayed } from "@/hooks/use-delayed";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
@@ -31,12 +31,22 @@ function deviceCount(count: number) {
   return count === 1 ? "1 device" : `${count} devices`;
 }
 
+// The server searches every group by any part of its name; paging stays inside
+// the open picker.
 export function GroupPicker(props: PickerProps) {
   const lifetime = useAuthLifetime();
-  const [pageToken, setPageToken] = useState("");
-  const query = useQuery(groupsQueryOptions(lifetime, pageToken));
-  const groups = query.data?.groups ?? [];
-  // A saved choice on another page is still named, not "unavailable".
+  const [search, setSearch] = useState("");
+  const typed = search.trim().slice(0, 128);
+  const nameSearch = useDelayed(typed, SEARCH_DELAY_MS);
+  const [page, setPage] = useState({ nameSearch: "", token: "" });
+  const pageToken = page.nameSearch === nameSearch ? page.token : "";
+  const query = useQuery({
+    ...groupsQueryOptions(lifetime, pageToken, nameSearch),
+    placeholderData: keepPreviousData,
+  });
+  const groups = query.error ? [] : (query.data?.groups ?? []);
+  // A saved choice on another page or outside the search is still named, not
+  // "unavailable".
   const selected = useQuery({
     ...groupLookupQueryOptions(lifetime, props.value),
     enabled: !!props.value && !!query.data && !groups.some((group) => group.id === props.value),
@@ -52,33 +62,31 @@ export function GroupPicker(props: PickerProps) {
       label: selected.data.name,
       description: deviceCount(selected.data.deviceIds.length),
     });
+  const settled = !query.isFetching && nameSearch === typed;
+  const nextPageToken = query.data?.nextPageToken ?? "";
   return (
-    <SearchPicker {...props} options={options} note="Search within this page of up to 50 groups.">
-      {query.isPending ? <p role="status">Loading groups…</p> : null}
-      {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
+    <SearchPicker
+      {...props}
+      search={search}
+      onSearchChange={setSearch}
+      options={options}
+      note="Type any part of a group name. Up to 50 groups at a time."
+      footer={pickerFooter({
+        loading: query.isPending,
+        error: query.error,
+        onRetry: () => void query.refetch(),
+        empty:
+          query.isSuccess && settled && groups.length === 0
+            ? nameSearch
+              ? `No device group names contain “${nameSearch}”.`
+              : "No device groups yet. Create one in Groups."
+            : undefined,
+        fetching: query.isFetching,
+        onFirst: pageToken ? () => setPage({ nameSearch, token: "" }) : undefined,
+        onMore: nextPageToken ? () => setPage({ nameSearch, token: nextPageToken }) : undefined,
+      })}
+    >
       {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
-      <div className="flex gap-2">
-        {pageToken ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setPageToken("")}
-          >
-            First groups
-          </Button>
-        ) : null}
-        {query.data?.nextPageToken ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setPageToken(query.data?.nextPageToken ?? "")}
-          >
-            More groups
-          </Button>
-        ) : null}
-      </div>
     </SearchPicker>
   );
 }
@@ -87,7 +95,7 @@ export function GroupPicker(props: PickerProps) {
 // name on the screen) answers most; a group past it is looked up by ID.
 export function GroupName({ value }: { value: string }) {
   const lifetime = useAuthLifetime();
-  const page = useQuery(groupsQueryOptions(lifetime, ""));
+  const page = useQuery(groupsQueryOptions(lifetime, "", ""));
   const listed = page.data?.groups.find((item) => item.id === value);
   const lookup = useQuery({
     ...groupLookupQueryOptions(lifetime, value),

@@ -1,23 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
-import { Button } from "@/components/ui/button";
-import { RpcError } from "@/components/ui/rpc-error";
-import { SearchPicker, type PickerOption, type PickerProps } from "@/components/ui/search-picker";
+import {
+  SearchPicker,
+  pickerFooter,
+  type PickerOption,
+  type PickerProps,
+} from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { SEARCH_DELAY_MS, useDelayed } from "@/hooks/use-delayed";
 import { suggestionsQueryOptions, type SuggestionScope } from "@/lib/suggestions";
-
-const SEARCH_DELAY_MS = 250;
-
-function useDelayed<T>(value: T, delay: number): T {
-  const [delayed, setDelayed] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDelayed(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return delayed;
-}
 
 function countLabel(field: SuggestionField, count: bigint): string {
   const noun = field === SuggestionField.DIRECTORY_GROUP ? "account" : "device";
@@ -76,9 +68,7 @@ export function SuggestionPicker({
     choices.push({ value: typed, label: `Use “${typed}”`, description: typedDescription });
   }
   const settled = !list.isFetching && prefix === typed;
-  const loading = list.isPending && !props.disabled;
-  const empty = list.isSuccess && settled && suggestions.length === 0;
-  const paged = after !== "" || !!list.data?.nextAfter;
+  const nextAfter = list.data?.nextAfter ?? "";
   return (
     <SearchPicker
       {...props}
@@ -87,57 +77,20 @@ export function SuggestionPicker({
       options={choices}
       placeholder={placeholder}
       note={note ?? "Type the beginning of a value. Only recorded values appear, 50 at a time."}
-      footer={
-        loading || list.error || empty || paged ? (
-          <>
-            {loading ? (
-              <p role="status" className="text-xs text-muted-foreground">
-                Loading choices…
-              </p>
-            ) : null}
-            {list.error ? (
-              <RpcError failure={toRpcFailure(list.error)} title="Couldn't load choices">
-                <Button type="button" variant="outline" onClick={() => void list.refetch()}>
-                  Retry choices
-                </Button>
-              </RpcError>
-            ) : null}
-            {empty ? (
-              <p className="text-xs text-muted-foreground">
-                {prefix
-                  ? `No recorded values start with “${prefix}”.`
-                  : "No values are recorded yet."}
-              </p>
-            ) : null}
-            {paged ? (
-              <div className="flex flex-wrap gap-2">
-                {after ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={list.isFetching}
-                    onClick={() => setPage({ prefix, after: "" })}
-                  >
-                    First choices
-                  </Button>
-                ) : null}
-                {list.data?.nextAfter ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={list.isFetching}
-                    onClick={() => setPage({ prefix, after: list.data?.nextAfter ?? "" })}
-                  >
-                    More choices
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-          </>
-        ) : undefined
-      }
+      footer={pickerFooter({
+        loading: list.isPending && !props.disabled,
+        error: list.error,
+        onRetry: () => void list.refetch(),
+        empty:
+          list.isSuccess && settled && suggestions.length === 0
+            ? prefix
+              ? `No recorded values start with “${prefix}”.`
+              : "No values are recorded yet."
+            : undefined,
+        fetching: list.isFetching,
+        onFirst: after ? () => setPage({ prefix, after: "" }) : undefined,
+        onMore: nextAfter ? () => setPage({ prefix, after: nextAfter }) : undefined,
+      })}
     >
       {children}
     </SearchPicker>

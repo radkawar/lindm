@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"slices"
@@ -208,6 +209,41 @@ func DecodeProfileCursor(token string) (uuid.UUID, error) {
 		return uuid.Nil, Invalid("page_token")
 	}
 	id, err := uuid.FromBytes(decoded[1:])
+	if err != nil || id == uuid.Nil {
+		return uuid.Nil, Invalid("page_token")
+	}
+	return id, nil
+}
+
+// EncodeProfileSearchCursor is EncodeProfileCursor bound to a list's search: an
+// empty search keeps the plain token; otherwise the token carries the first 16
+// bytes of the search's SHA-256, so it continues only that search.
+func EncodeProfileSearchCursor(id uuid.UUID, search string) string {
+	if search == "" || id == uuid.Nil {
+		return EncodeProfileCursor(id)
+	}
+	digest := sha256.Sum256([]byte(search))
+	var encoded [33]byte
+	encoded[0] = 'S'
+	copy(encoded[1:17], id[:])
+	copy(encoded[17:], digest[:16])
+	return base64.RawURLEncoding.EncodeToString(encoded[:])
+}
+
+// DecodeProfileSearchCursor accepts only a token encoded for the same search.
+func DecodeProfileSearchCursor(token, search string) (uuid.UUID, error) {
+	if search == "" || token == "" {
+		return DecodeProfileCursor(token)
+	}
+	decoded, err := base64.RawURLEncoding.Strict().DecodeString(token)
+	if err != nil || len(decoded) != 33 || decoded[0] != 'S' {
+		return uuid.Nil, Invalid("page_token")
+	}
+	digest := sha256.Sum256([]byte(search))
+	if !bytes.Equal(decoded[17:], digest[:16]) {
+		return uuid.Nil, Invalid("page_token")
+	}
+	id, err := uuid.FromBytes(decoded[1:17])
 	if err != nil || id == uuid.Nil {
 		return uuid.Nil, Invalid("page_token")
 	}

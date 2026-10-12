@@ -49,13 +49,15 @@ SELECT g.id, g.name,
     ARRAY(SELECT m.device_id::text FROM device_group_memberships m WHERE m.group_id = g.id ORDER BY m.device_id)::text[] AS device_ids
 FROM device_groups g
 WHERE g.id > $1::uuid
+  AND ($2::text = '' OR strpos(lower(g.name), lower($2::text)) > 0)
 ORDER BY g.id
-LIMIT $2::int
+LIMIT $3::int
 `
 
 type ListDeviceGroupsParams struct {
-	AfterID  uuid.UUID
-	RowLimit int32
+	AfterID    uuid.UUID
+	NameSearch string
+	RowLimit   int32
 }
 
 type ListDeviceGroupsRow struct {
@@ -65,7 +67,7 @@ type ListDeviceGroupsRow struct {
 }
 
 func (q *Queries) ListDeviceGroups(ctx context.Context, arg ListDeviceGroupsParams) ([]ListDeviceGroupsRow, error) {
-	rows, err := q.db.Query(ctx, listDeviceGroups, arg.AfterID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listDeviceGroups, arg.AfterID, arg.NameSearch, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}

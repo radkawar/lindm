@@ -57,18 +57,23 @@ func (q *Queries) CurrentExecutionHealth(ctx context.Context, arg CurrentExecuti
 }
 
 const getDynamicGroup = `-- name: GetDynamicGroup :one
-SELECT id,revision,definition FROM dynamic_target_groups WHERE id=$1
+SELECT id,revision,definition,name FROM dynamic_target_groups WHERE id=$1
 `
 
 func (q *Queries) GetDynamicGroup(ctx context.Context, id uuid.UUID) (DynamicTargetGroup, error) {
 	row := q.db.QueryRow(ctx, getDynamicGroup, id)
 	var i DynamicTargetGroup
-	err := row.Scan(&i.ID, &i.Revision, &i.Definition)
+	err := row.Scan(
+		&i.ID,
+		&i.Revision,
+		&i.Definition,
+		&i.Name,
+	)
 	return i, err
 }
 
 const getRollout = `-- name: GetRollout :one
-SELECT id, creator_id, definition, revision, ring_index, paused, pause_reason, stage_started_at FROM resource_rollouts WHERE id=$1
+SELECT id, creator_id, definition, revision, ring_index, paused, pause_reason, stage_started_at, name FROM resource_rollouts WHERE id=$1
 `
 
 func (q *Queries) GetRollout(ctx context.Context, id uuid.UUID) (ResourceRollout, error) {
@@ -83,6 +88,7 @@ func (q *Queries) GetRollout(ctx context.Context, id uuid.UUID) (ResourceRollout
 		&i.Paused,
 		&i.PauseReason,
 		&i.StageStartedAt,
+		&i.Name,
 	)
 	return i, err
 }
@@ -209,7 +215,7 @@ func (q *Queries) InsertDynamicGroupRevision(ctx context.Context, arg InsertDyna
 }
 
 const insertRollout = `-- name: InsertRollout :execrows
-INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING
+INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at,name) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING
 `
 
 type InsertRolloutParams struct {
@@ -217,6 +223,7 @@ type InsertRolloutParams struct {
 	Definition     []byte
 	CreatorID      uuid.UUID
 	StageStartedAt pgtype.Timestamptz
+	Name           string
 }
 
 func (q *Queries) InsertRollout(ctx context.Context, arg InsertRolloutParams) (int64, error) {
@@ -225,6 +232,7 @@ func (q *Queries) InsertRollout(ctx context.Context, arg InsertRolloutParams) (i
 		arg.Definition,
 		arg.CreatorID,
 		arg.StageStartedAt,
+		arg.Name,
 	)
 	if err != nil {
 		return 0, err
@@ -428,16 +436,20 @@ func (q *Queries) ListActiveRollouts(ctx context.Context, afterID uuid.UUID) ([]
 }
 
 const listDynamicGroups = `-- name: ListDynamicGroups :many
-SELECT id,revision,definition FROM dynamic_target_groups WHERE id > $1::uuid ORDER BY id LIMIT $2::int
+SELECT id,revision,definition,name FROM dynamic_target_groups
+WHERE id > $1::uuid
+  AND ($2::text = '' OR strpos(lower(name), lower($2::text)) > 0)
+ORDER BY id LIMIT $3::int
 `
 
 type ListDynamicGroupsParams struct {
-	AfterID  uuid.UUID
-	RowLimit int32
+	AfterID    uuid.UUID
+	NameSearch string
+	RowLimit   int32
 }
 
 func (q *Queries) ListDynamicGroups(ctx context.Context, arg ListDynamicGroupsParams) ([]DynamicTargetGroup, error) {
-	rows, err := q.db.Query(ctx, listDynamicGroups, arg.AfterID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listDynamicGroups, arg.AfterID, arg.NameSearch, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +457,12 @@ func (q *Queries) ListDynamicGroups(ctx context.Context, arg ListDynamicGroupsPa
 	items := []DynamicTargetGroup{}
 	for rows.Next() {
 		var i DynamicTargetGroup
-		if err := rows.Scan(&i.ID, &i.Revision, &i.Definition); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Revision,
+			&i.Definition,
+			&i.Name,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -457,16 +474,20 @@ func (q *Queries) ListDynamicGroups(ctx context.Context, arg ListDynamicGroupsPa
 }
 
 const listRollouts = `-- name: ListRollouts :many
-SELECT id FROM resource_rollouts WHERE id > $1::uuid ORDER BY id LIMIT $2::int
+SELECT id FROM resource_rollouts
+WHERE id > $1::uuid
+  AND ($2::text = '' OR strpos(lower(name), lower($2::text)) > 0)
+ORDER BY id LIMIT $3::int
 `
 
 type ListRolloutsParams struct {
-	AfterID  uuid.UUID
-	RowLimit int32
+	AfterID    uuid.UUID
+	NameSearch string
+	RowLimit   int32
 }
 
 func (q *Queries) ListRollouts(ctx context.Context, arg ListRolloutsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listRollouts, arg.AfterID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listRollouts, arg.AfterID, arg.NameSearch, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -664,18 +685,24 @@ func (q *Queries) LockTargetingShared(ctx context.Context) error {
 }
 
 const putDynamicGroup = `-- name: PutDynamicGroup :execrows
-INSERT INTO dynamic_target_groups(id,revision,definition) SELECT $1,1,$2 WHERE $3::bigint=0
-ON CONFLICT(id) DO UPDATE SET revision=dynamic_target_groups.revision+1,definition=EXCLUDED.definition WHERE dynamic_target_groups.revision=$3::bigint
+INSERT INTO dynamic_target_groups(id,revision,definition,name) SELECT $1,1,$2,$3 WHERE $4::bigint=0
+ON CONFLICT(id) DO UPDATE SET revision=dynamic_target_groups.revision+1,definition=EXCLUDED.definition,name=EXCLUDED.name WHERE dynamic_target_groups.revision=$4::bigint
 `
 
 type PutDynamicGroupParams struct {
 	ID         uuid.UUID
 	Definition []byte
+	Name       string
 	Expected   int64
 }
 
 func (q *Queries) PutDynamicGroup(ctx context.Context, arg PutDynamicGroupParams) (int64, error) {
-	result, err := q.db.Exec(ctx, putDynamicGroup, arg.ID, arg.Definition, arg.Expected)
+	result, err := q.db.Exec(ctx, putDynamicGroup,
+		arg.ID,
+		arg.Definition,
+		arg.Name,
+		arg.Expected,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -987,17 +1014,23 @@ func (q *Queries) TargetingDeviceSnapshot(ctx context.Context, deviceID uuid.UUI
 }
 
 const updateDynamicGroup = `-- name: UpdateDynamicGroup :execrows
-UPDATE dynamic_target_groups SET revision=revision+1,definition=$2 WHERE id=$1 AND revision=$3
+UPDATE dynamic_target_groups SET revision=revision+1,definition=$2,name=$3 WHERE id=$1 AND revision=$4
 `
 
 type UpdateDynamicGroupParams struct {
 	ID         uuid.UUID
 	Definition []byte
+	Name       string
 	Revision   int64
 }
 
 func (q *Queries) UpdateDynamicGroup(ctx context.Context, arg UpdateDynamicGroupParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateDynamicGroup, arg.ID, arg.Definition, arg.Revision)
+	result, err := q.db.Exec(ctx, updateDynamicGroup,
+		arg.ID,
+		arg.Definition,
+		arg.Name,
+		arg.Revision,
+	)
 	if err != nil {
 		return 0, err
 	}

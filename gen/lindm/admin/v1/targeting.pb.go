@@ -586,9 +586,13 @@ func (x *GetDynamicGroupResponse) GetGroup() *DynamicTargetGroup {
 }
 
 type ListDynamicGroupsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	AfterId       *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	PageSize uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	AfterId  *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	// Case-insensitive literal substring of the group name; empty disables it.
+	// after_id is a position in ID order under any search: restart from no
+	// after_id when the search changes.
+	NameSearch    string `protobuf:"bytes,3,opt,name=name_search,json=nameSearch,proto3" json:"name_search,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -633,6 +637,13 @@ func (x *ListDynamicGroupsRequest) GetPageSize() uint32 {
 func (x *ListDynamicGroupsRequest) GetAfterId() string {
 	if x != nil && x.AfterId != nil {
 		return *x.AfterId
+	}
+	return ""
+}
+
+func (x *ListDynamicGroupsRequest) GetNameSearch() string {
+	if x != nil {
+		return x.NameSearch
 	}
 	return ""
 }
@@ -2216,9 +2227,14 @@ func (x *ControlRolloutResponse) GetRollout() *RolloutState {
 }
 
 type ListRolloutsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	AfterId       *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	PageSize uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	AfterId  *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	// Case-insensitive literal substring of the rollout's name, its ring names in
+	// order joined by ", " (so a single ring name always matches); empty disables
+	// it. after_id is a position in ID order under any search: restart from no
+	// after_id when the search changes.
+	NameSearch    string `protobuf:"bytes,4,opt,name=name_search,json=nameSearch,proto3" json:"name_search,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2263,6 +2279,13 @@ func (x *ListRolloutsRequest) GetPageSize() uint32 {
 func (x *ListRolloutsRequest) GetAfterId() string {
 	if x != nil && x.AfterId != nil {
 		return *x.AfterId
+	}
+	return ""
+}
+
+func (x *ListRolloutsRequest) GetNameSearch() string {
+	if x != nil {
+		return x.NameSearch
 	}
 	return ""
 }
@@ -2350,10 +2373,12 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\x16GetDynamicGroupRequest\x12#\n" +
 	"\bgroup_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\agroupId\"S\n" +
 	"\x17GetDynamicGroupResponse\x128\n" +
-	"\x05group\x18\x01 \x01(\v2\".lindm.admin.v1.DynamicTargetGroupR\x05group\"y\n" +
+	"\x05group\x18\x01 \x01(\v2\".lindm.admin.v1.DynamicTargetGroupR\x05group\"\xa8\x01\n" +
 	"\x18ListDynamicGroupsRequest\x12&\n" +
 	"\tpage_size\x18\x01 \x01(\rB\t\xbaH\x06*\x04\x18d(\x01R\bpageSize\x12(\n" +
-	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01B\v\n" +
+	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01\x12-\n" +
+	"\vname_search\x18\x03 \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\n" +
+	"nameSearchB\v\n" +
 	"\t_after_id\"W\n" +
 	"\x19ListDynamicGroupsResponse\x12:\n" +
 	"\x06groups\x18\x01 \x03(\v2\".lindm.admin.v1.DynamicTargetGroupR\x06groups\"\x90\x01\n" +
@@ -2521,10 +2546,12 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\x10OPERATION_RESUME\x10\x02\x12\x15\n" +
 	"\x11OPERATION_PROMOTE\x10\x03\"P\n" +
 	"\x16ControlRolloutResponse\x126\n" +
-	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\x85\x01\n" +
+	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\xb4\x01\n" +
 	"\x13ListRolloutsRequest\x12&\n" +
 	"\tpage_size\x18\x01 \x01(\rB\t\xbaH\x06*\x04\x18d(\x01R\bpageSize\x12(\n" +
-	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01B\v\n" +
+	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01\x12-\n" +
+	"\vname_search\x18\x04 \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\n" +
+	"nameSearchB\v\n" +
 	"\t_after_idJ\x04\b\x03\x10\x04R\tread_only\"P\n" +
 	"\x14ListRolloutsResponse\x128\n" +
 	"\brollouts\x18\x01 \x03(\v2\x1c.lindm.admin.v1.RolloutStateR\brolloutsB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"

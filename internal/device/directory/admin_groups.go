@@ -35,12 +35,13 @@ func (s *Service) ListDeviceGroups(ctx context.Context, req *connect.Request[adm
 	if ids := req.Msg.GetGroupIds(); len(ids) > 0 {
 		return s.lookupDeviceGroups(ctx, ids)
 	}
-	after, err := core.DecodeProfileCursor(req.Msg.GetPageToken())
+	search := req.Msg.GetNameSearch()
+	after, err := core.DecodeProfileSearchCursor(req.Msg.GetPageToken(), search)
 	if err != nil {
 		return nil, err
 	}
 	limit := core.PageLimit(req.Msg.GetPageSize())
-	rows, err := devicedb.New(s.Pool).ListDeviceGroups(ctx, devicedb.ListDeviceGroupsParams{AfterID: after, RowLimit: limit + 1})
+	rows, err := devicedb.New(s.Pool).ListDeviceGroups(ctx, devicedb.ListDeviceGroupsParams{AfterID: after, NameSearch: search, RowLimit: limit + 1})
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -64,7 +65,7 @@ func (s *Service) ListDeviceGroups(ctx context.Context, req *connect.Request[adm
 		response.Groups = append(response.Groups, group)
 	}
 	if len(response.Groups) < len(rows) {
-		response.NextPageToken = core.EncodeProfileCursor(rows[len(response.Groups)-1].ID)
+		response.NextPageToken = core.EncodeProfileSearchCursor(rows[len(response.Groups)-1].ID, search)
 	}
 	return core.NoStore(response), nil
 }

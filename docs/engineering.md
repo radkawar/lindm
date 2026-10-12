@@ -194,6 +194,17 @@ catalogs and inputs, security tokens, certificate credentials and issuers, netwo
 connections, person bindings, external approved package sources) still take the
 issued reference as text, labelled by what it is; they need catalog APIs.
 
+A picker over a paged list never searches only the loaded page: the list RPC takes
+a bounded, case-insensitive literal substring (`ListDeviceGroupsRequest.name_search`,
+`ListDynamicGroupsRequest.name_search`, `ListRolloutsRequest.name_search` over the
+rollout's stage names joined by ", ", like `ListDevicesRequest.hostname_search`),
+the picker sends it after a 250 ms typing pause, and loading, failure with Retry,
+an empty result naming the search, and First/More choices paging sit in the open
+popover (`pickerFooter`). A device-group page token binds its search; the `after_id`
+keyset of dynamic groups and rollouts is valid under any search, and the pickers
+restart it whenever the search changes. Dynamic group and rollout names are stored
+beside their protobuf definitions (migration `targeting_names` backfilled them).
+
 **Free-text inputs.** A value that refers to something that already exists (devices
 and hostnames, packages and package managers, operating systems, architectures,
 statuses, kinds, groups, roles, profiles, accounts and actors, event types,

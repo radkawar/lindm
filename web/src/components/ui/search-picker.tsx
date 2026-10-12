@@ -1,5 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { RpcError } from "@/components/ui/rpc-error";
+import { toRpcFailure } from "@/lib/errors";
 import {
   Command,
   CommandEmpty,
@@ -139,6 +141,62 @@ export function SearchPicker({
       </Popover>
       {children}
     </div>
+  );
+}
+
+// The footer of a picker whose search runs on the server: loading, a failed read
+// with Retry, an empty result that names what was searched, and paging with
+// First/More choices. Undefined when there is nothing to say.
+export function pickerFooter({
+  loading,
+  error,
+  onRetry,
+  empty,
+  fetching,
+  onFirst,
+  onMore,
+}: {
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+  // Shown once the search has settled with no results; omit otherwise.
+  empty?: string;
+  fetching: boolean;
+  // Present when an earlier page exists, and when another page follows.
+  onFirst?: () => void;
+  onMore?: () => void;
+}): ReactNode {
+  if (!loading && !error && !empty && !onFirst && !onMore) return undefined;
+  return (
+    <>
+      {loading ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          Loading choices…
+        </p>
+      ) : null}
+      {error ? (
+        <RpcError failure={toRpcFailure(error)} title="Couldn't load choices">
+          <Button type="button" variant="outline" disabled={fetching} onClick={onRetry}>
+            Retry choices
+          </Button>
+        </RpcError>
+      ) : null}
+      {empty ? <p className="text-xs text-muted-foreground">{empty}</p> : null}
+      {onFirst || onMore ? (
+        <div className="flex flex-wrap gap-2">
+          {onFirst ? (
+            <Button type="button" variant="outline" size="sm" disabled={fetching} onClick={onFirst}>
+              First choices
+            </Button>
+          ) : null}
+          {onMore ? (
+            <Button type="button" variant="outline" size="sm" disabled={fetching} onClick={onMore}>
+              More choices
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </>
   );
 }
 

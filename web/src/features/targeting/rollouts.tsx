@@ -30,7 +30,7 @@ import { AssignmentForm } from "./assignment";
 import { ReasonControl } from "./controls";
 import { TargetMutation } from "./mutation";
 import {
-  dynamicGroupsQueryOptions,
+  dynamicGroupQueryOptions,
   rolloutsQueryOptions,
   targetAssignmentsQueryOptions,
 } from "./queries";
@@ -147,12 +147,11 @@ export function RolloutsView({
 }
 
 function DynamicGroupName({ value }: { value: string }) {
-  const query = useQuery(dynamicGroupsQueryOptions(useAuthLifetime(), ""));
-  const group = query.data?.find((item) => item.groupId === value);
-  if (group) return group.name || "(unnamed)";
+  const query = useQuery(dynamicGroupQueryOptions(useAuthLifetime(), value));
+  if (query.data) return query.data.name || "(unnamed)";
   if (query.isPending) return "(loading name…)";
   if (query.error) return "(name unavailable)";
-  return "(not among the first 100 dynamic groups)";
+  return "(deleted dynamic group)";
 }
 
 function TargetName({ target, names }: { target?: TargetRef; names: TargetNames }) {
@@ -202,7 +201,7 @@ function StagedRollouts({ names }: { names: TargetNames }) {
   const [afterId, setAfterId] = useState("");
   const [planning, setPlanning] = useState(false);
   const list = useQuery({
-    ...rolloutsQueryOptions(lifetime, afterId),
+    ...rolloutsQueryOptions(lifetime, afterId, ""),
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
   });
@@ -292,7 +291,7 @@ function SavedAssignments({ names }: { names: TargetNames }) {
   const [afterId, setAfterId] = useState("");
   const [editing, setEditing] = useState("");
   const list = useQuery(targetAssignmentsQueryOptions(lifetime, afterId));
-  const rollouts = useQuery(rolloutsQueryOptions(lifetime, ""));
+  const rollouts = useQuery(rolloutsQueryOptions(lifetime, "", ""));
   return (
     <section aria-labelledby="saved-assignments-title" className="grid min-w-0 gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">

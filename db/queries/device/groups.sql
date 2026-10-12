@@ -28,6 +28,7 @@ SELECT g.id, g.name,
     ARRAY(SELECT m.device_id::text FROM device_group_memberships m WHERE m.group_id = g.id ORDER BY m.device_id)::text[] AS device_ids
 FROM device_groups g
 WHERE g.id > sqlc.arg('after_id')::uuid
+  AND (sqlc.arg('name_search')::text = '' OR strpos(lower(g.name), lower(sqlc.arg('name_search')::text)) > 0)
 ORDER BY g.id
 LIMIT sqlc.arg('row_limit')::int;
 

@@ -42,7 +42,7 @@ export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {
   const [afterId, setAfterId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createGeneration, setCreateGeneration] = useState(0);
-  const list = useQuery(dynamicGroupsQueryOptions(lifetime, afterId));
+  const list = useQuery(dynamicGroupsQueryOptions(lifetime, afterId, ""));
   const groups = [...(list.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const startCreate = () => {
     discardSettledAttempt("dynamic-group:new");

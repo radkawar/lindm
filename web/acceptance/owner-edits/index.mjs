@@ -21,6 +21,7 @@ import * as advisorySeverity from "./advisory-severity.mjs";
 import * as enrollment from "./enrollment.mjs";
 import * as agentRepository from "./agent-repository.mjs";
 import * as rollouts from "./rollouts.mjs";
+import * as pickerServerSearch from "./picker-server-search.mjs";
 import * as profiles from "./profiles.mjs";
 import * as profileEditor from "./profile-editor.mjs";
 import * as profilePublish from "./profile-publish.mjs";
@@ -99,6 +100,7 @@ export const ownerEdits = [
   // One refused sign-in in a separate signed-out context.
   pass2P2SignInError,
   rollouts,
+  pickerServerSearch,
   accounts,
   authorization,
   profiles,

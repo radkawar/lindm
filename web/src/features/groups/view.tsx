@@ -34,13 +34,15 @@ import { DeviceMembersField, type DeviceLabelSlot } from "./device-members";
 const MAX_MEMBERS = 1000; // SetDeviceGroupRequest.device_ids max_items
 const LISTED_MEMBERS = 5;
 
-export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
+// One page of device groups in ID order. A non-empty nameSearch keeps only groups
+// whose name contains it in any case; pageToken must come from the same search.
+export function groupsQueryOptions(lifetime: AuthLifetime, pageToken: string, nameSearch: string) {
   return queryOptions({
-    queryKey: ["device-groups", lifetime.generation, pageToken] as const,
+    queryKey: ["device-groups", lifetime.generation, pageToken, nameSearch] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
       const result = await adminClient.listDeviceGroups(
-        { pageSize: 50, pageToken },
+        { pageSize: 50, pageToken, nameSearch },
         { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();
@@ -95,7 +97,7 @@ export function GroupsView({
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const [createGeneration, setCreateGeneration] = useState(0);
-  const list = useQuery(groupsQueryOptions(lifetime, pageToken));
+  const list = useQuery(groupsQueryOptions(lifetime, pageToken, ""));
   const groups = [...(list.data?.groups ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const startCreate = () => {
     setCreateGeneration((value) => value + 1);

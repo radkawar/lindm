@@ -13,6 +13,7 @@ type DynamicTargetGroup struct {
 	ID         uuid.UUID
 	Revision   int64
 	Definition []byte
+	Name       string
 }
 
 type ResourceRollout struct {
@@ -24,6 +25,7 @@ type ResourceRollout struct {
 	Paused         bool
 	PauseReason    string
 	StageStartedAt pgtype.Timestamptz
+	Name           string
 }
 
 type TargetAssignment struct {

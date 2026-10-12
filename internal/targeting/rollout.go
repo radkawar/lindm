@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,7 +106,7 @@ func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal,
 		return nil, err
 	}
 	id := uuid.MustParse(r.Rollout.RolloutId)
-	count, err := q.InsertRollout(ctx, targetingdb.InsertRolloutParams{ID: id, Definition: b, CreatorID: p.ID, StageStartedAt: pgtype.Timestamptz{Time: now, Valid: true}})
+	count, err := q.InsertRollout(ctx, targetingdb.InsertRolloutParams{ID: id, Definition: b, CreatorID: p.ID, StageStartedAt: pgtype.Timestamptz{Time: now, Valid: true}, Name: rolloutName(r.Rollout)})
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +397,7 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	if r.AfterId != nil {
 		after = uuid.MustParse(*r.AfterId)
 	}
-	ids, err := q.ListRollouts(ctx, targetingdb.ListRolloutsParams{AfterID: after, RowLimit: int32(r.PageSize)})
+	ids, err := q.ListRollouts(ctx, targetingdb.ListRolloutsParams{AfterID: after, NameSearch: r.NameSearch, RowLimit: int32(r.PageSize)})
 	if err != nil {
 		return nil, err
 	}
@@ -412,6 +413,16 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 		out.Rollouts = append(out.Rollouts, state)
 	}
 	return out, nil
+}
+
+// rolloutName is the rollout's searchable name: its ring names in order, as the
+// console shows them. Ring names are required and unique, so it is never empty.
+func rolloutName(spec *policyv1.RolloutSpec) string {
+	names := make([]string, len(spec.GetRings()))
+	for i, ring := range spec.GetRings() {
+		names[i] = ring.GetName()
+	}
+	return strings.Join(names, ", ")
 }
 
 // PromoteAutomatic shares the same CAS, frozen-cohort and audit path as manual

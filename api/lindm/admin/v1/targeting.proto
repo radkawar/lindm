@@ -81,6 +81,13 @@ message ListDynamicGroupsRequest {
     lte: 100
   }];
   optional string after_id = 2 [(buf.validate.field).string.uuid = true];
+  // Case-insensitive literal substring of the group name; empty disables it.
+  // after_id is a position in ID order under any search: restart from no
+  // after_id when the search changes.
+  string name_search = 3 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
 }
 message ListDynamicGroupsResponse {
   repeated DynamicTargetGroup groups = 1;
@@ -272,6 +279,14 @@ message ListRolloutsRequest {
   optional string after_id = 2 [(buf.validate.field).string.uuid = true];
   reserved 3;
   reserved "read_only";
+  // Case-insensitive literal substring of the rollout's name, its ring names in
+  // order joined by ", " (so a single ring name always matches); empty disables
+  // it. after_id is a position in ID order under any search: restart from no
+  // after_id when the search changes.
+  string name_search = 4 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
 }
 message ListRolloutsResponse {
   repeated RolloutState rollouts = 1;

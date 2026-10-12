@@ -1,13 +1,23 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { RolloutState } from "../../../gen/lindm/admin/v1/targeting_pb";
-import { Button } from "@/components/ui/button";
-import { SearchPicker, type PickerSlot, type PickerProps } from "@/components/ui/search-picker";
+import {
+  SearchPicker,
+  pickerFooter,
+  type PickerOption,
+  type PickerSlot,
+  type PickerProps,
+} from "@/components/ui/search-picker";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { SEARCH_DELAY_MS, useDelayed } from "@/hooks/use-delayed";
 import { toRpcFailure } from "@/lib/errors";
-import { dynamicGroupsQueryOptions, rolloutsQueryOptions } from "./queries";
+import {
+  dynamicGroupQueryOptions,
+  dynamicGroupsQueryOptions,
+  rolloutsQueryOptions,
+} from "./queries";
 
 const Context = createContext<TargetPickers | null>(null);
 export function TargetPickerProvider({
@@ -37,58 +47,70 @@ export type TargetNames = {
   profileVersionName: NameSlot;
 };
 
+const PAGE_SIZE = 100;
+
+// Search text as the server takes it, once typing pauses, with the ID-ordered
+// position that restarts whenever the search changes.
+function useServerSearch() {
+  const [search, setSearch] = useState("");
+  const typed = search.trim().slice(0, 128);
+  const nameSearch = useDelayed(typed, SEARCH_DELAY_MS);
+  const [page, setPage] = useState({ nameSearch: "", after: "" });
+  return {
+    search,
+    setSearch,
+    typed,
+    nameSearch,
+    after: page.nameSearch === nameSearch ? page.after : "",
+    goTo: (after: string) => setPage({ nameSearch, after }),
+  };
+}
+
+// The server searches every dynamic group by any part of its name.
 export function DynamicGroupPicker(props: PickerProps) {
-  const [after, setAfter] = useState("");
-  const query = useQuery(dynamicGroupsQueryOptions(useAuthLifetime(), after));
+  const lifetime = useAuthLifetime();
+  const search = useServerSearch();
+  const query = useQuery({
+    ...dynamicGroupsQueryOptions(lifetime, search.after, search.nameSearch),
+    placeholderData: keepPreviousData,
+  });
+  const groups = query.error ? [] : (query.data ?? []);
+  // A saved choice on another page or outside the search is still named.
+  const selected = useQuery({
+    ...dynamicGroupQueryOptions(lifetime, props.value),
+    enabled: !!props.value && !!query.data && !groups.some((g) => g.groupId === props.value),
+  });
+  const options: PickerOption[] = groups.map((group) => ({
+    value: group.groupId,
+    label: group.name,
+  }));
+  if (selected.data && !options.some((option) => option.value === selected.data?.groupId))
+    options.unshift({ value: selected.data.groupId, label: selected.data.name });
+  const settled = !query.isFetching && search.nameSearch === search.typed;
+  const last = groups.length === PAGE_SIZE ? (groups.at(-1)?.groupId ?? "") : "";
   return (
     <SearchPicker
       {...props}
-      options={(query.data ?? []).map((group) => ({ value: group.groupId, label: group.name }))}
-      note="Search within this page of up to 100 dynamic groups."
+      search={search.search}
+      onSearchChange={search.setSearch}
+      options={options}
+      note="Type any part of a dynamic group name. Up to 100 groups at a time."
+      footer={pickerFooter({
+        loading: query.isPending,
+        error: query.error,
+        onRetry: () => void query.refetch(),
+        empty:
+          query.isSuccess && settled && groups.length === 0
+            ? search.nameSearch
+              ? `No dynamic group names contain “${search.nameSearch}”.`
+              : "No dynamic groups yet. Choose a device group instead, or create a dynamic group in Groups."
+            : undefined,
+        fetching: query.isFetching,
+        onFirst: search.after ? () => search.goTo("") : undefined,
+        onMore: last ? () => search.goTo(last) : undefined,
+      })}
     >
-      {query.isPending ? (
-        <p role="status" className="text-sm">
-          Loading dynamic groups…
-        </p>
-      ) : null}
-      {query.error ? (
-        <RpcError failure={toRpcFailure(query.error)}>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            Retry dynamic groups
-          </Button>
-        </RpcError>
-      ) : null}
-      {!query.error && query.data?.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No dynamic groups on this page. Choose a device group instead, or create a dynamic group
-          in Groups.
-        </p>
-      ) : null}
-      {after ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching}
-          onClick={() => setAfter("")}
-        >
-          First dynamic groups
-        </Button>
-      ) : null}
-      {query.data?.length === 100 ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching}
-          onClick={() => setAfter(query.data?.at(-1)?.groupId ?? "")}
-        >
-          More dynamic groups
-        </Button>
-      ) : null}
+      {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
     </SearchPicker>
   );
 }
@@ -97,13 +119,22 @@ export function rolloutName(state: RolloutState) {
   return state.rollout?.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout";
 }
 
+// The server searches every rollout by any part of its name (its stage names).
 export function RolloutPicker(props: PickerProps) {
-  const [after, setAfter] = useState("");
-  const query = useQuery(rolloutsQueryOptions(useAuthLifetime(), after));
+  const search = useServerSearch();
+  const query = useQuery({
+    ...rolloutsQueryOptions(useAuthLifetime(), search.after, search.nameSearch),
+    placeholderData: keepPreviousData,
+  });
+  const rollouts = query.error ? [] : (query.data ?? []);
+  const settled = !query.isFetching && search.nameSearch === search.typed;
+  const last = rollouts.length === PAGE_SIZE ? (rollouts.at(-1)?.rollout?.rolloutId ?? "") : "";
   return (
     <SearchPicker
       {...props}
-      options={(query.data ?? []).flatMap((state) =>
+      search={search.search}
+      onSearchChange={search.setSearch}
+      options={rollouts.flatMap((state) =>
         state.rollout
           ? [
               {
@@ -114,51 +145,21 @@ export function RolloutPicker(props: PickerProps) {
             ]
           : [],
       )}
-      note="Search within this page of up to 100 rollouts."
-    >
-      {query.isPending ? (
-        <p role="status" className="text-sm">
-          Loading staged rollouts…
-        </p>
-      ) : null}
-      {query.error ? (
-        <RpcError failure={toRpcFailure(query.error)}>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            Retry staged rollouts
-          </Button>
-        </RpcError>
-      ) : null}
-      {!query.error && query.data?.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No staged rollouts on this page. Leave this optional selection empty, or plan one under
-          Staged rollouts above.
-        </p>
-      ) : null}
-      {after ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching}
-          onClick={() => setAfter("")}
-        >
-          First rollouts
-        </Button>
-      ) : null}
-      {query.data?.length === 100 ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching}
-          onClick={() => setAfter(query.data?.at(-1)?.rollout?.rolloutId ?? "")}
-        >
-          More rollouts
-        </Button>
-      ) : null}
-    </SearchPicker>
+      note="Type any part of a stage name. Up to 100 rollouts at a time."
+      footer={pickerFooter({
+        loading: query.isPending,
+        error: query.error,
+        onRetry: () => void query.refetch(),
+        empty:
+          query.isSuccess && settled && rollouts.length === 0
+            ? search.nameSearch
+              ? `No staged rollouts have a stage name containing “${search.nameSearch}”.`
+              : "No staged rollouts yet. Leave this optional selection empty, or plan one under Staged rollouts above."
+            : undefined,
+        fetching: query.isFetching,
+        onFirst: search.after ? () => search.goTo("") : undefined,
+        onMore: last ? () => search.goTo(last) : undefined,
+      })}
+    />
   );
 }

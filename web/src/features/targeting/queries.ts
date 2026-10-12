@@ -1,4 +1,5 @@
 import { toJsonString } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
 import {
   TargetExpressionSchema,
@@ -7,18 +8,46 @@ import {
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { adminClient } from "@/lib/rpc";
 
-export function dynamicGroupsQueryOptions(lifetime: AuthLifetime, afterId: string) {
+// A page of dynamic groups in ID order after afterId. A non-empty nameSearch keeps
+// only names containing it in any case; restart from "" when it changes.
+export function dynamicGroupsQueryOptions(
+  lifetime: AuthLifetime,
+  afterId: string,
+  nameSearch: string,
+) {
   return queryOptions({
-    queryKey: ["targeting", lifetime.generation, "groups", afterId] as const,
+    queryKey: ["targeting", lifetime.generation, "groups", afterId, nameSearch] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
       const response = await adminClient.listDynamicGroups(
-        { pageSize: 100, afterId: afterId || undefined },
+        { pageSize: 100, afterId: afterId || undefined, nameSearch },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();
       return response.groups;
     },
+  });
+}
+
+// One saved dynamic group by ID, wherever it sorts; null when it no longer exists.
+export function dynamicGroupQueryOptions(lifetime: AuthLifetime, groupId: string) {
+  return queryOptions({
+    queryKey: ["targeting", lifetime.generation, "group", groupId] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await adminClient.getDynamicGroup(
+          { groupId },
+          { signal: AbortSignal.any([signal, lifetime.signal]) },
+        );
+        lifetime.signal.throwIfAborted();
+        return response.group ?? null;
+      } catch (error) {
+        if (ConnectError.from(error).code === Code.NotFound) return null;
+        throw error;
+      }
+    },
+    retry: false,
   });
 }
 
@@ -83,13 +112,15 @@ export function targetAssignmentsQueryOptions(lifetime: AuthLifetime, afterId: s
   });
 }
 
-export function rolloutsQueryOptions(lifetime: AuthLifetime, afterId: string) {
+// A page of rollouts in ID order after afterId. A non-empty nameSearch keeps only
+// rollouts whose name (ring names joined by ", ") contains it in any case.
+export function rolloutsQueryOptions(lifetime: AuthLifetime, afterId: string, nameSearch: string) {
   return queryOptions({
-    queryKey: ["targeting", lifetime.generation, "rollouts", afterId] as const,
+    queryKey: ["targeting", lifetime.generation, "rollouts", afterId, nameSearch] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
       const response = await adminClient.listRollouts(
-        { pageSize: 100, afterId: afterId || undefined },
+        { pageSize: 100, afterId: afterId || undefined, nameSearch },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

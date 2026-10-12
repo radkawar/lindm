@@ -222,9 +222,9 @@ func (s *Store) PutDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Princ
 	id := uuid.MustParse(group.GroupId)
 	var count int64
 	if r.ExpectedRevision == 0 {
-		count, err = q.PutDynamicGroup(ctx, targetingdb.PutDynamicGroupParams{ID: id, Definition: b, Expected: 0})
+		count, err = q.PutDynamicGroup(ctx, targetingdb.PutDynamicGroupParams{ID: id, Definition: b, Name: group.Name, Expected: 0})
 	} else {
-		count, err = q.UpdateDynamicGroup(ctx, targetingdb.UpdateDynamicGroupParams{ID: id, Definition: b, Revision: int64(r.ExpectedRevision)})
+		count, err = q.UpdateDynamicGroup(ctx, targetingdb.UpdateDynamicGroupParams{ID: id, Definition: b, Name: group.Name, Revision: int64(r.ExpectedRevision)})
 	}
 	if err != nil {
 		return nil, err
@@ -250,7 +250,7 @@ func (s *Store) ListDynamicGroups(ctx context.Context, tx pgx.Tx, p identity.Pri
 	if r.AfterId != nil {
 		after = uuid.MustParse(*r.AfterId)
 	}
-	rows, err := q.ListDynamicGroups(ctx, targetingdb.ListDynamicGroupsParams{AfterID: after, RowLimit: int32(r.PageSize)})
+	rows, err := q.ListDynamicGroups(ctx, targetingdb.ListDynamicGroupsParams{AfterID: after, NameSearch: r.NameSearch, RowLimit: int32(r.PageSize)})
 	if err != nil {
 		return nil, err
 	}

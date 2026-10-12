@@ -96,17 +96,20 @@ INSERT INTO audit_events(id,occurred_at,actor_id,action,resource_id,reason,detai
 VALUES ($1,clock_timestamp(),$2,$3,$4,$5,jsonb_strip_nulls(jsonb_build_object('context',NULLIF(sqlc.arg('context')::text,''))));
 
 -- name: GetDynamicGroup :one
-SELECT id,revision,definition FROM dynamic_target_groups WHERE id=$1;
+SELECT id,revision,definition,name FROM dynamic_target_groups WHERE id=$1;
 
 -- name: ListDynamicGroups :many
-SELECT id,revision,definition FROM dynamic_target_groups WHERE id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT sqlc.arg(row_limit)::int;
+SELECT id,revision,definition,name FROM dynamic_target_groups
+WHERE id > sqlc.arg(after_id)::uuid
+  AND (sqlc.arg(name_search)::text = '' OR strpos(lower(name), lower(sqlc.arg(name_search)::text)) > 0)
+ORDER BY id LIMIT sqlc.arg(row_limit)::int;
 
 -- name: PutDynamicGroup :execrows
-INSERT INTO dynamic_target_groups(id,revision,definition) SELECT sqlc.arg(id),1,sqlc.arg(definition) WHERE sqlc.arg(expected)::bigint=0
-ON CONFLICT(id) DO UPDATE SET revision=dynamic_target_groups.revision+1,definition=EXCLUDED.definition WHERE dynamic_target_groups.revision=sqlc.arg(expected)::bigint;
+INSERT INTO dynamic_target_groups(id,revision,definition,name) SELECT sqlc.arg(id),1,sqlc.arg(definition),sqlc.arg(name) WHERE sqlc.arg(expected)::bigint=0
+ON CONFLICT(id) DO UPDATE SET revision=dynamic_target_groups.revision+1,definition=EXCLUDED.definition,name=EXCLUDED.name WHERE dynamic_target_groups.revision=sqlc.arg(expected)::bigint;
 
 -- name: UpdateDynamicGroup :execrows
-UPDATE dynamic_target_groups SET revision=revision+1,definition=$2 WHERE id=$1 AND revision=$3;
+UPDATE dynamic_target_groups SET revision=revision+1,definition=$2,name=$3 WHERE id=$1 AND revision=$4;
 
 -- name: InsertDynamicGroupRevision :exec
 INSERT INTO dynamic_target_group_revisions(group_id,revision,definition,actor_id) VALUES ($1,$2,$3,$4);
@@ -139,13 +142,16 @@ INSERT INTO target_membership_snapshots(preview_id,group_id,group_revision,devic
 INSERT INTO target_execution_heads(device_id,preview_id) VALUES ($1,$2) ON CONFLICT(device_id) DO UPDATE SET preview_id=EXCLUDED.preview_id;
 
 -- name: InsertRollout :execrows
-INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING;
+INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at,name) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING;
 
 -- name: GetRollout :one
 SELECT * FROM resource_rollouts WHERE id=$1;
 
 -- name: ListRollouts :many
-SELECT id FROM resource_rollouts WHERE id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT sqlc.arg(row_limit)::int;
+SELECT id FROM resource_rollouts
+WHERE id > sqlc.arg(after_id)::uuid
+  AND (sqlc.arg(name_search)::text = '' OR strpos(lower(name), lower(sqlc.arg(name_search)::text)) > 0)
+ORDER BY id LIMIT sqlc.arg(row_limit)::int;
 
 -- name: ListActiveRollouts :many
 SELECT id,creator_id,revision FROM resource_rollouts WHERE NOT paused AND id > sqlc.arg(after_id)::uuid ORDER BY id LIMIT 100;
