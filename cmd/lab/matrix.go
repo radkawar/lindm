@@ -372,7 +372,7 @@ var laneInputs = map[string][]string{
 	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "diagnostics", "record"},
 	"updates":             {"repo", "build-repo", "lab", "diagnostics", "record"},
 	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
-	"enroll-from-console": {"console-browser", "redhat-token-file", "record"},
+	"enroll-from-console": {"console-browser", "redhat-token-file", "diagnostics", "record"},
 	"services":            {"record"},
 	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "diagnostics", "record"},
 	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "diagnostics", "record"},
@@ -794,7 +794,9 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			args = append(args, "-lindmd", r.lindmd)
 		case "airgap":
 			args = append(args, r.airgap[c.Release.Key+"/"+c.Architecture]...)
-			args = append(args, "-work-dir", r.evidence, "-diagnostics", base+"-diagnostics")
+			// "diagnostics" is its own input: a second -diagnostics flag here
+			// made the matrix create one directory and the lane write another.
+			args = append(args, "-work-dir", r.evidence)
 		case "console-browser":
 			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, c.Release.Key+"-"+c.Architecture+".json"))
 			if r.consoleAdmin != "" {

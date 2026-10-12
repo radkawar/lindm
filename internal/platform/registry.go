@@ -637,7 +637,7 @@ var registry = []*Release{
 		FDE:     "LUKS2 (AutoYaST); systemd-cryptenroll with dracut",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); KDE separately qualified", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
-			Lanes:            []LabLane{LaneUpdates, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
+			Lanes:            []LabLane{LaneUpdates, LaneAirgap, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
 			ResourcePackages: []string{"rpm-build", "rpm", "createrepo_c", "gpg2", "openssl", "python313", "attr", "acl", "curl", "nftables", "firewalld", "pam_pwquality", "libpwquality1", "libpwquality-tools", "pam", "pam-config"},
 			Installer:        AutoYaST,
 			// YaST's NetworkManager readiness check executes /bin/ip, while

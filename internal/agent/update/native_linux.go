@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -453,14 +454,15 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		}
 		_, err = mutatingCommand(ctx, phase, "/usr/bin/dnf", "--assumeyes", "--disablerepo=*", "--setopt=install_weak_deps=False", "--setopt=obsoletes=False", "--setopt=plugins=0", action, path)
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_ZYPPER:
-		args := []string{"--non-interactive", "--no-refresh", "--disable-repositories", "install", "--no-recommends", "--no-allow-vendor-change"}
-		if interrupted && prior.version == tx.GetNativeVersion() {
-			args = append(args, "--force")
+		args, err := zypperUpdateArgs(directory, path, interrupted && prior.version == tx.GetNativeVersion())
+		if err != nil {
+			return err
 		}
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = mutatingCommand(ctx, phase, "/usr/bin/zypper", append(args, path)...)
+		_, err = mutatingCommand(ctx, phase, "/usr/bin/zypper", args...)
+		return err
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN:
 		preview, err := nativeCommand(ctx, "simulate", "/usr/bin/pacman", "-U", "--print", "--print-format", "%n", path)
 		if err != nil {
@@ -478,6 +480,31 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		return errors.New("native package manager unsupported")
 	}
 	return err
+}
+
+// zypperUpdateArgs installs only the verified input RPM. --disable-repositories
+// also disables zypper's command-line RPM repository (exit 104:
+// "_tmpRPMcache_:lindm-agent=<evr>" not found), so an empty private repository
+// directory in the transaction directory hides every configured repository
+// instead; missing dependencies fail rather than download.
+func zypperUpdateArgs(directory, path string, reinstall bool) ([]string, error) {
+	repos := filepath.Join(directory, "zypper-repos")
+	if err := os.Mkdir(repos, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return nil, err
+	}
+	info, err := os.Lstat(repos)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(repos)
+	if err != nil || !info.IsDir() || len(entries) != 0 {
+		return nil, errors.Join(errors.New("zypper repository directory is not an empty private directory"), err)
+	}
+	args := []string{"--non-interactive", "--no-refresh", "--reposd-dir", repos, "install", "--no-recommends", "--no-allow-vendor-change"}
+	if reinstall {
+		args = append(args, "--force")
+	}
+	return append(args, "--", path), nil
 }
 
 func ownedAPTPreview(data []byte) error {

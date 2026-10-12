@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,6 +59,55 @@ type Server struct {
 	gate     chan struct{}
 	admitted chan struct{}
 	keyPins  map[string]string
+
+	refusalMu sync.Mutex
+	refusals  Refusals
+}
+
+// maxRefusedPaths bounds the distinct unlisted packages a Server remembers.
+const maxRefusedPaths = 16
+
+// Refusals counts requests the closure could not serve. Signed metadata names
+// every package of the dated repository, so a client solver may select an RPM
+// the retained closure lacks; that 404 otherwise surfaces only as an opaque
+// client-side media error (AutoYaST: "Cannot access installation media").
+type Refusals struct {
+	// UnlistedPackages holds the first distinct closure-relative RPM paths
+	// requested under the snapshot prefix but absent from the manifest.
+	UnlistedPackages []string
+	UnlistedTotal    int
+	// Capacity counts 503 responses for the bounded request queue.
+	Capacity int
+}
+
+// Refused returns a copy of the refusals observed so far.
+func (s *Server) Refused() Refusals {
+	s.refusalMu.Lock()
+	defer s.refusalMu.Unlock()
+	r := s.refusals
+	r.UnlistedPackages = slices.Clone(r.UnlistedPackages)
+	return r
+}
+
+// Err describes the refusals, or returns nil when every request was served.
+func (r Refusals) Err() error {
+	if r.UnlistedTotal == 0 && r.Capacity == 0 {
+		return nil
+	}
+	return fmt.Errorf("snapshot closure refused %d request(s) for packages it does not retain %v and %d over-capacity request(s)", r.UnlistedTotal, r.UnlistedPackages, r.Capacity)
+}
+
+func (s *Server) refuse(name string, capacity bool) {
+	s.refusalMu.Lock()
+	defer s.refusalMu.Unlock()
+	if capacity {
+		s.refusals.Capacity++
+		return
+	}
+	s.refusals.UnlistedTotal++
+	if len(s.refusals.UnlistedPackages) < maxRefusedPaths && !slices.Contains(s.refusals.UnlistedPackages, name) {
+		s.refusals.UnlistedPackages = append(s.refusals.UnlistedPackages, name)
+	}
 }
 
 // Start verifies the signed, bounded closure before opening a listener. Each
@@ -204,6 +254,10 @@ func (s *Server) serveFile(ctx context.Context, files map[string]*labv1.Reposito
 		validQuery = true
 	}
 	if !ok || !validQuery {
+		// Repository-type probes (media.1/media, content) are expected 404s.
+		if strings.HasSuffix(name, ".rpm") {
+			s.refuse(name, false)
+		}
 		http.NotFound(w, r)
 		return
 	}
@@ -213,6 +267,7 @@ func (s *Server) serveFile(ctx context.Context, files map[string]*labv1.Reposito
 	case s.admitted <- struct{}{}:
 		defer func() { <-s.admitted }()
 	default:
+		s.refuse(name, true)
 		w.Header().Set("Retry-After", "1")
 		http.Error(w, "snapshot request capacity exhausted", http.StatusServiceUnavailable)
 		return

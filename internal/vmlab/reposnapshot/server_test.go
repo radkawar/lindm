@@ -180,6 +180,31 @@ func TestSnapshotHTTPSBoundsWaitingRequests(t *testing.T) {
 	}
 }
 
+// A solver may select an RPM the signed metadata names but the closure lacks;
+// the server, not the client's opaque media error, must name it.
+func TestSnapshotHTTPSReportsUnretainedPackages(t *testing.T) {
+	server, client, _, _ := servingFixture(t)
+	if err := server.Refused().Err(); err != nil {
+		t.Fatalf("fresh server reported refusals: %v", err)
+	}
+	for _, path := range []string{"aarch64/missing-1.0-1.aarch64.rpm", "aarch64/missing-1.0-1.aarch64.rpm", "media.1/media", "repodata/repomd.xml"} {
+		response, err := client.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := response.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refused := server.Refused()
+	if refused.UnlistedTotal != 2 || len(refused.UnlistedPackages) != 1 || refused.UnlistedPackages[0] != "aarch64/missing-1.0-1.aarch64.rpm" || refused.Capacity != 0 {
+		t.Fatalf("refusals = %+v", refused)
+	}
+	if err := refused.Err(); err == nil || !strings.Contains(err.Error(), "missing-1.0-1.aarch64.rpm") {
+		t.Fatalf("refusal description = %v", err)
+	}
+}
+
 func TestSnapshotPayloadRemainsImmutableAfterVerification(t *testing.T) {
 	server, _, root, _ := servingFixture(t)
 	payload, err := server.verifiedPayload(context.Background(), server.Manifest.GetFiles()[0])

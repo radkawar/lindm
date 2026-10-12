@@ -302,6 +302,13 @@ func sameRollingSelection(a, b []*resourcev1.PackageTransactionEntry) bool {
 	return true
 }
 
+// zypperCommitRepos names an always-empty private repository directory. A
+// commit must see only the staged RPM files and the installed system, yet
+// --disable-repositories also disables zypper's command-line RPM repository
+// (exit 104: "_tmpRPMcache_:<name>=<evr>" not found), so commits replace the
+// staging repository directory with this empty one instead.
+const zypperCommitRepos = "commit-repos"
+
 func zypperCommitArgs(directory string, d *resourcev1.NativePackageDesired, entries []*resourcev1.PackageTransactionEntry, preview bool) []string {
 	var paths []string
 	for _, entry := range entries {
@@ -309,20 +316,47 @@ func zypperCommitArgs(directory string, d *resourcev1.NativePackageDesired, entr
 			paths = append(paths, rollingArtifactPath(directory, entry))
 		}
 	}
-	args := []string{"--disable-repositories", "install", "--no-recommends", "--no-allow-vendor-change"}
+	args := []string{"install", "--no-recommends", "--no-allow-vendor-change"}
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-		args, paths = []string{"--disable-repositories", "remove"}, []string{zypperTarget(d)}
+		args, paths = []string{"remove"}, []string{zypperTarget(d)}
 	}
 	if preview {
 		args = append(args, "--dry-run")
 	}
 	args = append(args, "--")
-	return zypperArgs(directory, append(args, paths...)...)
+	return append([]string{"--non-interactive", "--xmlout", "--no-refresh", "--reposd-dir", filepath.Join(directory, zypperCommitRepos), "--cache-dir", filepath.Join(directory, "cache")}, append(args, paths...)...)
+}
+
+// emptyZypperCommitRepos creates or admits the private commit repository
+// directory only as a real, empty directory.
+func emptyZypperCommitRepos(directory string) error {
+	path := filepath.Join(directory, zypperCommitRepos)
+	if err := os.Mkdir(path, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("packageprovider: zypper commit repository directory %s is not a directory", path)
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 0 {
+		return fmt.Errorf("packageprovider: zypper commit repository directory %s is not empty", path)
+	}
+	return nil
 }
 
 func (p *Provider) previewZypperCommit(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, entries []*resourcev1.PackageTransactionEntry) error {
 	if len(entries) == 0 {
 		return nil
+	}
+	if err := emptyZypperCommitRepos(directory); err != nil {
+		return err
 	}
 	result, err := p.run(ctx, p.managerPath, zypperCommitArgs(directory, d, entries, true), "/", zypperEnv(directory, false))
 	if err != nil {
@@ -343,6 +377,9 @@ func (p *Provider) previewZypperCommit(ctx context.Context, directory string, d 
 }
 
 func (p *Provider) commitZypper(ctx context.Context, directory string, d *resourcev1.NativePackageDesired, entries []*resourcev1.PackageTransactionEntry) error {
+	if err := emptyZypperCommitRepos(directory); err != nil {
+		return err
+	}
 	_, err := commitNative(ctx, p.managerPath, zypperCommitArgs(directory, d, entries, false), "/", zypperEnv(directory, false))
 	return err
 }

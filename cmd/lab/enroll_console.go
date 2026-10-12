@@ -28,6 +28,7 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 	flags.StringVar(&options.AdminAddress, "admin-address", "", "optional guest-to-host IPv4 loopback forward preserving exact console origin port")
 	flags.StringVar(&options.DeviceAddress, "device-address", "", "optional guest-to-host IPv4 loopback forward preserving exact device origin port")
 	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL, which reaches its vendor repositories only when registered")
+	flags.StringVar(&options.DiagnosticsDir, "diagnostics", "", "existing private directory for the native package-manager log of a failed copied command")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err

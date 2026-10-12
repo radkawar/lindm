@@ -134,7 +134,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, vm.close()) }()
-	vm.captureDiagnostics = options.DiagnosticsDir != ""
+	vm.captureDiagnostics, vm.diagnosticsDir = options.DiagnosticsDir != "", options.DiagnosticsDir
 	defer func() {
 		if err != nil && options.DiagnosticsDir != "" {
 			err = errors.Join(err, saveLifecycleFailure(ctx, vm, options.DiagnosticsDir))

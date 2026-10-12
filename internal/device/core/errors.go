@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
@@ -34,6 +35,9 @@ func MapErr(err error) error {
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case "23514", "23502", "22001":
+			// The device sees only "constraint"; name the violated schema
+			// object (never the row's values) for the operator.
+			slog.Warn("device database constraint violation", "code", pgErr.Code, "table", pgErr.TableName, "column", pgErr.ColumnName, "constraint", pgErr.ConstraintName)
 			return Invalid("constraint")
 		case "23505":
 			return rpcreason.Error(connect.CodeAborted, "conflict")

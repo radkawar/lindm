@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,9 @@ import (
 type VMConsoleEnrollmentOptions struct {
 	CacheDir, WorkDir, LabBinary, CommandFile string
 	AdminAddress, DeviceAddress               string
+	// DiagnosticsDir receives, when the copied command fails, the guest's
+	// native package-manager log tail; never the command or its output.
+	DiagnosticsDir string
 	// RedHatTokenFile registers an entitled (RHEL) guest, as a customer's
 	// subscribed host is, so the copied DNF command reaches its vendor
 	// repositories. Required for entitled releases, refused otherwise.
@@ -186,7 +190,8 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 		return nil, errors.New("captured console command transport failed (secret-bearing output withheld; command not retried)")
 	}
 	if executed.ExitCode != 0 {
-		return nil, fmt.Errorf("captured console command exited %d (output withheld; command not retried)", executed.ExitCode)
+		failure := fmt.Errorf("captured console command exited %d (output withheld; command not retried)", executed.ExitCode)
+		return nil, errors.Join(failure, saveConsolePackageLog(ctx, vm, backend, options.DiagnosticsDir))
 	}
 	if _, err := vm.run(ctx, "sudo -n install -d -m 0755 /var/tmp/lindm-native-lab", nil, 4096, time.Minute); err != nil {
 		return nil, err
@@ -274,6 +279,45 @@ func consoleEnrollmentPackageQuery(backend platform.Backend) (tool, query string
 	default:
 		return "", "", errors.New("console enrollment has no native package query for this backend")
 	}
+}
+
+// consolePackageLogs names each backend's own native log. Package managers
+// record repository URLs and solver, signature and download errors there,
+// never the copied command's bootstrap fetches or enrollment material.
+var consolePackageLogs = map[platform.Backend]string{
+	platform.BackendAPT:    "/var/log/apt/term.log",
+	platform.BackendDNF4:   "/var/log/dnf.log",
+	platform.BackendDNF5:   "/var/log/dnf5.log",
+	platform.BackendZypper: "/var/log/zypper.log",
+	platform.BackendPacman: "/var/log/pacman.log",
+}
+
+// saveConsolePackageLog keeps a failed copied command's diagnosable cause
+// without its secret-bearing output: the native package-manager log tail.
+func saveConsolePackageLog(ctx context.Context, vm *guestVM, backend platform.Backend, directory string) error {
+	path, ok := consolePackageLogs[backend]
+	if directory == "" || !ok || vm.client == nil || vm.processError() != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	result, err := vm.runResult(ctx, "sudo -n tail -n 1500 "+nativeQuote(path), nil, 2<<20, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("collect private console package log: %w", err)
+	}
+	data, err := json.Marshal(struct {
+		Source, Path string
+		ExitCode     int
+		Log          string
+	}{"console-command-package-log", path, result.ExitCode, string(result.Stdout)})
+	if err != nil {
+		return err
+	}
+	saved, err := saveGuestDiagnostics(directory, data)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("private console package log saved to %q", saved)
 }
 
 func readConsoleCommand(path string) (_ []byte, err error) {

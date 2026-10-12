@@ -244,6 +244,9 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 		}
 		closeErr := serial.Close()
 		<-drained
+		if err != nil && snapshot != nil {
+			err = errors.Join(err, snapshot.Refused().Err())
+		}
 		if err = errors.Join(err, closeErr, vm.Kill()); err != nil {
 			return nil, err
 		}

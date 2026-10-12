@@ -500,7 +500,11 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string, di
 				strings.Contains(pending, "Failed to activate with specified passphrase. (Passphrase incorrect?)")) {
 				return true, errors.New("encrypted boot rejected unlock secret")
 			}
-			if encryptedUnlockPrompt(pending) {
+			prompted := encryptedUnlockPrompt(pending)
+			if sent {
+				prompted = encryptedUnlockPrompt(withoutLineRedraws(pending))
+			}
+			if prompted {
 				if secret == "" {
 					return true, errors.New("unattended encrypted boot requested a passphrase")
 				}
@@ -536,6 +540,29 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string, di
 			}
 			return sent, errors.New("encrypted boot serial console closed before readiness")
 		}
+	}
+}
+
+// withoutLineRedraws drops in-place rewrites of the current console line: an
+// erase-line and carriage return through the next newline. systemd's tty
+// password agent rewrites its own prompt that way as typed input arrives
+// (observed on openSUSE Tumbleweed's initrd); only a prompt on a fresh line is a
+// new request for the secret.
+func withoutLineRedraws(text string) string {
+	const redraw = "\x1b[2K\r"
+	var kept strings.Builder
+	for {
+		start := strings.Index(text, redraw)
+		if start < 0 {
+			kept.WriteString(text)
+			return kept.String()
+		}
+		kept.WriteString(text[:start])
+		end := strings.IndexByte(text[start:], '\n')
+		if end < 0 {
+			return kept.String()
+		}
+		text = text[start+end:]
 	}
 }
 

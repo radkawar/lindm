@@ -608,6 +608,26 @@ func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, archit
 		if err := guest.command(ctx, "install agent from site APT repository", apt+"install --no-install-recommends "+nativeQuote(packaging.PackageName+"="+version), nil); err != nil {
 			return err
 		}
+	case platform.BackendZypper:
+		// As the console's zypper command: the site CA joins the system trust
+		// store and the fingerprint-pinned station key the RPM keyring (libzypp
+		// has no per-repository CA file). Only the site repository is
+		// configured; the distribution repositories are unreachable here.
+		trust := "install -m 0644 " + airgapGuestDir + "/site-ca.crt /etc/pki/trust/anchors/lindm-site.crt; update-ca-certificates; rpm --import " + airgapGuestDir + "/signer.asc"
+		if err := guest.command(ctx, "trust site CA and pinned station key", trust, nil); err != nil {
+			return err
+		}
+		repo := "[lindm-offline]\nname=lindm offline bundle\nbaseurl=" + base + "/rpm/\nenabled=1\nautorefresh=0\ngpgcheck=1\nrepo_gpgcheck=1\npkg_gpgcheck=1\n"
+		if err := guest.uploadBytes(ctx, airgapGuestDir+"/repos/lindm-offline.repo", []byte(repo)); err != nil {
+			return err
+		}
+		zypper := "zypper --non-interactive --reposd-dir " + airgapGuestDir + "/repos --cache-dir " + airgapGuestDir + "/zypp-cache "
+		if err := guest.command(ctx, "authenticate site zypper metadata", zypper+"refresh --force lindm-offline", nil); err != nil {
+			return err
+		}
+		if err := guest.command(ctx, "install agent from site zypper repository", zypper+"--no-refresh install --no-recommends --from lindm-offline "+nativeQuote(packaging.PackageName+"="+version+"-"+packaging.RPMRelease), nil); err != nil {
+			return err
+		}
 	default:
 		repo := "[lindm-offline]\nname=lindm offline bundle\nbaseurl=" + base + "/rpm/\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://" + airgapGuestDir + "/signer.asc\nsslverify=1\nsslcacert=" + airgapGuestDir + "/site-ca.crt\n"
 		if err := guest.uploadBytes(ctx, airgapGuestDir+"/repos/lindm-offline.repo", []byte(repo)); err != nil {

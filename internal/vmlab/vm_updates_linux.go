@@ -127,7 +127,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	defer func() { err = errors.Join(err, vm.close()) }()
-	vm.captureDiagnostics = options.DiagnosticsDir != ""
+	vm.captureDiagnostics, vm.diagnosticsDir = options.DiagnosticsDir != "", options.DiagnosticsDir
 	defer func() {
 		if err != nil && !errors.Is(ctx.Err(), context.Canceled) && options.DiagnosticsDir != "" {
 			err = errors.Join(err, saveUpdateFailure(ctx, vm, options.DiagnosticsDir))

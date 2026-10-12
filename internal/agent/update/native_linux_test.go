@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -201,5 +202,28 @@ func TestNativePackagePathMatchesPrivateAPTArchiveIdentity(t *testing.T) {
 		if got := packagePath("/private/transaction", tx); got != filepath.Join("/private/transaction", test.name) {
 			t.Fatalf("native staged filename %q, want %q", got, test.name)
 		}
+	}
+}
+
+// zypper's --disable-repositories also disables the command-line RPM repository
+// (exit 104 on Tumbleweed); updates must hide configured repositories with an
+// empty private directory instead and refuse one that is not empty.
+func TestZypperUpdateHidesRepositoriesWithoutDisablingCommandLineRPM(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "agent.rpm")
+	args, err := zypperUpdateArgs(directory, path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repos := filepath.Join(directory, "zypper-repos")
+	want := []string{"--non-interactive", "--no-refresh", "--reposd-dir", repos, "install", "--no-recommends", "--no-allow-vendor-change", "--force", "--", path}
+	if !slices.Equal(args, want) {
+		t.Fatalf("args = %q, want %q", args, want)
+	}
+	if err := os.WriteFile(filepath.Join(repos, "vendor.repo"), []byte("[vendor]\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zypperUpdateArgs(directory, path, false); err == nil {
+		t.Fatal("non-empty repository directory admitted")
 	}
 }

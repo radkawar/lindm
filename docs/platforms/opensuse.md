@@ -102,6 +102,15 @@ exclusively from the browser-captured command. Browser confirmation of the
 server-side enrollment precedes guest teardown. This path is included in the
 periodic rolling matrix on each admitted architecture.
 
+The `airgap` lane installs the first agent on Tumbleweed only from the imported
+bundle's signed RPM repository, served by the site `lindmd` at
+`/offline/repositories/<arch>/rpm/`. As the console command does, the guest adds
+the site CA to the system trust store (libzypp has no per-repository CA file)
+and imports the fingerprint-pinned station key into the RPM keyring; zypper then
+uses a private repository directory containing only that site repository, with
+repository and package signatures required. The disabled vendor repositories
+are unreachable in the isolated site namespace and are never refreshed.
+
 Select the exact openSUSE release in the console for the zypper install-and-enroll
 command. It uses signed RPM packages and metadata from the customer's own `lindmd`
 HTTPS `/repo/rpm` endpoint, never an external agent repository or a DNF command

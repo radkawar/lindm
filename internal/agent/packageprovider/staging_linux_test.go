@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -291,5 +292,31 @@ func TestPackageEffectSummaryUsesCompleteNativeManifest(t *testing.T) {
 	manifest.Entries = []*resourcev1.PackageTransactionEntry{nil}
 	if err := ValidateNativePlan(plan, manifest); err == nil {
 		t.Fatal("missing native operation accepted")
+	}
+}
+
+// zypper's --disable-repositories also disables the command-line RPM repository
+// (exit 104 on Tumbleweed); commits must instead name an empty private
+// repository directory, and refuse one that is not empty.
+func TestZypperCommitKeepsCommandLineRPMRepository(t *testing.T) {
+	directory := t.TempDir()
+	desired := &resourcev1.NativePackageDesired{Package: &resourcev1.PackageIdentity{NativeName: "fixture", Architecture: "x86_64"}, Presence: resourcev1.Presence_PRESENCE_PRESENT}
+	for _, preview := range []bool{true, false} {
+		args := zypperCommitArgs(directory, desired, nil, preview)
+		if slices.Contains(args, "--disable-repositories") {
+			t.Fatalf("commit disables the command-line repository: %q", args)
+		}
+		if i := slices.Index(args, "--reposd-dir"); i < 0 || args[i+1] != filepath.Join(directory, zypperCommitRepos) {
+			t.Fatalf("commit does not hide configured repositories: %q", args)
+		}
+	}
+	if err := emptyZypperCommitRepos(directory); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, zypperCommitRepos, "staging.repo"), []byte("[staging]\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := emptyZypperCommitRepos(directory); err == nil {
+		t.Fatal("non-empty commit repository directory admitted")
 	}
 }

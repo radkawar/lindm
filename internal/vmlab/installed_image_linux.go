@@ -208,6 +208,9 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 		err = runImageInstaller(ctx, dir, installer, spec, hardware)
 	}
 	if err != nil {
+		if snapshot != nil {
+			err = errors.Join(err, snapshot.Refused().Err())
+		}
 		return nil, err
 	}
 	if spec.bindSources != nil && snapshot == nil {

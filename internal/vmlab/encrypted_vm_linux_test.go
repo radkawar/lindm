@@ -101,6 +101,47 @@ func TestEncryptedUnlockSerialRejectsRepeatedPrompt(t *testing.T) {
 	}
 }
 
+// Tumbleweed's systemd tty agent erases and rewrites its prompt line once input
+// arrives; that is the same request, not a rejection. A prompt on a fresh line
+// after submission still is.
+func TestEncryptedUnlockSerialPromptRedrawIsNotRejection(t *testing.T) {
+	const prompt = "\r\nPlease enter passphrase for disk cr_root::"
+	for _, tc := range []struct {
+		name, after string
+		rejected    bool
+	}{
+		{"redraw", "\x1b[2K\rPlease enter passphrase for disk cr_root: \r\n[  OK  ] Finished Cryptography Setup for cr_root.\r\n", false},
+		{"redraw then fresh prompt", "\x1b[2K\rPlease enter passphrase for disk cr_root: \r\n" + prompt, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			host, guest := net.Pipe()
+			defer func() { _ = host.Close(); _ = guest.Close() }()
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				if _, err := io.WriteString(guest, prompt); err != nil {
+					done <- err
+					return
+				}
+				if _, err := io.ReadFull(guest, make([]byte, len("secret\r"))); err != nil {
+					done <- err
+					return
+				}
+				_, err := io.WriteString(guest, tc.after)
+				done <- err
+			}()
+			seen, err := unlockEncryptedSerial(ctx, host, "secret", nil)
+			if !seen || (err != nil) != tc.rejected || (err != nil && err.Error() != "encrypted boot rejected unlock secret") {
+				t.Fatalf("seen=%v err=%v, want rejected=%v", seen, err, tc.rejected)
+			}
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestEncryptedUnlockSerialRejectsFailureWithoutRepeatedPrompt(t *testing.T) {
 	for _, message := range []string{
 		"No key available with this passphrase.",
