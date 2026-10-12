@@ -6305,6 +6305,66 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "29be12a0c0841ed194f6d242792fa48f8dd9af0fd17b524822408dde92c029dd"
+    },
+    {
+      "platform": "arch",
+      "cell": "encrypted",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-grub-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/encrypted-x86_64.json",
+      "sha256": "92e204de454b249bf1acbf24eed7e00434482eda1325814603701ae08b8bc01d",
+      "recorded": "2026-10-12T06:50:32.474015678Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "57f17e1bf6b7926bd56fb50c10deed97f48305bbe32bfa9051dd84ae7d41a9af",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/resources-x86_64.json",
+      "sha256": "2af6ec1907b79cedd6a433050014046ee4fed396bbef60173bc3978579c71816",
+      "recorded": "2026-10-12T06:53:04.617644031Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "services",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json",
+      "sha256": "d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214",
+      "recorded": "2026-10-12T07:00:15.494046793Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
+    },
+    {
+      "platform": "arch",
+      "cell": "device-actions",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-grub-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r7/arch/device-actions-x86_64.json",
+      "sha256": "f97c3791c770aa654cec03202f578b9f303f67b07664800c2f32ad3fe1e9676f",
+      "recorded": "2026-10-12T07:03:01.059347802Z",
+      "revision": "c8d3864245a949bb2e0a3310939551a91a16701a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "57f17e1bf6b7926bd56fb50c10deed97f48305bbe32bfa9051dd84ae7d41a9af",
+      "repositorySnapshotDate": "2026-10-02"
     }
   ]
 }

@@ -171,9 +171,9 @@ func firewallTargets(public ed25519.PublicKey) []*agentv1.ConnectivityProbeTarge
 // firewallLinkScript assigns persistent static addresses to the NIC with the
 // exact permanent MAC and prints its kernel name once both are usable.
 // An active NetworkManager (Fedora/EL and desktop installs such as Linux
-// Mint) owns the link; otherwise Ubuntu's netplan renders systemd-networkd and
-// Debian installer images use ifupdown, whose interfaces file sources
-// interfaces.d.
+// Mint) owns the link; otherwise Ubuntu's netplan and Arch's cloud image use
+// systemd-networkd, and Debian installer images use ifupdown, whose interfaces
+// file sources interfaces.d.
 const firewallLinkScript = `set -eu
 mac=$1; v4=$2; v6=$3
 ifname=
@@ -205,9 +205,7 @@ EOF
  nmcli connection reload
  nmcli connection up lindm-lab-peer-link >/dev/null
 else
-. /etc/os-release
-case "$ID" in
-ubuntu)
+networkd_link() {
  install -d -m 0755 /etc/systemd/network
  cat > /etc/systemd/network/10-lindm-lab-peer-link.network <<EOF
 [Match]
@@ -231,7 +229,10 @@ EOF
  chmod 0644 /etc/systemd/network/10-lindm-lab-peer-link.network
  networkctl reload
  networkctl reconfigure "$ifname"
- ;;
+}
+. /etc/os-release
+case "$ID" in
+ubuntu) networkd_link ;;
 debian)
  grep -qx 'source /etc/network/interfaces.d/\*' /etc/network/interfaces
  cat > /etc/network/interfaces.d/lindm-lab-peer-link <<EOF
@@ -247,7 +248,8 @@ EOF
  chmod 0644 /etc/network/interfaces.d/lindm-lab-peer-link
  ifup "$ifname"
  ;;
-*) exit 1 ;;
+# Other images without NetworkManager (Arch's cloud image) run systemd-networkd.
+*) systemctl is-active --quiet systemd-networkd.service; networkd_link ;;
 esac
 fi
 i=0
