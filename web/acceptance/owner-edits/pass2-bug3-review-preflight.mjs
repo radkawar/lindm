@@ -21,7 +21,10 @@ export const task = {
 const STATUS = /^(Ready to send|Not ready to send)$/;
 const EVIDENCE =
   /last checked in .+, but its latest inventory arrived .+ ago\. This action needs inventory from the last 5 minutes, and check-ins don't include inventory\./;
-const SEND_OFF = "Send is off until this is resolved: inventory needs refreshing.";
+const SEND_OFF =
+  "Send and approval requests are off until this is resolved: inventory needs refreshing.";
+// A restart needs no approval, so the fix sends the same request once inventory is fresh.
+const REFRESH = { name: "Refresh inventory and send when ready", exact: true };
 
 export async function check({ page, demo, visit, require, capture, step }) {
   const deviceId = demo.Routes.DeviceID;
@@ -59,7 +62,7 @@ export async function check({ page, demo, visit, require, capture, step }) {
   require(EVIDENCE.test(
     text,
   ), `the blocker does not separate the check-in from the inventory age: ${text}`);
-  const refresh = blocker.getByRole("button", { name: "Refresh inventory", exact: true });
+  const refresh = blocker.getByRole("button", REFRESH);
   require((await refresh.isVisible()) &&
     (await refresh.isEnabled()), "the blocker offers no enabled Refresh inventory button");
   require(await send.isDisabled(), "Send action is enabled while the review is blocked");
@@ -97,7 +100,7 @@ export async function check({ page, demo, visit, require, capture, step }) {
   // The refusal reruns the real check, so its evidence names current times again.
   await blocker.getByText(EVIDENCE).waitFor({ timeout: 30_000 });
   require(await blocker
-    .getByRole("button", { name: "Refresh inventory", exact: true })
+    .getByRole("button", REFRESH)
     .isEnabled(), "the refusal offers no Refresh inventory fix");
   require(!(await dialog
     .getByText("Something went wrong", { exact: true })

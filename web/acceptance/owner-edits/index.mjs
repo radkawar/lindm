@@ -33,6 +33,7 @@ import * as approvals from "./approvals.mjs";
 import * as audit from "./audit.mjs";
 import * as pass2RestartDelay from "./pass2-bug2-restart-delay.mjs";
 import * as pass2ReviewPreflight from "./pass2-bug3-review-preflight.mjs";
+import * as pass2ApprovalPreflight from "./pass2-p2-5-approval-preflight.mjs";
 import * as commandPalette from "./command-palette.mjs";
 import * as commandPaletteTyping from "./command-palette-typing.mjs";
 import * as wipeForm from "./wipe-form.mjs";
@@ -84,8 +85,9 @@ export const ownerEdits = [
   approvals,
   audit,
   pass2RestartDelay,
-  // Needs the route device's inventory stale, so it precedes the wipe check's refresh.
+  // Need the route device's inventory stale, so they precede the wipe check's refresh.
   pass2ReviewPreflight,
+  pass2ApprovalPreflight,
   commandPalette,
   commandPaletteTyping,
   wipeForm,

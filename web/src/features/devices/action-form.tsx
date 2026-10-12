@@ -310,6 +310,7 @@ export function DeviceActionForm({
   const [rpcFailure, setRpcFailure] = useState<RpcFailure | null>(null);
   const [fieldErrors, setFieldErrors] = useState<readonly FieldError[]>([]);
   const [refreshFailure, setRefreshFailure] = useState<RpcFailure | null>(null);
+  const [sendWhenReady, setSendWhenReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -346,16 +347,27 @@ export function DeviceActionForm({
       ? "error"
       : refreshOutcome(refreshAction.data, refreshAction.dataUpdatedAt);
   const refreshSucceeded = refreshResult === "succeeded";
-  const recheckAfterRefresh = useEffectEvent(() => {
-    if (attempt?.status === "frozen" || attempt?.status === "rejected")
-      void checkPreflight(attempt);
+  const recheckAfterRefresh = useEffectEvent(async () => {
+    if (attempt?.status !== "frozen" && attempt?.status !== "rejected") return;
+    const checked = await checkPreflight(attempt);
+    // "Refresh inventory and send when ready": the same reviewed (and, when
+    // required, approved) request goes out only once the server's checks pass.
+    if (
+      sendWhenReady &&
+      checked?.status === "frozen" &&
+      checked.preflight.state === "checked" &&
+      !checked.preflight.result.blockedReason
+    ) {
+      setSendWhenReady(false);
+      void send(checked);
+    }
   });
   useEffect(() => {
     if (!refreshSucceeded) return;
     void queryClient.invalidateQueries({
       queryKey: ["device-storage-targets", lifetime.generation, deviceId],
     });
-    recheckAfterRefresh();
+    void recheckAfterRefresh();
   }, [refreshSucceeded, queryClient, lifetime.generation, deviceId]);
   const destructive = kind === "cryptoErase" || kind === "sanitize";
   const frozen = attempt !== null;
@@ -760,7 +772,7 @@ export function DeviceActionForm({
         { signal: lifetime.signal, timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();
-      updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) =>
+      return updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) =>
         // A server-precondition refusal the checks now pass can be sent again
         // with the same request ID; any other refusal still needs Edit action.
         current.status === "rejected" &&
@@ -770,8 +782,8 @@ export function DeviceActionForm({
           : { ...current, preflight: { state: "checked", result } },
       );
     } catch (error) {
-      if (lifetime.signal.aborted) return;
-      updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) => ({
+      if (lifetime.signal.aborted) return null;
+      return updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) => ({
         ...current,
         preflight: { state: "failed", failure: toRpcFailure(error) },
       }));
@@ -806,7 +818,10 @@ export function DeviceActionForm({
         queryKey: ["device-actions", lifetime.generation, deviceId],
       });
     } catch (error) {
-      if (!lifetime.signal.aborted) setRefreshFailure(toRpcFailure(error));
+      if (!lifetime.signal.aborted) {
+        setRefreshFailure(toRpcFailure(error));
+        setSendWhenReady(false);
+      }
     } finally {
       inFlight.current = false;
       if (!lifetime.signal.aborted) setBusy(false);
@@ -881,6 +896,17 @@ export function DeviceActionForm({
       attempt.status === "accepted"
     )
       return;
+    // An approver should decide only a request the device can take now; a
+    // refusal (such as stale inventory) is shown with its fix instead.
+    if (!attempt.approvalId) {
+      const checked = await checkPreflight(attempt);
+      if (
+        !checked ||
+        checked.preflight.state !== "checked" ||
+        checked.preflight.result.blockedReason
+      )
+        return;
+    }
     inFlight.current = true;
     setBusy(true);
     setError("");
@@ -1014,11 +1040,18 @@ export function DeviceActionForm({
   const canRefreshInventory =
     canPermission(principal, actionPermissions.refreshInventory) &&
     canPermission(principal, "fleet.read");
+  // Only a request that needs no further approval can go out on its own once
+  // fresh inventory passes the checks.
+  const reviewedCase = attempt?.payload.spec?.action.case;
+  const sendableAfterRefresh =
+    (reviewedCase !== "cryptoErase" && reviewedCase !== "sanitize") ||
+    attempt?.approvalState === ApprovalState.APPROVED;
+  const blockedControls = attempt?.approvalId ? "Send is" : "Send and approval requests are";
   const sendBlockedReason = !attempt
     ? ""
     : attempt.status === "rejected"
       ? blocker
-        ? `Send is off until this is resolved: ${blocker.title.toLowerCase()}.`
+        ? `${blockedControls} off until this is resolved: ${blocker.title.toLowerCase()}.`
         : `Send is off after this refusal. ${attempt.failure ? classifyRpcFailure(attempt.failure).action : "Edit the action to start a new request."}`
       : attempt.status !== "frozen"
         ? ""
@@ -1027,7 +1060,7 @@ export function DeviceActionForm({
           : preflight?.state === "failed"
             ? "Send is available once the server's checks run. Check again."
             : blocker
-              ? `Send is off until this is resolved: ${blocker.title.toLowerCase()}.`
+              ? `${blockedControls} off until this is resolved: ${blocker.title.toLowerCase()}.`
               : "";
   const reviewCheck = !attempt ? null : preflight?.state === "checking" ? (
     <p role="status" className="text-sm text-muted-foreground">
@@ -1055,8 +1088,11 @@ export function DeviceActionForm({
         {inventoryBlockers[refusalReason] && canRefreshInventory ? (
           refreshResult === "waiting" ? (
             <p role="status">
-              Inventory requested. Waiting for {deviceName} to report it; this action is checked
-              again when it arrives. {refreshLink}
+              Inventory requested. Waiting for {deviceName} to report it; this action is{" "}
+              {sendWhenReady
+                ? "sent once the server's checks pass"
+                : "checked again when it arrives"}
+              . {refreshLink}
             </p>
           ) : (
             <>
@@ -1076,12 +1112,19 @@ export function DeviceActionForm({
                   <Button
                     type="button"
                     disabled={busy}
-                    onClick={() => void requestInventory(attempt)}
+                    onClick={() => {
+                      setSendWhenReady(sendableAfterRefresh);
+                      void requestInventory(attempt);
+                    }}
                   >
-                    Refresh inventory
+                    {sendableAfterRefresh
+                      ? "Refresh inventory and send when ready"
+                      : "Refresh inventory"}
                   </Button>
                   <span className="text-muted-foreground">
-                    Uses the reason above. This action is checked again when inventory arrives.
+                    {sendableAfterRefresh
+                      ? "Uses the reason above. This exact request is sent once fresh inventory passes the server's checks; nothing is sent if they still fail."
+                      : "Uses the reason above. This action is checked again when inventory arrives."}
                   </span>
                 </div>
               )}
@@ -1862,7 +1905,11 @@ export function DeviceActionForm({
                   !attempt.approvalAmbiguous) ||
                 attempt.status === "ambiguous" ||
                 attempt.status === "inflight" ||
-                attempt.status === "accepted"
+                attempt.status === "accepted" ||
+                (!attempt.approvalId && !!blocker)
+              }
+              aria-describedby={
+                !attempt.approvalId && blocker ? `${prefix}-send-blocked` : undefined
               }
               onClick={() => void approval()}
             >
@@ -1886,6 +1933,7 @@ export function DeviceActionForm({
                 setError("");
                 setRpcFailure(null);
                 setRefreshFailure(null);
+                setSendWhenReady(false);
               }}
             >
               Edit action

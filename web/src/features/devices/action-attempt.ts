@@ -50,16 +50,18 @@ export function setDeviceActionAttempt(
 }
 
 // Applies an async result only while the same reviewed request is still current,
-// so a late check never lands on an edited or discarded action.
+// so a late check never lands on an edited or discarded action. Returns the
+// stored attempt, or null when the request changed.
 export function updateDeviceActionAttempt(
   lifetime: AuthLifetime,
   deviceId: string,
   payload: CreateDeviceActionRequest,
   update: (current: DeviceActionAttempt) => DeviceActionAttempt,
-): boolean {
+): DeviceActionAttempt | null {
   const current = attempts.get(deviceId);
-  if (!current || current.payload !== payload) return false;
-  return setDeviceActionAttempt(lifetime, deviceId, update(current));
+  if (!current || current.payload !== payload) return null;
+  const next = update(current);
+  return setDeviceActionAttempt(lifetime, deviceId, next) ? next : null;
 }
 
 export function useDeviceActionAttempt(deviceId: string): DeviceActionAttempt | null {

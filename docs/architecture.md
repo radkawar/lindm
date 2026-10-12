@@ -883,7 +883,12 @@ so the console review shows a refusal and its remedy before Send. Request expiry
 idempotency and approval stay create-only checks. Check-ins (every 60 seconds) and
 host inventory (every 10 minutes) are separate facts: inventory-selecting actions
 need inventory received within 5 minutes, so a device that just checked in can still
-need a refresh.
+need a refresh. The console runs the same check before requesting approval, so an
+approver never decides a request the device cannot take. A precondition refusal
+creates and consumes nothing, so an approved request refused for stale inventory
+keeps its approval; "Refresh inventory and send when ready" requests inventory under
+the same reason and sends the identical request once the check passes (within the
+request's 10-minute expiry).
 
 Power requests use the authenticated local logind D-Bus, with the root-owned
 `allow_power_actions` opt-in. Optional `delay_seconds` is bounded to 0–3600 and an

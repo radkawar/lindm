@@ -13,6 +13,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity"
 )
 
@@ -82,6 +83,43 @@ func TestPreflightDeviceActionMatchesCreateRefusalWithoutSideEffects(t *testing.
 	}
 	if actions != 0 || audits != 0 {
 		t.Fatalf("preflight persisted work: actions=%d audits=%d", actions, audits)
+	}
+}
+
+// With two-person approval required for restarts, stale inventory refuses the
+// approved request without spending its approval: after fresh inventory
+// arrives, the same approved request is created once, carrying the approval.
+func TestApprovedActionSurvivesStaleInventoryRefusal(t *testing.T) {
+	f := newDeviceActionFixture(t)
+	imperativePolicy(t, f, &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(identity.PermissionRunRemoteExecution)}})
+	request := f.request(restartActionSpec())
+	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("restart admitted without the required approval: %v", err)
+	}
+	f.approval(t, request)
+	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE host_observations SET received_at=clock_timestamp()-interval '7 minutes' WHERE generation_id=$1", f.principal.GenerationID); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.preflight(t, f.ownerCtx, request.GetSpec()).GetBlockedReason(); got != "device_action_inventory_stale" {
+		t.Fatalf("stale inventory not reported for the approved request: %q", got)
+	}
+	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); rpcReason(err) != "device_action_inventory_stale" {
+		t.Fatalf("approved request admitted with stale inventory: %v", err)
+	}
+	f.observeStorageDetails(t, nativeDetailsFixture())
+	if got := f.preflight(t, f.ownerCtx, request.GetSpec()).GetBlockedReason(); got != "" {
+		t.Fatalf("fresh inventory still blocks the approved request: %q", got)
+	}
+	created := f.create(t, request)
+	replayed := f.create(t, request)
+	if created.GetActionId() == "" || replayed.GetActionId() != created.GetActionId() {
+		t.Fatalf("approved request not created exactly once: %v %v", created, replayed)
+	}
+	// The refusal left the approval usable: the created action carries it, and
+	// only that action does (its start consumes it).
+	var bound int
+	if err := f.svc.Pool.QueryRow(t.Context(), "SELECT count(*) FROM device_actions WHERE approval_id=$1 AND id=$2", request.GetApprovalId(), created.GetActionId()).Scan(&bound); err != nil || bound != 1 {
+		t.Fatalf("approved action does not carry its approval: count=%d err=%v", bound, err)
 	}
 }
 
