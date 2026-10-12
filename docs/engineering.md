@@ -320,7 +320,10 @@ published patch status (stale after the fleet patch bound, judged by server rece
 Findings are the fresh evaluation's finding set minus active exceptions, flagged
 when partial. A missing report is Unknown or Not checked, never a zero. Last
 inventory is the published snapshot's relative receipt time; the cursor expiry
-sentence is a pager tooltip. Custom attribute definitions are managed in Settings.
+sentence is a pager tooltip. Custom attribute definitions are managed in Settings:
+each has a display name administrators read and a lowercase key, derived from the
+name and fixed once created, that devices and filters use; legacy definitions
+without a display name are shown by key.
 Search, order and filters participate in cursor binding. `sort` orders the whole
 result across pages by hostname (case-insensitive), last contact or operating system
 (id then version), either direction; rows without that value (pending, never seen,

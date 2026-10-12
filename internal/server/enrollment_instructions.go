@@ -109,9 +109,14 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 		default:
 			choice.PackageFamily = string(release.Family)
 		}
+		supported := release.Supported(platform.Lifecycle)
+		choice.Support = adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED
+		if supported {
+			choice.Support = adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED
+		}
 		if choice.Readiness.Ready {
 			switch {
-			case !release.Supported(platform.Lifecycle):
+			case !supported:
 				choice.Readiness = enrollmentNotReady("platform_installation_gated", release.GateReason(platform.Lifecycle)+". Select a registry platform with a supported native installation method.")
 			case repository == nil:
 				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish a signed native agent repository for this package family on lindmd.")
@@ -122,8 +127,11 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 		if repository != nil && repository.err == nil {
 			for _, arch := range release.Architectures {
 				normalized := nativeArchitecture(arch)
-				if containsArchitecture(repository.architectures, normalized) {
+				switch {
+				case containsArchitecture(repository.architectures, normalized):
 					choice.Architectures = append(choice.Architectures, normalized)
+				case supported && normalized != "":
+					choice.UnpublishedArchitectures = append(choice.UnpublishedArchitectures, normalized)
 				}
 			}
 			if choice.Readiness.Ready && len(choice.Architectures) == 0 {

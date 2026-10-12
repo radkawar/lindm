@@ -111,6 +111,22 @@ func TestInventoryMetadataTypingOwnershipAuditAndReplay(t *testing.T) {
 	}
 }
 
+// The console shows the display name an administrator typed, not the key.
+func TestAttributeDefinitionKeepsDisplayName(t *testing.T) {
+	f := newEnrolled(t, 0)
+	definition := &adminv1.AttributeDefinition{Key: "cost-center", DisplayName: "Cost center", Type: adminv1.AttributeType_ATTRIBUTE_TYPE_ENUM, EnumValues: []string{"R&D", "Sales"}}
+	if _, err := f.svc.SetAttributeDefinition(f.ownerCtx, connect.NewRequest(&adminv1.SetAttributeDefinitionRequest{RequestId: uuid.NewString(), Definition: definition, Reason: "define cost center"})); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := f.svc.ListAttributeDefinitions(f.ownerCtx, connect.NewRequest(&adminv1.ListAttributeDefinitionsRequest{}))
+	if err != nil || len(listed.Msg.GetDefinitions()) != 1 {
+		t.Fatalf("list definitions: %v", err)
+	}
+	if got := listed.Msg.GetDefinitions()[0]; got.GetKey() != "cost-center" || got.GetDisplayName() != "Cost center" {
+		t.Fatalf("definition lost its display name: %v", got)
+	}
+}
+
 func TestInventoryMetadataAuditFailureRollsBack(t *testing.T) {
 	f := newEnrolled(t, 0)
 	if _, err := f.conn.Exec(f.ctx, `CREATE FUNCTION reject_inventory_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='inventory.SetDeviceMetadata' THEN RAISE EXCEPTION 'test audit unavailable'; END IF; RETURN NEW; END $$;

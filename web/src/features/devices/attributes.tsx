@@ -15,6 +15,7 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
+import { ATTRIBUTE_TYPE_LABEL, attributeName } from "./attribute-names";
 import { attributeDefinitionsQueryOptions } from "./queries";
 
 export function readAttributeInputs(data: FormData, attributes: Record<string, AttributeValue>) {
@@ -76,7 +77,8 @@ export function AttributeFields({
           <div className="flex flex-wrap items-end gap-2" key={key}>
             <div className="grid min-w-0 flex-1 gap-1.5">
               <Label htmlFor={`attribute:${key}`}>
-                {key} ({field.case?.replace("Value", "") ?? "unknown"})
+                {definition ? attributeName(definition) : key}
+                {definition ? ` (${ATTRIBUTE_TYPE_LABEL[definition.type] ?? "Unknown"})` : ""}
               </Label>
               {field.case === "boolValue" ? (
                 <SelectField
@@ -135,7 +137,7 @@ export function AttributeFields({
               .filter((definition) => !Object.hasOwn(attributes, definition.key))
               .map((definition) => ({
                 value: definition.key,
-                label: `${definition.key} (${AttributeType[definition.type]?.toLowerCase() ?? "unknown"})`,
+                label: `${attributeName(definition)} (${ATTRIBUTE_TYPE_LABEL[definition.type] ?? "Unknown"})`,
               })),
           ]}
         />

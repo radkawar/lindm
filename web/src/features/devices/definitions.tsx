@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -31,6 +32,13 @@ import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
+import {
+  ATTRIBUTE_TYPE_LABEL,
+  attributeName,
+  definitionFieldErrors,
+  keyFromName,
+  type DefinitionFieldErrors,
+} from "./attribute-names";
 import { attributeDefinitionsQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
 
@@ -72,10 +80,17 @@ export function AttributeDefinitions() {
             <TableBody>
               {data.definitions.map((definition) => (
                 <TableRow key={definition.key}>
-                  <TableCell>{definition.key}</TableCell>
                   <TableCell>
-                    {AttributeType[definition.type]?.toLowerCase() ?? "Unknown"}
+                    <span className="grid">
+                      <span>{attributeName(definition)}</span>
+                      {definition.displayName ? (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {definition.key}
+                        </span>
+                      ) : null}
+                    </span>
                   </TableCell>
+                  <TableCell>{ATTRIBUTE_TYPE_LABEL[definition.type] ?? "Unknown"}</TableCell>
                   <TableCell className="whitespace-normal">
                     {definition.enumValues.join(", ") || "Any"}
                   </TableCell>
@@ -86,7 +101,7 @@ export function AttributeDefinitions() {
                         disabled={editing !== null}
                         onClick={() => setEditing(definition)}
                       >
-                        Edit {definition.key}
+                        Edit {attributeName(definition)}
                       </Button>
                     </TableCell>
                   ) : null}
@@ -96,29 +111,12 @@ export function AttributeDefinitions() {
           </Table>
         ) : null}
         {data?.definitions.length === 0 ? <p>No custom attributes yet.</p> : null}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={!afterKey || definitions.isFetching}
-            onClick={() => setAfterKey("")}
-          >
-            First page
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!data?.nextAfterKey || definitions.isFetching}
-            onClick={() => setAfterKey(data?.nextAfterKey ?? "")}
-          >
-            Next page
-          </Button>
-          <Button
-            variant="outline"
-            disabled={definitions.isFetching}
-            onClick={() => void definitions.refetch()}
-          >
-            Refresh
-          </Button>
-        </div>
+        <ListPagination
+          label="Custom attribute pages"
+          busy={definitions.isFetching}
+          onPrevious={afterKey ? () => setAfterKey("") : undefined}
+          onNext={data?.nextAfterKey ? () => setAfterKey(data.nextAfterKey) : undefined}
+        />
         {canManage && !editing ? (
           <Button
             className="w-fit"
@@ -144,7 +142,12 @@ function DefinitionForm({
 }) {
   const lifetime = useAuthLifetime();
   const queryClient = useQueryClient();
+  const existing = definition.key !== "";
   const [type, setType] = useState(definition.type);
+  const [displayName, setDisplayName] = useState(attributeName(definition));
+  const [key, setKey] = useState(definition.key);
+  const [keyEdited, setKeyEdited] = useState(existing);
+  const [errors, setErrors] = useState<DefinitionFieldErrors>({});
   const [captured, setCaptured] = useState<SetAttributeDefinitionRequest | null>(null);
   const [inputError, setInputError] = useState("");
   const inFlight = useRef(false);
@@ -188,20 +191,34 @@ function DefinitionForm({
           let request = captured;
           if (!request) {
             const data = new FormData(event.currentTarget);
+            const fields = {
+              displayName: displayName.trim(),
+              key: key.trim(),
+              type,
+              enumValues:
+                type === AttributeType.ENUM
+                  ? String(data.get("enum") ?? "")
+                      .split("\n")
+                      .map((value) => value.trim())
+                      .filter(Boolean)
+                  : [],
+              reason: String(data.get("reason") ?? "").trim(),
+            };
+            const found = definitionFieldErrors(fields);
+            setErrors(found);
+            if (Object.keys(found).length) {
+              setInputError("");
+              return;
+            }
             request = create(SetAttributeDefinitionRequestSchema, {
               requestId: newRequestId(),
               definition: {
-                key: String(data.get("key") ?? "").trim(),
+                key: fields.key,
+                displayName: fields.displayName,
                 type,
-                enumValues:
-                  type === AttributeType.ENUM
-                    ? String(data.get("enum") ?? "")
-                        .split("\n")
-                        .map((value) => value.trim())
-                        .filter(Boolean)
-                    : [],
+                enumValues: fields.enumValues,
               },
-              reason: String(data.get("reason") ?? "").trim(),
+              reason: fields.reason,
             });
             validateRequest(SetAttributeDefinitionRequestSchema, request);
             setCaptured(request);
@@ -209,22 +226,61 @@ function DefinitionForm({
           setInputError("");
           inFlight.current = true;
           save.mutate(request);
-        } catch (error) {
-          setInputError(toRpcFailure(error).message);
+        } catch {
+          setInputError(
+            "This attribute can't be saved as entered. Check each field and try again.",
+          );
         }
       }}
     >
       <fieldset disabled={captured !== null} className="grid gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="definition-key">Name</Label>
+          <Label htmlFor="definition-name">Name</Label>
+          <Input
+            id="definition-name"
+            data-freeform="attribute display name"
+            value={displayName}
+            aria-invalid={errors.displayName ? true : undefined}
+            aria-describedby={errors.displayName ? "definition-name-error" : undefined}
+            onChange={(event) => {
+              setDisplayName(event.target.value);
+              if (!keyEdited) setKey(keyFromName(event.target.value));
+              setErrors((current) => ({ ...current, displayName: undefined }));
+            }}
+          />
+          {errors.displayName ? (
+            <p id="definition-name-error" className="text-sm text-destructive">
+              {errors.displayName}
+            </p>
+          ) : null}
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="definition-key">Key</Label>
           <Input
             id="definition-key"
-            name="key"
-            defaultValue={definition.key}
-            readOnly={definition.key !== ""}
-            required
             data-freeform="name of a new attribute definition"
+            className="font-mono"
+            value={key}
+            readOnly={existing}
+            aria-invalid={errors.key ? true : undefined}
+            aria-describedby={errors.key ? "definition-key-error" : "definition-key-hint"}
+            onChange={(event) => {
+              setKey(event.target.value);
+              setKeyEdited(true);
+              setErrors((current) => ({ ...current, key: undefined }));
+            }}
           />
+          {errors.key ? (
+            <p id="definition-key-error" className="text-sm text-destructive">
+              {errors.key}
+            </p>
+          ) : (
+            <p id="definition-key-hint" className="text-xs text-muted-foreground">
+              {existing
+                ? "The key can't change after the attribute is created."
+                : "Filled in from the name. Lowercase letters, digits, hyphens, underscores or dots; it can't change later."}
+            </p>
+          )}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="definition-type">Type</Label>
@@ -234,11 +290,11 @@ function DefinitionForm({
             disabled={captured !== null}
             onValueChange={(value) => setType(Number(value) as AttributeType)}
             options={[
-              { value: AttributeType.STRING, label: "Text" },
-              { value: AttributeType.INT, label: "Whole number" },
-              { value: AttributeType.BOOL, label: "Yes/no" },
-              { value: AttributeType.ENUM, label: "List of values" },
-            ]}
+              AttributeType.STRING,
+              AttributeType.INT,
+              AttributeType.BOOL,
+              AttributeType.ENUM,
+            ].map((value) => ({ value, label: ATTRIBUTE_TYPE_LABEL[value] }))}
           />
         </div>
         {type === AttributeType.ENUM ? (
@@ -247,10 +303,17 @@ function DefinitionForm({
             <Textarea
               id="definition-enum"
               name="enum"
-              defaultValue={definition.enumValues.join("\n")}
-              required
               data-freeform="allowed values chosen for a new enum definition"
+              defaultValue={definition.enumValues.join("\n")}
+              aria-invalid={errors.enumValues ? true : undefined}
+              aria-describedby={errors.enumValues ? "definition-enum-error" : undefined}
+              onChange={() => setErrors((current) => ({ ...current, enumValues: undefined }))}
             />
+            {errors.enumValues ? (
+              <p id="definition-enum-error" className="text-sm text-destructive">
+                {errors.enumValues}
+              </p>
+            ) : null}
           </div>
         ) : null}
         <div className="grid gap-1.5">
@@ -258,9 +321,16 @@ function DefinitionForm({
           <Textarea
             id="definition-reason"
             name="reason"
-            required
             data-freeform="audit reason for this change"
+            aria-invalid={errors.reason ? true : undefined}
+            aria-describedby={errors.reason ? "definition-reason-error" : undefined}
+            onChange={() => setErrors((current) => ({ ...current, reason: undefined }))}
           />
+          {errors.reason ? (
+            <p id="definition-reason-error" className="text-sm text-destructive">
+              {errors.reason}
+            </p>
+          ) : null}
         </div>
       </fieldset>
       {captured ? (

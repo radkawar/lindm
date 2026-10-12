@@ -16,6 +16,7 @@ import * as revealApproval from "./pass2-reveal-approval.mjs";
 import * as advisories from "./advisories.mjs";
 import * as advisoriesSources from "./advisories-sources.mjs";
 import * as enrollment from "./enrollment.mjs";
+import * as agentRepository from "./agent-repository.mjs";
 import * as rollouts from "./rollouts.mjs";
 import * as pass2Bug7DialogScrolled from "./pass2-bug7-dialog-scrolled.mjs";
 import * as pass2Bug8PickerSidebar from "./pass2-bug8-picker-sidebar.mjs";
@@ -31,6 +32,7 @@ import * as pass2ReviewPreflight from "./pass2-bug3-review-preflight.mjs";
 import * as commandPalette from "./command-palette.mjs";
 import * as commandPaletteTyping from "./command-palette-typing.mjs";
 import * as wipeForm from "./wipe-form.mjs";
+import * as customAttributeNames from "./custom-attribute-names.mjs";
 import * as pass2Bug4 from "./pass2-bug4-enrollment-stale.mjs";
 import * as pass2Bug5 from "./pass2-bug5-token-cancel.mjs";
 import * as pass2Bug6 from "./pass2-bug6-install-command.mjs";
@@ -59,6 +61,7 @@ export const ownerEdits = [
   enrollment,
   pass2Bug5,
   pass2SafetyApprovals,
+  agentRepository,
   rollouts,
   accounts,
   authorization,
@@ -78,6 +81,8 @@ export const ownerEdits = [
   commandPaletteTyping,
   wipeForm,
   pass2SafetyWipe,
+  // Creates the "Cost center" custom attribute.
+  customAttributeNames,
   // Creates a one-time code, then approves the seed's pending enrollment.
   pass2Bug6,
   pass2Bug4,

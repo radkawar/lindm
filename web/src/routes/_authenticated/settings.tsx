@@ -1,3 +1,4 @@
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { RestrictedPage } from "@/components/layout/restricted-page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +12,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsRoute() {
   const { principal } = Route.useRouteContext();
+  const queryClient = useQueryClient();
+  const fetching = useIsFetching();
   const enrollment = canPermission(principal, "enrollment.manage", true);
   if (!enrollment && !canPermission(principal, "inventory.manage", true))
     return (
@@ -25,6 +28,8 @@ function SettingsRoute() {
       <PageHeader
         title="Settings"
         description="Check whether this server can enroll devices, and define the attributes devices carry."
+        onRefresh={() => void queryClient.refetchQueries({ type: "active" })}
+        refreshing={fetching > 0}
       />
       {enrollment ? <RepositoryReadinessSection /> : null}
       <AttributeDefinitions />

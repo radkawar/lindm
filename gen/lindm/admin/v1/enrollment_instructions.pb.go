@@ -23,6 +23,57 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type EnrollmentPlatformSupport int32
+
+const (
+	EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED EnrollmentPlatformSupport = 0
+	// lindm installs its agent on this release once the server publishes it.
+	EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED EnrollmentPlatformSupport = 1
+	// Registry row whose agent installation is design-only or not implemented.
+	EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED EnrollmentPlatformSupport = 2
+)
+
+// Enum value maps for EnrollmentPlatformSupport.
+var (
+	EnrollmentPlatformSupport_name = map[int32]string{
+		0: "ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED",
+		1: "ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED",
+		2: "ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED",
+	}
+	EnrollmentPlatformSupport_value = map[string]int32{
+		"ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED":   0,
+		"ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED":     1,
+		"ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED": 2,
+	}
+)
+
+func (x EnrollmentPlatformSupport) Enum() *EnrollmentPlatformSupport {
+	p := new(EnrollmentPlatformSupport)
+	*p = x
+	return p
+}
+
+func (x EnrollmentPlatformSupport) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EnrollmentPlatformSupport) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_enrollment_instructions_proto_enumTypes[0].Descriptor()
+}
+
+func (EnrollmentPlatformSupport) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_enrollment_instructions_proto_enumTypes[0]
+}
+
+func (x EnrollmentPlatformSupport) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EnrollmentPlatformSupport.Descriptor instead.
+func (EnrollmentPlatformSupport) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{0}
+}
+
 type GetEnrollmentInstructionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -302,8 +353,15 @@ type EnrollmentPlatform struct {
 	// Registry-declared vendor unattended installer formats for this release,
 	// in console order. A provisioning snippet is offered only for these.
 	ProvisioningFormats []string `protobuf:"bytes,10,rep,name=provisioning_formats,json=provisioningFormats,proto3" json:"provisioning_formats,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Whether lindm implements agent installation for this release at all,
+	// independent of what this server has published.
+	Support EnrollmentPlatformSupport `protobuf:"varint,11,opt,name=support,proto3,enum=lindm.admin.v1.EnrollmentPlatformSupport" json:"support,omitempty"`
+	// Registry architectures of this release for which this server publishes no
+	// signed agent package. Empty when the release is not supported or its
+	// package family has no published repository at all.
+	UnpublishedArchitectures []string `protobuf:"bytes,12,rep,name=unpublished_architectures,json=unpublishedArchitectures,proto3" json:"unpublished_architectures,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *EnrollmentPlatform) Reset() {
@@ -402,6 +460,20 @@ func (x *EnrollmentPlatform) GetVersionRule() string {
 func (x *EnrollmentPlatform) GetProvisioningFormats() []string {
 	if x != nil {
 		return x.ProvisioningFormats
+	}
+	return nil
+}
+
+func (x *EnrollmentPlatform) GetSupport() EnrollmentPlatformSupport {
+	if x != nil {
+		return x.Support
+	}
+	return EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED
+}
+
+func (x *EnrollmentPlatform) GetUnpublishedArchitectures() []string {
+	if x != nil {
+		return x.UnpublishedArchitectures
 	}
 	return nil
 }
@@ -647,7 +719,7 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x13EnrollmentReadiness\x12\x14\n" +
 	"\x05ready\x18\x01 \x01(\bR\x05ready\x12 \n" +
 	"\x06reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06reason\x12 \n" +
-	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xbf\x04\n" +
+	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xe9\x05\n" +
 	"\x12EnrollmentPlatform\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x02id\x12\x1e\n" +
 	"\x05label\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05label\x12\x1d\n" +
@@ -662,7 +734,10 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\fversion_rule\x18\t \x01(\tB*\xbaH'r%R\x05exactR\x05majorR\x06absentR\bsnapshotR\x03anyR\vversionRule\x12v\n" +
 	"\x14provisioning_formats\x18\n" +
 	" \x03(\tBC\xbaH@\x92\x01=\x10\b\x18\x01\"7r5R\n" +
-	"cloud-initR\tkickstartR\vautoinstallR\bautoyastR\x05nixosR\x13provisioningFormats\"\xe7\x02\n" +
+	"cloud-initR\tkickstartR\vautoinstallR\bautoyastR\x05nixosR\x13provisioningFormats\x12O\n" +
+	"\asupport\x18\v \x01(\x0e2).lindm.admin.v1.EnrollmentPlatformSupportB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\asupport\x12W\n" +
+	"\x19unpublished_architectures\x18\f \x03(\tB\x1a\xbaH\x17\x92\x01\x14\x10\x02\"\x10r\x0eR\x05amd64R\x05arm64R\x18unpublishedArchitectures\"\xe7\x02\n" +
 	"\x17EnrollmentAPTRepository\x12'\n" +
 	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
@@ -680,7 +755,11 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
 	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\x125\n" +
 	"\x0frepository_name\x18\x04 \x01(\tB\f\xbaH\tr\a\n" +
-	"\x05lindmR\x0erepositoryNameB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x05lindmR\x0erepositoryName*\xa2\x01\n" +
+	"\x19EnrollmentPlatformSupport\x12+\n" +
+	"'ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED\x10\x00\x12)\n" +
+	"%ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED\x10\x01\x12-\n" +
+	")ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED\x10\x02B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_enrollment_instructions_proto_rawDescOnce sync.Once
@@ -694,28 +773,31 @@ func file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescData
 }
 
+var file_lindm_admin_v1_enrollment_instructions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_lindm_admin_v1_enrollment_instructions_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_lindm_admin_v1_enrollment_instructions_proto_goTypes = []any{
-	(*GetEnrollmentInstructionsRequest)(nil),  // 0: lindm.admin.v1.GetEnrollmentInstructionsRequest
-	(*GetEnrollmentInstructionsResponse)(nil), // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse
-	(*EnrollmentReadiness)(nil),               // 2: lindm.admin.v1.EnrollmentReadiness
-	(*EnrollmentPlatform)(nil),                // 3: lindm.admin.v1.EnrollmentPlatform
-	(*EnrollmentAPTRepository)(nil),           // 4: lindm.admin.v1.EnrollmentAPTRepository
-	(*EnrollmentDNFRepository)(nil),           // 5: lindm.admin.v1.EnrollmentDNFRepository
-	(*EnrollmentArchRepository)(nil),          // 6: lindm.admin.v1.EnrollmentArchRepository
+	(EnrollmentPlatformSupport)(0),            // 0: lindm.admin.v1.EnrollmentPlatformSupport
+	(*GetEnrollmentInstructionsRequest)(nil),  // 1: lindm.admin.v1.GetEnrollmentInstructionsRequest
+	(*GetEnrollmentInstructionsResponse)(nil), // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse
+	(*EnrollmentReadiness)(nil),               // 3: lindm.admin.v1.EnrollmentReadiness
+	(*EnrollmentPlatform)(nil),                // 4: lindm.admin.v1.EnrollmentPlatform
+	(*EnrollmentAPTRepository)(nil),           // 5: lindm.admin.v1.EnrollmentAPTRepository
+	(*EnrollmentDNFRepository)(nil),           // 6: lindm.admin.v1.EnrollmentDNFRepository
+	(*EnrollmentArchRepository)(nil),          // 7: lindm.admin.v1.EnrollmentArchRepository
 }
 var file_lindm_admin_v1_enrollment_instructions_proto_depIdxs = []int32{
-	4, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
-	5, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
-	3, // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse.platforms:type_name -> lindm.admin.v1.EnrollmentPlatform
-	2, // 3: lindm.admin.v1.GetEnrollmentInstructionsResponse.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
-	6, // 4: lindm.admin.v1.GetEnrollmentInstructionsResponse.arch_repository:type_name -> lindm.admin.v1.EnrollmentArchRepository
-	2, // 5: lindm.admin.v1.EnrollmentPlatform.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	5, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
+	6, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
+	4, // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse.platforms:type_name -> lindm.admin.v1.EnrollmentPlatform
+	3, // 3: lindm.admin.v1.GetEnrollmentInstructionsResponse.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
+	7, // 4: lindm.admin.v1.GetEnrollmentInstructionsResponse.arch_repository:type_name -> lindm.admin.v1.EnrollmentArchRepository
+	3, // 5: lindm.admin.v1.EnrollmentPlatform.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
+	0, // 6: lindm.admin.v1.EnrollmentPlatform.support:type_name -> lindm.admin.v1.EnrollmentPlatformSupport
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_enrollment_instructions_proto_init() }
@@ -729,13 +811,14 @@ func file_lindm_admin_v1_enrollment_instructions_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc), len(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_lindm_admin_v1_enrollment_instructions_proto_goTypes,
 		DependencyIndexes: file_lindm_admin_v1_enrollment_instructions_proto_depIdxs,
+		EnumInfos:         file_lindm_admin_v1_enrollment_instructions_proto_enumTypes,
 		MessageInfos:      file_lindm_admin_v1_enrollment_instructions_proto_msgTypes,
 	}.Build()
 	File_lindm_admin_v1_enrollment_instructions_proto = out.File

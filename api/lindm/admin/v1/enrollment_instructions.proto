@@ -103,6 +103,28 @@ message EnrollmentPlatform {
       ]
     }
   ];
+  // Whether lindm implements agent installation for this release at all,
+  // independent of what this server has published.
+  EnrollmentPlatformSupport support = 11 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Registry architectures of this release for which this server publishes no
+  // signed agent package. Empty when the release is not supported or its
+  // package family has no published repository at all.
+  repeated string unpublished_architectures = 12 [
+    (buf.validate.field).repeated.max_items = 2,
+    (buf.validate.field).repeated.items.string.in = "amd64",
+    (buf.validate.field).repeated.items.string.in = "arm64"
+  ];
+}
+
+enum EnrollmentPlatformSupport {
+  ENROLLMENT_PLATFORM_SUPPORT_UNSPECIFIED = 0;
+  // lindm installs its agent on this release once the server publishes it.
+  ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED = 1;
+  // Registry row whose agent installation is design-only or not implemented.
+  ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED = 2;
 }
 
 message EnrollmentAPTRepository {

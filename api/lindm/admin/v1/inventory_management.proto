@@ -59,6 +59,12 @@ message AttributeDefinition {
       }
     }
   }];
+  // Name administrators read ("Cost center"); empty on definitions saved
+  // before display names existed, which are shown by key.
+  string display_name = 4 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
 }
 
 message DeviceMetadata {

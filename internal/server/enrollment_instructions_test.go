@@ -181,3 +181,52 @@ func TestEnrollmentReadinessDistinguishesFamilyAndArchitecture(t *testing.T) {
 		}
 	}
 }
+
+// Support is a registry fact, so the console can group platforms even while a
+// server-wide gate makes every row share the same readiness reason.
+func TestEnrollmentPlatformSupportIsIndependentOfServerSetup(t *testing.T) {
+	f := newNativeFixture(t)
+	f.apt(t, "arm64")
+	resources := f.resources()
+	validator, err := protovalidate.New(protovalidate.WithMessages(&adminv1.GetEnrollmentInstructionsResponse{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(response *adminv1.GetEnrollmentInstructionsResponse, gated bool) {
+		t.Helper()
+		if err := validator.Validate(response); err != nil {
+			t.Fatalf("invalid instruction projection: %v", err)
+		}
+		for _, choice := range response.Platforms {
+			release, _ := platform.Lookup(choice.Id)
+			want := adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED
+			if release.Supported(platform.Lifecycle) {
+				want = adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED
+			}
+			if choice.GetSupport() != want {
+				t.Fatalf("%s support %v, want %v", choice.Id, choice.GetSupport(), want)
+			}
+			switch choice.Id {
+			case "nixos":
+				if choice.GetSupport() != adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_NOT_SUPPORTED || len(choice.UnpublishedArchitectures) != 0 {
+					t.Fatalf("design-only release classified as installable: %v", choice)
+				}
+			case "ubuntu-24.04", "linuxmint-22.3":
+				if strings.Join(choice.UnpublishedArchitectures, ",") != "amd64" {
+					t.Fatalf("%s unpublished architectures %v, want amd64", choice.Id, choice.UnpublishedArchitectures)
+				}
+			case "fedora-44":
+				// No RPM repository at all: the family, not an architecture, is missing.
+				if choice.GetSupport() != adminv1.EnrollmentPlatformSupport_ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED || len(choice.UnpublishedArchitectures) != 0 {
+					t.Fatalf("unpublished family reported as missing architectures: %v", choice)
+				}
+			}
+			if gated && choice.GetReadiness().GetReason() != response.GetReadiness().GetReason() {
+				t.Fatalf("%s reason %q differs from the server-wide gate %q", choice.Id, choice.GetReadiness().GetReason(), response.GetReadiness().GetReason())
+			}
+		}
+	}
+	check(enrollmentInstructions(resources, loadNativeRepositories(t.Context(), resources)), false)
+	resources.EnrollmentTLSUnavailable = true
+	check(enrollmentInstructions(resources, loadNativeRepositories(t.Context(), resources)), true)
+}

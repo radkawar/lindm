@@ -299,10 +299,13 @@ func (*AttributeValue_BoolValue) isAttributeValue_Value() {}
 func (*AttributeValue_EnumValue) isAttributeValue_Value() {}
 
 type AttributeDefinition struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Type          AttributeType          `protobuf:"varint,2,opt,name=type,proto3,enum=lindm.admin.v1.AttributeType" json:"type,omitempty"`
-	EnumValues    []string               `protobuf:"bytes,3,rep,name=enum_values,json=enumValues,proto3" json:"enum_values,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Key        string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Type       AttributeType          `protobuf:"varint,2,opt,name=type,proto3,enum=lindm.admin.v1.AttributeType" json:"type,omitempty"`
+	EnumValues []string               `protobuf:"bytes,3,rep,name=enum_values,json=enumValues,proto3" json:"enum_values,omitempty"`
+	// Name administrators read ("Cost center"); empty on definitions saved
+	// before display names existed, which are shown by key.
+	DisplayName   string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -356,6 +359,13 @@ func (x *AttributeDefinition) GetEnumValues() []string {
 		return x.EnumValues
 	}
 	return nil
+}
+
+func (x *AttributeDefinition) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
 }
 
 type DeviceMetadata struct {
@@ -1076,13 +1086,14 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"bool_value\x18\x03 \x01(\bH\x00R\tboolValue\x12/\n" +
 	"\n" +
 	"enum_value\x18\x04 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00H\x00R\tenumValueB\x0e\n" +
-	"\x05value\x12\x05\xbaH\x02\b\x01\"\xd2\x02\n" +
+	"\x05value\x12\x05\xbaH\x02\b\x01\"\x83\x03\n" +
 	"\x13AttributeDefinition\x120\n" +
 	"\x03key\x18\x01 \x01(\tB\x1e\xbaH\x1br\x19\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$R\x03key\x12=\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x1d.lindm.admin.v1.AttributeTypeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04type\x128\n" +
 	"\venum_values\x18\x03 \x03(\tB\x17\xbaH\x14\x92\x01\x11\x10@\x18\x01\"\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00R\n" +
-	"enumValues:\x8f\x01\xbaH\x8b\x01\x1a\x88\x01\n" +
+	"enumValues\x12/\n" +
+	"\fdisplay_name\x18\x04 \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\vdisplayName:\x8f\x01\xbaH\x8b\x01\x1a\x88\x01\n" +
 	" attribute_definition.enum_values\x122Only enum definitions require nonempty enum values\x1a0(this.type == 4) == (size(this.enum_values) > 0)\"\xa6\x03\n" +
 	"\x0eDeviceMetadata\x12J\n" +
 	"\x06labels\x18\x01 \x03(\tB2\xbaH/\x92\x01,\x10 \x18\x01\"&r$\x10\x01\x18@2\x1e^[a-zA-Z0-9][a-zA-Z0-9_.:/-]*$R\x06labels\x128\n" +

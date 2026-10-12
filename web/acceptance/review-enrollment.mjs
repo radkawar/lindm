@@ -74,7 +74,7 @@ const choices = ["Ubuntu 24.04 LTS", "Fedora 44"];
 const contracts = {
   "/settings": {
     headings: ["Settings", "Agent repository"],
-    buttons: ["Check again"],
+    buttons: ["Refresh"],
     disclosure: "Repository and trust details",
   },
   "/enrollment": {
@@ -168,10 +168,12 @@ async function reviewEnrollment({
     await page.getByText(status, { exact: true }).waitFor();
     const section = page.getByRole("region", { name: "Agent repository" });
     for (const label of choices) await section.getByText(label, { exact: true }).waitFor();
-    if (!ready)
-      require((await section.innerText()).includes(
-        "releaseRepository.directory/repo",
-      ), "Missing repository does not name its publication configuration remedy");
+    require(!(await section.innerText()).includes(
+      "releaseRepository",
+    ), "Primary repository text names server configuration keys");
+    require((await section
+      .getByRole("link", { name: "Server setup guide", exact: true })
+      .count()) === 1, "Repository readiness does not link the server setup guide");
     entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
     const details = page.locator("summary").filter({ hasText: contract.disclosure });
     await details.click();
@@ -179,6 +181,10 @@ async function reviewEnrollment({
     require((await section.innerText()).includes(
       ready ? `${origin}/repo/apt` : "Not published",
     ), "Repository details do not match this fixture's publication state");
+    if (!ready)
+      require((await section.innerText()).includes(
+        "releaseRepository.directory/repo",
+      ), "Missing repository details do not name the publication configuration remedy");
     entry.screenshots.details = await screenshot(page, `${prefix}-details.png`, false);
     await details.click();
   });
