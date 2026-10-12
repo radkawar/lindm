@@ -332,6 +332,9 @@ export function DeviceActionForm({
     canPermission(principal, actionPermissions[kind]) &&
     (kind !== "refreshInventory" || canPermission(principal, "fleet.read"));
   const currentLockId = !actions.error ? actions.data?.lockActionId : undefined;
+  // A device has at most one account lock; pin the one shown when the form opened
+  // so a lock replaced before sending is refused rather than silently followed.
+  if (kind === "releaseLock" && currentLockId && !lockId) setLockId(currentLockId);
   const prefix = `action-${selectedKind ?? mode}-${deviceId}`;
   const confirmationName = detail.data?.device?.hostname || deviceId;
   const frozenSpec = attempt?.payload.spec?.action;
@@ -1091,22 +1094,11 @@ export function DeviceActionForm({
                 </fieldset>
               ) : null}
               {kind === "releaseLock" ? (
-                <div className="grid gap-2">
-                  <Label htmlFor={`${prefix}-original-lock`}>Lock to undo</Label>
-                  <SelectField
-                    id={`${prefix}-original-lock`}
-                    value={lockId}
-                    disabled={busy || !currentLockId}
-                    onValueChange={setLockId}
-                    options={[
-                      { value: "", label: "Select the lock" },
-                      ...(currentLockId
-                        ? [{ value: currentLockId, label: "Current account lock" }]
-                        : []),
-                    ]}
-                  />
-                  {!currentLockId ? <p>This device has no account lock to undo.</p> : null}
-                </div>
+                <p className="text-sm">
+                  {currentLockId
+                    ? "Undoes the account lock currently on this device."
+                    : "This device has no account lock to undo."}
+                </p>
               ) : null}
               {kind === "quarantine" ? (
                 <>
@@ -1403,7 +1395,11 @@ export function DeviceActionForm({
                         ? "Users can lose unsaved work."
                         : attempt.payload.spec?.action.case === "patchNow"
                           ? "Updates can restart services and, with a reboot policy, the device."
-                          : "Check the details above before sending."}
+                          : attempt.payload.spec?.action.case === "releaseLock"
+                            ? "This re-enables the local accounts lindm locked on this device, so their users can sign in again."
+                            : attempt.payload.spec?.action.case === "releaseQuarantine"
+                              ? "This removes the network quarantine on this device."
+                              : "Check the details above before sending."}
               </AlertDescription>
             </Alert>
           ) : null}

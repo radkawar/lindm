@@ -239,29 +239,26 @@ export function DeviceRecoveryRevealPage({
           {query.isPending ? <p role="status">Loading recovery key record…</p> : null}
           {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
           {action ? (
-            <>
-              <DeviceActionResult action={action} linked={false} />
-              {action.spec?.action.case === "escrowRotate" ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recovery access</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RecoveryKeyReveal
-                      key={`${lifetime.generation}:${deviceId}:${actionId}`}
-                      deviceId={deviceId}
-                      deviceName={device.hostname}
-                      actionId={actionId}
-                    />
-                  </CardContent>
-                </Card>
-              ) : (
-                <p>
-                  This action doesn&apos;t have a recovery key. Pick a recovery key from the
-                  Encryption tab.
-                </p>
-              )}
-            </>
+            action.spec?.action.case === "escrowRotate" ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recovery access</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RecoveryKeyReveal
+                    key={`${lifetime.generation}:${deviceId}:${actionId}`}
+                    deviceId={deviceId}
+                    deviceName={device.hostname}
+                    actionId={actionId}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
+              <p>
+                This action doesn&apos;t have a recovery key. Pick a recovery key from the
+                Encryption tab.
+              </p>
+            )
           ) : null}
         </div>
       )}

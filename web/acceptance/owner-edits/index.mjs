@@ -19,11 +19,15 @@ import * as wipeForm from "./wipe-form.mjs";
 import * as pass2Bug4 from "./pass2-bug4-enrollment-stale.mjs";
 import * as pass2Bug5 from "./pass2-bug5-token-cancel.mjs";
 import * as pass2Bug6 from "./pass2-bug6-install-command.mjs";
+import * as pass2SafetyUndo from "./pass2-safety-undo.mjs";
+import * as pass2SafetyAssistance from "./pass2-safety-assistance.mjs";
+import * as pass2SafetyReveal from "./pass2-safety-reveal.mjs";
 
 export const ownerEdits = [
   dashboard,
   deviceList,
   deviceOverview,
+  pass2SafetyUndo,
   deviceEncryption,
   deviceActions,
   assistanceRecord,
@@ -37,4 +41,6 @@ export const ownerEdits = [
   // Creates a one-time code, then approves the seed's pending enrollment.
   pass2Bug6,
   pass2Bug4,
+  pass2SafetyAssistance,
+  pass2SafetyReveal,
 ];

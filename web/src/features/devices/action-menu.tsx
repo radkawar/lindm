@@ -156,7 +156,13 @@ export function DeviceActionDialog({
         >
           <DialogHeader>
             <DialogTitle>{actionLabels[kind]}</DialogTitle>
-            <DialogDescription>{deviceName}</DialogDescription>
+            <DialogDescription>
+              {kind === "releaseLock"
+                ? `Re-enables the local accounts lindm locked on ${deviceName}. Screens stay locked until a user unlocks them. Nothing is sent until you review and send.`
+                : kind === "releaseQuarantine"
+                  ? `Restores normal network access on ${deviceName} when it next checks in. Nothing is sent until you review and send.`
+                  : deviceName}
+            </DialogDescription>
           </DialogHeader>
           <DeviceActionForm
             key={kind}

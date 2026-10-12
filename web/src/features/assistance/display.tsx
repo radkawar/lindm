@@ -59,7 +59,14 @@ export function endCauseText(session: AssistanceSession): string {
 export function localSessionText(session: AssistanceSession): string {
   const local = session.localSession;
   if (!local?.username) {
-    if (session.state === AssistanceState.ENDED) return session.targetUsername || "Not reported";
+    if (session.state === AssistanceState.ENDED) {
+      // A session that never started was never accepted by anyone on the device.
+      if (!session.startedAt)
+        return session.targetUsername
+          ? `No one accepted (requested for ${session.targetUsername})`
+          : "No one accepted";
+      return session.targetUsername || "Not reported";
+    }
     return session.targetUsername ? `Waiting (${session.targetUsername})` : "Waiting";
   }
   const kind = [local.sessionType, local.desktop].filter(Boolean).join(", ");

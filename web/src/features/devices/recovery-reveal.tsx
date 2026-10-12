@@ -10,6 +10,7 @@ import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
+import { RevealedSecret } from "@/components/ui/revealed-secret";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +40,7 @@ export function RecoveryKeyReveal({
   const [approvalState, setApprovalState] = useState<ApprovalState | null>(null);
   const [ambiguous, setAmbiguous] = useState<"reveal" | "approval" | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
+  const [hidesAt, setHidesAt] = useState(0);
   const held = useRef<Uint8Array | null>(null);
   const request = useRef<RevealRecoveryKeyRequest | null>(null);
   const inFlight = useRef(false);
@@ -194,6 +196,7 @@ export function RecoveryKeyReveal({
         return;
       }
       held.current = response.recoveryKey;
+      setHidesAt(Date.now() + 30_000);
       setSecret(response.recoveryKey);
       toast.success("Recovery key revealed", {
         description: "It hides after 30 seconds or when you leave the page.",
@@ -215,9 +218,21 @@ export function RecoveryKeyReveal({
 
   return (
     <div className="grid gap-3 rounded-md border p-3">
-      <p className="text-sm text-muted-foreground">
-        The key hides after 30 seconds or when you leave the page.
-      </p>
+      {secret ? (
+        <RevealedSecret
+          label="Recovery key"
+          display={groupKey(new TextDecoder().decode(secret))}
+          raw={new TextDecoder().decode(secret)}
+          hidesAt={hidesAt}
+          note="Grouped in fours for reading aloud; Copy copies it without dashes."
+          copiedMessage="Recovery key copied"
+          onHide={hide}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          The key hides after 30 seconds or when you leave the page.
+        </p>
+      )}
       <Label htmlFor={`reveal-reason-${actionId}`}>Reason</Label>
       <Textarea
         id={`reveal-reason-${actionId}`}
@@ -284,20 +299,11 @@ export function RecoveryKeyReveal({
             Start over
           </Button>
         ) : null}
-        {secret ? (
-          <Button variant="outline" onClick={hide}>
-            Hide now
-          </Button>
-        ) : null}
       </div>
-      {secret ? (
-        <pre
-          className="whitespace-pre-wrap break-all rounded-md border p-3 text-sm"
-          aria-label="Recovery key"
-        >
-          {new TextDecoder().decode(secret)}
-        </pre>
-      ) : null}
     </div>
   );
+}
+
+function groupKey(key: string) {
+  return key.match(/.{1,4}/g)?.join("-") ?? key;
 }

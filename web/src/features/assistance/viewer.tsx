@@ -464,6 +464,8 @@ function AssistanceConnection({
   const queryClient = useQueryClient();
   const sessionId = session.id;
   const controlRequested = session.mode === AssistanceMode.CONTROL;
+  const waitingForUser =
+    session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED;
   const [attempt, setAttempt] = useState(0);
   const [link, setLink] = useState<LinkState>(idleLink);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>("new");
@@ -709,8 +711,7 @@ function AssistanceConnection({
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {session.state === AssistanceState.REQUESTED ||
-        session.state === AssistanceState.PROMPTED ? (
+        {waitingForUser ? (
           <p role="status">
             Waiting for the user on the device to accept. Keep this page open; leaving cancels the
             request.
@@ -755,9 +756,11 @@ function AssistanceConnection({
             {controlBlocked}
           </p>
         ) : null}
+        {waitingForUser ? <UserSidePreview session={session} /> : null}
         <div
           ref={surfaceRef}
           tabIndex={capturing ? 0 : -1}
+          hidden={waitingForUser}
           aria-label={
             capturing
               ? "Remote screen. Keyboard and pointer input is sent to the device. Click outside to release the keyboard."
@@ -779,10 +782,7 @@ function AssistanceConnection({
           />
           {!stream ? (
             <p className="absolute inset-0 grid place-items-center text-sm text-white/70">
-              {session.state === AssistanceState.REQUESTED ||
-              session.state === AssistanceState.PROMPTED
-                ? "Waiting for permission to share"
-                : "Waiting for the shared screen"}
+              Waiting for the shared screen
             </p>
           ) : controlAvailable && !capturing ? (
             <p className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit bg-black/70 px-3 py-1.5 text-sm text-white">
@@ -798,5 +798,51 @@ function AssistanceConnection({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+// What the person at the device sees while the request waits, mirroring the
+// desktop agent's consent notification (internal/agent/desktop/session.go
+// promptNotification): a persistent critical notification with Allow and Decline,
+// then the desktop's own screen-sharing dialog after Allow.
+function UserSidePreview({ session }: { session: AssistanceSession }) {
+  const control = session.mode === AssistanceMode.CONTROL;
+  const operator = session.operatorDisplay || "The requesting admin";
+  const prompted = session.state === AssistanceState.PROMPTED;
+  return (
+    <section
+      aria-label="What the user sees"
+      data-assistance-user-side
+      className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm"
+    >
+      <h3 className="font-semibold">What the user sees</h3>
+      <p className="text-muted-foreground">
+        {prompted
+          ? "The device is showing this notification on the user's desktop. It stays until they choose."
+          : "The device hasn't shown the request yet. When it does, the user gets this notification on their desktop."}
+      </p>
+      <div className="grid max-w-md gap-2 rounded-md border bg-background p-3 shadow-sm">
+        <p className="font-medium">Remote assistance request</p>
+        <p>
+          {control
+            ? `${operator} asks to view your screen and control your keyboard and pointer.`
+            : `${operator} asks to view your screen.`}
+        </p>
+        <p>Reason: {session.reason}</p>
+        <p>
+          {control
+            ? "Control is requested. The system dialog that follows lets you allow viewing only."
+            : "Control is not requested. The system dialog that follows selects what is shared."}
+        </p>
+        <div className="flex gap-2" aria-hidden="true">
+          <span className="rounded-md border px-3 py-1">Allow</span>
+          <span className="rounded-md border px-3 py-1">Decline</span>
+        </div>
+      </div>
+      <p className="text-muted-foreground">
+        If they choose Allow, their desktop asks which screen to share
+        {control ? " and whether to allow control" : ""}. Nothing is shared until they confirm it.
+      </p>
+    </section>
   );
 }
