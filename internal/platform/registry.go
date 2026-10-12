@@ -211,7 +211,7 @@ var (
 	// recovery key only in the journal (noble's 255 printed it), so the lab
 	// routes its diagnostics to the console like Debian 13 and Fedora/EL.
 	ubuntuResoluteGuest = LabGuest{
-		Initrd: ubuntuGuest.Initrd, CryptsetupConsole: true,
+		KernelConfig: ubuntuGuest.KernelConfig, Initrd: ubuntuGuest.Initrd, CryptsetupConsole: true,
 		Actions: ubuntuGuest.Actions, OwnedBoot: ubuntuGuest.OwnedBoot, MeasuredBoot: ubuntuGuest.MeasuredBoot,
 	}
 	fedoraGraphical = []string{"base-graphical", "desktop-accessibility", "fonts", "guest-desktop-agents", "hardware-support", "input-methods", "networkmanager-submodules"}

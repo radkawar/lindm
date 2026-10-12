@@ -9720,6 +9720,57 @@
       "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
       "repositorySnapshotDate": "2026-10-02",
       "mainlineRevision": "f8366a6b6d20ba664ec36d7e782c6d66baa99e64"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "recovery-sanitize",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/recovery-requal2-20261012T145207Z/ubuntu-24.04/recovery-sanitize-aarch64.json",
+      "sha256": "e88b2907ecf78cef3cfe71e05cb425ae3d11d07c4f661d709a55f15d9108fe9b",
+      "recorded": "2026-10-12T15:18:35.863939543Z",
+      "revision": "a5ab6aef03a9de4315e37ca156f75b761906de50",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5442dc4f7b5eb4ecf4ed6a51bafe4d43cd243c40786916920b738dc4427419f6",
+      "recoveryManifest": "ubuntu-noble-20260926-arm64",
+      "recoveryManifestSha256": "29be12a0c0841ed194f6d242792fa48f8dd9af0fd17b524822408dde92c029dd",
+      "mainlineRevision": "b4e9281ab3c5b51af7a08ffdb3428fa6fbe6bed0"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "recovery-sanitize",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-arm64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/recovery-requal2-20261012T145207Z/ubuntu-26.04/recovery-sanitize-aarch64.json",
+      "sha256": "712e0268d4c9ff4b2d991767912ce20a25ea638e5d8bcf2164d6c45dbe99d9c6",
+      "recorded": "2026-10-12T15:19:54.587678937Z",
+      "revision": "a5ab6aef03a9de4315e37ca156f75b761906de50",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "45de5797fd37e3deaea5691dccdf833aa9b52743831ad1465fbb1f9dc0cef6ef",
+      "recoveryManifest": "ubuntu-resolute-20260927-arm64",
+      "recoveryManifestSha256": "d606280eeb4308aae3e08d820804f720a2d7b06063e702d91392e2b4d9b58f4c",
+      "mainlineRevision": "b4e9281ab3c5b51af7a08ffdb3428fa6fbe6bed0"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "recovery-sanitize",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/recovery-requal2-20261012T161221Z/ubuntu-26.04/recovery-sanitize-aarch64.json",
+      "sha256": "300c07d19f85eabaa477358f0e276c6d47354977b59334635676314d090eb015",
+      "recorded": "2026-10-12T16:26:01.475688014Z",
+      "revision": "a5ab6aef03a9de4315e37ca156f75b761906de50-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "45de5797fd37e3deaea5691dccdf833aa9b52743831ad1465fbb1f9dc0cef6ef",
+      "recoveryManifest": "ubuntu-resolute-20260927-arm64",
+      "recoveryManifestSha256": "d606280eeb4308aae3e08d820804f720a2d7b06063e702d91392e2b4d9b58f4c",
+      "mainlineRevision": "b4e9281ab3c5b51af7a08ffdb3428fa6fbe6bed0"
     }
   ]
 }
