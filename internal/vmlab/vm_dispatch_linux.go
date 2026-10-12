@@ -406,6 +406,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	defer func() { err = errors.Join(err, fixture.Close()) }()
+	// Runs before Close removes the log: a refused device sync is only a
+	// reason code on the guest ("invalid_argument: observation").
+	defer func() {
+		if err != nil && options.DiagnosticsDir != "" {
+			err = errors.Join(err, saveFixtureServerLog(fixture, options.DiagnosticsDir))
+		}
+	}()
 	result.Database = fixture.DatabaseName
 	var delegation *agentv1.UpdateExecutionTrustRequest
 	var resourceSigner *devlab.ExecutionTrustExercise

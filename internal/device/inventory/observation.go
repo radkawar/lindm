@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
+	"log/slog"
 	"time"
 
 	"lindm/internal/device/core"
 
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -45,6 +48,10 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 		return nil, core.Invalid("observation")
 	}
 	if err := s.Rules.Validate(observation); err != nil {
+		// The device only learns invalid_argument; the server log names the
+		// refused fields and rules (never values) so a collector defect is
+		// diagnosable from one refusal.
+		slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "violations", violationPaths(err))
 		return nil, core.Invalid("observation")
 	}
 	// Device detail also carries list projections and bounded administrator
@@ -363,4 +370,17 @@ func projectionParams(observation *inventoryv1.HostObservation, now time.Time, s
 		params.Architecture = observation.GetArchitecture().GetValue()
 	}
 	return params
+}
+
+// violationPaths reports at most eight field paths and rule IDs, never values.
+func violationPaths(err error) []string {
+	var invalid *protovalidate.ValidationError
+	if !errors.As(err, &invalid) {
+		return nil
+	}
+	paths := make([]string, 0, min(len(invalid.Violations), 8))
+	for _, violation := range invalid.Violations[:min(len(invalid.Violations), 8)] {
+		paths = append(paths, protovalidate.FieldPathString(violation.Proto.GetField())+":"+violation.Proto.GetRuleId())
+	}
+	return paths
 }

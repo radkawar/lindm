@@ -9771,6 +9771,55 @@
       "recoveryManifest": "ubuntu-resolute-20260927-arm64",
       "recoveryManifestSha256": "d606280eeb4308aae3e08d820804f720a2d7b06063e702d91392e2b4d9b58f4c",
       "mainlineRevision": "b4e9281ab3c5b51af7a08ffdb3428fa6fbe6bed0"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "tpm-unattended-boots",
+      "architecture": "aarch64",
+      "manifest": "rhel-9.8-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-tpm-arm-20261012T184640Z/rhel-9/tpm-unattended-boots-aarch64.json",
+      "sha256": "479aa63af4689ad9ae888a9016c48851a51f339f92b0e52a4910945925107e12",
+      "recorded": "2026-10-12T19:58:20.647258868Z",
+      "revision": "d4c3c79447ebf44a9f8aab46e1ec85ed2773b62f",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "3499b90f1e57dfaf4a1cd92a8dc7e022e7c7496e09be258516f402ccc1700dd7",
+      "recoveryManifest": "rhel-9.8-kvm-aarch64",
+      "recoveryManifestSha256": "d5b55939beb977f68adf91ee1e29c02796e1178b810f32e78f3368731c7520da",
+      "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "rhel-10.2-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-x86-t-20261012T162735Z/rhel-10/resources-x86_64.json",
+      "sha256": "e6710751ddabd7faee36cdee66d368fbd91ede0b1eb68292733cdb63ff38b32d",
+      "recorded": "2026-10-12T20:09:33.554259406Z",
+      "revision": "99100c25b0c8cac11d7d0a22033af6a062b1f455-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "66c1657e4c5faefdcaf3459fb7851228e9a9cb69e9c47751e695eba87bb74cf3",
+      "mainlineRevision": "74158b0a02b37ec2c99e377b1ad6bf1ced0ad74d"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "tpm-unattended-boots",
+      "architecture": "aarch64",
+      "manifest": "rhel-10.2-dvd-aarch64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-tpm-arm-20261012T184640Z/rhel-10/tpm-unattended-boots-aarch64.json",
+      "sha256": "849e7bf0f53a8848ede3f7a69062642ed10aa92117bc3fa5c98eb99b19cc0cf4",
+      "recorded": "2026-10-12T20:24:49.576866729Z",
+      "revision": "d4c3c79447ebf44a9f8aab46e1ec85ed2773b62f",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "875fa1011c8dc818c2993aa04233e1b474cf1808f581d33db185841729e9cb41",
+      "recoveryManifest": "rhel-10.2-kvm-aarch64",
+      "recoveryManifestSha256": "1aa358494a5e9e6fd0982cf8f910ee5b7da951ee944850483b4f209ed996de7a",
+      "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
     }
   ]
 }
