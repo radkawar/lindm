@@ -47,14 +47,25 @@ type RemoteRun struct {
 	// run is ready. The marker is read over ssh without logging, removed
 	// remotely and never returned as evidence. The context ends when the
 	// remote run does; publish nothing after that. An error cancels the run.
-	OnHeld         func(ctx context.Context, marker []byte) error
+	OnHeld func(ctx context.Context, marker []byte) error
+	// OnRegistration is called with each bounded marker a held run's worker
+	// writes as <evidence>/registration to have the controller record a
+	// vendor registration. The marker is removed remotely only after
+	// OnRegistration returns, which acknowledges the durable record to the
+	// waiting worker; an error cancels the run. It is polled until held.
+	OnRegistration func(ctx context.Context, marker []byte) error
 	Stdout, Stderr io.Writer
 }
 
 // heldMarker is the remote evidence file that announces a ready held run.
 const heldMarker = "held"
 
-// maxHeldMarker bounds the held marker; it carries small JSON only.
+// RegistrationMarker is the evidence file in which a held run's worker asks
+// its controller to record a registration; its removal is the acknowledgement.
+const RegistrationMarker = "registration"
+
+// maxHeldMarker bounds the held and registration markers; they carry small
+// JSON only.
 const maxHeldMarker = 64 << 10
 
 // QuoteShell quotes one argument for the explicit remote Bash, never the user's
@@ -512,10 +523,10 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	var heldErr error
 	if runErr == nil {
 		watched := make(chan struct{})
-		if r.OnHeld != nil && outputs["evidence"] != "" {
+		if (r.OnHeld != nil || r.OnRegistration != nil) && outputs["evidence"] != "" {
 			go func() {
 				defer close(watched)
-				if heldErr = r.watchHeld(runCtx, remote+"/records/evidence/"+heldMarker, 10*time.Second); heldErr != nil {
+				if heldErr = r.watchHeld(runCtx, remote+"/records/evidence", 10*time.Second); heldErr != nil {
 					cancelRun()
 				}
 			}()
@@ -641,9 +652,9 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 
 // collectAssistanceEvidence returns immutable records and screenshots into the
 // run's exclusively created destination, but never the held owner's
-// credentials or the held marker.
+// credentials or the held and registration control markers.
 func collectAssistanceEvidence(ctx context.Context, alias, source, destination string, stderr io.Writer) error {
-	cmd := exec.CommandContext(ctx, "rsync", "-a", "--protect-args", "--chmod=Du=rwx,Dgo=", "--exclude=/owner-access", "--exclude=/"+heldMarker, "-e", "ssh -o BatchMode=yes -o ConnectTimeout=10", "--", transferPath(alias, source+"/"), destination+"/")
+	cmd := exec.CommandContext(ctx, "rsync", "-a", "--protect-args", "--chmod=Du=rwx,Dgo=", "--exclude=/owner-access", "--exclude=/"+heldMarker, "--exclude=/"+RegistrationMarker, "-e", "ssh -o BatchMode=yes -o ConnectTimeout=10", "--", transferPath(alias, source+"/"), destination+"/")
 	cmd.Stdout, cmd.Stderr = stderr, stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("collect assistance evidence: %w", err)
@@ -651,17 +662,30 @@ func collectAssistanceEvidence(ctx context.Context, alias, source, destination s
 	return nil
 }
 
-// watchHeld polls for the remote held marker until the run ends. Once present,
-// it reads the bounded marker without logging it, removes it remotely and
-// hands it to OnHeld exactly once.
-func (r RemoteRun) watchHeld(ctx context.Context, marker string, interval time.Duration) error {
+// watchHeld polls the remote evidence directory until the run ends or is
+// held. Every registration marker goes to OnRegistration before the held
+// probe. Once the held marker is present, it reads the bounded marker without
+// logging it, removes it remotely and hands it to OnHeld exactly once.
+func (r RemoteRun) watchHeld(ctx context.Context, dir string, interval time.Duration) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	marker := dir + "/" + heldMarker
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
+		}
+		if r.OnRegistration != nil {
+			if err := r.acknowledgeRegistration(ctx, dir+"/"+RegistrationMarker); err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				return err
+			}
+		}
+		if r.OnHeld == nil {
+			continue
 		}
 		probe := executionCommand(ctx, r.Host.SshAlias, "test -e "+QuoteShell(marker))
 		if err := probe.Run(); err != nil {
@@ -691,6 +715,31 @@ func (r RemoteRun) watchHeld(ctx context.Context, marker string, interval time.D
 		// an orderly shutdown, not a held-access failure.
 		return nil
 	}
+}
+
+// acknowledgeRegistration hands a present registration marker to
+// OnRegistration and removes it only once that returned: the worker waits for
+// the removal, so it never continues before the controller's record.
+func (r RemoteRun) acknowledgeRegistration(ctx context.Context, marker string) error {
+	const absent = 3
+	read := executionCommand(ctx, r.Host.SshAlias, "test -e "+QuoteShell(marker)+" || exit "+strconv.Itoa(absent)+"; head -c "+strconv.Itoa(maxHeldMarker+1)+" -- "+QuoteShell(marker))
+	out := baselineOutput{limit: maxHeldMarker}
+	read.Stdout = &out
+	err := read.Run()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == absent {
+		return nil
+	}
+	if err != nil || out.exceeded {
+		return errors.New("read registration marker failed or exceeded its bound")
+	}
+	if err := r.OnRegistration(ctx, out.Bytes()); err != nil {
+		return fmt.Errorf("record registration: %w", err)
+	}
+	if err := executionCommand(ctx, r.Host.SshAlias, "rm -f -- "+QuoteShell(marker)).Run(); err != nil {
+		return fmt.Errorf("acknowledge registration: %w", err)
+	}
+	return nil
 }
 
 func removeFlag(args []string, name string) []string {

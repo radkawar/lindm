@@ -241,7 +241,7 @@ func DemoDeviceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		adminForward = reopened
 	}
 	if release.Lab.Entitlement {
-		if err := registerDemoRedHat(ctx, vm.guest, root, options.RedHatTokenFile, options.LabBinary); err != nil {
+		if err := registerDemoRedHat(ctx, vm.guest, root, options.RedHatTokenFile, options.LabBinary, options.RedHatRegistered); err != nil {
 			return err
 		}
 		// Advisory matching needs the entitled repositories in current host

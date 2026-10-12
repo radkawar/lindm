@@ -252,7 +252,8 @@ func TestReverseForwardOptionsRequirePortIPPort(t *testing.T) {
 }
 
 func TestWatchHeldDeliversMarkerOnceAndRemovesIt(t *testing.T) {
-	marker := filepath.Join(t.TempDir(), heldMarker)
+	dir := t.TempDir()
+	marker := filepath.Join(dir, heldMarker)
 	var got []string
 	run := RemoteRun{Host: &labv1.LabHost{}, OnHeld: func(_ context.Context, data []byte) error {
 		got = append(got, string(data))
@@ -261,7 +262,7 @@ func TestWatchHeldDeliversMarkerOnceAndRemovesIt(t *testing.T) {
 	if err := os.WriteFile(marker, []byte(`{"device_id":"d"}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := run.watchHeld(t.Context(), marker, 10*time.Millisecond); err != nil {
+	if err := run.watchHeld(t.Context(), dir, 10*time.Millisecond); err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0] != `{"device_id":"d"}` {
@@ -273,14 +274,14 @@ func TestWatchHeldDeliversMarkerOnceAndRemovesIt(t *testing.T) {
 	if err := os.WriteFile(marker, make([]byte, maxHeldMarker+1), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := run.watchHeld(t.Context(), marker, 10*time.Millisecond); err == nil {
+	if err := run.watchHeld(t.Context(), dir, 10*time.Millisecond); err == nil {
 		t.Fatal("oversized marker accepted")
 	}
 	failing := RemoteRun{Host: &labv1.LabHost{}, OnHeld: func(context.Context, []byte) error { return errors.New("owner access failed") }}
 	if err := os.WriteFile(marker, []byte("{}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := failing.watchHeld(t.Context(), marker, 10*time.Millisecond); err == nil {
+	if err := failing.watchHeld(t.Context(), dir, 10*time.Millisecond); err == nil {
 		t.Fatal("OnHeld failure was not reported")
 	}
 	// Ctrl-C while OnHeld waits (e.g. for device findings) is an orderly
@@ -294,8 +295,106 @@ func TestWatchHeldDeliversMarkerOnceAndRemovesIt(t *testing.T) {
 	if err := os.WriteFile(marker, []byte("{}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := interrupted.watchHeld(ctx, marker, 10*time.Millisecond); err != nil {
+	if err := interrupted.watchHeld(ctx, dir, 10*time.Millisecond); err != nil {
 		t.Fatalf("cancellation during OnHeld reported %v", err)
+	}
+}
+
+// A worker continues only once its registration marker is gone, so the
+// controller removes it only after recording it; readiness follows both
+// records, and an unrecorded registration is never acknowledged.
+func TestWatchHeldAcknowledgesRegistrationOnlyAfterRecording(t *testing.T) {
+	dir := t.TempDir()
+	registration := filepath.Join(dir, RegistrationMarker)
+	publish := func(name, data string) error {
+		if err := os.WriteFile(filepath.Join(dir, ".pending"), []byte(data), 0600); err != nil {
+			return err
+		}
+		return os.Rename(filepath.Join(dir, ".pending"), filepath.Join(dir, name))
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	worker := make(chan error, 1)
+	go func() {
+		// The demo worker's protocol: each record waits for its acknowledgement.
+		for _, step := range []string{"run", "consumer"} {
+			if err := publish(RegistrationMarker, step); err != nil {
+				worker <- err
+				return
+			}
+			for {
+				if _, err := os.Stat(registration); errors.Is(err, os.ErrNotExist) {
+					break
+				}
+				if ctx.Err() != nil {
+					worker <- errors.New("registration was never acknowledged")
+					return
+				}
+				time.Sleep(time.Millisecond)
+			}
+		}
+		worker <- publish(heldMarker, "{}")
+	}()
+	var recorded []string
+	run := RemoteRun{Host: &labv1.LabHost{}, OnRegistration: func(_ context.Context, data []byte) error {
+		if _, err := os.Stat(registration); err != nil {
+			return errors.New("registration acknowledged before it was recorded")
+		}
+		recorded = append(recorded, string(data))
+		return nil
+	}, OnHeld: func(context.Context, []byte) error {
+		if len(recorded) != 2 {
+			return errors.New("held before every registration was recorded")
+		}
+		return nil
+	}}
+	if err := run.watchHeld(ctx, dir, 5*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-worker; err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(recorded, ",") != "run,consumer" {
+		t.Fatalf("recorded registrations = %q", recorded)
+	}
+	failing := RemoteRun{Host: &labv1.LabHost{}, OnRegistration: func(context.Context, []byte) error { return errors.New("state write failed") }}
+	if err := publish(RegistrationMarker, "run"); err != nil {
+		t.Fatal(err)
+	}
+	if err := failing.watchHeld(ctx, dir, 5*time.Millisecond); err == nil {
+		t.Fatal("unrecorded registration was not reported")
+	}
+	if _, err := os.Stat(registration); err != nil {
+		t.Fatalf("unrecorded registration was acknowledged: %v", err)
+	}
+}
+
+// Only ssh's own failure (exit 255) is unreachability; a command that ran on
+// the host and failed is a genuine failure that destroy must not route around.
+func TestProbeSSHDistinguishesUnreachableHosts(t *testing.T) {
+	path := os.Getenv("PATH")
+	host := &labv1.LabHost{Name: "spark", Transport: "ssh", SshAlias: "spark"}
+	for status, want := range map[string]string{"0": "reachable", "255": "unreachable", "1": "failed"} {
+		bin := t.TempDir()
+		script := "#!/bin/sh\necho 'ssh: connect to host spark port 22: No route to host' >&2\nexit " + status + "\n"
+		if err := os.WriteFile(filepath.Join(bin, "ssh"), []byte(script), 0700); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+path)
+		err := ProbeSSH(t.Context(), host)
+		got := "failed"
+		switch {
+		case err == nil:
+			got = "reachable"
+		case errors.Is(err, ErrHostUnreachable):
+			got = "unreachable"
+		}
+		if got != want {
+			t.Errorf("ssh exit %s probed %s (%v), want %s", status, got, err, want)
+		}
+	}
+	if err := ProbeSSH(t.Context(), &labv1.LabHost{Name: "local", Transport: "local"}); err == nil || errors.Is(err, ErrHostUnreachable) {
+		t.Fatalf("local host probed over SSH: %v", err)
 	}
 }
 

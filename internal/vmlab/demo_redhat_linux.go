@@ -27,7 +27,9 @@ const demoRedHatReceiptSuffix = ".redhat-registration.jsonl"
 // servicing stream that only its entitled repositories corroborate. Unlike a
 // disposable lane, the consumer outlives each run and is removed by exact
 // UUID on destroy. The single-use activation key is deleted immediately.
-func registerDemoRedHat(ctx context.Context, vm *guestVM, root, tokenFile, labBinary string) (err error) {
+// record durably stores the identity on the controller: the run name before
+// Red Hat is contacted, then its consumer before any further guest operation.
+func registerDemoRedHat(ctx context.Context, vm *guestVM, root, tokenFile, labBinary string, record func(context.Context, *labv1.RedHatRegistrationIdentity) error) (err error) {
 	identity, err := readDemoRedHatReceipt(root)
 	if err != nil {
 		return err
@@ -40,6 +42,9 @@ func registerDemoRedHat(ctx context.Context, vm *guestVM, root, tokenFile, labBi
 	}
 	if tokenFile == "" {
 		return errors.New("entitled organization device requires -redhat-token-file")
+	}
+	if record == nil {
+		return errors.New("entitled organization device requires its controller's registration record")
 	}
 	if err := lifecycleCommand(ctx, vm, "stage registration probe directory", "install -d -m 0755 "+nativeGuestDir); err != nil {
 		return err
@@ -58,6 +63,12 @@ func registerDemoRedHat(ctx context.Context, vm *guestVM, root, tokenFile, labBi
 	runName, err := newVMRedHatRunName()
 	if err != nil {
 		return err
+	}
+	// The controller holds the run name before this host's receipt and any
+	// Red Hat contact, so it refuses a lost registration reply too. Without a
+	// receipt nothing was registered, and a later start records a new name.
+	if err := record(ctx, &labv1.RedHatRegistrationIdentity{RunName: runName}); err != nil {
+		return fmt.Errorf("record red hat registration %s on the controller: %w", runName, err)
 	}
 	receipt, err := createVMRedHatReceipt(root, runName)
 	if err != nil {
@@ -85,9 +96,14 @@ func registerDemoRedHat(ctx context.Context, vm *guestVM, root, tokenFile, labBi
 	if err := runVMRedHatProbe(ctx, vm, "redhat-register", payload, registered); err != nil {
 		return err
 	}
-	// Persist the exact consumer before any other guest operation.
+	// Persist the exact consumer before any other guest operation: first in
+	// this host's receipt, then on the controller, which can remove it while
+	// this host is unreachable.
 	if err := appendVMRedHatReceipt(receipt, registered); err != nil {
 		return err
+	}
+	if err := record(ctx, registered); err != nil {
+		return fmt.Errorf("record red hat consumer %s (%s) on the controller: %w", registered.GetConsumerUuid(), runName, err)
 	}
 	if err := runVMRedHatProbe(ctx, vm, "redhat-identity", nil, nil); err != nil {
 		return err

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
+
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/labhost"
@@ -257,4 +259,43 @@ func publishAssistanceHeld(dir string, access *vmlab.AssistanceHold) (err error)
 		return err
 	}
 	return os.Rename(file.Name(), filepath.Join(dir, "held"))
+}
+
+// publishDemoRegistration asks the SSH controller to record an organization
+// device's public RHSM identity and returns only once it removed the marker,
+// which it does after its demo state durably holds that identity. Nothing
+// else is published while it waits.
+func publishDemoRegistration(ctx context.Context, dir string, identity *labv1.RedHatRegistrationIdentity, interval time.Duration) error {
+	data, err := protojson.Marshal(identity)
+	if err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(dir, ".registration-")
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+		return errors.Join(err, os.Remove(file.Name()))
+	}
+	marker := filepath.Join(dir, labhost.RegistrationMarker)
+	if err := os.Rename(file.Name(), marker); err != nil {
+		return errors.Join(err, os.Remove(file.Name()))
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if _, err := os.Lstat(marker); errors.Is(err, os.ErrNotExist) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("controller did not record Red Hat registration %s %s: %w", identity.GetRunName(), identity.GetConsumerUuid(), ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }

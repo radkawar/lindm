@@ -102,6 +102,14 @@ message DemoState {
     min_items: 1
     max_items: 100
   }];
+  // Set when the controller created this state and records every device's
+  // RHSM registration in its binding. An older state's consumers are recorded
+  // only in the device receipts on their execution hosts.
+  bool records_redhat_registrations = 2;
+  // Set when destroy could not reach every device host. The controller keeps
+  // this state, its fixture and owner access for a later destroy that finishes
+  // host cleanup; the demo is never resumed.
+  bool destroying = 3;
 }
 
 // DemoBinding prevents a changed host inventory from orphaning a held device.
@@ -124,4 +132,30 @@ message DemoBinding {
   LabHost host = 3 [(buf.validate.field).required = true];
   DemoDevice device = 4 [(buf.validate.field).required = true];
   string manifest_sha256 = 5 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  // Recorded on the controller before the device host contacts Red Hat, and
+  // with its consumer before any further guest operation, so destroy can
+  // remove that exact consumer while the host is unreachable.
+  DemoRedHatRegistration redhat_registration = 6;
+}
+
+// DemoRedHatRegistration is one device's public RHSM identity. A run name
+// without a consumer UUID is unconfirmed (lost registration reply or record):
+// destroy refuses it rather than resolving a consumer by name or hostname.
+message DemoRedHatRegistration {
+  option (buf.validate.message).cel = {
+    id: "demo.redhat_removed_consumer"
+    message: "only a recorded consumer can be removed"
+    expression: "!this.removed || this.consumer_uuid != ''"
+  };
+  string run_name = 1 [(buf.validate.field).string.pattern = "^lindm-lab-[0-9a-f]{32}$"];
+  string consumer_uuid = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string = {
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      not_in: ["00000000-0000-0000-0000-000000000000"]
+    }
+  ];
+  // The controller removed the consumer through the Red Hat systems API and
+  // observed its absence; the device's host cleanup may still be pending.
+  bool removed = 3;
 }

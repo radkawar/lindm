@@ -327,8 +327,16 @@ func (x *DemoFirmware) GetSecureBoot() bool {
 // DemoState persists the original execution-host and device binding. It contains
 // no enrollment secrets and does not establish native success.
 type DemoState struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Bindings      []*DemoBinding         `protobuf:"bytes,1,rep,name=bindings,proto3" json:"bindings,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Bindings []*DemoBinding         `protobuf:"bytes,1,rep,name=bindings,proto3" json:"bindings,omitempty"`
+	// Set when the controller created this state and records every device's
+	// RHSM registration in its binding. An older state's consumers are recorded
+	// only in the device receipts on their execution hosts.
+	RecordsRedhatRegistrations bool `protobuf:"varint,2,opt,name=records_redhat_registrations,json=recordsRedhatRegistrations,proto3" json:"records_redhat_registrations,omitempty"`
+	// Set when destroy could not reach every device host. The controller keeps
+	// this state, its fixture and owner access for a later destroy that finishes
+	// host cleanup; the demo is never resumed.
+	Destroying    bool `protobuf:"varint,3,opt,name=destroying,proto3" json:"destroying,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -370,6 +378,20 @@ func (x *DemoState) GetBindings() []*DemoBinding {
 	return nil
 }
 
+func (x *DemoState) GetRecordsRedhatRegistrations() bool {
+	if x != nil {
+		return x.RecordsRedhatRegistrations
+	}
+	return false
+}
+
+func (x *DemoState) GetDestroying() bool {
+	if x != nil {
+		return x.Destroying
+	}
+	return false
+}
+
 // DemoBinding prevents a changed host inventory from orphaning a held device.
 type DemoBinding struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -378,8 +400,12 @@ type DemoBinding struct {
 	Host           *LabHost               `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
 	Device         *DemoDevice            `protobuf:"bytes,4,opt,name=device,proto3" json:"device,omitempty"`
 	ManifestSha256 string                 `protobuf:"bytes,5,opt,name=manifest_sha256,json=manifestSha256,proto3" json:"manifest_sha256,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Recorded on the controller before the device host contacts Red Hat, and
+	// with its consumer before any further guest operation, so destroy can
+	// remove that exact consumer while the host is unreachable.
+	RedhatRegistration *DemoRedHatRegistration `protobuf:"bytes,6,opt,name=redhat_registration,json=redhatRegistration,proto3" json:"redhat_registration,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *DemoBinding) Reset() {
@@ -447,6 +473,78 @@ func (x *DemoBinding) GetManifestSha256() string {
 	return ""
 }
 
+func (x *DemoBinding) GetRedhatRegistration() *DemoRedHatRegistration {
+	if x != nil {
+		return x.RedhatRegistration
+	}
+	return nil
+}
+
+// DemoRedHatRegistration is one device's public RHSM identity. A run name
+// without a consumer UUID is unconfirmed (lost registration reply or record):
+// destroy refuses it rather than resolving a consumer by name or hostname.
+type DemoRedHatRegistration struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	RunName      string                 `protobuf:"bytes,1,opt,name=run_name,json=runName,proto3" json:"run_name,omitempty"`
+	ConsumerUuid string                 `protobuf:"bytes,2,opt,name=consumer_uuid,json=consumerUuid,proto3" json:"consumer_uuid,omitempty"`
+	// The controller removed the consumer through the Red Hat systems API and
+	// observed its absence; the device's host cleanup may still be pending.
+	Removed       bool `protobuf:"varint,3,opt,name=removed,proto3" json:"removed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DemoRedHatRegistration) Reset() {
+	*x = DemoRedHatRegistration{}
+	mi := &file_lindm_lab_v1_demo_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DemoRedHatRegistration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DemoRedHatRegistration) ProtoMessage() {}
+
+func (x *DemoRedHatRegistration) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_lab_v1_demo_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DemoRedHatRegistration.ProtoReflect.Descriptor instead.
+func (*DemoRedHatRegistration) Descriptor() ([]byte, []int) {
+	return file_lindm_lab_v1_demo_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DemoRedHatRegistration) GetRunName() string {
+	if x != nil {
+		return x.RunName
+	}
+	return ""
+}
+
+func (x *DemoRedHatRegistration) GetConsumerUuid() string {
+	if x != nil {
+		return x.ConsumerUuid
+	}
+	return ""
+}
+
+func (x *DemoRedHatRegistration) GetRemoved() bool {
+	if x != nil {
+		return x.Removed
+	}
+	return false
+}
+
 var File_lindm_lab_v1_demo_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_demo_proto_rawDesc = "" +
@@ -484,18 +582,28 @@ const file_lindm_lab_v1_demo_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\aversion\x12,\n" +
 	"\vsecure_boot\x18\x05 \x01(\bB\x06\xbaH\x03\xc8\x01\x01H\x00R\n" +
 	"secureBoot\x88\x01\x01B\x0e\n" +
-	"\f_secure_boot\"\xd5\x01\n" +
+	"\f_secure_boot\"\xb7\x02\n" +
 	"\tDemoState\x12A\n" +
 	"\bbindings\x18\x01 \x03(\v2\x19.lindm.lab.v1.DemoBindingB\n" +
-	"\xbaH\a\x92\x01\x04\b\x01\x10dR\bbindings:\x84\x01\xbaH\x80\x01\x1a~\n" +
-	"\x14demo.unique_bindings\x12\x1bbinding keys must be unique\x1aIthis.bindings.all(b, this.bindings.filter(o, o.key == b.key).size() == 1)\"\x83\x03\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10dR\bbindings\x12@\n" +
+	"\x1crecords_redhat_registrations\x18\x02 \x01(\bR\x1arecordsRedhatRegistrations\x12\x1e\n" +
+	"\n" +
+	"destroying\x18\x03 \x01(\bR\n" +
+	"destroying:\x84\x01\xbaH\x80\x01\x1a~\n" +
+	"\x14demo.unique_bindings\x12\x1bbinding keys must be unique\x1aIthis.bindings.all(b, this.bindings.filter(o, o.key == b.key).size() == 1)\"\xda\x03\n" +
 	"\vDemoBinding\x12.\n" +
 	"\x03key\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x03key\x129\n" +
 	"\tdemo_name\x18\x02 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\bdemoName\x121\n" +
 	"\x04host\x18\x03 \x01(\v2\x15.lindm.lab.v1.LabHostB\x06\xbaH\x03\xc8\x01\x01R\x04host\x128\n" +
 	"\x06device\x18\x04 \x01(\v2\x18.lindm.lab.v1.DemoDeviceB\x06\xbaH\x03\xc8\x01\x01R\x06device\x12>\n" +
-	"\x0fmanifest_sha256\x18\x05 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x0emanifestSha256:\\\xbaHY\x1aW\n" +
-	"\x15demo.binding_identity\x12!binding key must match its device\x1a\x1bthis.key == this.device.key*R\n" +
+	"\x0fmanifest_sha256\x18\x05 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x0emanifestSha256\x12U\n" +
+	"\x13redhat_registration\x18\x06 \x01(\v2$.lindm.lab.v1.DemoRedHatRegistrationR\x12redhatRegistration:\\\xbaHY\x1aW\n" +
+	"\x15demo.binding_identity\x12!binding key must match its device\x1a\x1bthis.key == this.device.key\"\xfd\x02\n" +
+	"\x16DemoRedHatRegistration\x12:\n" +
+	"\brun_name\x18\x01 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\arunName\x12\x93\x01\n" +
+	"\rconsumer_uuid\x18\x02 \x01(\tBn\xbaHk\xd8\x01\x01rf2>^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$Z$00000000-0000-0000-0000-000000000000R\fconsumerUuid\x12\x18\n" +
+	"\aremoved\x18\x03 \x01(\bR\aremoved:w\xbaHt\x1ar\n" +
+	"\x1cdemo.redhat_removed_consumer\x12'only a recorded consumer can be removed\x1a)!this.removed || this.consumer_uuid != ''*R\n" +
 	"\bDemoRole\x12\x19\n" +
 	"\x15DEMO_ROLE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11DEMO_ROLE_DESKTOP\x10\x01\x12\x14\n" +
@@ -514,28 +622,30 @@ func file_lindm_lab_v1_demo_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_lab_v1_demo_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_lab_v1_demo_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_lindm_lab_v1_demo_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_lindm_lab_v1_demo_proto_goTypes = []any{
-	(DemoRole)(0),        // 0: lindm.lab.v1.DemoRole
-	(*DemoSpec)(nil),     // 1: lindm.lab.v1.DemoSpec
-	(*DemoDevice)(nil),   // 2: lindm.lab.v1.DemoDevice
-	(*DemoFirmware)(nil), // 3: lindm.lab.v1.DemoFirmware
-	(*DemoState)(nil),    // 4: lindm.lab.v1.DemoState
-	(*DemoBinding)(nil),  // 5: lindm.lab.v1.DemoBinding
-	(*LabHost)(nil),      // 6: lindm.lab.v1.LabHost
+	(DemoRole)(0),                  // 0: lindm.lab.v1.DemoRole
+	(*DemoSpec)(nil),               // 1: lindm.lab.v1.DemoSpec
+	(*DemoDevice)(nil),             // 2: lindm.lab.v1.DemoDevice
+	(*DemoFirmware)(nil),           // 3: lindm.lab.v1.DemoFirmware
+	(*DemoState)(nil),              // 4: lindm.lab.v1.DemoState
+	(*DemoBinding)(nil),            // 5: lindm.lab.v1.DemoBinding
+	(*DemoRedHatRegistration)(nil), // 6: lindm.lab.v1.DemoRedHatRegistration
+	(*LabHost)(nil),                // 7: lindm.lab.v1.LabHost
 }
 var file_lindm_lab_v1_demo_proto_depIdxs = []int32{
 	2, // 0: lindm.lab.v1.DemoSpec.devices:type_name -> lindm.lab.v1.DemoDevice
 	0, // 1: lindm.lab.v1.DemoDevice.role:type_name -> lindm.lab.v1.DemoRole
 	3, // 2: lindm.lab.v1.DemoDevice.firmware:type_name -> lindm.lab.v1.DemoFirmware
 	5, // 3: lindm.lab.v1.DemoState.bindings:type_name -> lindm.lab.v1.DemoBinding
-	6, // 4: lindm.lab.v1.DemoBinding.host:type_name -> lindm.lab.v1.LabHost
+	7, // 4: lindm.lab.v1.DemoBinding.host:type_name -> lindm.lab.v1.LabHost
 	2, // 5: lindm.lab.v1.DemoBinding.device:type_name -> lindm.lab.v1.DemoDevice
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	6, // 6: lindm.lab.v1.DemoBinding.redhat_registration:type_name -> lindm.lab.v1.DemoRedHatRegistration
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_lindm_lab_v1_demo_proto_init() }
@@ -552,7 +662,7 @@ func file_lindm_lab_v1_demo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_lab_v1_demo_proto_rawDesc), len(file_lindm_lab_v1_demo_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -28,6 +28,36 @@ func remoteDestroyRequested(args []string) bool {
 	return false
 }
 
+// ErrHostUnreachable reports that SSH itself could not connect to or
+// authenticate with a lab host (ssh exit status 255), as distinct from a
+// command that ran there and failed.
+var ErrHostUnreachable = errors.New("lab host unreachable over SSH")
+
+// ProbeSSH runs a no-op on an SSH lab host within one bounded connection
+// attempt. A connection or authentication failure wraps ErrHostUnreachable.
+func ProbeSSH(ctx context.Context, host *labv1.LabHost) error {
+	if host.GetTransport() != "ssh" {
+		return fmt.Errorf("host %s does not use SSH transport", host.GetName())
+	}
+	probe, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	output := baselineOutput{limit: 4 << 10}
+	cmd := executionCommand(probe, host.GetSshAlias(), "true")
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err := cmd.Run()
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return nil
+	case ctx.Err() != nil:
+		return ctx.Err()
+	case errors.As(err, &exit) && exit.ExitCode() == 255, probe.Err() != nil:
+		return fmt.Errorf("%w: %s (%s): %s", ErrHostUnreachable, host.GetName(), host.GetSshAlias(), strings.TrimSpace(output.String()))
+	default:
+		return fmt.Errorf("probe host %s: %w", host.GetName(), err)
+	}
+}
+
 // destroyAssistance uses the current native lab binary and normal host-exec
 // admission. Only that maintained command validates and removes persistent state;
 // transport cleanup owns just its new staging directory, never the demo root.

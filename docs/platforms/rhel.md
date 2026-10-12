@@ -446,7 +446,10 @@ The server is then registered with RHSM like a real organization's server: CSAF
 findings need the servicing stream its entitled BaseOS repository corroborates
 (unregistered, evaluation stays `rhel_platform_stream_unavailable`). The DVD
 repository is retired once the entitled repositories are available; `-destroy`
-removes the exact recorded RHSM consumer before deleting the VM.
+removes the exact recorded RHSM consumer before deleting the VM. The controller
+also records the consumer UUID and run name before any further guest operation,
+so a destroy while the Spark is unreachable still removes that exact consumer
+and leaves only the VM and device root pending for the host's return.
 
 The executor's action sandbox drop-in names a LUKS target by its approved
 `/dev/disk/by-uuid/<luks_uuid>` alias, verified at provisioning to be the

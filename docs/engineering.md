@@ -944,11 +944,19 @@ only from the console `/repo`, with its unchanged signature checks. After
 enrollment and TPM binding, the device host registers it with RHSM through the
 maintained hosted path (`-redhat-token-file`, never in argv content, logs or
 evidence), deletes the single-use activation key, retires the DVD repository and
-mount, and uses the entitled repositories. The consumer UUID is persisted in a
-private receipt in the device root before any further guest operation; resume
-never registers again. `-destroy` removes that exact consumer through the Red
-Hat systems API, verifies its absence and reports it, before deleting the VM;
-a receipt without a recorded consumer is refused, never resolved by hostname.
+mount, and uses the entitled repositories. The controller records the public
+run name in its `demo-state.json` binding (`DemoBinding.redhat_registration`)
+before the device host writes its receipt or contacts Red Hat. After
+registration the consumer UUID is persisted first in a private receipt in the
+device root and then in that controller binding, both before any further guest
+operation. A remote worker publishes each record as a private
+`registration` marker in its run evidence; the controller's SSH watcher
+writes the state, then removes the marker, and the worker waits for that
+removal (bounded at 10 minutes) before it continues. Resume never registers
+again. `-destroy` removes that exact consumer through the Red Hat systems API,
+verifies its absence (an already absent consumer counts as removed) and
+reports it, before deleting the VM; a receipt without a recorded consumer is
+refused, never resolved by hostname.
 Each start requests the product's inventory refresh on the registered server so
 evaluation sees its entitled repositories. A device whose evaluation stays
 UNKNOWN for a product reason that only its own evidence can change (currently
@@ -1009,6 +1017,30 @@ an `ssh -L` command with a controller-host placeholder, the private enrollment
 location, and per-desktop `assistance-respond` commands. Local-user consent
 remains mandatory. Destruction uses the saved host bindings and exact owned
 paths, preserves shared caches and refuses active lifecycle locks.
+
+Destroy first probes each bound SSH host. A host whose `ssh` itself fails
+(exit 255: no route, refused connection or failed authentication) is
+unreachable; its devices keep their VMs and device roots. For each such device
+the controller removes the consumer recorded in its binding by exact UUID and
+run name (`RemoveSystem`, absence verified), marks it `removed`, sets
+`DemoState.destroying` and keeps its state, `control-plane/` and
+`owner-access`. It prints `Pending host cleanup:` for each device and the exact
+`lab demo -name NAME -destroy …` command that finishes host cleanup once the
+host is reachable; that later run lets the host remove its receipt (the
+consumer is then already absent) and VM, then destroys the controller. A
+demo with `destroying` set is never resumed. Exit status: **0** when every
+reachable device was destroyed and every unreachable device's recorded
+consumer is removed (or it never registered), even with host cleanup pending:
+the output then says the demo is **NOT fully destroyed**, never
+`Destroyed organization demo`. **Non-zero** for genuine failures: a reachable
+host's destroy failing, a failed or unverified removal, a missing
+`-redhat-token-file` for a recorded consumer, or an unreachable device whose
+registration recorded no consumer UUID (refused, never guessed: destroy again
+once the host is reachable, or use `lab images redhat cleanup`). Demos created
+before controller records (`records_redhat_registrations` unset) are
+unchanged: only the host receipt records their consumer, so an unreachable
+host fails the destroy with a message naming that host's receipt, and destroy
+prints that the demo predates controller Red Hat records.
 
 #### Console UI review
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/labhost"
 	"lindm/internal/vmlab"
 )
@@ -165,8 +166,14 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		options.Hold = func(access *vmlab.AssistanceHold) error {
 			return publishAssistanceHeld(*evidence, access)
 		}
+		options.RedHatRegistered = func(ctx context.Context, identity *labv1.RedHatRegistrationIdentity) error {
+			return publishDemoRegistration(ctx, *evidence, identity, time.Second)
+		}
 		if ready, ok := ctx.Value(demoDeviceHeldKey{}).(func(*vmlab.AssistanceHold) error); ok {
 			options.Hold = ready
+		}
+		if record, ok := ctx.Value(demoDeviceRegisteredKey{}).(func(context.Context, *labv1.RedHatRegistrationIdentity) error); ok {
+			options.RedHatRegistered = record
 		}
 		return vmlab.DemoDeviceVM(ctx, manifest, options, input, stderr)
 	}

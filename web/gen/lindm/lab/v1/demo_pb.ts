@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/lab/v1/demo.proto.
  */
 export const file_lindm_lab_v1_demo: GenFile = /*@__PURE__*/
-  fileDesc("ChdsaW5kbS9sYWIvdjEvZGVtby5wcm90bxIMbGluZG0ubGFiLnYxIrUCCghEZW1vU3BlYxIfCgxvcmdhbml6YXRpb24YASABKAlCCbpIBnIEkLUYARI1CgdkZXZpY2VzGAIgAygLMhgubGluZG0ubGFiLnYxLkRlbW9EZXZpY2VCCrpIB5IBBAgBEGQ60AG6SMwBGskBChNkZW1vLnVuaXF1ZV9kZXZpY2VzEihkZXZpY2Uga2V5cyBhbmQgaG9zdG5hbWVzIG11c3QgYmUgdW5pcXVlGocBdGhpcy5kZXZpY2VzLmFsbChkLCB0aGlzLmRldmljZXMuZmlsdGVyKG8sIG8ua2V5ID09IGQua2V5KS5zaXplKCkgPT0gMSAmJiB0aGlzLmRldmljZXMuZmlsdGVyKG8sIG8uaG9zdG5hbWUgPT0gZC5ob3N0bmFtZSkuc2l6ZSgpID09IDEpIsIECgpEZW1vRGV2aWNlEikKA2tleRgBIAEoCUIcukgZchcQARg/MhFeW2Etel1bYS16MC05LV0qJBI8Cghob3N0bmFtZRgCIAEoCUIqukgnciUQARg/Mh9eW2EtejAtOV0oW2EtejAtOS1dKlthLXowLTldKT8kEhsKCG1hbmlmZXN0GAMgASgJQgm6SAZyBJC1GAESMAoEcm9sZRgEIAEoDjIWLmxpbmRtLmxhYi52MS5EZW1vUm9sZUIKukgHggEEEAEgABIXCgVncm91cBgFIAEoCUIIukgFcgOwAQESKgoScHJvdmlzaW9uaW5nX3Rva2VuGAYgASgJQg66SAtyCRABGIABugEBABISCgphc3Npc3RhbmNlGAcgASgIEhAKCHRwbV9iaW5kGAggASgIEi8KBGhvc3QYCSABKAlCHLpIGXIXEAEYPzIRXlthLXpdW2EtejAtOS1dKiRIAIgBARI0CghmaXJtd2FyZRgKIAEoCzIaLmxpbmRtLmxhYi52MS5EZW1vRmlybXdhcmVCBrpIA8gBATp0ukhxGm8KF2RlbW8uZGVza3RvcF9hc3Npc3RhbmNlEjBhc3Npc3RhbmNlIGlzIG9ubHkgYXZhaWxhYmxlIGZvciBERVNLVE9QIGRldmljZXMaIiF0aGlzLmFzc2lzdGFuY2UgfHwgdGhpcy5yb2xlID09IDFCBwoFX2hvc3RKBAgLEAxKBAgMEA1SDWZpbGVfcHJvdmlkZXJSEHBhY2thZ2VfcHJvdmlkZXIirAEKDERlbW9GaXJtd2FyZRIXCgRjb2RlGAEgASgJQgm6SAZyBJC1GAESFwoEdmFycxgCIAEoCUIJukgGcgSQtRgBEhsKB3BhY2thZ2UYAyABKAlCCrpIB3IFEAEYgAESGwoHdmVyc2lvbhgEIAEoCUIKukgHcgUQARiAARIgCgtzZWN1cmVfYm9vdBgFIAEoCEIGukgDyAEBSACIAQFCDgoMX3NlY3VyZV9ib290IssBCglEZW1vU3RhdGUSNwoIYmluZGluZ3MYASADKAsyGS5saW5kbS5sYWIudjEuRGVtb0JpbmRpbmdCCrpIB5IBBAgBEGQ6hAG6SIABGn4KFGRlbW8udW5pcXVlX2JpbmRpbmdzEhtiaW5kaW5nIGtleXMgbXVzdCBiZSB1bmlxdWUaSXRoaXMuYmluZGluZ3MuYWxsKGIsIHRoaXMuYmluZGluZ3MuZmlsdGVyKG8sIG8ua2V5ID09IGIua2V5KS5zaXplKCkgPT0gMSki1gIKC0RlbW9CaW5kaW5nEikKA2tleRgBIAEoCUIcukgZchcQARg/MhFeW2Etel1bYS16MC05LV0qJBIvCglkZW1vX25hbWUYAiABKAlCHLpIGXIXEAEYPzIRXlthLXpdW2EtejAtOS1dKiQSKwoEaG9zdBgDIAEoCzIVLmxpbmRtLmxhYi52MS5MYWJIb3N0Qga6SAPIAQESMAoGZGV2aWNlGAQgASgLMhgubGluZG0ubGFiLnYxLkRlbW9EZXZpY2VCBrpIA8gBARIuCg9tYW5pZmVzdF9zaGEyNTYYBSABKAlCFbpIEnIQMg5eWzAtOWEtZl17NjR9JDpcukhZGlcKFWRlbW8uYmluZGluZ19pZGVudGl0eRIhYmluZGluZyBrZXkgbXVzdCBtYXRjaCBpdHMgZGV2aWNlGht0aGlzLmtleSA9PSB0aGlzLmRldmljZS5rZXkqUgoIRGVtb1JvbGUSGQoVREVNT19ST0xFX1VOU1BFQ0lGSUVEEAASFQoRREVNT19ST0xFX0RFU0tUT1AQARIUChBERU1PX1JPTEVfU0VSVkVSEAJCHlocbGluZG0vZ2VuL2xpbmRtL2xhYi92MTtsYWJ2MWIGcHJvdG8z", [file_buf_validate_validate, file_lindm_lab_v1_hosts, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChdsaW5kbS9sYWIvdjEvZGVtby5wcm90bxIMbGluZG0ubGFiLnYxIrUCCghEZW1vU3BlYxIfCgxvcmdhbml6YXRpb24YASABKAlCCbpIBnIEkLUYARI1CgdkZXZpY2VzGAIgAygLMhgubGluZG0ubGFiLnYxLkRlbW9EZXZpY2VCCrpIB5IBBAgBEGQ60AG6SMwBGskBChNkZW1vLnVuaXF1ZV9kZXZpY2VzEihkZXZpY2Uga2V5cyBhbmQgaG9zdG5hbWVzIG11c3QgYmUgdW5pcXVlGocBdGhpcy5kZXZpY2VzLmFsbChkLCB0aGlzLmRldmljZXMuZmlsdGVyKG8sIG8ua2V5ID09IGQua2V5KS5zaXplKCkgPT0gMSAmJiB0aGlzLmRldmljZXMuZmlsdGVyKG8sIG8uaG9zdG5hbWUgPT0gZC5ob3N0bmFtZSkuc2l6ZSgpID09IDEpIsIECgpEZW1vRGV2aWNlEikKA2tleRgBIAEoCUIcukgZchcQARg/MhFeW2Etel1bYS16MC05LV0qJBI8Cghob3N0bmFtZRgCIAEoCUIqukgnciUQARg/Mh9eW2EtejAtOV0oW2EtejAtOS1dKlthLXowLTldKT8kEhsKCG1hbmlmZXN0GAMgASgJQgm6SAZyBJC1GAESMAoEcm9sZRgEIAEoDjIWLmxpbmRtLmxhYi52MS5EZW1vUm9sZUIKukgHggEEEAEgABIXCgVncm91cBgFIAEoCUIIukgFcgOwAQESKgoScHJvdmlzaW9uaW5nX3Rva2VuGAYgASgJQg66SAtyCRABGIABugEBABISCgphc3Npc3RhbmNlGAcgASgIEhAKCHRwbV9iaW5kGAggASgIEi8KBGhvc3QYCSABKAlCHLpIGXIXEAEYPzIRXlthLXpdW2EtejAtOS1dKiRIAIgBARI0CghmaXJtd2FyZRgKIAEoCzIaLmxpbmRtLmxhYi52MS5EZW1vRmlybXdhcmVCBrpIA8gBATp0ukhxGm8KF2RlbW8uZGVza3RvcF9hc3Npc3RhbmNlEjBhc3Npc3RhbmNlIGlzIG9ubHkgYXZhaWxhYmxlIGZvciBERVNLVE9QIGRldmljZXMaIiF0aGlzLmFzc2lzdGFuY2UgfHwgdGhpcy5yb2xlID09IDFCBwoFX2hvc3RKBAgLEAxKBAgMEA1SDWZpbGVfcHJvdmlkZXJSEHBhY2thZ2VfcHJvdmlkZXIirAEKDERlbW9GaXJtd2FyZRIXCgRjb2RlGAEgASgJQgm6SAZyBJC1GAESFwoEdmFycxgCIAEoCUIJukgGcgSQtRgBEhsKB3BhY2thZ2UYAyABKAlCCrpIB3IFEAEYgAESGwoHdmVyc2lvbhgEIAEoCUIKukgHcgUQARiAARIgCgtzZWN1cmVfYm9vdBgFIAEoCEIGukgDyAEBSACIAQFCDgoMX3NlY3VyZV9ib290IoUCCglEZW1vU3RhdGUSNwoIYmluZGluZ3MYASADKAsyGS5saW5kbS5sYWIudjEuRGVtb0JpbmRpbmdCCrpIB5IBBAgBEGQSJAoccmVjb3Jkc19yZWRoYXRfcmVnaXN0cmF0aW9ucxgCIAEoCBISCgpkZXN0cm95aW5nGAMgASgIOoQBukiAARp+ChRkZW1vLnVuaXF1ZV9iaW5kaW5ncxIbYmluZGluZyBrZXlzIG11c3QgYmUgdW5pcXVlGkl0aGlzLmJpbmRpbmdzLmFsbChiLCB0aGlzLmJpbmRpbmdzLmZpbHRlcihvLCBvLmtleSA9PSBiLmtleSkuc2l6ZSgpID09IDEpIpkDCgtEZW1vQmluZGluZxIpCgNrZXkYASABKAlCHLpIGXIXEAEYPzIRXlthLXpdW2EtejAtOS1dKiQSLwoJZGVtb19uYW1lGAIgASgJQhy6SBlyFxABGD8yEV5bYS16XVthLXowLTktXSokEisKBGhvc3QYAyABKAsyFS5saW5kbS5sYWIudjEuTGFiSG9zdEIGukgDyAEBEjAKBmRldmljZRgEIAEoCzIYLmxpbmRtLmxhYi52MS5EZW1vRGV2aWNlQga6SAPIAQESLgoPbWFuaWZlc3Rfc2hhMjU2GAUgASgJQhW6SBJyEDIOXlswLTlhLWZdezY0fSQSQQoTcmVkaGF0X3JlZ2lzdHJhdGlvbhgGIAEoCzIkLmxpbmRtLmxhYi52MS5EZW1vUmVkSGF0UmVnaXN0cmF0aW9uOly6SFkaVwoVZGVtby5iaW5kaW5nX2lkZW50aXR5EiFiaW5kaW5nIGtleSBtdXN0IG1hdGNoIGl0cyBkZXZpY2UaG3RoaXMua2V5ID09IHRoaXMuZGV2aWNlLmtleSLdAgoWRGVtb1JlZEhhdFJlZ2lzdHJhdGlvbhIxCghydW5fbmFtZRgBIAEoCUIfukgcchoyGF5saW5kbS1sYWItWzAtOWEtZl17MzJ9JBKFAQoNY29uc3VtZXJfdXVpZBgCIAEoCUJuukhr2AEBcmYyPl5bMC05YS1mXXs4fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXsxMn0kWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDASDwoHcmVtb3ZlZBgDIAEoCDp3ukh0GnIKHGRlbW8ucmVkaGF0X3JlbW92ZWRfY29uc3VtZXISJ29ubHkgYSByZWNvcmRlZCBjb25zdW1lciBjYW4gYmUgcmVtb3ZlZBopIXRoaXMucmVtb3ZlZCB8fCB0aGlzLmNvbnN1bWVyX3V1aWQgIT0gJycqUgoIRGVtb1JvbGUSGQoVREVNT19ST0xFX1VOU1BFQ0lGSUVEEAASFQoRREVNT19ST0xFX0RFU0tUT1AQARIUChBERU1PX1JPTEVfU0VSVkVSEAJCHlocbGluZG0vZ2VuL2xpbmRtL2xhYi92MTtsYWJ2MWIGcHJvdG8z", [file_buf_validate_validate, file_lindm_lab_v1_hosts, file_lindm_validation_v1_string_rules]);
 
 /**
  * DemoSpec describes real devices, not qualification evidence. Relative file
@@ -160,6 +160,24 @@ export type DemoState = Message<"lindm.lab.v1.DemoState"> & {
    * @generated from field: repeated lindm.lab.v1.DemoBinding bindings = 1;
    */
   bindings: DemoBinding[];
+
+  /**
+   * Set when the controller created this state and records every device's
+   * RHSM registration in its binding. An older state's consumers are recorded
+   * only in the device receipts on their execution hosts.
+   *
+   * @generated from field: bool records_redhat_registrations = 2;
+   */
+  recordsRedhatRegistrations: boolean;
+
+  /**
+   * Set when destroy could not reach every device host. The controller keeps
+   * this state, its fixture and owner access for a later destroy that finishes
+   * host cleanup; the demo is never resumed.
+   *
+   * @generated from field: bool destroying = 3;
+   */
+  destroying: boolean;
 };
 
 /**
@@ -199,6 +217,15 @@ export type DemoBinding = Message<"lindm.lab.v1.DemoBinding"> & {
    * @generated from field: string manifest_sha256 = 5;
    */
   manifestSha256: string;
+
+  /**
+   * Recorded on the controller before the device host contacts Red Hat, and
+   * with its consumer before any further guest operation, so destroy can
+   * remove that exact consumer while the host is unreachable.
+   *
+   * @generated from field: lindm.lab.v1.DemoRedHatRegistration redhat_registration = 6;
+   */
+  redhatRegistration?: DemoRedHatRegistration | undefined;
 };
 
 /**
@@ -207,6 +234,40 @@ export type DemoBinding = Message<"lindm.lab.v1.DemoBinding"> & {
  */
 export const DemoBindingSchema: GenMessage<DemoBinding> = /*@__PURE__*/
   messageDesc(file_lindm_lab_v1_demo, 4);
+
+/**
+ * DemoRedHatRegistration is one device's public RHSM identity. A run name
+ * without a consumer UUID is unconfirmed (lost registration reply or record):
+ * destroy refuses it rather than resolving a consumer by name or hostname.
+ *
+ * @generated from message lindm.lab.v1.DemoRedHatRegistration
+ */
+export type DemoRedHatRegistration = Message<"lindm.lab.v1.DemoRedHatRegistration"> & {
+  /**
+   * @generated from field: string run_name = 1;
+   */
+  runName: string;
+
+  /**
+   * @generated from field: string consumer_uuid = 2;
+   */
+  consumerUuid: string;
+
+  /**
+   * The controller removed the consumer through the Red Hat systems API and
+   * observed its absence; the device's host cleanup may still be pending.
+   *
+   * @generated from field: bool removed = 3;
+   */
+  removed: boolean;
+};
+
+/**
+ * Describes the message lindm.lab.v1.DemoRedHatRegistration.
+ * Use `create(DemoRedHatRegistrationSchema)` to create a new message.
+ */
+export const DemoRedHatRegistrationSchema: GenMessage<DemoRedHatRegistration> = /*@__PURE__*/
+  messageDesc(file_lindm_lab_v1_demo, 5);
 
 /**
  * DemoRole selects the installed system's role, independently of its group.

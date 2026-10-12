@@ -28,6 +28,10 @@ import (
 
 type demoDeviceHeldKey struct{}
 
+// demoDeviceRegisteredKey carries a local device worker's controller record
+// of its RHSM registration (recordRedHatRegistration).
+type demoDeviceRegisteredKey struct{}
+
 type demoOptions struct {
 	name, spec, repository, build, lab, lindmd, evidence, address, ledger string
 	cache, golden, redhatToken                                            string
@@ -35,12 +39,14 @@ type demoOptions struct {
 }
 
 type demoRun struct {
-	options        demoOptions
-	root           string
-	spec           *demolab.Spec
+	options    demoOptions
+	root       string
+	spec       *demolab.Spec
+	controller *vmlab.AssistanceController
+	access     *demoOwnerAccess
+	// stateMu serializes device workers' registration records into state.
+	stateMu        sync.Mutex
 	state          *labv1.DemoState
-	controller     *vmlab.AssistanceController
-	access         *demoOwnerAccess
 	stdout, stderr io.Writer
 }
 
@@ -63,7 +69,7 @@ func runDemo(ctx context.Context, args []string, stdout, stderr io.Writer) (err 
 	var options demoOptions
 	flags.StringVar(&options.name, "name", "", "persistent organization demo name")
 	flags.StringVar(&options.spec, "spec", "lab/demo/org-demo.json", "strict protobuf JSON organization lab spec")
-	flags.BoolVar(&options.destroy, "destroy", false, "remove stopped controller and all bound devices on their original hosts")
+	flags.BoolVar(&options.destroy, "destroy", false, "remove stopped controller and all bound devices on their original hosts; an unreachable host's devices stay pending (their recorded RHSM consumers are still removed) and the controller is kept for a later -destroy")
 	flags.StringVar(&options.repository, "repo", ".", "repository with initialized development PostgreSQL and trust")
 	flags.StringVar(&options.build, "build-repo", ".", "current source checkout with built console and installed npm dependencies")
 	flags.StringVar(&options.lab, "lab", "artifacts/bin/lab", "rebuilt native lab binary")

@@ -36,6 +36,10 @@ type VMAssistanceOptions struct {
 	// RedHatTokenFile registers an entitled organization device with RHSM;
 	// only the organization demo mode uses it.
 	RedHatTokenFile string
+	// RedHatRegistered durably records an organization device's RHSM identity
+	// on its controller: the public run name before Red Hat is contacted, then
+	// the same run's consumer UUID. The worker continues only after it returns.
+	RedHatRegistered func(context.Context, *labv1.RedHatRegistrationIdentity) error
 	// Scenarios selects lane scenarios by name, in lane order; nil runs all.
 	Scenarios []string
 	// Hold, when set, receives the owner's access once the selected scenarios

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,7 +19,6 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/demolab"
-	"lindm/internal/devlab"
 	"lindm/internal/labexec"
 	"lindm/internal/labhost"
 	"lindm/internal/vmlab"
@@ -101,6 +99,10 @@ func (r *demoRun) runDevice(ctx context.Context, bound *labv1.DemoBinding, crede
 			return err
 		}
 		run := labhost.RemoteRun{Host: bound.Host, Architecture: arch, Repository: r.options.build, Args: args, Hold: true, BatchCredential: credential, Stdout: r.stdout, Stderr: r.stderr}
+		// The worker continues only after this records its registration.
+		run.OnRegistration = func(_ context.Context, marker []byte) error {
+			return r.recordRegistrationMarker(bound.Key, marker)
+		}
 		if forward {
 			admin, relay := strconv.Itoa(int(authority.AdminPort)), strconv.Itoa(int(handle.Relay.ListenerPort))
 			run.ReverseForwards = []string{admin + ":127.0.0.1:" + admin, relay + ":" + handle.ControllerAddress + ":" + relay}
@@ -127,6 +129,9 @@ func (r *demoRun) runDevice(ctx context.Context, bound *labv1.DemoBinding, crede
 		return err
 	}
 	ctx = context.WithValue(ctx, demoDeviceHeldKey{}, ready)
+	ctx = context.WithValue(ctx, demoDeviceRegisteredKey{}, func(_ context.Context, identity *labv1.RedHatRegistrationIdentity) error {
+		return r.recordRedHatRegistration(bound.Key, identity)
+	})
 	return slots.RunBatchWorker(ctx, credential, func(ctx context.Context) error { return runVMAssistance(ctx, args[2:], r.stdout, r.stderr) })
 }
 
@@ -231,50 +236,5 @@ func (r *demoRun) writeReady() error {
 		token = " -redhat-token-file " + r.options.redhatToken
 	}
 	_, err := fmt.Fprintf(r.stdout, "Destroy after stop: %s demo -name %s -destroy -repo %s -build-repo %s%s\nEvidence: %s\n", r.options.lab, r.options.name, r.options.repository, r.options.build, token, r.options.evidence)
-	return err
-}
-
-func destroyOrganizationDemo(ctx context.Context, options demoOptions, root string, stdout, stderr io.Writer) error {
-	if _, err := os.Lstat(root); errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err := openAssistanceDemoRoot(root); err != nil {
-		return err
-	}
-	state, err := readDemoState(root)
-	if err != nil {
-		return err
-	}
-	for _, bound := range state.Bindings {
-		if bound.Host.GetTransport() == "ssh" {
-			args := []string{"vm", "assistance", "-hold", "-name", bound.DemoName, "-demo-parent", options.name, "-destroy"}
-			// The device host removes a recorded RHSM consumer before its VM.
-			if options.redhatToken != "" {
-				args = labhost.SetFlag(args, "redhat-token-file", options.redhatToken)
-			}
-			if err := (labhost.RemoteRun{Host: bound.Host, Repository: options.build, Args: args, Stdout: stdout, Stderr: stderr}).Run(ctx); err != nil {
-				return err
-			}
-		} else {
-			work, err := labhost.ResolveWorkDirectory(bound.Host)
-			if err != nil {
-				return err
-			}
-			deviceRoot, err := labhost.DemoDirectory(work, bound.DemoName)
-			if err != nil {
-				return err
-			}
-			if err := destroyOrganizationDevice(ctx, options.repository, deviceRoot, options.name, options.redhatToken, stdout); err != nil {
-				return err
-			}
-		}
-	}
-	if err := devlab.DestroyPersistentFixture(ctx, options.repository, filepath.Join(root, "control-plane")); err != nil {
-		return err
-	}
-	if err := os.RemoveAll(root); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(stdout, "Destroyed organization demo:", options.name)
 	return err
 }

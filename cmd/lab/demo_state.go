@@ -133,9 +133,24 @@ func matchDemoState(state *labv1.DemoState, spec *demolab.Spec) error {
 	return nil
 }
 
+// writeDemoState durably replaces the controller's demo state.
+func writeDemoState(root string, state *labv1.DemoState) error {
+	if err := protovalidate.Validate(state); err != nil {
+		return err
+	}
+	data, err := protojson.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return publishDemoFile(filepath.Join(root, "demo-state.json"), data, 0600)
+}
+
 func bindDemoState(name, root string, spec *demolab.Spec, cfg *labv1.LabConfig) (*labv1.DemoState, error) {
 	state, err := readDemoState(root)
 	if err == nil {
+		if state.GetDestroying() {
+			return nil, fmt.Errorf("organization demo %s is being destroyed and has host cleanup pending; finish it with lab demo -name %s -destroy", name, name)
+		}
 		return state, matchDemoState(state, spec)
 	}
 	if !errors.Is(err, os.ErrNotExist) {
@@ -149,14 +164,54 @@ func bindDemoState(name, root string, spec *demolab.Spec, cfg *labv1.LabConfig) 
 	if err != nil {
 		return nil, err
 	}
-	if err := protovalidate.Validate(state); err != nil {
-		return nil, err
+	state.RecordsRedhatRegistrations = true
+	return state, writeDemoState(root, state)
+}
+
+// recordRedHatRegistration durably records a device's RHSM identity in the
+// controller's state before its worker continues: the run name before the
+// host contacts Red Hat, then that run's consumer. A host without a receipt
+// never contacted Red Hat, so a new run name replaces an unconfirmed one; a
+// recorded consumer is never replaced.
+func (r *demoRun) recordRedHatRegistration(key string, identity *labv1.RedHatRegistrationIdentity) error {
+	registration := &labv1.DemoRedHatRegistration{RunName: identity.GetRunName(), ConsumerUuid: identity.GetConsumerUuid()}
+	if err := protovalidate.Validate(registration); err != nil {
+		return fmt.Errorf("device %s reported an invalid Red Hat registration: %w", key, err)
 	}
-	data, err := protojson.Marshal(state)
-	if err != nil {
-		return nil, err
+	r.stateMu.Lock()
+	defer r.stateMu.Unlock()
+	var bound *labv1.DemoBinding
+	for _, binding := range r.state.GetBindings() {
+		if binding.GetKey() == key {
+			bound = binding
+		}
 	}
-	return state, publishDemoFile(filepath.Join(root, "demo-state.json"), data, 0600)
+	if bound == nil {
+		return fmt.Errorf("device %s has no demo binding", key)
+	}
+	current := bound.GetRedhatRegistration()
+	if proto.Equal(current, registration) {
+		return nil
+	}
+	if current.GetConsumerUuid() != "" || (registration.ConsumerUuid != "" && current != nil && current.GetRunName() != registration.RunName) {
+		return fmt.Errorf("device %s already records Red Hat registration %s %s; refusing %s %s", key, current.GetRunName(), current.GetConsumerUuid(), registration.RunName, registration.ConsumerUuid)
+	}
+	bound.RedhatRegistration = registration
+	if err := writeDemoState(r.root, r.state); err != nil {
+		bound.RedhatRegistration = current
+		return err
+	}
+	return nil
+}
+
+// recordRegistrationMarker records the identity a remote device worker
+// published in its registration marker.
+func (r *demoRun) recordRegistrationMarker(key string, marker []byte) error {
+	identity := new(labv1.RedHatRegistrationIdentity)
+	if err := protojson.Unmarshal(marker, identity); err != nil {
+		return fmt.Errorf("device %s: invalid Red Hat registration marker: %w", key, err)
+	}
+	return r.recordRedHatRegistration(key, identity)
 }
 
 func demoToken(access *demoOwnerAccess, name string) string {
