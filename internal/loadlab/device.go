@@ -63,9 +63,18 @@ func (r *runner) transport(address string, certificate *tls.Certificate) *http.T
 // protocol. A remote generator runs only enrollDevice; grants never leave the
 // orchestrator except as the one-use secret consumed by that enrollment.
 func (r *runner) enroll(ctx context.Context, index int) (*simulatedDevice, error) {
-	secret, err := r.grant(ctx, index)
-	if err != nil {
-		return nil, err
+	var secret string
+	var err error
+	if index < len(r.demo) {
+		secret = r.demo[index].provisioningToken
+		if secret == "" {
+			return nil, errors.New("demo device requires its organization provisioning token")
+		}
+	} else {
+		secret, err = r.grant(ctx, index)
+		if err != nil {
+			return nil, err
+		}
 	}
 	d, err := r.enrollDevice(ctx, index, secret)
 	if err != nil {
@@ -117,11 +126,20 @@ func (r *runner) enrollDevice(ctx context.Context, index int, secret string) (d 
 	if err != nil {
 		return d, err
 	}
-	enrolled, err := r.enrollment.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{GrantSecret: secret, TransactionId: uuid.NewString(), CsrPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr})}))
-	if err != nil {
-		return d, fmt.Errorf("device %d: enroll: %w", index, err)
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr})
+	if d.demo != nil {
+		provisioned, err := r.enrollment.Provision(ctx, connect.NewRequest(&enrollmentv1.ProvisionRequest{ProvisioningToken: secret, TransactionId: uuid.NewString(), InstallationId: d.installation, CsrPem: csrPEM}))
+		if err != nil {
+			return d, fmt.Errorf("device %d: provision: %w", index, err)
+		}
+		d.id, d.generation, d.certificate = provisioned.Msg.GetDeviceId(), provisioned.Msg.GetEnrollmentGeneration(), provisioned.Msg.GetCertificatePem()
+	} else {
+		enrolled, err := r.enrollment.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{GrantSecret: secret, TransactionId: uuid.NewString(), CsrPem: csrPEM}))
+		if err != nil {
+			return d, fmt.Errorf("device %d: enroll: %w", index, err)
+		}
+		d.id, d.generation, d.certificate = enrolled.Msg.GetDeviceId(), enrolled.Msg.GetEnrollmentGeneration(), enrolled.Msg.GetCertificatePem()
 	}
-	d.id, d.generation, d.certificate = enrolled.Msg.GetDeviceId(), enrolled.Msg.GetEnrollmentGeneration(), enrolled.Msg.GetCertificatePem()
 	block, _ := pem.Decode(d.certificate)
 	if block == nil {
 		return d, errors.New("missing enrollment certificate")

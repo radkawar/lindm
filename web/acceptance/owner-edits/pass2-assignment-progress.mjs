@@ -1,8 +1,8 @@
 // Owner pass 2, item 1: profile assignments on the live demo device never left
 // "Pending / No changes sent yet" because the demo device never asked for
-// resource work. State-changing: assigns "Server hardening" to the route device,
-// waits until every item has a result and every removed item completed, then
-// restores "Workstation baseline" the same way so later checks see the seed.
+// resource work. State-changing: assigns the organization's "Contractors" profile
+// to the route device, waits until every item has a result and every removed
+// item completed, then assigns "Company baseline" (lab/demo/org.json) the same way.
 export const task = {
   name: "Assignment progress on the live demo device",
   screenId: "owner-pass2-assignment-progress",
@@ -86,8 +86,8 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     if (shot) await capture("assignment-progressed");
   }
 
-  await assign("Server hardening");
-  await awaitProgress("Server hardening", true);
-  await assign("Workstation baseline");
-  await awaitProgress("Workstation baseline", false);
+  await assign("Contractors");
+  await awaitProgress("Contractors", true);
+  await assign("Company baseline");
+  await awaitProgress("Company baseline", false);
 }

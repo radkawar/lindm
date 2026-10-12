@@ -1,6 +1,7 @@
 package devlab
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,7 +12,29 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
+	"time"
+
+	"google.golang.org/protobuf/proto"
+
+	configv1 "lindm/gen/lindm/config/v1"
 )
+
+// cachedRefreshConfig returns a copy of cfg for refreshes behind
+// acceptanceFeedCache. The cache materializes and hashes each complete vendor
+// artifact before the production parser reads a byte, so a slow link would trip
+// the production idle watchdog without any stalled stream. The lab duration
+// already bounds the refresh; an unset idle bound inherits it (capped at the
+// protocol maximum). Explicit bounds and cfg itself are left unchanged.
+func cachedRefreshConfig(cfg *configv1.AdvisoryConfig, duration time.Duration) *configv1.AdvisoryConfig {
+	cfg = proto.CloneOf(cfg)
+	for _, feed := range cfg.GetFeeds() {
+		if feed.ProgressTimeoutSeconds == nil {
+			feed.ProgressTimeoutSeconds = proto.Uint32(uint32(min(max(duration.Seconds(), 1), 3600)))
+		}
+	}
+	return cfg
+}
 
 // AcceptanceFeedArtifact records bytes actually delivered to the production feed
 // parser. A cache hit requires current vendor HTTP revalidation and a digest check;
@@ -30,23 +53,24 @@ type acceptanceCacheEntry struct {
 }
 
 type acceptanceFeedCache struct {
-	// Serialize acquisition, index replacement and budget accounting. Response
-	// bodies are independent files and may be parsed concurrently after return.
-	mu        sync.Mutex
 	base      http.RoundTripper
 	directory string
+	mu        sync.Mutex // guards the shared byte budget and completed artifacts
 	remaining int64
 	artifacts []AcceptanceFeedArtifact
 }
 
 func (c *acceptanceFeedCache) RoundTrip(request *http.Request) (_ *http.Response, resultErr error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if request.Method != http.MethodGet {
 		return nil, errors.New("acceptance feed cache only permits GET")
 	}
 	key := sha256.Sum256([]byte(request.URL.String()))
 	index := filepath.Join(c.directory, hex.EncodeToString(key[:])+".json")
+	lock, err := lockAcceptanceFeedCache(request.Context(), index+".lock")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resultErr = errors.Join(resultErr, lock.Close()) }()
 	var cached acceptanceCacheEntry
 	indexFile, err := os.Open(index)
 	var encoded []byte
@@ -85,7 +109,7 @@ func (c *acceptanceFeedCache) RoundTrip(request *http.Request) (_ *http.Response
 		}
 		response.StatusCode, response.Status, response.Header = http.StatusOK, "200 OK", cached.Header.Clone()
 		response.Body, response.ContentLength = file, cached.Bytes
-		c.artifacts = append(c.artifacts, AcceptanceFeedArtifact{URL: request.URL.String(), SHA256: cached.SHA256, Bytes: cached.Bytes, Revalidated: true})
+		c.recordArtifact(AcceptanceFeedArtifact{URL: request.URL.String(), SHA256: cached.SHA256, Bytes: cached.Bytes, Revalidated: true})
 		return response, nil
 	}
 	if response.StatusCode != http.StatusOK {
@@ -102,15 +126,11 @@ func (c *acceptanceFeedCache) RoundTrip(request *http.Request) (_ *http.Response
 		}
 	}()
 	hash := sha256.New()
-	count, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(response.Body, c.remaining+1))
+	count, copyErr := io.Copy(acceptanceCacheWriter{cache: c, writer: io.MultiWriter(file, hash)}, response.Body)
 	err = errors.Join(copyErr, response.Body.Close(), file.Close())
 	if err != nil {
 		return nil, err
 	}
-	if count > c.remaining {
-		return nil, errors.New("acceptance vendor feed byte budget exceeded")
-	}
-	c.remaining -= count
 	entry := acceptanceCacheEntry{SHA256: hex.EncodeToString(hash.Sum(nil)), Bytes: count, Header: response.Header.Clone()}
 	if err := os.Rename(name, filepath.Join(c.directory, entry.SHA256)); err != nil {
 		return nil, err
@@ -127,14 +147,17 @@ func (c *acceptanceFeedCache) RoundTrip(request *http.Request) (_ *http.Response
 		return nil, err
 	}
 	response.Body = body
-	c.artifacts = append(c.artifacts, AcceptanceFeedArtifact{URL: request.URL.String(), SHA256: entry.SHA256, Bytes: count})
+	c.recordArtifact(AcceptanceFeedArtifact{URL: request.URL.String(), SHA256: entry.SHA256, Bytes: count})
 	return response, nil
 }
 
 func (c *acceptanceFeedCache) openCached(entry acceptanceCacheEntry) (_ *os.File, resultErr error) {
 	digest, err := hex.DecodeString(entry.SHA256)
-	if err != nil || len(digest) != sha256.Size || entry.Bytes < 0 || entry.Bytes > c.remaining {
-		return nil, errors.New("invalid or over-budget acceptance feed cache entry")
+	if err != nil || len(digest) != sha256.Size || entry.Bytes < 0 {
+		return nil, errors.New("invalid acceptance feed cache entry")
+	}
+	if err := c.consumeBytes(entry.Bytes); err != nil {
+		return nil, err
 	}
 	file, err := os.Open(filepath.Join(c.directory, entry.SHA256))
 	if err != nil {
@@ -156,6 +179,70 @@ func (c *acceptanceFeedCache) openCached(entry acceptanceCacheEntry) (_ *os.File
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	c.remaining -= count
 	return file, nil
+}
+
+// Budget accounting never holds the mutex during network or filesystem I/O.
+func (c *acceptanceFeedCache) consumeBytes(count int64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if count > c.remaining {
+		return errors.New("acceptance vendor feed byte budget exceeded")
+	}
+	c.remaining -= count
+	return nil
+}
+
+func (c *acceptanceFeedCache) recordArtifact(artifact AcceptanceFeedArtifact) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.artifacts = append(c.artifacts, artifact)
+}
+
+type acceptanceCacheWriter struct {
+	cache  *acceptanceFeedCache
+	writer io.Writer
+}
+
+func (w acceptanceCacheWriter) Write(data []byte) (int, error) {
+	if err := w.cache.consumeBytes(int64(len(data))); err != nil {
+		return 0, err
+	}
+	return w.writer.Write(data)
+}
+
+// lockAcceptanceFeedCache serializes one URL's revalidation and index publication
+// across processes without delaying unrelated vendor URLs. Content-addressed
+// bodies remain readable through open descriptors after the entry lock is released.
+func lockAcceptanceFeedCache(ctx context.Context, path string) (*os.File, error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0600)
+	if err != nil {
+		return nil, err
+	}
+	var ticker *time.Ticker
+	defer func() {
+		if ticker != nil {
+			ticker.Stop()
+		}
+	}()
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, errors.Join(err, file.Close())
+		}
+		err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return file, nil
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+			return nil, errors.Join(err, file.Close())
+		}
+		if ticker == nil {
+			ticker = time.NewTicker(100 * time.Millisecond)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, errors.Join(ctx.Err(), file.Close())
+		case <-ticker.C:
+		}
+	}
 }

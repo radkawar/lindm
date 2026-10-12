@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	}
 	flags := flag.NewFlagSet("console", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	repo := flags.String("repo", ".", "repository with protected development trust and running Postgres (read-only)")
+	repo := flags.String("repo", ".", "repository with read-only development trust, running Postgres and the shared demo advisory cache")
 	binary := flags.String("lindmd", "", "prebuilt real lindmd executable with current embedded console")
 	devices := flags.Int("devices", 300, "simulated devices with host and package inventory (1..10000)")
 	packages := flags.Int("packages", 200, "simulated packages per device (1..5000)")
@@ -29,13 +30,21 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	hostObservation := flags.String("host-observation", "", "captured HostObservation protobuf JSON to replay on one simulated device (historical, at most 1 MiB)")
 	revealApproval := flags.Bool("reveal-approval", false, "require a second human to approve secret and local-admin password reveals")
 	demo := flags.Bool("demo", false, "seed the deterministic console demo dataset instead of the capacity population (ignores -devices/-packages/-assignment-percent/-enrollment-workers)")
+	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache for -demo (default <repo>/.cache/lab/advisories)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if *binary == "" || flags.NArg() != 0 {
 		return errors.New("lab console requires -lindmd FILE; no positional arguments")
 	}
-	setup, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	if *advisoryCache == "" {
+		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
+	}
+	setupTimeout := 30 * time.Minute
+	if *demo {
+		setupTimeout = 3 * time.Hour
+	}
+	setup, cancel := context.WithTimeout(ctx, setupTimeout)
 	defer cancel()
 	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(setup, *repo, *binary)
 	if err != nil {
@@ -51,7 +60,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	reporting := "devices stop reporting after population."
 	if *demo {
 		// The outer context: the route device keeps checking in until the console stops.
-		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation})
+		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache})
 		if err != nil {
 			return err
 		}

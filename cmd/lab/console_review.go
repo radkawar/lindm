@@ -56,17 +56,21 @@ const consoleReviewPrintedFailures = 200
 func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writer) (resultErr error) {
 	flags := flag.NewFlagSet("console review", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	repo := flags.String("repo", ".", "repository with protected development trust and running Postgres (read-only)")
+	repo := flags.String("repo", ".", "repository with read-only development trust, running Postgres and the shared advisory cache")
 	binary := flags.String("lindmd", "", "prebuilt real lindmd executable with the console under review embedded")
 	evidence := flags.String("evidence", "", "new private directory for report.json, index.html and screenshots")
 	hostObservation := flags.String("host-observation", "", "optional captured HostObservation protobuf JSON to replay on one demo device")
 	directoryAuthorization := flags.Bool("directory-authorization", false, "include real Keycloak group-role editing and scoped browser authorization")
-	timeout := flags.Duration("timeout", time.Hour, "overall review deadline")
+	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache (default <repo>/.cache/lab/advisories)")
+	timeout := flags.Duration("timeout", 3*time.Hour, "overall review deadline including first vendor refresh")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if *binary == "" || *evidence == "" || flags.NArg() != 0 {
 		return errors.New("lab console review requires -lindmd FILE -evidence NEW_DIRECTORY; no positional arguments")
+	}
+	if *advisoryCache == "" {
+		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
 	}
 	checkout, err := os.Getwd()
 	if err != nil {
@@ -98,7 +102,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, fixture.Close()) }()
-	demo, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation})
+	demo, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, SourceDirectory: checkout, AdvisoryCache: *advisoryCache})
 	if err != nil {
 		return fmt.Errorf("seed demo console: %w", err)
 	}

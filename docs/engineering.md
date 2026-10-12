@@ -1033,51 +1033,146 @@ logical console host to its private server, preserving Origin, cookies and real
 responses. It creates no provider catalog and changes no OAuth scopes or shared
 directory group; all owned users, groups and databases are removed afterwards.
 
-The demo seed (`loadlab.SeedDemo`) is deterministic and uses only product RPCs on
-the isolated fixture: synthetic-labelled Ubuntu, Fedora, RHEL and Debian devices
-that are enrolled, pending approval, compliance-stale and revoked (with approval);
-encrypted, unencrypted and unknown roots, with an escrowed key; three profiles whose
-assignments are compliant, drifting and failed; advisory findings from the checked-in
-feed fixtures served by a fixture-owned loopback origin, with one accepted risk;
-lock, refresh, escrow-rotate and a wipe awaiting approval; a completed control-mode
-and a declined assistance session; a one-time code, an automatic provisioning token,
-a group, rollout, secret, webhook, report schedule and audit export. Contact-stale
-devices need 24 hours of silence and are not seeded; the one-time code expires
-after 15 minutes and the pending wipe's action after 10. `-host-observation FILE`
-replays a captured host on one demo device. The route device (`ubuntu-ws-01`) keeps
-checking in while the fixture runs, so remote assistance can be requested from it;
-no user answers, so requested sessions stay waiting. It also fetches action work on
-each 30-second check-in and completes a requested inventory refresh (other work
-expires unstarted), so console flows waiting for fresh storage can finish. Its
-independent `approver` account is an admin (`AuthorityFixture.UseAdminApprover`),
-the least built-in role that can decide every approval kind, not a second owner.
+The demo seed (`loadlab.SeedDemo`) applies `lab/demo/org.json` through the product
+organization engine, not a second catalog of groups, profiles, targeting rules,
+rollouts or enrollment credentials. The fixture configures the declared
+authorization policy and supplies its browser owner session for account operations;
+CLI bearer restrictions remain unchanged. Synthetic devices enroll through the
+organization's department provisioning tokens, retaining their static membership.
+The enrollment prerequisite pass omits rollouts and assignments: rollout creation
+freezes its cohort and correctly rejects an empty canary population. After device
+enrollment and inventory, the full unchanged source document is applied, including
+its rollouts and assignments. A separate post-seed apply verifies idempotence.
+Normal devices retain their department targeting labels. Outcomes are retained in
+the sanitized demo report, including pending advisory selectors and unsupported
+operations; missing hosts or findings are never fabricated. The declared Engineering
+rollout has a 25% Pilot and 100% Fleet ring with manual Fleet promotion. It is
+prepared but not linked to an assignment: the synthetic executor cannot establish
+native health for the organization's full resource set, and linking that failed
+head would correctly pause its rollout before dispatch. No health gate is relaxed.
+The seed's independent `approver` account is an admin
+(`AuthorityFixture.UseAdminApprover`), the least built-in role that can decide every
+approval kind, not a second owner.
 
-The Ubuntu, Debian and RHEL advisory fixtures are single vendor notices, so their
-feeds are partial: those devices evaluate `UNKNOWN`/`feed_partial_coverage` and
-every finding, including the route device's accepted one, reads Unknown. The
-Fedora fixture's recorded FEDORA-2026-7d4732cbab node is served inside an
-`<updates>` root as the complete updateinfo of the fixture's controlled
-repository (complete for that demo repository only, never Fedora 44 updates), so
-`fedora-ws-03` reports its sudo `0:1.9.17-7.p2.fc44` (fixed `0:1.9.17-10.p2.fc44`)
-Affected. That finding carries a risk-acceptance proposal awaiting independent
-approval, beside one whose finding evidence is unavailable; the seed fails when
-no Affected finding appears instead of omitting them.
+The synthetic-only overlay adds enrolled, pending, compliance-stale and revoked
+devices; encrypted, unencrypted and unknown roots with escrow custody; device action
+and assistance history; a secret, webhook, report schedule and audit export; and
+an unassigned "Guest Wi-Fi firewall" profile (`Routes.FirewallProfileID`), whose
+unnamed zone the console must identify by its `wlan0`/`192.168.50.0/24` binding.
+Headless servers report assistance off (`Routes.AssistanceOffDeviceID`). The older
+`ubuntu-ws-02` agent reports no assistance setting and refuses a request before
+start (`Routes.RefusedAssistance*`). The Engineering laptop `ubuntu-ws-09` never
+reports inventory (`Routes.FactsPendingDeviceID`). It is still pending, and
+organization targeting activates only active devices. The seed therefore assigns
+Engineering tools to it directly, and that profile's platform-limited package
+rows wait for its device facts. On the Ubuntu route device, the Fedora/RHEL rows
+are not applicable.
+Organization resource kinds that the simulator cannot execute remain unsupported,
+not compliant. A separately named synthetic kiosk profile supplies a short-lived
+verification history for the stale presentation. The kiosk retains token-created
+Contractors membership for RBAC, but the synthetic overlay deliberately removes
+only its department targeting label and adds `synthetic-history-only`, alongside
+`synthetic-demo`, `kiosk` and `lobby`. It is outside organization policy targeting
+so a subsequent unchanged organization apply preserves the stale history.
+The route device (`ubuntu-ws-01`)
+keeps checking in while the fixture runs; callers stop `DemoPresence` before closing
+the fixture. Requested assistance sessions stay waiting because no user is present.
+The route includes completed action, escrow and ended assistance IDs. One current
+vendor finding gets an explicitly synthetic review exception, retrying only the
+definitive `advisory_evidence_changed` rejection. The organization's own exact
+exception selectors still run through `orgapply`. A seed organization apply that
+meets the definitive `targeting_revision_conflict` rejection (a live check-in
+changed the previewed revision) is re-planned, at most five times, unless that
+attempt issued credentials.
+It also fetches action work on each 30-second check-in and completes a requested
+inventory refresh (other work expires unstarted), so console flows waiting for fresh
+storage can finish. A second current Affected finding on `ubuntu-ws-02` carries a
+risk-acceptance proposal awaiting independent approval, beside one whose finding
+evidence is unavailable; the seed fails when no Affected finding appears instead of
+omitting them.
+
+Advisories come from registry-derived real Ubuntu OSV, Fedora updateinfo and RHEL
+CSAF exports, not single-record fixtures or a loopback feed server. First refresh
+uses the revalidating HTTP cache at `<repo>/.cache/lab/advisories`, shared across
+worktrees using the same `-repo` development-trust checkout; `-advisory-cache DIRECTORY`
+selects another persistent cache. Cache revalidation/index publication holds a
+context-bounded cross-process flock per URL, so concurrent reviews cannot truncate
+one another's indexes and slow exports do not block unrelated URLs. Shared byte
+budget and artifact bookkeeping uses short in-process critical sections, never
+holding a mutex during network or filesystem I/O. Every fresh fixture revalidates
+cached vendor responses, including ETags, before publication.
+Warm this cache before a shared review. Initial download/refresh has its own
+two-hour bound, before the twenty-minute device seed; each wait inside it for the
+server's own real-feed evaluation (accepted, proposed and scale findings) is
+bounded at eight minutes and reports the last freshness reason. The review's
+overall default is three hours. The cache stores and hashes a whole vendor
+artifact before the parser reads it. Held lab advisories (`EnableAdvisories`, like
+`RefreshVendorFeeds`) therefore set an unset per-source `progress_timeout_seconds`
+to the protocol maximum of one hour. Without it, a changed 778 MB Ubuntu OSV
+archive at the observed ~1 MB/s trips the default five-minute idle watchdog before
+any document is parsed. The fixture server's persisted configuration carries the
+same bound, because a feed whose configuration differs from its publication is
+retired on restart. The webhook alone uses the fixture-owned loopback origin.
+
+The full-feed fixture regression also checks that a post-seed organization apply
+has no changes or new credentials. Run it after `make acceptance-build`, using
+the development-trust checkout for `LINDM_CONSOLE_REPOSITORY`:
+
+```sh
+LINDM_CONSOLE_REPOSITORY=/path/to/trust-checkout \
+LINDM_CONSOLE_LINDMD="$PWD/artifacts/bin/lindmd" \
+flock -w 10800 ~/.cache/lindm-integration.lock \
+go test -tags=integration,consolelab ./internal/loadlab \
+  -run '^TestSeedDemoProducesConsoleReviewStates$' -count=1 -timeout=45m
+```
+
+Keep race detection enabled for the ordinary unit suites (`make check`). This
+separate vendor-backed regression parses multi-million-record publications even
+with a warm HTTP cache; race instrumentation of the parser can exhaust the
+45-minute shared integration slot before device seeding starts.
+
+`lab/demo/*-packages.json` retains all package records unchanged, with only JSON
+formatting and the `PackageBatch` envelope changed, from maintained native
+inspection captures on 2026-10-09:
+
+| Replay       | Packages | Source observation SHA-256                                         |
+| ------------ | -------: | ------------------------------------------------------------------ |
+| Ubuntu 24.04 |      664 | `d07821f1a23003704b8196ea6f21f3dff9e7198c419a3de25f43a4ddf8e77709` |
+| Fedora 44    |      427 | `b1f784f1c16de0fd9acfcdd762bf3e1b43ef079a07c7e4c26ca473a8addce3c8` |
+| RHEL 9.8     |      490 | `31d8897f2c71163279bd6ff2e66c9fdf1288450b3f8dc58839a2b0c28a733a1a` |
+
+Capture commands, image digests, collection timestamps and independent native
+package-oracle counts are in `internal/advisory/testdata/provenance.txt`.
+The original Ubuntu/Fedora observations are
+`artifacts/inventory-{ubuntu24,fedora44}-observation-20261009.json`; RHEL is
+`~/.cache/lindm-platformlanes-20261009/rhel98-native-observation.json`.
+RHEL also replays the retained `rhel98-platform.json`: its unregistered host had no
+enabled repositories, so missing stream coverage stays unknown rather than
+inventing entitlement. The prior Debian build/support roles now use Ubuntu
+captures; no complete maintained Debian export or native amd64 capture is claimed.
+Package evidence is historical, while hardware and execution are synthetic and
+explicitly labelled. These replays do not qualify native execution or current
+whole-host health. `-host-observation FILE` can additionally replay a captured host
+on one device; it does not turn that synthetic device into a live host.
+Successful vendor publication is not a completeness claim. Unscoped rejected vendor
+records keep the feed non-fresh even when its signed publication has not expired.
+The observed Red Hat export rejected CVE-2023-44487's invalid RPM purl
+`pkg:rpm/redhat/nginx:1.24?arch=src`; the seed retains that rejection and incomplete
+coverage instead of editing vendor data or forcing the feed fresh.
 
 Scale fixtures (`internal/loadlab/demo_scale.go`) make pagination, pickers and
-long-content layouts reachable by the review: a Fedora 44 server with the
-70-character hostname `fedora-ci-gpu-runner-0042.build-farm.eu-central-1.lab.example.internal`
-and 3,010 packages, 2,000 of them installed below 500 synthetic security updates
-that the controlled repository serves after the recorded node
-(`FEDORA-2026-SYNTHETIC-NNNN`, titled and described as synthetic, citing no CVE;
-`internal/devlab/console_demo_scale.go`), so it reports 2,000 Affected findings
-across all severities; 2,400 extra packages on the route device; package names
-over 100 characters and versions over 80 characters; 120 device groups with
+long-content layouts reachable by the review: an IT-helpdesk Fedora 44 server with
+the 70-character hostname
+`fedora-ci-gpu-runner-0042.build-farm.eu-central-1.lab.example.internal`, whose
+captured Fedora baseline gains 1,000 synthetic packages; 2,400 extra packages on
+the route device; package names over 100 characters and versions over 80
+characters (`internal/devlab/console_demo_scale.go`); 120 device groups with
 four audited membership changes each, 110 extra profiles (one with 25 revisions),
-40 local accounts (usernames up to 64 characters) and 150 audited label changes,
-about 1,000 audit events in all. The seed waits for the server's own evaluation
-to list every synthetic finding. It adds about 9 seconds (44 s to 53 s measured on
-the shared development host): the audited writes run eight at a time while the
-kiosk's verification lapses.
+40 local accounts (usernames up to 64 characters) and 150 audited label changes
+that keep its enrollment and department labels, about 1,000 audit events in all.
+No vendor feed claims the synthetic packages, and no synthetic advisory is served:
+large finding lists come from the real vendor exports. The seed waits until the
+server's own evaluation reports an Affected finding on the scale server.
 
 The runner reads every route from `web/src/routeTree.gen.ts`. Parameterised routes use
 the seeded IDs; `$kind` expands to every complex device action. A route the run cannot

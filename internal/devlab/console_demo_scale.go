@@ -1,35 +1,12 @@
 package devlab
 
 import (
-	"bytes"
-	"encoding/xml"
 	"fmt"
 	"strings"
 )
 
-// consoleDemoSyntheticUpdates is the number of synthetic security updates the
-// console demo's controlled Fedora repository publishes beside its recorded
-// vendor node. Each update covers consoleDemoSubpackages binary packages, so
-// a host carrying every affected build reports 2,000 AFFECTED findings. Their
-// base names start at consoleDemoUpdateBase, above any bulk package index.
-const (
-	consoleDemoSyntheticUpdates = 500
-	consoleDemoSubpackages      = 4
-	consoleDemoUpdateBase       = 20000
-)
-
-// ConsoleDemoPackage is one synthetic binary RPM the console demo's controlled
-// Fedora repository fixes: installed at Installed it is AFFECTED until Fixed.
-type ConsoleDemoPackage struct {
-	Name, Installed, Fixed string
-}
-
-// consoleDemoUpdate is one synthetic, explicitly labelled security update.
-type consoleDemoUpdate struct {
-	id, severity, issued string
-	packages             []ConsoleDemoPackage
-}
-
+// Synthetic package catalog for console demo scale fixtures. No vendor feed
+// claims these packages; they only exercise inventory volume and layout.
 var syntheticPackageStems = []string{
 	"aurora", "basalt", "cobalt", "delta", "ember", "fjord", "garnet", "harbor", "indigo", "juniper",
 	"kelvin", "lumen", "meridian", "nimbus", "onyx", "prism", "quartz", "raven", "sierra", "tundra",
@@ -88,53 +65,4 @@ func SyntheticPackageVersion(manager string, index int) string {
 	default:
 		return fmt.Sprintf("%d.%d.%d-%dubuntu%d", 1+index%9, index%31, index%17, 1+index%5, index%3)
 	}
-}
-
-// consoleDemoUpdates returns the deterministic synthetic updates. Severities
-// cycle so every severity filter and sort has many rows.
-func consoleDemoUpdates() []consoleDemoUpdate {
-	severities := []string{"Critical", "Important", "Important", "Moderate", "Moderate", "Moderate", "Low", "Low"}
-	suffixes := []string{"", "-libs", "-devel", "-doc"}[:consoleDemoSubpackages]
-	updates := make([]consoleDemoUpdate, consoleDemoSyntheticUpdates)
-	for i := range updates {
-		base := syntheticPackageBase("rpm", consoleDemoUpdateBase+i)
-		version, release := fmt.Sprintf("%d.%d.%d", 1+i%9, i%31, i%17), 1+i%5
-		update := consoleDemoUpdate{id: fmt.Sprintf("FEDORA-2026-SYNTHETIC-%04d", i+1), severity: severities[i%len(severities)], issued: fmt.Sprintf("2026-%02d-%02d 08:%02d:00", 1+i%9, 1+i%28, i%60)}
-		for _, suffix := range suffixes {
-			update.packages = append(update.packages, ConsoleDemoPackage{Name: base + suffix, Installed: fmt.Sprintf("0:%s-%d.fc44", version, release), Fixed: fmt.Sprintf("0:%s-%d.fc44", version, release+1)})
-		}
-		updates[i] = update
-	}
-	return updates
-}
-
-// ConsoleDemoAffectedPackages lists every binary package the synthetic
-// updates fix, at the installed build that each update reports AFFECTED.
-func ConsoleDemoAffectedPackages() []ConsoleDemoPackage {
-	var packages []ConsoleDemoPackage
-	for _, update := range consoleDemoUpdates() {
-		packages = append(packages, update.packages...)
-	}
-	return packages
-}
-
-// consoleDemoUpdateinfo renders the synthetic updates as updateinfo <update>
-// nodes for the controlled Fedora repository. Titles and descriptions say they
-// are synthetic; they cite no CVE so no real identifier is fabricated.
-func consoleDemoUpdateinfo() ([]byte, error) {
-	var out bytes.Buffer
-	for _, update := range consoleDemoUpdates() {
-		fmt.Fprintf(&out, `<update from="synthetic@lindm.invalid" status="stable" type="security" version="2.0"><id>%s</id><title>Synthetic demo update %s</title><issued date="%s"/><release>Fedora 44</release><severity>%s</severity><summary>Synthetic console demo security update, not a Fedora advisory</summary><description>Synthetic fixture for console scale review.</description><references/><pkglist><collection short="F44"><name>Fedora 44</name>`, update.id, update.id, update.issued, update.severity)
-		for _, pkg := range update.packages {
-			var name bytes.Buffer
-			if err := xml.EscapeText(&name, []byte(pkg.Name)); err != nil {
-				return nil, err
-			}
-			epoch, evr, _ := strings.Cut(pkg.Fixed, ":")
-			version, release, _ := strings.Cut(evr, "-")
-			fmt.Fprintf(&out, `<package name="%s" version="%s" release="%s" epoch="%s" arch="x86_64"><filename>%s-%s-%s.x86_64.rpm</filename></package>`, name.String(), version, release, epoch, name.String(), version, release)
-		}
-		out.WriteString("</collection></pkglist></update>")
-	}
-	return out.Bytes(), nil
 }

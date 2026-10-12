@@ -21,7 +21,7 @@ import (
 // A device that never reports one fails the seed rather than omitting both
 // review fixtures.
 func (s *demoSeed) proposeAdvisoryAcceptance(ctx context.Context, d *simulatedDevice) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, demoEvaluationWait)
 	defer cancel()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()

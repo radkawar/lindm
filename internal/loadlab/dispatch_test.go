@@ -35,6 +35,30 @@ import (
 	"lindm/internal/trust"
 )
 
+func TestDemoDispatchPreservesStoppedDisabledOrganizationIntent(t *testing.T) {
+	for _, outcome := range []serviceOutcome{serviceApplies, serviceConverged} {
+		t.Run(map[serviceOutcome]string{serviceApplies: "applied", serviceConverged: "already-converged"}[outcome], func(t *testing.T) {
+			f := newReplayFixture(t)
+			f.d.demo = &demoDevice{service: outcome}
+			desired := f.intent.GetDesired().GetSystemdService()
+			desired.Runtime = resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE
+			desired.Enablement = resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED
+			f.work.IntentEnvelope = f.sign(f.intent, f.planKey)
+			if err := f.r.dispatch(t.Context(), f.d); err != nil {
+				t.Fatal(err)
+			}
+			verification := f.lastAttestation.GetStatus().GetVerification()
+			observed := verification.GetAfter().GetSystemdService()
+			if !f.closed || observed.GetActiveState() != "inactive" || observed.GetUnitFileState() != "disabled" || !proto.Equal(observed, verification.GetSystemdService().GetObservation()) {
+				t.Fatalf("organization stop/disable intent was reported as running: %v", verification)
+			}
+			if (f.authorizations == 0) != (outcome == serviceConverged) {
+				t.Fatalf("unexpected start authorization count: %d", f.authorizations)
+			}
+		})
+	}
+}
+
 func TestDispatchRetainsStartedActionAfterReportFailure(t *testing.T) {
 	for _, test := range []struct {
 		name string

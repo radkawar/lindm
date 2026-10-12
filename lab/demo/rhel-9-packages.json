@@ -1,0 +1,4414 @@
+{
+  "packages": [
+    {
+      "name": "NetworkManager",
+      "version": "1:1.54.3-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "NetworkManager-libnm",
+      "version": "1:1.54.3-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "NetworkManager-team",
+      "version": "1:1.54.3-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "NetworkManager-tui",
+      "version": "1:1.54.3-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "acl",
+      "version": "0:2.3.1-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "alternatives",
+      "version": "0:1.24-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "attr",
+      "version": "0:2.5.1-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "audit",
+      "version": "0:3.1.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "audit-libs",
+      "version": "0:3.1.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "authselect",
+      "version": "0:1.2.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "authselect-compat",
+      "version": "0:1.2.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "authselect-libs",
+      "version": "0:1.2.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "basesystem",
+      "version": "0:11-13.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "bash",
+      "version": "0:5.1.8-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "binutils",
+      "version": "0:2.35.2-72.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "binutils-gold",
+      "version": "0:2.35.2-72.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "bluez",
+      "version": "0:5.85-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "bzip2-libs",
+      "version": "0:1.0.8-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "c-ares",
+      "version": "0:1.19.1-2.el9_4",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ca-certificates",
+      "version": "0:2025.2.80_v9.0.305-91.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "checkpolicy",
+      "version": "0:3.6-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "chrony",
+      "version": "0:4.8-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cloud-init",
+      "version": "0:24.4-8.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cloud-utils-growpart",
+      "version": "0:0.33-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cockpit-bridge",
+      "version": "0:356-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cockpit-system",
+      "version": "0:356-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cockpit-ws",
+      "version": "0:356-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cockpit-ws-selinux",
+      "version": "0:356-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "coreutils",
+      "version": "0:8.32-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "coreutils-common",
+      "version": "0:8.32-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cpio",
+      "version": "0:2.13-16.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cracklib",
+      "version": "0:2.9.6-28.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cracklib-dicts",
+      "version": "0:2.9.6-28.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cronie",
+      "version": "0:1.5.7-16.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cronie-anacron",
+      "version": "0:1.5.7-16.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "crontabs",
+      "version": "0:1.11-27.20190603git.el9_0",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "crypto-policies",
+      "version": "0:20260224-1.gitea0f072.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "crypto-policies-scripts",
+      "version": "0:20260224-1.gitea0f072.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cryptsetup-libs",
+      "version": "0:2.8.1-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "curl",
+      "version": "0:7.76.1-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "cyrus-sasl-lib",
+      "version": "0:2.1.27-22.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dbus",
+      "version": "1:1.12.20-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dbus-broker",
+      "version": "0:28-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dbus-common",
+      "version": "1:1.12.20-8.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dbus-libs",
+      "version": "1:1.12.20-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dbus-tools",
+      "version": "1:1.12.20-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "device-mapper",
+      "version": "9:1.02.207-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "device-mapper-libs",
+      "version": "9:1.02.207-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dhcp-client",
+      "version": "12:4.4.2-20.b1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dhcp-common",
+      "version": "12:4.4.2-20.b1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "diffutils",
+      "version": "0:3.7-12.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dmidecode",
+      "version": "1:3.6-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dnf",
+      "version": "0:4.14.0-34.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dnf-data",
+      "version": "0:4.14.0-34.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dnf-plugins-core",
+      "version": "0:4.3.0-26.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dosfstools",
+      "version": "0:4.2-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dracut",
+      "version": "0:057-110.git20260130.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dracut-config-generic",
+      "version": "0:057-110.git20260130.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dracut-network",
+      "version": "0:057-110.git20260130.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "dracut-squash",
+      "version": "0:057-110.git20260130.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "e2fsprogs",
+      "version": "0:1.46.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "e2fsprogs-libs",
+      "version": "0:1.46.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "efi-filesystem",
+      "version": "0:6-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "efibootmgr",
+      "version": "0:16-12.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "efivar-libs",
+      "version": "0:38-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "elfutils-debuginfod-client",
+      "version": "0:0.194-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "elfutils-default-yama-scope",
+      "version": "0:0.194-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "elfutils-libelf",
+      "version": "0:0.194-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "elfutils-libs",
+      "version": "0:0.194-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ethtool",
+      "version": "2:6.15-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "expat",
+      "version": "0:2.5.0-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "file",
+      "version": "0:5.39-17.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "file-libs",
+      "version": "0:5.39-17.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "filesystem",
+      "version": "0:3.16-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "findutils",
+      "version": "1:4.8.0-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "flashrom",
+      "version": "0:1.2-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "fuse-libs",
+      "version": "0:2.9.9-17.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "fwupd",
+      "version": "0:2.0.19-2.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "fwupd-plugin-flashrom",
+      "version": "0:2.0.19-2.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gawk",
+      "version": "0:5.1.0-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gawk-all-langpacks",
+      "version": "0:5.1.0-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gdbm-libs",
+      "version": "1:1.23-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gdisk",
+      "version": "0:1.0.7-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "geolite2-city",
+      "version": "0:20191217-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "geolite2-country",
+      "version": "0:20191217-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gettext",
+      "version": "0:0.21-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gettext-libs",
+      "version": "0:0.21-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "glib2",
+      "version": "0:2.68.4-19.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "glibc",
+      "version": "0:2.34-266.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "glibc-common",
+      "version": "0:2.34-266.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "glibc-gconv-extra",
+      "version": "0:2.34-266.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "glibc-minimal-langpack",
+      "version": "0:2.34-266.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gmp",
+      "version": "1:6.2.0-13.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gnupg2",
+      "version": "0:2.3.3-5.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gnutls",
+      "version": "0:3.8.10-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gobject-introspection",
+      "version": "0:1.68.0-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gpgme",
+      "version": "0:1.15.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grep",
+      "version": "0:3.6-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "groff-base",
+      "version": "0:1.22.4-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-common",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-efi-x64",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-pc",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-pc-modules",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-tools",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grub2-tools-minimal",
+      "version": "1:2.06-126.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "grubby",
+      "version": "0:8.40-69.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gssproxy",
+      "version": "0:0.8.4-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "gzip",
+      "version": "0:1.12-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "hdparm",
+      "version": "0:9.62-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "hostname",
+      "version": "0:3.23-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "hwdata",
+      "version": "0:0.348-9.22.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ima-evm-utils",
+      "version": "0:1.6.2-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "inih",
+      "version": "0:49-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "initscripts-rename-device",
+      "version": "0:10.11.8-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "initscripts-service",
+      "version": "0:10.11.8-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "insights-client",
+      "version": "0:3.9.3-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "insights-core",
+      "version": "0:3.7.5-1.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "insights-core-selinux",
+      "version": "0:3.7.5-1.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ipcalc",
+      "version": "0:1.0.0-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "iproute",
+      "version": "0:6.17.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "iproute-tc",
+      "version": "0:6.17.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "iptables-libs",
+      "version": "0:1.8.10-11.el9_5",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "iputils",
+      "version": "0:20210202-15.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "irqbalance",
+      "version": "2:1.9.4-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "jansson",
+      "version": "0:2.14-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "jq",
+      "version": "0:1.6-19.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "json-c",
+      "version": "0:0.14-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "json-glib",
+      "version": "0:1.6.6-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kbd",
+      "version": "0:2.4.0-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kbd-legacy",
+      "version": "0:2.4.0-11.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kbd-misc",
+      "version": "0:2.4.0-11.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel-core",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel-modules",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel-modules-core",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel-tools",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kernel-tools-libs",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kexec-tools",
+      "version": "0:2.0.29-17.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "keyutils",
+      "version": "0:1.6.3-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "keyutils-libs",
+      "version": "0:1.6.3-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kmod",
+      "version": "0:28-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kmod-libs",
+      "version": "0:28-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "kpartx",
+      "version": "0:0.8.7-45.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "krb5-libs",
+      "version": "0:1.21.1-9.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "less",
+      "version": "0:590-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libacl",
+      "version": "0:2.3.1-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libarchive",
+      "version": "0:3.5.3-9.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libassuan",
+      "version": "0:2.5.5-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libattr",
+      "version": "0:2.5.1-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libbabeltrace",
+      "version": "0:1.5.8-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libbasicobjects",
+      "version": "0:0.1.1-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libblkid",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libbpf",
+      "version": "2:1.5.0-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libbrotli",
+      "version": "0:1.0.9-9.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcap",
+      "version": "0:2.48-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcap-ng",
+      "version": "0:0.8.2-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcbor",
+      "version": "0:0.7.0-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcollection",
+      "version": "0:0.7.0-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcom_err",
+      "version": "0:1.46.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcomps",
+      "version": "0:0.1.18-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libcurl",
+      "version": "0:7.76.1-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdaemon",
+      "version": "0:0.14-23.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdb",
+      "version": "0:5.3.28-57.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdhash",
+      "version": "0:0.5.0-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdnf",
+      "version": "0:0.69.0-18.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdnf-plugin-subscription-manager",
+      "version": "0:1.29.50-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libdrm",
+      "version": "0:2.4.128-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libeconf",
+      "version": "0:0.4.1-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libedit",
+      "version": "0:3.1-39.20210216cvs.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libestr",
+      "version": "0:0.1.11-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libev",
+      "version": "0:4.33-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libevent",
+      "version": "0:2.1.12-8.el9_4",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libfastjson",
+      "version": "0:0.99.9-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libfdisk",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libffi",
+      "version": "0:3.4.2-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libfido2",
+      "version": "0:1.13.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libgcc",
+      "version": "0:11.5.0-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libgcrypt",
+      "version": "0:1.10.0-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libgomp",
+      "version": "0:11.5.0-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libgpg-error",
+      "version": "0:1.42-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libibverbs",
+      "version": "0:61.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libidn2",
+      "version": "0:2.3.0-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libini_config",
+      "version": "0:1.3.1-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libjcat",
+      "version": "0:0.1.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libkcapi",
+      "version": "0:1.4.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libkcapi-hmaccalc",
+      "version": "0:1.4.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libksba",
+      "version": "0:1.5.1-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libldb",
+      "version": "0:4.23.5-8.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libmaxminddb",
+      "version": "0:1.5.2-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libmnl",
+      "version": "0:1.0.4-16.el9_4",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libmodulemd",
+      "version": "0:2.13.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libmount",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libndp",
+      "version": "0:1.9-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnetfilter_conntrack",
+      "version": "0:1.0.9-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnfnetlink",
+      "version": "0:1.0.1-23.el9_5",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnfsidmap",
+      "version": "1:2.5.4-42.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnghttp2",
+      "version": "0:1.43.0-6.el9_8.1",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnl3",
+      "version": "0:3.11.0-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libnl3-cli",
+      "version": "0:3.11.0-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpath_utils",
+      "version": "0:0.2.1-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpcap",
+      "version": "14:1.10.0-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpciaccess",
+      "version": "0:0.16-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpipeline",
+      "version": "0:1.5.3-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpsl",
+      "version": "0:0.21.1-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libpwquality",
+      "version": "0:1.4.4-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libref_array",
+      "version": "0:0.1.5-53.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "librepo",
+      "version": "0:1.19.0-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libreport-filesystem",
+      "version": "0:2.15.2-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "librhsm",
+      "version": "0:0.0.3-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libseccomp",
+      "version": "0:2.5.2-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libselinux",
+      "version": "0:3.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libselinux-utils",
+      "version": "0:3.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsemanage",
+      "version": "0:3.6-5.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsepol",
+      "version": "0:3.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsigsegv",
+      "version": "0:2.13-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsmartcols",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsolv",
+      "version": "0:0.7.24-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libss",
+      "version": "0:1.46.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libssh",
+      "version": "0:0.10.4-18.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libssh-config",
+      "version": "0:0.10.4-18.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsss_certmap",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsss_idmap",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsss_nss_idmap",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsss_sudo",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libstdc++",
+      "version": "0:11.5.0-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libsysfs",
+      "version": "0:2.1.1-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtalloc",
+      "version": "0:2.4.3-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtasn1",
+      "version": "0:4.16.0-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtdb",
+      "version": "0:1.4.14-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libteam",
+      "version": "0:1.31-16.el9_1",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtevent",
+      "version": "0:0.17.1-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtirpc",
+      "version": "0:1.3.3-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtool-ltdl",
+      "version": "0:2.4.6-46.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libtraceevent",
+      "version": "0:1.8.4-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libunistring",
+      "version": "0:0.9.10-15.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "liburing",
+      "version": "0:2.12-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libusbx",
+      "version": "0:1.0.26-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libuser",
+      "version": "0:0.63-17.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libutempter",
+      "version": "0:1.2.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libuuid",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libverto",
+      "version": "0:0.3.2-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libverto-libev",
+      "version": "0:0.3.2-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libxcrypt",
+      "version": "0:4.4.18-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libxcrypt-compat",
+      "version": "0:4.4.18-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libxml2",
+      "version": "0:2.9.13-14.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libxmlb",
+      "version": "0:0.3.24-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libyaml",
+      "version": "0:0.2.5-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "libzstd",
+      "version": "0:1.5.5-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "linux-firmware",
+      "version": "0:20260130-160.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "linux-firmware-whence",
+      "version": "0:20260130-160.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lmdb-libs",
+      "version": "0:0.9.29-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "logrotate",
+      "version": "0:3.18.0-12.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lshw",
+      "version": "0:B.02.20-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lsscsi",
+      "version": "0:0.32-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lua-libs",
+      "version": "0:5.4.4-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lz4-libs",
+      "version": "0:1.9.3-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "lzo",
+      "version": "0:2.10-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "man-db",
+      "version": "0:2.9.3-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "microcode_ctl",
+      "version": "4:20260210-1.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "mokutil",
+      "version": "2:0.7.2-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "mpfr",
+      "version": "0:4.1.0-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ncurses",
+      "version": "0:6.2-12.20210508.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ncurses-base",
+      "version": "0:6.2-12.20210508.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "ncurses-libs",
+      "version": "0:6.2-12.20210508.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "nettle",
+      "version": "0:3.10.1-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "newt",
+      "version": "0:0.52.21-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "nfs-utils",
+      "version": "1:2.5.4-42.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "npth",
+      "version": "0:1.6-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "numactl-libs",
+      "version": "0:2.0.19-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "oddjob",
+      "version": "0:0.34.7-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "oddjob-mkhomedir",
+      "version": "0:0.34.7-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "oniguruma",
+      "version": "0:6.9.6-1.el9.6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openldap",
+      "version": "0:2.6.8-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssh",
+      "version": "0:9.9p1-7.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssh-clients",
+      "version": "0:9.9p1-7.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssh-server",
+      "version": "0:9.9p1-7.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssl",
+      "version": "1:3.5.5-2.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssl-fips-provider",
+      "version": "0:3.0.7-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssl-fips-provider-so",
+      "version": "0:3.0.7-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "openssl-libs",
+      "version": "1:3.5.5-2.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "os-prober",
+      "version": "0:1.77-12.el9_5",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "p11-kit",
+      "version": "0:0.26.2-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "p11-kit-trust",
+      "version": "0:0.26.2-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pam",
+      "version": "0:1.5.1-28.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "parted",
+      "version": "0:3.5-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "passwd",
+      "version": "0:0.80-12.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pciutils",
+      "version": "0:3.7.0-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pciutils-libs",
+      "version": "0:3.7.0-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pcre",
+      "version": "0:8.44-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pcre2",
+      "version": "0:10.40-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pcre2-syntax",
+      "version": "0:10.40-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-AutoLoader",
+      "version": "0:5.74-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-B",
+      "version": "0:1.80-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Carp",
+      "version": "0:1.50-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Class-Struct",
+      "version": "0:0.66-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Data-Dumper",
+      "version": "0:2.174-462.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Digest",
+      "version": "0:1.19-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Digest-MD5",
+      "version": "0:2.58-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Encode",
+      "version": "4:3.08-462.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Errno",
+      "version": "0:1.30-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Exporter",
+      "version": "0:5.74-461.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Fcntl",
+      "version": "0:1.13-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-File-Basename",
+      "version": "0:2.85-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-File-Path",
+      "version": "0:2.18-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-File-Temp",
+      "version": "1:0.231.100-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-File-stat",
+      "version": "0:1.09-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-FileHandle",
+      "version": "0:2.03-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Getopt-Long",
+      "version": "1:2.52-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Getopt-Std",
+      "version": "0:1.12-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-HTTP-Tiny",
+      "version": "0:0.076-462.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-IO",
+      "version": "0:1.43-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-IO-Socket-IP",
+      "version": "0:0.41-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-IO-Socket-SSL",
+      "version": "0:2.073-2.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-IPC-Open3",
+      "version": "0:1.21-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-MIME-Base64",
+      "version": "0:3.16-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Mozilla-CA",
+      "version": "0:20200520-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-NDBM_File",
+      "version": "0:1.15-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Net-SSLeay",
+      "version": "0:1.94-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-POSIX",
+      "version": "0:1.94-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-PathTools",
+      "version": "0:3.78-461.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Pod-Escapes",
+      "version": "1:1.07-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Pod-Perldoc",
+      "version": "0:3.28.01-461.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Pod-Simple",
+      "version": "1:3.42-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Pod-Usage",
+      "version": "4:2.01-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Scalar-List-Utils",
+      "version": "4:1.56-462.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-SelectSaver",
+      "version": "0:1.02-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Socket",
+      "version": "4:2.031-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Storable",
+      "version": "1:3.21-460.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Symbol",
+      "version": "0:1.08-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Term-ANSIColor",
+      "version": "0:5.01-461.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Term-Cap",
+      "version": "0:1.17-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Text-ParseWords",
+      "version": "0:3.30-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Text-Tabs+Wrap",
+      "version": "0:2013.0523-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-Time-Local",
+      "version": "2:1.300-7.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-URI",
+      "version": "0:5.09-3.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-base",
+      "version": "0:2.27-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-constant",
+      "version": "0:1.33-461.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-if",
+      "version": "0:0.60.800-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-interpreter",
+      "version": "4:5.32.1-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-libnet",
+      "version": "0:3.13-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-libs",
+      "version": "4:5.32.1-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-mro",
+      "version": "0:1.23-481.1.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-overload",
+      "version": "0:1.31-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-overloading",
+      "version": "0:0.02-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-parent",
+      "version": "1:0.238-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-podlators",
+      "version": "1:4.14-460.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-subs",
+      "version": "0:1.03-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "perl-vars",
+      "version": "0:1.05-481.1.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "pigz",
+      "version": "0:2.8-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "policycoreutils",
+      "version": "0:3.6-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "policycoreutils-python-utils",
+      "version": "0:3.6-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "polkit",
+      "version": "0:0.117-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "polkit-libs",
+      "version": "0:0.117-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "polkit-pkla-compat",
+      "version": "0:0.1-21.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "popt",
+      "version": "0:1.18-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "prefixdevname",
+      "version": "0:0.1.0-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "procps-ng",
+      "version": "0:3.3.17-14.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "protobuf-c",
+      "version": "0:1.3.3-13.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "psmisc",
+      "version": "0:23.4-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "publicsuffix-list-dafsa",
+      "version": "0:20210518-3.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python-unversioned-command",
+      "version": "0:3.9.25-7.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3",
+      "version": "0:3.9.25-7.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-attrs",
+      "version": "0:20.3.0-7.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-audit",
+      "version": "0:3.1.5-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-babel",
+      "version": "0:2.9.1-2.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-chardet",
+      "version": "0:4.0.0-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-cloud-what",
+      "version": "0:1.29.50-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-configobj",
+      "version": "0:5.0.6-25.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-dasbus",
+      "version": "0:1.7-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-dateutil",
+      "version": "1:2.9.0.post0-1.el9_7",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-dbus",
+      "version": "0:1.2.18-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-decorator",
+      "version": "0:4.4.2-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-distro",
+      "version": "0:1.5.0-7.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-dnf",
+      "version": "0:4.14.0-34.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-dnf-plugins-core",
+      "version": "0:4.3.0-26.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-file-magic",
+      "version": "0:5.39-17.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-gobject-base",
+      "version": "0:3.40.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-gobject-base-noarch",
+      "version": "0:3.40.1-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-gpg",
+      "version": "0:1.15.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-hawkey",
+      "version": "0:0.69.0-18.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-idna",
+      "version": "0:2.10-7.el9_4.1",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-iniparse",
+      "version": "0:0.4-45.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-inotify",
+      "version": "0:0.9.6-25.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-jinja2",
+      "version": "0:2.11.3-8.el9_5",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-jsonpatch",
+      "version": "0:1.21-16.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-jsonpointer",
+      "version": "0:2.0-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-jsonschema",
+      "version": "0:3.2.0-13.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libcomps",
+      "version": "0:0.1.18-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libdnf",
+      "version": "0:0.69.0-18.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-librepo",
+      "version": "0:1.19.0-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libs",
+      "version": "0:3.9.25-7.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libselinux",
+      "version": "0:3.6-3.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libsemanage",
+      "version": "0:3.6-5.el9_6",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-libxml2",
+      "version": "0:2.9.13-14.el9_7",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-linux-procfs",
+      "version": "0:0.7.4-2.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-markupsafe",
+      "version": "0:1.1.1-12.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-netifaces",
+      "version": "0:0.10.6-15.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-oauthlib",
+      "version": "0:3.1.1-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-perf",
+      "version": "0:5.14.0-687.5.3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pexpect",
+      "version": "0:4.8.0-7.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pip-wheel",
+      "version": "0:21.3.1-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-policycoreutils",
+      "version": "0:3.6-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-prettytable",
+      "version": "0:0.7.2-27.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-ptyprocess",
+      "version": "0:0.6.0-12.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pyrsistent",
+      "version": "0:0.17.3-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pyserial",
+      "version": "0:3.4-12.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pysocks",
+      "version": "0:1.7.1-12.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pytz",
+      "version": "0:2021.1-5.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pyudev",
+      "version": "0:0.22.0-6.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-pyyaml",
+      "version": "0:5.4.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-requests",
+      "version": "0:2.25.1-10.el9_6",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-rpm",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-setools",
+      "version": "0:4.4.4-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-setuptools",
+      "version": "0:53.0.0-15.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-setuptools-wheel",
+      "version": "0:53.0.0-15.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-six",
+      "version": "0:1.15.0-9.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-subscription-manager-rhsm",
+      "version": "0:1.29.50-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-systemd",
+      "version": "0:234-19.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "python3-urllib3",
+      "version": "0:1.26.5-6.el9_7.1",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "qemu-guest-agent",
+      "version": "17:10.1.0-17.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "quota",
+      "version": "1:4.09-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "quota-nls",
+      "version": "1:4.09-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "readline",
+      "version": "0:8.1-4.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "redhat-logos",
+      "version": "0:90.6-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "redhat-release",
+      "version": "0:9.8-1.0.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "redhat-release-eula",
+      "version": "0:9.8-1.0.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rhc",
+      "version": "1:0.2.7-5.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rhsm-icons",
+      "version": "0:6-2.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rootfiles",
+      "version": "0:8.1-35.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpcbind",
+      "version": "0:1.2.6-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-build-libs",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-libs",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-plugin-audit",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-plugin-selinux",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-plugin-systemd-inhibit",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rpm-sign-libs",
+      "version": "0:4.16.1.3-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rsync",
+      "version": "0:3.2.5-3.el9_7.2",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rsyslog",
+      "version": "0:8.2510.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "rsyslog-logrotate",
+      "version": "0:8.2510.0-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sed",
+      "version": "0:4.8-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "selinux-policy",
+      "version": "0:38.1.75-2.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "selinux-policy-targeted",
+      "version": "0:38.1.75-2.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "setroubleshoot-plugins",
+      "version": "0:3.3.14-4.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "setroubleshoot-server",
+      "version": "0:3.3.35-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "setup",
+      "version": "0:2.13.7-10.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sg3_utils",
+      "version": "0:1.47-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sg3_utils-libs",
+      "version": "0:1.47-10.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "shadow-utils",
+      "version": "2:4.9-16.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "shared-mime-info",
+      "version": "0:2.1-5.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "shim-x64",
+      "version": "0:16.1-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "slang",
+      "version": "0:2.3.2-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "snappy",
+      "version": "0:1.1.8-8.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sos",
+      "version": "0:4.10.2-2.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sqlite-libs",
+      "version": "0:3.34.1-10.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "squashfs-tools",
+      "version": "0:4.4-10.git1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sscg",
+      "version": "0:4.0.3-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sssd-client",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sssd-common",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sssd-kcm",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sssd-nfs-idmap",
+      "version": "0:2.9.8-4.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "subscription-manager",
+      "version": "0:1.29.50-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "subscription-manager-cockpit",
+      "version": "0:6-2.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "subscription-manager-rhsm-certificates",
+      "version": "0:20220623-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "sudo",
+      "version": "0:1.9.17p2-3.el9_8",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "system-reinstall-bootc",
+      "version": "0:1.13.0-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "systemd",
+      "version": "0:252-67.el9_8.2",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "systemd-libs",
+      "version": "0:252-67.el9_8.2",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "systemd-pam",
+      "version": "0:252-67.el9_8.2",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "systemd-rpm-macros",
+      "version": "0:252-67.el9_8.2",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "systemd-udev",
+      "version": "0:252-67.el9_8.2",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "tar",
+      "version": "2:1.34-11.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "tcpdump",
+      "version": "14:4.99.0-9.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "teamd",
+      "version": "0:1.31-16.el9_1",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "tpm2-tss",
+      "version": "0:3.2.3-1.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "tuned",
+      "version": "0:2.27.0-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "tzdata",
+      "version": "0:2026a-1.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "usermode",
+      "version": "0:1.114-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "userspace-rcu",
+      "version": "0:0.12.1-6.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "util-linux",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "util-linux-core",
+      "version": "0:2.37.4-25.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "vim-minimal",
+      "version": "2:8.2.2637-26.el9_8.4",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "virt-what",
+      "version": "0:1.27-2.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "which",
+      "version": "0:2.21-30.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "xfsprogs",
+      "version": "0:6.4.0-7.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "xz",
+      "version": "0:5.2.5-8.el9_0",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "xz-libs",
+      "version": "0:5.2.5-8.el9_0",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "yum",
+      "version": "0:4.14.0-34.el9_8",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "yum-utils",
+      "version": "0:4.3.0-26.el9",
+      "architecture": "noarch",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    },
+    {
+      "name": "zlib",
+      "version": "0:1.2.11-40.el9",
+      "architecture": "x86_64",
+      "manager": "rpm",
+      "module": {
+        "status": "COLLECTION_STATUS_SUCCESS"
+      }
+    }
+  ]
+}

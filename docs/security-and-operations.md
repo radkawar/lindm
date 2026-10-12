@@ -789,6 +789,15 @@ row is one the server dispatches under its qualified ownership operations (check
 by a unit test); the rows removed for that reason are listed under
 [gaps](#declarative-organization-gaps).
 
+The declared Engineering rollout is prepared but not yet linked to an assignment:
+Pilot admits 25% (at least one canary), then Fleet admits 100% after explicit
+promotion. Both rings require at least one observation, a 24-hour soak and health
+evidence no older than one hour. Failure, unknown and unavailable thresholds remain
+enforced. The shared organization example leaves it unlinked because synthetic
+executors cannot establish native rollout health; linking their unsupported head
+would correctly pause it before dispatch. Real-device operators may explicitly
+link a qualified assignment to the rollout without weakening these gates.
+
 Company baseline sets deny-by-default ingress with TCP/22 allowed
 for both IP families, `/etc/motd.d/50-company`,
 disabled/stopped `cups.service`, and daily security-update starts between 02:00 and

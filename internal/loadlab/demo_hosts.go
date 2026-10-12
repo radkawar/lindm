@@ -2,11 +2,13 @@ package loadlab
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -53,12 +55,14 @@ type demoDevice struct {
 	headless bool
 	// assistance is the executor setting reported with every assistance sync;
 	// UNSPECIFIED models an agent that predates the report.
-	assistance agentv1.AssistancePolicy
-	encryption encryptionState
-	service    serviceOutcome
-	profile    int // index into demoProfiles; -1 is unassigned
-	historical bool
-	proposal   bool // carries the advisory risk-acceptance proposal; needs a complete feed
+	assistance        agentv1.AssistancePolicy
+	encryption        encryptionState
+	service           serviceOutcome
+	department        string // provisioning token name in lab/demo/org.json
+	provisioningToken string // cleared after enrollment; never evidence
+	historical        bool
+	proposal          bool // carries the pending advisory risk-acceptance proposal
+	bulk              int  // synthetic scale packages beside the captured baseline
 	// factsWithheld never reports host inventory, so platform-limited items
 	// wait for its facts while unrestricted items still apply.
 	factsWithheld bool
@@ -73,56 +77,8 @@ func dpkg(name, version, source, sourceVersion string) *inventoryv1.Package {
 	return &inventoryv1.Package{Name: name, Version: version, Architecture: "amd64", Manager: string(platform.PackageDBDpkg), SourceName: source, SourceVersion: sourceVersion}
 }
 
-func rpm(name, version string, module bool) *inventoryv1.Package {
-	p := &inventoryv1.Package{Name: name, Version: version, Architecture: "x86_64", Manager: string(platform.PackageDBRPM)}
-	if module {
-		p.Module = &inventoryv1.ModuleObservation{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS}
-	}
-	return p
-}
-
-// Affected versions match the checked-in vendor feed fixtures served by
-// devlab.ConfigureConsoleDemo: USN-6859-1, DSA-5724-1, FEDORA sudo and
-// RHSA-2024:6783. Only the Fedora source is complete, so only Fedora's sudo
-// 0:1.9.17-7.p2.fc44 (fixed 0:1.9.17-10.p2.fc44) evaluates AFFECTED; the
-// others' matches stay UNKNOWN under partial coverage.
-func ubuntuPackages(openssh string) []*inventoryv1.Package {
-	return []*inventoryv1.Package{
-		dpkg("base-files", "13ubuntu10.3", "base-files", "13ubuntu10.3"), dpkg("bash", "5.2.21-2ubuntu4", "bash", "5.2.21-2ubuntu4"),
-		dpkg("coreutils", "9.4-3ubuntu6", "coreutils", "9.4-3ubuntu6"), dpkg("cups", "2.4.7-1.2ubuntu7.4", "cups", "2.4.7-1.2ubuntu7.4"),
-		dpkg("curl", "8.5.0-2ubuntu10.6", "curl", "8.5.0-2ubuntu10.6"), dpkg("libc6", "2.39-0ubuntu8.6", "glibc", "2.39-0ubuntu8.6"),
-		dpkg("openssh-client", openssh, "openssh", openssh), dpkg("openssh-server", openssh, "openssh", openssh),
-		dpkg("openssl", "3.0.13-0ubuntu3.6", "openssl", "3.0.13-0ubuntu3.6"), dpkg("sudo", "1.9.15p5-3ubuntu5.24.04.1", "sudo", "1.9.15p5-3ubuntu5.24.04.1"),
-		dpkg("systemd", "255.4-1ubuntu8.10", "systemd", "255.4-1ubuntu8.10"),
-	}
-}
-
-func debianPackages(openssh string) []*inventoryv1.Package {
-	return []*inventoryv1.Package{
-		dpkg("base-files", "12.4+deb12u11", "base-files", "12.4+deb12u11"), dpkg("bash", "5.2.15-2+b8", "bash", "5.2.15-2"),
-		dpkg("coreutils", "9.1-1", "coreutils", "9.1-1"), dpkg("curl", "7.88.1-10+deb12u12", "curl", "7.88.1-10+deb12u12"),
-		dpkg("libc6", "2.36-9+deb12u10", "glibc", "2.36-9+deb12u10"), dpkg("openssh-client", openssh, "openssh", openssh),
-		dpkg("openssh-server", openssh, "openssh", openssh), dpkg("openssl", "3.0.16-1~deb12u1", "openssl", "3.0.16-1~deb12u1"),
-		dpkg("sudo", "1.9.13p3-1+deb12u1", "sudo", "1.9.13p3-1+deb12u1"), dpkg("systemd", "252.38-1~deb12u1", "systemd", "252.38-1~deb12u1"),
-	}
-}
-
-func fedoraPackages() []*inventoryv1.Package {
-	return []*inventoryv1.Package{
-		rpm("bash", "0:5.3.0-2.fc44", false), rpm("coreutils", "0:9.7-5.fc44", false), rpm("cups", "1:2.5.0-3.fc44", false),
-		rpm("curl", "0:8.15.0-2.fc44", false), rpm("glibc", "0:2.42-4.fc44", false), rpm("kernel", "0:6.17.1-300.fc44", false),
-		rpm("openssh-server", "0:10.0p1-5.fc44", false), rpm("openssl-libs", "1:3.5.1-2.fc44", false),
-		rpm("sudo", "0:1.9.17-7.p2.fc44", false), rpm("systemd", "0:258.1-1.fc44", false),
-	}
-}
-
-func rhelPackages() []*inventoryv1.Package {
-	return []*inventoryv1.Package{
-		rpm("audit", "0:3.1.2-2.el9", true), rpm("bash", "0:5.1.8-9.el9", true), rpm("coreutils", "0:8.32-36.el9", true),
-		rpm("curl", "0:7.76.1-29.el9_4", true), rpm("glibc", "0:2.34-100.el9_4.2", true), rpm("kernel", "0:5.14.0-427.13.1.el9_4", true),
-		rpm("openssh-server", "0:8.7p1-38.el9_4.1", true), rpm("openssl-libs", "1:3.0.7-27.el9_4", true),
-		rpm("sudo", "0:1.9.5p2-10.el9_3", true), rpm("systemd", "0:252-32.el9_4", true),
-	}
+func rpm(name, version string) *inventoryv1.Package {
+	return &inventoryv1.Package{Name: name, Version: version, Architecture: "x86_64", Manager: string(platform.PackageDBRPM)}
 }
 
 const (
@@ -133,38 +89,35 @@ const (
 // demoDevices returns the deterministic fleet in enrollment order. Index 0
 // is the richest device; the pending enrollment is provisioned separately.
 // Operating systems are registry rows, never os-release literals.
-func demoDevices() ([]*demoDevice, error) {
-	el9, ok := platform.Lookup("rhel-9")
-	if !ok {
-		return nil, errors.New("load: demo release rhel-9 is not registered")
+func demoDevices(source string) ([]*demoDevice, error) {
+	raw, err := os.ReadFile(filepath.Join(source, "internal", "advisory", "testdata", "rhel98-platform.json"))
+	if err != nil {
+		return nil, err
 	}
-	// An entitled standard-stream host; its CPE is the registry's advisory product.
-	el := &inventoryv1.PlatformDetails{
-		Cpe:            observed(el9.Advisory.Ecosystem + "::baseos"),
-		ReleaseverLock: &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},
-		Repositories:   &inventoryv1.RepositoryObservation{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Backend: string(el9.Packages.Backend), Ids: []string{"rhel-9-for-x86_64-appstream-rpms", "rhel-9-for-x86_64-baseos-rpms"}},
+	el := new(inventoryv1.PlatformDetails)
+	if err := protojson.Unmarshal(raw, el); err != nil {
+		return nil, err
 	}
 	devices := []*demoDevice{
-		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "engineering"}},
+		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation"}, bulk: demoRoutePackages},
 		// An older agent: it does not report its assistance setting, which is off.
-		{hostname: "ubuntu-ws-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionNone, service: serviceApplies, profile: 0, labels: []string{"workstation", "engineering"}},
-		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "design"}, proposal: true},
-		{hostname: "debian-srv-04", key: "debian-12", kernel: "6.1.0-37-amd64", headless: true, assistance: assistanceOff, encryption: encryptionUnknown, service: serviceFails, profile: 1, labels: []string{"server", "build"}},
+		{hostname: "ubuntu-ws-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionNone, service: serviceApplies, department: "engineering", labels: []string{"workstation"}, proposal: true},
+		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "finance", labels: []string{"workstation"}},
+		{hostname: "ubuntu-srv-04", key: "ubuntu-24.04", kernel: "6.8.0-142-generic", headless: true, assistance: assistanceOff, encryption: encryptionUnknown, service: serviceFails, department: "it-helpdesk", labels: []string{"server", "build"}},
 		// The owner's report: a headless RHEL server, assistance off, an admin on SSH.
-		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.4", kernel: "5.14.0-427.13.1.el9_4.x86_64", sessions: 1, headless: true, assistance: assistanceOff, encryption: encryptionNone, service: serviceApplies, profile: 1, labels: []string{"server", "database"}, platform: el},
-		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionUnknown, service: serviceConverged, profile: 2, labels: []string{"kiosk", "lobby"}, state: "stale"},
-		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", assistance: assistanceOn, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "retired"}, state: "revoked"},
-		{hostname: "debian-ws-08", key: "debian-12", kernel: "6.1.0-37-amd64", sessions: 1, encryption: encryptionNone, profile: -1, labels: []string{"workstation", "support"}, historical: true},
-		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", headless: true, assistance: assistanceOff, encryption: encryptionLUKS, profile: -1, labels: []string{"server", "ci-runner", "gpu"}},
-		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, profile: 0, labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
+		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.8", kernel: "5.14.0-687.5.3.el9_8.x86_64", sessions: 1, headless: true, assistance: assistanceOff, encryption: encryptionNone, service: serviceApplies, department: "finance", labels: []string{"server", "database"}, platform: el},
+		{hostname: "ubuntu-kiosk-06", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionUnknown, service: serviceConverged, department: "contractors", labels: []string{"kiosk", "lobby"}, state: "stale"},
+		{hostname: "fedora-ws-07", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", assistance: assistanceOn, encryption: encryptionNone, department: "contractors", labels: []string{"workstation", "retired"}, state: "revoked"},
+		{hostname: "ubuntu-ws-08", key: "ubuntu-24.04", kernel: "6.8.0-142-generic", sessions: 1, encryption: encryptionNone, department: "it-helpdesk", labels: []string{"workstation", "support"}, historical: true},
+		{hostname: demoScaleHostname, key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", headless: true, assistance: assistanceOff, encryption: encryptionLUKS, department: "it-helpdesk", labels: []string{"server", "ci-runner", "gpu"}, bulk: demoScalePackages},
+		// A new Engineering laptop that has not reported inventory: Engineering
+		// tools' platform-limited package rows wait for its facts.
+		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
 	}
-	inventories := [][]*inventoryv1.Package{
-		slices.Concat(ubuntuPackages("1:9.6p1-3ubuntu13"), bulkPackages("dpkg", demoRoutePackages)), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u2"),
-		rhelPackages(), ubuntuPackages("1:9.6p1-3ubuntu13.19"), fedoraPackages(), debianPackages("1:9.2p1-2+deb12u3"),
-		slices.Concat(fedoraPackages(), affectedPackages(), bulkPackages("rpm", demoScalePackages)),
-		ubuntuPackages("1:9.6p1-3ubuntu13.19"),
-	}
+	baselines := make(map[string][]*inventoryv1.Package)
+	inventories := make(map[string]packageData)
 	for i, device := range devices {
+		var ok bool
 		if device.release, ok = platform.Lookup(device.key); !ok {
 			return nil, fmt.Errorf("load: demo release %s is not registered", device.key)
 		}
@@ -172,10 +125,39 @@ func demoDevices() ([]*demoDevice, error) {
 			device.versionID = device.release.Version.Value
 		}
 		device.backend = string(device.release.Native().Packages.Backend.PackageDB())
-		var err error
-		if device.packages, err = packages(len(inventories[i]), inventories[i]); err != nil {
-			return nil, err
+		baseline, ok := baselines[device.key]
+		if !ok {
+			raw, err := os.ReadFile(filepath.Join(source, "lab", "demo", device.key+"-packages.json"))
+			if err != nil {
+				return nil, err
+			}
+			batch := new(inventoryv1.PackageBatch)
+			if err := protojson.Unmarshal(raw, batch); err != nil {
+				return nil, err
+			}
+			baseline = batch.GetPackages()
+			baselines[device.key] = baseline
 		}
+		// Captured baselines are shared per release; scale devices add labelled
+		// synthetic packages that no vendor feed claims.
+		inventory := device.key
+		if device.bulk > 0 {
+			inventory = device.hostname
+			manager := "rpm"
+			if device.backend == string(platform.PackageDBDpkg) {
+				manager = "dpkg"
+			}
+			baseline = slices.Concat(baseline, bulkPackages(manager, device.bulk))
+		}
+		data, ok := inventories[inventory]
+		if !ok {
+			var err error
+			if data, err = packages(len(baseline), baseline); err != nil {
+				return nil, err
+			}
+			inventories[inventory] = data
+		}
+		device.packages = data
 		if device.state == "" {
 			device.state = "enrolled"
 		}
@@ -270,7 +252,7 @@ func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, in
 			return nil, nil
 		}
 		observation = proto.CloneOf(service)
-		observation.GetSystemdService().ActiveState = "active"
+		simulateServiceState(observation.GetSystemdService(), desired.GetSystemdService())
 		verification.Disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED
 		verification.Checks = &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: proto.CloneOf(observation.GetSystemdService()), RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, JobCompleted: true, Converged: true}}
 	case desired.GetEncryptionCompliance() != nil:
@@ -315,4 +297,18 @@ func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, in
 		status.State, status.Failure = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE
 	}
 	return status, nil
+}
+
+// simulateServiceState is synthetic executor evidence, never native observation.
+func simulateServiceState(observed *resourcev1.SystemdServiceObservation, desired *resourcev1.SystemdServiceDesired) {
+	observed.ActiveState = "inactive"
+	if desired.GetRuntime() == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE {
+		observed.ActiveState = "active"
+	}
+	switch desired.GetEnablement() {
+	case resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED:
+		observed.UnitFileState = "enabled"
+	case resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED:
+		observed.UnitFileState = "disabled"
+	}
 }

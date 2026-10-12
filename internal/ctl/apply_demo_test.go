@@ -34,6 +34,9 @@ func (emptyOrganizationCatalog) GetDynamicGroup(context.Context, *connect.Reques
 func (emptyOrganizationCatalog) GetProfileRevision(context.Context, *connect.Request[adminv1.GetProfileRevisionRequest]) (*connect.Response[adminv1.GetProfileRevisionResponse], error) {
 	return nil, connect.NewError(connect.CodeNotFound, errors.New("absent"))
 }
+func (emptyOrganizationCatalog) ListRollouts(context.Context, *connect.Request[adminv1.ListRolloutsRequest]) (*connect.Response[adminv1.ListRolloutsResponse], error) {
+	return connect.NewResponse(&adminv1.ListRolloutsResponse{}), nil
+}
 func (emptyOrganizationCatalog) ListTargetAssignments(context.Context, *connect.Request[adminv1.ListTargetAssignmentsRequest]) (*connect.Response[adminv1.ListTargetAssignmentsResponse], error) {
 	return connect.NewResponse(&adminv1.ListTargetAssignmentsResponse{}), nil
 }
@@ -77,7 +80,7 @@ func TestDemoOrganizationPlan(t *testing.T) {
 	for _, outcome := range plan.Outcomes {
 		counts[outcome.Kind]++
 	}
-	for kind, want := range map[string]int{"group": 4, "dynamic_group": 4, "profile": 4, "assignment": 7, "provisioning_token": 4, "enrollment_grant": 1, "account": 4, "authorization": 1, "advisory_exception": 2, "capability_policy": 1} {
+	for kind, want := range map[string]int{"group": 4, "dynamic_group": 4, "profile": 4, "rollout": 1, "assignment": 7, "provisioning_token": 4, "enrollment_grant": 1, "account": 4, "authorization": 1, "advisory_exception": 2, "capability_policy": 1} {
 		if counts[kind] != want {
 			t.Errorf("%s outcomes=%d want %d", kind, counts[kind], want)
 		}

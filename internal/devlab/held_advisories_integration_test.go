@@ -151,8 +151,10 @@ func TestEnableAdvisoriesRestartsOnlyServerWithPublishedConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !proto.Equal(persisted.Proto.GetAdvisories(), cfg) {
-		t.Fatal("restarted config omitted requested advisory feeds")
+	// The persisted feeds equal the refreshed ones (with the cached-download idle
+	// bound), so the restarted server keeps the held publication below.
+	if !proto.Equal(persisted.Proto.GetAdvisories(), cachedRefreshConfig(cfg, heldAdvisoryDuration)) {
+		t.Fatal("restarted config differs from the refreshed advisory feeds")
 	}
 	feeds, err := owner.Admin.ListAdvisoryFeeds(ctx, connect.NewRequest(&adminv1.ListAdvisoryFeedsRequest{}))
 	if err != nil {

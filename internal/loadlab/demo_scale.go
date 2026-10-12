@@ -27,10 +27,10 @@ import (
 const (
 	// demoScaleHostname is a 70-character FQDN (longest label 25 characters).
 	demoScaleHostname = "fedora-ci-gpu-runner-0042.build-farm.eu-central-1.lab.example.internal"
-	// The route device's bulk packages beside its curated Ubuntu baseline.
+	// The route device's bulk packages beside its captured Ubuntu baseline.
 	demoRoutePackages = 2400
-	// The scale device's unaffected bulk packages beside its 2,000 synthetic
-	// AFFECTED builds (devlab.ConsoleDemoAffectedPackages).
+	// The scale device's bulk packages beside its captured Fedora baseline. No
+	// vendor feed claims them; its findings come from the real Fedora export.
 	demoScalePackages = 1000
 	demoScaleGroups   = 120
 	// Each scale group gets this many later membership changes (audited).
@@ -51,21 +51,10 @@ func bulkPackages(manager string, count int) []*inventoryv1.Package {
 	for i := range packages {
 		name, version := devlab.SyntheticPackageName(manager, i), devlab.SyntheticPackageVersion(manager, i)
 		if manager == "rpm" {
-			packages[i] = rpm(name, version, false)
+			packages[i] = rpm(name, version)
 		} else {
 			packages[i] = dpkg(name, version, name, version)
 		}
-	}
-	return packages
-}
-
-// affectedPackages installs every build the console demo's synthetic Fedora
-// updates fix, so the scale device reports 2,000 AFFECTED findings.
-func affectedPackages() []*inventoryv1.Package {
-	affected := devlab.ConsoleDemoAffectedPackages()
-	packages := make([]*inventoryv1.Package, len(affected))
-	for i, pkg := range affected {
-		packages[i] = rpm(pkg.Name, pkg.Installed, false)
 	}
 	return packages
 }
@@ -179,10 +168,16 @@ func (s *demoSeed) scaleAccount(ctx context.Context, i int) error {
 	return nil
 }
 
-// relabel records the scale device's rack moves one after another.
+// relabel records the scale device's rack moves one after another. Its
+// enrollment labels, including the department targeting label, are kept so
+// rack moves never change organization policy targeting.
 func (s *demoSeed) relabel(ctx context.Context, d *simulatedDevice) error {
+	base := slices.Clone(d.demo.labels)
+	if !slices.Contains(base, "synthetic-demo") {
+		base = append(base, "synthetic-demo")
+	}
 	for i := range demoScaleRelabels {
-		labels := []string{"synthetic-demo", "server", "ci-runner", "gpu", fmt.Sprintf("rack-%c%d", 'a'+rune(i%6), 1+i%12)}
+		labels := append(slices.Clone(base), fmt.Sprintf("rack-%c%d", 'a'+rune(i%6), 1+i%12))
 		metadata := &adminv1.DeviceMetadata{Labels: labels, Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a live host"}}
 		if _, err := s.owner.Admin.SetDeviceMetadata(ctx, connect.NewRequest(&adminv1.SetDeviceMetadataRequest{RequestId: uuid.NewString(), DeviceId: d.id, Metadata: metadata, Reason: fmt.Sprintf("Rack move %d during the build farm rebalance", i+1)})); err != nil {
 			return fmt.Errorf("relabel scale device: %w", err)
@@ -192,8 +187,8 @@ func (s *demoSeed) relabel(ctx context.Context, d *simulatedDevice) error {
 }
 
 // awaitScaleFindings waits until the server's own evaluation of the scale
-// device lists at least the synthetic AFFECTED builds, so console review never
-// sees the fleet before its large findings set exists.
+// device reports an AFFECTED finding from the real Fedora export, so console
+// review never sees the large inventory before its findings exist.
 func (s *demoSeed) awaitScaleFindings(ctx context.Context) error {
 	var device *simulatedDevice
 	for _, d := range s.devices {
@@ -202,41 +197,21 @@ func (s *demoSeed) awaitScaleFindings(ctx context.Context) error {
 		}
 	}
 	if device == nil {
-		return fmt.Errorf("scale device missing")
+		return errors.New("scale device missing")
 	}
-	want := len(devlab.ConsoleDemoAffectedPackages())
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, demoEvaluationWait)
 	defer cancel()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		affected, err := s.countAffected(ctx, device, want)
-		if err == nil && affected >= want {
+		finding, freshness, err := s.affectedFinding(ctx, device)
+		if err == nil && finding != nil {
 			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("wait for %d scale findings on %s (have %d): %w", want, demoScaleHostname, affected, errors.Join(ctx.Err(), err))
+			return fmt.Errorf("wait for an AFFECTED finding on %s (last freshness %v %q): %w", demoScaleHostname, freshness.GetState(), freshness.GetReason(), errors.Join(ctx.Err(), err))
 		case <-ticker.C:
-		}
-	}
-}
-
-func (s *demoSeed) countAffected(ctx context.Context, d *simulatedDevice, enough int) (int, error) {
-	count := 0
-	for token := ""; ; {
-		response, err := s.owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: d.id, PageSize: 200, PageToken: token}))
-		if err != nil {
-			return count, err
-		}
-		for _, finding := range response.Msg.GetFindings() {
-			if finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
-				count++
-			}
-		}
-		token = response.Msg.GetNextPageToken()
-		if token == "" || count >= enough {
-			return count, nil
 		}
 	}
 }

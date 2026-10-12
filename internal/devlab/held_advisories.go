@@ -95,6 +95,9 @@ const (
 // disposable fixture. Connected fixtures cannot mutate controller configuration.
 // Identical configuration leaves existing publications intact; the normal server
 // worker refreshes when due, and held callers still gate on WaitDeviceFindings.
+// The persisted feeds are exactly the ones refreshed here, including their
+// cached-download idle bound: a different feed configuration would retire the
+// held publication when the server restarts.
 func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.AdvisoryConfig, cacheDir string) error {
 	if f.connected != nil {
 		return errors.New("advisory configuration requires controller-owned authority fixture")
@@ -108,6 +111,7 @@ func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.A
 	if cacheDir == "" {
 		return errors.New("held advisories require a persistent cache directory")
 	}
+	cfg = cachedRefreshConfig(cfg, heldAdvisoryDuration)
 	ctx, cancel := context.WithTimeout(ctx, heldAdvisoryDuration)
 	defer cancel()
 	document, err := config.Load(f.configPath())
@@ -117,7 +121,7 @@ func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.A
 	if proto.Equal(document.Proto.GetAdvisories(), cfg) {
 		return nil
 	}
-	document.Proto.Advisories = proto.CloneOf(cfg)
+	document.Proto.Advisories = cfg
 	resources, err := document.Resolve()
 	if err != nil {
 		return err

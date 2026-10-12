@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -21,6 +22,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/orgapply"
 )
 
 // SeedDemo must leave every review state as real server state, read back here
@@ -30,7 +32,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	if repository == "" || binary == "" {
 		t.Fatal("set LINDM_CONSOLE_REPOSITORY and LINDM_CONSOLE_LINDMD for the real console lab regression")
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 12*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Hour)
 	defer cancel()
 	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, repository, binary)
 	if err != nil {
@@ -42,7 +44,11 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		}
 	})
 	started := time.Now()
-	demo, presence, err := SeedDemo(ctx, fixture, DemoOptions{})
+	source, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	demo, presence, err := SeedDemo(ctx, fixture, DemoOptions{SourceDirectory: source, AdvisoryCache: filepath.Join(repository, ".cache", "lab", "advisories")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,9 +58,6 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		}
 	})
 	t.Logf("seeded in %s", time.Since(started).Round(time.Second))
-	if elapsed := time.Since(started); elapsed > 5*time.Minute {
-		t.Fatalf("demo seeding took %s", elapsed)
-	}
 	encoded, err := json.Marshal(demo)
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +102,20 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		if row == nil {
 			t.Fatalf("device %s not listed", device.ID)
 		}
+		if !slices.Contains(row.GetMetadata().GetLabels(), "synthetic-demo") {
+			t.Fatalf("device %s is not labelled synthetic", device.ID)
+		}
+		if device.State != "pending" && device.State != "awaiting-inventory" {
+			detail, err := admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: device.ID}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Captured baselines, plus the labelled synthetic scale packages.
+			wantPackages := map[string]uint32{"Ubuntu 24.04 LTS": 664, "Fedora 44": 427, "RHEL 9": 490}[device.OS] + map[string]uint32{"ubuntu-ws-01": demoRoutePackages, demoScaleHostname: demoScalePackages}[device.Hostname]
+			if wantPackages == 0 || detail.Msg.GetCurrentSnapshot().GetPackageCount() != wantPackages || !detail.Msg.GetCurrentSnapshot().GetPackagesAvailable() {
+				t.Fatalf("%s did not replay its complete captured package batch: %v", device.Hostname, detail.Msg.GetCurrentSnapshot())
+			}
+		}
 		want := map[string]adminv1.DeviceState{"enrolled": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "stale": adminv1.DeviceState_DEVICE_STATE_ACTIVE, "pending": adminv1.DeviceState_DEVICE_STATE_PENDING, "awaiting-inventory": adminv1.DeviceState_DEVICE_STATE_PENDING, "revoked": adminv1.DeviceState_DEVICE_STATE_REVOKED}[device.State]
 		if row.GetLifecycleState() != want || device.State != "pending" && device.State != "awaiting-inventory" && row.GetHostname() != device.Hostname {
 			t.Fatalf("device %+v listed as %v %q", device, row.GetLifecycleState(), row.GetHostname())
@@ -108,31 +125,39 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		}
 		compliance[row.GetCompliance()]++
 	}
-	// Converged read-only results comply; encryption drift, a native service
-	// failure and unsupported kinds need attention.
-	if listed[routes.DeviceID].GetCompliance() != adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT] != 2 || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION] != 3 || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED] == 0 {
-		t.Fatalf("missing compliant/drifting/failed outcomes: %v", compliance)
+	// Organization kinds without a native simulator provider remain attention,
+	// never invented compliant outcomes.
+	if listed[routes.DeviceID].GetCompliance() != adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION || compliance[adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION] < 3 {
+		t.Fatalf("missing honest unsupported/failed outcomes: %v", compliance)
 	}
-	// The Fedora-only item is outside the Ubuntu route device's platform and
-	// waits on the laptop that has not reported inventory.
-	for id, want := range map[string]adminv1.ResourceDisposition{routes.DeviceID: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE, routes.FactsPendingDeviceID: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS} {
+	// Engineering tools' platform-limited package rows: the Fedora/RHEL git row
+	// is outside the Ubuntu route device's platform, and the Ubuntu git row
+	// waits on the Engineering laptop that has not reported inventory.
+	for id, row := range map[string]struct {
+		key  string
+		want adminv1.ResourceDisposition
+	}{routes.DeviceID: {"rpm/git", adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE}, routes.FactsPendingDeviceID: {"deb/git", adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS}} {
 		state, err := admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: id}))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !slices.ContainsFunc(state.Msg.GetResources(), func(item *adminv1.ResourceState) bool {
-			return item.GetDesired().GetRef().GetCanonicalKey() == "firewalld.service" && item.GetDisposition() == want && len(item.GetApplicability().GetProducts()) == 1
+			return item.GetDesired().GetRef().GetCanonicalKey() == row.key && item.GetDisposition() == row.want && len(item.GetApplicability().GetProducts()) > 0
 		}) {
-			t.Fatalf("device %s lacks the %v firewalld row: %v", id, want, state.Msg.GetResources())
+			t.Fatalf("device %s lacks the %v %s row: %v", id, row.want, row.key, state.Msg.GetResources())
 		}
 	}
 	encryption, err := admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: routes.DeviceID}))
 	if err != nil || encryption.Msg.GetEscrow().GetActionId() != routes.RecoveryActionID || !encryption.Msg.GetEscrow().GetRetirementConfirmed() || !encryption.Msg.GetObservation().GetEncrypted() || !slices.Contains(encryption.Msg.GetObservation().GetLindmKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) || !slices.Contains(encryption.Msg.GetObservation().GetOccupiedKeyslots(), encryption.Msg.GetEscrow().GetKeyslot()) {
 		t.Fatalf("route device lacks escrowed encrypted root: %v %v", encryption, err)
 	}
+	// Refresh, escrow rotation and lock succeeded; the later undo expired
+	// unstarted, so the accounts stay locked.
 	actions, err := admin.GetDeviceActions(ctx, connect.NewRequest(&adminv1.GetDeviceActionsRequest{DeviceId: routes.DeviceID, PageSize: 50}))
-	if err != nil || !actions.Msg.GetSessionsLocked() || len(actions.Msg.GetActions()) != 3 || !slices.ContainsFunc(actions.Msg.GetActions(), func(action *adminv1.DeviceAction) bool {
+	if err != nil || !actions.Msg.GetSessionsLocked() || len(actions.Msg.GetActions()) != 4 || !slices.ContainsFunc(actions.Msg.GetActions(), func(action *adminv1.DeviceAction) bool {
 		return action.GetActionId() == routes.ActionID && action.GetStatus().GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED
+	}) || !slices.ContainsFunc(actions.Msg.GetActions(), func(action *adminv1.DeviceAction) bool {
+		return action.GetSpec().GetReleaseLock() != nil && action.GetClosedReason() == "expired_unstarted"
 	}) {
 		t.Fatalf("route device action history: %v %v", actions, err)
 	}
@@ -169,9 +194,27 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	if err != nil || refused.Msg.GetSession().GetDeviceId() != routes.RefusedAssistanceDeviceID || refused.Msg.GetSession().GetEndCause() != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DISABLED || refused.Msg.GetSession().GetStartedAt() != nil {
 		t.Fatalf("refused assistance record: %v %v", refused, err)
 	}
-	findings, err := admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: routes.DeviceID, PageSize: 50}))
-	if err != nil || !slices.ContainsFunc(findings.Msg.GetFindings(), func(finding *adminv1.AdvisoryFinding) bool { return finding.GetException() != nil }) {
-		t.Fatalf("missing accepted advisory finding: %v %v", findings, err)
+	findingRequest := &adminv1.ListDeviceFindingsRequest{DeviceId: routes.DeviceID, PageSize: 200}
+	exposures := 0
+	accepted := false
+	for {
+		findings, err := admin.ListDeviceFindings(ctx, connect.NewRequest(findingRequest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, finding := range findings.Msg.GetFindings() {
+			if finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED || finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_ACCEPTED {
+				exposures++
+			}
+			accepted = accepted || finding.GetException() != nil
+		}
+		findingRequest.PageToken = findings.Msg.GetNextPageToken()
+		if findingRequest.PageToken == "" {
+			break
+		}
+	}
+	if exposures < 2 || !accepted {
+		t.Fatalf("route device needs one accepted and another real exposed finding: exposures=%d accepted=%t", exposures, accepted)
 	}
 	feeds, err := admin.ListAdvisoryFeeds(ctx, connect.NewRequest(&adminv1.ListAdvisoryFeedsRequest{}))
 	if err != nil {
@@ -180,12 +223,24 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	published := 0
 	for _, feed := range feeds.Msg.GetFeeds() {
 		t.Logf("feed %s: advisories=%d fresh=%v error=%q", feed.GetId(), feed.GetAdvisoryCount(), feed.GetFresh(), feed.GetError())
-		if feed.GetAdvisoryCount() > 0 && feed.GetError() == "" {
+		// A successfully published export may still be incomplete: unscoped
+		// vendor-record rejection must not be turned into fresh coverage.
+		unscoped := false
+		for _, rejected := range feed.GetRejectedRecords() {
+			unscoped = unscoped || rejected.GetUnscoped()
+		}
+		if !feed.GetFresh() && !unscoped {
+			t.Errorf("feed %s is not fresh and has no unscoped rejection explaining incomplete coverage", feed.GetId())
+		}
+		if unscoped && feed.GetFresh() {
+			t.Errorf("feed %s reports fresh coverage despite an unscoped vendor-record rejection", feed.GetId())
+		}
+		if feed.GetAdvisoryCount() > 1 && feed.GetError() == "" && len(feed.GetArtifacts()) > 0 && feed.GetCheckedAt().AsTime().After(started) && feed.GetExpiresAt().AsTime().After(time.Now()) {
 			published++
 		}
 	}
-	if len(feeds.Msg.GetFeeds()) != 4 || published < 3 {
-		t.Fatalf("served vendor fixtures were not published: %v", feeds)
+	if len(feeds.Msg.GetFeeds()) != 3 || published != 3 {
+		t.Fatalf("real vendor publications=%d feeds=%d; want three current publications with retained provenance", published, len(feeds.Msg.GetFeeds()))
 	}
 	for _, device := range demo.Devices {
 		if device.State == "pending" || device.State == "revoked" {
@@ -196,6 +251,9 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("%s: compliance=%v findings=%d freshness=%v/%s", device.Hostname, listed[device.ID].GetCompliance(), len(findings.Msg.GetFindings()), findings.Msg.GetFreshness().GetState(), findings.Msg.GetFreshness().GetReason())
+		if device.Hostname == "rhel-srv-05" && findings.Msg.GetFreshness().GetReason() != "rhel_platform_stream_unavailable" {
+			t.Fatalf("captured unregistered RHEL platform invented coverage: %v", findings.Msg.GetFreshness())
+		}
 	}
 	// Proposed risk: an AFFECTED finding pending independent review beside a
 	// proposal whose finding evidence is unavailable.
@@ -210,7 +268,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		t.Fatalf("advisory acceptance proposals: %v", proposals)
 	}
 	request := proposed.GetAcceptAdvisoryFinding()
-	findings, err = admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: request.GetDeviceId(), PageSize: 50}))
+	findings, err := admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: request.GetDeviceId(), PageSize: 50}))
 	if err != nil || !slices.ContainsFunc(findings.Msg.GetFindings(), func(finding *adminv1.AdvisoryFinding) bool {
 		return finding.GetId() == request.GetFindingId() && finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED
 	}) {
@@ -262,10 +320,82 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	if err != nil || !targets.Msg.GetFresh() || targets.Msg.GetUnavailableReason() != "" || len(targets.Msg.GetTargets()) == 0 {
 		t.Fatalf("refreshed wipe storage: %v %v", targets, err)
 	}
+	raw, err := os.ReadFile(filepath.Join(source, "lab", "demo", "org.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := orgapply.Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := orgapply.Plan(ctx, admin, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := orgapply.Apply(ctx, admin, plan, orgapply.Options{AccountClient: owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Secrets) != 0 {
+		t.Fatal("second apply reissued credentials")
+	}
+	for _, outcome := range second.Outcomes {
+		if outcome.Status == "unchanged" || outcome.Kind == "authorization" && outcome.Status == "unsupported" || outcome.Kind == "advisory_exception" && outcome.Status == "pending" {
+			continue
+		}
+		t.Errorf("second organization apply changed state: %+v", outcome)
+	}
+	// Scale fixtures add many unrelated groups; only organization groups are
+	// checked here.
+	declared := make(map[string]bool, len(spec.GetGroups()))
+	for _, group := range spec.GetGroups() {
+		declared[group.GetId()] = true
+	}
+	var organizationGroups []*adminv1.DeviceGroup
+	for token := ""; ; {
+		groups, err := admin.ListDeviceGroups(ctx, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{PageSize: 100, PageToken: token}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, group := range groups.Msg.GetGroups() {
+			if declared[group.GetId()] {
+				organizationGroups = append(organizationGroups, group)
+			}
+		}
+		if token = groups.Msg.GetNextPageToken(); token == "" {
+			break
+		}
+	}
+	if len(organizationGroups) != len(spec.GetGroups()) {
+		t.Fatalf("unexpected organization groups: %v", organizationGroups)
+	}
+	for _, group := range organizationGroups {
+		if len(group.GetDeviceIds()) == 0 {
+			t.Errorf("organization group %s has no provisioned members", group.GetName())
+		}
+		if group.GetName() == "Engineering" && !slices.Contains(group.GetDeviceIds(), routes.DeviceID) {
+			t.Error("route device did not enroll through Engineering token membership")
+		}
+		if group.GetName() == "Contractors" {
+			for _, device := range demo.Devices {
+				if device.State != "stale" {
+					continue
+				}
+				labels := listed[device.ID].GetMetadata().GetLabels()
+				if !slices.Contains(group.GetDeviceIds(), device.ID) || !slices.Contains(labels, "synthetic-history-only") || slices.Contains(labels, "department/contractors") {
+					t.Error("history-only kiosk lost RBAC membership or rejoined organization targeting")
+				}
+			}
+		}
+	}
+	if !slices.Contains(listed[routes.DeviceID].GetMetadata().GetLabels(), "department/engineering") {
+		t.Error("route device lost its provisioning token department label")
+	}
 	// Owner pass 2: a console assignment on the present route device must make
 	// progress. Replacing the profile both adds items and releases removed ones;
-	// each item gets a terminal result and each release completes. Restoring the
-	// seeded profile re-adds items the device already ran once.
+	// each item gets a terminal result and each release completes. Returning to
+	// the first organization profile re-adds items the device already ran once.
+	// This runs after the idempotency apply above because it changes assignment.
 	byName := map[string]*adminv1.ProfileSummary{}
 	for token := ""; ; {
 		profiles, err := admin.ListProfiles(ctx, connect.NewRequest(&adminv1.ListProfilesRequest{PageSize: 100, PageToken: token}))
@@ -279,8 +409,8 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			break
 		}
 	}
-	if byName["Server hardening"] == nil || byName["Workstation baseline"] == nil {
-		t.Fatalf("demo profiles: %d listed without the seeded profiles", len(byName))
+	if byName["Company baseline"] == nil || byName["Contractors"] == nil {
+		t.Fatalf("demo profiles: %d listed without the organization's Company baseline and Contractors", len(byName))
 	}
 	assign := func(profile *adminv1.ProfileSummary) {
 		t.Helper()
@@ -325,6 +455,90 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			}
 		}
 	}
-	assign(byName["Server hardening"])
-	assign(byName["Workstation baseline"])
+	assign(byName["Company baseline"])
+	assign(byName["Contractors"])
+	assign(byName["Company baseline"])
+}
+
+// Exercise organization targeting/dispatch independently of the expensive vendor
+// import. The full SeedDemo regression above still requires all real feeds.
+func TestDemoOrganizationResourceConvergence(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	defer cancel()
+	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, os.Getenv("LINDM_CONSOLE_REPOSITORY"), os.Getenv("LINDM_CONSOLE_LINDMD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := fixture.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	body, err := os.ReadFile("../../lab/demo/org.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	organization, err := orgapply.Decode(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fixture.ConfigureAuthorization(ctx, organization.GetAuthorization()); err != nil {
+		t.Fatal(err)
+	}
+	devices, err := demoDevices("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	devices = devices[:1]
+	r := &runner{fixture: fixture, metrics: &measurements{}, demo: devices, options: Options{Packages: 1, EnrollmentWorkers: 1}}
+	if err := r.prepare(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		r.enrollmentTransport.CloseIdleConnections()
+		if err := r.owner.Close(context.WithoutCancel(ctx)); err != nil {
+			t.Error(err)
+		}
+	})
+	s := &demoSeed{runner: r, organization: organization}
+	enrollment := proto.CloneOf(organization)
+	enrollment.Rollouts, enrollment.Assignments = nil, nil
+	applied, err := s.applyOrganization(ctx, enrollment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(applied.Secrets)
+	for _, token := range organization.GetProvisioningTokens() {
+		if token.GetName() == devices[0].department {
+			devices[0].labels = append(devices[0].labels, token.GetRequest().GetMetadata().GetLabels()...)
+		}
+	}
+	for _, secret := range applied.Secrets {
+		if secret.Kind == "provisioning_token" && secret.Name == devices[0].department {
+			devices[0].provisioningToken = secret.Value
+		}
+	}
+	enrolled, err := r.enrollBatch(ctx, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := enrolled[0]
+	defer d.close()
+	if err := s.describe(ctx, d, nil); err != nil {
+		t.Fatal(err)
+	}
+	applied, err = s.applyOrganization(ctx, organization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(applied.Secrets)
+	if err := s.converge(ctx, d); err != nil {
+		state, readErr := s.owner.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: d.id}))
+		if readErr == nil {
+			for _, resource := range state.Msg.GetResources() {
+				t.Logf("resource=%s disposition=%s reason=%s action=%s", resource.GetResourceId(), resource.GetDisposition(), resource.GetReason(), resource.GetLatestAction().GetStatus().GetState())
+			}
+		}
+		t.Fatalf("converge: %v; state read: %v", err, readErr)
+	}
 }

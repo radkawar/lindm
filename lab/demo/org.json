@@ -954,6 +954,39 @@
       }
     }
   ],
+  "rollouts": [
+    {
+      "rolloutId": "4bc494b9-b909-5106-b434-7d9e10b9591c",
+      "salt": "yolO266+mkbcCMrQtHlzydRdZSqvKOsjyk5Fh6hhOkc=",
+      "rings": [
+        {
+          "name": "Pilot",
+          "cohort": { "staticGroupId": "26d5407e-0035-5ae1-b4c9-83d105e13915" },
+          "cumulativeBasisPoints": 2500,
+          "minimumCanaries": 1,
+          "minimumObserved": 1,
+          "soakSeconds": 86400,
+          "failureBasisPoints": 500,
+          "unknownBasisPoints": 1000,
+          "unavailableBasisPoints": 1000,
+          "healthMaxAgeSeconds": 3600
+        },
+        {
+          "name": "Fleet",
+          "cohort": { "staticGroupId": "26d5407e-0035-5ae1-b4c9-83d105e13915" },
+          "cumulativeBasisPoints": 10000,
+          "minimumCanaries": 1,
+          "minimumObserved": 1,
+          "soakSeconds": 86400,
+          "failureBasisPoints": 500,
+          "unknownBasisPoints": 1000,
+          "unavailableBasisPoints": 1000,
+          "manualPromotion": true,
+          "healthMaxAgeSeconds": 3600
+        }
+      ]
+    }
+  ],
   "assignments": [
     {
       "profileId": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",

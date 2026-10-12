@@ -197,7 +197,7 @@ func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendin
 		return nil
 	}
 	after := proto.CloneOf(p.status.GetBefore())
-	after.GetSystemdService().ActiveState = "active"
+	simulateServiceState(after.GetSystemdService(), p.intent.GetDesired().GetSystemdService())
 	after.Metadata.ObservedAt = stamp()
 	after.GetSystemdService().ObservedAt = after.Metadata.ObservedAt
 	p.status.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED

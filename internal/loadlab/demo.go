@@ -10,6 +10,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -21,14 +23,17 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	orgv1 "lindm/gen/lindm/org/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/escrow"
+	"lindm/internal/orgapply"
 	"lindm/internal/platform"
 	"lindm/internal/rpcreason"
 )
@@ -38,6 +43,10 @@ type DemoOptions struct {
 	// HostObservationFile replays a captured host report on one demo device,
 	// with the same semantics as PopulateOptions.HostObservationFile.
 	HostObservationFile string
+	// SourceDirectory holds lab/demo/org.json; defaults to the current checkout.
+	SourceDirectory string
+	// AdvisoryCache retains vendor exports across runs; defaults beneath SourceDirectory/.cache.
+	AdvisoryCache string
 }
 
 // Demo holds no credentials; safe to print/store as evidence.
@@ -45,6 +54,7 @@ type Demo struct {
 	Devices            []DemoDevice
 	Routes             DemoRoutes
 	HistoricalDeviceID string
+	Organization       []orgapply.Outcome
 }
 
 // DemoDevice is one seeded device. State is enrolled, pending (a provisioning
@@ -75,10 +85,11 @@ type DemoRoutes struct {
 // demoSeed drives the real Admin, Enrollment and Device APIs for one fixture.
 type demoSeed struct {
 	*runner
-	devices  []*simulatedDevice
-	approver *devlab.ApprovalSession
-	origin   *devlab.ConsoleDemo
-	demo     Demo
+	devices      []*simulatedDevice
+	approver     *devlab.ApprovalSession
+	origin       *devlab.ConsoleDemo
+	demo         Demo
+	organization *orgv1.Organization
 }
 
 // DemoPresence keeps the route device checking in after seeding, so the console
@@ -99,17 +110,17 @@ func (p *DemoPresence) Stop() error {
 	return <-p.done
 }
 
-// SeedDemo builds the deterministic console review dataset on a caller-owned
-// dynamic local console fixture: real profile, enrollment, advisory, action,
-// assistance, approval, secret and integration state reached only through
-// product RPCs and simulated devices. Devices are labelled synthetic. All but
+// SeedDemo applies the maintained organization and adds synthetic review history
+// on a caller-owned dynamic local fixture. Organization and device mutations use
+// product APIs; advisory publications come from current real vendor exports.
+// Devices are labelled synthetic. All but
 // the route device stop reporting afterwards; that one keeps polling its
 // assistance state and action work (real check-ins) and completes requested
 // inventory refreshes until the caller stops the returned presence, which it
-// must do before closing the fixture. It reconfigures the
-// fixture once through ConfigureConsoleDemo, never returns or logs secret
-// material, and releases its sessions and other device transports before
-// return. The caller must not concurrently close or reconfigure the fixture.
+// must do before closing the fixture. It configures the fixture's demo feeds,
+// relay and organization authorization, never returns or logs secret material,
+// and releases its sessions and other device transports before return.
+// The caller must not concurrently close or reconfigure the fixture.
 func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options DemoOptions) (_ Demo, presence *DemoPresence, resultErr error) {
 	// Registered first so it runs last: a cleanup failure must not leak the presence loop.
 	defer func() {
@@ -118,8 +129,23 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 			presence = nil
 		}
 	}()
-	seedCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
+	if options.SourceDirectory == "" {
+		options.SourceDirectory = "."
+	}
+	if options.AdvisoryCache == "" {
+		options.AdvisoryCache = filepath.Join(options.SourceDirectory, ".cache", "lab", "advisories")
+	}
+	body, err := os.ReadFile(filepath.Join(options.SourceDirectory, "lab", "demo", "org.json"))
+	if err != nil {
+		return Demo{}, nil, fmt.Errorf("read demo organization: %w", err)
+	}
+	organization, err := orgapply.Decode(body)
+	if err != nil {
+		return Demo{}, nil, err
+	}
+	if len(organization.GetProfiles()) == 0 {
+		return Demo{}, nil, errors.New("console demo organization requires a profile route")
+	}
 	var historical *inventoryv1.HostObservation
 	if options.HostObservationFile != "" {
 		var err error
@@ -127,14 +153,35 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 			return Demo{}, nil, err
 		}
 	}
-	devices, err := demoDevices()
+	devices, err := demoDevices(options.SourceDirectory)
 	if err != nil {
 		return Demo{}, nil, err
 	}
-	origin, err := fixture.ConfigureConsoleDemo(seedCtx)
+	feeds := &configv1.AdvisoryConfig{RefreshEnabled: true}
+	seen := make(map[string]bool)
+	for _, device := range devices {
+		if seen[device.release.Key] {
+			continue
+		}
+		cfg, err := devlab.HeldAdvisories(*device.release, "amd64")
+		if err != nil {
+			return Demo{}, nil, err
+		}
+		feeds.Feeds = append(feeds.Feeds, cfg.GetFeeds()...)
+		seen[device.release.Key] = true
+	}
+	// Initial vendor downloads/revalidation have their own bounded deadline,
+	// before the twenty-minute synthetic device seed (enrollment, scale writes
+	// and real-feed evaluation waits).
+	origin, err := fixture.ConfigureConsoleDemo(ctx, feeds, options.AdvisoryCache)
 	if err != nil {
 		return Demo{}, nil, fmt.Errorf("configure console demo: %w", err)
 	}
+	if err := fixture.ConfigureAuthorization(ctx, organization.GetAuthorization()); err != nil {
+		return Demo{}, nil, err
+	}
+	seedCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+	defer cancel()
 	r := &runner{fixture: fixture, metrics: &measurements{}, historicalHost: historical, demo: devices, options: Options{Packages: 1, EnrollmentWorkers: 4}}
 	if err := r.prepare(seedCtx); err != nil {
 		return Demo{}, nil, err
@@ -145,6 +192,34 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		resultErr = errors.Join(resultErr, r.owner.Close(cleanup))
 	}()
 	defer r.enrollmentTransport.CloseIdleConnections()
+	s := &demoSeed{runner: r, origin: origin, organization: organization}
+	// Provision enrollment prerequisites through the same organization engine.
+	// Rollouts freeze a real cohort at creation and cannot precede enrollment;
+	// their assignments are applied with the full spec after inventory arrives.
+	enrollment := proto.CloneOf(organization)
+	enrollment.Rollouts, enrollment.Assignments = nil, nil
+	applied, err := s.applyOrganization(seedCtx, enrollment)
+	if err != nil {
+		return Demo{}, nil, err
+	}
+	defer clear(applied.Secrets)
+	for _, device := range devices {
+		for _, token := range organization.GetProvisioningTokens() {
+			if token.GetName() == device.department {
+				device.labels = append(device.labels, token.GetRequest().GetMetadata().GetLabels()...)
+			}
+		}
+		for _, secret := range applied.Secrets {
+			if secret.Kind == "provisioning_token" && secret.Name == device.department {
+				device.provisioningToken = secret.Value
+			}
+		}
+	}
+	defer func() {
+		for _, device := range devices {
+			device.provisioningToken = ""
+		}
+	}()
 	enrolled, err := r.enrollBatch(seedCtx, 0, len(devices))
 	var present *simulatedDevice
 	defer func() {
@@ -171,7 +246,7 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		defer cancel()
 		resultErr = errors.Join(resultErr, approver.Close(cleanup))
 	}()
-	s := &demoSeed{runner: r, devices: enrolled, approver: approver, origin: origin}
+	s.devices, s.approver = enrolled, approver
 	if err := s.seed(seedCtx, historical); err != nil {
 		return Demo{}, nil, err
 	}
@@ -184,6 +259,33 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		done <- s.checkIns(presenceCtx, present)
 	}()
 	return s.demo, presence, nil
+}
+
+// applyOrganization keeps all organization mutations in the product engine.
+// Account operations use the fixture owner's existing cookie/CSRF session.
+// Live demo check-ins can change a device's targeting revision between preview
+// and activation; that definitive targeting_revision_conflict rejection is
+// re-planned against current state. An attempt that issued credentials is never
+// retried, because a re-plan could not show them again.
+func (s *demoSeed) applyOrganization(ctx context.Context, organization *orgv1.Organization) (*orgapply.Result, error) {
+	const attempts = 5
+	for attempt := 1; ; attempt++ {
+		plan, err := orgapply.Plan(ctx, s.owner.Admin, organization)
+		if err != nil {
+			return nil, err
+		}
+		result, err := orgapply.Apply(ctx, s.owner.Admin, plan, orgapply.Options{AccountClient: s.owner})
+		if err == nil {
+			return result, nil
+		}
+		issued := result != nil && len(result.Secrets) > 0
+		if result != nil {
+			clear(result.Secrets)
+		}
+		if issued || attempt == attempts || rpcreason.Get(err) != "targeting_revision_conflict" {
+			return nil, err
+		}
+	}
 }
 
 // checkIns polls the device's assistance state, action work and resource
@@ -291,18 +393,34 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			s.demo.Routes.AssistanceOffDeviceID = d.id
 		}
 	}
-	profiles, err := s.publishProfiles(ctx)
+	// Re-plan after enrollment/metadata so targeting activates actual members
+	// and exceptions resolve actual inventory. This is not an idempotency probe;
+	// the integration test reapplies the finished organization independently.
+	applied, err := s.applyOrganization(ctx, s.organization)
 	if err != nil {
 		return err
 	}
-	s.demo.Routes.ProfileID = profiles[0].GetProfileId()
-	s.demo.Routes.FirewallProfileID = profiles[3].GetProfileId()
-	// The kiosk's short verification age starts lapsing while the rest seeds.
-	assigned := slices.Clone(s.devices)
-	slices.SortStableFunc(assigned, func(a, b *simulatedDevice) int { return b.demo.profile - a.demo.profile })
-	for _, d := range assigned {
-		if d.demo.profile >= 0 {
-			if err := s.converge(ctx, d, profiles[d.demo.profile]); err != nil {
+	if len(applied.Secrets) != 0 {
+		clear(applied.Secrets)
+		return errors.New("post-enrollment organization apply unexpectedly reissued credentials")
+	}
+	s.demo.Organization = applied.Outcomes
+	s.demo.Routes.ProfileID = s.organization.GetProfiles()[0].GetId()
+	if s.demo.Routes.FirewallProfileID, err = s.publishFirewallReviewProfile(ctx); err != nil {
+		return err
+	}
+	for _, d := range s.devices {
+		switch {
+		case d.demo.state == "stale":
+			if err := s.seedStaleProfile(ctx, d); err != nil {
+				return err
+			}
+		case d.demo.factsWithheld:
+			if err := s.assignFactsPending(ctx, d); err != nil {
+				return err
+			}
+		default:
+			if err := s.converge(ctx, d); err != nil {
 				return fmt.Errorf("converge %s: %w", d.demo.hostname, err)
 			}
 		}
@@ -325,7 +443,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			}
 		}
 	}
-	if err := s.enrollments(ctx, profiles[0]); err != nil {
+	if err := s.enrollments(ctx); err != nil {
 		return err
 	}
 	if err := s.catalog(ctx); err != nil {
@@ -364,6 +482,14 @@ func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical 
 		row.Hostname, row.OS = "", ""
 	}
 	metadata := &adminv1.DeviceMetadata{Labels: append([]string{"synthetic-demo"}, d.demo.labels...), Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a live host"}}
+	if d.demo.state == "stale" {
+		// Preserve token-created static RBAC membership, but keep this explicit
+		// history-only device outside department policy targeting.
+		metadata.Labels = slices.DeleteFunc(metadata.Labels, func(label string) bool {
+			return label == "department/"+d.demo.department
+		})
+		metadata.Labels = append(metadata.Labels, "synthetic-history-only")
+	}
 	if d.demo.historical && historical != nil {
 		row.Hostname, row.OS = historical.GetHostname().GetValue(), platform.Identify(platform.OSRelease{ID: historical.GetOsId().GetValue(), VersionID: historical.GetOsVersion().GetValue()}).Name
 		metadata.Labels = append(metadata.Labels, "historical-inventory-replay")
@@ -378,98 +504,87 @@ func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical 
 	return nil
 }
 
-// demoProfiles are the published catalog: profile 0 is the workstation
-// baseline, 1 server hardening and 2 a kiosk whose 30 s verification age
-// makes a silent device's compliance stale. Profile 3, a guest Wi-Fi firewall
-// zone, is published but never assigned: firewall zones have no name, and the
-// console must identify one by what it binds rather than its UUID.
-func demoProfiles() []*policyv1.ResourceProfile {
-	ownership := func(release resourcev1.ReleaseBehavior) *resourcev1.OwnershipPolicy {
-		return &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: release}
+// assignFactsPending gives a device that has never reported inventory the
+// organization profile with platform-limited rows. Organization targeting
+// activates only active devices, so this one synthetic assignment is direct;
+// those rows then wait for the device's facts while unrestricted rows apply.
+func (s *demoSeed) assignFactsPending(ctx context.Context, d *simulatedDevice) error {
+	index := slices.IndexFunc(s.organization.GetProfiles(), func(profile *orgv1.Profile) bool {
+		return slices.ContainsFunc(profile.GetSpec().GetResources(), func(item *policyv1.ProfileResource) bool { return item.GetApplicability() != nil })
+	})
+	if index < 0 {
+		return errors.New("organization declares no platform-limited profile row")
 	}
-	verification := func(age uint32) *resourcev1.VerificationPolicy {
-		return &resourcev1.VerificationPolicy{MaxAgeSeconds: age, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}
-	}
-	service := func(unit string, age uint32) *policyv1.ProfileResource {
-		return &policyv1.ProfileResource{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: unit}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: unit, Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN), Verification: verification(age)}
-	}
-	// The registry's Fedora 44 row on x86_64, the only platform the item targets.
-	fedora, _ := platform.Lookup("fedora-44")
-	fedoraOnly := func(item *policyv1.ProfileResource) *policyv1.ProfileResource {
-		item.Applicability = &resourcev1.Applicability{Products: []*resourcev1.PlatformProduct{{OsId: fedora.ID, Product: fedora.Distribution, Version: fedora.Version.Value, Architecture: "x86_64"}}}
-		return item
-	}
-	week := uint32(7 * 24 * 3600)
-	guestZone := uuid.NewString()
-	profiles := []*policyv1.ResourceProfile{
-		{Name: "Workstation baseline", Description: "Printing service and LUKS root encryption compliance for staff laptops; Fedora laptops also run firewalld.", Resources: []*policyv1.ProfileResource{
-			service("cups.service", week),
-			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE, CanonicalKey: "system/root"}, State: &resourcev1.ResourceDesiredState_EncryptionCompliance{EncryptionCompliance: &resourcev1.EncryptionComplianceDesired{RequireLuksRoot: true}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
-			// Not applicable on the Ubuntu laptops; waits on a laptop without inventory.
-			fedoraOnly(service("firewalld.service", week)),
-		}},
-		{Name: "Server hardening", Description: "Audit daemon and a pre-login legal banner for shared servers.", Resources: []*policyv1.ProfileResource{
-			service("auditd.service", week),
-			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE, CanonicalKey: "/etc/issue.net"}, State: &resourcev1.ResourceDesiredState_ManagedFile{ManagedFile: &resourcev1.ManagedFileDesired{Path: "/etc/issue.net", Presence: resourcev1.Presence_PRESENCE_PRESENT, Content: []byte("Authorized use only. Activity may be monitored.\n"), Mode: proto.Uint32(0o644)}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
-		}},
-		{Name: "Lobby kiosk", Description: "Single-application browser session, verified every 30 seconds.", Resources: []*policyv1.ProfileResource{service("kiosk-browser.service", 30)}},
-		{Name: "Guest Wi-Fi firewall", Description: "Drop unsolicited inbound traffic from the guest network.", Resources: []*policyv1.ProfileResource{
-			{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, CanonicalKey: guestZone}, State: &resourcev1.ResourceDesiredState_FirewallZone{FirewallZone: &resourcev1.FirewallZoneDesired{ZoneId: guestZone, Presence: resourcev1.Presence_PRESENCE_PRESENT, Interfaces: []*resourcev1.InterfaceSelector{{Identity: &resourcev1.InterfaceSelector_PermanentMac{PermanentMac: "02:00:00:00:50:01"}, Ifname: proto.String("wlan0")}}, SourceNetworks: []*resourcev1.CIDR{{NetworkAddress: "192.168.50.0", PrefixLength: 24}}, DefaultIngress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_DROP, DefaultEgress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT}}}, Ownership: ownership(resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED), Verification: verification(week)},
-		}},
-	}
-	for _, profile := range profiles {
-		ids := make([]string, len(profile.GetResources()))
-		for i := range ids {
-			ids[i] = uuid.NewString()
-		}
-		slices.Sort(ids)
-		for i, item := range profile.GetResources() {
-			item.ResourceId = ids[i]
-		}
-	}
-	return profiles
-}
-
-func (s *demoSeed) publishProfiles(ctx context.Context) ([]*adminv1.ProfileRevision, error) {
-	var revisions []*adminv1.ProfileRevision
-	for _, spec := range demoProfiles() {
-		published, err := s.owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Spec: spec, Reason: "Publish console demo profile"}))
-		if err != nil {
-			return nil, fmt.Errorf("publish demo profile: %w", err)
-		}
-		revisions = append(revisions, published.Msg.GetRevision())
-	}
-	return revisions, nil
-}
-
-// converge assigns the profile and runs the simulated executor until every
-// resource has one admitted terminal report.
-func (s *demoSeed) converge(ctx context.Context, d *simulatedDevice, profile *adminv1.ProfileRevision) error {
-	reconcile := uint32(86400)
-	if d.demo.state == "stale" {
-		reconcile = 300
-	}
-	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(reconcile), Reason: "Assign console demo profile"})); err != nil {
-		return fmt.Errorf("assign demo profile: %w", err)
-	}
-	state, err := s.owner.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: d.id}))
+	head, err := s.owner.Admin.GetProfileRevision(ctx, connect.NewRequest(&adminv1.GetProfileRevisionRequest{ProfileId: s.organization.GetProfiles()[index].GetId()}))
 	if err != nil {
-		return fmt.Errorf("read demo assignment: %w", err)
+		return fmt.Errorf("read platform-limited organization profile: %w", err)
 	}
-	// Items outside the device's platform, or waiting for its facts, never run.
-	want := d.serviceReports
-	for _, item := range state.Msg.GetResources() {
-		switch item.GetDisposition() {
-		case adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE, adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS:
-		default:
-			want++
-		}
+	profile := head.Msg.GetRevision()
+	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(86400), Reason: "Seed a device awaiting its first inventory"})); err != nil {
+		return fmt.Errorf("assign %s: %w", d.demo.hostname, err)
 	}
+	return s.converge(ctx, d)
+}
+
+// seedStaleProfile is a synthetic-only observation history, not an organization
+// baseline. Its short verification lifetime makes the stale UI state observable
+// without waiting an hour or forging collection timestamps.
+func (s *demoSeed) seedStaleProfile(ctx context.Context, d *simulatedDevice) error {
+	spec := &policyv1.ResourceProfile{Name: "Synthetic kiosk observation", Description: "Synthetic review history, not an organization policy.", Resources: []*policyv1.ProfileResource{{
+		ResourceId:   uuid.NewString(),
+		Desired:      &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "kiosk-browser.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "kiosk-browser.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}},
+		Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},
+		Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 30, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
+	}}}
+	published, err := s.owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Spec: spec, Reason: "Seed synthetic stale observation history"}))
+	if err != nil {
+		return err
+	}
+	profile := published.Msg.GetRevision()
+	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(300), Reason: "Seed synthetic stale observation history"})); err != nil {
+		return err
+	}
+	return s.converge(ctx, d)
+}
+
+// publishFirewallReviewProfile publishes a synthetic-only, never-assigned guest
+// Wi-Fi firewall zone so console review sees an unnamed zone identified by its
+// binding rather than its UUID. It is not part of the organization policy.
+func (s *demoSeed) publishFirewallReviewProfile(ctx context.Context) (string, error) {
+	zone := uuid.NewString()
+	spec := &policyv1.ResourceProfile{Name: "Guest Wi-Fi firewall", Description: "Drop unsolicited inbound traffic from the guest network.", Resources: []*policyv1.ProfileResource{{
+		ResourceId: uuid.NewString(),
+		Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, CanonicalKey: zone}, State: &resourcev1.ResourceDesiredState_FirewallZone{FirewallZone: &resourcev1.FirewallZoneDesired{
+			ZoneId: zone, Presence: resourcev1.Presence_PRESENCE_PRESENT, Interfaces: []*resourcev1.InterfaceSelector{{Identity: &resourcev1.InterfaceSelector_PermanentMac{PermanentMac: "02:00:00:00:50:01"}, Ifname: proto.String("wlan0")}},
+			SourceNetworks: []*resourcev1.CIDR{{NetworkAddress: "192.168.50.0", PrefixLength: 24}}, DefaultIngress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_DROP, DefaultEgress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT,
+		}}},
+		Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED},
+		Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 7 * 24 * 3600, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
+	}}}
+	published, err := s.owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Spec: spec, Reason: "Publish synthetic firewall zone review profile"}))
+	if err != nil {
+		return "", fmt.Errorf("publish firewall review profile: %w", err)
+	}
+	return published.Msg.GetRevision().GetProfileId(), nil
+}
+
+// converge reports actual simulator outcomes for the product's effective
+// assignment. Unsupported resource kinds remain refused, never compliant.
+func (s *demoSeed) converge(ctx context.Context, d *simulatedDevice) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	for d.serviceReports < want {
+	for {
+		state, err := s.owner.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: d.id}))
+		if err != nil {
+			return err
+		}
+		if !slices.ContainsFunc(state.Msg.GetResources(), func(r *adminv1.ResourceState) bool {
+			return r.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING || r.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS
+		}) {
+			return nil
+		}
 		if err := s.syncTrust(ctx, d); err != nil {
 			return err
 		}
@@ -486,7 +601,6 @@ func (s *demoSeed) converge(ctx context.Context, d *simulatedDevice, profile *ad
 		case <-ticker.C:
 		}
 	}
-	return nil
 }
 
 // richDevice gives the route device its action, escrow and assistance history.
@@ -546,7 +660,16 @@ func (s *demoSeed) deviceAction(ctx context.Context, d *simulatedDevice, spec *a
 	if _, err := d.client.GetSyncState(ctx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: d.epoch})); err != nil {
 		return "", err
 	}
-	created, err := s.owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(&adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, Spec: spec, ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Minute)), Reason: "Console demo device action"}))
+	request := &adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, Spec: spec, ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Minute)), Reason: "Synthetic console demo device action"}
+	created, err := s.owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
+	if rpcreason.Get(err) == "approval_required" {
+		approval, approvalErr := s.approver.Approve(ctx, s.owner, &adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: request}})
+		if approvalErr != nil {
+			return "", approvalErr
+		}
+		request.ApprovalId = approval.GetId()
+		created, err = s.owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))
+	}
 	if err != nil {
 		return "", err
 	}
@@ -773,9 +896,9 @@ func (s *demoSeed) revoke(ctx context.Context, d *simulatedDevice) error {
 	return nil
 }
 
-// enrollments leaves one provisioned device awaiting approval, an automatic
-// provisioning token and an unused one-time grant. Secrets are discarded.
-func (s *demoSeed) enrollments(ctx context.Context, baseline *adminv1.ProfileRevision) error {
+// enrollments leaves one synthetic device awaiting approval. Organization tokens
+// and grants are issued exclusively by orgapply.
+func (s *demoSeed) enrollments(ctx context.Context) error {
 	pending, err := s.owner.Admin.CreateProvisioningToken(ctx, connect.NewRequest(&adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), LifetimeSeconds: 86400, MaxUses: 1, ApprovalRequired: true, Reason: "Contractor laptop; approve after identity check",
 		Metadata: &adminv1.DeviceMetadata{Labels: []string{"synthetic-demo", "contractor"}, Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo laptop awaiting approval"}}}))
 	if err != nil {
@@ -799,43 +922,11 @@ func (s *demoSeed) enrollments(ctx context.Context, baseline *adminv1.ProfileRev
 		return errors.New("approval-required provisioning issued device authority")
 	}
 	s.demo.Devices = append(s.demo.Devices, DemoDevice{ID: provisioned.Msg.GetDeviceId(), State: "pending"})
-	automatic, err := s.owner.Admin.CreateProvisioningToken(ctx, connect.NewRequest(&adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), LifetimeSeconds: 86400, MaxUses: 25, Reason: "Imaging batch for the spring laptop refresh",
-		Metadata: &adminv1.DeviceMetadata{Labels: []string{"synthetic-demo", "laptop-refresh"}}, ProfileRevisionIds: []string{baseline.GetRevisionId()}}))
-	if err != nil {
-		return fmt.Errorf("create demo automatic token: %w", err)
-	}
-	automatic.Msg.Secret = ""
-	grant, err := s.owner.Admin.CreateEnrollmentGrant(ctx, connect.NewRequest(&adminv1.CreateEnrollmentGrantRequest{RequestId: uuid.NewString(), LifetimeSeconds: 900, Reason: "Replacement laptop for the support desk"}))
-	if err != nil {
-		return fmt.Errorf("create demo enrollment grant: %w", err)
-	}
-	grant.Msg.Secret = ""
 	return nil
 }
 
-// catalog seeds a device group and rollout, a managed secret and the
-// integration destination, report schedule and audit export.
+// catalog seeds synthetic secret custody and integration/report history.
 func (s *demoSeed) catalog(ctx context.Context) error {
-	group := uuid.NewString()
-	var members []string
-	for _, d := range s.devices {
-		if slices.Contains(d.demo.labels, "workstation") && d.demo.state == "enrolled" {
-			members = append(members, d.id)
-		}
-	}
-	if _, err := s.owner.Admin.SetDeviceGroup(ctx, connect.NewRequest(&adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: group, Name: "Engineering workstations", DeviceIds: members, Reason: "Group staff workstations for staged rollouts"})); err != nil {
-		return fmt.Errorf("create demo device group: %w", err)
-	}
-	salt := make([]byte, 32)
-	if _, err := rand.Read(salt); err != nil {
-		return err
-	}
-	ring := func(name string, basis uint32, manual bool) *policyv1.RolloutRing {
-		return &policyv1.RolloutRing{Name: name, Cohort: &policyv1.TargetRef{Target: &policyv1.TargetRef_StaticGroupId{StaticGroupId: group}}, CumulativeBasisPoints: basis, MinimumCanaries: 1, MinimumObserved: 1, SoakSeconds: 86400, FailureBasisPoints: 500, UnknownBasisPoints: 1000, UnavailableBasisPoints: 1000, ManualPromotion: manual, HealthMaxAgeSeconds: 3600}
-	}
-	if _, err := s.owner.Admin.PutRollout(ctx, connect.NewRequest(&adminv1.PutRolloutRequest{RequestId: uuid.NewString(), Rollout: &policyv1.RolloutSpec{RolloutId: uuid.NewString(), Salt: salt, Rings: []*policyv1.RolloutRing{ring("pilot", 2500, false), ring("fleet", 10000, true)}}, Reason: "Stage workstation baseline changes"})); err != nil {
-		return fmt.Errorf("create demo rollout: %w", err)
-	}
 	material := make([]byte, 32)
 	if _, err := rand.Read(material); err != nil {
 		return err
@@ -872,17 +963,22 @@ func (s *demoSeed) catalog(ctx context.Context) error {
 	return nil
 }
 
+// demoEvaluationWait bounds each wait for the server's own advisory evaluation.
+// Real vendor exports hold millions of claims, and the route and scale devices
+// carry thousands of packages, so a loaded shared host can need minutes.
+const demoEvaluationWait = 8 * time.Minute
+
 // acceptFinding waits for the server's own evaluation of the route device
-// against the served vendor fixtures, then accepts one finding.
+// against the real vendor exports, then accepts one finding for review.
 func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, demoEvaluationWait)
 	defer cancel()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		findings, err := s.owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: d.id, PageSize: 50}))
-		if err == nil && len(findings.Msg.GetFindings()) > 0 {
-			request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: d.id, FindingId: findings.Msg.GetFindings()[0].GetId(), ExpiresAt: timestamppb.New(time.Now().Add(30 * 24 * time.Hour)), Reason: "SSH is firewalled to the VPN until the maintenance window"}
+		finding, freshness, err := s.affectedFinding(ctx, d)
+		if err == nil && finding != nil {
+			request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: d.id, FindingId: finding.GetId(), ExpiresAt: timestamppb.New(time.Now().Add(30 * 24 * time.Hour)), Reason: "Synthetic review exception; no production risk acceptance"}
 			approval, err := s.approver.Approve(ctx, s.owner, &adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}})
 			if err != nil {
 				return fmt.Errorf("independently approve demo advisory acceptance: %w", err)
@@ -900,7 +996,7 @@ func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error 
 		}
 		select {
 		case <-ctx.Done():
-			return errors.Join(fmt.Errorf("wait for demo advisory findings: %w", ctx.Err()), err)
+			return errors.Join(fmt.Errorf("wait for demo advisory findings on %s (last freshness %v %q): %w", d.demo.hostname, freshness.GetState(), freshness.GetReason(), ctx.Err()), err)
 		case <-ticker.C:
 		}
 	}

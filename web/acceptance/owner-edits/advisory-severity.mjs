@@ -1,13 +1,13 @@
-// Owner task: an advisory whose source publishes no severity (the seeded
-// Debian DSA-5724-1) reads as an honest neutral "Not rated by the source", not
-// as an error-looking "Not published" status. Read-only.
+// Owner task: an advisory whose source publishes no severity (real Ubuntu OSV
+// records in the seed's vendor feeds) reads as an honest neutral "Not rated by
+// the source", not as an error-looking "Not published" status. Read-only.
 export const task = {
   name: "Unrated advisory severity",
   screenId: "owner-pass2-advisory-severity",
   route: "/advisories",
   priority: "normal",
   acceptance:
-    "DSA-5724-1 (no vendor severity) shows 'Not rated by the source' in neutral text; no severity cell says 'Not published' or uses an attention/failure colour.",
+    "An advisory without a vendor severity shows 'Not rated by the source' in neutral text; no severity cell says 'Not published' or uses an attention/failure colour.",
 };
 
 const UNRATED = "Not rated by the source";
@@ -53,9 +53,8 @@ export async function check({ page, visit, require, capture, step }) {
       require(cell.neutral, `${cell.advisory} unrated severity is not neutral muted text`);
     }
   }
-  const dsa = cells.find((cell) => cell.advisory === "DSA-5724-1");
-  require(dsa, "seeded DSA-5724-1 is not listed on the first advisory page");
-  require(!dsa ||
-    dsa.kind === "unrated", `DSA-5724-1 severity is "${dsa?.text}", expected unrated`);
+  require(cells.some(
+    (cell) => cell.kind === "unrated",
+  ), "no advisory without a vendor severity is listed on the first advisory page");
   await capture("advisory-unrated-severity");
 }

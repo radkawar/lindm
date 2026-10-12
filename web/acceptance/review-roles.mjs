@@ -90,7 +90,8 @@ export async function reviewRoleWalkthroughs({
     {
       name: "scoped helpdesk",
       scoped: true,
-      account: { role: "helpdesk", scopes: [{ labels: ["engineering"] }] },
+      // lab/demo/org.json's Engineering provisioning token label.
+      account: { role: "helpdesk", scopes: [{ labels: ["department/engineering"] }] },
     },
   ];
   const results = [];
