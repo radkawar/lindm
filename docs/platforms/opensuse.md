@@ -103,11 +103,11 @@ for scripts); zypper then refreshes and installs from a `--reposd-dir` holding o
 `lindm.repo`, so DVD or mirror repositories in the target cannot fail the install.
 Chroot-script failures are not fatal to YaST; read
 `/var/adm/autoinstall/logs/lindm-enroll.sh.log` when a device does not appear, and
-delete the retained profile under `/var/adm/autoinstall/` after enrollment. The
-`provision-autoyast` lane on Tumbleweed aarch64 has proven installation and
-enrollment reservation; see the
-[installer provisioning evidence](../verification.md#installer-provisioning-from-the-console-2026-10-12)
-for its approval-to-Enrolled status.
+delete the retained profile under `/var/adm/autoinstall/` after enrollment.
+Tumbleweed 20261007 aarch64 passed `provision-autoyast` end to end, through
+independent approval to **Enrolled**
+([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
+x86_64 and SLES/SLED have no provisioning record.
 
 The maintained `enroll-from-console` lane serves the manifest's verified vendor
 closure for prerequisite packages and checks the native RPM database both before
