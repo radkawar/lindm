@@ -7467,6 +7467,20 @@
       "verified": true,
       "scope": "partial-feed matching",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818"
+    },
+    {
+      "platform": "fedora-43",
+      "cell": "self-update",
+      "architecture": "x86_64",
+      "manifest": "fedora-cloud-43-1.6-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/fedora-f43-x86su-20261012T072741Z/fedora-43/self-update-x86_64.json",
+      "sha256": "678473c1a3af805395fba6f07b8af3dbd3e188be107041b20a1afa5203a0aee7",
+      "recorded": "2026-10-12T09:24:09.657058746Z",
+      "revision": "614a05b7d6a7a055da927d21861bd9157c33b2d3-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "957515a9eeaf3bb94529f786bfb2bc0e09b3a1568ac4420bc0d7ed61dfd4ec39"
     }
   ]
 }
