@@ -530,9 +530,10 @@ completed in 435.92 seconds and populated the controller entry; this recovery is
 not a claim that the original controller command exited successfully.
 
 The implemented agent self-update helper installs only the admitted local package
-using zypper `--no-refresh --disable-repositories`, without recommendations or
-vendor changes. Interrupted same-version work can force reinstallation
-([`native_linux.go`](../../internal/agent/update/native_linux.go):457-465).
+using zypper `--no-refresh --reposd-dir <empty private directory>`, without
+recommendations or vendor changes (see the command-line repository note above).
+Interrupted same-version work can force reinstallation
+([`native_linux.go`](../../internal/agent/update/native_linux.go), `zypperUpdateArgs`).
 This is an agent-package path, not a Tumbleweed distribution upgrade or an atomic
 OS updater. Signed metadata, immutable staging, authorization and observed native
 recovery remain required (`docs/architecture.md:949-978`).
@@ -546,7 +547,8 @@ lindmd's own HTTPS `/repo/rpm` repository, requiring both signed `repomd.xml`
 and package signatures. Publication finishes before the server opens its immutable
 repository snapshot. The independent signed release catalog then delivers the
 agent update. A zypper process in the owned frozen update cgroup plus an independently
-observed partial RPM unpack file is required for its interruption witness.
+observed partial RPM unpack file is required for its interruption witness; libzypp
+names zypper's main thread `Zypp-main`, which is the frozen process's comm.
 No SELinux mode is inferred from RPM packaging. Enabling this maintained lane
 does not itself create a native pass in the verification ledger.
 
@@ -576,6 +578,26 @@ snapshot check is not an immutable archive. ARM qualification must retain the
 vendor-signed metadata and required RPM closure and serve that retained content
 under an authenticated HTTPS root. The lab's temporary HTTPS endpoint is runtime
 transport, not an immutable manifest identity.
+
+The os-update lane provisions prerequisites at the image's own closure, so a
+policy pinned to that same closure could not change a package. Its whole-system
+policy targets `Lab.OSUpdateTargets`, a later, separately captured closure served
+as a second lane origin: x86_64 targets the 2026-10-10 closure (manifest
+`1165cc188e357a44320f9dee48974af28f76f0c6dd454d22e6d875526ac6ad3a`, signed repomd
+`f48382bb7f18b6762f1fcf342954413c5ed88edd33a6c9215c4d80dc86e1f0d2`, 2,075 files,
+2,657,776,978 bytes; acquisition receipt
+`~/.cache/lindm-tw-qualify/capture-x86-20261010/capture.json`, SHA-256
+`33c2a2635b44007ad2ecc41067b75294efbe5828a9c2546c7c8fff041b216a64`). The aarch64
+ports repository has published nothing after the 2026-10-07 snapshot already
+pinned by the aarch64 goldens (its repomd is still `990c58b8…`, revision
+2026-10-08T02:08Z, observed 2026-10-12), so aarch64 has no later target and its
+os-update lane cannot yet change a package.
+
+Closure capture writes the installer's requested locale (`en_US`, the AutoYaST
+`<language>`) into each solver root. libzypp selects `-lang` packages that
+supplement requested locales; the 2026-10-07 aarch64 closure, solved without a
+locale, lacked `openconnect-lang`, which YaST then requested for the GNOME
+profile (recipe v10's desktop taboo excludes it for that snapshot).
 
 The existing signed-resource authorization, ownership journal, native helper,
 maintenance-window timer and authorized patch-now boundaries remain in force.

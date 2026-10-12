@@ -44,6 +44,8 @@ var RepositorySnapshotRecipes = map[string]RepositorySnapshotRecipe{
 		SnapshotPackages: map[string]map[string][]string{
 			"20261007": {"aarch64": {"kernel-default=7.2.9-1.1"}},
 			"20261009": {"x86_64": {"kernel-default=7.2.9-1.1"}},
+			// OS-update target: the later x86_64 closure a 20261009 golden upgrades to.
+			"20261010": {"x86_64": {"kernel-default=7.2.9-1.1"}},
 		},
 		// YaST's en_US locale selection recommends it with the GNOME pattern;
 		// the 20261007 aarch64 closure, solved without RequestedLocales, lacks it.
@@ -701,6 +703,11 @@ var registry = []*Release{
 			// deliberately disables recommends, so this is a required input.
 			InstallerPackages: []string{"rpm", "zypper", "iproute2"},
 			TPM:               LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "udev", "tpm2.0-tools", "libtss2-esys0"}},
+			// The 2026-10-10 x86_64 closure (captured 2026-10-12, 2,075 files)
+			// is later than the 20261009 goldens. The aarch64 ports repository
+			// has published nothing after its 2026-10-07 snapshot (repomd
+			// 990c58b8…, revision 2026-10-08T02:08Z), so aarch64 has no target.
+			OSUpdateTargets: map[string]RollingTarget{"x86_64": {Date: "2026-10-10", ClosureSHA256: "1165cc188e357a44320f9dee48974af28f76f0c6dd454d22e6d875526ac6ad3a", RepomdSHA256: "f48382bb7f18b6762f1fcf342954413c5ed88edd33a6c9215c4d80dc86e1f0d2"}},
 			Session: LabSession{
 				Desktops:  map[string][]string{"gnome": {"patterns-gnome-gnome", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good"}},
 				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},

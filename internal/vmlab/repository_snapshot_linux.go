@@ -22,6 +22,10 @@ import (
 	"lindm/internal/vmlab/reposnapshot"
 )
 
+// tumbleweedInstallerLocale is the Tumbleweed AutoYaST profile's <language>;
+// closure capture requests the same locale as the installer's solver.
+const tumbleweedInstallerLocale = "en_US"
+
 // RepositorySnapshotOptions runs inside the ordinary admitted disposable VM.
 type RepositorySnapshotOptions struct {
 	Capture                           reposnapshot.CaptureOptions
@@ -180,6 +184,10 @@ func CaptureRepositorySnapshot(ctx context.Context, image *labv1.ImageManifest, 
 				script += fmt.Sprintf("cp /var/tmp/lindm-repository-keys/key-%d \"$root/keys/key-%d\"\nrpm --root \"$root\" --import \"$root/keys/key-%d\"\n", i, i, i)
 			}
 			script += "printf '%s\\n' '[snapshot]' 'name=Authenticated bounded snapshot' 'enabled=1' 'autorefresh=0' 'gpgcheck=1' 'repo_gpgcheck=1' 'pkg_gpgcheck=1' " + nativeQuote("baseurl="+repository) + " > \"$root/etc/zypp/repos.d/snapshot.repo\"\n"
+			// Request the installer's locale: libzypp selects "-lang" packages
+			// supplementing requested locales, so a closure solved without one
+			// lacked RPMs YaST then fetched (openconnect-lang on aarch64 GNOME).
+			script += "mkdir -p \"$root/var/lib/zypp\"\nprintf '%s\\n' " + nativeQuote(tumbleweedInstallerLocale) + " > \"$root/var/lib/zypp/RequestedLocales\"\n"
 			// Auto-import is confined to this authenticated proxy: it can expose only
 			// the pinned key and keys delegated by the exact signed repomd, never a
 			// mutable origin or an unverified guest repository.

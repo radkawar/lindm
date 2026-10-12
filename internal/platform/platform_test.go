@@ -11,6 +11,7 @@ func TestSnapshotRecipeRequiresExactKernelAndSnapshot(t *testing.T) {
 	for _, target := range []struct{ version, architecture string }{
 		{"20261007", "aarch64"},
 		{"20261009", "x86_64"},
+		{"20261010", "x86_64"},
 	} {
 		inputs, err := RepositorySnapshotInputs("opensuse-tumbleweed", target.version, target.architecture)
 		if err != nil {
@@ -23,7 +24,8 @@ func TestSnapshotRecipeRequiresExactKernelAndSnapshot(t *testing.T) {
 	for _, target := range []struct{ version, architecture string }{
 		{"20261007", "x86_64"},
 		{"20261009", "aarch64"},
-		{"20261010", "x86_64"},
+		{"20261010", "aarch64"},
+		{"20261011", "x86_64"},
 		{"", "aarch64"},
 	} {
 		if _, err := RepositorySnapshotInputs("opensuse-tumbleweed", target.version, target.architecture); err == nil {
