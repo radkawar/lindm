@@ -8769,6 +8769,39 @@
       "source": "MATRIX_SOURCE_IMPORT",
       "verified": true,
       "mainlineRevision": "971717c3811801fcbeb74b446124ce9df18055c1"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-x86-20261012T131646Z/ubuntu-24.04/tpm-unattended-boots-x86_64.json",
+      "sha256": "589451a7397a3d755b0950cc37255302b3f057f544fe486549ec0e1c69148d5e",
+      "recorded": "2026-10-12T15:06:36.565811834Z",
+      "revision": "16546b682329bf8e420f8485f3dbaabc8c195837",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "matrix run at ae830412; ledger append refused by schema",
+      "reference": "#tpm2-unseal-race-and-unattended-boot-regression",
+      "mainlineRevision": "16546b682329bf8e420f8485f3dbaabc8c195837"
+    },
+    {
+      "platform": "debian-12",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "debian-12-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-deb12-20261012T160753Z/debian-12/tpm-unattended-boots-x86_64.json",
+      "sha256": "79c51de3bae52985ec8860b561b2f21a7c6e6a149bad65ad8adf44843717ba71",
+      "recorded": "2026-10-12T18:43:33.063593628Z",
+      "revision": "16546b682329bf8e420f8485f3dbaabc8c195837-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "09557b4fbd31d0f47b8226791f56e01583e7a99569b96d6d1aa0fcd7cbaff726",
+      "recoveryManifest": "debian-12-amd64",
+      "recoveryManifestSha256": "09557b4fbd31d0f47b8226791f56e01583e7a99569b96d6d1aa0fcd7cbaff726",
+      "mainlineRevision": "16546b682329bf8e420f8485f3dbaabc8c195837"
     }
   ]
 }
