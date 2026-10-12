@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -145,6 +146,57 @@ func captureProvisionSnippet(options VMProvisionOptions, format string, backend 
 // wait, uploads the read-only observer only then, obtains the independent
 // approval, and records the enrolled device and its package provenance.
 func awaitProvisionedEnrollment(ctx context.Context, vm *guestVM, release *platform.Release, options VMProvisionOptions, pins provisionPins, result *VMProvisionResult) error {
+	err := awaitProvisionedSteps(ctx, vm, release, options, pins, result)
+	if err != nil && options.DiagnosticsDir != "" {
+		err = errors.Join(err, recordProvisionDiagnostics(ctx, vm, options.DiagnosticsDir))
+	}
+	return err
+}
+
+// provisionGuestDiagnostics shows why the snippet did not enroll: its
+// units, journal and the vendor installer's own script logs. Token files are
+// never read; the output stays private.
+const provisionGuestDiagnostics = `exec 2>&1
+set +e
+systemctl --no-pager status lindm-provision.service lindm-executor.service lindm-agent.service
+journalctl --no-pager -b -n 300 -u lindm-provision.service -u lindm-executor.service -u lindm-agent.service
+ls -la /etc/lindm /etc/systemd/system/lindm-provision.service /usr/libexec/lindm
+rpm -q lindm-agent || dpkg-query -W lindm-agent
+cat /etc/hosts
+tail -n 200 /var/log/cloud-init-output.log
+for log in /var/adm/autoinstall/logs/* /var/log/anaconda/ks-script-*.log /var/log/installer/curtin-install.log; do test -f "$log" && { echo "== $log"; tail -n 200 "$log"; }; done
+`
+
+// recordProvisionDiagnostics writes the guest's provisioning diagnostics to a
+// new owner-only file in the caller's private diagnostics directory.
+func recordProvisionDiagnostics(ctx context.Context, vm *guestVM, dir string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
+	defer cancel()
+	command := "sudo -n sh -c " + nativeQuote(provisionGuestDiagnostics)
+	observed, err := vm.runResult(ctx, command, nil, 1<<20, time.Minute)
+	if err != nil {
+		// A timed-out wait closed the pinned transport; reconnect once.
+		if vm.client != nil {
+			_ = vm.client.Close()
+			vm.client = nil
+		}
+		if connectErr := vm.connect(ctx); connectErr != nil {
+			return fmt.Errorf("collect guest provisioning diagnostics: %w", errors.Join(err, connectErr))
+		}
+		if observed, err = vm.runResult(ctx, command, nil, 1<<20, time.Minute); err != nil {
+			return fmt.Errorf("collect guest provisioning diagnostics: %w", err)
+		}
+	}
+	defer clear(observed.Stdout)
+	file, err := os.OpenFile(filepath.Join(dir, "guest-provisioning.log"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(observed.Stdout)
+	return errors.Join(err, file.Close())
+}
+
+func awaitProvisionedSteps(ctx context.Context, vm *guestVM, release *platform.Release, options VMProvisionOptions, pins provisionPins, result *VMProvisionResult) error {
 	if err := waitProvisionUnit(ctx, vm, 25*time.Minute, func(active, outcome string) (bool, error) {
 		if active == "failed" {
 			return false, errors.New("provisioning unit failed before approval")
@@ -225,20 +277,36 @@ func awaitProvisionedEnrollment(ctx context.Context, vm *guestVM, release *platf
 }
 
 // waitProvisionUnit polls the snippet's unit state until done reports true.
+// The unit was installed before this wait (by cloud-init's write_files or
+// in the installed target), so an absent unit, one whose start condition
+// failed, or a failed executor it requires will never enroll and ends the
+// wait at once.
 func waitProvisionUnit(ctx context.Context, vm *guestVM, timeout time.Duration, done func(active, outcome string) (bool, error)) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
-		data, err := vm.run(ctx, "systemctl show --property=ActiveState --property=Result "+provisionUnit, nil, 4096, 30*time.Second)
+		data, err := vm.run(ctx, "systemctl show --property=Id --property=LoadState --property=ActiveState --property=Result --property=ConditionResult "+provisionUnit+" lindm-executor.service", nil, 8192, 30*time.Second)
 		if err == nil {
-			var active, outcome string
-			for line := range strings.SplitSeq(string(data), "\n") {
-				if value, ok := strings.CutPrefix(line, "ActiveState="); ok {
-					active = value
+			units := map[string]map[string]string{}
+			for block := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n\n") {
+				state := map[string]string{}
+				for line := range strings.SplitSeq(block, "\n") {
+					if key, value, ok := strings.Cut(line, "="); ok {
+						state[key] = value
+					}
 				}
-				if value, ok := strings.CutPrefix(line, "Result="); ok {
-					outcome = value
-				}
+				units[state["Id"]] = state
+			}
+			state, executor := units[provisionUnit], units["lindm-executor.service"]
+			active, outcome := state["ActiveState"], state["Result"]
+			if state["LoadState"] != "loaded" {
+				return fmt.Errorf("the snippet's %s is not installed (LoadState=%s)", provisionUnit, state["LoadState"])
+			}
+			if active == "inactive" && state["ConditionResult"] == "no" {
+				return fmt.Errorf("the snippet's %s skipped its start condition", provisionUnit)
+			}
+			if executor["ActiveState"] == "failed" {
+				return fmt.Errorf("lindm-executor.service, which %s requires, failed (%s)", provisionUnit, executor["Result"])
 			}
 			if active == "active" || active == "failed" || active == "activating" {
 				finished, err := done(active, outcome)
