@@ -14,15 +14,17 @@ import (
 	"golang.org/x/sys/unix"
 
 	"lindm/internal/agent/statefs"
+	"lindm/internal/platform"
 )
 
 // validateAccountRoot proves the helper-only account root exposes exactly the
 // host /etc bind and no home, mail or data tree; a chroot root additionally
 // holds only the host procfs, selinuxfs and read-only /usr binds (with EL's
 // /bin -> usr/bin link, so the tools' own login-shell check sees the host
-// shells). The launcher owns mount setup; this path is never taken from
+// shells), and a vendor-configuration prefix root only the read-only host
+// /usr/etc bind. The launcher owns mount setup; this path is never taken from
 // desired policy or a native argv field.
-func validateAccountRoot(root string, chroot bool) (err error) {
+func validateAccountRoot(root string, quirks platform.Quirks) (err error) {
 	if !filepath.IsAbs(root) || filepath.Clean(root) != root || filepath.Base(root) != "account-root" {
 		return ErrUnsafe
 	}
@@ -35,8 +37,11 @@ func validateAccountRoot(root string, chroot bool) (err error) {
 	// A distribution default that creates a mailbox writes it there, never on
 	// the host; it is discarded with the transaction directory.
 	want, links := []string{"etc", "var"}, map[string]string(nil)
-	if chroot {
+	switch {
+	case quirks.AccountChroot:
 		want, links = []string{"bin", "etc", "proc", "sys", "usr", "var"}, map[string]string{"bin": "usr/bin"}
+	case quirks.AccountVendorConfig:
+		want = []string{"etc", "usr", "var"}
 	}
 	if err = onlyEntries(root, want, links); err != nil {
 		return err
@@ -44,8 +49,14 @@ func validateAccountRoot(root string, chroot bool) (err error) {
 	if err = sameNode("/etc", filepath.Join(root, "etc"), true); err != nil {
 		return fmt.Errorf("%w: account-root requires the exact protected /etc bind", err)
 	}
-	if !chroot {
-		return nil
+	if !quirks.AccountChroot {
+		if !quirks.AccountVendorConfig {
+			return nil
+		}
+		if err = onlyEntries(filepath.Join(root, "usr"), []string{"etc"}, nil); err != nil {
+			return err
+		}
+		return readOnlyBind(VendorConfigDirectory, filepath.Join(root, "usr", "etc"))
 	}
 	if err = onlyEntries(filepath.Join(root, "sys"), []string{"fs"}, nil); err != nil {
 		return err
@@ -53,17 +64,11 @@ func validateAccountRoot(root string, chroot bool) (err error) {
 	if err = onlyEntries(filepath.Join(root, "sys", "fs"), []string{"selinux"}, nil); err != nil {
 		return err
 	}
-	for _, path := range []string{"/sys/fs/selinux", "/usr"} {
-		if err = sameNode(path, filepath.Join(root, path), false); err != nil {
-			return fmt.Errorf("%w: account-root requires the exact host %s bind", err, path)
-		}
+	if err = sameNode("/sys/fs/selinux", filepath.Join(root, "sys", "fs", "selinux"), false); err != nil {
+		return fmt.Errorf("%w: account-root requires the exact host /sys/fs/selinux bind", err)
 	}
-	var usr unix.Statfs_t
-	if err = unix.Statfs(filepath.Join(root, "usr"), &usr); err != nil {
+	if err = readOnlyBind("/usr", filepath.Join(root, "usr")); err != nil {
 		return err
-	}
-	if usr.Flags&unix.ST_RDONLY == 0 {
-		return fmt.Errorf("%w: account-root /usr bind is writable", ErrUnsafe)
 	}
 	// systemd mounts the unit's own /proc instance, so the bound procfs is
 	// identified as a procfs root showing this process in its pid namespace.
@@ -82,6 +87,21 @@ func validateAccountRoot(root string, chroot bool) (err error) {
 	}
 	if fs.Type != unix.PROC_SUPER_MAGIC || st.Ino != 1 || self != strconv.Itoa(os.Getpid()) {
 		return fmt.Errorf("%w: account-root requires this pid namespace's procfs", ErrUnsafe)
+	}
+	return nil
+}
+
+// readOnlyBind requires bound to be the host directory, mounted read-only.
+func readOnlyBind(host, bound string) error {
+	if err := sameNode(host, bound, false); err != nil {
+		return fmt.Errorf("%w: account-root requires the exact host %s bind", err, host)
+	}
+	var fs unix.Statfs_t
+	if err := unix.Statfs(bound, &fs); err != nil {
+		return err
+	}
+	if fs.Flags&unix.ST_RDONLY == 0 {
+		return fmt.Errorf("%w: account-root %s bind is writable", ErrUnsafe, host)
 	}
 	return nil
 }

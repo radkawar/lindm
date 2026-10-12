@@ -36,6 +36,11 @@ type command struct {
 // inside the action's scratch directory.
 const NativeRootDirectory = "account-root"
 
+// VendorConfigDirectory holds login.defs of a
+// vendor-directory shadow (platform Quirks.AccountVendorConfig); the account
+// root binds it read-only at usr/etc.
+const VendorConfigDirectory = "/usr/etc"
+
 type nativeConfig struct {
 	Native              *agentv1.NativeAccountProviderConfig
 	Platform            *resourcev1.PlatformProduct
@@ -61,7 +66,7 @@ func ApplyNative(ctx context.Context, env resourceprovider.NativeEnv, request *a
 	if err := checkNative(ctx, config); err != nil {
 		return nil, err
 	}
-	if err := validateAccountRoot(config.AccountRoot, platform.Of(config.Platform).Native().Quirks.AccountChroot); err != nil {
+	if err := validateAccountRoot(config.AccountRoot, platform.Of(config.Platform).Native().Quirks); err != nil {
 		return nil, err
 	}
 	if err := executeNative(ctx, config, request, beforeEffect, runNative, func() (*localDB, error) { return readDatabase(config.NativeDigest) }); err != nil {
@@ -90,7 +95,7 @@ func executeNative(ctx context.Context, config nativeConfig, r *agentv1.NativeRe
 		return ErrConflict
 	}
 	// Independent NSS checks include every member and referenced numeric identity.
-	p := &Provider{run: run, config: Config{Native: config.Native, NativeDigest: config.NativeDigest, Ownership: r.GetOwnership().GetOwner(), ActionID: r.GetActionId(), Secrets: helperPasswordHash(r)}}
+	p := &Provider{run: run, minimumAgeRemoved: platform.Of(config.Platform).Native().Quirks.NoPasswordMinAge, config: Config{Native: config.Native, NativeDigest: config.NativeDigest, Ownership: r.GetOwnership().GetOwner(), ActionID: r.GetActionId(), Secrets: helperPasswordHash(r)}}
 	if err := p.validateDesired(resource.PlanDesired(r.Plan)); err != nil {
 		return err
 	}
@@ -100,7 +105,7 @@ func executeNative(ctx context.Context, config nativeConfig, r *agentv1.NativeRe
 	if err := validateNativeTarget(ctx, p, r, db); err != nil {
 		return err
 	}
-	commands, err := nativeCommands(r, db)
+	commands, err := nativeCommands(r, db, !p.minimumAgeRemoved)
 	if err != nil {
 		return err
 	}
@@ -182,7 +187,7 @@ func executeNative(ctx context.Context, config nativeConfig, r *agentv1.NativeRe
 	if err = checkHooks(); err != nil {
 		return err
 	}
-	if err = runCommands(ctx, commands, db.revision, beforeEffect, run, readDB); err != nil {
+	if err = runCommands(ctx, commands, db.revision, beforeEffect, keepDatabaseLabels(run, filepath.Join(config.AccountRoot, "etc")), readDB); err != nil {
 		return err
 	}
 	if u := r.Plan.GetLocalUser(); u != nil && u.GetCreateHome() {
@@ -299,7 +304,10 @@ func loginDefsHook(data []byte) bool {
 	}
 	return false
 }
-func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([]command, error) {
+
+// nativeCommands derives the shadow-tool commands for before→target;
+// minimumAge is false when the native chage has no --mindays.
+func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB, minimumAge bool) ([]command, error) {
 	before, target := r.Before.GetObservation(), r.Target.GetObservation()
 	name := r.Plan.GetRef().GetCanonicalKey()
 	var out []command
@@ -390,7 +398,7 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 			}
 		}
 		if u.GetExists() {
-			args := agingArgs(old.GetAging(), u.GetAging())
+			args := agingArgs(old.GetAging(), u.GetAging(), minimumAge)
 			if len(args) > 0 {
 				args = append(args, "--", name)
 				appendCommand("chage", args...)
@@ -472,7 +480,11 @@ func helperPasswordHash(r *agentv1.NativeResourceTransactionRequest) func(contex
 	}
 }
 func decimal(v uint32) string { return strconv.FormatUint(uint64(v), 10) }
-func agingArgs(old, next *resourcev1.PasswordAging) []string {
+
+// agingArgs are the chage options for old→next. Without minimumAge the native
+// chage has no --mindays; the target then keeps the observed minimum unless
+// the entry is rewritten, which clears it natively (Provider.target).
+func agingArgs(old, next *resourcev1.PasswordAging, minimumAge bool) []string {
 	var out []string
 	if old == nil {
 		old = &resourcev1.PasswordAging{}
@@ -484,6 +496,9 @@ func agingArgs(old, next *resourcev1.PasswordAging) []string {
 		flag string
 		a, b *uint32
 	}{{"--mindays", old.MinDays, next.MinDays}, {"--maxdays", old.MaxDays, next.MaxDays}, {"--warndays", old.WarnDays, next.WarnDays}, {"--inactive", old.InactiveDays, next.InactiveDays}} {
+		if field.flag == "--mindays" && !minimumAge {
+			continue
+		}
 		if field.a == nil && field.b == nil || field.a != nil && field.b != nil && *field.a == *field.b {
 			continue
 		}

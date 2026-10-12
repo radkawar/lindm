@@ -91,7 +91,7 @@ func TestUserRemovalAndHomeChangeNeverRequestDataDeletionOrMove(t *testing.T) {
 	target.Observation.GetLocalUser().Exists = false
 	target.Observation.GetLocalUser().Groups = nil
 	r := &agentv1.NativeResourceTransactionRequest{Before: before, Target: target, Plan: &resourcev1.ResourcePlan{Ref: before.Observation.Ref}}
-	commands, err := nativeCommands(r, fixtureDB())
+	commands, err := nativeCommands(r, fixtureDB(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestUserRemovalAndHomeChangeNeverRequestDataDeletionOrMove(t *testing.T) {
 	target = proto.CloneOf(before)
 	target.Observation.GetLocalUser().Home.Path = "/home/renamed"
 	r.Target = target
-	commands, err = nativeCommands(r, fixtureDB())
+	commands, err = nativeCommands(r, fixtureDB(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestMemberCommandPreservesUnownedLocalEdges(t *testing.T) {
 	target := proto.CloneOf(before)
 	target.Observation.GetLocalGroup().Members = []string{"alice", "external"}
 	r := &agentv1.NativeResourceTransactionRequest{Before: before, Target: target, Plan: &resourcev1.ResourcePlan{Ref: before.Observation.Ref}}
-	commands, err := nativeCommands(r, fixtureDB())
+	commands, err := nativeCommands(r, fixtureDB(), true)
 	if err != nil {
 		t.Fatal(err)
 	}

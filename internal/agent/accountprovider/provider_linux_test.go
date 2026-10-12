@@ -211,7 +211,7 @@ func TestNewUsersLockedWithoutHomeCopy(t *testing.T) {
 		t.Fatal("creation did not preserve data and default locked")
 	}
 	request := &agentv1.NativeResourceTransactionRequest{Before: before, Target: target, Plan: &resourcev1.ResourcePlan{Ref: d.Ref, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: user}}}}
-	commands, err := nativeCommands(request, db)
+	commands, err := nativeCommands(request, db, true)
 	if err != nil {
 		t.Fatal(err)
 	}

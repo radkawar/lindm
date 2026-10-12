@@ -21,7 +21,42 @@ import (
 	"lindm/internal/secretseal"
 )
 
+// target is the expected native poststate. A shadow without a minimum
+// password age (platform Quirks.NoPasswordMinAge: 4.20 removed chage
+// --mindays) can never set sp_min and clears it
+// whenever it rewrites the entry: useradd leaves it empty, and chage, chpasswd
+// and usermod --lock/--unlock/--password drop it. There the expected minimum
+// is the observed one, or absent once the entry is rewritten, and a desired
+// minimum is unsupported.
 func (p *Provider) target(ctx context.Context, d *resourcev1.ResourceDesiredState, op resourcev1.ResourceOperation, before *agentv1.ResourceOwnershipSnapshot, db *localDB, l *agentv1.ResourceOwnershipLedger) (*agentv1.ResourceOwnershipSnapshot, []*resourcev1.MemberEdgeChange, error) {
+	target, edges, err := p.plannedTarget(ctx, d, op, before, db, l)
+	if err != nil || !p.minimumAgeRemoved {
+		return target, edges, err
+	}
+	u := target.GetObservation().GetLocalUser()
+	if !u.GetExists() || u.GetAging() == nil {
+		return target, edges, nil
+	}
+	if desired := d.GetLocalUser().GetAging(); op == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE && desired != nil && desired.MinDays != nil {
+		return nil, nil, fmt.Errorf("%w: the native shadow has no minimum password age", ErrUnsupported)
+	}
+	observed := before.GetObservation().GetLocalUser()
+	u.Aging.MinDays = nil
+	if observed.GetExists() && observed.GetAging() != nil && observed.GetAging().MinDays != nil && !rewritesShadow(before, target) {
+		u.Aging.MinDays = proto.Uint32(observed.GetAging().GetMinDays())
+	}
+	return target, edges, nil
+}
+
+// rewritesShadow reports whether the commands for an existing user rewrite
+// its shadow entry: a new password field (usermod or chpasswd) or a chage of
+// any field other than the minimum age.
+func rewritesShadow(before, target *agentv1.ResourceOwnershipSnapshot) bool {
+	return !sameToken(before.GetAccountPrivate().GetPasswordToken(), target.GetAccountPrivate().GetPasswordToken()) ||
+		len(agingArgs(before.GetObservation().GetLocalUser().GetAging(), target.GetObservation().GetLocalUser().GetAging(), false)) != 0
+}
+
+func (p *Provider) plannedTarget(ctx context.Context, d *resourcev1.ResourceDesiredState, op resourcev1.ResourceOperation, before *agentv1.ResourceOwnershipSnapshot, db *localDB, l *agentv1.ResourceOwnershipLedger) (*agentv1.ResourceOwnershipSnapshot, []*resourcev1.MemberEdgeChange, error) {
 	target := proto.CloneOf(before)
 	if op == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		return releaseTarget(before, l)

@@ -290,6 +290,34 @@ aging fields there remain unqualified (the password lane sets only pwquality).
 A minimum password age is refused outright: shadow 4.20 removed `PASS_MIN_DAYS`
 and its tools fail while it is set (registry `Quirks.NoPasswordMinAge`).
 
+The shadow tools run with `--prefix` on the helper's private account root, and
+`--prefix` reads `login.defs` only below that prefix (`/etc` and `/usr/etc` there).
+With only the `/etc` bind, Tumbleweed's `useradd` fell back to its built-in
+defaults and warned that the lab's UID 24002 was outside "UID_MAX 6000"; the
+provider treats native stderr as an unknown outcome. Tumbleweed therefore sets
+`Quirks.AccountVendorConfig`: the account root also binds the host `/usr/etc`
+read-only at `usr/etc`, and the helper verifies that bind before any effect.
+
+shadow 4.20 also leaves `sp_min` empty in every entry `useradd`, `chage`,
+`chpasswd` and `usermod --lock/--unlock/--password` write (`usermod --shell`
+and `--groups` do not touch the entry), and its `chage` has no `--mindays`.
+Creating a user still ran `chage --mindays 0`, which failed. With
+`Quirks.NoPasswordMinAge` the accounts provider never passes `--mindays`,
+expects the observed minimum to survive only while the entry is not rewritten,
+and refuses a desired minimum age as unsupported.
+
+shadow 4.20 also sets no SELinux file context for a database it rewrites under
+`--prefix` or `--root` (`commonio_close` labels only when neither is given), so
+a rewritten `/etc/passwd` takes the directory default `etc_t` instead of
+`passwd_file_t`. `chage` and `chpasswd` run confined as `passwd_t` (Tumbleweed's
+policy transitions `unconfined_service_t` there), which may not write `etc_t`
+files: the aarch64 resources lane's first `chage` after `useradd` failed with
+"cannot open …/account-root//etc/passwd". On an SELinux host the helper now records the
+labels of `passwd`, `shadow`, `group` and `gshadow` before each native command
+and restores them afterwards on the rewritten files and their `-` backups
+(`keepDatabaseLabels`). Databases mislabeled by an earlier agent keep their
+label; `restorecon /etc/passwd /etc/shadow /etc/group` repairs them.
+
 Tumbleweed also keeps no `/etc/gshadow`; shadow's tools maintain it only when it
 exists, and `groupadd` never creates it. The accounts provider admits an absent
 group shadow (bound into the local database revision, so creating it later
@@ -1223,28 +1251,41 @@ on the DGX Spark hosts, x86_64 on local KVM, each record in the
 [ledger](../verification.md#1-launch-platform-qualification) under
 `~/.cache/lindm-tier2-matrix/`:
 
-| Cell                | aarch64 record / SHA-256                                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Inventory           | `tw2-arm-r3-939f2fe8/…/inventory-aarch64.json` / `53abab0a32e563a3dbb0e41ad52fed8028a43ef106d51cadd1956e3d2b64964c`           |
-| Lifecycle           | `tw2-arm-r3-939f2fe8/…/lifecycle-aarch64.json` / `f7fa56dfd6911c9b884cef6b5f34df9d83a66a17ec85d2d66bca000ff8384b05`           |
-| Dispatch            | `tw2-arm-r3-939f2fe8/…/dispatch-aarch64.json` / `60a29b4ea2e5f9bee1c4fa4489c9070b710e0b591383cc94eca20e06f988ff5d`            |
-| Services            | `tw2-arm-r3-939f2fe8/…/services-aarch64.json` / `720005992062be156d7e23d7856a2eec194e684f091fa845f17889f5c9251435`            |
-| Advisories          | `tw2-arm-r3-939f2fe8/…/advisories-aarch64.json` / `617a0a34dd91e174d6e0892d982a503517fb15ff222e6f04ab7f0541e6d0d067`          |
-| Air gap             | `tw2-arm-r3-939f2fe8/…/airgap-aarch64.json` / `0ef2900ba8965d70512925420db4fe26ea0052932284c1d26a1261965f77984b`              |
-| Enroll from console | `tw2-arm-r4-a0ec26df/…/enroll-from-console-aarch64.json` / `80b7b52e98acfa8c381391b57acec2e5ac239f4d73f7bf714a832dc070250ae0` |
-| Self-update         | `tw2-arm-r6-8823efd3/…/self-update-aarch64.json` / `032745dad5c723b6004a9b421a7960d0a5fe71fc564ec30acfbf45675fa0c46e`         |
+| Cell                 | aarch64 record / SHA-256                                                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory            | `tw2-arm-r3-939f2fe8/…/inventory-aarch64.json` / `53abab0a32e563a3dbb0e41ad52fed8028a43ef106d51cadd1956e3d2b64964c`                |
+| Lifecycle            | `tw2-arm-r3-939f2fe8/…/lifecycle-aarch64.json` / `f7fa56dfd6911c9b884cef6b5f34df9d83a66a17ec85d2d66bca000ff8384b05`                |
+| Dispatch             | `tw2-arm-r3-939f2fe8/…/dispatch-aarch64.json` / `60a29b4ea2e5f9bee1c4fa4489c9070b710e0b591383cc94eca20e06f988ff5d`                 |
+| Services             | `tw2-arm-r3-939f2fe8/…/services-aarch64.json` / `720005992062be156d7e23d7856a2eec194e684f091fa845f17889f5c9251435`                 |
+| Advisories           | `tw2-arm-r3-939f2fe8/…/advisories-aarch64.json` / `617a0a34dd91e174d6e0892d982a503517fb15ff222e6f04ab7f0541e6d0d067`               |
+| Air gap              | `tw2-arm-r3-939f2fe8/…/airgap-aarch64.json` / `0ef2900ba8965d70512925420db4fe26ea0052932284c1d26a1261965f77984b`                   |
+| Enroll from console  | `tw2-arm-r4-a0ec26df/…/enroll-from-console-aarch64.json` / `80b7b52e98acfa8c381391b57acec2e5ac239f4d73f7bf714a832dc070250ae0`      |
+| Self-update          | `tw2-arm-r6-8823efd3/…/self-update-aarch64.json` / `032745dad5c723b6004a9b421a7960d0a5fe71fc564ec30acfbf45675fa0c46e`              |
+| Encrypted            | `tw2-arm-r8-531543ca/…/encrypted-aarch64.json` / `8cdbdab75fb718162baca673432df30b6b44bd2f26965deba5de6bd803f4b7c5`                |
+| Assistance           | `tw2-arm-r8-531543ca/…/assistance-aarch64/assistance.json` / `007f67627b471dffab7d01067f8d9d7333ed0819b83382a6493643350aeb777d`    |
+| Device actions       | `tw2-arm-da-r2-724cf2ed/…/device-actions-aarch64.json` / `4b30b9f39632082cd3b286b89f3f022330f4c40e78ffaf15b85a3e687344c1c6`        |
+| TPM unattended boots | `tw2-arm-tpm-r2-c43c16df/…/tpm-unattended-boots-aarch64.json` / `4174e9b0fa3f1d15710d82224571f823d6b057448d4626695b26396482bb9075` |
+
+| Cell                | x86_64 record / SHA-256                                                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory           | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`                                                                  |
+| Dispatch            | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported: the lane finished after its matrix parent was stopped) |
+| Enroll from console | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`                                                        |
 
 (`…` is `opensuse-tumbleweed`.) Recovery sanitize is recorded in the
 [Tier 2 recovery section](../verification.md#tier-2-recovery-sanitize-records-2026-10-12).
-The remaining cells failed for Tumbleweed-specific reasons fixed in this landing,
-and are being rerun: package commits (zypper exit 5, `ProtectSystem`), agent
-self-update recovery (zypper's hard links), local accounts (`/usr/etc/login.defs`,
-no `/etc/gshadow`), GNOME autologin (GDM sysconfig), live-root erase (btrfs root
-mapping, udev cascade), TPM policy binding (automatic pcrlock) and the assistance
-readiness gate. aarch64 `os-update` has no later target: the ports repository has
-published nothing after its 2026-10-07 snapshot (repomd revision
-2026-10-08T02:08Z, unchanged on 2026-10-12), so no `Lab.OSUpdateTargets` entry
-exists for aarch64. x86_64 cells are queued behind the shared local KVM slots.
+Earlier failed records in the ledger have Tumbleweed-specific causes fixed since:
+package commits (zypper exit 5, `ProtectSystem`), agent self-update recovery
+(zypper's hard links), GNOME autologin (GDM sysconfig), live-root erase (btrfs
+root mapping, udev cascade), TPM policy binding (automatic pcrlock) and the
+assistance readiness gate. aarch64 resources still failed at local-user creation
+(records `tw2-arm-r8`, `tw2-arm-res-r9`, `tw2-arm-res-r10`): `/usr/etc/login.defs`
+outside the prefix, shadow 4.20's removed `--mindays`, then the `etc_t` label on
+`/etc/passwd`; each is fixed above and the cell is not yet rerun. aarch64
+`os-update` has no later target: the ports repository has published nothing
+after its 2026-10-07 snapshot (repomd revision 2026-10-08T02:08Z, unchanged on
+2026-10-12), so no `Lab.OSUpdateTargets` entry exists for aarch64. The other
+x86_64 cells are queued behind the shared local KVM slots.
 
 ## Known gaps
 

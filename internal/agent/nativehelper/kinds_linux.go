@@ -79,7 +79,7 @@ func applyOnly(apply resourceprovider.NativeApply) func(context.Context, *config
 
 var account = nativeKind{
 	prepare: func(directory string, request *agentv1.NativeResourceTransactionRequest) error {
-		return prepareAccountRoot(directory, platform.Of(request.GetPlan().GetBackend().GetProduct()).Native().Quirks.AccountChroot)
+		return prepareAccountRoot(directory, platform.Of(request.GetPlan().GetBackend().GetProduct()).Native().Quirks)
 	},
 	effect: func(s *effectSandbox, directory string, _ *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ResourceDesiredState) error {
 		s.accountRoot = filepath.Join(directory, accountprovider.NativeRootDirectory)

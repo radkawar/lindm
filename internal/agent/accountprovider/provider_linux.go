@@ -62,9 +62,12 @@ type Provider struct {
 	boot    string
 	backend *resourcev1.BackendSelection
 	run     nativeRun
-	readDB  func() (*localDB, error)
-	mu      sync.Mutex
-	closed  bool
+	// minimumAgeRemoved: the release's shadow (4.20 or later) has no minimum
+	// password age (platform Quirks.NoPasswordMinAge; see target).
+	minimumAgeRemoved bool
+	readDB            func() (*localDB, error)
+	mu                sync.Mutex
+	closed            bool
 }
 
 var _ resourceprovider.Provider = (*Provider)(nil)
@@ -297,7 +300,7 @@ func (p *Provider) plan(ctx context.Context, d *resourcev1.ResourceDesiredState,
 	if err := resource.ValidatePlan(plan); err != nil {
 		return nil, err
 	}
-	commands, err := nativeCommands(&agentv1.NativeResourceTransactionRequest{Plan: plan, Before: before, Target: target}, db)
+	commands, err := nativeCommands(&agentv1.NativeResourceTransactionRequest{Plan: plan, Before: before, Target: target}, db, !p.minimumAgeRemoved)
 	if err != nil {
 		return nil, err
 	}

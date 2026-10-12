@@ -80,7 +80,7 @@ linters:
         text: "Function 'observeLocal' is too long"
         linters: [funlen]
       - path: '(^|/)internal/agent/accountprovider/target_linux\.go$'
-        text: "Function 'target' is too long"
+        text: "Function 'plannedTarget' is too long"
         linters: [funlen]
       - path: '(^|/)internal/agent/actionprovider/compliance_linux\.go$'
         text: "Function 'observeRootEncryption' is too long"

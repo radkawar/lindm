@@ -188,9 +188,10 @@ func resourceProperties(kind nativeKind, directory string, request *agentv1.Nati
 	properties = setProperty(properties, "RestrictSUIDSGID", true)
 	properties = setProperty(properties, "NoNewPrivileges", true)
 	if sandbox.accountRoot != "" {
-		chroot := platform.Of(request.GetPlan().GetBackend().GetProduct()).Native().Quirks.AccountChroot
-		properties = setProperty(properties, "BindPaths", accountRootBinds(sandbox.accountRoot, chroot))
-		if chroot {
+		quirks := platform.Of(request.GetPlan().GetBackend().GetProduct()).Native().Quirks
+		properties = setProperty(properties, "BindPaths", accountRootBinds(sandbox.accountRoot, quirks.AccountChroot))
+		switch {
+		case quirks.AccountChroot:
 			// The bound procfs lacks the unit's own ProtectKernelTunables and
 			// ProtectKernelLogs overmounts; repeat them inside the account root.
 			readOnly := make([]string, 0, len(protectedProcEntries))
@@ -201,6 +202,10 @@ func resourceProperties(kind nativeKind, directory string, request *agentv1.Nati
 			properties = setProperty(properties, "InaccessiblePaths", []string{"-" + filepath.Join(sandbox.accountRoot, "proc", "kmsg")})
 			// The tools' own login-shell check resolves the host shells there.
 			properties = setProperty(properties, "BindReadOnlyPaths", []bindPath{{"/usr", filepath.Join(sandbox.accountRoot, "usr"), false, 0}})
+		case quirks.AccountVendorConfig:
+			// --prefix reads login.defs only below the prefix; this shadow
+			// ships it in the vendor /usr/etc.
+			properties = setProperty(properties, "BindReadOnlyPaths", []bindPath{{accountprovider.VendorConfigDirectory, filepath.Join(sandbox.accountRoot, "usr", "etc"), false, 0}})
 		}
 	}
 	properties = setProperty(properties, "MemoryMax", sandbox.memoryMax)
@@ -245,7 +250,7 @@ func accountRootBinds(accountRoot string, chroot bool) []bindPath {
 	return binds
 }
 
-func prepareAccountRoot(directory string, chroot bool) error {
+func prepareAccountRoot(directory string, quirks platform.Quirks) error {
 	parent, err := statefs.OpenDirectory(directory)
 	if err != nil {
 		return err
@@ -269,7 +274,8 @@ func prepareAccountRoot(directory string, chroot bool) error {
 			return err
 		}
 	}
-	if chroot {
+	switch {
+	case quirks.AccountChroot:
 		// Mount points for the host procfs, selinuxfs and /usr binds, and EL's
 		// merged /bin link.
 		for _, path := range []string{"proc", "sys", "sys/fs", "sys/fs/selinux", "usr"} {
@@ -279,6 +285,13 @@ func prepareAccountRoot(directory string, chroot bool) error {
 		}
 		if err := unix.Symlinkat("usr/bin", root, "bin"); err != nil && !errors.Is(err, unix.EEXIST) {
 			return err
+		}
+	case quirks.AccountVendorConfig:
+		// Mount point for the read-only vendor /usr/etc bind.
+		for _, path := range []string{"usr", "usr/etc"} {
+			if err := unix.Mkdirat(root, path, 0755); err != nil && !errors.Is(err, unix.EEXIST) {
+				return err
+			}
 		}
 	}
 	target, err := statefs.OpenDirectory(filepath.Join(directory, accountprovider.NativeRootDirectory, "etc"))

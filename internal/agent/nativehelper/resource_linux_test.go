@@ -210,12 +210,14 @@ func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 	for _, tc := range []struct {
 		product *resourcev1.PlatformProduct
 		chroot  bool
+		vendor  bool
 	}{
-		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false},
-		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
-		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
-		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
-		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "10.2"}, true},
+		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false, false},
+		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false, false},
+		{&resourcev1.PlatformProduct{OsId: "opensuse-tumbleweed", Version: "20261009"}, false, true},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true, false},
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true, false},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "10.2"}, true, false},
 	} {
 		plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: "lindm-native-test"}, Backend: &resourcev1.BackendSelection{Product: tc.product}, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: &resourcev1.LocalUserDesired{Name: "lindm-native-test"}}}}
 		values := unitValues(t, directory, plan, nil, nil)
@@ -236,6 +238,12 @@ func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 			}
 		} else if _, ok := values["ReadOnlyPaths"]; ok {
 			t.Fatalf("%s: prefix product received chroot-only mounts", tc.product.GetOsId())
+		} else if tc.vendor {
+			// --prefix reads login.defs only below the prefix: the vendor
+			// /usr/etc is bound read-only at its usr/etc mount point.
+			if !slices.Equal(unitValue[[]bindPath](t, values, "BindReadOnlyPaths"), []bindPath{{"/usr/etc", filepath.Join(root, "usr/etc"), false, 0}}) {
+				t.Fatalf("%s: vendor login.defs was not bound read-only into the prefix", tc.product.GetOsId())
+			}
 		} else if _, ok := values["BindReadOnlyPaths"]; ok {
 			t.Fatalf("%s: prefix product received chroot-only mounts", tc.product.GetOsId())
 		}

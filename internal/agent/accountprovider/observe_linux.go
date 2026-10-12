@@ -58,6 +58,7 @@ func nativeProvider(ctx context.Context, c nativeConfig) (*Provider, error) {
 		return nil, ErrUnsupported
 	}
 	p.backend = &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SHADOW, NativeVersion: string(version), ProviderVersion: "1", Product: proto.CloneOf(c.Platform)}
+	p.minimumAgeRemoved = release.Native().Quirks.NoPasswordMinAge
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
 	if err != nil {
 		return nil, err

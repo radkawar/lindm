@@ -178,6 +178,12 @@ type Quirks struct {
 	// because --prefix takes the SELinux label of the prefixed path (EL 9
 	// shadow-utils 4.9, EL 10 4.15) and EL 9's chage has no --prefix.
 	AccountChroot bool
+	// AccountVendorConfig: shadow reads login.defs from the vendor /usr/etc
+	// (libeconf builds) and --prefix reads it only
+	// below the prefix, so a prefix account root also binds the host /usr/etc
+	// read-only. Without it Tumbleweed's useradd used its built-in defaults
+	// (UID_MAX 6000) instead of the host policy.
+	AccountVendorConfig bool
 	// SystemdFloor is the oldest systemd whose unit-file/timer D-Bus interface
 	// and systemd-analyze verify options the definition provider uses.
 	SystemdFloor int

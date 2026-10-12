@@ -828,7 +828,8 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: []Feed{FeedSUSEOVAL, FeedSUSECSAF}, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse", OVALPlatform: "openSUSE Tumbleweed", OVALReleasePackage: "openSUSE-release", Partial: "vendor package assessments do not cover all rolling or third-party packages", Exports: map[Feed]AdvisoryExport{
 			FeedSUSEOVAL: {URL: "https://ftp.suse.com/pub/projects/security/oval/opensuse.tumbleweed.xml.gz", Format: "suse-oval", MaxAgeSeconds: 604800, MaxArchiveBytes: 67108864},
 		}},
-		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig, NoPasswordMinAge: true,
+		// shadow 4.20 ships only /usr/etc/login.defs (no /etc/login.defs).
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig, NoPasswordMinAge: true, AccountVendorConfig: true,
 			RecoveryGRUB: GRUBChain{Entries: GRUBBLSLoaderEntryOneShot, ConfigDirectory: "EFI/opensuse", BootDirectory: "/boot/efi"},
 			Password: []PasswordPins{
 				{Version: "20261007", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},

@@ -95,7 +95,7 @@ func TestHashedPasswordDriftConvergeAndRelease(t *testing.T) {
 	if err != nil || bytes.Contains(public, []byte(sha512Hash)) {
 		t.Fatal("public plan carries the password hash")
 	}
-	commands, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, baseline, target), fixtureDB())
+	commands, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, baseline, target), fixtureDB(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestHashedPasswordDriftConvergeAndRelease(t *testing.T) {
 	if restored.GetAccountPrivate().GetPasswordToken() != "!"+baselineHash {
 		t.Fatal("release did not restore the exact baseline shadow field")
 	}
-	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, restored), fixtureDB())
+	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, restored), fixtureDB(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,12 +127,12 @@ func TestHashedPasswordDriftConvergeAndRelease(t *testing.T) {
 	// through usermod; an empty (passwordless) field is never written.
 	marker := proto.CloneOf(restored)
 	marker.AccountPrivate.PasswordToken = proto.String("!!")
-	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, marker), fixtureDB())
+	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, marker), fixtureDB(), true)
 	if err != nil || len(commands) != 1 || !slices.Equal(commands[0].args, []string{"--password", "!!", "--", "alice"}) {
 		t.Fatalf("lock marker restore = %v %v", commands, err)
 	}
 	marker.AccountPrivate.PasswordToken = proto.String("")
-	if _, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, marker), fixtureDB()); !errors.Is(err, ErrUnsafe) {
+	if _, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, target, marker), fixtureDB(), true); !errors.Is(err, ErrUnsafe) {
 		t.Fatal("passwordless shadow field accepted")
 	}
 }
@@ -250,7 +250,7 @@ func TestNativeHashedPasswordLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, absent, created), db)
+	commands, err := nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, absent, created), db, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestNativeHashedPasswordLifecycle(t *testing.T) {
 	// Drift: the observed field differs; remediation rewrites exactly it.
 	drifted := proto.CloneOf(created)
 	drifted.AccountPrivate.PasswordToken = proto.String(driftHash)
-	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, created, drifted), db)
+	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, created, drifted), db, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestNativeHashedPasswordLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, drifted, remediated), db)
+	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, drifted, remediated), db, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestNativeHashedPasswordLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, remediated, restored), db)
+	commands, err = nativeCommands(passwordRequest(d, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE, remediated, restored), db, true)
 	if err != nil {
 		t.Fatal(err)
 	}
