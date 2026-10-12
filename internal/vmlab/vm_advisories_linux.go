@@ -19,6 +19,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
@@ -54,6 +55,35 @@ func vmAdvisorySource(release *platform.Release, imageVersion, architecture stri
 	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
 		return nil, errors.New("advisories: no maintained vendor source")
 	}
+	return vmAdvisoryFeedSource(release, imageVersion, architecture, release.Advisory.Feeds[0], "matrix-"+release.Key)
+}
+
+// AirgapAdvisories derives the connected station's bundle feeds from every
+// registry feed with a maintained export, with the same partial-coverage
+// policy as the advisories lane. Feeds the registry lists without an export
+// (for example Tumbleweed's CSAF) cannot be acquired and are not invented.
+func AirgapAdvisories(release *platform.Release, imageVersion, architecture string) (*configv1.AdvisoryConfig, error) {
+	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
+		return nil, errors.New("advisories: no maintained vendor source")
+	}
+	cfg := new(configv1.AdvisoryConfig)
+	for _, feed := range release.Advisory.Feeds {
+		if _, exported := release.Advisory.Exports[feed]; !exported {
+			continue
+		}
+		source, err := vmAdvisoryFeedSource(release, imageVersion, architecture, feed, "airgap-"+release.Key+"-"+string(feed))
+		if err != nil {
+			return nil, err
+		}
+		cfg.Feeds = append(cfg.Feeds, source)
+	}
+	if len(cfg.Feeds) == 0 {
+		return nil, fmt.Errorf("advisories: no maintained export for %s", release.Key)
+	}
+	return cfg, nil
+}
+
+func vmAdvisoryFeedSource(release *platform.Release, imageVersion, architecture string, feed platform.Feed, prefix string) (*advisoryv1.FeedSource, error) {
 	versionID := release.Version.Value
 	if release.Version.Rule == platform.VersionSnapshot {
 		versionID = imageVersion
@@ -67,15 +97,14 @@ func vmAdvisorySource(release *platform.Release, imageVersion, architecture stri
 	if !slices.Contains(release.Architectures, architecture) {
 		return nil, fmt.Errorf("advisories: unsupported architecture %q", architecture)
 	}
-	primary := release.Advisory.Feeds[0]
-	export, ok := release.Advisory.Exports[primary]
+	export, ok := release.Advisory.Exports[feed]
 	url := export.URL
 	if len(export.ArchitectureURLs) != 0 {
 		url = export.ArchitectureURLs[architecture]
 	}
 	format, supported := advisoryv1.FeedFormat_value["FEED_FORMAT_"+strings.ToUpper(strings.ReplaceAll(export.Format, "-", "_"))]
 	if !ok || url == "" || export.MaxAgeSeconds == 0 || !supported || format == 0 {
-		return nil, fmt.Errorf("advisories: no maintained primary export for %s/%s", release.Key, architecture)
+		return nil, fmt.Errorf("advisories: no maintained %s export for %s/%s", feed, release.Key, architecture)
 	}
 	if release.Native().Packages.Backend == platform.BackendAPT {
 		switch architecture {
@@ -86,7 +115,7 @@ func vmAdvisorySource(release *platform.Release, imageVersion, architecture stri
 		}
 	}
 	source := &advisoryv1.FeedSource{
-		Id:     "matrix-" + release.Key + "-" + architecture,
+		Id:     prefix + "-" + architecture,
 		Distro: release.ID, Release: release.FeedRelease(versionID), Architecture: architecture,
 		Url: url, Format: advisoryv1.FeedFormat(format), MaxAgeSeconds: export.MaxAgeSeconds,
 		PlatformStream: export.PlatformStream,

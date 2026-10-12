@@ -285,8 +285,8 @@ func (x *BundleRelease) GetArtifactCount() int32 {
 	return 0
 }
 
-// A signed native repository below repositories/<architecture>/apt or
-// repositories/<architecture>/rpm, built from the release export's packages.
+// A signed native repository below repositories/<architecture>/apt, .../rpm or
+// .../arch (pacman, amd64 only), built from the release export's packages.
 type NativeRepository struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Format       string                 `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
@@ -538,10 +538,9 @@ const file_lindm_bundle_v1_bundle_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^[0-9]+\\.[0-9]+\\.[0-9]+$R\aversion\x12>\n" +
 	"\x0fmanifest_sha256\x18\x02 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x0emanifestSha256\x12C\n" +
 	"\x12attestation_key_id\x18\x03 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x10attestationKeyId\x120\n" +
-	"\x0eartifact_count\x18\x04 \x01(\x05B\t\xbaH\x06\x1a\x04\x18@(\x01R\rartifactCount\"\xa1\x02\n" +
-	"\x10NativeRepository\x12'\n" +
-	"\x06format\x18\x01 \x01(\tB\x0f\xbaH\fr\n" +
-	"R\x03debR\x03rpmR\x06format\x127\n" +
+	"\x0eartifact_count\x18\x04 \x01(\x05B\t\xbaH\x06\x1a\x04\x18@(\x01R\rartifactCount\"\xa7\x02\n" +
+	"\x10NativeRepository\x12-\n" +
+	"\x06format\x18\x01 \x01(\tB\x15\xbaH\x12r\x10R\x03debR\x03rpmR\x04archR\x06format\x127\n" +
 	"\farchitecture\x18\x02 \x01(\tB\x13\xbaH\x10r\x0eR\x05amd64R\x05arm64R\farchitecture\x12\\\n" +
 	"\x17signing_key_fingerprint\x18\x03 \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x15signingKeyFingerprint\x12M\n" +
 	"\bpackages\x18\x04 \x03(\tB1\xbaH.\x92\x01+\b\x01\x10\b\"%r#\x18\x80\x022\x1e^[A-Za-z0-9][A-Za-z0-9._+~-]*$R\bpackages\"\xe6\x01\n" +

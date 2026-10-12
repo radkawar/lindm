@@ -170,6 +170,63 @@ func TestArchEncryptedMachineIdentityIsPublicButCredentialsStayPrivate(t *testin
 	}
 }
 
+// Regression: a top-level umask 077 made pacstrap's `mkdir -p -m` create /etc
+// and /var root-only (pacman keeps existing directory modes), so dbus-broker
+// could not read /etc/machine-id after dropping privileges and the first boot
+// never configured networking. Only the key and credential writers are private.
+func TestArchInstallersScopeCredentialUmask(t *testing.T) {
+	login, private, public := encryptedInstallerTestKeys(t)
+	recipes := map[string][]byte{}
+	for _, edition := range []string{"systemd-boot-encrypted-lab", "grub-encrypted-lab"} {
+		manifest := &labv1.ImageManifest{Distribution: "arch", Version: "rolling", Edition: edition, RepositorySnapshotDate: proto.String("2026-10-02")}
+		recipe, err := archEncryptedInstallerRecipe(encryptedInstallerMedia(manifest), "x86_64", "private-test-secret", login, private, public, "gnome")
+		if err != nil {
+			t.Fatal(err)
+		}
+		recipes[edition] = recipe
+	}
+	for edition, recipe := range recipes {
+		lines := strings.Split(string(recipe), "\n")
+		umask, depth := "", 0
+		for i, line := range lines {
+			switch {
+			case line == "(":
+				depth++
+			case strings.HasSuffix(line, ")") && !strings.HasPrefix(line, "("):
+				depth--
+			case depth == 0 && strings.HasPrefix(line, "umask "):
+				umask = line
+			}
+			if strings.HasPrefix(line, "pacstrap ") && umask != "umask 022" {
+				t.Fatalf("%s: pacstrap runs under %q", edition, umask)
+			}
+			if strings.Contains(line, "> /run/lindm-install-key") && !strings.HasPrefix(line, "(umask 077 && ") {
+				t.Fatalf("%s: install key is not written under umask 077", edition)
+			}
+			if strings.HasSuffix(line, "| base64 -d > /mnt/root/lindm-provision") {
+				if depth != 1 || lines[i-1] != "umask 077" {
+					t.Fatalf("%s: credential provisioning file is not written under a scoped umask 077", edition)
+				}
+				payload, err := base64.StdEncoding.DecodeString(strings.TrimSuffix(strings.TrimPrefix(line, "printf '%s' '"), "' | base64 -d > /mnt/root/lindm-provision"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				// System files after the credential writer must not inherit 077.
+				credentials := strings.LastIndex(string(payload), "umask 077\n")
+				if credentials < 0 || strings.Contains(string(payload[:credentials]), "umask") {
+					t.Fatalf("%s: chroot provisioning changes umask before the credential writer", edition)
+				}
+				if rest := string(payload[credentials:]); edition != "systemd-boot-lab" && !strings.Contains(rest, "\numask 022\n") {
+					t.Fatalf("%s: boot and desktop provisioning inherit the credential umask", edition)
+				}
+			}
+		}
+		if depth != 0 || umask != "umask 022" {
+			t.Fatalf("%s: unbalanced or private top-level umask %q", edition, umask)
+		}
+	}
+}
+
 func TestArchInstallerRejectsUnpinnedOrImplicitBootSelection(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, test := range []struct{ arch, edition, snapshot string }{

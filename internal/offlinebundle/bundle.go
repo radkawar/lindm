@@ -2,7 +2,8 @@
 //
 // A bundle is a directory with a fixed layout: release/ (a verified release
 // export with per-artifact SBOM/provenance statements), repositories/ (signed
-// APT and RPM repositories built from those packages), updates/ (offline-signed
+// APT and RPM repositories, plus pacman where the release carries Arch packages,
+// built from those packages), updates/ (offline-signed
 // TUF root chain, targets metadata, targets and paused channel proposals) and
 // advisories/ (authenticated vendor feed snapshots). bundle.json is a strict
 // protobuf OfflineBundleManifest naming every file's SHA-256 and size;
@@ -187,9 +188,12 @@ func (b *Bundle) checkLayout() error {
 			return fmt.Errorf("%w: duplicate repository %s", ErrCorrupt, directory)
 		}
 		repositories[directory] = true
-		if repository.GetFormat() == "deb" {
+		switch repository.GetFormat() {
+		case "deb":
 			required = append(required, directory+"/dists/stable/InRelease")
-		} else {
+		case "arch":
+			required = append(required, directory+"/lindm.db", directory+"/lindm.db.sig")
+		default:
 			required = append(required, directory+"/repodata/repomd.xml", directory+"/repodata/repomd.xml.asc")
 		}
 	}
@@ -212,8 +216,8 @@ func (b *Bundle) checkLayout() error {
 
 func repositoryPath(repository *bundlev1.NativeRepository) string {
 	kind := "apt"
-	if repository.GetFormat() == "rpm" {
-		kind = "rpm"
+	if format := repository.GetFormat(); format == "rpm" || format == "arch" {
+		kind = format
 	}
 	return reposDir + "/" + repository.GetArchitecture() + "/" + kind
 }

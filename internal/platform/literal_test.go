@@ -20,6 +20,7 @@ var nonDistroLiterals = map[string]map[string]string{
 	"internal/agent/dnf/versionlock.go":           {"arch": "DNF versionlock condition key (RPM architecture)"},
 	"internal/agent/packageprovider/pin_linux.go": {"arch": "DNF versionlock condition key (RPM architecture)"},
 	"internal/packaging/result.go":                {"arch": "pacman package format name and .PKGINFO architecture field key"},
+	"internal/offlinebundle/bundle.go":            {"arch": "pacman repository format name (portable; packaging is Linux-only)"},
 	"cmd/lab/hosts.go":                            {"arch": "architecture flag name"},
 	"cmd/lab/images_redhat.go":                    {"arch": "architecture flag name"},
 	"cmd/lab/lifecycle.go":                        {"arch": "pacman package-format flag name"},

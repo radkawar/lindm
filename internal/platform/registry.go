@@ -551,7 +551,7 @@ var registry = []*Release{
 		FDE:     "LUKS2; systemd-cryptenroll with mkinitcpio sd-encrypt",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); owner-chosen bootloader", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
-			Lanes:              []LabLane{LaneUpdates, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
+			Lanes:              []LabLane{LaneUpdates, LaneAirgap, LaneAdvisories, LaneResources, LaneServices, LaneEnrollFromConsole},
 			ResourcePackages:   []string{"gnupg", "openssl", "python", "attr", "acl", "curl", "libarchive", "zstd", "pacman-contrib", "nftables", "firewalld", "libpwquality", "pam", "pambase"},
 			Installer:          ArchISO,
 			OfflineRTCWaitUnit: "systemd-time-wait-sync.service",

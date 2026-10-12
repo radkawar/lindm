@@ -292,7 +292,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	architecture := map[string]string{"amd64": "amd64", "x86_64": "amd64", "arm64": "arm64", "aarch64": "arm64"}[manifest.GetArchitecture()]
-	if err := installOfflineAgent(ctx, guest, architecture, result.FirstVersion); err != nil {
+	if err := installOfflineAgent(ctx, guest, architecture, result.FirstVersion, options.PackageFingerprint); err != nil {
 		return result, err
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "agent " + result.FirstVersion + " installed only from the site-served signed " + distribution + " repository"})
@@ -575,9 +575,28 @@ func pinnedPackageKey(ctx context.Context, path, fingerprint, work string) ([]by
 
 // installOfflineAgent uses only the site server's signed repository through
 // the forwarded administrative listener, with the station key pinned locally.
-func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, architecture, version string) error {
+func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, architecture, version, fingerprint string) error {
 	base := "https://localhost:18444/offline/repositories/" + architecture
-	if guest.backend == platform.BackendAPT {
+	switch guest.backend {
+	case platform.BackendPacman:
+		// An isolated keyring admits only the pinned station key; the site CA
+		// authenticates transport only. Database and package signatures are
+		// both required, so a byte change anywhere fails before install.
+		gpgDir := airgapGuestDir + "/pacman-gnupg"
+		if err := guest.command(ctx, "pin station key in isolated pacman keyring", "install -d -m 0700 "+gpgDir+"; pacman-key --gpgdir "+gpgDir+" --init; pacman-key --gpgdir "+gpgDir+" --add "+airgapGuestDir+"/signer.asc; pacman-key --gpgdir "+gpgDir+" --lsign-key "+nativeQuote(fingerprint), nil); err != nil {
+			return err
+		}
+		if err := guest.uploadBytes(ctx, gpgDir+"/gpg.conf", []byte("no-auto-key-retrieve\nauto-key-locate clear\nkeyserver hkp://127.0.0.1:9\n")); err != nil {
+			return err
+		}
+		config := "[options]\nArchitecture = auto\nGPGDir = " + gpgDir + "\nCacheDir = " + airgapGuestDir + "/archives\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nLocalFileSigLevel = Required TrustedOnly\nXferCommand = /usr/bin/curl --fail --silent --show-error --cacert " + airgapGuestDir + "/site-ca.crt --output %o %u\n[lindm]\nServer = " + base + "/arch\n"
+		if err := guest.uploadBytes(ctx, airgapGuestDir+"/pacman.conf", []byte(config)); err != nil {
+			return err
+		}
+		if err := guest.command(ctx, "install agent from site pacman repository", "pacman --noconfirm --config "+airgapGuestDir+"/pacman.conf -Syy lindm/"+packaging.PackageName, nil); err != nil {
+			return err
+		}
+	case platform.BackendAPT:
 		source := "Types: deb\nURIs: " + base + "/apt/\nSuites: stable\nComponents: main\nSigned-By: " + airgapGuestDir + "/signer.asc\n"
 		if err := guest.uploadBytes(ctx, airgapGuestDir+"/offline.sources", []byte(source)); err != nil {
 			return err
@@ -589,7 +608,7 @@ func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, archit
 		if err := guest.command(ctx, "install agent from site APT repository", apt+"install --no-install-recommends "+nativeQuote(packaging.PackageName+"="+version), nil); err != nil {
 			return err
 		}
-	} else {
+	default:
 		repo := "[lindm-offline]\nname=lindm offline bundle\nbaseurl=" + base + "/rpm/\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://" + airgapGuestDir + "/signer.asc\nsslverify=1\nsslcacert=" + airgapGuestDir + "/site-ca.crt\n"
 		if err := guest.uploadBytes(ctx, airgapGuestDir+"/repos/lindm-offline.repo", []byte(repo)); err != nil {
 			return err
@@ -603,18 +622,21 @@ func installOfflineAgent(ctx context.Context, guest *nativeGuestPackages, archit
 }
 
 func assertOfflineAgentVersion(ctx context.Context, guest *nativeGuestPackages, version string) error {
-	query := "rpm -q --qf '%{VERSION}\\n' lindm-agent"
-	if guest.backend == platform.BackendAPT {
-		query = "dpkg-query -W -f='${db:Status-Status} ${Version}\\n' lindm-agent"
-		version = "installed " + version
+	query, record := "rpm -q --qf '%{VERSION}\\n' lindm-agent", version
+	switch guest.backend {
+	case platform.BackendAPT:
+		query, record = "dpkg-query -W -f='${db:Status-Status} ${Version}\\n' lindm-agent", "installed "+version
+	case platform.BackendPacman:
+		// pacman reports pkgver-pkgrel; lindm packages use pkgrel 1.
+		query, record = "pacman -Q lindm-agent", "lindm-agent "+version+"-1"
 	}
 	result, err := guest.result(ctx, query+"; "+packaging.BinaryPath+" version", nil)
 	if err != nil {
 		return err
 	}
 	lines := strings.Split(strings.TrimSpace(string(result.Stdout)), "\n")
-	if result.ExitCode != 0 || len(lines) != 2 || lines[0] != version || !strings.HasSuffix(version, lines[1]) {
-		return fmt.Errorf("installed agent is %q, expected %s", strings.TrimSpace(string(result.Stdout)), version)
+	if result.ExitCode != 0 || len(lines) != 2 || lines[0] != record || !strings.HasSuffix(version, lines[1]) {
+		return fmt.Errorf("installed agent is %q, expected %s", strings.TrimSpace(string(result.Stdout)), record)
 	}
 	return nil
 }

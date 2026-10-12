@@ -3915,6 +3915,21 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "d606280eeb4308aae3e08d820804f720a2d7b06063e702d91392e2b4d9b58f4c"
+    },
+    {
+      "platform": "arch",
+      "cell": "inventory",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json",
+      "sha256": "e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb",
+      "recorded": "2026-10-11T21:44:16.402020433Z",
+      "revision": "b0d2e4602b90066898a523aef93906ca5c65d3e2",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02"
     }
   ]
 }

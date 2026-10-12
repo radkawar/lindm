@@ -50,10 +50,24 @@ type Request struct {
 	OCICABundle, OCICASHA256              string
 }
 
+// exportArtifact copies one built package, and an Arch package's detached
+// package-signer signature, into the release export.
+func exportArtifact(exported string, built builtArtifact) error {
+	if err := copyNew(built.path, filepath.Join(exported, built.artifact.GetPath()), 0644); err != nil {
+		return err
+	}
+	if built.nativeSignature == "" {
+		return nil
+	}
+	return copyNew(built.nativeSignature, filepath.Join(exported, built.artifact.GetNativeSignaturePath()), 0644)
+}
+
 type builtArtifact struct {
 	artifact *releasev1.ReleaseArtifact
 	path     string
 	sbom     []byte
+	// nativeSignature is the Arch package's detached package-signer signature.
+	nativeSignature string
 }
 type buildOutput struct {
 	observation      *releasev1.BuildObservation
@@ -145,7 +159,7 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 	for _, built := range first.artifacts {
 		artifact := built.artifact
 		artifact.SecondUnsignedSha256 = second.observation.GetUnsignedSha256()[artifact.GetPath()]
-		if err := copyNew(built.path, filepath.Join(exported, artifact.GetPath()), 0644); err != nil {
+		if err := exportArtifact(exported, built); err != nil {
 			return nil, err
 		}
 		artifact.SbomPath = artifact.GetPath() + ".sbom.dsse.json"
@@ -342,7 +356,10 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 			result.packagePublicKey = native.PublicKey
 			for _, item := range native.Artifacts {
 				artifact := &releasev1.ReleaseArtifact{Path: filepath.Base(item.Path), Product: product, Architecture: arch, Format: string(item.Format), Sha256: item.SHA256, Size: item.Size, UnsignedSha256: item.UnsignedSHA256}
-				result.artifacts = append(result.artifacts, builtArtifact{artifact: artifact, path: item.Path, sbom: bom})
+				if item.SignaturePath != "" {
+					artifact.NativeSignaturePath = artifact.GetPath() + ".sig"
+				}
+				result.artifacts = append(result.artifacts, builtArtifact{artifact: artifact, path: item.Path, sbom: bom, nativeSignature: item.SignaturePath})
 				observation.UnsignedSha256[artifact.GetPath()] = artifact.GetUnsignedSha256()
 			}
 			// The privileged split agent needs native systemd integration, not an OCI runtime.
@@ -430,6 +447,11 @@ func packageArgs(request Request, product, arch, binary, packageDir string) []st
 		packageCommand, binaryFlag = "build-cli", "-lindmctl"
 	}
 	args := []string{"packages", packageCommand, binaryFlag, binary, "-version", request.Version, "-arch", arch, "-output", packageDir, "-source-date-epoch", fmt.Sprint(request.SourceDateEpoch), "-signer-home", request.PackageSigner.Home, "-fingerprint", request.PackageSigner.Fingerprint}
+	// Arch Linux is an x86_64-only platform; Arch Linux ARM is a separate
+	// derivative the release does not target. Arch packaging is agent-only.
+	if product == "lindm-agent" && arch == "amd64" {
+		args = append(args, "-formats", "deb,rpm,arch")
+	}
 	if request.PackageSigner.Custody == packaging.CustodyDevelopment {
 		args = append(args, "-development-key")
 	} else {

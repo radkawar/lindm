@@ -499,7 +499,7 @@ func encryptedGoldenID(m *labv1.ImageManifest, opts EncryptedVMOptions, codeDige
 		recipeVersion += "\n" + omarchyInstallerRecipeVersion
 	}
 	if platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer == platform.ArchISO {
-		ownedDBKey += "\narchiso-v2:" + m.GetEdition() + "\nrepository:" + m.GetRepositorySnapshotDate()
+		ownedDBKey += "\narchiso-v3:" + m.GetEdition() + "\nrepository:" + m.GetRepositorySnapshotDate()
 	}
 	if platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer == platform.AutoYaST {
 		ownedDBKey += "\nautoyast-encrypted-v1\n" + tumbleweedInstallerRecipeVersion

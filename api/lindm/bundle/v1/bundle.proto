@@ -75,13 +75,14 @@ message BundleRelease {
   }];
 }
 
-// A signed native repository below repositories/<architecture>/apt or
-// repositories/<architecture>/rpm, built from the release export's packages.
+// A signed native repository below repositories/<architecture>/apt, .../rpm or
+// .../arch (pacman, amd64 only), built from the release export's packages.
 message NativeRepository {
   string format = 1 [(buf.validate.field).string = {
     in: [
       "deb",
-      "rpm"
+      "rpm",
+      "arch"
     ]
   }];
   string architecture = 2 [(buf.validate.field).string = {

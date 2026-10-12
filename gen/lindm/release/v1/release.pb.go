@@ -136,6 +136,7 @@ type ReleaseArtifact struct {
 	SbomPath             string                 `protobuf:"bytes,9,opt,name=sbom_path,json=sbomPath,proto3" json:"sbom_path,omitempty"`
 	ProvenancePath       string                 `protobuf:"bytes,10,opt,name=provenance_path,json=provenancePath,proto3" json:"provenance_path,omitempty"`
 	SignaturePath        string                 `protobuf:"bytes,11,opt,name=signature_path,json=signaturePath,proto3" json:"signature_path,omitempty"`
+	NativeSignaturePath  string                 `protobuf:"bytes,12,opt,name=native_signature_path,json=nativeSignaturePath,proto3" json:"native_signature_path,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -243,6 +244,13 @@ func (x *ReleaseArtifact) GetProvenancePath() string {
 func (x *ReleaseArtifact) GetSignaturePath() string {
 	if x != nil {
 		return x.SignaturePath
+	}
+	return ""
+}
+
+func (x *ReleaseArtifact) GetNativeSignaturePath() string {
+	if x != nil {
+		return x.NativeSignaturePath
 	}
 	return ""
 }
@@ -515,13 +523,13 @@ const file_lindm_release_v1_release_proto_rawDesc = "" +
 	"\acustody\x18\a \x01(\tB\x1e\xbaH\x1br\x19R\vdevelopmentR\n" +
 	"productionR\acustody\x12F\n" +
 	"\x06builds\x18\b \x03(\v2\".lindm.release.v1.BuildObservationB\n" +
-	"\xbaH\a\x92\x01\x04\b\x02\x10\x02R\x06builds\"\xc2\x04\n" +
+	"\xbaH\a\x92\x01\x04\b\x02\x10\x02R\x06builds\"\xf0\x06\n" +
 	"\x0fReleaseArtifact\x12\x1e\n" +
 	"\x04path\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04path\x12>\n" +
 	"\aproduct\x18\x02 \x01(\tB$\xbaH!r\x1fR\x06lindmdR\vlindm-agentR\blindmctlR\aproduct\x127\n" +
-	"\farchitecture\x18\x03 \x01(\tB\x13\xbaH\x10r\x0eR\x05amd64R\x05arm64R\farchitecture\x12,\n" +
-	"\x06format\x18\x04 \x01(\tB\x14\xbaH\x11r\x0fR\x03debR\x03rpmR\x03ociR\x06format\x12-\n" +
+	"\farchitecture\x18\x03 \x01(\tB\x13\xbaH\x10r\x0eR\x05amd64R\x05arm64R\farchitecture\x122\n" +
+	"\x06format\x18\x04 \x01(\tB\x1a\xbaH\x17r\x15R\x03debR\x03rpmR\x03ociR\x04archR\x06format\x12-\n" +
 	"\x06sha256\x18\x05 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x06sha256\x12\x1b\n" +
 	"\x04size\x18\x06 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\x04size\x12>\n" +
 	"\x0funsigned_sha256\x18\a \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x0eunsignedSha256\x12K\n" +
@@ -532,7 +540,9 @@ const file_lindm_release_v1_release_proto_rawDesc = "" +
 	" \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x0eprovenancePath\x121\n" +
 	"\x0esignature_path\x18\v \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\rsignaturePath\"\xcc\x06\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\rsignaturePath\x12<\n" +
+	"\x15native_signature_path\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x13nativeSignaturePath:\xe7\x01\xbaH\xe3\x01\x1a\xe0\x01\n" +
+	"\x19artifact.native_signature\x12VArch packages require the adjacent detached package signature; other formats have none\x1akthis.format == 'arch' ? this.native_signature_path == this.path + '.sig' : this.native_signature_path == ''\"\xcc\x06\n" +
 	"\x10BuildObservation\x12:\n" +
 	"\rsource_sha256\x18\x01 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\fsourceSha256\x12&\n" +
 	"\n" +

@@ -22,6 +22,7 @@ import (
 	"lindm/internal/packaging"
 	"lindm/internal/releasebuild"
 	"lindm/internal/releaseupdate"
+	"lindm/internal/vmlab"
 )
 
 // prepareAirgap uses the release and bundle builders, not a second packaging
@@ -89,7 +90,9 @@ func (r *matrixRun) prepareAirgap(ctx context.Context, cells []*labmatrix.Cell, 
 		if err := os.Mkdir(work, 0700); err != nil {
 			return err
 		}
-		cfg, err := devlab.HeldAdvisories(*c.Release, c.Architecture)
+		// Registry-declared partial coverage is recorded by the lane, as in the
+		// advisories lane; only feeds with a maintained export are acquired.
+		cfg, err := vmlab.AirgapAdvisories(c.Release, c.Manifest.Image.GetVersion(), c.Architecture)
 		if err != nil {
 			return err
 		}
@@ -189,11 +192,19 @@ func matrixAirgapChannel(release *releasev1.ReleaseManifest, directory string, g
 		}
 		target := "packages/lindm-agent/" + artifact.GetArchitecture() + "/" + artifact.GetPath()
 		native := release.GetVersion()
-		if artifact.GetFormat() == "rpm" {
+		switch artifact.GetFormat() {
+		case "rpm":
 			native += "-" + packaging.RPMRelease
+		case string(packaging.FormatArch):
+			native += "-1" // pacman reports pkgver-pkgrel; lindm packages use pkgrel 1.
 		}
-		channel.Artifacts = append(channel.Artifacts, &updatev1.AgentUpdateArtifact{Version: release.GetVersion(), Architecture: artifact.GetArchitecture(), PackageFormat: artifact.GetFormat(), TargetPath: target, NativeVersion: native, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1})
+		update := &updatev1.AgentUpdateArtifact{Version: release.GetVersion(), Architecture: artifact.GetArchitecture(), PackageFormat: artifact.GetFormat(), TargetPath: target, NativeVersion: native, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1}
 		files[target] = filepath.Join(directory, artifact.GetPath())
+		if signature := artifact.GetNativeSignaturePath(); signature != "" {
+			update.SignatureTargetPath = target + ".sig"
+			files[update.SignatureTargetPath] = filepath.Join(directory, signature)
+		}
+		channel.Artifacts = append(channel.Artifacts, update)
 	}
 	return channel, files
 }

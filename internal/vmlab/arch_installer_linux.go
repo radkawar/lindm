@@ -67,13 +67,17 @@ mkinitcpio -P
 systemctl enable sshd.service NetworkManager.service
 rm -f /etc/machine-id
 install -m 0644 /dev/null /etc/machine-id
-` + encryptedInstallerProvision(login, hostPrivate, hostPublic) + boot
+` + encryptedInstallerProvision(login, hostPrivate, hostPublic) + "umask 022\n" + boot
 	if desktop != "" {
 		provision += encryptedInstallerDesktopProvision(media.release, desktop, architecture)
 	}
+	// Only the key and credential writers run under umask 077. pacstrap's
+	// `mkdir -p -m` creates /etc and /var with the caller's umask and pacman
+	// keeps existing directory modes, so an inherited 077 leaves them
+	// root-only and unprivileged D-Bus cannot read /etc/machine-id.
 	return []byte(fmt.Sprintf(`#!/bin/bash
 set -euo pipefail
-umask 077
+umask 022
 # archiso starts this on tty1 before all services necessarily finish.
 systemctl start pacman-init.service
 systemctl start network-online.target
@@ -86,7 +90,7 @@ size=1G, type=bc13c2ff-59e6-4262-a352-b275fd6f7172
 type=L
 LINDM_PARTITIONS
 udevadm settle
-printf '%%s' %s > /run/lindm-install-key
+(umask 077 && printf '%%s' %s > /run/lindm-install-key)
 cryptsetup luksFormat --batch-mode --type luks2 --key-file /run/lindm-install-key /dev/vda3
 cryptsetup open --key-file /run/lindm-install-key /dev/vda3 lindm-root
 rm -f /run/lindm-install-key
@@ -94,13 +98,15 @@ mkfs.ext4 /dev/mapper/lindm-root
 mkfs.fat -F32 /dev/vda1
 mkfs.fat -F32 /dev/vda2
 mount /dev/mapper/lindm-root /mnt
-mount --mkdir /dev/vda2 /mnt/boot
-mount --mkdir /dev/vda1 /mnt/boot/efi
+mount --mkdir -o fmask=0077,dmask=0077 /dev/vda2 /mnt/boot
+mount --mkdir -o fmask=0077,dmask=0077 /dev/vda1 /mnt/boot/efi
 printf '%%s\n' %s > /etc/pacman.d/mirrorlist
 pacstrap -K /mnt %s
 genfstab -U /mnt > /mnt/etc/fstab
 cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
-%s
+(
+umask 077
+%s)
 arch-chroot /mnt /bin/bash -eu /root/lindm-provision
 rm -f /mnt/root/lindm-provision
 sync

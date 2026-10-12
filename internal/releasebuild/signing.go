@@ -264,7 +264,13 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		for _, name := range []string{artifact.GetPath(), artifact.GetSbomPath(), artifact.GetProvenancePath(), artifact.GetSignaturePath()} {
+		names := []string{artifact.GetPath(), artifact.GetSbomPath(), artifact.GetProvenancePath(), artifact.GetSignaturePath()}
+		// The detached OpenPGP signature authenticates itself against the
+		// package signer; consumers (pacman, PublishArch, the agent) verify it.
+		if artifact.GetNativeSignaturePath() != "" {
+			names = append(names, artifact.GetNativeSignaturePath())
+		}
+		for _, name := range names {
 			if filepath.Base(name) != name || name == "." || seen[name] {
 				return nil, errors.New("releasebuild: unsafe or duplicate release path")
 			}

@@ -33,6 +33,13 @@ message ReleaseManifest {
 }
 
 message ReleaseArtifact {
+  // An Arch (pacman) package carries its package signer's detached OpenPGP
+  // signature beside it; pacman and the agent require it, other formats embed theirs.
+  option (buf.validate.message).cel = {
+    id: "artifact.native_signature"
+    message: "Arch packages require the adjacent detached package signature; other formats have none"
+    expression: "this.format == 'arch' ? this.native_signature_path == this.path + '.sig' : this.native_signature_path == ''"
+  };
   string path = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 256
@@ -54,7 +61,8 @@ message ReleaseArtifact {
     in: [
       "deb",
       "rpm",
-      "oci"
+      "oci",
+      "arch"
     ]
   }];
   string sha256 = 5 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
@@ -73,6 +81,7 @@ message ReleaseArtifact {
     min_len: 1
     max_len: 256
   }];
+  string native_signature_path = 12 [(buf.validate.field).string.max_len = 256];
 }
 
 message BuildObservation {

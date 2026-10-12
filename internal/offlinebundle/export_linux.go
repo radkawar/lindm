@@ -173,6 +173,9 @@ func copyRelease(source, destination string, release *releasev1.ReleaseManifest)
 	names := []string{"release.json", "release.json.dsse"}
 	for _, artifact := range release.GetArtifacts() {
 		names = append(names, artifact.GetPath(), artifact.GetSbomPath(), artifact.GetProvenancePath(), artifact.GetSignaturePath())
+		if artifact.GetNativeSignaturePath() != "" {
+			names = append(names, artifact.GetNativeSignaturePath())
+		}
 	}
 	var manifestDigest string
 	for _, name := range names {
@@ -190,7 +193,8 @@ func copyRelease(source, destination string, release *releasev1.ReleaseManifest)
 	return manifestDigest, nil
 }
 
-// buildRepositories publishes one APT and one RPM repository per architecture
+// buildRepositories publishes one APT and one RPM repository per architecture,
+// plus a pacman repository where the release carries Arch packages (amd64),
 // from the attested release packages, binding each to the package signer.
 func buildRepositories(ctx context.Context, work string, release *releasev1.ReleaseManifest, signer packaging.SigningKey) ([]*bundlev1.NativeRepository, error) {
 	var repositories []*bundlev1.NativeRepository
@@ -199,7 +203,7 @@ func buildRepositories(ctx context.Context, work string, release *releasev1.Rele
 		if err := os.MkdirAll(parent, 0700); err != nil {
 			return nil, err
 		}
-		for _, format := range []string{"deb", "rpm"} {
+		for _, format := range []string{"deb", "rpm", string(packaging.FormatArch)} {
 			var paths, names []string
 			for _, artifact := range release.GetArtifacts() {
 				if artifact.GetArchitecture() == architecture && artifact.GetFormat() == format {
@@ -207,12 +211,17 @@ func buildRepositories(ctx context.Context, work string, release *releasev1.Rele
 					names = append(names, artifact.GetPath())
 				}
 			}
+			// Arch packages exist only where the release targets Arch Linux.
+			if len(paths) == 0 && format == string(packaging.FormatArch) {
+				continue
+			}
 			if len(paths) == 0 {
 				return nil, fmt.Errorf("offlinebundle: release export has no %s %s packages", architecture, format)
 			}
 			sort.Strings(names)
 			var fingerprint string
-			if format == "deb" {
+			switch format {
+			case "deb":
 				repository, err := packaging.PublishAPT(ctx, packaging.APTRequest{OutputDir: parent, DEBs: paths, Signer: signer, SourceDateEpoch: release.GetSourceDateEpoch()})
 				if err != nil {
 					return nil, fmt.Errorf("publish %s APT repository: %w", architecture, err)
@@ -221,13 +230,24 @@ func buildRepositories(ctx context.Context, work string, release *releasev1.Rele
 					return nil, errors.New("offlinebundle: APT repository was not verified after signing")
 				}
 				fingerprint = repository.Fingerprint
-			} else {
+			case "rpm":
 				repository, err := packaging.PublishRPM(ctx, packaging.RPMRequest{OutputDir: parent, RPMs: paths, Signer: signer, SourceDateEpoch: release.GetSourceDateEpoch()})
 				if err != nil {
 					return nil, fmt.Errorf("publish %s RPM repository: %w", architecture, err)
 				}
 				if !repository.RepoMetadataSigned || !repository.GPGCheck {
 					return nil, errors.New("offlinebundle: RPM repository metadata is not signed")
+				}
+				fingerprint = repository.Fingerprint
+			default:
+				// PublishArch reads each package's adjacent attested .sig and
+				// verifies it against the signer before signing lindm.db.
+				repository, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: parent, Packages: paths, Signer: signer, SourceDateEpoch: release.GetSourceDateEpoch()})
+				if err != nil {
+					return nil, fmt.Errorf("publish %s pacman repository: %w", architecture, err)
+				}
+				if !repository.PackagesVerified || !repository.RepoMetadataSigned {
+					return nil, errors.New("offlinebundle: pacman repository was not verified after signing")
 				}
 				fingerprint = repository.Fingerprint
 			}
