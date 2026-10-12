@@ -6291,6 +6291,20 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "29be12a0c0841ed194f6d242792fa48f8dd9af0fd17b524822408dde92c029dd"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "provision-cloud-init",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-20260926-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/lab-evidence/provision-20261012-ci4/ubuntu-24.04/provision-cloud-init-aarch64.json",
+      "sha256": "3e468cd556412fcb2147d92eca77c34700a9813efdc9802f16abed96ff960af7",
+      "recorded": "2026-10-12T06:38:44.276730486Z",
+      "revision": "a34abb1ef5b702bec4453f9b1b36070caa658f91",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "29be12a0c0841ed194f6d242792fa48f8dd9af0fd17b524822408dde92c029dd"
     }
   ]
 }
