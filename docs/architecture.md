@@ -488,6 +488,13 @@ rollout's device dispatches each queued a principal write on the assigning
 actor's row and starved the console pool (diagnosed at 10,000 devices with
 three replicas). Break-glass principals keep one observation per call so each
 denial audit commits with its own observation.
+The approval inbox and its dashboard count (`GetFleetSummary`) decide every inbox
+permission from one such round and recheck them all under one policy and
+principal lock in the read transaction. They previously took one round, principal
+write and commit per inbox permission: an owner's dashboard read made 326
+statements and 17 commits, 16 of them durable, so a host with slow `fsync` pushed
+it past the 500 ms admin-read budget. It now makes 32 statements and two durable
+commits (the observation and the audited count).
 An observed denial still commits revocation, audit and the effective authority
 version. `principals.authorization_version` advances on effective role, permission
 or scope changes, including disable/re-enable and owner pinning, not unchanged

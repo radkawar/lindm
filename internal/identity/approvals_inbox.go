@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -116,10 +115,8 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	}
 	var rows []identitydb.ListVisibleApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
-		for _, authorization := range authorizations {
-			if err := s.LockAuthorization(ctx, tx, authorization, authorization.permission); err != nil {
-				return err
-			}
+		if err := s.lockInbox(ctx, tx, authorizations); err != nil {
+			return err
 		}
 		var err error
 		rows, err = q.ListVisibleApprovals(ctx, visibility)
@@ -171,6 +168,7 @@ func approvalRequiredScopes(principal Principal, permission Permission) ([]appro
 
 // approvalInboxVisibility is shared by the paged inbox and its pending count.
 // An action grant alone never grants access to another requester's inbox.
+// Every inbox permission is decided from one fresh observation of the actor.
 func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) ([]*Authorization, identitydb.ListVisibleApprovalsParams, error) {
 	permissions := approvalInboxPermissions
 	authorizations := make([]*Authorization, 0, len(permissions))
@@ -179,13 +177,15 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 	}
 	scopes := make(map[string]json.RawMessage, len(permissions))
 	requiredScopes := make(map[string][]approvalRequiredScope)
-	for _, permission := range permissions {
-		authorization, err := s.AuthorizeFresh(ctx, actor, permission)
-		if errors.Is(err, ErrAuthorizationDenied) {
+	fresh := make([]*Authorization, len(permissions))
+	if err := s.authorizeFreshEach(ctx, actor, permissions, fresh); err != nil {
+		return nil, visibility, err
+	}
+	var err error
+	for i, permission := range permissions {
+		authorization := fresh[i]
+		if authorization == nil {
 			continue
-		}
-		if err != nil {
-			return nil, visibility, err
 		}
 		principal := authorization.Principal()
 		if principal.ServiceAccount {
@@ -215,13 +215,21 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 	if len(authorizations) == 0 {
 		return nil, visibility, ErrAuthorizationDenied
 	}
-	var err error
 	visibility.Scopes, err = json.Marshal(scopes)
 	if err != nil {
 		return nil, visibility, err
 	}
 	visibility.RequiredScopes, err = json.Marshal(requiredScopes)
 	return authorizations, visibility, err
+}
+
+// lockInbox fences every inbox authorization of one actor in tx at once.
+func (s *Service) lockInbox(ctx context.Context, tx pgx.Tx, authorizations []*Authorization) error {
+	fences := make([]authorizationFence, len(authorizations))
+	for i, authorization := range authorizations {
+		fences[i] = authorizationFence{authorization, authorization.permission}
+	}
+	return s.lockAuthorizations(ctx, tx, false, fences...)
 }
 
 // CountOpenApprovals counts unexpired pending records, and the actor's own
@@ -238,10 +246,8 @@ func (s *Service) CountOpenApprovals(ctx context.Context, actor uuid.UUID) (pend
 	}
 	var counts identitydb.CountVisibleOpenApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
-		for _, authorization := range authorizations {
-			if err := s.LockAuthorization(ctx, tx, authorization, authorization.permission); err != nil {
-				return err
-			}
+		if err := s.lockInbox(ctx, tx, authorizations); err != nil {
+			return err
 		}
 		var err error
 		counts, err = q.CountVisibleOpenApprovals(ctx, identitydb.CountVisibleOpenApprovalsParams{

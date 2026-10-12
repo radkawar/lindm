@@ -5,7 +5,9 @@ package identity
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -169,5 +171,75 @@ WHERE NOT l.granted AND a.datname = current_database() AND a.pid <> pg_backend_p
 	}
 	if err := tx(); !errors.Is(err, ErrAuthorizationChanged) {
 		t.Fatalf("shared fence after revocation = %v, want %v", err, ErrAuthorizationChanged)
+	}
+}
+
+// countingDirectory answers every observation at once and counts them.
+type countingDirectory struct {
+	subject  uuid.UUID
+	observed atomic.Int32
+}
+
+func (d *countingDirectory) Observe(context.Context, string) (directoryObservation, error) {
+	d.observed.Add(1)
+	return directoryObs(d.subject, time.Time{}, true), nil
+}
+
+// The approval inbox and its dashboard count decide every inbox permission
+// from one fresh observation (one directory read and principal write, not one
+// per permission) and fence them all under one principal lock, where a stale
+// or foreign authorization among them still rejects the read.
+func TestApprovalInboxSharesOneFreshObservation(t *testing.T) {
+	svc, ctx, conn := integrationService(t)
+	subject, grant := observedAuthorization(t, ctx, svc)
+	directory := &countingDirectory{subject: subject}
+	svc.directory = directory
+	authorizations, _, err := svc.approvalInboxVisibility(ctx, grant.actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(authorizations) < 2 {
+		t.Fatalf("inbox authorized %d permissions; the fixture must hold several", len(authorizations))
+	}
+	for _, authorization := range authorizations[1:] {
+		if !authorization.observedAt.Equal(authorizations[0].observedAt) {
+			t.Fatalf("inbox permissions came from different observations: %v, %v", authorization.observedAt, authorizations[0].observedAt)
+		}
+	}
+	if observed := directory.observed.Load(); observed != 1 {
+		t.Fatalf("inbox observations = %d for %d permissions, want one", observed, len(authorizations))
+	}
+	if _, _, err := svc.CountOpenApprovals(ctx, grant.actorID); err != nil {
+		t.Fatal(err)
+	}
+	if observed := directory.observed.Load(); observed != 2 {
+		t.Fatalf("inbox count observations = %d, want one", observed-1)
+	}
+	lock := func(authorizations []*Authorization) error {
+		tx, err := svc.pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		return svc.lockInbox(ctx, tx, authorizations)
+	}
+	if err := lock(authorizations); err != nil {
+		t.Fatalf("one-observation inbox fence: %v", err)
+	}
+	last := len(authorizations) - 1
+	stale := *authorizations[last]
+	stale.version++
+	if err := lock(append(slices.Clone(authorizations[:last]), &stale)); !errors.Is(err, ErrAuthorizationChanged) {
+		t.Fatalf("inbox fence with one stale authorization = %v, want %v", err, ErrAuthorizationChanged)
+	}
+	_, foreign := observedAuthorization(t, ctx, svc)
+	if err := lock(append(slices.Clone(authorizations), foreign)); !errors.Is(err, ErrAuthorizationDenied) {
+		t.Fatalf("inbox fence with another actor's authorization = %v, want %v", err, ErrAuthorizationDenied)
+	}
+	if _, err := conn.Exec(ctx, `UPDATE principals SET authorization_version = authorization_version + 1 WHERE id = $1`, grant.actorID); err != nil {
+		t.Fatal(err)
+	}
+	if err := lock(authorizations); !errors.Is(err, ErrAuthorizationChanged) {
+		t.Fatalf("inbox fence after an authority change = %v, want %v", err, ErrAuthorizationChanged)
 	}
 }

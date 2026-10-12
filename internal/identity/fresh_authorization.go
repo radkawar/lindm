@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -109,51 +110,91 @@ func (a *Authorization) ExpiresAt() time.Time {
 // write per round instead of queueing a write each on the actor's row lock. A
 // break-glass principal keeps one observation and denial audit per call.
 func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permission Permission) (*Authorization, error) {
-	if s == nil || s.pool == nil {
-		return nil, errUnavailable
+	var authorization [1]*Authorization
+	if err := s.authorizeFreshEach(ctx, actorID, []Permission{permission}, authorization[:]); err != nil {
+		return nil, err
 	}
-	if actorID == uuid.Nil || !knownPermission(permission) {
+	if authorization[0] == nil {
 		return nil, ErrAuthorizationDenied
 	}
+	return authorization[0], nil
+}
+
+// authorizeFreshEach is AuthorizeFresh for several permissions of one actor:
+// it sets authorizations[i] for each granted permissions[i] and leaves denied
+// entries nil. They are decided from one shared observation round, not a
+// directory read, principal write and commit each. A break-glass principal
+// keeps one observation and denial audit per permission.
+func (s *Service) authorizeFreshEach(ctx context.Context, actorID uuid.UUID, permissions []Permission, authorizations []*Authorization) error {
+	if s == nil || s.pool == nil {
+		return errUnavailable
+	}
+	if actorID == uuid.Nil || !slices.ContainsFunc(permissions, knownPermission) {
+		return nil
+	}
 	// A caller waits for at most the round in flight plus its own round.
-	ctx, cancel := context.WithTimeout(ctx, 2*directoryFetchTimeout)
+	wait, cancel := context.WithTimeout(ctx, 2*directoryFetchTimeout)
 	defer cancel()
 	round := s.freshRounds.join(s, actorID)
 	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	case <-wait.Done():
+		return wait.Err()
 	case <-round.done:
 	}
 	if round.err != nil {
-		return nil, round.err
+		return round.err
 	}
 	if round.snapshot.BreakGlass {
-		return s.authorizeFreshAlone(ctx, actorID, permission)
+		// Each break-glass observation gets its own directoryFetchTimeout, not
+		// a share of the round's wait, however many permissions are asked.
+		for i, permission := range permissions {
+			if !knownPermission(permission) {
+				continue
+			}
+			authorization, err := s.authorizeFreshAlone(ctx, actorID, permission)
+			if errors.Is(err, ErrAuthorizationDenied) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			authorizations[i] = authorization
+		}
+		return nil
 	}
 	snapshot := round.snapshot
 	decision := decideAccess(round.now, s.accessIssuer(snapshot), snapshot.policy, snapshot)
 	principal := s.snapshotPrincipal(snapshot, decision.Role)
-	if decision.Kind != accessOK || !Authorize(principal, permission) {
-		return nil, ErrAuthorizationDenied
+	if decision.Kind != accessOK {
+		return nil
 	}
-	if snapshot.AuthorizationVersion <= 0 || snapshot.AuthorizationRole != decision.Role {
-		return nil, ErrAuthorizationChanged
+	var digest []byte
+	for i, permission := range permissions {
+		if !knownPermission(permission) || !Authorize(principal, permission) {
+			continue
+		}
+		if snapshot.AuthorizationVersion <= 0 || snapshot.AuthorizationRole != decision.Role {
+			return ErrAuthorizationChanged
+		}
+		expires := snapshot.ObservedAt.Add(dispatchAuthorizationWindow)
+		if snapshot.ObservedAt.Before(round.acquiredAt) || round.now.Before(snapshot.ObservedAt) || !round.now.Before(expires) {
+			return ErrAuthorizationExpired
+		}
+		if digest == nil {
+			var err error
+			if digest, err = bindingsDigest(principal.Bindings); err != nil {
+				return err
+			}
+		}
+		authorizations[i] = &Authorization{
+			service: s, actorID: actorID, role: decision.Role, permission: permission,
+			version: snapshot.AuthorizationVersion, observedAt: snapshot.ObservedAt, expiresAt: expires,
+			monotonicDeadline: round.monotonicDeadline,
+			principal:         clonePrincipal(principal),
+			bindingsDigest:    digest,
+		}
 	}
-	expires := snapshot.ObservedAt.Add(dispatchAuthorizationWindow)
-	if snapshot.ObservedAt.Before(round.acquiredAt) || round.now.Before(snapshot.ObservedAt) || !round.now.Before(expires) {
-		return nil, ErrAuthorizationExpired
-	}
-	digest, err := bindingsDigest(principal.Bindings)
-	if err != nil {
-		return nil, err
-	}
-	return &Authorization{
-		service: s, actorID: actorID, role: decision.Role, permission: permission,
-		version: snapshot.AuthorizationVersion, observedAt: snapshot.ObservedAt, expiresAt: expires,
-		monotonicDeadline: round.monotonicDeadline,
-		principal:         clonePrincipal(principal),
-		bindingsDigest:    digest,
-	}, nil
+	return nil
 }
 
 // freshRound is one shared observation and principal write for the callers
@@ -357,7 +398,7 @@ func (s *Service) authorizeFreshAlone(ctx context.Context, actorID uuid.UUID, pe
 // match the approval; a read approval cannot gate a write. The lock remains held
 // on return.
 func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) error {
-	return s.lockAuthorization(ctx, tx, authorization, permission, false)
+	return s.lockAuthorizations(ctx, tx, false, authorizationFence{authorization, permission})
 }
 
 // LockAuthorizationShared is LockAuthorization for transactions that never
@@ -366,45 +407,88 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 // principal UPDATE conflicts), but concurrent fenced transactions of the same
 // actor, such as a rollout's device dispatches, no longer serialize on it.
 func (s *Service) LockAuthorizationShared(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) error {
-	return s.lockAuthorization(ctx, tx, authorization, permission, true)
+	return s.lockAuthorizations(ctx, tx, true, authorizationFence{authorization, permission})
 }
 
-func (s *Service) lockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission, shared bool) (result error) {
+// authorizationFence is one authorization and the operation permission it must
+// cover.
+type authorizationFence struct {
+	authorization *Authorization
+	permission    Permission
+}
+
+// lockAuthorizations fences authorizations of one actor under one policy,
+// runtime-authorization and principal lock, each read once for all of them.
+// Every fence passes the same checks as LockAuthorization alone; the first
+// failure rejects them all.
+func (s *Service) lockAuthorizations(ctx context.Context, tx pgx.Tx, shared bool, fences ...authorizationFence) (result error) {
+	var failed authorizationFence
+	if len(fences) != 0 {
+		failed = fences[0]
+	}
 	defer func() {
-		if result != nil && s != nil && authorization != nil && authorization.service == s && authorization.breakGlass {
-			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, auditkind.IdentityBreakGlassDenied, "", "worker authorization fence denied: "+string(permission)))
+		if result != nil && s != nil && failed.authorization != nil && failed.authorization.service == s && failed.authorization.breakGlass {
+			result = errors.Join(result, s.emergencyAudit(ctx, failed.authorization.actorID, auditkind.IdentityBreakGlassDenied, "", "worker authorization fence denied: "+string(failed.permission)))
 		}
 	}()
-	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(authorization.principal, permission) {
+	each := func(check func(*Authorization, Permission) error) error {
+		for _, fence := range fences {
+			if err := check(fence.authorization, fence.permission); err != nil {
+				failed = fence
+				return err
+			}
+		}
+		return nil
+	}
+	if s == nil || tx == nil || len(fences) == 0 {
 		return ErrAuthorizationDenied
+	}
+	actorID := fences[0].authorization.ActorID()
+	if err := each(func(authorization *Authorization, permission Permission) error {
+		if authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.actorID != actorID || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(authorization.principal, permission) {
+			return ErrAuthorizationDenied
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	q := identitydb.New(tx)
 	if err := s.lockPolicy(ctx, q); err != nil {
 		return err
 	}
-	if authorization.principal.policy == nil {
-		return ErrAuthorizationDenied
-	}
 	current, err := q.ReadRuntimeAuthorization(ctx)
 	if err != nil {
 		return s.dbErr(err)
 	}
-	if !bytes.Equal(current.Digest, authorization.principal.policy.digest) {
-		return ErrAuthorizationChanged
+	if err := each(func(authorization *Authorization, _ Permission) error {
+		if authorization.principal.policy == nil {
+			return ErrAuthorizationDenied
+		}
+		if !bytes.Equal(current.Digest, authorization.principal.policy.digest) {
+			return ErrAuthorizationChanged
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	lockPrincipal := q.GetPrincipalForUpdate
 	if shared {
 		lockPrincipal = q.GetPrincipalForShare
 	}
-	row, err := lockPrincipal(ctx, authorization.actorID)
+	row, err := lockPrincipal(ctx, actorID)
 	if err != nil {
 		return s.authorizationStoreError(err)
 	}
 	if row.Issuer != s.issuer && row.Issuer != s.localIssuer {
 		return ErrAuthorizationDenied
 	}
-	if row.AuthorizationVersion != authorization.version {
-		return ErrAuthorizationChanged
+	if err := each(func(authorization *Authorization, _ Permission) error {
+		if row.AuthorizationVersion != authorization.version {
+			return ErrAuthorizationChanged
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	snapshot, err := s.readSnapshot(ctx, q, row)
 	if err != nil {
@@ -414,34 +498,41 @@ func (s *Service) lockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if err != nil {
 		return err
 	}
-	if authorization.monotonicDeadline.IsZero() || !time.Now().Before(authorization.monotonicDeadline) {
-		return ErrAuthorizationExpired
-	}
-	if authorization.observedAt.IsZero() || now.Before(authorization.observedAt) || now.Before(snapshot.ObservedAt) || !now.Before(authorization.expiresAt) || authorization.expiresAt.After(authorization.observedAt.Add(dispatchAuthorizationWindow)) || !authorization.expiresAt.After(authorization.observedAt) {
-		return ErrAuthorizationExpired
-	}
 	decision := decideAccess(now, s.accessIssuer(snapshot), snapshot.policy, snapshot)
 	principal := s.snapshotPrincipal(snapshot, decision.Role)
-	if decision.Kind != accessOK || !Authorize(principal, authorization.permission) {
-		return ErrAuthorizationDenied
-	}
-	if snapshot.BreakGlass {
-		deadline, err := q.ActiveBreakGlassDeadline(ctx, authorization.actorID)
-		if err != nil || !now.Before(deadline.Time) {
+	breakGlassChecked := false
+	var digest []byte
+	return each(func(authorization *Authorization, _ Permission) error {
+		if authorization.monotonicDeadline.IsZero() || !time.Now().Before(authorization.monotonicDeadline) {
+			return ErrAuthorizationExpired
+		}
+		if authorization.observedAt.IsZero() || now.Before(authorization.observedAt) || now.Before(snapshot.ObservedAt) || !now.Before(authorization.expiresAt) || authorization.expiresAt.After(authorization.observedAt.Add(dispatchAuthorizationWindow)) || !authorization.expiresAt.After(authorization.observedAt) {
+			return ErrAuthorizationExpired
+		}
+		if decision.Kind != accessOK || !Authorize(principal, authorization.permission) {
 			return ErrAuthorizationDenied
 		}
-	}
-	if decision.Role != authorization.role || snapshot.AuthorizationRole != authorization.role || snapshot.ObservedAt.Before(authorization.observedAt) || principal.ServiceAccount != authorization.principal.ServiceAccount {
-		return ErrAuthorizationChanged
-	}
-	digest, err := bindingsDigest(principal.Bindings)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(digest, authorization.bindingsDigest) {
-		return ErrAuthorizationChanged
-	}
-	return nil
+		if snapshot.BreakGlass && !breakGlassChecked {
+			deadline, err := q.ActiveBreakGlassDeadline(ctx, actorID)
+			if err != nil || !now.Before(deadline.Time) {
+				return ErrAuthorizationDenied
+			}
+			breakGlassChecked = true
+		}
+		if decision.Role != authorization.role || snapshot.AuthorizationRole != authorization.role || snapshot.ObservedAt.Before(authorization.observedAt) || principal.ServiceAccount != authorization.principal.ServiceAccount {
+			return ErrAuthorizationChanged
+		}
+		if digest == nil {
+			var err error
+			if digest, err = bindingsDigest(principal.Bindings); err != nil {
+				return err
+			}
+		}
+		if !bytes.Equal(digest, authorization.bindingsDigest) {
+			return ErrAuthorizationChanged
+		}
+		return nil
+	})
 }
 
 func (s *Service) authorizationTime(ctx context.Context, q *identitydb.Queries) (time.Time, error) {

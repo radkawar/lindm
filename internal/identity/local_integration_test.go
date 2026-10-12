@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -293,6 +294,62 @@ func TestBreakGlassAuthorityAndAudit(t *testing.T) {
 		if count == 0 {
 			t.Errorf("missing durable audit %s", action)
 		}
+	}
+}
+
+// An emergency operator's approval inbox takes one break-glass observation and
+// denial audit per inbox permission, each inside its own observation timeout.
+// A slow store whose total exceeds the shared round wait must not fail it.
+func TestBreakGlassInboxObservationsEachGetTheirOwnTimeout(t *testing.T) {
+	s, ctx, pool := localIntegrationService(t)
+	enrollment, err := s.BootstrapLocalOwner(ctx, "emergency")
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := localAuthenticator(t)
+	enrollLocal(t, s, ctx, enrollment, auth)
+	s.localPrimary = false
+	s.issuer = "https://unavailable.example/realms/lindm"
+	s.breakGlass = &configv1.BreakGlassPolicy{AllowedPermissions: []string{string(PermissionRevokeDevice)}, ConsoleOnly: true, MaxSessionLifetime: durationpb.New(5 * time.Minute), RequireIncidentReason: true}
+	if _, err = pool.Exec(ctx, "UPDATE local_accounts SET break_glass=true WHERE id=$1", enrollment.AccountID); err != nil {
+		t.Fatal(err)
+	}
+	principal, _, err := s.resolve(ctx, loginLocal(t, s, ctx, "emergency", "incident 123", auth))
+	if err != nil || !principal.BreakGlass {
+		t.Fatalf("emergency principal: %+v %v", principal, err)
+	}
+	// Every denied inbox permission commits its own break-glass denial audit.
+	// Slow each audit write so their sum exceeds the round's shared wait while
+	// each observation stays well inside its own timeout.
+	denied := len(approvalInboxPermissions) - 1
+	delay := 2*directoryFetchTimeout/time.Duration(denied) + 250*time.Millisecond
+	if delay > directoryFetchTimeout/4 {
+		t.Fatalf("audit delay %v leaves no headroom within the %v observation timeout", delay, directoryFetchTimeout)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`CREATE FUNCTION lindm_test_slow_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(%f); RETURN NEW; END $$`, delay.Seconds())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `CREATE TRIGGER lindm_test_slow_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION lindm_test_slow_audit()`); err != nil {
+		t.Fatal(err)
+	}
+	deniedAudits := func() int {
+		t.Helper()
+		var count int
+		if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM audit_events WHERE action=$1", "identity.break_glass_denied").Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	before := deniedAudits()
+	started := time.Now()
+	if _, _, err := s.CountOpenApprovals(t.Context(), principal.ID); err != nil {
+		t.Fatalf("emergency inbox count failed after %v: %v", time.Since(started), err)
+	}
+	if elapsed := time.Since(started); elapsed <= 2*directoryFetchTimeout {
+		t.Fatalf("emergency inbox count took %v, within one shared round wait; the regression would prove nothing", elapsed)
+	}
+	if audits := deniedAudits() - before; audits != denied {
+		t.Fatalf("break-glass denial audits = %d, want one per denied inbox permission (%d)", audits, denied)
 	}
 }
 
