@@ -11,7 +11,7 @@ import { packageSearchDefaults, parsePackageSearch } from "@/features/devices/pa
 import { DeviceResourceComplianceBadge, DeviceResources } from "@/features/services/view";
 import { ResourceAssignmentDialog } from "@/features/services/assignment-form";
 import { ProfilePicker } from "@/features/profiles/picker";
-import { RevokeApprovalRequest } from "@/features/approvals/revoke";
+import { DeviceRevocationStatus, RevokeApprovalRequest } from "@/features/approvals/revoke";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
@@ -76,6 +76,7 @@ function DeviceDetailRoute() {
       findings={<DeviceFindings deviceId={deviceId} />}
       findingsSummary={<DeviceFindingsSummary deviceId={deviceId} />}
       revoke={(device) => <RevokeApprovalRequest deviceId={device.id} />}
+      notices={<DeviceRevocationStatus deviceId={deviceId} />}
       assistance={<DeviceAssistanceCard deviceId={deviceId} />}
       accountPicker={(props) => <AccountPicker {...props} />}
     />

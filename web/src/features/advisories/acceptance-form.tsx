@@ -145,7 +145,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
               </Button>
             </>
           ) : null}
-          {attempt.status === "rejected" || attempt.status === "succeeded" ? (
+          {attempt.status === "rejected" ? (
             <Button
               type="button"
               variant="outline"
@@ -155,7 +155,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
                 mutation.reset();
               }}
             >
-              Accept again
+              Change and try again
             </Button>
           ) : null}
         </div>

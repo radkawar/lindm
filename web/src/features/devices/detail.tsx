@@ -71,6 +71,7 @@ export function DeviceDetailView({
   compliance,
   revoke,
   assistance,
+  notices,
   accountPicker,
 }: {
   deviceId: string;
@@ -85,6 +86,9 @@ export function DeviceDetailView({
   revoke?: (device: Device) => ReactNode;
   // Remote assistance request form and session history, shown on its own tab.
   assistance: ReactNode;
+  // Open requests about this device that need someone's next step (a pending
+  // or approved revocation); renders nothing when there are none.
+  notices?: ReactNode;
   accountPicker: PickerSlot;
 }) {
   const lifetime = useAuthLifetime();
@@ -232,6 +236,7 @@ export function DeviceDetailView({
       ) : device && revoked ? (
         <RevokedBanner device={device} />
       ) : null}
+      {device ? notices : null}
       {unavailable ? (
         <Alert data-review-state="blocked">
           <AlertTitle>

@@ -52,6 +52,7 @@ import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
 import * as pass2RevokedDevice from "./pass2-bug9-revoked-device.mjs";
 import * as fleetPass2 from "./fleet-pass-2.mjs";
+import * as pass2P2Approvals from "./pass2-p2-approvals.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -85,6 +86,8 @@ export const ownerEdits = [
   secrets,
   secretReveal,
   approvals,
+  // Proposes a risk acceptance and a revocation, then withdraws both.
+  pass2P2Approvals,
   audit,
   auditLogPass2,
   pass2RestartDelay,
