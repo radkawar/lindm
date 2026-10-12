@@ -29,6 +29,7 @@ import * as pass2SafetyReveal from "./pass2-safety-reveal.mjs";
 import * as accounts from "./accounts.mjs";
 import * as authorization from "./authorization.mjs";
 import * as pass2AssignmentProgress from "./pass2-assignment-progress.mjs";
+import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -57,6 +58,7 @@ export const ownerEdits = [
   pass2Bug4,
   pass2SafetyAssistance,
   pass2SafetyReveal,
+  pass2SecretReveal,
   // Changes and restores the route device profile; keep last.
   pass2AssignmentProgress,
 ];

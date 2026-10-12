@@ -12,6 +12,7 @@ import { RevealApprovalNote, revealApprovalRequired } from "@/components/ui/reve
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
+import { RevealedSecret } from "@/components/ui/revealed-secret";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +54,7 @@ export function SecretReveal({
   const [approvalState, setApprovalState] = useState<ApprovalState | null>(null);
   const [ambiguous, setAmbiguous] = useState<"reveal" | "approval" | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
+  const [hidesAt, setHidesAt] = useState(0);
   const held = useRef<Uint8Array | null>(null);
   const request = useRef<RevealSecretRequest | null>(null);
   const inFlight = useRef(false);
@@ -204,6 +206,7 @@ export function SecretReveal({
         return;
       }
       held.current = material;
+      setHidesAt(Date.now() + 30_000);
       setSecret(material);
       toast.success("Secret revealed", {
         description: "It disappears after 30 seconds.",
@@ -230,9 +233,23 @@ export function SecretReveal({
   const awaitingApproval = approvalRequired === true && approvalState !== ApprovalState.APPROVED;
   return (
     <div className="grid gap-3 rounded-md border p-3">
-      <p className="text-sm text-muted-foreground">
-        The value disappears after 30 seconds or when you leave this page.
-      </p>
+      {shown ? (
+        <RevealedSecret
+          label="Secret value"
+          display={shown.text}
+          raw={shown.text}
+          hidesAt={hidesAt}
+          note={
+            shown.hex ? "Shown and copied as hexadecimal because it isn't plain text." : undefined
+          }
+          copiedMessage="Secret copied"
+          onHide={hide}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          The value disappears after 30 seconds or when you leave this page.
+        </p>
+      )}
       <Label htmlFor={`${idPrefix}-reason`}>Reason</Label>
       <Textarea
         id={`${idPrefix}-reason`}
@@ -306,27 +323,7 @@ export function SecretReveal({
             Start over
           </Button>
         ) : null}
-        {secret ? (
-          <Button variant="outline" onClick={hide}>
-            Hide now
-          </Button>
-        ) : null}
       </div>
-      {shown ? (
-        <>
-          {shown.hex ? (
-            <p className="text-sm text-muted-foreground">
-              Shown as hexadecimal because it isn't plain text.
-            </p>
-          ) : null}
-          <pre
-            className="whitespace-pre-wrap break-all rounded-md border p-3 text-sm select-all"
-            aria-label="Secret value"
-          >
-            {shown.text}
-          </pre>
-        </>
-      ) : null}
     </div>
   );
 }
